@@ -1,6 +1,6 @@
 import { wgs84ToTokyo } from "./datum";
 
-// 埼玉県・人口上位12市の「建築基準法上の道路」の調べ方（2026-09 調査）。
+// 埼玉県・人口上位22市の「建築基準法上の道路」の調べ方（2026-09 調査）。
 // 詳細と出典は docs/saitama-research.md。
 
 /** 地図に何が載っているか */
@@ -42,12 +42,15 @@ export type Municipality = {
 
 // --- GISベンダーごとのURLテンプレート -------------------------------------
 
-/** wagmap（越谷・上尾・熊谷・川越）。座標は旧日本測地系で渡す */
+/**
+ * wagmap。受け取る座標の測地系が自治体ごとに違う（間違えると約450mずれる）。
+ * 実測: 越谷・上尾・熊谷・川越 = 旧日本測地系、朝霞 = 世界測地系
+ */
 const wagmap =
-  (slug: string, mid: number, scale = 1000) =>
+  (slug: string, mid: number, datum: "tokyo" | "wgs84") =>
   (lat: number, lng: number) => {
-    const t = wgs84ToTokyo(lat, lng);
-    return `https://www2.wagmap.jp/${slug}/Map?mid=${mid}&mpx=${t.lng.toFixed(6)}&mpy=${t.lat.toFixed(6)}&mps=${scale}`;
+    const p = datum === "tokyo" ? wgs84ToTokyo(lat, lng) : { lat, lng };
+    return `https://www2.wagmap.jp/${slug}/Map?mid=${mid}&mpx=${p.lng.toFixed(6)}&mpy=${p.lat.toFixed(6)}&mps=1000`;
   };
 
 /** Sonicweb（さいたま市）。座標は世界測地系のまま */
@@ -90,7 +93,7 @@ export const MUNICIPALITIES: Municipality[] = [
     name: "川越市",
     codes: ["11201"],
     coverage: "none",
-    maps: [{ kind: "public_road", label: "道路台帳・網図（市道）", build: wagmap("kawagoe", 25), verified: false }],
+    maps: [{ kind: "public_road", label: "道路台帳・網図（市道）", build: wagmap("kawagoe", 25, "tokyo"), verified: true }],
     contact: { dept: "建設管理課（道路台帳）", phone: "049-224-5987" },
     note: "建築基準法上の道路種別はネット非公開。窓口の問い合わせ方法は要確認。",
   },
@@ -112,8 +115,8 @@ export const MUNICIPALITIES: Municipality[] = [
     codes: ["11222"],
     coverage: "full",
     maps: [
-      { kind: "road_type", label: "建築基準法上の道路種別", build: wagmap("koshigayacity", 31), verified: true },
-      { kind: "public_road", label: "道路台帳・認定路線", build: wagmap("koshigayacity", 5), verified: false },
+      { kind: "road_type", label: "建築基準法上の道路種別", build: wagmap("koshigayacity", 31, "tokyo"), verified: true },
+      { kind: "public_road", label: "道路台帳・認定路線", build: wagmap("koshigayacity", 5, "tokyo"), verified: true },
     ],
   },
   {
@@ -141,15 +144,15 @@ export const MUNICIPALITIES: Municipality[] = [
     name: "上尾市",
     codes: ["11219"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "指定道路図（建築基準法道路種別）", build: wagmap("ageocity", 9), verified: true }],
+    maps: [{ kind: "road_type", label: "指定道路図（建築基準法道路種別）", build: wagmap("ageocity", 9, "tokyo"), verified: true }],
   },
   {
     name: "熊谷市",
     codes: ["11202"],
     coverage: "partial",
     maps: [
-      { kind: "designated_only", label: "位置指定道路情報", build: wagmap("kumagaya", 170), verified: true },
-      { kind: "public_road", label: "道路台帳図・認定路線網図", build: wagmap("kumagaya", 90), verified: false },
+      { kind: "designated_only", label: "位置指定道路情報", build: wagmap("kumagaya", 170, "tokyo"), verified: true },
+      { kind: "public_road", label: "道路台帳図・認定路線網図", build: wagmap("kumagaya", 90, "tokyo"), verified: true },
     ],
   },
   {
@@ -178,6 +181,95 @@ export const MUNICIPALITIES: Municipality[] = [
     ],
     contact: { dept: "都市建設部 建築住宅課", phone: "04-2946-8234", hours: "平日 9:00〜16:30" },
     note: "指定道路図はWeb地図にあるが、座標指定URLは未調査。",
+  },
+  {
+    name: "入間市",
+    codes: ["11225"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "都市整備部 開発建築課", phone: "04-2964-1111（代表）" },
+  },
+  {
+    name: "朝霞市",
+    codes: ["11227"],
+    coverage: "full",
+    maps: [
+      { kind: "road_type", label: "建築基準法道路（公道・私道とも）", build: wagmap("asaka", 120, "wgs84"), verified: true },
+      { kind: "public_road", label: "道路情報（市道）", build: wagmap("asaka", 81, "wgs84"), verified: false },
+    ],
+    contact: { dept: "都市建設部 開発建築課", phone: "048-463-2585" },
+  },
+  {
+    name: "三郷市",
+    codes: ["11237"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "開発指導課 建築指導係", phone: "048-930-7743", note: "地名地番を調べてから問い合わせる" },
+  },
+  {
+    name: "戸田市",
+    codes: ["11224"],
+    coverage: "partial",
+    maps: [
+      { kind: "public_road", label: "いいとだマップ（道路路線図）", build: null, url: "https://www.city.toda.saitama.jp/soshiki/273/doro-kanri-rosenzu.html", verified: false },
+    ],
+    contact: { dept: "建築住宅課", phone: "048-441-1800", hours: "平日 8:30〜17:15" },
+    note: "市道で認定・現況幅員4m以上なら42条1項1号（市の案内より）。それ以外と新曽の区画整理地内は問い合わせ。",
+  },
+  {
+    name: "深谷市",
+    codes: ["11218"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "建築住宅課", phone: "048-574-6655", note: "道路の扱いは電話・メール不可、窓口のみ" },
+  },
+  {
+    name: "鴻巣市",
+    codes: ["11217"],
+    coverage: "none",
+    maps: [],
+    contact: {
+      dept: "建築住宅課（本庁舎2階30番窓口）",
+      note: "電話・FAX・メール不可、窓口のみ。先に道路課（28番窓口）で査定状況を確認してから行く",
+    },
+  },
+  {
+    name: "ふじみ野市",
+    codes: ["11245"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "建築課 建築指導係", phone: "049-220-2069", hours: "平日 8:30〜17:15" },
+  },
+  {
+    name: "富士見市",
+    codes: ["11235"],
+    coverage: "partial",
+    maps: [
+      {
+        kind: "designated_only",
+        label: "道路位置指定の閲覧（図面番号から選ぶPDF）",
+        build: null,
+        url: "https://www.city.fujimi.saitama.jp/kurashi_tetsuzuki/sumai/jyuutaku/shiteidouro-etsuran/shitei-douro-etsuran.html",
+        verified: false,
+      },
+      { kind: "public_road", label: "路線網図（市道）", build: null, url: "https://www.city.fujimi.saitama.jp/kurashi_tetsuzuki/05douro/doro_kotsu/douromouzu.html", verified: false },
+    ],
+    contact: { dept: "建築指導課" },
+  },
+  {
+    name: "加須市",
+    codes: ["11210"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "都市整備部 建築開発課（建築指導担当）", phone: "0480-62-1111（代表）", hours: "平日 8:30〜17:15" },
+  },
+  {
+    name: "坂戸市",
+    codes: ["11239"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "建築指導担当" },
+    note: "e-マップさかど（https://sakado.geogeo.jp/）に建築確認情報あり。道路種別の問い合わせ方法は未調査。",
   },
 ];
 

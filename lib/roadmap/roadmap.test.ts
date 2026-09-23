@@ -42,6 +42,12 @@ describe("buildLinks", () => {
     expect(link.pinpoint).toBe(true);
   });
 
+  it("wagmap でも世界測地系の自治体（朝霞）は変換しない", () => {
+    // 朝霞市役所（本町一丁目1）。変換なしで市役所が中心に来ることを実測済み
+    const [link] = buildLinks(findMunicipality("11227")!, 35.796852, 139.593796);
+    expect(link.url).toBe("https://www2.wagmap.jp/asaka/Map?mid=120&mpx=139.593796&mpy=35.796852&mps=1000");
+  });
+
   it("Sonicweb は世界測地系のまま URL を作る", () => {
     const [link] = buildLinks(findMunicipality("11103")!, 35.904289, 139.624069);
     expect(link.url).toBe("https://www.sonicweb-asp.jp/saitama/map?theme=th_45&pos=139.624069%2C35.904289&scale=1000");
