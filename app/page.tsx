@@ -1,134 +1,140 @@
 "use client";
 
-// 動作確認用の仮画面。デザインは後で差し替える前提で、機能要件（docs/features.md）の必須項目だけ満たす。
-import { useState } from "react";
-import { lookup, type LookupResult, type Municipality, type ResolvedLink } from "@/lib/roadmap";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Header } from "@/components/header";
+import { HistoryList } from "@/components/history-list";
+import { AlertIcon, ChevronRightIcon, MapIcon } from "@/components/icons";
+import { CitiesSheet, HelpSheet } from "@/components/info-sheets";
+import { ResultView } from "@/components/result-view";
+import { SearchCard } from "@/components/search-card";
+import { addHistory, clearHistory, loadHistory, type HistoryItem } from "@/lib/history";
+import { lookup, MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
 
-const COVERAGE_TEXT: Record<Municipality["coverage"], { label: string; className: string }> = {
-  full: { label: "ネットで全種別が分かります", className: "bg-green-100 text-green-900" },
-  partial: { label: "一部だけ公開（位置指定道路など）。載っていなければ窓口で確認", className: "bg-yellow-100 text-yellow-900" },
-  none: { label: "ネットでは分かりません。問い合わせてください", className: "bg-red-100 text-red-900" },
-};
+type Shown = { query: string; result: LookupResult };
 
 export default function Home() {
-  const [address, setAddress] = useState("");
+  const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<LookupResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [shown, setShown] = useState<Shown | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [sheet, setSheet] = useState<"help" | "cities" | null>(null);
+  const pushed = useRef(false);
 
-  async function onSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (!address.trim()) return;
+  const search = useCallback(async (address: string, push: boolean) => {
+    const q = address.trim();
+    if (!q) return;
+    setInput(q);
     setLoading(true);
     setError(null);
-    setResult(null);
     try {
-      setResult(await lookup(address.trim()));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "検索に失敗しました");
+      const result = await lookup(q);
+      setShown({ query: q, result });
+      if (result.status !== "not_found") {
+        setHistory(
+          addHistory({
+            address: q,
+            city: result.status === "ok" ? result.municipality.name : undefined,
+            coverage: result.status === "ok" ? result.municipality.coverage : undefined,
+            at: Date.now(),
+          }),
+        );
+      }
+      // 端末の「戻る」でホームに戻れるよう、結果画面を履歴に積む
+      if (push) {
+        window.history.pushState(null, "", `?q=${encodeURIComponent(q)}`);
+        pushed.current = true;
+      }
+      window.scrollTo(0, 0);
+    } catch {
+      setError("通信に失敗しました。電波の良い場所でもう一度お試しください。");
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  // 初回表示: 端末の履歴を読み、?q= 付きで開かれたらそのまま検索する
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("q");
+    queueMicrotask(() => {
+      setHistory(loadHistory());
+      if (q) void search(q, false);
+    });
+    const onPop = () => {
+      const q = new URLSearchParams(window.location.search).get("q");
+      if (q) void search(q, false);
+      else setShown(null);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [search]);
+
+  function backHome() {
+    if (pushed.current) {
+      pushed.current = false;
+      window.history.back();
+    } else {
+      window.history.replaceState(null, "", window.location.pathname);
+      setShown(null);
     }
   }
 
   return (
-    <main className="mx-auto w-full max-w-md flex-1 p-4 space-y-4">
-      <h1 className="text-xl font-bold">ROAD-SNAP</h1>
+    <div className="flex flex-1 flex-col bg-gradient-to-b from-mint/70 to-background">
+      <main className="mx-auto w-full max-w-md flex-1 space-y-6 px-4 pb-8 pt-6">
+        <Header onHelp={() => setSheet("help")} compact={!!shown} />
 
-      <form onSubmit={onSearch} className="flex gap-2">
-        <input
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          placeholder="例: 埼玉県越谷市越ヶ谷4-2-1"
-          className="flex-1 rounded border px-3 py-2 text-base"
-        />
-        <button disabled={loading} className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50">
-          {loading ? "検索中…" : "検索"}
-        </button>
-      </form>
+        {shown ? (
+          <ResultView query={shown.query} result={shown.result} onBack={backHome} />
+        ) : (
+          <>
+            <SearchCard
+              value={input}
+              onChange={setInput}
+              onSearch={() => search(input, true)}
+              loading={loading}
+              cityCount={MUNICIPALITIES.length}
+              onShowCities={() => setSheet("cities")}
+            />
+            {error && (
+              <p role="alert" className="flex gap-2 rounded-2xl bg-red-50 p-3 text-sm text-red-800">
+                <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                {error}
+              </p>
+            )}
+            {history.length === 0 && (
+              <button onClick={() => setSheet("help")} className="flex w-full items-center gap-4 rounded-3xl border border-line bg-white/80 p-4 text-left">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-mint text-brand">
+                  <MapIcon className="h-6 w-6" />
+                </span>
+                <span className="flex-1">
+                  <span className="block font-bold text-brand">このアプリでできること</span>
+                  <span className="text-sm text-muted">住所から、市の公式道路図を物件の場所で開きます。ネットで分からない市は問い合わせ先を案内します。</span>
+                </span>
+                <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />
+              </button>
+            )}
+            <HistoryList
+              items={history}
+              onSelect={(a) => search(a, true)}
+              onClear={() => {
+                clearHistory();
+                setHistory([]);
+              }}
+            />
+          </>
+        )}
+      </main>
 
-      {error && <p className="text-red-700">{error}</p>}
-      {result && <Result result={result} />}
+      <footer className="border-t border-line bg-white/70 px-4 py-4">
+        <p className="mx-auto flex max-w-md gap-2 text-xs text-muted">
+          <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
+          表示される地図は参考情報です。重要事項説明などの最終確認は、必ず役所の窓口で行ってください。
+        </p>
+      </footer>
 
-      <p className="pt-4 text-xs opacity-70">
-        表示される地図は参考情報です。重要事項説明などの最終確認は、必ず役所の窓口で行ってください。
-      </p>
-    </main>
-  );
-}
-
-function Result({ result }: { result: LookupResult }) {
-  if (result.status === "not_found") {
-    return <p>住所が見つかりませんでした。市区町村名から入力してください。</p>;
-  }
-  if (result.status === "unsupported") {
-    const q = encodeURIComponent(`${result.matchedAddress.replace(/^埼玉県/, "").match(/^.+?[市町村]/)?.[0] ?? ""} 指定道路図`);
-    return (
-      <div className="space-y-2">
-        <p>{result.matchedAddress} 付近</p>
-        <p>この市町村はまだ未対応です。</p>
-        <a className="underline" href={`https://www.google.com/search?q=${q}`} target="_blank" rel="noreferrer">
-          Googleで指定道路図を探す
-        </a>
-      </div>
-    );
-  }
-
-  const { municipality: m, links } = result;
-  const contact = m.contact;
-  const coverage = COVERAGE_TEXT[m.coverage];
-  const primary = links.filter((l) => l.kind !== "public_road");
-  const secondary = links.filter((l) => l.kind === "public_road");
-  const contactBlock = contact && (
-    <div className="rounded border p-3 space-y-1">
-      <p className="font-bold">{contact.dept}</p>
-      {contact.phone && <a className="block underline" href={`tel:${contact.phone.split(/[（(/]/)[0].trim()}`}>{contact.phone}</a>}
-      {contact.email && <a className="block underline" href={`mailto:${contact.email}`}>{contact.email}</a>}
-      {contact.hours && <p className="text-sm">{contact.hours}</p>}
-      {contact.note && <p className="text-sm font-bold text-red-700">⚠ {contact.note}</p>}
+      <HelpSheet open={sheet === "help"} onClose={() => setSheet(null)} />
+      <CitiesSheet open={sheet === "cities"} onClose={() => setSheet(null)} />
     </div>
-  );
-
-  return (
-    <div className="space-y-3">
-      <p className="text-sm">
-        {result.matchedAddress} 付近（{result.town}）
-      </p>
-      <p className="font-bold">{m.name}</p>
-      <p className={`rounded p-2 text-sm ${coverage.className}`}>{coverage.label}</p>
-      {m.note && <p className="text-sm opacity-80">{m.note}</p>}
-
-      {m.coverage === "none" && contactBlock}
-
-      <div className="space-y-2">
-        {primary.map((l) => (
-          <LinkButton key={l.url} link={l} big />
-        ))}
-        {secondary.map((l) => (
-          <LinkButton key={l.url} link={l} />
-        ))}
-      </div>
-      {links.some((l) => l.pinpoint) && (
-        <p className="text-xs opacity-70">最初に利用規約の同意画面が出ます。同意すると、該当地点が画面中央の十字の位置に表示されます。</p>
-      )}
-
-      {m.coverage !== "none" && contactBlock}
-    </div>
-  );
-}
-
-function LinkButton({ link, big }: { link: ResolvedLink; big?: boolean }) {
-  return (
-    <a
-      href={link.url}
-      target="_blank"
-      rel="noreferrer"
-      className={`block rounded border px-3 ${big ? "bg-foreground py-3 text-background font-bold" : "py-2"}`}
-    >
-      {link.label}
-      <span className="block text-xs font-normal opacity-80">
-        {link.pinpoint ? "該当地点が開きます" : "地図の入口が開きます（地図内で住所を検索してください）"}
-      </span>
-    </a>
   );
 }

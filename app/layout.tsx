@@ -2,13 +2,15 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ROAD-SNAP",
-  description: "住所から自治体の道路種別図をその場所で開く",
+  title: "MICHILU（ミチル）",
+  description: "不動産のための道路情報チェック。住所から市の公式道路図をその場所で開きます。",
+  appleWebApp: { capable: true, title: "MICHILU", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  themeColor: "#fefeff",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

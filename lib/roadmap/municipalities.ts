@@ -27,6 +27,8 @@ export type Contact = {
   hours?: string;
   /** 電話で答えてくれるか等、問い合わせ時の注意 */
   note?: string;
+  /** 道路種別を電話では答えてくれない（窓口・メールのみ）。UIで発信ボタンを出さない */
+  noPhoneInquiry?: boolean;
 };
 
 export type Municipality = {
@@ -108,6 +110,7 @@ export const MUNICIPALITIES: Municipality[] = [
       dept: "建築指導課（市役所低層棟2階）",
       email: "a9180@city.tokorozawa.lg.jp",
       note: "電話は原則不可。メールは地番・地図・公図を添付、回答まで数日。",
+      noPhoneInquiry: true,
     },
   },
   {
@@ -138,6 +141,7 @@ export const MUNICIPALITIES: Municipality[] = [
       phone: "048-796-8046",
       hours: "平日 8:30〜17:15",
       note: "道路種別の確認は窓口のみ（電話不可）",
+      noPhoneInquiry: true,
     },
   },
   {
@@ -221,7 +225,7 @@ export const MUNICIPALITIES: Municipality[] = [
     codes: ["11218"],
     coverage: "none",
     maps: [],
-    contact: { dept: "建築住宅課", phone: "048-574-6655", note: "道路の扱いは電話・メール不可、窓口のみ" },
+    contact: { dept: "建築住宅課", phone: "048-574-6655", note: "道路の扱いは電話・メール不可、窓口のみ", noPhoneInquiry: true },
   },
   {
     name: "鴻巣市",
@@ -231,6 +235,7 @@ export const MUNICIPALITIES: Municipality[] = [
     contact: {
       dept: "建築住宅課（本庁舎2階30番窓口）",
       note: "電話・FAX・メール不可、窓口のみ。先に道路課（28番窓口）で査定状況を確認してから行く",
+      noPhoneInquiry: true,
     },
   },
   {

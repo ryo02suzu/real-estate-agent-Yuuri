@@ -1,20 +1,21 @@
 @import "tailwindcss";
 
+/* ロゴから取った配色。ロゴの白地に合わせてライトテーマ固定 */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --background: #fefeff;
+  --foreground: #1e3f4a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-ink: #1e3f4a; /* ロゴ文字の深緑 */
+  --color-muted: #5b727a;
+  --color-brand: #1f7a4c; /* ボタン（白文字でコントラスト確保） */
+  --color-brand-light: #2e9d62; /* ピンの緑 */
+  --color-mint: #eef6f1;
+  --color-line: #dde7e2;
 }
 
 body {
