@@ -12,6 +12,9 @@ import { lookup, MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
 
 type Shown = { query: string; result: LookupResult };
 
+const PREFS = [...new Set(MUNICIPALITIES.map((m) => m.pref))];
+const COVERAGE_TEXT = `${PREFS.join("・")} 全${MUNICIPALITIES.length}市町村に対応`;
+
 export default function Home() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -93,7 +96,7 @@ export default function Home() {
               onChange={setInput}
               onSearch={() => search(input, true)}
               loading={loading}
-              cityCount={MUNICIPALITIES.length}
+              coverageText={COVERAGE_TEXT}
               onShowCities={() => setSheet("cities")}
             />
             {error && (
@@ -109,7 +112,7 @@ export default function Home() {
                 </span>
                 <span className="flex-1">
                   <span className="block font-bold text-brand">このアプリでできること</span>
-                  <span className="text-sm text-muted">住所から、市の公式道路図を物件の場所で開きます。ネットで分からない市は問い合わせ先を案内します。</span>
+                  <span className="text-sm text-muted">住所から、市町村の公式道路図を物件の場所で開きます。ネットで分からない市町村は問い合わせ先を案内します。</span>
                 </span>
                 <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />
               </button>

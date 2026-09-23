@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "MICHILU（ミチル）",
     short_name: "MICHILU",
-    description: "不動産のための道路情報チェック。住所から市の公式道路図をその場所で開きます。",
+    description: "不動産のための道路情報チェック。住所から市町村の公式道路図をその場所で開きます。",
     start_url: "/",
     display: "standalone",
     background_color: "#fefeff",

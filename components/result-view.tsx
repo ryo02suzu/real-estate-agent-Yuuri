@@ -38,7 +38,7 @@ function Unsupported({ result }: { result: Extract<LookupResult, { status: "unsu
       <MapPreview lat={result.lat} lng={result.lng} />
       <div className="rounded-3xl bg-white p-5 border border-line shadow-[0_4px_24px_rgba(30,63,74,0.06)]">
         <p className="font-bold text-ink">{city ? `${city}は` : "この市町村は"}まだ未対応です</p>
-        <p className="mt-1 text-sm text-muted">市の公式サイトで「指定道路図」や「道路種別」を探してください。</p>
+        <p className="mt-1 text-sm text-muted">市町村の公式サイトで「指定道路図」や「道路種別」を探してください。</p>
         <a
           href={`https://www.google.com/search?q=${q}`}
           target="_blank"
@@ -57,7 +57,7 @@ function Found({ result }: { result: Extract<LookupResult, { status: "ok" }> }) 
   const m = result.municipality;
   const primary = result.links.filter((l) => l.kind !== "public_road");
   const secondary = result.links.filter((l) => l.kind === "public_road");
-  const contact = m.contact && <ContactCard contact={m.contact} city={m.name} />;
+  const contact = result.contact && <ContactCard contact={result.contact} city={m.name} />;
   const pinpointHint = result.links.some((l) => l.pinpoint) && (
     <p className="mt-3 text-xs text-muted">最初に利用規約の画面が出ます。「同意する」を押すと、物件の場所が画面中央の十字の位置に表示されます。</p>
   );

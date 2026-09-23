@@ -8,11 +8,12 @@ type Props = {
   onChange: (v: string) => void;
   onSearch: () => void;
   loading: boolean;
-  cityCount: number;
+  /** 例: 「埼玉県・千葉県 全117市町村に対応」 */
+  coverageText: string;
   onShowCities: () => void;
 };
 
-export function SearchCard({ value, onChange, onSearch, loading, cityCount, onShowCities }: Props) {
+export function SearchCard({ value, onChange, onSearch, loading, coverageText, onShowCities }: Props) {
   const [pasteError, setPasteError] = useState(false);
 
   async function paste() {
@@ -73,7 +74,7 @@ export function SearchCard({ value, onChange, onSearch, loading, cityCount, onSh
       </button>
 
       <button type="button" onClick={onShowCities} className="mt-3 w-full text-center text-xs text-brand underline-offset-2 hover:underline">
-        埼玉県 {cityCount}市に対応（一覧を見る）
+        {coverageText}（一覧を見る）
       </button>
     </form>
   );

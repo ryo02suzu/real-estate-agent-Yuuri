@@ -1,9 +1,10 @@
 import { geocode, reverseGeocode } from "./geocode";
-import { buildLinks, findMunicipality, type Municipality, type ResolvedLink } from "./municipalities";
+import { buildLinks, findMunicipality, resolveContact, type Contact, type Municipality, type ResolvedLink } from "./municipalities";
 
 export * from "./municipalities";
 export { geocode, reverseGeocode } from "./geocode";
 export { wgs84ToTokyo } from "./datum";
+export { toWebMercator } from "./vendors";
 
 export type LookupResult =
   | { status: "not_found" } // 住所が見つからない
@@ -16,6 +17,8 @@ export type LookupResult =
       town: string;
       municipality: Municipality;
       links: ResolvedLink[];
+      /** その地点の問い合わせ先（政令市は区ごとの窓口） */
+      contact?: Contact;
     };
 
 /** 住所を1つ渡すと、その場所の道路図URLと問い合わせ先をまとめて返す */
@@ -35,5 +38,6 @@ export async function lookup(address: string): Promise<LookupResult> {
     town: rev.town,
     municipality,
     links: buildLinks(municipality, geo.lat, geo.lng),
+    contact: resolveContact(municipality, rev.muniCd),
   };
 }
