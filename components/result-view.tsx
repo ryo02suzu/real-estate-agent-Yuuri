@@ -20,7 +20,7 @@ export function ResultView({ query, result, onBack }: { query: string; result: L
 
 function NotFound({ query }: { query: string }) {
   return (
-    <div className="rounded-3xl bg-white p-6 text-center shadow-[0_4px_24px_rgba(30,63,74,0.08)]">
+    <div className="rounded-3xl bg-white p-6 text-center border border-line shadow-[0_4px_24px_rgba(30,63,74,0.06)]">
       <SearchIcon className="mx-auto h-10 w-10 text-muted" />
       <p className="mt-3 font-bold text-ink">住所が見つかりませんでした</p>
       <p className="mt-1 break-all text-sm text-muted">「{query}」</p>
@@ -36,7 +36,7 @@ function Unsupported({ result }: { result: Extract<LookupResult, { status: "unsu
     <div className="space-y-4">
       <PlaceLine address={result.matchedAddress} />
       <MapPreview lat={result.lat} lng={result.lng} />
-      <div className="rounded-3xl bg-white p-5 shadow-[0_4px_24px_rgba(30,63,74,0.08)]">
+      <div className="rounded-3xl bg-white p-5 border border-line shadow-[0_4px_24px_rgba(30,63,74,0.06)]">
         <p className="font-bold text-ink">{city ? `${city}は` : "この市町村は"}まだ未対応です</p>
         <p className="mt-1 text-sm text-muted">市の公式サイトで「指定道路図」や「道路種別」を探してください。</p>
         <a
@@ -115,7 +115,7 @@ function Found({ result }: { result: Extract<LookupResult, { status: "ok" }> }) 
 
 function CityPanel({ municipality: m, children }: { municipality: Municipality; children?: React.ReactNode }) {
   return (
-    <section className="rounded-3xl bg-white p-5 shadow-[0_4px_24px_rgba(30,63,74,0.08)]">
+    <section className="rounded-3xl bg-white p-5 border border-line shadow-[0_4px_24px_rgba(30,63,74,0.06)]">
       <div className="flex items-center justify-between">
         <p className="text-2xl font-black text-ink">{m.name}</p>
         <CoverageBadge coverage={m.coverage} />

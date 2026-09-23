@@ -80,7 +80,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-1 flex-col bg-gradient-to-b from-mint/70 to-background">
+    <div className="flex flex-1 flex-col bg-background">
       <main className="mx-auto w-full max-w-md flex-1 space-y-6 px-4 pb-8 pt-6">
         <Header onHelp={() => setSheet("help")} compact={!!shown} />
 

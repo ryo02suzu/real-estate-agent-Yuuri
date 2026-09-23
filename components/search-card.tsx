@@ -32,7 +32,7 @@ export function SearchCard({ value, onChange, onSearch, loading, cityCount, onSh
         e.preventDefault();
         onSearch();
       }}
-      className="rounded-3xl bg-white p-4 shadow-[0_4px_24px_rgba(30,63,74,0.08)]"
+      className="rounded-3xl bg-white p-4 border border-line shadow-[0_4px_24px_rgba(30,63,74,0.06)]"
     >
       <label htmlFor="address" className="sr-only">
         住所
