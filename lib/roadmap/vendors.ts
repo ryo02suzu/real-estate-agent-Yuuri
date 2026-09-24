@@ -8,12 +8,17 @@ type Build = (lat: number, lng: number) => string;
  * gprj=3（JGD2000）は厚木・小田原・茅ヶ崎などで無視されるため使わない（全地図の変換結果を確認済み）。
  */
 export const wagmap =
-  (slug: string, mid: number, extra = "", host = "https://www2.wagmap.jp"): Build =>
+  (
+    slug: string,
+    mid: number,
+    /** extra: 追加パラメータ（例: 表示レイヤ &mcl=…）、host: 独自ドメイン、scale: 縮尺（地図に無い縮尺だと東京都の地図は表示されない） */
+    { extra = "", host = "https://www2.wagmap.jp", scale = 1000 }: { extra?: string; host?: string; scale?: number } = {},
+  ): Build =>
   (lat, lng) =>
-    `${host}/${slug}/Map?mid=${mid}&mpx=${lng.toFixed(6)}&mpy=${lat.toFixed(6)}&mps=1000&gprj=2${extra}`;
+    `${host}/${slug}/Map?mid=${mid}&mpx=${lng.toFixed(6)}&mpy=${lat.toFixed(6)}&mps=${scale}&gprj=2${extra}`;
 
 /** 横浜市のiマッピー（wagmap と同じ仕組みで独自ドメイン）。mcl=100,70,70,70 が「建築基準法道路種別（指定道路図）」 */
-export const yokohamaMappy: Build = wagmap("yokohama", 2, "&mcl=100%2C70%2C70%2C70", "https://wwwm.city.yokohama.lg.jp");
+export const yokohamaMappy: Build = wagmap("yokohama", 2, { extra: "&mcl=100%2C70%2C70%2C70", host: "https://wwwm.city.yokohama.lg.jp" });
 
 /** Sonicweb（sonicweb-asp.jp）。世界測地系、pos=経度,緯度。layers は最初から表示するレイヤ（例: "dm%2Cth_5"） */
 export const sonicweb =
@@ -80,3 +85,9 @@ export const machiInfo =
   (city: string, consentPage: string, scale = 1000): Build =>
   (lat, lng) =>
     `https://www.machi-info.jp/machikado/${city}/consentpage/${consentPage}?lon=${lng.toFixed(6)}&lat=${lat.toFixed(6)}&scale=${scale}`;
+
+/** ArcGIS Web AppBuilder（…/apps/webappviewer/index.html?id=）。center=経度,緯度,4326&scale= */
+export const arcgisWebApp =
+  (host: string, appId: string, scale = 2500): Build =>
+  (lat, lng) =>
+    `https://${host}/apps/webappviewer/index.html?id=${appId}&center=${lng.toFixed(6)},${lat.toFixed(6)},4326&scale=${scale}`;

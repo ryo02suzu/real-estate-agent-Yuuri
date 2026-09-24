@@ -2,6 +2,7 @@
 import { CHIBA } from "./data/chiba";
 import { KANAGAWA } from "./data/kanagawa";
 import { SAITAMA } from "./data/saitama";
+import { TOKYO } from "./data/tokyo";
 
 /** 地図に何が載っているか */
 export type MapKind =
@@ -50,7 +51,7 @@ export type Municipality = {
   note?: string;
 };
 
-export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA];
+export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO];
 
 export function findMunicipality(muniCd: string): Municipality | undefined {
   return MUNICIPALITIES.find((m) => m.codes.includes(muniCd));
