@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans_JP } from "next/font/google";
+import { Jost, Noto_Sans_JP, Noto_Serif_JP } from "next/font/google";
 import "./globals.css";
 
 // 端末ごとに字形がばらつかないよう、日本語フォントを同梱する
@@ -10,6 +10,10 @@ const notoSansJP = Noto_Sans_JP({
   variable: "--font-noto-sans-jp",
 });
 
+// 見出しの明朝とロゴ文字の欧文
+const notoSerifJP = Noto_Serif_JP({ weight: ["400", "500"], subsets: ["latin"], display: "swap", variable: "--font-noto-serif-jp" });
+const jost = Jost({ weight: ["300", "400"], subsets: ["latin"], display: "swap", variable: "--font-jost" });
+
 export const metadata: Metadata = {
   title: "MICHILU（ミチル）",
   description: "不動産のための道路情報チェック。住所から市町村の公式道路図をその場所で開きます。",
@@ -19,12 +23,12 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#fefeff",
+  themeColor: "#fbfaf8",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ja" className={`${notoSansJP.variable} h-full antialiased`}>
+    <html lang="ja" className={`${notoSansJP.variable} ${notoSerifJP.variable} ${jost.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

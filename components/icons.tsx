@@ -113,3 +113,16 @@ export const ShareIcon = ({ className }: P) => (
     <path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
   </svg>
 );
+
+export const MenuIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M4 7h16M4 12h16M4 17h16" />
+  </svg>
+);
+
+export const AreaIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.6} className={className}>
+    <path d="M12 21s-6-5.3-6-11a6 6 0 0 1 12 0c0 5.7-6 11-6 11Z" />
+    <circle cx="12" cy="10" r="2.2" />
+  </svg>
+);

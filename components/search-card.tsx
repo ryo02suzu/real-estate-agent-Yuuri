@@ -1,19 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { CloseIcon, PasteIcon, SearchIcon } from "./icons";
+import { CloseIcon, PasteIcon, PinIcon, SearchIcon } from "./icons";
 
 type Props = {
   value: string;
   onChange: (v: string) => void;
   onSearch: () => void;
   loading: boolean;
-  /** 例: 「関東1都6県 全316市区町村に対応」 */
-  coverageText: string;
-  onShowCities: () => void;
 };
 
-export function SearchCard({ value, onChange, onSearch, loading, coverageText, onShowCities }: Props) {
+export function SearchCard({ value, onChange, onSearch, loading }: Props) {
   const [pasteError, setPasteError] = useState(false);
 
   async function paste() {
@@ -33,49 +30,44 @@ export function SearchCard({ value, onChange, onSearch, loading, coverageText, o
         e.preventDefault();
         onSearch();
       }}
-      className="rounded-3xl bg-white p-4 border border-line shadow-[0_4px_24px_rgba(30,63,74,0.06)]"
     >
       <label htmlFor="address" className="sr-only">
         住所
       </label>
-      <div className="flex items-center gap-2 rounded-2xl border border-line bg-white px-3 focus-within:border-brand-light focus-within:ring-2 focus-within:ring-brand-light/20">
-        <SearchIcon className="h-5 w-5 shrink-0 text-muted" />
+      <div className="flex items-center gap-2 rounded-full border border-white bg-white py-2 pl-5 pr-2 shadow-soft focus-within:ring-2 focus-within:ring-brand-light/30">
+        <PinIcon className="h-5 w-5 shrink-0 text-muted" />
         <input
           id="address"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="住所を入力"
+          placeholder="住所を入力（例：東京都渋谷区神南1-1-1）"
           autoComplete="off"
           enterKeyHint="search"
-          className="min-w-0 flex-1 bg-transparent py-3.5 text-base text-ink outline-none placeholder:text-muted/70"
+          className="min-w-0 flex-1 bg-transparent py-2.5 text-base text-ink outline-none placeholder:text-[13px] placeholder:text-muted/70"
         />
-        {value ? (
+        {value && (
           <button type="button" onClick={() => onChange("")} aria-label="入力を消す" className="rounded-full p-1.5 text-muted hover:bg-mint">
             <CloseIcon className="h-4 w-4" />
           </button>
-        ) : (
-          <button type="button" onClick={paste} className="flex shrink-0 items-center gap-1 rounded-xl bg-mint px-2.5 py-1.5 text-xs font-bold text-brand">
-            <PasteIcon className="h-4 w-4" />
+        )}
+        <button
+          type="submit"
+          disabled={loading || !value.trim()}
+          aria-label="検索"
+          className="bg-gold flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-white shadow-[0_6px_16px_rgba(138,102,50,0.35)] transition active:scale-95 disabled:opacity-60"
+        >
+          {loading ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <SearchIcon className="h-6 w-6" />}
+        </button>
+      </div>
+      <div className="mt-2 flex items-center justify-between px-3 text-xs text-muted">
+        <span>{pasteError ? "貼り付けできませんでした。入力欄を長押ししてください。" : loading ? "検索中…" : "住所を貼り付けて検索できます"}</span>
+        {!value && (
+          <button type="button" onClick={paste} className="flex shrink-0 items-center gap-1 rounded-full bg-mint px-3 py-1.5 font-bold text-brand">
+            <PasteIcon className="h-3.5 w-3.5" />
             貼り付け
           </button>
         )}
       </div>
-      <p className="mt-2 px-1 text-xs text-muted">
-        {pasteError ? "貼り付けできませんでした。入力欄を長押しして貼り付けてください。" : "例）埼玉県越谷市越ヶ谷4-2-1"}
-      </p>
-
-      <button
-        type="submit"
-        disabled={loading || !value.trim()}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand py-3.5 text-base font-bold text-white shadow-sm transition active:scale-[0.99] disabled:opacity-40"
-      >
-        {loading ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <SearchIcon className="h-5 w-5" />}
-        {loading ? "検索中…" : "検索"}
-      </button>
-
-      <button type="button" onClick={onShowCities} className="mt-3 w-full text-center text-xs text-brand underline-offset-2 hover:underline">
-        {coverageText}（一覧を見る）
-      </button>
     </form>
   );
 }

@@ -1,21 +1,23 @@
 @import "tailwindcss";
 
-/* ロゴから取った配色。ロゴの白地に合わせてライトテーマ固定 */
+/* デザインモックの配色（白地にシャンパンゴールド）。ライトテーマ固定 */
 :root {
   color-scheme: light;
-  --background: #fefeff;
-  --foreground: #1e3f4a;
+  --background: #fbfaf8;
+  --foreground: #242e37;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-ink: #1e3f4a; /* ロゴ文字の深緑 */
-  --color-muted: #5b727a;
-  --color-brand: #1f7a4c; /* ボタン（白文字でコントラスト確保） */
-  --color-brand-light: #2e9d62; /* ピンの緑 */
-  --color-mint: #eef6f1;
-  --color-line: #dde7e2;
+  --color-ink: #242e37; /* 本文・ロゴ文字の墨色 */
+  --color-muted: #6c6f74;
+  --color-brand: #8a6632; /* ボタン地（白文字でコントラスト確保） */
+  --color-brand-light: #c49a5c; /* ピン・線のゴールド */
+  --color-mint: #f6f0e5; /* 淡いクリーム（旧ミント。クラス名はそのまま） */
+  --color-line: #ebe4d8;
+  --font-serif: var(--font-noto-serif-jp), "Hiragino Mincho ProN", serif;
+  --font-latin: var(--font-jost), sans-serif;
 }
 
 body {
@@ -29,4 +31,22 @@ body {
 /* 住所や電話番号の数字は桁を揃える */
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* 検索ボタンなどの金属調ゴールド */
+.bg-gold {
+  background: linear-gradient(145deg, #e3c79a 0%, #b88a4d 55%, #8a6632 100%);
+}
+
+/* 白いカードの柔らかい影 */
+.shadow-soft {
+  box-shadow: 0 6px 28px rgba(60, 44, 20, 0.07);
+}
+
+/* 横スクロールのチップ列でスクロールバーを隠す */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

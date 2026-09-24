@@ -202,7 +202,7 @@ function MapButton({ link, primary }: { link: ResolvedLink; primary?: boolean })
       rel="noreferrer"
       className={
         primary
-          ? "flex items-center gap-3 rounded-2xl bg-brand px-4 py-3.5 text-white shadow-sm active:scale-[0.99]"
+          ? "flex items-center gap-3 bg-gold rounded-2xl px-4 py-3.5 text-white shadow-[0_6px_16px_rgba(138,102,50,0.3)] active:scale-[0.99]"
           : "flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-3 text-ink active:scale-[0.99]"
       }
     >

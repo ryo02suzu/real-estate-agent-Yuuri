@@ -1,27 +1,57 @@
 import Image from "next/image";
-import { InfoIcon } from "./icons";
+import { MenuIcon } from "./icons";
 
-// いただいたロゴをマークと文字に分け、横並びにしたもの（白地は透過）
+// ロゴのマーク（ゴールド）。文字は欧文フォントで組み、I の上にゴールドの葉を置く
 const MARK = { src: "/logo-mark.webp", w: 204, h: 202 };
-const TYPE = { src: "/logo-type.webp", w: 564, h: 164 };
 
-export function Header({ onHelp, compact }: { onHelp: () => void; compact?: boolean }) {
-  const markH = compact ? 40 : 60;
-  const typeH = compact ? 29 : 42;
+function Wordmark({ className }: { className: string }) {
   return (
-    <header className="flex items-center gap-2.5">
-      <Image src={MARK.src} alt="" width={Math.round((markH * MARK.w) / MARK.h)} height={markH} priority />
-      <Image
-        src={TYPE.src}
-        alt="MICHILU 不動産のための道路情報チェック"
-        width={Math.round((typeH * TYPE.w) / TYPE.h)}
-        height={typeH}
-        priority
-      />
-      <button onClick={onHelp} className="ml-auto flex flex-col items-center rounded-xl px-2 py-1 text-ink hover:bg-mint">
-        <InfoIcon className="h-6 w-6" />
-        <span className="text-[10px]">使い方</span>
-      </button>
+    <span className={`font-latin font-normal tracking-[0.12em] text-ink ${className}`} aria-label="MICHILU">
+      MICH
+      <span className="relative inline-block">
+        I
+        <svg viewBox="0 0 10 14" aria-hidden className="absolute -top-[0.32em] left-1/2 h-[0.34em] w-auto -translate-x-[15%] rotate-[18deg] text-brand-light">
+          <path d="M5 0C9 3 9.5 9 5 14 .5 9 1 3 5 0Z" fill="currentColor" />
+        </svg>
+      </span>
+      LU
+    </span>
+  );
+}
+
+export function Header({ onMenu, compact }: { onMenu: () => void; compact?: boolean }) {
+  const menu = (
+    <button
+      onClick={onMenu}
+      aria-label="メニュー"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-ink shadow-soft hover:bg-mint"
+    >
+      <MenuIcon className="h-5 w-5" />
+    </button>
+  );
+
+  if (compact) {
+    return (
+      <header className="flex items-center gap-2.5">
+        <Image src={MARK.src} alt="" width={40} height={40} priority />
+        <Wordmark className="text-[26px] leading-none" />
+        <span className="ml-auto">{menu}</span>
+      </header>
+    );
+  }
+
+  return (
+    <header className="relative pt-2">
+      <div className="absolute right-0 top-0">{menu}</div>
+      <div className="flex items-center justify-center gap-3 pt-10">
+        <Image src={MARK.src} alt="" width={Math.round((76 * MARK.w) / MARK.h)} height={76} priority />
+        <Wordmark className="text-[40px] leading-none" />
+      </div>
+      <p className="mt-6 text-center font-serif text-[15px] leading-8 tracking-[0.12em] text-ink/85">
+        住所から、建築基準法上の
+        <br />
+        道路種別の確認先をすぐに開けます。
+      </p>
     </header>
   );
 }
