@@ -23,6 +23,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover", // ノッチ・ホームバーの余白は env(safe-area-inset-*) で取る
   themeColor: "#fbfaf8",
 };
 

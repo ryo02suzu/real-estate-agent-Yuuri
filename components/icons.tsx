@@ -126,3 +126,22 @@ export const AreaIcon = ({ className }: P) => (
     <circle cx="12" cy="10" r="2.2" />
   </svg>
 );
+
+export const PinOutlineIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.6} className={className}>
+    <path d="M12 21s-6.5-6-6.5-11.5a6.5 6.5 0 0 1 13 0C18.5 15 12 21 12 21Z" />
+    <circle cx="12" cy="9.5" r="2.3" />
+  </svg>
+);
+
+export const BuildingIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.6} className={className}>
+    <path d="M4 21V8l6-3v16M10 21V3l10 4v14M3 21h18M13 9h1M16 9h1M13 12h1M16 12h1M13 15h1M16 15h1M6.5 11h1M6.5 14h1" />
+  </svg>
+);
+
+export const ExpandIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7" />
+  </svg>
+);

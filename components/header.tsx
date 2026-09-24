@@ -19,12 +19,12 @@ function Wordmark({ className }: { className: string }) {
   );
 }
 
-export function Header({ onMenu, compact }: { onMenu: () => void; compact?: boolean }) {
+export function Header({ onMenu, onHome, compact }: { onMenu: () => void; onHome?: () => void; compact?: boolean }) {
   const menu = (
     <button
       onClick={onMenu}
       aria-label="メニュー"
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-ink shadow-soft hover:bg-mint"
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-ink shadow-soft hover:bg-mint"
     >
       <MenuIcon className="h-5 w-5" />
     </button>
@@ -32,9 +32,12 @@ export function Header({ onMenu, compact }: { onMenu: () => void; compact?: bool
 
   if (compact) {
     return (
-      <header className="flex items-center gap-2.5">
-        <Image src={MARK.src} alt="" width={40} height={40} priority />
-        <Wordmark className="text-[26px] leading-none" />
+      <header className="flex items-center">
+        {/* ロゴを押すとホームへ戻る */}
+        <button onClick={onHome} aria-label="ホームへ戻る" className="flex items-center gap-2">
+          <Image src={MARK.src} alt="" width={Math.round((42 * MARK.w) / MARK.h)} height={42} priority />
+          <Wordmark className="text-[22px] leading-none" />
+        </button>
         <span className="ml-auto">{menu}</span>
       </header>
     );
@@ -43,11 +46,11 @@ export function Header({ onMenu, compact }: { onMenu: () => void; compact?: bool
   return (
     <header className="relative pt-2">
       <div className="absolute right-0 top-0">{menu}</div>
-      <div className="flex items-center justify-center gap-3 pt-10">
-        <Image src={MARK.src} alt="" width={Math.round((76 * MARK.w) / MARK.h)} height={76} priority />
-        <Wordmark className="text-[40px] leading-none" />
+      <div className="flex items-center justify-center gap-2.5 pt-7">
+        <Image src={MARK.src} alt="" width={Math.round((64 * MARK.w) / MARK.h)} height={64} priority />
+        <Wordmark className="text-[32px] leading-none" />
       </div>
-      <p className="mt-6 text-center font-serif text-[15px] leading-8 tracking-[0.12em] text-ink/85">
+      <p className="mt-3 text-center font-serif text-[12.5px] leading-[1.9] tracking-[0.12em] text-ink/85">
         住所から、建築基準法上の
         <br />
         道路種別の確認先をすぐに開けます。

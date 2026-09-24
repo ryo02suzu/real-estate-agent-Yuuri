@@ -2,9 +2,10 @@ import type { Municipality } from "@/lib/roadmap";
 
 type Coverage = Municipality["coverage"];
 
-export const COVERAGE: Record<Coverage, { short: string; long: string; list: string; badge: string; panel: string; dot: string }> = {
+export const COVERAGE: Record<Coverage, { short: string; pill: string; long: string; list: string; badge: string; panel: string; dot: string }> = {
   full: {
     short: "全種別あり",
+    pill: "ネットで全種別が分かります",
     long: "この市町村の地図で、建築基準法上の道路種別がすべて分かります。",
     list: "市町村の地図で道路種別がすべて分かる",
     badge: "bg-green-100 text-green-800",
@@ -13,6 +14,7 @@ export const COVERAGE: Record<Coverage, { short: string; long: string; list: str
   },
   partial: {
     short: "一部のみ",
+    pill: "ネットで分かるのは一部だけ",
     long: "ネットで分かるのは位置指定道路など一部だけです。地図に載っていない道路は窓口で確認してください。",
     list: "位置指定道路など、一部だけネットで分かる",
     badge: "bg-amber-100 text-amber-800",
@@ -21,6 +23,7 @@ export const COVERAGE: Record<Coverage, { short: string; long: string; list: str
   },
   none: {
     short: "ネット非公開",
+    pill: "ネットでは非公開（窓口へ）",
     long: "道路種別はネットで公開されていません。下の窓口に問い合わせてください。",
     list: "ネットでは分からない（問い合わせ先を表示します）",
     badge: "bg-red-100 text-red-800",
@@ -29,6 +32,7 @@ export const COVERAGE: Record<Coverage, { short: string; long: string; list: str
   },
   outside: {
     short: "都市計画区域外",
+    pill: "都市計画区域外",
     long: "この市町村には都市計画区域がありません。建築基準法の接道義務（43条）は原則かかりませんが、条例や開発の条件があるため、下の窓口で確認してください。",
     list: "都市計画区域外（接道義務は原則かからない。窓口で確認）",
     badge: "bg-slate-100 text-slate-700",
@@ -43,6 +47,17 @@ export function CoverageBadge({ coverage }: { coverage: Coverage }) {
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${c.badge}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
       {c.short}
+    </span>
+  );
+}
+
+/** 結果画面の「ネットで全種別が分かります」の丸いラベル */
+export function CoveragePill({ coverage }: { coverage: Coverage }) {
+  const c = COVERAGE[coverage];
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${c.badge}`}>
+      <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] text-white ${c.dot}`}>{coverage === "full" ? "✓" : "!"}</span>
+      {c.pill}
     </span>
   );
 }
