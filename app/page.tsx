@@ -13,7 +13,9 @@ import { lookup, MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
 type Shown = { query: string; result: LookupResult };
 
 const PREFS = [...new Set(MUNICIPALITIES.map((m) => m.pref))];
-const COVERAGE_TEXT = `${PREFS.join("・")} 全${MUNICIPALITIES.length}市町村に対応`;
+// 関東の1都6県がそろったら地方名でまとめて表示する
+const KANTO = ["東京都", "神奈川県", "埼玉県", "千葉県", "茨城県", "栃木県", "群馬県"];
+const COVERAGE_TEXT = `${KANTO.every((p) => PREFS.includes(p as (typeof PREFS)[number])) ? "関東1都6県" : PREFS.join("・")} 全${MUNICIPALITIES.length}市区町村に対応`;
 
 export default function Home() {
   const [input, setInput] = useState("");

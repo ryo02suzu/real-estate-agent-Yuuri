@@ -8,7 +8,7 @@ type Props = {
   onChange: (v: string) => void;
   onSearch: () => void;
   loading: boolean;
-  /** 例: 「埼玉県・千葉県 全117市町村に対応」 */
+  /** 例: 「関東1都6県 全316市区町村に対応」 */
   coverageText: string;
   onShowCities: () => void;
 };

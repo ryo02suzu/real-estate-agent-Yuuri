@@ -1,6 +1,6 @@
 # MICHILU（ミチル）
 
-不動産のための道路情報チェック。住所を入れると、その市の公式「建築基準法上の道路」図を物件の場所で開きます（埼玉県・千葉県 全117市町村に対応）。ネットで分からない市は問い合わせ先を案内します。
+不動産のための道路情報チェック。住所を入れると、その市の公式「建築基準法上の道路」図を物件の場所で開きます（関東1都6県 全316市区町村に対応）。ネットで分からない市は問い合わせ先を案内します。
 
 ## 動かす
 
@@ -20,7 +20,7 @@ npm run build    # 静的サイトを out/ に書き出す（Vercel 等にその
 | `app/page.tsx`, `components/` | 画面（ホーム・結果・使い方・対応市一覧） |
 | `lib/history.ts` | 直近5件の検索履歴（端末の localStorage のみ） |
 | `docs/features.md` | UIの機能要件 |
-| `docs/saitama-research.md`, `docs/chiba-research.md` | 市町村ごとの調査結果と出典 |
+| `docs/saitama-research.md`, `docs/chiba-research.md`, `docs/kanagawa-research.md`, `docs/tokyo-research.md`, `docs/kanto-north-research.md` | 市区町村ごとの調査結果と出典 |
 
 ## ロジックの使い方
 
