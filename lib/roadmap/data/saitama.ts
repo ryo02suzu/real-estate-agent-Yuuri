@@ -38,7 +38,7 @@ const CITIES: Municipality[] = [
     name: "川越市",
     codes: ["11201"],
     coverage: "none",
-    maps: [{ kind: "public_road", label: "道路台帳・網図（市道）", build: wagmap("kawagoe", 25, "tokyo"), verified: true }],
+    maps: [{ kind: "public_road", label: "道路台帳・網図（市道）", build: wagmap("kawagoe", 25), verified: true }],
     contact: { dept: "建築指導課", phone: "049-224-8811" },
   },
   {
@@ -62,8 +62,8 @@ const CITIES: Municipality[] = [
     codes: ["11222"],
     coverage: "full",
     maps: [
-      { kind: "road_type", label: "建築基準法上の道路種別", build: wagmap("koshigayacity", 31, "tokyo"), verified: true },
-      { kind: "public_road", label: "道路台帳・認定路線", build: wagmap("koshigayacity", 5, "tokyo"), verified: true },
+      { kind: "road_type", label: "建築基準法上の道路種別", build: wagmap("koshigayacity", 31), verified: true },
+      { kind: "public_road", label: "道路台帳・認定路線", build: wagmap("koshigayacity", 5), verified: true },
     ],
     contact: { dept: "建築住宅課", phone: "048-964-2111（代表）" },
   },
@@ -90,7 +90,7 @@ const CITIES: Municipality[] = [
     name: "上尾市",
     codes: ["11219"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "指定道路図（建築基準法道路種別）", build: wagmap("ageocity", 9, "tokyo"), verified: true }],
+    maps: [{ kind: "road_type", label: "指定道路図（建築基準法道路種別）", build: wagmap("ageocity", 9), verified: true }],
     contact: { dept: "建築安全課", phone: "048-775-8490" },
   },
   {
@@ -99,8 +99,8 @@ const CITIES: Municipality[] = [
     codes: ["11202"],
     coverage: "partial",
     maps: [
-      { kind: "designated_only", label: "位置指定道路情報", build: wagmap("kumagaya", 170, "tokyo"), verified: true },
-      { kind: "public_road", label: "道路台帳図・認定路線網図", build: wagmap("kumagaya", 90, "tokyo"), verified: true },
+      { kind: "designated_only", label: "位置指定道路情報", build: wagmap("kumagaya", 170), verified: true },
+      { kind: "public_road", label: "道路台帳図・認定路線網図", build: wagmap("kumagaya", 90), verified: true },
     ],
     contact: { dept: "建築審査課", phone: "0493-39-4809" },
   },
@@ -148,8 +148,8 @@ const CITIES: Municipality[] = [
     codes: ["11227"],
     coverage: "full",
     maps: [
-      { kind: "road_type", label: "建築基準法道路（公道・私道とも）", build: wagmap("asaka", 120, "wgs84"), verified: true },
-      { kind: "public_road", label: "道路情報（市道）", build: wagmap("asaka", 81, "wgs84"), verified: false },
+      { kind: "road_type", label: "建築基準法道路（公道・私道とも）", build: wagmap("asaka", 120), verified: true },
+      { kind: "public_road", label: "道路情報（市道）", build: wagmap("asaka", 81), verified: false },
     ],
     contact: { dept: "都市建設部 開発建築課", phone: "048-463-2585" },
   },
@@ -266,7 +266,7 @@ const CITIES: Municipality[] = [
     name: "本庄市",
     codes: ["11211"],
     coverage: "partial",
-    maps: [{ kind: "designated_only", label: "位置指定道路", build: wagmap("honjo", 10, "tokyo"), verified: true }],
+    maps: [{ kind: "designated_only", label: "位置指定道路", build: wagmap("honjo", 10), verified: true }],
     contact: { dept: "建築開発課", phone: "0495-25-1111（代表）" },
   },
   {
@@ -368,7 +368,7 @@ const CITIES: Municipality[] = [
     name: "鶴ヶ島市",
     codes: ["11241"],
     coverage: "none",
-    maps: [{ kind: "public_road", label: "道路台帳図・路線網図（市道）", build: wagmap("tsurugashima", 42, "wgs84"), verified: true }],
+    maps: [{ kind: "public_road", label: "道路台帳図・路線網図（市道）", build: wagmap("tsurugashima", 42), verified: true }],
     contact: { dept: "都市計画課", phone: "049-271-1111（代表）" },
   },
   {

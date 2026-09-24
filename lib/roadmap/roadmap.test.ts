@@ -1,19 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { wgs84ToTokyo } from "./datum";
 import GSI_CODES from "./data/gsi-muni-codes.json";
 import { MUNICIPALITIES, buildLinks, findMunicipality, lookup, resolveContact } from "./index";
 
-// 熊谷市役所（宮町二丁目47）。国土地理院の座標と、wagmap で市役所が中心に来た旧測地系座標
+// 熊谷市役所（宮町二丁目47）の国土地理院の座標
 const KUMAGAYA_CITY_HALL = { lat: 36.147129, lng: 139.38858 };
-const KUMAGAYA_CITY_HALL_TOKYO = { lat: 36.143959, lng: 139.39178 };
-
-describe("wgs84ToTokyo", () => {
-  it("熊谷市役所で実測と一致する", () => {
-    const t = wgs84ToTokyo(KUMAGAYA_CITY_HALL.lat, KUMAGAYA_CITY_HALL.lng);
-    expect(t.lat).toBeCloseTo(KUMAGAYA_CITY_HALL_TOKYO.lat, 5);
-    expect(t.lng).toBeCloseTo(KUMAGAYA_CITY_HALL_TOKYO.lng, 5);
-  });
-});
 
 describe("カバー率（国土地理院の市区町村コード表と照合）", () => {
   const covered = (pref: keyof typeof GSI_CODES) => {
@@ -61,16 +51,10 @@ describe("MUNICIPALITIES", () => {
 });
 
 describe("buildLinks", () => {
-  it("wagmap は旧測地系の座標で URL を作る", () => {
+  it("wagmap は世界測地系の座標に gprj=3 を付ける（自治体ごとの測地系の違いを吸収）", () => {
     const [link] = buildLinks(findMunicipality("11202")!, KUMAGAYA_CITY_HALL.lat, KUMAGAYA_CITY_HALL.lng);
-    expect(link.url).toBe("https://www2.wagmap.jp/kumagaya/Map?mid=170&mpx=139.391780&mpy=36.143959&mps=1000");
+    expect(link.url).toBe("https://www2.wagmap.jp/kumagaya/Map?mid=170&mpx=139.388580&mpy=36.147129&mps=1000&gprj=3");
     expect(link.pinpoint).toBe(true);
-  });
-
-  it("wagmap でも世界測地系の自治体（朝霞）は変換しない", () => {
-    // 朝霞市役所（本町一丁目1）。変換なしで市役所が中心に来ることを実測済み
-    const [link] = buildLinks(findMunicipality("11227")!, 35.796852, 139.593796);
-    expect(link.url).toBe("https://www2.wagmap.jp/asaka/Map?mid=120&mpx=139.593796&mpy=35.796852&mps=1000");
   });
 
   it("Sonicweb は世界測地系のまま URL を作る", () => {
@@ -121,7 +105,7 @@ describe("lookup", () => {
     if (r.status !== "ok") return;
     expect(r.municipality.name).toBe("熊谷市");
     expect(r.town).toBe("宮町二丁目");
-    expect(r.links[0].url).toContain("mpx=139.391780");
+    expect(r.links[0].url).toContain("mpx=139.388580");
   });
 
   it("API がエラーなら例外を投げる", async () => {

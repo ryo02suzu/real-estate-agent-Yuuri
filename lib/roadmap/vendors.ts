@@ -1,19 +1,16 @@
 // 自治体が使っている Web GIS ごとの「座標付きURL」の作り方。
 // どれも実機で「その地点が中心に開く」ことを確かめた形式（未確認のものはデータ側で verified:false）。
-import { wgs84ToTokyo } from "./datum";
-
 type Build = (lat: number, lng: number) => string;
 
 /**
- * wagmap（www2.wagmap.jp）。受け取る測地系が自治体ごとに違う（間違えると約450mずれる）。
- * 実測: 越谷・上尾・熊谷・川越・本庄 = 旧日本測地系、朝霞・鶴ヶ島 = 世界測地系
+ * wagmap（www2.wagmap.jp）。gprj=3 を付けると世界測地系(JGD2000/WGS84)の座標として解釈される。
+ * 付けないと自治体ごとに旧日本測地系／世界測地系の解釈が違い、約450mずれる
+ * （越谷・上尾・熊谷・川越・本庄・朝霞・鶴ヶ島・茂原・成田の市役所で gprj=3 の中心一致を確認済み）。
  */
 export const wagmap =
-  (slug: string, mid: number, datum: "tokyo" | "wgs84"): Build =>
-  (lat, lng) => {
-    const p = datum === "tokyo" ? wgs84ToTokyo(lat, lng) : { lat, lng };
-    return `https://www2.wagmap.jp/${slug}/Map?mid=${mid}&mpx=${p.lng.toFixed(6)}&mpy=${p.lat.toFixed(6)}&mps=1000`;
-  };
+  (slug: string, mid: number): Build =>
+  (lat, lng) =>
+    `https://www2.wagmap.jp/${slug}/Map?mid=${mid}&mpx=${lng.toFixed(6)}&mpy=${lat.toFixed(6)}&mps=1000&gprj=3`;
 
 /** Sonicweb（sonicweb-asp.jp）。世界測地系、pos=経度,緯度 */
 export const sonicweb =

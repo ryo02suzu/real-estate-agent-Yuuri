@@ -3,7 +3,6 @@ import { buildLinks, findMunicipality, resolveContact, type Contact, type Munici
 
 export * from "./municipalities";
 export { geocode, reverseGeocode } from "./geocode";
-export { wgs84ToTokyo } from "./datum";
 export { toWebMercator } from "./vendors";
 
 export type LookupResult =
