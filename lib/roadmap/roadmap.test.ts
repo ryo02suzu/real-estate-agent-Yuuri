@@ -22,13 +22,15 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
 
   it("埼玉県の全市町村を網羅している", () => covered("埼玉県"));
   it("千葉県の全市町村を網羅している", () => covered("千葉県"));
+  it("神奈川県の全市町村を網羅している", () => covered("神奈川県"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
   // 総務省の市外局番表のうち埼玉・千葉で使われるもの。「04」は 04-29xx（所沢・狭山・入間）と 04-7xxx（柏・流山・野田・我孫子・鴨川）だけ
-  const AREA: Record<string, string[]> = {
+  const AREA: Partial<Record<string, string[]>> = {
     埼玉県: ["04", "042", "048", "0480", "049", "0493", "0494", "0495"],
     千葉県: ["04", "043", "0436", "0438", "0439", "047", "0470", "0475", "0476", "0478", "0479"],
+    神奈川県: ["042", "044", "045", "046", "0463", "0465", "0466", "0467"],
   };
   const contacts = MUNICIPALITIES.flatMap((m) =>
     [m.contact, ...Object.values(m.contactByCode ?? {})].filter((c) => c?.phone).map((c) => ({ m, phone: c!.phone! })),
@@ -86,6 +88,24 @@ describe("buildLinks", () => {
   it("Sonicweb は世界測地系のまま URL を作る", () => {
     const [link] = buildLinks(findMunicipality("11103")!, 35.904289, 139.624069);
     expect(link.url).toBe("https://www.sonicweb-asp.jp/saitama/map?theme=th_45&pos=139.624069%2C35.904289&scale=1000");
+  });
+
+  it("横浜市は iマッピーの建築基準法道路種別レイヤ（mcl）を付けて開く", () => {
+    const [link] = buildLinks(findMunicipality("14104")!, 35.450195, 139.634903);
+    expect(link.url).toBe(
+      "https://wwwm.city.yokohama.lg.jp/yokohama/Map?mid=2&mpx=139.634903&mpy=35.450195&mps=1000&gprj=2&mcl=100%2C70%2C70%2C70",
+    );
+  });
+
+  it("大和市は machi-info の同意ページに座標を渡す", () => {
+    const [link] = buildLinks(findMunicipality("14213")!, 35.487579, 139.458206);
+    expect(link.url).toBe("https://www.machi-info.jp/machikado/yamato_city/consentpage/gis-road.html?lon=139.458206&lat=35.487579&scale=1000");
+  });
+
+  it("川崎市は区ごとに建築審査課の担当が変わる", () => {
+    const m = findMunicipality("14135")!;
+    expect(resolveContact(m, "14131")?.phone).toBe("044-200-3016");
+    expect(resolveContact(m, "14137")?.phone).toBe("044-200-3045");
   });
 
   it("Sonicweb は表示レイヤを付けられる（狭山市は道路種別レイヤを最初から表示）", () => {

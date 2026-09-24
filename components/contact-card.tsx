@@ -9,7 +9,7 @@ export function ContactCard({ contact, city }: { contact: Contact; city: string 
       <p className="text-xs text-muted">問い合わせ先</p>
       <p className="mt-0.5 font-bold text-ink">
         {/* 県の出先機関（「千葉県 ○○土木事務所」など）は市町村名を付けない */}
-        {/^(埼玉県|千葉県)/.test(contact.dept) ? contact.dept : `${city} ${contact.dept}`}
+        {/^(東京都|\S{2,3}県)\s/.test(contact.dept) ? contact.dept : `${city} ${contact.dept}`}
       </p>
       {contact.hours && <p className="mt-0.5 text-xs text-muted">受付 {contact.hours}</p>}
 
