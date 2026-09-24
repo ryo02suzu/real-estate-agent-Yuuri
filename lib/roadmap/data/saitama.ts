@@ -50,6 +50,7 @@ const CITIES: Municipality[] = [
     ],
     contact: {
       dept: "建築指導課（市役所低層棟2階）",
+      phone: "04-2998-9180",
       email: "a9180@city.tokorozawa.lg.jp",
       note: "電話は原則不可。メールは地番・地図・公図を添付、回答まで数日。",
       noPhoneInquiry: true,
@@ -80,9 +81,12 @@ const CITIES: Municipality[] = [
     pref,
     name: "春日部市",
     codes: ["11214"],
-    coverage: "none",
-    maps: [{ kind: "public_road", label: "かすかべオラナビ（道路台帳参考図）", build: geocloudMp("kasukabe.geocloud.jp", 11), verified: false }],
-    contact: { dept: "建築課 建築安全担当", phone: "048-796-8046", hours: "平日 8:30〜17:15", note: "道路種別の確認は窓口のみ（電話不可）", noPhoneInquiry: true },
+    coverage: "full",
+    maps: [
+      { kind: "road_type", label: "建築基準法上の道路種別（かすかべオラナビ）", build: geocloudMp("kasukabe.geocloud.jp", 81), verified: true },
+      { kind: "public_road", label: "道路台帳参考図（市道）", build: geocloudMp("kasukabe.geocloud.jp", 11), verified: false },
+    ],
+    contact: { dept: "建築課 建築安全担当", phone: "048-796-8046", hours: "平日 8:30〜17:15", note: "地図に色が付いていない道は窓口で確認（電話不可）", noPhoneInquiry: true },
   },
   {
     pref,
@@ -120,25 +124,22 @@ const CITIES: Municipality[] = [
     codes: ["11232"],
     coverage: "none",
     maps: [],
-    contact: { dept: "建築審査課", phone: "0480-22-1111（代表）", note: "道路種別判定依頼書（付近見取図・公図・現況写真）の提出が必要" },
+    contact: { dept: "まちづくり推進部 建築審査課 企画指導係", phone: "0480-22-1111（代表）", note: "道路種別判定依頼書（付近見取図・公図・現況写真）の提出が必要" },
   },
   {
     pref,
     name: "狭山市",
     codes: ["11215"],
-    coverage: "partial",
-    maps: [
-      { kind: "road_type", label: "指定道路図（案内ページ）", build: null, url: "https://www.city.sayama.saitama.jp/jigyo/kaihatsu/douro_shoukai_tel.html", verified: false },
-    ],
+    coverage: "full",
+    maps: [{ kind: "road_type", label: "指定道路図（建築基準法上の道路）", build: sonicweb("sayama", "th_3", 1000, "dm%2Cth_5"), verified: true }],
     contact: { dept: "都市建設部 建築住宅課", phone: "04-2946-8234", hours: "平日 9:00〜16:30" },
-    note: "指定道路図はWeb地図にあるが、座標指定URLは未調査。",
   },
   {
     pref,
     name: "入間市",
     codes: ["11225"],
     coverage: "none",
-    maps: [],
+    maps: [{ kind: "public_road", label: "認定路線マップ（市道）", build: wagmap("iruma", 3), verified: false }],
     contact: { dept: "都市整備部 開発建築課", phone: "04-2964-1111（代表）" },
   },
   {
@@ -166,10 +167,10 @@ const CITIES: Municipality[] = [
     codes: ["11224"],
     coverage: "partial",
     maps: [
-      { kind: "public_road", label: "いいとだマップ（道路路線図）", build: null, url: "https://www.city.toda.saitama.jp/soshiki/273/doro-kanri-rosenzu.html", verified: false },
+      { kind: "public_road", label: "いいとだマップ（道路路線図・認定幅員）", build: geocloudMp("e-toda.kukanjoho.jp", 401), verified: true },
     ],
-    contact: { dept: "建築住宅課", phone: "048-441-1800", hours: "平日 8:30〜17:15" },
-    note: "市道で認定・現況幅員4m以上なら42条1項1号（市の案内より）。それ以外と新曽の区画整理地内は問い合わせ。",
+    contact: { dept: "建築住宅課（本庁舎3階）", phone: "048-441-1800", hours: "平日 8:30〜17:15" },
+    note: "市道で認定・現況幅員4m以上なら42条1項1号（市の案内より）。位置指定道路（私道）は非公表なので問い合わせ。",
   },
   {
     pref,
@@ -222,7 +223,7 @@ const CITIES: Municipality[] = [
     name: "加須市",
     codes: ["11210"],
     coverage: "none",
-    maps: [],
+    maps: [{ kind: "public_road", label: "かぞまっぷ 道路台帳図（参考）", build: wagmap("kazo", 4), verified: false }],
     contact: { dept: "都市整備部 建築開発課（建築指導担当）", phone: "0480-62-1111（代表）", hours: "平日 8:30〜17:15" },
   },
   {
@@ -290,7 +291,7 @@ const CITIES: Municipality[] = [
     codes: ["11223"],
     coverage: "none",
     maps: [],
-    contact: { dept: "建築課", phone: "048-432-3200（代表）" },
+    contact: { dept: "都市整備部 建築課 建築開発指導係", phone: "048-433-7715" },
   },
   {
     pref,
@@ -350,9 +351,10 @@ const CITIES: Municipality[] = [
     pref,
     name: "蓮田市",
     codes: ["11238"],
-    coverage: "none",
-    maps: [],
+    coverage: "partial",
+    maps: [{ kind: "road_type", label: "指定道路図（42条1項1〜5号。2項道路は載っていない）", build: sonicweb("hasuda", "th_10"), verified: true }],
     contact: { dept: "建築指導課", phone: "048-768-3111（代表）" },
+    note: "地図に載るのは42条1項の道路の一部。2項道路や色の無い道は窓口で確認。",
   },
   {
     pref,

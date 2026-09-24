@@ -24,6 +24,31 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("千葉県の全市町村を網羅している", () => covered("千葉県"));
 });
 
+describe("電話番号の区切り（市外局番の桁数）", () => {
+  // 総務省の市外局番表のうち埼玉・千葉で使われるもの。「04」は 04-29xx（所沢・狭山・入間）と 04-7xxx（柏・流山・野田・我孫子・鴨川）だけ
+  const AREA: Record<string, string[]> = {
+    埼玉県: ["04", "042", "048", "0480", "049", "0493", "0494", "0495"],
+    千葉県: ["04", "043", "0436", "0438", "0439", "047", "0470", "0475", "0476", "0478", "0479"],
+  };
+  const contacts = MUNICIPALITIES.flatMap((m) =>
+    [m.contact, ...Object.values(m.contactByCode ?? {})].filter((c) => c?.phone).map((c) => ({ m, phone: c!.phone! })),
+  );
+
+  it.each(contacts.map(({ m, phone }) => [`${m.pref}${m.name}`, m.pref, phone] as const))("%s %s %s", (_, pref, phone) => {
+    const numbers = phone.match(/[\d-]+-[\d-]+/g) ?? [];
+    expect(numbers.length).toBeGreaterThan(0);
+    for (const n of numbers) {
+      const [area, local, sub] = n.split("-");
+      expect(n, "固定電話は 10 桁").toMatch(/^\d+-\d+-\d{4}$/);
+      expect(area + local + sub).toHaveLength(10);
+      expect(AREA[pref], `${n}: ${pref}の市外局番ではない`).toContain(area);
+      // 市外局番＋市内局番はどの地域でも 6 桁（03-xxxx / 047-xxx / 0476-xx）
+      expect((area + local).length, `${n}: 市外局番と市内局番の区切り位置が違う`).toBe(6);
+      if (area === "04") expect(local[0], `${n}: 04 の後は 2（埼玉）か 7（千葉）`).toBe(pref === "埼玉県" ? "2" : "7");
+    }
+  });
+});
+
 describe("MUNICIPALITIES", () => {
   it("市区町村コードが重複していない", () => {
     const codes = MUNICIPALITIES.flatMap((m) => m.codes);
@@ -61,6 +86,11 @@ describe("buildLinks", () => {
   it("Sonicweb は世界測地系のまま URL を作る", () => {
     const [link] = buildLinks(findMunicipality("11103")!, 35.904289, 139.624069);
     expect(link.url).toBe("https://www.sonicweb-asp.jp/saitama/map?theme=th_45&pos=139.624069%2C35.904289&scale=1000");
+  });
+
+  it("Sonicweb は表示レイヤを付けられる（狭山市は道路種別レイヤを最初から表示）", () => {
+    const [link] = buildLinks(findMunicipality("11215")!, 35.852903, 139.412314);
+    expect(link.url).toBe("https://www.sonicweb-asp.jp/sayama/map?theme=th_3&pos=139.412314%2C35.852903&scale=1000&layers=dm%2Cth_5");
   });
 
   it("座標で開けない地図は入口の URL を返す", () => {

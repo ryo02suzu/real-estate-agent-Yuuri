@@ -12,11 +12,11 @@ export const wagmap =
   (lat, lng) =>
     `https://www2.wagmap.jp/${slug}/Map?mid=${mid}&mpx=${lng.toFixed(6)}&mpy=${lat.toFixed(6)}&mps=1000&gprj=3`;
 
-/** Sonicweb（sonicweb-asp.jp）。世界測地系、pos=経度,緯度 */
+/** Sonicweb（sonicweb-asp.jp）。世界測地系、pos=経度,緯度。layers は最初から表示するレイヤ（例: "dm%2Cth_5"） */
 export const sonicweb =
-  (slug: string, theme: string, scale = 1000): Build =>
+  (slug: string, theme: string, scale = 1000, layers?: string): Build =>
   (lat, lng) =>
-    `https://www.sonicweb-asp.jp/${slug}/map?theme=${theme}&pos=${lng.toFixed(6)}%2C${lat.toFixed(6)}&scale=${scale}`;
+    `https://www.sonicweb-asp.jp/${slug}/map?theme=${theme}&pos=${lng.toFixed(6)}%2C${lat.toFixed(6)}&scale=${scale}${layers ? `&layers=${layers}` : ""}`;
 
 /** Webメルカトル（EPSG:3857）のメートル座標 */
 export function toWebMercator(lat: number, lng: number): { x: number; y: number } {
@@ -60,7 +60,7 @@ export const geocloud =
   (lat, lng) =>
     `${webgisUrl}?${query}&z=18&ll=${lat.toFixed(6)}%2C${lng.toFixed(6)}`;
 
-/** geocloud 新版（https://<市>.geocloud.jp/mp/<地図ID>）。?z=&ll=緯度,経度 */
+/** geocloud 新版（https://<市>.geocloud.jp/mp/<地図ID>、戸田市の e-toda.kukanjoho.jp も同じ）。?z=&ll=緯度,経度 */
 export const geocloudMp =
   (host: string, mapId: number): Build =>
   (lat, lng) =>
