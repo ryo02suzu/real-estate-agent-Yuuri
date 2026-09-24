@@ -2,7 +2,7 @@ import { MUNICIPALITIES, type Municipality } from "@/lib/roadmap";
 import { COVERAGE, CoverageBadge } from "./coverage";
 import { Sheet } from "./sheet";
 
-const ORDER: Municipality["coverage"][] = ["full", "partial", "none"];
+const ORDER: Municipality["coverage"][] = ["full", "partial", "none", "outside"];
 
 export function CitiesSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const prefs = [...new Set(MUNICIPALITIES.map((m) => m.pref))];

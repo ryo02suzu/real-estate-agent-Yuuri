@@ -21,6 +21,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   };
 
   it("埼玉県の全市町村を網羅している", () => covered("埼玉県"));
+  it("千葉県の全市町村を網羅している", () => covered("千葉県"));
 });
 
 describe("MUNICIPALITIES", () => {
@@ -118,7 +119,7 @@ describe("vendors", () => {
   it("alandis は Webメルカトルのメートル座標で URL を作る", async () => {
     const { alandis } = await import("./vendors");
     // 飯能市役所。地図の地図URL機能が出す値と一致することを実測済み
-    expect(alandis("https://webgis.alandis.jp/hanno11/210", "shitei")(35.857018, 139.327576)).toBe(
+    expect(alandis("https://webgis.alandis.jp/hanno11/210/webgis", "shitei")(35.857018, 139.327576)).toBe(
       "https://webgis.alandis.jp/hanno11/210/webgis/index.php/autologin_jswebgis?ap=jsWebGIS&m=2&u=shitei&x=15509874.814&y=4280965.063&s=1000&rs=3857",
     );
   });

@@ -28,14 +28,15 @@ export function toWebMercator(lat: number, lng: number): { x: number; y: number 
 }
 
 /**
- * alandis（webgis.alandis.jp）。地図URL機能の形式: x,y は EPSG:3857 のメートル
- * base 例: "https://webgis.alandis.jp/hanno11/210"、user はマップ種別（例: shitei）
+ * alandis（webgis.alandis.jp ほか）。地図の「地図URL」機能と同じ形式で、x,y は EPSG:3857 のメートル。
+ * webgisBase 例: "https://webgis.alandis.jp/hanno11/210/webgis"、user はマップ種別（例: shitei, guest3）、
+ * extra は表示レイヤ指定など（例: "&li=3&si=0"）
  */
 export const alandis =
-  (base: string, user: string, scale = 1000): Build =>
+  (webgisBase: string, user: string, extra = "", scale = 1000): Build =>
   (lat, lng) => {
     const { x, y } = toWebMercator(lat, lng);
-    return `${base}/webgis/index.php/autologin_jswebgis?ap=jsWebGIS&m=2&u=${user}&x=${x.toFixed(3)}&y=${y.toFixed(3)}&s=${scale}&rs=3857`;
+    return `${webgisBase}/index.php/autologin_jswebgis?ap=jsWebGIS&m=2&u=${user}&x=${x.toFixed(3)}&y=${y.toFixed(3)}&s=${scale}&rs=3857${extra}`;
   };
 
 /** cloudgis（*.cloudgis.jp, gauandy）。?lon=&lat=&z= で世界測地系 */
@@ -50,11 +51,20 @@ export const openMap =
   (lat, lng) =>
     `https://open-map.jp/${slug}/index.html#lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&z=${zoom}&layers=${encodeURIComponent(layer)}`;
 
-/** geocloud（*.geocloud.jp/webgis）。?ll=緯度,経度&z= */
+/**
+ * geocloud 旧版（…/webgis/?mp=…）。&ll=緯度,経度&z= で開く。
+ * 自動ブラウザには 403 を返すため、確認は iPhone の User-Agent で行った（川口・市川）。
+ */
 export const geocloud =
-  (host: string, mp: number, extra = ""): Build =>
+  (webgisUrl: string, query: string): Build =>
   (lat, lng) =>
-    `https://${host}/webgis/?z=18&ll=${lat.toFixed(6)}%2C${lng.toFixed(6)}&t=roadmap&mp=${mp}${extra}`;
+    `${webgisUrl}?${query}&z=18&ll=${lat.toFixed(6)}%2C${lng.toFixed(6)}`;
+
+/** geocloud 新版（https://<市>.geocloud.jp/mp/<地図ID>）。?z=&ll=緯度,経度 */
+export const geocloudMp =
+  (host: string, mapId: number): Build =>
+  (lat, lng) =>
+    `https://${host}/mp/${mapId}?z=18&ll=${lat.toFixed(6)},${lng.toFixed(6)}`;
 
 /** ArcGIS Experience Builder。#<地図ウィジェットID>=center:経度,緯度,4326,scale:n */
 export const arcgisExperience =

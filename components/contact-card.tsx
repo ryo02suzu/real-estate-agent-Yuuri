@@ -8,7 +8,8 @@ export function ContactCard({ contact, city }: { contact: Contact; city: string 
     <section className="rounded-2xl border border-line bg-white p-4">
       <p className="text-xs text-muted">問い合わせ先</p>
       <p className="mt-0.5 font-bold text-ink">
-        {city} {contact.dept}
+        {/* 県の出先機関（「千葉県 ○○土木事務所」など）は市町村名を付けない */}
+        {/^(埼玉県|千葉県)/.test(contact.dept) ? contact.dept : `${city} ${contact.dept}`}
       </p>
       {contact.hours && <p className="mt-0.5 text-xs text-muted">受付 {contact.hours}</p>}
 
@@ -21,7 +22,7 @@ export function ContactCard({ contact, city }: { contact: Contact; city: string 
 
       {/* 電話で答えてくれない市は、発信ボタンにせず番号だけ小さく出す（窓口の場所確認用） */}
       {contact.noPhoneInquiry && phones.length > 0 && (
-        <p className="mt-3 text-xs text-muted">代表番号 {phones.map((p) => p.number).join(" / ")}（道路種別は電話では答えてもらえません）</p>
+        <p className="mt-3 text-xs text-muted">電話 {phones.map((p) => p.number).join(" / ")}（窓口の場所・受付時間の確認用。道路種別は電話では答えてもらえません）</p>
       )}
 
       {((!contact.noPhoneInquiry && phones.length > 0) || contact.email) && (

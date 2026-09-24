@@ -37,8 +37,11 @@ export type Municipality = {
   name: string;
   /** 国土地理院の逆ジオコーダが返す muniCd。政令市は区ごとのコード */
   codes: string[];
-  /** ネットで道路種別がどこまで分かるか */
-  coverage: "full" | "partial" | "none";
+  /**
+   * ネットで道路種別がどこまで分かるか。
+   * outside = 市町村内に都市計画区域が無い（建築基準法の接道義務＝43条は原則かからない）
+   */
+  coverage: "full" | "partial" | "none" | "outside";
   maps: MapLink[];
   contact?: Contact;
   /** 区によって窓口が違う政令市用。muniCd → 窓口 */

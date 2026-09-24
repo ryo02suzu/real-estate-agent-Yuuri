@@ -27,6 +27,14 @@ export const COVERAGE: Record<Coverage, { short: string; long: string; list: str
     panel: "bg-red-50 text-red-900 border-red-200",
     dot: "bg-red-500",
   },
+  outside: {
+    short: "都市計画区域外",
+    long: "この市町村には都市計画区域がありません。建築基準法の接道義務（43条）は原則かかりませんが、条例や開発の条件があるため、下の窓口で確認してください。",
+    list: "都市計画区域外（接道義務は原則かからない。窓口で確認）",
+    badge: "bg-slate-100 text-slate-700",
+    panel: "bg-slate-50 text-slate-800 border-slate-200",
+    dot: "bg-slate-500",
+  },
 };
 
 export function CoverageBadge({ coverage }: { coverage: Coverage }) {

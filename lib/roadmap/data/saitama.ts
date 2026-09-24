@@ -1,7 +1,7 @@
 // 埼玉県 全63市町村（2026-09 調査）。出典は docs/saitama-research.md。
 // 窓口の部署・電話番号は県「建築行政の窓口」ページの一覧を基本に、市の道路種別案内ページで上書きしている。
 import type { Contact, MapLink, Municipality } from "../municipalities";
-import { alandis, arcgisExperience, cloudgis, geocloud, openMap, sonicweb, wagmap } from "../vendors";
+import { alandis, arcgisExperience, cloudgis, geocloud, geocloudMp, openMap, sonicweb, wagmap } from "../vendors";
 
 const pref = "埼玉県" as const;
 
@@ -29,9 +29,8 @@ const CITIES: Municipality[] = [
     name: "川口市",
     codes: ["11203"],
     coverage: "partial",
-    maps: [{ kind: "road_type", label: "指定道路マップ", build: geocloud("kawaguchi.geocloud.jp", 22, "&op=70&vlf=-1"), verified: false }],
+    maps: [{ kind: "road_type", label: "指定道路マップ", build: geocloud("https://kawaguchi.geocloud.jp/webgis/", "t=roadmap&mp=22&op=70&vlf=-1"), verified: true }],
     contact: { dept: "建築安全課", phone: "048-242-6344（第1係）/ 048-258-1199（第2係）", hours: "9:00〜16:30" },
-    note: "URL形式は市の公式ページ記載のもの。スマホ実機で位置を要確認。",
   },
   {
     pref,
@@ -82,7 +81,7 @@ const CITIES: Municipality[] = [
     name: "春日部市",
     codes: ["11214"],
     coverage: "none",
-    maps: [{ kind: "public_road", label: "かすかべオラナビ（道路台帳参考図）", build: null, url: "https://kasukabe.geocloud.jp/mp/11", verified: false }],
+    maps: [{ kind: "public_road", label: "かすかべオラナビ（道路台帳参考図）", build: geocloudMp("kasukabe.geocloud.jp", 11), verified: false }],
     contact: { dept: "建築課 建築安全担当", phone: "048-796-8046", hours: "平日 8:30〜17:15", note: "道路種別の確認は窓口のみ（電話不可）", noPhoneInquiry: true },
   },
   {
@@ -256,8 +255,8 @@ const CITIES: Municipality[] = [
     codes: ["11209"],
     coverage: "partial",
     maps: [
-      { kind: "designated_only", label: "指定道路図（位置指定道路）", build: alandis("https://webgis.alandis.jp/hanno11/210", "shitei"), verified: true },
-      { kind: "public_road", label: "市道路線情報", build: alandis("https://webgis.alandis.jp/hanno11/210", "doro"), verified: false },
+      { kind: "designated_only", label: "指定道路図（位置指定道路）", build: alandis("https://webgis.alandis.jp/hanno11/210/webgis", "shitei"), verified: true },
+      { kind: "public_road", label: "市道路線情報", build: alandis("https://webgis.alandis.jp/hanno11/210/webgis", "doro"), verified: false },
     ],
     contact: { dept: "建築課", phone: "042-973-2111（代表）", note: "電話では答えてもらえない。メールかFAXで問い合わせる", noPhoneInquiry: true },
   },

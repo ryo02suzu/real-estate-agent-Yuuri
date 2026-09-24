@@ -63,7 +63,7 @@ function Found({ result }: { result: Extract<LookupResult, { status: "ok" }> }) 
   );
 
   // ネットで分からない市は、問い合わせ先を先に見せ、市道の地図は参考として後ろに回す
-  if (m.coverage === "none") {
+  if (m.coverage === "none" || m.coverage === "outside") {
     return (
       <div className="space-y-4">
         <PlaceLine address={result.matchedAddress} />
