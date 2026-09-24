@@ -1,7 +1,7 @@
 // 東京都 全62区市町村（2026-09 調査）。出典は docs/tokyo-research.md。
 // 23区: 各区が特定行政庁。多摩: 特定行政庁の11市は各市、それ以外の15市2町・檜原村・奥多摩町は都の多摩建築指導事務所。島しょは都（各支庁の土木課が窓口）。
 import type { Contact, Municipality } from "../municipalities";
-import { alandis, arcgisExperience, arcgisExperienceAt, arcgisWebApp, chuoMap, geocloud, geocloudMp, machiInfoMap, sonicweb, wagmap } from "../vendors";
+import { alandis, arcgisExperience, arcgisWebApp, chuoMap, geocloud, geocloudMp, machiInfoMap, sonicweb, wagmap } from "../vendors";
 
 const pref = "東京都" as const;
 
@@ -20,12 +20,14 @@ const WARDS: Municipality[] = [
       {
         kind: "road_type",
         label: "建築基準法上の道路種別（千代田区都市計画情報提供ポータル・ArcGIS）",
-        build: arcgisExperienceAt("https://tokei-gis2.chiyodatoshikei.jp/toshikei/apps/experiencebuilder/experience/?id=6ce28f9528e44850b850f0ce0f34eadc", "widget_6"),
-        verified: false,
+        // この地図は URL での位置指定を受け付けない（4326・平面直角座標とも無視）。開いたら画面の「住所検索」で探す
+        build: null,
+        url: "https://tokei-gis2.chiyodatoshikei.jp/toshikei/apps/experiencebuilder/experience/?id=6ce28f9528e44850b850f0ce0f34eadc",
+        verified: true,
       },
     ],
     contact: { dept: "環境まちづくり部 建築指導課 建築審査係", phone: "03-5211-4308", email: "kenchikushidou@city.chiyoda.lg.jp" },
-    note: "地図（ArcGIS）は読み込みに時間がかかることがあります。",
+    note: "地図は区全体が表示される。画面の「住所検索」タブで物件を探す。読み込みに時間がかかることがあります。",
   },
   {
     pref,
@@ -48,7 +50,7 @@ const WARDS: Municipality[] = [
     name: "新宿区",
     codes: ["13104"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "建築基準法の道路種別情報（新宿区みんなのGIS）", build: sonicweb("shinjuku2", "th_1209"), verified: false }],
+    maps: [{ kind: "road_type", label: "建築基準法の道路種別情報（新宿区みんなのGIS）", build: sonicweb("shinjuku2", "th_1209"), verified: true }],
     contact: { dept: "都市計画部 建築調整課 細街路拡幅整備担当（本庁舎8階）", phone: "03-5273-3733", note: COUNTER_ONLY, noPhoneInquiry: true },
   },
   {
@@ -66,8 +68,8 @@ const WARDS: Municipality[] = [
     codes: ["13106"],
     coverage: "full",
     maps: [
-      { kind: "road_type", label: "建築基準法道路マップ（たいとうマップ）", build: wagmap("taito", 4), verified: false },
-      { kind: "public_road", label: "認定道路・道路台帳図", build: wagmap("taito", 3), verified: false },
+      { kind: "road_type", label: "建築基準法道路マップ（たいとうマップ）", build: wagmap("taito", 4), verified: true },
+      { kind: "public_road", label: "認定道路・道路台帳図", build: wagmap("taito", 3), verified: true },
     ],
     contact: { dept: "都市づくり部 建築課 狭あい道路担当", phone: "03-5246-1337" },
   },
@@ -76,7 +78,7 @@ const WARDS: Municipality[] = [
     name: "墨田区",
     codes: ["13107"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "指定道路図（建築基準法上の道路種別）", build: sonicweb("sumida", "th_8"), verified: false }],
+    maps: [{ kind: "road_type", label: "指定道路図（建築基準法上の道路種別）", build: sonicweb("sumida", "th_8"), verified: true }],
     contact: { dept: "都市計画部 建築指導課（区役所9階）", phone: "03-5608-6267", note: "後退方法や中心線などの詳細は電話・メール・FAXでは答えてもらえない。窓口で確認" },
   },
   {
@@ -84,7 +86,7 @@ const WARDS: Municipality[] = [
     name: "江東区",
     codes: ["13108"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "指定道路マップ（ことまっぷ）", build: geocloudMp("koto.geocloud.jp", 3), verified: false }],
+    maps: [{ kind: "road_type", label: "指定道路マップ（ことまっぷ）", build: geocloudMp("koto.geocloud.jp", 3), verified: true }],
     contact: { dept: "都市整備部 建築課 道路調査係（5階27番窓口）", phone: "03-3647-9736" },
   },
   {
@@ -92,7 +94,7 @@ const WARDS: Municipality[] = [
     name: "品川区",
     codes: ["13109"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "指定道路図（しながわMAP）", build: wagmap("shinagawa", 67), verified: false }],
+    maps: [{ kind: "road_type", label: "指定道路図（しながわMAP）", build: wagmap("shinagawa", 67), verified: true }],
     contact: { dept: "都市環境部 建築課（本庁舎6階）", phone: "03-5742-6769" },
   },
   {
@@ -100,7 +102,7 @@ const WARDS: Municipality[] = [
     name: "目黒区",
     codes: ["13110"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "目黒区指定道路図（めぐろ地図情報サービス）", build: sonicweb("meguro", "th_3"), verified: false }],
+    maps: [{ kind: "road_type", label: "目黒区指定道路図（めぐろ地図情報サービス）", build: sonicweb("meguro", "th_3"), verified: true }],
     contact: { dept: "都市整備部 建築課 調査係（総合庁舎6階）", phone: "03-5722-9638", note: COUNTER_ONLY, noPhoneInquiry: true },
   },
   {
@@ -108,7 +110,7 @@ const WARDS: Municipality[] = [
     name: "大田区",
     codes: ["13111"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "指定道路情報（大田区わがまちガイド）", build: wagmap("ota", 1), verified: false }],
+    maps: [{ kind: "road_type", label: "指定道路情報（大田区わがまちガイド）", build: wagmap("ota", 1), verified: true }],
     contact: { dept: "まちづくり推進部 建築調整課 地域道路整備担当", phone: "03-5744-1308", note: "道路相談は窓口のみ（一般の道路相談は12:00〜13:00）", noPhoneInquiry: true },
   },
   {
@@ -116,7 +118,7 @@ const WARDS: Municipality[] = [
     name: "世田谷区",
     codes: ["13112"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "指定道路図（せたがやiMap）", build: sonicweb("setagaya", "shiteidouro"), verified: false }],
+    maps: [{ kind: "road_type", label: "指定道路図（せたがやiMap）", build: sonicweb("setagaya", "shiteidouro"), verified: true }],
     contact: { dept: "防災街づくり担当部 建築安全課（二子玉川分庁舎2階）", phone: "03-6432-7188", note: COUNTER_ONLY, noPhoneInquiry: true },
   },
   {
@@ -124,7 +126,7 @@ const WARDS: Municipality[] = [
     name: "渋谷区",
     codes: ["13113"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "建築基準法の道路（指定道路図）", build: wagmap("shibuya", 1008), verified: false }],
+    maps: [{ kind: "road_type", label: "建築基準法の道路（指定道路図）", build: wagmap("shibuya", 1008), verified: true }],
     contact: { dept: "都市整備部 建築課 調査係", phone: "03-3463-2734", note: COUNTER_ONLY, noPhoneInquiry: true },
   },
   {
@@ -133,8 +135,8 @@ const WARDS: Municipality[] = [
     codes: ["13114"],
     coverage: "full",
     maps: [
-      { kind: "road_type", label: "中野区建築基準法道路種別図（なかのデータマップ）", build: wagmap("nakanodatamap", 52), verified: false },
-      { kind: "public_road", label: "認定路線網図・道路台帳現況平面図", build: wagmap("nakanodatamap", 61), verified: false },
+      { kind: "road_type", label: "中野区建築基準法道路種別図（なかのデータマップ）", build: wagmap("nakanodatamap", 52), verified: true },
+      { kind: "public_road", label: "認定路線網図・道路台帳現況平面図", build: wagmap("nakanodatamap", 61), verified: true },
     ],
     contact: { dept: "都市基盤部 建築課 道路判定係（区役所9階）", phone: "03-3228-5549", note: "間違いを防ぐため電話ではなく窓口で相談", noPhoneInquiry: true },
   },
@@ -156,7 +158,7 @@ const WARDS: Municipality[] = [
         kind: "road_type",
         label: "道路台帳現況平面図及び建築基準法上の道路種別等（ArcGIS）",
         build: arcgisWebApp("toshisei.maps.arcgis.com", "c4832f4fda79495fab7b83e2001817a5"),
-        verified: false,
+        verified: true,
       },
     ],
     contact: { dept: "都市整備部 建築課", phone: "03-3981-1111（代表）" },
@@ -175,8 +177,8 @@ const WARDS: Municipality[] = [
     codes: ["13118"],
     coverage: "full",
     maps: [
-      { kind: "road_type", label: "指定道路マップ（荒川区地図情報）", build: wagmap("arakawa", 2), verified: false },
-      { kind: "public_road", label: "道路台帳・路線網図", build: wagmap("arakawa", 4), verified: false },
+      { kind: "road_type", label: "指定道路マップ（荒川区地図情報）", build: wagmap("arakawa", 2), verified: true },
+      { kind: "public_road", label: "道路台帳・路線網図", build: wagmap("arakawa", 4), verified: true },
     ],
     contact: { dept: "防災都市づくり部 建築指導課 細街路整備係", phone: "03-3802-3111（代表）", note: "指定道路の詳細は電話不可。窓口で確認", noPhoneInquiry: true },
   },
@@ -194,7 +196,7 @@ const WARDS: Municipality[] = [
     name: "練馬区",
     codes: ["13120"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "建築基準法による道路等（ねりまっぷ・参考公開）", build: sonicweb("nerimap", "th_216"), verified: false }],
+    maps: [{ kind: "road_type", label: "建築基準法による道路等（ねりまっぷ・参考公開）", build: sonicweb("nerimap", "th_216"), verified: true }],
     contact: { dept: "建築・開発担当部 建築審査課 道路調査係（本庁舎15階）", phone: "03-5984-1984" },
     note: "参考公開。最終確認は建築審査課 道路調査係の窓口で。",
   },
@@ -203,7 +205,7 @@ const WARDS: Municipality[] = [
     name: "足立区",
     codes: ["13121"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "建築基準法道路（指定道路）（あだち地図情報）", build: sonicweb("adachi2", "th_2"), verified: false }],
+    maps: [{ kind: "road_type", label: "建築基準法道路（指定道路）（あだち地図情報）", build: sonicweb("adachi2", "th_2"), verified: true }],
     contact: { dept: "建築室 道路照会担当", phone: "03-3880-5463" },
   },
   {
@@ -211,7 +213,7 @@ const WARDS: Municipality[] = [
     name: "葛飾区",
     codes: ["13122"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "建築基準法道路種別（かつしかWEBマップ）", build: sonicweb("katsushika", "th_25"), verified: false }],
+    maps: [{ kind: "road_type", label: "建築基準法道路種別（かつしかWEBマップ）", build: sonicweb("katsushika", "th_25"), verified: true }],
     contact: { dept: "都市整備部 住環境整備課 開発指導係", phone: "03-5654-8349" },
   },
   {
@@ -219,7 +221,7 @@ const WARDS: Municipality[] = [
     name: "江戸川区",
     codes: ["13123"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "指定道路情報（江戸川区）", build: wagmap("edogawa", 2), verified: false }],
+    maps: [{ kind: "road_type", label: "指定道路情報（江戸川区）", build: wagmap("edogawa", 2), verified: true }],
     contact: { dept: "都市開発部 建築指導課 調査係", phone: "03-5662-1104" },
   },
 ];
@@ -232,7 +234,7 @@ const TAMA_CITIES: Municipality[] = [
     name: "八王子市",
     codes: ["13201"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "指定道路マップ（試行・ArcGIS）", build: arcgisExperience("98e34509695f4543b012c0b6f118b681", "widget_124"), verified: false }],
+    maps: [{ kind: "road_type", label: "指定道路マップ（試行・ArcGIS）", build: arcgisExperience("98e34509695f4543b012c0b6f118b681", "widget_124"), verified: true }],
     contact: { dept: "まちなみ整備部 建築指導課", phone: "042-620-7263", note: "道路種別は電話・FAXでは答えてもらえない。窓口で確認", noPhoneInquiry: true },
     note: "地図（ArcGIS）は読み込みに時間がかかることがあります。試行中のため最新は窓口で確認。",
   },
@@ -276,7 +278,7 @@ const TAMA_CITIES: Municipality[] = [
     coverage: "full",
     maps: [
       { kind: "road_type", label: "道路種別図（調布まっぷ）", build: wagmap("chofu", 5), verified: true },
-      { kind: "public_road", label: "路線認定図（市道）", build: wagmap("chofu", 6), verified: false },
+      { kind: "public_road", label: "路線認定図（市道）", build: wagmap("chofu", 6), verified: true },
     ],
     contact: { dept: "都市整備部 建築指導課", phone: "042-481-7515", note: "道路種別は電話・メール・FAX不可。窓口で確認", noPhoneInquiry: true },
   },
@@ -295,7 +297,7 @@ const TAMA_CITIES: Municipality[] = [
     coverage: "full",
     maps: [
       { kind: "road_type", label: "道路種別図（こだいら地図情報システム）", build: sonicweb("kodaira", "th_24"), verified: true },
-      { kind: "public_road", label: "認定路線網図（市道）", build: sonicweb("kodaira", "th_16"), verified: false },
+      { kind: "public_road", label: "認定路線網図（市道）", build: sonicweb("kodaira", "th_16"), verified: true },
     ],
     contact: { dept: "都市開発部 建築指導課 管理担当", phone: "042-346-9851" },
   },
@@ -309,7 +311,7 @@ const TAMA_CITIES: Municipality[] = [
         kind: "road_type",
         label: "道路種別図（地図検索・試行・ArcGIS）",
         build: arcgisWebApp("hinocity.maps.arcgis.com", "08e3629b00114275925dbb849668e12c"),
-        verified: false,
+        verified: true,
       },
     ],
     contact: { dept: "まちづくり部 建築指導課", phone: "042-587-6211", note: "道路の扱いは電話・メールでは答えてもらえない。窓口で確認", noPhoneInquiry: true },
@@ -336,7 +338,7 @@ const TAMA_CITIES: Municipality[] = [
         url: "https://www.city.nishitokyo.lg.jp/siseizyoho/matidukuri/kentikusidou/dourosyubetu.html",
         verified: false,
       },
-      { kind: "public_road", label: "道路網図（西東京市まちづくりマップ）", build: wagmap("nishitokyo", 2), verified: false },
+      { kind: "public_road", label: "道路網図（西東京市まちづくりマップ）", build: wagmap("nishitokyo", 2), verified: true },
     ],
     contact: { dept: "まちづくり部 建築指導課 審査係", phone: "042-438-4017" },
   },

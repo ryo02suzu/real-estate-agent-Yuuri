@@ -2,7 +2,7 @@
 // 特定行政庁は宇都宮・足利・栃木・佐野・鹿沼・日光・小山・大田原・那須塩原の9市。
 // それ以外の市町は県（令和7年4月から県庁の建築指導課に集約）が扱う。
 import type { Contact, MapLink, Municipality } from "../municipalities";
-import { sonicweb } from "../vendors";
+import { sonicweb, wagmap } from "../vendors";
 
 const pref = "栃木県" as const;
 
@@ -36,17 +36,17 @@ const CITIES: Municipality[] = [
       noPhoneInquiry: true,
     },
   },
-  { pref, name: "足利市", codes: ["09202"], coverage: "none", maps: [], contact: { dept: "都市建設部 建築指導課", phone: "0284-20-2222（代表）" } },
+  { pref, name: "足利市", codes: ["09202"], coverage: "none", maps: [{ kind: "public_road", label: "認定路線網図（市道）", build: sonicweb("ashikaga", "th_3"), verified: true }], contact: { dept: "都市建設部 建築指導課 建築指導担当", phone: "0284-20-2170" } },
   {
     pref,
     name: "栃木市",
     codes: ["09203"],
     coverage: "partial",
-    maps: [{ kind: "designated_only", label: "指定道路図（栃木市地理情報システム・位置指定道路の一部）", build: sonicweb("tochigi", "th_38"), verified: false }],
+    maps: [{ kind: "designated_only", label: "指定道路図（栃木市地理情報システム・位置指定道路の一部）", build: sonicweb("tochigi", "th_38"), verified: true }],
     contact: { dept: "建築指導課 建築指導係", phone: "0282-21-2441" },
     note: "公開は位置指定道路の一部だけ。建築確認では必ず建築指導課で最新を確認。",
   },
-  { pref, name: "佐野市", codes: ["09204"], coverage: "none", maps: [], contact: { dept: "都市建設部 建築指導課", phone: "0283-24-5111（代表）" } },
+  { pref, name: "佐野市", codes: ["09204"], coverage: "none", maps: [{ kind: "public_road", label: "路線網図（市道）", build: sonicweb("sano", "th_54"), verified: true }], contact: { dept: "都市建設部 建築指導課", phone: "0283-20-3104" } },
   {
     pref,
     name: "鹿沼市",
@@ -64,8 +64,8 @@ const CITIES: Municipality[] = [
     maps: [{ kind: "designated_only", label: "指定道路図（画像・1項4号/5号/2項）", build: null, url: "https://www.city.nikko.lg.jp/soshiki/7/1035/6/8377.html", verified: false }],
     contact: { dept: "建設部 建築住宅課 建築指導係", phone: "0288-21-5197", note: "図で分からない道はフォームで照会・調査を依頼できる" },
   },
-  { pref, name: "小山市", codes: ["09208"], coverage: "none", maps: [], contact: { dept: "都市整備部 建築指導課", phone: "0285-23-1111（代表）" } },
-  { pref, name: "大田原市", codes: ["09210"], coverage: "none", maps: [], contact: { dept: "建築指導課", phone: "0287-23-1111（代表）" } },
+  { pref, name: "小山市", codes: ["09208"], coverage: "none", maps: [{ kind: "public_road", label: "認定道路情報（おやまわが街ガイド）", build: wagmap("oyamacity", 3, { scale: 2500 }), verified: true }], contact: { dept: "建築指導課 建築指導係（市役所4階）", phone: "0285-22-9233" } },
+  { pref, name: "大田原市", codes: ["09210"], coverage: "none", maps: [], contact: { dept: "建築指導課", phone: "0287-23-1178" } },
   { pref, name: "那須塩原市", codes: ["09213"], coverage: "none", maps: [], contact: { dept: "建築指導課", phone: "0287-62-7174" } },
 ];
 

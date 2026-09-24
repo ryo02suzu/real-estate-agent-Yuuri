@@ -41,21 +41,21 @@ const onPrefMap = (name: string, code: string, contact: Contact): Municipality =
 
 const CITIES: Municipality[] = [
   onPrefMap("水戸市", "08201", { dept: "建築指導課 審査第2係", phone: "029-224-1111（代表・内線3461）" }),
-  onPrefMap("日立市", "08202", { dept: "建築指導課", phone: "0294-22-3111（代表）" }),
+  onPrefMap("日立市", "08202", { dept: "都市建設部 建築指導課（本庁舎5階）", phone: "0294-22-3111（代表・内線428）" }),
   {
     pref,
     name: "土浦市",
     codes: ["08203"],
     coverage: "full",
     maps: [
-      { kind: "road_type", label: "指定道路（土浦市地図情報）", build: sonicweb("tsuchiura", "th_1"), verified: false },
-      { kind: "public_road", label: "認定路線網図（市道）", build: sonicweb("tsuchiura", "th_30"), verified: false },
+      { kind: "road_type", label: "指定道路（土浦市地図情報）", build: sonicweb("tsuchiura", "th_1"), verified: true },
+      { kind: "public_road", label: "認定路線網図（市道）", build: sonicweb("tsuchiura", "th_30"), verified: true },
     ],
-    contact: { dept: "建築指導課", phone: "029-826-1111（代表）" },
+    contact: { dept: "建築指導課 建築係（本庁舎4階）", phone: "029-826-1111（代表・内線2254）" },
   },
-  onPrefMap("古河市", "08204", { dept: "建築指導課", phone: "0280-92-3111（代表）" }),
-  { pref, name: "高萩市", codes: ["08214"], coverage: "none", maps: [], contact: { dept: "建築課", phone: "0293-23-2111（代表）" } },
-  { pref, name: "北茨城市", codes: ["08215"], coverage: "none", maps: [], contact: { dept: "建築課", phone: "0293-43-1111（代表）" } },
+  onPrefMap("古河市", "08204", { dept: "建築指導課", phone: "0280-76-1511（代表）" }),
+  { pref, name: "高萩市", codes: ["08214"], coverage: "none", maps: [], contact: { dept: "都市建設課 建築指導検査室（本庁舎2階）", phone: "0293-23-7032" } },
+  { pref, name: "北茨城市", codes: ["08215"], coverage: "none", maps: [], contact: { dept: "建築課", phone: "0293-43-1111（代表・内線254）" } },
   onPrefMap("取手市", "08217", { dept: "建築指導課", phone: "0297-74-2141（代表）" }),
   {
     pref,
@@ -66,7 +66,7 @@ const CITIES: Municipality[] = [
     contact: { dept: "建築指導課", phone: "029-883-1111（代表）" },
     note: "市道かどうかは「つくミル」の認定道路マップで確認できるが、建築基準法の道路種別は窓口で確認。",
   },
-  onPrefMap("ひたちなか市", "08221", { dept: "建築指導課", phone: "029-273-0111（代表）" }),
+  onPrefMap("ひたちなか市", "08221", { dept: "建築指導課 審査係", phone: "029-273-0111（代表・内線1351）" }),
 ];
 
 // --- 県が扱う35市町村 ----------------------------------------------------------

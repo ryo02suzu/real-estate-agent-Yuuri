@@ -100,3 +100,16 @@ export const MapIcon = ({ className }: P) => (
     <path d="m3 6 6-2 6 2 6-2v14l-6 2-6-2-6 2V6ZM9 4v14M15 6v14" />
   </svg>
 );
+
+export const CopyIcon = ({ className }: P) => (
+  <svg {...base} className={className}>
+    <rect x="9" y="9" width="11" height="11" rx="2" />
+    <path d="M5 15V6a2 2 0 0 1 2-2h9" />
+  </svg>
+);
+
+export const ShareIcon = ({ className }: P) => (
+  <svg {...base} className={className}>
+    <path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+  </svg>
+);

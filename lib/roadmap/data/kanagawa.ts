@@ -117,7 +117,7 @@ const CITIES: Municipality[] = [
     coverage: "full",
     maps: [
       { kind: "road_type", label: "指定道路図（まっぷdeちがさき）", build: wagmap("chigasaki", 15), verified: true },
-      { kind: "public_road", label: "市道番号・認定幅員図", build: wagmap("chigasaki", 83), verified: false },
+      { kind: "public_road", label: "市道番号・認定幅員図", build: wagmap("chigasaki", 83), verified: true },
     ],
     contact: { dept: "都市部 建築指導課（本庁舎3階）", phone: "0467-81-7184" },
   },
@@ -127,8 +127,8 @@ const CITIES: Municipality[] = [
     codes: ["14211"],
     coverage: "full",
     maps: [
-      { kind: "road_type", label: "指定道路種別（はだのWEBマップ）", build: wagmap("hadano", 17), verified: false },
-      { kind: "public_road", label: "認定市道路線網図", build: wagmap("hadano", 5), verified: false },
+      { kind: "road_type", label: "指定道路種別（はだのWEBマップ）", build: wagmap("hadano", 17), verified: true },
+      { kind: "public_road", label: "認定市道路線網図", build: wagmap("hadano", 5), verified: true },
     ],
     contact: { dept: "都市部 建築指導課", phone: "0463-83-0883" },
   },
@@ -139,7 +139,7 @@ const CITIES: Municipality[] = [
     coverage: "full",
     maps: [
       { kind: "road_type", label: "建築基準法道路（厚木タウンマップ）", build: wagmap("atsugi", 4), verified: true },
-      { kind: "public_road", label: "路線網図（市道）", build: wagmap("atsugi", 11), verified: false },
+      { kind: "public_road", label: "路線網図（市道）", build: wagmap("atsugi", 11), verified: true },
     ],
     contact: { dept: "都市みらい部 建築指導課 建築指導係", phone: "046-225-2430", note: "電話だけの問い合わせには答えてもらえない。窓口か電子申請で道路相談", noPhoneInquiry: true },
   },

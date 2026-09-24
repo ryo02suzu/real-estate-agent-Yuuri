@@ -110,6 +110,13 @@ describe("buildLinks", () => {
     expect(link.url).toBe("https://www.machi-info.jp/machikado/yamato_city/consentpage/gis-road.html?lon=139.458206&lat=35.487579&scale=1000");
   });
 
+  it("ArcGIS Experience Builder は「/#」の後に center の区切りを %2C で渡す（埼玉県の町の地図）", () => {
+    const [link] = buildLinks(findMunicipality("11408")!, 36.118332, 139.193054); // 寄居町
+    expect(link.url).toBe(
+      "https://experience.arcgis.com/experience/a810ee78463c4ba9b5cbcbd3fe680416/#widget_34=center:139.193054%2C36.118332%2C4326,scale:2500",
+    );
+  });
+
   it("川崎市は区ごとに建築審査課の担当が変わる", () => {
     const m = findMunicipality("14135")!;
     expect(resolveContact(m, "14131")?.phone).toBe("044-200-3016");

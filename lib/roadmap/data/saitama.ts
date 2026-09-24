@@ -15,7 +15,7 @@ const CITIES: Municipality[] = [
     coverage: "partial",
     maps: [
       { kind: "designated_only", label: "指定道路図（位置指定道路のみ）", build: sonicweb("saitama", "th_45"), verified: true },
-      { kind: "public_road", label: "認定路線（市道）", build: sonicweb("saitama", "th_31"), verified: false },
+      { kind: "public_road", label: "認定路線（市道）", build: sonicweb("saitama", "th_31"), verified: true },
     ],
     // 西・北・大宮・見沼・岩槻区 = 北部建設事務所、中央・桜・浦和・南・緑区 = 南部建設事務所
     contactByCode: {
@@ -84,7 +84,7 @@ const CITIES: Municipality[] = [
     coverage: "full",
     maps: [
       { kind: "road_type", label: "建築基準法上の道路種別（かすかべオラナビ）", build: geocloudMp("kasukabe.geocloud.jp", 81), verified: true },
-      { kind: "public_road", label: "道路台帳参考図（市道）", build: geocloudMp("kasukabe.geocloud.jp", 11), verified: false },
+      { kind: "public_road", label: "道路台帳参考図（市道）", build: geocloudMp("kasukabe.geocloud.jp", 11), verified: true },
     ],
     contact: { dept: "建築課 建築安全担当", phone: "048-796-8046", hours: "平日 8:30〜17:15", note: "地図に色が付いていない道は窓口で確認（電話不可）", noPhoneInquiry: true },
   },
@@ -139,7 +139,7 @@ const CITIES: Municipality[] = [
     name: "入間市",
     codes: ["11225"],
     coverage: "none",
-    maps: [{ kind: "public_road", label: "認定路線マップ（市道）", build: wagmap("iruma", 3), verified: false }],
+    maps: [{ kind: "public_road", label: "認定路線マップ（市道）", build: wagmap("iruma", 3), verified: true }],
     contact: { dept: "都市整備部 開発建築課", phone: "04-2964-1111（代表）" },
   },
   {
@@ -149,7 +149,7 @@ const CITIES: Municipality[] = [
     coverage: "full",
     maps: [
       { kind: "road_type", label: "建築基準法道路（公道・私道とも）", build: wagmap("asaka", 120), verified: true },
-      { kind: "public_road", label: "道路情報（市道）", build: wagmap("asaka", 81), verified: false },
+      { kind: "public_road", label: "道路情報（市道）", build: wagmap("asaka", 81), verified: true },
     ],
     contact: { dept: "都市建設部 開発建築課", phone: "048-463-2585" },
   },
@@ -223,7 +223,7 @@ const CITIES: Municipality[] = [
     name: "加須市",
     codes: ["11210"],
     coverage: "none",
-    maps: [{ kind: "public_road", label: "かぞまっぷ 道路台帳図（参考）", build: wagmap("kazo", 4), verified: false }],
+    maps: [{ kind: "public_road", label: "かぞまっぷ 道路台帳図（参考）", build: wagmap("kazo", 4), verified: true }],
     contact: { dept: "都市整備部 建築開発課（建築指導担当）", phone: "0480-62-1111（代表）", hours: "平日 8:30〜17:15" },
   },
   {
@@ -257,7 +257,7 @@ const CITIES: Municipality[] = [
     coverage: "partial",
     maps: [
       { kind: "designated_only", label: "指定道路図（位置指定道路）", build: alandis("https://webgis.alandis.jp/hanno11/210/webgis", "shitei"), verified: true },
-      { kind: "public_road", label: "市道路線情報", build: alandis("https://webgis.alandis.jp/hanno11/210/webgis", "doro"), verified: false },
+      { kind: "public_road", label: "市道路線情報", build: alandis("https://webgis.alandis.jp/hanno11/210/webgis", "doro"), verified: true },
     ],
     contact: { dept: "建築課", phone: "042-973-2111（代表）", note: "電話では答えてもらえない。メールかFAXで問い合わせる", noPhoneInquiry: true },
   },
@@ -326,7 +326,7 @@ const CITIES: Municipality[] = [
     coverage: "partial",
     maps: [
       { kind: "designated_only", label: "指定道路情報（位置指定道路）", build: cloudgis("okegawa.cloudgis.jp", "shitei"), verified: true },
-      { kind: "public_road", label: "市道認定（道路台帳・道路網図）", build: cloudgis("okegawa.cloudgis.jp", "road"), verified: false },
+      { kind: "public_road", label: "市道認定（道路台帳・道路網図）", build: cloudgis("okegawa.cloudgis.jp", "road"), verified: true },
     ],
     contact: { dept: "建築課", phone: "048-786-3211（代表）" },
   },
@@ -429,7 +429,7 @@ const PREF_ROAD_MAP: MapLink = {
   kind: "road_type",
   label: "埼玉県指定道路図（試行）",
   build: arcgisExperience("a810ee78463c4ba9b5cbcbd3fe680416", "widget_34"),
-  verified: false,
+  verified: true,
 };
 
 const prefTown = (name: string, code: string, office: keyof typeof OFFICE): Municipality => ({

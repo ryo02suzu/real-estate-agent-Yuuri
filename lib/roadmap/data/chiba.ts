@@ -18,7 +18,7 @@ const CITIES: Municipality[] = [
     coverage: "full",
     maps: [
       { kind: "road_type", label: "建築基準法道路（千葉市地図情報システム）", build: alandis("https://webgis.alandis.jp/chiba12/webgis", "guest3", "&li=3&si=0"), verified: true },
-      { kind: "public_road", label: "認定道路（市道）", build: alandis("https://webgis.alandis.jp/chiba12/webgis", "guest1", "&li=1&si=0"), verified: false },
+      { kind: "public_road", label: "認定道路（市道）", build: alandis("https://webgis.alandis.jp/chiba12/webgis", "guest1", "&li=1&si=0"), verified: true },
     ],
     contact: { dept: "建築情報相談課", phone: "043-245-5841" },
     note: "色の無い（白地の）道路は、建築基準法の道路でないか未判定。",
@@ -36,7 +36,7 @@ const CITIES: Municipality[] = [
     name: "船橋市",
     codes: ["12204"],
     coverage: "none",
-    maps: [{ kind: "public_road", label: "道路台帳図（市道）", build: sonicweb("funabashi", "th_22"), verified: false }],
+    maps: [{ kind: "public_road", label: "道路台帳図（市道）", build: sonicweb("funabashi", "th_22"), verified: true }],
     contact: { dept: "建築指導課（市役所6階）", phone: "047-436-2672", hours: "平日 9:00〜17:00", note: "道路種別は窓口のみ（電話・FAX不可）", noPhoneInquiry: true },
   },
   {
@@ -46,7 +46,7 @@ const CITIES: Municipality[] = [
     coverage: "full",
     maps: [
       { kind: "road_type", label: "指定道路（やさシティマップ）", build: sonicweb("matsudo", "th_33"), verified: true },
-      { kind: "public_road", label: "認定路線網図（市道）", build: sonicweb("matsudo", "th_8"), verified: false },
+      { kind: "public_road", label: "認定路線網図（市道）", build: sonicweb("matsudo", "th_8"), verified: true },
     ],
     contact: { dept: "建築指導課（新館8階）", phone: "047-366-7368", note: "道路種別の電話での問い合わせは不可。窓口で確認", noPhoneInquiry: true },
   },
@@ -55,7 +55,7 @@ const CITIES: Municipality[] = [
     name: "柏市",
     codes: ["12217"],
     coverage: "none",
-    maps: [{ kind: "public_road", label: "市道認定路線網図", build: sonicweb("kashiwa", "th_15"), verified: false }],
+    maps: [{ kind: "public_road", label: "市道認定路線網図", build: sonicweb("kashiwa", "th_15"), verified: true }],
     contact: { dept: "建築指導課（分庁舎2 1階）", phone: "04-7167-1145", note: "道路種別は窓口のみ（電話・FAX・メール不可）", noPhoneInquiry: true },
   },
   {
@@ -74,7 +74,7 @@ const CITIES: Municipality[] = [
         kind: "public_road",
         label: "道路台帳図（市道）",
         build: alandis("https://www2.city-gis.ichihara.chiba.jp/ichihara/alandis/webgis", "guest07", "&li=7&si=0"),
-        verified: false,
+        verified: true,
       },
     ],
     contact: { dept: "建築指導課", phone: "0436-23-9840" },
@@ -127,7 +127,7 @@ const CITIES: Municipality[] = [
     name: "木更津市",
     codes: ["12206"],
     coverage: "none",
-    maps: [{ kind: "public_road", label: "道路情報マップ（市道路線網図）", build: wagmap("kisarazu", 3), verified: false }],
+    maps: [{ kind: "public_road", label: "道路情報マップ（市道路線網図）", build: wagmap("kisarazu", 3), verified: true }],
     contact: {
       dept: "都市整備部 建築指導課",
       phone: "0438-23-8596",
@@ -214,7 +214,7 @@ const CITIES: Municipality[] = [
     name: "印西市",
     codes: ["12231"],
     coverage: "none",
-    maps: [{ kind: "public_road", label: "認定市道路網図", build: wagmap("inzai", 2), verified: false }],
+    maps: [{ kind: "public_road", label: "認定市道路網図", build: wagmap("inzai", 2), verified: true }],
     contact: { dept: "開発建築課 建築指導係", phone: "0476-33-4909", hours: "平日 9:00〜16:30", note: "道路相談書を提出して判定してもらう" },
   },
 ];

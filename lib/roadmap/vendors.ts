@@ -74,14 +74,18 @@ export const geocloudMp =
   (lat, lng) =>
     `https://${host}/mp/${mapId}?z=18&ll=${lat.toFixed(6)},${lng.toFixed(6)}`;
 
-/** ArcGIS Experience Builder。#<地図ウィジェットID>=center:経度,緯度,4326,scale:n。pageUrl は自治体の ArcGIS Enterprise 上のアプリも可 */
+/**
+ * ArcGIS Experience Builder。…/#<地図ウィジェットID>=center:経度%2C緯度%2C4326,scale:n。
+ * 「#」の直前に「/」が無いと位置指定が無視される。center 内のカンマは %2C にしないと
+ * 「,」区切りのパラメータとして分解されて初期表示に戻る（埼玉県の地図で確認）。pageUrl は自治体の ArcGIS Enterprise 上のアプリも可
+ */
 export const arcgisExperienceAt =
   (pageUrl: string, mapWidget: string, scale = 2500): Build =>
   (lat, lng) =>
-    `${pageUrl}#${mapWidget}=center:${lng.toFixed(6)},${lat.toFixed(6)},4326,scale:${scale}`;
+    `${pageUrl}#${mapWidget}=center:${lng.toFixed(6)}%2C${lat.toFixed(6)}%2C4326,scale:${scale}`;
 
 export const arcgisExperience = (appId: string, mapWidget: string, scale = 2500): Build =>
-  arcgisExperienceAt(`https://experience.arcgis.com/experience/${appId}`, mapWidget, scale);
+  arcgisExperienceAt(`https://experience.arcgis.com/experience/${appId}/`, mapWidget, scale);
 
 /** machi-info.jp（大和市など）。同意ページが lon/lat/scale を地図へ引き継ぐ。世界測地系 */
 export const machiInfo =

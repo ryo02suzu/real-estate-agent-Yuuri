@@ -69,7 +69,7 @@ const CITIES: Municipality[] = [
     codes: ["10204"],
     coverage: "partial",
     maps: [PREF_ROAD_MAP],
-    contact: { dept: "建築指導課", phone: "0270-24-5111（代表）" },
+    contact: { dept: "都市計画部 建築指導課 建築指導係", phone: "0270-27-2762" },
     note: "県の地図で指定道路の一部が確認できる。道路種別は建築指導課で確認。",
   },
   {
@@ -78,7 +78,7 @@ const CITIES: Municipality[] = [
     codes: ["10205"],
     coverage: "none",
     maps: [],
-    contact: { dept: "建築指導課", phone: "0276-47-1111（代表）" },
+    contact: { dept: "建築指導課 建築行政係", phone: "0276-47-1871" },
   },
   {
     pref,
@@ -86,7 +86,7 @@ const CITIES: Municipality[] = [
     codes: ["10207"],
     coverage: "none",
     maps: [],
-    contact: { dept: "建築指導課", phone: "0276-72-4111（代表）" },
+    contact: { dept: "都市建設部 建築課 建築指導係", phone: "0276-72-4111（代表）" },
   },
 ];
 
