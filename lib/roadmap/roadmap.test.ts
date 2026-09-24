@@ -23,6 +23,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("埼玉県の全市町村を網羅している", () => covered("埼玉県"));
   it("千葉県の全市町村を網羅している", () => covered("千葉県"));
   it("神奈川県の全市町村を網羅している", () => covered("神奈川県"));
+  it("東京都の全区市町村を網羅している", () => covered("東京都"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
@@ -140,10 +141,10 @@ describe("lookup", () => {
 
   it("未対応の市町村なら unsupported", async () => {
     stubFetch(
-      [{ geometry: { coordinates: [139.7528, 35.694] }, properties: { title: "東京都千代田区九段南一丁目" } }],
-      { results: { muniCd: "13101", lv01Nm: "九段南一丁目" } },
+      [{ geometry: { coordinates: [138.568449, 35.662257] }, properties: { title: "山梨県甲府市丸の内一丁目" } }],
+      { results: { muniCd: "19201", lv01Nm: "丸の内一丁目" } },
     );
-    const r = await lookup("東京都千代田区九段南1-2-1");
+    const r = await lookup("山梨県甲府市丸の内1-18-1");
     expect(r.status).toBe("unsupported");
   });
 

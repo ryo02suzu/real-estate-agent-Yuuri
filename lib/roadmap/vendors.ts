@@ -74,11 +74,14 @@ export const geocloudMp =
   (lat, lng) =>
     `https://${host}/mp/${mapId}?z=18&ll=${lat.toFixed(6)},${lng.toFixed(6)}`;
 
-/** ArcGIS Experience Builder。#<地図ウィジェットID>=center:経度,緯度,4326,scale:n */
-export const arcgisExperience =
-  (appId: string, mapWidget: string, scale = 2500): Build =>
+/** ArcGIS Experience Builder。#<地図ウィジェットID>=center:経度,緯度,4326,scale:n。pageUrl は自治体の ArcGIS Enterprise 上のアプリも可 */
+export const arcgisExperienceAt =
+  (pageUrl: string, mapWidget: string, scale = 2500): Build =>
   (lat, lng) =>
-    `https://experience.arcgis.com/experience/${appId}#${mapWidget}=center:${lng.toFixed(6)},${lat.toFixed(6)},4326,scale:${scale}`;
+    `${pageUrl}#${mapWidget}=center:${lng.toFixed(6)},${lat.toFixed(6)},4326,scale:${scale}`;
+
+export const arcgisExperience = (appId: string, mapWidget: string, scale = 2500): Build =>
+  arcgisExperienceAt(`https://experience.arcgis.com/experience/${appId}`, mapWidget, scale);
 
 /** machi-info.jp（大和市など）。同意ページが lon/lat/scale を地図へ引き継ぐ。世界測地系 */
 export const machiInfo =
@@ -91,3 +94,12 @@ export const arcgisWebApp =
   (host: string, appId: string, scale = 2500): Build =>
   (lat, lng) =>
     `https://${host}/apps/webappviewer/index.html?id=${appId}&center=${lng.toFixed(6)},${lat.toFixed(6)},4326&scale=${scale}`;
+
+/** machi-info の新版（<区>.machi-info.jp、Google マップ）。?map_id=&lt=緯度&lg=経度&z= */
+export const machiInfoMap =
+  (host: string, mapId: number, zoom = 18): Build =>
+  (lat, lng) =>
+    `https://${host}/?map_id=${mapId}&lt=${lat.toFixed(6)}&lg=${lng.toFixed(6)}&z=${zoom}`;
+
+/** 中央区都市計画情報等閲覧システム。map.php?lat=&lon=（表示図の切替は画面上で行う） */
+export const chuoMap: Build = (lat, lng) => `https://chuo-map.jp/map.php?lat=${lat.toFixed(6)}&lon=${lng.toFixed(6)}`;
