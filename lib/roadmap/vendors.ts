@@ -3,14 +3,14 @@
 type Build = (lat: number, lng: number) => string;
 
 /**
- * wagmap（www2.wagmap.jp）。gprj=3 を付けると世界測地系(JGD2000/WGS84)の座標として解釈される。
- * 付けないと自治体ごとに旧日本測地系／世界測地系の解釈が違い、約450mずれる
- * （越谷・上尾・熊谷・川越・本庄・朝霞・鶴ヶ島・茂原・成田の市役所で gprj=3 の中心一致を確認済み）。
+ * wagmap（www2.wagmap.jp）。gprj=2 を付けると mpx/mpy を世界測地系(WGS84)の経度・緯度として受け取り、
+ * サーバが地図の測地系へ変換する。付けないと地図の測地系（旧日本測地系が多い）のまま解釈され約450mずれる。
+ * gprj=3（JGD2000）は厚木・小田原・茅ヶ崎などで無視されるため使わない（全地図の変換結果を確認済み）。
  */
 export const wagmap =
   (slug: string, mid: number): Build =>
   (lat, lng) =>
-    `https://www2.wagmap.jp/${slug}/Map?mid=${mid}&mpx=${lng.toFixed(6)}&mpy=${lat.toFixed(6)}&mps=1000&gprj=3`;
+    `https://www2.wagmap.jp/${slug}/Map?mid=${mid}&mpx=${lng.toFixed(6)}&mpy=${lat.toFixed(6)}&mps=1000&gprj=2`;
 
 /** Sonicweb（sonicweb-asp.jp）。世界測地系、pos=経度,緯度。layers は最初から表示するレイヤ（例: "dm%2Cth_5"） */
 export const sonicweb =

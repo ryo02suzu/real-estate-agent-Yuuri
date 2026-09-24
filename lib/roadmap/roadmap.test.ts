@@ -77,9 +77,9 @@ describe("MUNICIPALITIES", () => {
 });
 
 describe("buildLinks", () => {
-  it("wagmap は世界測地系の座標に gprj=3 を付ける（自治体ごとの測地系の違いを吸収）", () => {
+  it("wagmap は世界測地系の座標に gprj=2 を付ける（自治体ごとの測地系の違いを吸収）", () => {
     const [link] = buildLinks(findMunicipality("11202")!, KUMAGAYA_CITY_HALL.lat, KUMAGAYA_CITY_HALL.lng);
-    expect(link.url).toBe("https://www2.wagmap.jp/kumagaya/Map?mid=170&mpx=139.388580&mpy=36.147129&mps=1000&gprj=3");
+    expect(link.url).toBe("https://www2.wagmap.jp/kumagaya/Map?mid=170&mpx=139.388580&mpy=36.147129&mps=1000&gprj=2");
     expect(link.pinpoint).toBe(true);
   });
 

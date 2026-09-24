@@ -77,7 +77,7 @@
 |---|---|---|
 | alandis | 千葉市・市原市・流山市 | `…/index.php/autologin_jswebgis?…&u=<マップ>&x=&y=`（EPSG:3857）`&rs=3857` |
 | Sonicweb | 松戸市・浦安市（船橋・柏は市道図） | `map?theme=&pos=経度,緯度` |
-| wagmap | 成田市・茂原市（木更津・印西は市道図） | `Map?mid=&mpx=経度&mpy=緯度&gprj=3` |
+| wagmap | 成田市・茂原市（木更津・印西は市道図） | `Map?mid=&mpx=経度&mpy=緯度&gprj=2`（WGS84 を指定。gprj=3 は無視する地図がある） |
 | geocloud 旧版 | 市川市 | `webgis/?mp=…&ll=緯度,経度&z=` |
 | geocloud 新版 | 我孫子市 | `/mp/<地図ID>?ll=緯度,経度&z=` |
 
