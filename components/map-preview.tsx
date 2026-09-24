@@ -7,7 +7,7 @@ export function MapPreview({ lat, lng }: { lat: number; lng: number }) {
   // z18 のタイルを半分の大きさで描く＝縮尺は z17 相当で、高精細画面でもくっきり
   const { tiles, size, offsetX, offsetY } = tilesAround(lat, lng, 18, { size: 128, radius: 2, layer: "pale" });
   return (
-    <div className="relative h-[120px] overflow-hidden rounded-xl border border-line bg-mint">
+    <div className="relative h-[104px] overflow-hidden rounded-xl border border-line bg-mint">
       <div className="absolute left-1/2 top-1/2" style={{ transform: `translate(${-offsetX}px, ${-offsetY}px)` }}>
         {tiles.map((t) => (
           <img key={`${t.x}-${t.y}`} src={t.url} alt="" width={size} height={size} className="absolute max-w-none" style={{ left: t.left, top: t.top }} />

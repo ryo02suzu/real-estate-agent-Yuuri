@@ -106,7 +106,7 @@ export default function Home() {
         <Header onMenu={() => open("menu")} onHome={shown ? backHome : undefined} compact={!!shown} />
 
         {shown ? (
-          <div className="mt-4 space-y-3">
+          <div className="mt-3 space-y-2.5">
             <SearchCard value={input} onChange={setInput} onSearch={() => search(input, true)} loading={loading} compact />
             {error && <ErrorLine text={error} />}
             <ResultView query={shown.query} result={shown.result} />
@@ -210,7 +210,7 @@ export default function Home() {
 
 function ErrorLine({ text }: { text: string }) {
   return (
-    <p role="alert" className="flex gap-2 rounded-2xl bg-red-50 p-3 text-sm text-red-800">
+    <p role="alert" className="flex gap-2 rounded-2xl bg-[#f8efe9] p-3 text-sm text-[#8a4f3a]">
       <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
       {text}
     </p>
