@@ -1,3 +1,5 @@
+"use client";
+
 /* eslint-disable @next/next/no-img-element -- 外部タイル画像をそのまま並べるため */
 import { tilesAround } from "@/lib/tiles";
 import { ExpandIcon, PinIcon } from "./icons";
@@ -10,7 +12,20 @@ export function MapPreview({ lat, lng }: { lat: number; lng: number }) {
     <div className="relative h-[104px] overflow-hidden rounded-xl border border-line bg-mint">
       <div className="absolute left-1/2 top-1/2" style={{ transform: `translate(${-offsetX}px, ${-offsetY}px)` }}>
         {tiles.map((t) => (
-          <img key={`${t.x}-${t.y}`} src={t.url} alt="" width={size} height={size} className="absolute max-w-none" style={{ left: t.left, top: t.top }} />
+          <img
+            key={`${t.x}-${t.y}`}
+            src={t.url}
+            alt=""
+            width={size}
+            height={size}
+            className="absolute max-w-none"
+            style={{ left: t.left, top: t.top }}
+            // 淡色地図に無いタイル（水面など）は標準地図で埋める
+            onError={(e) => {
+              const img = e.currentTarget;
+              if (img.src.includes("/pale/")) img.src = img.src.replace("/pale/", "/std/");
+            }}
+          />
         ))}
       </div>
       <PinIcon className="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-full text-brand drop-shadow" />

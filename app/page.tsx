@@ -43,7 +43,7 @@ export default function Home() {
     try {
       const result = await lookup(q);
       setShown({ query: q, result });
-      if (result.status !== "not_found") {
+      if (result.status === "ok" || result.status === "unsupported") {
         setHistory(
           addHistory({
             address: q,
@@ -109,7 +109,7 @@ export default function Home() {
           <div className="mt-3 space-y-2.5">
             <SearchCard value={input} onChange={setInput} onSearch={() => search(input, true)} loading={loading} compact />
             {error && <ErrorLine text={error} />}
-            <ResultView query={shown.query} result={shown.result} />
+            <ResultView query={shown.query} result={shown.result} onPick={(a) => search(a, false)} />
           </div>
         ) : (
           <div className="mt-5 space-y-4">

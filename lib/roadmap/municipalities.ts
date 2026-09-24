@@ -22,6 +22,8 @@ export type MapLink = {
   url?: string;
   /** 実機で「その地点が中心に開く」ことを確認済みか */
   verified: boolean;
+  /** 開いたあとに必要な操作（レイヤの切り替えなど）。ボタンの下に出す */
+  tip?: string;
 };
 
 export type Contact = {
@@ -65,7 +67,7 @@ export function resolveContact(m: Municipality, muniCd: string): Contact | undef
   return m.contactByCode?.[muniCd] ?? m.contact;
 }
 
-export type ResolvedLink = { kind: MapKind; label: string; url: string; pinpoint: boolean; verified: boolean };
+export type ResolvedLink = { kind: MapKind; label: string; url: string; pinpoint: boolean; verified: boolean; tip?: string };
 
 /** 座標から、その市で開くべき地図のURL一覧を作る */
 export function buildLinks(m: Municipality, lat: number, lng: number): ResolvedLink[] {
@@ -75,5 +77,6 @@ export function buildLinks(m: Municipality, lat: number, lng: number): ResolvedL
     url: link.build ? link.build(lat, lng) : link.url!,
     pinpoint: link.build !== null,
     verified: link.verified,
+    tip: link.tip,
   }));
 }

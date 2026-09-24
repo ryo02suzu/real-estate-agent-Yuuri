@@ -1,9 +1,15 @@
+"use client";
+
+import { useState } from "react";
+import { ASK, BRING, buildInquiryText } from "@/lib/inquiry";
 import type { Contact } from "@/lib/roadmap";
 import { parsePhones } from "@/lib/phone";
-import { AlertIcon, ChevronRightIcon, MailIcon, PhoneIcon } from "./icons";
+import { AlertIcon, ChevronRightIcon, CopyIcon, MailIcon, NoteIcon, PhoneIcon } from "./icons";
+import { Sheet } from "./sheet";
 
 /** 問い合わせ先。部署名などの表と、ワンタップで発信できる電話ボタン */
-export function ContactCard({ contact, city }: { contact: Contact; city: string }) {
+export function ContactCard({ contact, city, address }: { contact: Contact; city: string; address: string }) {
+  const [memo, setMemo] = useState(false);
   const phones = contact.phone ? parsePhones(contact.phone) : [];
   // 県の出先機関（「千葉県 ○○土木事務所」など）は市町村名を付けない
   const dept = /^(東京都|\S{2,3}県)\s/.test(contact.dept) ? contact.dept : `${city} ${contact.dept}`;
@@ -12,7 +18,10 @@ export function ContactCard({ contact, city }: { contact: Contact; city: string 
       <h3 className="flex items-center gap-2 border-b border-line/70 pb-2 text-[13px] font-semibold text-ink">
         <PhoneIcon className="h-4 w-4 text-brand-light" />
         お問い合わせ先
-        {phones.length > 0 && <span className="ml-auto text-[10.5px] font-normal text-muted">番号をタップで電話</span>}
+        <button onClick={() => setMemo(true)} className="ml-auto flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 text-[11px] font-normal text-brand">
+          <NoteIcon className="h-3.5 w-3.5" />
+          窓口で聞くこと
+        </button>
       </h3>
       <dl className="mt-2 grid grid-cols-[4.5em_1fr] gap-x-2 gap-y-1 text-[12px] leading-relaxed">
         <dt className="text-muted">部署名</dt>
@@ -65,6 +74,49 @@ export function ContactCard({ contact, city }: { contact: Contact; city: string 
           )}
         </div>
       )}
+      <InquirySheet open={memo} onClose={() => setMemo(false)} address={address} dept={dept} />
     </section>
+  );
+}
+
+function InquirySheet({ open, onClose, address, dept }: { open: boolean; onClose: () => void; address: string; dept: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    const text = buildInquiryText(address, dept);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.prompt("コピーしてください", text);
+    }
+  };
+  return (
+    <Sheet title="窓口で聞くこと" open={open} onClose={onClose}>
+      <p className="text-[12px] text-muted">{dept}</p>
+      <h4 className="mb-1.5 mt-4 text-[13px] font-semibold text-ink">持っていくもの</h4>
+      <ul className="space-y-1 text-[13px] text-ink">
+        {BRING.map((b) => (
+          <li key={b} className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-light" />
+            {b}
+          </li>
+        ))}
+      </ul>
+      <h4 className="mb-1.5 mt-4 text-[13px] font-semibold text-ink">聞くこと</h4>
+      <ol className="space-y-1.5 text-[13px] text-ink">
+        {ASK.map((a, i) => (
+          <li key={a} className="flex gap-2">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-mint text-[11px] text-brand">{i + 1}</span>
+            {a}
+          </li>
+        ))}
+      </ol>
+      <button onClick={copy} className="bg-gold mt-5 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-[14px] font-semibold text-white">
+        <CopyIcon className="h-4 w-4" />
+        {copied ? "コピーしました" : "FAX・メール用の依頼文をコピー"}
+      </button>
+      <p className="mt-2 text-[11px] text-muted">住所と聞くことを入れた文面です。地番と会社名を書き足して使ってください。</p>
+    </Sheet>
   );
 }

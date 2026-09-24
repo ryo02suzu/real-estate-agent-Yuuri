@@ -56,6 +56,7 @@ describe("buildSummary", () => {
       lng: 139.38858,
       matchedAddress: "埼玉県熊谷市宮町二丁目",
       town: "宮町二丁目",
+      approximate: false,
       municipality: m,
       links: buildLinks(m, 36.147129, 139.38858),
       contact: resolveContact(m, "11202"),
@@ -64,5 +65,15 @@ describe("buildSummary", () => {
     expect(text).toContain("埼玉県熊谷市：ネットで分かるのは一部");
     expect(text).toContain("https://www2.wagmap.jp/kumagaya/Map?mid=170");
     expect(text).toContain("窓口：熊谷市 建築審査課 0493-39-4809");
+  });
+});
+
+describe("buildInquiryText", () => {
+  it("宛先・所在地・聞くことを入れた依頼文を作る", async () => {
+    const { buildInquiryText, ASK } = await import("./inquiry");
+    const t = buildInquiryText("埼玉県熊谷市宮町二丁目47番地", "熊谷市 建築審査課");
+    expect(t.startsWith("熊谷市 建築審査課 御中")).toBe(true);
+    expect(t).toContain("所在地：埼玉県熊谷市宮町二丁目47番地");
+    expect(t).toContain(`1. ${ASK[0]}`);
   });
 });

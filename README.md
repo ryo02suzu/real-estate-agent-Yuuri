@@ -8,6 +8,7 @@
 npm install
 npm run dev      # http://localhost:3000
 npm test         # ロジックのユニットテスト
+npm run check-links  # 全地図リンクが開けるか確認（ネット接続が必要。毎週 GitHub Actions でも実行）
 npm run build    # 静的サイトを out/ に書き出す（Vercel 等にそのまま置ける）
 ```
 

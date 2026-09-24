@@ -1,0 +1,26 @@
+# 毎週月曜の朝（日本時間 7:00）に、全市区町村の地図リンクが開けるか確認する。
+# 壊れたリンクがあるとこのワークフローが失敗し、GitHub から通知が届く。結果は実行ページの Summary に出る。
+name: 地図リンクの確認
+
+on:
+  schedule:
+    - cron: "0 22 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check-links
+      - if: always()
+        run: cat link-check-report.md >> "$GITHUB_STEP_SUMMARY" || true

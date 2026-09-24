@@ -430,6 +430,7 @@ const PREF_ROAD_MAP: MapLink = {
   label: "埼玉県指定道路図（試行）",
   build: arcgisExperience("a810ee78463c4ba9b5cbcbd3fe680416", "widget_34"),
   verified: true,
+  tip: "「利用条件に同意します」にチェックを入れて「OK」。地図の読み込みに少し時間がかかります。",
 };
 
 const prefTown = (name: string, code: string, office: keyof typeof OFFICE): Municipality => ({
@@ -439,7 +440,6 @@ const prefTown = (name: string, code: string, office: keyof typeof OFFICE): Muni
   coverage: "full",
   maps: [PREF_ROAD_MAP],
   contact: OFFICE[office],
-  note: "県の地図（ArcGIS）は読み込みに時間がかかることがあります。",
 });
 
 const PREF_TOWNS: Municipality[] = [

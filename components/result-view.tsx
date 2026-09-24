@@ -5,13 +5,14 @@ import type { LookupResult, Municipality, ResolvedLink } from "@/lib/roadmap";
 import { buildSummary } from "@/lib/summary";
 import { ContactCard } from "./contact-card";
 import { COVERAGE, CoveragePill } from "./coverage";
-import { BuildingIcon, ChevronRightIcon, CopyIcon, InfoIcon, MapIcon, PinOutlineIcon, SearchIcon, ShareIcon } from "./icons";
+import { AlertIcon, BuildingIcon, ChevronRightIcon, CopyIcon, InfoIcon, MapIcon, PinOutlineIcon, SearchIcon, ShareIcon } from "./icons";
 import { MapPreview } from "./map-preview";
 
 const CARD = "shadow-soft rounded-2xl border border-white bg-white";
 
-export function ResultView({ query, result }: { query: string; result: LookupResult }) {
+export function ResultView({ query, result, onPick }: { query: string; result: LookupResult; onPick: (address: string) => void }) {
   if (result.status === "not_found") return <NotFound query={query} />;
+  if (result.status === "choose") return <Choose query={query} result={result} onPick={onPick} />;
   if (result.status === "unsupported") return <Unsupported result={result} />;
   return <Found result={result} />;
 }
@@ -24,6 +25,27 @@ function NotFound({ query }: { query: string }) {
       <p className="mt-1 break-all text-sm text-muted">「{query}」</p>
       <p className="mt-3 text-xs leading-relaxed text-muted">都道府県・市区町村から入力してください。建物名や部屋番号は外すと見つかりやすくなります。</p>
     </div>
+  );
+}
+
+/** 同名の場所が複数あるとき、候補から選んでもらう */
+function Choose({ query, result, onPick }: { query: string; result: Extract<LookupResult, { status: "choose" }>; onPick: (address: string) => void }) {
+  return (
+    <section className={`${CARD} p-4`}>
+      <p className="text-[14px] font-semibold text-ink">「{query}」に当てはまる場所が複数あります</p>
+      <p className="mt-1 text-[11px] text-muted">物件の場所を選んでください。都道府県から入れると一度で見つかります。</p>
+      <ul className="mt-3 divide-y divide-line/70">
+        {result.candidates.map((c) => (
+          <li key={c.matchedAddress}>
+            <button onClick={() => onPick(c.matchedAddress)} className="flex w-full items-center gap-2 py-2.5 text-left text-[13px] text-ink">
+              <PinOutlineIcon className="h-4 w-4 shrink-0 text-brand-light" />
+              <span className="flex-1">{c.matchedAddress}</span>
+              <ChevronRightIcon className="h-4 w-4 shrink-0 text-muted" />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -63,12 +85,12 @@ function Found({ result }: { result: Extract<LookupResult, { status: "ok" }> }) 
       利用規約に同意すると、物件の場所が地図の中央に出ます。
     </p>
   );
-  const contact = result.contact && <ContactCard contact={result.contact} city={m.name} />;
+  const contact = result.contact && <ContactCard contact={result.contact} city={m.name} address={result.matchedAddress} />;
 
   return (
     <div className="space-y-2.5">
       <section className={CARD}>
-        <Place address={result.matchedAddress} actions={<><CopyButton text={result.matchedAddress} /><ShareButton result={result} /></>} />
+        <Place address={result.matchedAddress} approximate={result.approximate} actions={<><CopyButton text={result.matchedAddress} /><ShareButton result={result} /></>} />
         <div className="border-t border-line/70 px-4 pb-4 pt-3">
           <CityLine municipality={m} />
           <div className="mt-2.5">
@@ -110,7 +132,7 @@ function Found({ result }: { result: Extract<LookupResult, { status: "ok" }> }) 
 }
 
 /** 「検索地点」：国土地理院が解釈した住所。番地まで一致しないことがあるので「付近」 */
-function Place({ address, actions }: { address: string; actions?: React.ReactNode }) {
+function Place({ address, approximate, actions }: { address: string; approximate?: boolean; actions?: React.ReactNode }) {
   return (
     <div className="px-4 pb-3 pt-3">
       <div className="flex items-center justify-between">
@@ -123,7 +145,14 @@ function Place({ address, actions }: { address: string; actions?: React.ReactNod
       <p className="mt-1 text-[16px] font-semibold leading-snug text-ink">
         {address} <span className="whitespace-nowrap text-[13px] font-normal">付近</span>
       </p>
-      <p className="mt-1 text-[10.5px] text-muted">※ 番地までは一致しないことがあります</p>
+      {approximate ? (
+        <p className="mt-1 flex gap-1 text-[10.5px] leading-[1.6] text-[#8a4f3a]">
+          <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+          番地が見つからず、町の中心を表示しています。地図で物件の場所を探してください。
+        </p>
+      ) : (
+        <p className="mt-1 text-[10.5px] text-muted">※ 番地までは一致しないことがあります</p>
+      )}
     </div>
   );
 }
@@ -198,24 +227,34 @@ function ShareButton({ result }: { result: Extract<LookupResult, { status: "ok" 
 }
 
 function MapButton({ link, primary }: { link: ResolvedLink; primary?: boolean }) {
-  const sub = link.pinpoint ? "物件の場所が開きます" : "地図の入口が開きます（地図内で住所を検索してください）";
+  const sub = link.pinpoint ? "物件の場所が開きます" : "地図の入口が開きます";
+  // 開いたあとに操作が要る地図は、その手順を出す。入口しか開けない地図は住所の貼り付けを案内
+  const tip = link.tip ?? (link.pinpoint ? undefined : "上の「住所コピー」を押し、地図の住所検索に貼り付けてください。");
   return (
-    <a
-      href={link.url}
-      target="_blank"
-      rel="noreferrer"
-      className={
-        primary
-          ? "bg-gold flex items-center gap-3 rounded-xl px-4 py-2.5 text-white shadow-[0_6px_16px_rgba(138,102,50,0.28)] active:scale-[0.99]"
-          : "flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-2.5 text-ink active:scale-[0.99]"
-      }
-    >
-      <MapIcon className={`h-6 w-6 shrink-0 ${primary ? "" : "text-brand-light"}`} />
-      <span className="min-w-0 flex-1">
-        <span className="block text-[13.5px] font-semibold leading-snug">{link.label}</span>
-        <span className={`mt-0.5 block text-[10.5px] ${primary ? "text-white/85" : "text-muted"}`}>{sub}</span>
-      </span>
-      <ChevronRightIcon className="h-4 w-4 shrink-0 opacity-80" />
-    </a>
+    <div>
+      <a
+        href={link.url}
+        target="_blank"
+        rel="noreferrer"
+        className={
+          primary
+            ? "bg-gold flex items-center gap-3 rounded-xl px-4 py-2.5 text-white shadow-[0_6px_16px_rgba(138,102,50,0.28)] active:scale-[0.99]"
+            : "flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-2.5 text-ink active:scale-[0.99]"
+        }
+      >
+        <MapIcon className={`h-6 w-6 shrink-0 ${primary ? "" : "text-brand-light"}`} />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[13.5px] font-semibold leading-snug">{link.label}</span>
+          <span className={`mt-0.5 block text-[10.5px] ${primary ? "text-white/85" : "text-muted"}`}>{sub}</span>
+        </span>
+        <ChevronRightIcon className="h-4 w-4 shrink-0 opacity-80" />
+      </a>
+      {tip && (
+        <p className="mt-1 flex gap-1 px-1 text-[10.5px] leading-[1.6] text-brand">
+          <span className="shrink-0">▶︎</span>
+          {tip}
+        </p>
+      )}
+    </div>
   );
 }

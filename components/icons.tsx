@@ -145,3 +145,9 @@ export const ExpandIcon = ({ className }: P) => (
     <path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7" />
   </svg>
 );
+
+export const NoteIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5" />
+  </svg>
+);

@@ -174,6 +174,30 @@ describe("lookup", () => {
     expect(r.links[0].url).toContain("mpx=139.388580");
   });
 
+  it("都道府県なしで全国に同名の場所があれば、候補から選ばせる", async () => {
+    stubFetch(
+      [
+        { geometry: { coordinates: [141.1, 43.0] }, properties: { title: "北海道七飯町本町一丁目１番" } },
+        { geometry: { coordinates: [139.63, 35.45] }, properties: { title: "神奈川県横浜市中区本町一丁目１番" } },
+      ],
+      {},
+    );
+    const r = await lookup("本町1-1");
+    expect(r.status).toBe("choose");
+    if (r.status !== "choose") return;
+    // 関東の候補を先に並べる
+    expect(r.candidates[0].matchedAddress).toContain("横浜市");
+  });
+
+  it("番地を入れたのに町までしか一致しなければ approximate", async () => {
+    stubFetch(
+      [{ geometry: { coordinates: [139.38, 36.18] }, properties: { title: "埼玉県熊谷市三ケ尻" } }],
+      { results: { muniCd: "11202", lv01Nm: "三ケ尻" } },
+    );
+    const r = await lookup("埼玉県熊谷市大字三ケ尻9999番");
+    expect(r.status === "ok" && r.approximate).toBe(true);
+  });
+
   it("API がエラーなら例外を投げる", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 503 })));
     await expect(lookup("埼玉県熊谷市")).rejects.toThrow("503");
