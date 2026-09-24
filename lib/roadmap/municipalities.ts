@@ -1,5 +1,6 @@
 // 市区町村ごとの「建築基準法上の道路」の調べ方。データ本体は data/ 以下、出典は docs/ 以下。
 import { CHIBA } from "./data/chiba";
+import { GUNMA } from "./data/gunma";
 import { KANAGAWA } from "./data/kanagawa";
 import { SAITAMA } from "./data/saitama";
 import { TOKYO } from "./data/tokyo";
@@ -51,7 +52,7 @@ export type Municipality = {
   note?: string;
 };
 
-export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO];
+export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA];
 
 export function findMunicipality(muniCd: string): Municipality | undefined {
   return MUNICIPALITIES.find((m) => m.codes.includes(muniCd));
