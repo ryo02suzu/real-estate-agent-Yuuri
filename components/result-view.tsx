@@ -128,7 +128,7 @@ function Place({ address, copyable }: { address: string; copyable?: boolean }) {
           </button>
         )}
       </div>
-      <p className="mt-1.5 font-serif text-[17px] leading-snug tracking-[0.03em] text-ink">
+      <p className="mt-1.5 text-[17px] font-semibold leading-snug text-ink">
         {address} <span className="whitespace-nowrap text-[14px]">付近</span>
       </p>
       <p className="mt-1.5 text-[11px] leading-[1.7] text-muted">

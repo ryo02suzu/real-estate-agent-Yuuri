@@ -124,7 +124,7 @@ export default function Home() {
             >
               <span className="relative z-10 flex-1 py-4 pl-5 pr-2 [text-shadow:0_0_10px_#fff,0_0_3px_#fff]">
                 <span className="mb-2.5 block h-px w-6 bg-brand-light" />
-                <span className="block font-serif text-[17px] leading-[1.65] tracking-[0.08em] text-ink">
+                <span className="block text-[17px] font-semibold leading-[1.6] tracking-[0.04em] text-ink">
                   公式の地図で、
                   <br />
                   スムーズなご提案を。
@@ -168,7 +168,7 @@ export default function Home() {
 
             <div className="relative -mx-4 -mb-2 h-[92px]">
               <SkylineIllustration className="absolute inset-0 h-full w-full" />
-              <p className="absolute left-7 top-1 -rotate-[12deg] font-serif text-[13px] leading-6 tracking-[0.2em] text-ink/70">
+              <p className="absolute left-7 top-1 -rotate-[12deg] text-[13px] leading-6 tracking-[0.15em] text-ink/70">
                 もっとスムーズに、
                 <br />
                 <span className="pl-6">もっと確実に。</span>

@@ -16,16 +16,16 @@
   --color-brand-light: #c49a5c; /* ピン・線のゴールド */
   --color-mint: #f6f0e5; /* 淡いクリーム（旧ミント。クラス名はそのまま） */
   --color-line: #ebe4d8;
-  --font-serif: var(--font-noto-serif-jp), "Hiragino Mincho ProN", serif;
   --font-latin: var(--font-jost), sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-noto-sans-jp), "Hiragino Sans", "Noto Sans JP", sans-serif;
+  /* iPhone 標準の文字（San Francisco＋ヒラギノ角ゴ）。Android は端末の標準（Noto Sans CJK）になる */
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Noto Sans CJK JP", sans-serif;
   font-feature-settings: "palt"; /* 約物を詰めて見た目を整える */
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
 }
 
 /* 住所や電話番号の数字は桁を揃える */

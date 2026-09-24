@@ -50,7 +50,7 @@ export function Header({ onMenu, onHome, compact }: { onMenu: () => void; onHome
         <Image src={MARK.src} alt="" width={Math.round((64 * MARK.w) / MARK.h)} height={64} priority />
         <Wordmark className="text-[32px] leading-none" />
       </div>
-      <p className="mt-3 text-center font-serif text-[12.5px] leading-[1.9] tracking-[0.12em] text-ink/85">
+      <p className="mt-3 text-center text-[13px] leading-[1.8] tracking-[0.06em] text-ink/85">
         住所から、建築基準法上の
         <br />
         道路種別の確認先をすぐに開けます。

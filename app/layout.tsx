@@ -1,17 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Jost, Noto_Sans_JP, Noto_Serif_JP } from "next/font/google";
+import { Jost } from "next/font/google";
 import "./globals.css";
 
-// 端末ごとに字形がばらつかないよう、日本語フォントを同梱する
-const notoSansJP = Noto_Sans_JP({
-  weight: ["400", "500", "700", "900"],
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-noto-sans-jp",
-});
-
-// 見出しの明朝とロゴ文字の欧文
-const notoSerifJP = Noto_Serif_JP({ weight: ["400", "500"], subsets: ["latin"], display: "swap", variable: "--font-noto-serif-jp" });
+// ロゴ文字（MICHILU）の欧文だけ同梱する。本文は端末の標準フォント（globals.css）
 const jost = Jost({ weight: ["300", "400"], subsets: ["latin"], display: "swap", variable: "--font-jost" });
 
 export const metadata: Metadata = {
@@ -29,7 +20,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ja" className={`${notoSansJP.variable} ${notoSerifJP.variable} ${jost.variable} h-full antialiased`}>
+    <html lang="ja" className={`${jost.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
