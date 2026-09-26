@@ -222,10 +222,10 @@ describe("vendors", () => {
 });
 
 describe("分割図（PDF）の市", () => {
-  it("桐生市役所は索引図の K024R の図に載っている", () => {
+  it("桐生市役所は K023R と L023L の境目にあるので、隣の図も出す", () => {
     const [link] = buildLinks(findMunicipality("10203")!, 36.405319, 139.330597);
-    expect(link.sheet?.label).toBe("K024R");
-    expect(link.url).toMatch(/k024r\.pdf$/);
+    expect([link.sheet?.label, link.sheet?.neighbor?.label].sort()).toEqual(["K023R", "L023L"]);
+    expect(link.url).toMatch(/(k023r|l023l)\.pdf$/);
   });
 
   it("索引図の区域の外なら一覧ページを開く", () => {
