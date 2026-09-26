@@ -24,16 +24,18 @@ export function ResultView({
   query,
   result,
   onPick,
+  desktop,
 }: {
   query: string;
   result: LookupResult;
   onPick: (address: string) => void;
+  /** PC（横長の画面）用の配置 */
+  desktop?: boolean;
 }) {
   if (result.status === "not_found") return <NotFound query={query} />;
-  if (result.status === "choose")
-    return <Choose query={query} result={result} onPick={onPick} />;
+  if (result.status === "choose") return <Choose query={query} result={result} onPick={onPick} />;
   if (result.status === "unsupported") return <Unsupported result={result} />;
-  return <Found result={result} />;
+  return desktop ? <DesktopFound result={result} /> : <Found result={result} />;
 }
 
 function NotFound({ query }: { query: string }) {
@@ -149,9 +151,9 @@ function Found({
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2.5 [&>*]:shrink-0 lg:grid lg:grid-cols-[3fr_2fr] lg:grid-rows-[minmax(0,1fr)] lg:items-start lg:gap-5">
+    <div className="flex min-h-0 flex-1 flex-col gap-2.5 [&>*]:shrink-0">
       <section
-        className={`${CARD} flex min-h-0 flex-1 !shrink flex-col lg:h-full`}
+        className={`${CARD} flex min-h-0 flex-1 !shrink flex-col`}
       >
         <Place
           address={result.matchedAddress}
@@ -192,8 +194,7 @@ function Found({
         </div>
       </section>
 
-      {/* PC では右の列にまとめる。スマホではそのまま下に並ぶ */}
-      <div className="flex flex-col gap-2.5 lg:gap-5">
+      <div className="flex flex-col gap-2.5">
         {contact}
 
         {offline && result.links.length > 0 && (
@@ -403,6 +404,64 @@ function MapButton({
           </span>
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * PC の結果画面。左：検索地点・市・地図ボタン・問い合わせ先、右：大きな地図プレビュー。
+ * 画面の高さいっぱいに収め、スクロールさせない
+ */
+function DesktopFound({ result }: { result: Extract<LookupResult, { status: "ok" }> }) {
+  const m = result.municipality;
+  const offline = m.coverage === "none" || m.coverage === "outside";
+  const primary = result.links.filter((l) => !offline && l.kind !== "public_road");
+  const others = result.links.filter((l) => offline || l.kind === "public_road");
+  return (
+    <div className="grid min-h-0 flex-1 grid-cols-[minmax(380px,440px)_1fr] gap-6">
+      <div className="flex min-h-0 flex-col gap-4">
+        <section className={CARD}>
+          <Place
+            address={result.matchedAddress}
+            approximate={result.approximate}
+            actions={
+              <>
+                <CopyButton text={result.matchedAddress} />
+                <ShareButton result={result} />
+              </>
+            }
+          />
+          <div className="border-t border-line/70 px-4 pb-4 pt-3">
+            <CityLine municipality={m} />
+          </div>
+        </section>
+
+        {result.links.length > 0 && (
+          <section className={`${CARD} p-4`}>
+            <h3 className="mb-2 text-[13px] font-semibold text-ink">{offline ? "参考：公道（市道）かどうかの地図" : "地図を開く"}</h3>
+            <div className="space-y-2">
+              {primary.map((l) => (
+                <MapButton key={l.url} link={l} primary />
+              ))}
+              {others.map((l) => (
+                <MapButton key={l.url} link={l} />
+              ))}
+            </div>
+            {result.links.some((l) => l.pinpoint) && (
+              <p className="mt-2 flex gap-1.5 text-[11px] leading-[1.6] text-muted">
+                <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+                地図は新しいタブで開きます。利用規約に同意すると、物件の場所が地図の中央に出ます。
+              </p>
+            )}
+          </section>
+        )}
+
+        {result.contact && <ContactCard contact={result.contact} city={m.name} address={result.matchedAddress} />}
+      </div>
+
+      <section className={`${CARD} flex min-h-0 flex-col p-3`}>
+        <MapPreview lat={result.lat} lng={result.lng} className="min-h-0 flex-1" large />
+      </section>
     </div>
   );
 }

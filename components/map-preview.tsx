@@ -5,9 +5,22 @@ import { tilesAround } from "@/lib/tiles";
 import { ExpandIcon, PinIcon } from "./icons";
 
 /** 地理院タイルで検索地点の周辺を表示する（確認用の静的プレビュー） */
-export function MapPreview({ lat, lng, className = "h-[104px]" }: { lat: number; lng: number; className?: string }) {
+export function MapPreview({
+  lat,
+  lng,
+  className = "h-[104px]",
+  large,
+}: {
+  lat: number;
+  lng: number;
+  className?: string;
+  /** PC の大きな枠：z18 のタイルを半分の大きさで 9×9 枚（1152px 四方） */
+  large?: boolean;
+}) {
   // z18 のタイルを半分の大きさで描く＝縮尺は z17 相当で、高精細画面でもくっきり
-  const { tiles, size, offsetX, offsetY } = tilesAround(lat, lng, 18, { size: 128, radius: 2, layer: "pale" });
+  const { tiles, size, offsetX, offsetY } = large
+    ? tilesAround(lat, lng, 18, { size: 128, radius: 4, layer: "pale" })
+    : tilesAround(lat, lng, 18, { size: 128, radius: 2, layer: "pale" });
   return (
     <div className={`relative overflow-hidden rounded-xl border border-line bg-mint ${className}`}>
       <div className="absolute left-1/2 top-1/2" style={{ transform: `translate(${-offsetX}px, ${-offsetY}px)` }}>
@@ -28,7 +41,7 @@ export function MapPreview({ lat, lng, className = "h-[104px]" }: { lat: number;
           />
         ))}
       </div>
-      <PinIcon className="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-full text-brand drop-shadow" />
+      <PinIcon className={`absolute left-1/2 top-1/2 ${large ? "h-12 w-12" : "h-8 w-8"} -translate-x-1/2 -translate-y-full text-brand drop-shadow`} />
       {/* 地理院地図をその場所で開く（周辺を広く見たいとき） */}
       <a
         href={`https://maps.gsi.go.jp/#17/${lat.toFixed(6)}/${lng.toFixed(6)}/`}

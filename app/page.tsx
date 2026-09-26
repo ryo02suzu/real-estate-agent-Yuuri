@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Header } from "@/components/header";
+import { DesktopHeader, Header } from "@/components/header";
+import { useDesktop } from "@/lib/use-desktop";
 import { HistoryChips, HistoryList } from "@/components/history-list";
 import { AlertIcon, AreaIcon, ChevronRightIcon, ClockIcon, InfoIcon, MapIcon } from "@/components/icons";
 import { MapIllustration, SkylineIllustration } from "@/components/illustrations";
@@ -33,6 +34,7 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [sheet, setSheet] = useState<SheetName | "menu" | null>(null);
   const pushed = useRef(false);
+  const desktop = useDesktop();
 
   const search = useCallback(async (address: string, push: boolean) => {
     const q = address.trim();
@@ -93,6 +95,79 @@ export default function Home() {
   }
 
   const open = (name: SheetName | "menu") => setSheet(name);
+
+  const sheetsEl = (
+    <>
+      <MenuSheet open={sheet === "menu"} onClose={() => setSheet(null)} onOpen={open} />
+      <HelpSheet open={sheet === "help"} onClose={() => setSheet(null)} />
+      <CitiesSheet open={sheet === "cities"} onClose={() => setSheet(null)} />
+      <Sheet title="検索履歴" open={sheet === "history"} onClose={() => setSheet(null)}>
+        <HistoryList
+          items={history}
+          onSelect={(a) => {
+            setSheet(null);
+            void search(a, true);
+          }}
+          onClear={() => {
+            clearHistory();
+            setHistory([]);
+          }}
+        />
+      </Sheet>
+    </>
+  );
+
+  if (desktop) {
+    return (
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
+        <svg aria-hidden viewBox="0 0 400 400" className="pointer-events-none absolute -right-24 -top-24 h-[520px] w-[520px] text-brand-light/40">
+          <path d="M90 0 C130 150 250 250 400 290" stroke="currentColor" strokeWidth="1.2" fill="none" />
+        </svg>
+        <main className="relative mx-auto flex min-h-0 w-full max-w-[1280px] flex-1 flex-col px-10 pb-4 pt-6">
+          <DesktopHeader onHome={shown ? backHome : undefined} onOpen={open}>
+            {shown && (
+              <div className="max-w-2xl">
+                <SearchCard value={input} onChange={setInput} onSearch={() => search(input, true)} loading={loading} compact />
+              </div>
+            )}
+          </DesktopHeader>
+          {error && (
+            <div className="mt-4">
+              <ErrorLine text={error} />
+            </div>
+          )}
+          {shown ? (
+            <div className="mt-6 flex min-h-0 flex-1 flex-col">
+              {shown.result.status === "ok" ? (
+                <ResultView query={shown.query} result={shown.result} onPick={(a) => search(a, false)} desktop />
+              ) : (
+                <div className="mx-auto w-full max-w-xl">
+                  <ResultView query={shown.query} result={shown.result} onPick={(a) => search(a, false)} />
+                </div>
+              )}
+            </div>
+          ) : (
+            <DesktopHome
+              input={input}
+              setInput={setInput}
+              loading={loading}
+              onSearch={() => search(input, true)}
+              history={history}
+              onPick={(a) => search(a, true)}
+              onOpen={open}
+            />
+          )}
+        </main>
+        <footer className="relative px-10 pb-4">
+          <p className="mx-auto flex max-w-[1280px] items-center justify-center gap-2 text-[11.5px] text-muted">
+            <InfoIcon className="h-4 w-4 shrink-0" />
+            表示される地図は参考情報です。重要事項説明などの最終確認は、必ず役所の窓口で行ってください。
+          </p>
+        </footer>
+        {sheetsEl}
+      </div>
+    );
+  }
 
   // スクロールしない1画面の作り。画面の高さに応じて、ホームは街並みの絵、結果は地図プレビューが伸び縮みする
   return (
@@ -188,22 +263,7 @@ export default function Home() {
         </p>
       </footer>
 
-      <MenuSheet open={sheet === "menu"} onClose={() => setSheet(null)} onOpen={open} />
-      <HelpSheet open={sheet === "help"} onClose={() => setSheet(null)} />
-      <CitiesSheet open={sheet === "cities"} onClose={() => setSheet(null)} />
-      <Sheet title="検索履歴" open={sheet === "history"} onClose={() => setSheet(null)}>
-        <HistoryList
-          items={history}
-          onSelect={(a) => {
-            setSheet(null);
-            void search(a, true);
-          }}
-          onClear={() => {
-            clearHistory();
-            setHistory([]);
-          }}
-        />
-      </Sheet>
+      {sheetsEl}
     </div>
   );
 }
@@ -214,5 +274,99 @@ function ErrorLine({ text }: { text: string }) {
       <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
       {text}
     </p>
+  );
+}
+
+/** PC のホーム。左：見出し・検索・履歴、右：地図の絵とできること。下に街並み */
+function DesktopHome({
+  input,
+  setInput,
+  loading,
+  onSearch,
+  history,
+  onPick,
+  onOpen,
+}: {
+  input: string;
+  setInput: (v: string) => void;
+  loading: boolean;
+  onSearch: () => void;
+  history: HistoryItem[];
+  onPick: (address: string) => void;
+  onOpen: (name: SheetName) => void;
+}) {
+  return (
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className="grid flex-1 grid-cols-[1.05fr_1fr] items-center gap-14">
+        <section>
+          <span className="mb-5 block h-px w-12 bg-brand-light" />
+          <h1 className="text-[38px] font-semibold leading-[1.45] tracking-[0.04em] text-ink xl:text-[44px]">
+            住所から、
+            <br />
+            道路種別の確認先へ。
+          </h1>
+          <p className="mt-4 text-[15px] leading-[1.9] text-muted">
+            国土地理院で物件の場所を調べ、市区町村の公式道路図をその場所で開きます。
+            <br />
+            ネットで分からない市は、窓口と聞くことを案内します。
+          </p>
+          <div className="mt-8">
+            <SearchCard value={input} onChange={setInput} onSearch={onSearch} loading={loading} />
+          </div>
+          <div className="mt-6">
+            <HistoryChips items={history.slice(0, 3)} onSelect={onPick} onShowAll={() => onOpen("history")} />
+          </div>
+          <dl className="mt-8 flex gap-10">
+            {[
+              [`${MUNICIPALITIES.length}`, "対応市区町村"],
+              [AREA_TEXT, "対応エリア"],
+              ["毎週", "地図リンクの自動確認"],
+            ].map(([v, k]) => (
+              <div key={k}>
+                <dt className="text-[11.5px] text-muted">{k}</dt>
+                <dd className="mt-0.5 text-[22px] font-semibold tracking-[0.02em] text-ink">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <button
+            onClick={() => onOpen("help")}
+            className="shadow-soft relative flex h-[250px] w-full overflow-hidden rounded-3xl border border-white bg-white text-left"
+          >
+            <span className="relative z-10 flex-1 py-8 pl-8 pr-2 [text-shadow:0_0_10px_#fff,0_0_3px_#fff]">
+              <span className="mb-3 block h-px w-8 bg-brand-light" />
+              <span className="block text-[24px] font-semibold leading-[1.6] tracking-[0.04em] text-ink">
+                公式の地図で、
+                <br />
+                スムーズなご提案を。
+              </span>
+              <span className="mt-3 block text-[12.5px] leading-[1.8] text-muted">使い方を見る</span>
+            </span>
+            <MapIllustration className="absolute -right-6 top-0 h-full w-[60%] opacity-90" />
+          </button>
+          <div className="grid grid-cols-3 gap-4">
+            {FEATURES.map(({ key, title, body, Icon }) => (
+              <button
+                key={title}
+                onClick={() => onOpen(key)}
+                className="shadow-soft relative flex flex-col rounded-2xl border border-white bg-white p-4 pb-10 text-left transition hover:-translate-y-0.5"
+              >
+                <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-mint to-white text-brand-light">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="text-[14px] font-medium text-ink">{title}</span>
+                <span className="mt-1.5 text-[12px] leading-[1.7] text-muted">{body}</span>
+                <span className="absolute bottom-3 right-3 flex h-7 w-7 items-center justify-center rounded-full border border-line text-ink">
+                  <ChevronRightIcon className="h-3.5 w-3.5" />
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
+      <SkylineIllustration className="pointer-events-none absolute -bottom-4 right-0 h-[130px] w-[520px] opacity-70" />
+    </div>
   );
 }
