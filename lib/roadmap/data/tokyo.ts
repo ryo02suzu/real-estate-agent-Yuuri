@@ -1,6 +1,9 @@
 // 東京都 全62区市町村（2026-09 調査）。出典は docs/tokyo-research.md。
 // 23区: 各区が特定行政庁。多摩: 特定行政庁の11市は各市、それ以外の15市2町・檜原村・奥多摩町は都の多摩建築指導事務所。島しょは都（各支庁の土木課が窓口）。
 import type { Contact, Municipality } from "../municipalities";
+import type { SheetIndex } from "../sheets";
+import MINATO_SHEETS from "./sheets/minato.json";
+import KITA_SHEETS from "./sheets/kita.json";
 import { alandis, arcgisExperience, arcgisWebApp, chuoMap, geocloud, geocloudMp, machiInfoMap, sonicweb, wagmap } from "../vendors";
 
 const pref = "東京都" as const;
@@ -42,7 +45,16 @@ const WARDS: Municipality[] = [
     name: "港区",
     codes: ["13103"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "指定道路図（分割図から選ぶPDF）", build: null, url: "https://www.city.minato.tokyo.jp/kenchikushinsa/douroshubetsu/siteidourozu.html", verified: false }],
+    maps: [
+      {
+        kind: "road_type",
+        label: "指定道路図（PDF）",
+        build: null,
+        url: "https://www.city.minato.tokyo.jp/kenchikushinsa/douroshubetsu/siteidourozu.html",
+        verified: true,
+        sheets: MINATO_SHEETS as SheetIndex,
+      },
+    ],
     contact: { dept: "街づくり支援部 建築課 建築審査係（区役所6階605）", phone: "03-3578-2286", note: COUNTER_ONLY, noPhoneInquiry: true },
   },
   {
@@ -169,7 +181,16 @@ const WARDS: Municipality[] = [
     name: "北区",
     codes: ["13117"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "指定道路図（PDF）", build: null, url: "https://www.city.kita.lg.jp/dev-environment/construction/1009298/1009491.html", verified: false }],
+    maps: [
+      {
+        kind: "road_type",
+        label: "指定道路図（PDF）",
+        build: null,
+        url: "https://www.city.kita.lg.jp/dev-environment/construction/1009298/1009491.html",
+        verified: true,
+        sheets: KITA_SHEETS as SheetIndex,
+      },
+    ],
     contact: { dept: "まちづくり部 建築課 細街路整備係（第一庁舎7階）", phone: "03-3908-9194", note: COUNTER_ONLY, noPhoneInquiry: true },
   },
   {
@@ -334,10 +355,12 @@ const TAMA_CITIES: Municipality[] = [
     maps: [
       {
         kind: "road_type",
-        label: "西東京市道路種別図（PDF）",
+        label: "西東京市道路種別図（PDF・市全体で1枚）",
         build: null,
-        url: "https://www.city.nishitokyo.lg.jp/siseizyoho/matidukuri/kentikusidou/dourosyubetu.html",
-        verified: false,
+        // 市全体の1枚。更新のたびにファイル名（日付）が変わるので、切れたら週次のリンク確認で分かる
+        url: "https://www.city.nishitokyo.lg.jp/siseizyoho/matidukuri/kentikusidou/dourosyubetu.files/20260701douroshubetu.pdf",
+        verified: true,
+        tip: "市全体の図が開きます（約6.5MB）。拡大して物件の場所を探してください。",
       },
       { kind: "public_road", label: "道路網図（西東京市まちづくりマップ）", build: wagmap("nishitokyo", 2), verified: true },
     ],

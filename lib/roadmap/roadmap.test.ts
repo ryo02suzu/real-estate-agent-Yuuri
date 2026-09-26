@@ -234,3 +234,19 @@ describe("分割図（PDF）の市", () => {
     expect(link.url).toContain("1013857/index.html");
   });
 });
+
+describe("港区の分割図", () => {
+  it("六本木6-10-1（六本木ヒルズ）は 28 番の図", () => {
+    const [link] = buildLinks(findMunicipality("13103")!, 35.660464, 139.729249);
+    expect(link.sheet?.label).toBe("28");
+    expect(link.url).toMatch(/_?28\.pdf$/);
+  });
+});
+
+describe("北区の分割図", () => {
+  it("北区役所（王子本町1-15-22）は 152 番の図（10枚綴りのPDFのページ指定つき）", () => {
+    const [link] = buildLinks(findMunicipality("13117")!, 35.752802, 139.733743);
+    expect(link.sheet?.label).toBe("152");
+    expect(link.url).toMatch(/151-160\.pdf#page=2$/);
+  });
+});

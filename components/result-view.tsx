@@ -347,8 +347,10 @@ function MapButton({
       ? "物件の場所が開きます"
       : "地図の入口が開きます";
   // 開いたあとに操作が要る地図は、その手順を出す。入口しか開けない地図は住所の貼り付けを案内
+  // 複数ページのPDF（北区など）はページを添える。iPhone ではページ指定が効かないことがある
+  const page = sheet?.url.match(/#page=(\d+)/)?.[1];
   const tip = sheet
-    ? `物件は図の${sheet.where}あたりです。`
+    ? `物件は図の${sheet.where}あたりです。${page ? `（PDFの${page}ページ目）` : ""}`
     : (link.tip ??
       (link.pinpoint
         ? undefined

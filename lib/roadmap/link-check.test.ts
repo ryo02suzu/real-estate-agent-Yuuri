@@ -39,6 +39,12 @@ describe.skipIf(!process.env.LINK_CHECK)("地図リンクの死活確認", () =>
       if (!p && m.maps.some((l) => l.build)) missing.push(m.pref + m.name);
       const [lat, lng] = p ?? [0, 0];
       for (const l of buildLinks(m, lat, lng)) if (l.pinpoint ? p : true) jobs.push({ city: `${m.pref}${m.name}`, label: l.label, url: l.url });
+      // 分割図の市は、全部の図のPDF（ページ指定は外す）と一覧ページも見る
+      for (const map of m.maps) {
+        if (!map.sheets) continue;
+        if (map.url) jobs.push({ city: `${m.pref}${m.name}`, label: `${map.label}（一覧）`, url: map.url });
+        for (const [label, url] of map.sheets.cells) jobs.push({ city: `${m.pref}${m.name}`, label: `${map.label} ${label}`, url: url.split("#")[0] });
+      }
     }
     // 同じURL（県の地図の入口など）は1回だけ見る
     const unique = [...new Map(jobs.map((j) => [j.url, j])).values()];
