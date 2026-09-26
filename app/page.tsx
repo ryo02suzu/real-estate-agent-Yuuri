@@ -102,7 +102,7 @@ export default function Home() {
         <path d="M90 0 C130 150 250 250 400 290" stroke="currentColor" strokeWidth="1.2" fill="none" />
       </svg>
 
-      <main className="relative mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))]">
+      <main className={`relative mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))] ${shown ? "lg:max-w-5xl lg:px-8" : "lg:max-w-lg"}`}>
         <Header onMenu={() => open("menu")} onHome={shown ? backHome : undefined} compact={!!shown} />
 
         {shown ? (
@@ -166,7 +166,7 @@ export default function Home() {
               </div>
             </section>
 
-            <div className="relative -mx-4 -mb-2 min-h-[64px] flex-1">
+            <div className="relative -mx-4 -mb-2 min-h-[64px] flex-1 lg:max-h-[200px]">
               <SkylineIllustration className="absolute inset-0 h-full w-full" />
               <p className="absolute left-7 top-1 -rotate-[12deg] text-[13px] leading-6 tracking-[0.15em] text-ink/70">
                 もっとスムーズに、
@@ -182,7 +182,7 @@ export default function Home() {
       </main>
 
       <footer className="relative px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-1">
-        <p className="mx-auto flex max-w-md items-start gap-2 text-[10.5px] leading-[1.7] text-muted">
+        <p className="mx-auto flex max-w-md items-start gap-2 text-[10.5px] lg:max-w-5xl lg:justify-center leading-[1.7] text-muted">
           <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
           表示される地図は参考情報です。重要事項説明などの最終確認は、必ず役所の窓口で行ってください。
         </p>

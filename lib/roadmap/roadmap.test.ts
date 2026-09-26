@@ -220,3 +220,17 @@ describe("vendors", () => {
     );
   });
 });
+
+describe("分割図（PDF）の市", () => {
+  it("桐生市役所は索引図の K024R の図に載っている", () => {
+    const [link] = buildLinks(findMunicipality("10203")!, 36.405319, 139.330597);
+    expect(link.sheet?.label).toBe("K024R");
+    expect(link.url).toMatch(/k024r\.pdf$/);
+  });
+
+  it("索引図の区域の外なら一覧ページを開く", () => {
+    const [link] = buildLinks(findMunicipality("10203")!, 36.7, 139.1);
+    expect(link.sheet).toBeUndefined();
+    expect(link.url).toContain("1013857/index.html");
+  });
+});

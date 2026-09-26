@@ -3,6 +3,8 @@
 // （小規模建築物だけ市）で、道路種別を含むそれ以外は県の土木事務所が扱う。
 import type { Contact, MapLink, Municipality } from "../municipalities";
 import { geocloud, wagmap } from "../vendors";
+import KIRYU_SHEETS from "./sheets/kiryu.json";
+import type { SheetIndex } from "../sheets";
 
 const pref = "群馬県" as const;
 
@@ -59,7 +61,16 @@ const CITIES: Municipality[] = [
     name: "桐生市",
     codes: ["10203"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "指定道路図（図郭番号から選ぶPDF）", build: null, url: "https://www.city.kiryu.lg.jp/kurashi/jutaku/1013857/index.html", verified: false }],
+    maps: [
+      {
+        kind: "road_type",
+        label: "指定道路図（PDF）",
+        build: null,
+        url: "https://www.city.kiryu.lg.jp/kurashi/jutaku/1013857/index.html",
+        verified: true,
+        sheets: KIRYU_SHEETS as SheetIndex,
+      },
+    ],
     contact: { dept: "都市整備部 建築指導課", phone: "0277-48-9032" },
     note: "市は「不動産取引の資料には使えない参考図」としている。最新は建築指導課で確認。",
   },

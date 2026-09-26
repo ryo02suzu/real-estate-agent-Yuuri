@@ -6,6 +6,7 @@ import { KANAGAWA } from "./data/kanagawa";
 import { SAITAMA } from "./data/saitama";
 import { TOCHIGI } from "./data/tochigi";
 import { TOKYO } from "./data/tokyo";
+import { findSheet, type SheetHit, type SheetIndex } from "./sheets";
 
 /** 地図に何が載っているか */
 export type MapKind =
@@ -24,6 +25,8 @@ export type MapLink = {
   verified: boolean;
   /** 開いたあとに必要な操作（レイヤの切り替えなど）。ボタンの下に出す */
   tip?: string;
+  /** PDFの分割図で公開している市：どの図かを座標から求める索引（無ければ url の一覧ページを開く） */
+  sheets?: SheetIndex;
 };
 
 export type Contact = {
@@ -67,16 +70,29 @@ export function resolveContact(m: Municipality, muniCd: string): Contact | undef
   return m.contactByCode?.[muniCd] ?? m.contact;
 }
 
-export type ResolvedLink = { kind: MapKind; label: string; url: string; pinpoint: boolean; verified: boolean; tip?: string };
+export type ResolvedLink = {
+  kind: MapKind;
+  label: string;
+  url: string;
+  pinpoint: boolean;
+  verified: boolean;
+  tip?: string;
+  /** 分割図の市で、物件が載っている図 */
+  sheet?: SheetHit;
+};
 
 /** 座標から、その市で開くべき地図のURL一覧を作る */
 export function buildLinks(m: Municipality, lat: number, lng: number): ResolvedLink[] {
-  return m.maps.map((link) => ({
-    kind: link.kind,
-    label: link.label,
-    url: link.build ? link.build(lat, lng) : link.url!,
-    pinpoint: link.build !== null,
-    verified: link.verified,
-    tip: link.tip,
-  }));
+  return m.maps.map((link) => {
+    const sheet = link.sheets && findSheet(link.sheets, lat, lng);
+    return {
+      kind: link.kind,
+      label: link.label,
+      url: sheet ? sheet.url : link.build ? link.build(lat, lng) : link.url!,
+      pinpoint: link.build !== null,
+      verified: link.verified,
+      tip: link.tip,
+      sheet,
+    };
+  });
 }
