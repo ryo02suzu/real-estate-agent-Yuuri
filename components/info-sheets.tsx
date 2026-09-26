@@ -1,5 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import { MUNICIPALITIES, type Municipality } from "@/lib/roadmap";
-import { COVERAGE, CoverageBadge } from "./coverage";
+import { CoverageBadge } from "./coverage";
 import { AreaIcon, ChevronRightIcon, ClockIcon, InfoIcon } from "./icons";
 import { Sheet } from "./sheet";
 
@@ -7,45 +10,38 @@ const ORDER: Municipality["coverage"][] = ["full", "partial", "none", "outside"]
 
 export function CitiesSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const prefs = [...new Set(MUNICIPALITIES.map((m) => m.pref))];
+  // スクロールさせないよう、都県ごとのタブで1つずつ見せる
+  const [pref, setPref] = useState(prefs[0]);
+  const inPref = MUNICIPALITIES.filter((m) => m.pref === pref);
   return (
-    <Sheet title="対応している市町村" open={open} onClose={onClose}>
-      <div className="space-y-7">
-        {prefs.map((pref) => {
-          const inPref = MUNICIPALITIES.filter((m) => m.pref === pref);
+    <Sheet title={`対応している市区町村（全${MUNICIPALITIES.length}）`} open={open} onClose={onClose}>
+      <div className="-mx-1 mb-3 flex flex-wrap gap-1.5">
+        {prefs.map((p) => (
+          <button
+            key={p}
+            onClick={() => setPref(p)}
+            className={`rounded-full px-3 py-1 text-[12px] ${p === pref ? "bg-gold text-white" : "border border-line text-ink"}`}
+          >
+            {p.replace(/[都県]$/, "")}
+          </button>
+        ))}
+      </div>
+      <div className="space-y-2.5">
+        {ORDER.map((cov) => {
+          const list = inPref.filter((m) => m.coverage === cov);
+          if (list.length === 0) return null;
           return (
-            <section key={pref}>
-              <h3 className="mb-3 border-b border-line pb-1 font-bold text-ink">
-                {pref}
-                <span className="ml-2 text-xs font-normal text-muted">全{inPref.length}市町村</span>
-              </h3>
-              <div className="space-y-4">
-                {ORDER.map((cov) => {
-                  const list = inPref.filter((m) => m.coverage === cov);
-                  if (list.length === 0) return null;
-                  return (
-                    <div key={cov}>
-                      <div className="mb-1 flex items-center gap-2">
-                        <CoverageBadge coverage={cov} />
-                        <span className="text-xs text-muted">{list.length}</span>
-                      </div>
-                      <p className="mb-1.5 text-xs text-muted">{COVERAGE[cov].list}</p>
-                      <p className="text-sm leading-relaxed text-ink">
-                        {list.map((m, i) => (
-                          <span key={m.name} className="whitespace-nowrap">
-                            {m.name}
-                            {i < list.length - 1 && "、"}
-                          </span>
-                        ))}
-                      </p>
-                    </div>
-                  );
-                })}
+            <div key={cov}>
+              <div className="mb-0.5 flex items-center gap-2">
+                <CoverageBadge coverage={cov} />
+                <span className="text-[11px] text-muted">{list.length}</span>
               </div>
-            </section>
+              <p className="text-[11.5px] leading-[1.65] text-ink">{list.map((m) => m.name).join("、")}</p>
+            </div>
           );
         })}
-        <p className="text-xs text-muted">この一覧にない市町村は「未対応」と表示されます。</p>
       </div>
+      <p className="mt-3 text-[11px] text-muted">一覧にない市区町村は「未対応」と表示されます。</p>
     </Sheet>
   );
 }
@@ -59,7 +55,7 @@ export function HelpSheet({ open, onClose }: { open: boolean; onClose: () => voi
   ];
   return (
     <Sheet title="使い方" open={open} onClose={onClose}>
-      <ol className="space-y-4">
+      <ol className="space-y-4 [@media(max-height:720px)]:space-y-2">
         {steps.map(([title, body], i) => (
           <li key={title} className="flex gap-3">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gold text-sm font-bold text-white">{i + 1}</span>
@@ -70,7 +66,7 @@ export function HelpSheet({ open, onClose }: { open: boolean; onClose: () => voi
           </li>
         ))}
       </ol>
-      <div className="mt-6 rounded-2xl bg-mint p-4 text-sm text-ink">
+      <div className="mt-6 rounded-2xl bg-mint p-4 text-sm text-ink [@media(max-height:720px)]:mt-3 [@media(max-height:720px)]:p-3 [@media(max-height:720px)]:text-xs">
         <p className="font-bold">MICHILUは判定をしません</p>
         <p className="mt-1 text-muted">
           市町村の公式地図を開くためのツールです。地図は参考情報で、重要事項説明などの最終確認は必ず役所の窓口で行ってください。

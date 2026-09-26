@@ -22,8 +22,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  /* iPhone 標準の文字（San Francisco＋ヒラギノ角ゴ）。Android は端末の標準（Noto Sans CJK）になる */
-  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Noto Sans CJK JP", sans-serif;
+  font-family: var(--font-noto-sans-jp), "Hiragino Sans", "Noto Sans JP", sans-serif;
   font-feature-settings: "palt"; /* 約物を詰めて見た目を整える */
   letter-spacing: 0.01em;
 }

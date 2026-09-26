@@ -5,11 +5,11 @@ import { tilesAround } from "@/lib/tiles";
 import { ExpandIcon, PinIcon } from "./icons";
 
 /** 地理院タイルで検索地点の周辺を表示する（確認用の静的プレビュー） */
-export function MapPreview({ lat, lng }: { lat: number; lng: number }) {
+export function MapPreview({ lat, lng, className = "h-[104px]" }: { lat: number; lng: number; className?: string }) {
   // z18 のタイルを半分の大きさで描く＝縮尺は z17 相当で、高精細画面でもくっきり
   const { tiles, size, offsetX, offsetY } = tilesAround(lat, lng, 18, { size: 128, radius: 2, layer: "pale" });
   return (
-    <div className="relative h-[104px] overflow-hidden rounded-xl border border-line bg-mint">
+    <div className={`relative overflow-hidden rounded-xl border border-line bg-mint ${className}`}>
       <div className="absolute left-1/2 top-1/2" style={{ transform: `translate(${-offsetX}px, ${-offsetY}px)` }}>
         {tiles.map((t) => (
           <img

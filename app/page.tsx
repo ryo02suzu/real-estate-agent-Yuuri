@@ -94,25 +94,25 @@ export default function Home() {
 
   const open = (name: SheetName | "menu") => setSheet(name);
 
-  // iPhone の1画面（390×844pt）に収まる寸法。モックを 390pt 幅に換算して決めた
+  // スクロールしない1画面の作り。画面の高さに応じて、ホームは街並みの絵、結果は地図プレビューが伸び縮みする
   return (
-    <div className="relative flex flex-1 flex-col overflow-hidden bg-background">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
       {/* 右上から流れるゴールドの細い弧（モックの飾り） */}
       <svg aria-hidden viewBox="0 0 400 400" className="pointer-events-none absolute -right-40 -top-28 h-[360px] w-[360px] text-brand-light/40">
         <path d="M90 0 C130 150 250 250 400 290" stroke="currentColor" strokeWidth="1.2" fill="none" />
       </svg>
 
-      <main className="relative mx-auto w-full max-w-md flex-1 px-4 pb-4 pt-[max(12px,env(safe-area-inset-top))]">
+      <main className="relative mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))]">
         <Header onMenu={() => open("menu")} onHome={shown ? backHome : undefined} compact={!!shown} />
 
         {shown ? (
-          <div className="mt-3 space-y-2.5">
+          <div className="mt-3 flex min-h-0 flex-1 flex-col gap-2.5 [&>*]:shrink-0 [&>*:last-child]:shrink">
             <SearchCard value={input} onChange={setInput} onSearch={() => search(input, true)} loading={loading} compact />
             {error && <ErrorLine text={error} />}
             <ResultView query={shown.query} result={shown.result} onPick={(a) => search(a, false)} />
           </div>
         ) : (
-          <div className="mt-5 space-y-4">
+          <div className="mt-5 flex min-h-0 flex-1 flex-col gap-4 [@media(max-height:720px)]:mt-3 [@media(max-height:720px)]:gap-3 [&>*:not(:last-child)]:shrink-0">
             <SearchCard value={input} onChange={setInput} onSearch={() => search(input, true)} loading={loading} />
             {error && <ErrorLine text={error} />}
 
@@ -120,7 +120,7 @@ export default function Home() {
 
             <button
               onClick={() => open("help")}
-              className="shadow-soft relative flex h-[132px] w-full overflow-hidden rounded-2xl border border-white bg-white text-left"
+              className="shadow-soft relative flex h-[132px] w-full overflow-hidden rounded-2xl border border-white bg-white text-left [@media(max-height:720px)]:hidden"
             >
               <span className="relative z-10 flex-1 py-4 pl-5 pr-2 [text-shadow:0_0_10px_#fff,0_0_3px_#fff]">
                 <span className="mb-2.5 block h-px w-6 bg-brand-light" />
@@ -166,7 +166,7 @@ export default function Home() {
               </div>
             </section>
 
-            <div className="relative -mx-4 -mb-2 h-[92px]">
+            <div className="relative -mx-4 -mb-2 min-h-[64px] flex-1">
               <SkylineIllustration className="absolute inset-0 h-full w-full" />
               <p className="absolute left-7 top-1 -rotate-[12deg] text-[13px] leading-6 tracking-[0.15em] text-ink/70">
                 もっとスムーズに、

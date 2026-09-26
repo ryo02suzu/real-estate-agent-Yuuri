@@ -46,7 +46,7 @@ export function Header({ onMenu, onHome, compact }: { onMenu: () => void; onHome
   return (
     <header className="relative pt-2">
       <div className="absolute right-0 top-0">{menu}</div>
-      <div className="flex items-center justify-center gap-2.5 pt-7">
+      <div className="flex items-center justify-center gap-2.5 pt-7 [@media(max-height:720px)]:pt-3">
         <Image src={MARK.src} alt="" width={Math.round((64 * MARK.w) / MARK.h)} height={64} priority />
         <Wordmark className="text-[32px] leading-none" />
       </div>

@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Jost } from "next/font/google";
+import { Jost, Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
 
-// ロゴ文字（MICHILU）の欧文だけ同梱する。本文は端末の標準フォント（globals.css）
+// 本文は Noto Sans JP を同梱し、どの端末でも同じ見た目にする。ロゴ文字（MICHILU）は Jost
+const notoSansJP = Noto_Sans_JP({ weight: ["400", "500", "600", "700"], subsets: ["latin"], display: "swap", variable: "--font-noto-sans-jp" });
 const jost = Jost({ weight: ["300", "400"], subsets: ["latin"], display: "swap", variable: "--font-jost" });
 
 export const metadata: Metadata = {
@@ -20,8 +21,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ja" className={`${jost.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="ja" className={`${notoSansJP.variable} ${jost.variable} h-full antialiased`}>
+      <body className="flex h-dvh flex-col overflow-hidden">{children}</body>
     </html>
   );
 }

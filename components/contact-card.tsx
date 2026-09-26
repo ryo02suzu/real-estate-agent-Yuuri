@@ -94,8 +94,8 @@ function InquirySheet({ open, onClose, address, dept }: { open: boolean; onClose
   return (
     <Sheet title="窓口で聞くこと" open={open} onClose={onClose}>
       <p className="text-[12px] text-muted">{dept}</p>
-      <h4 className="mb-1.5 mt-4 text-[13px] font-semibold text-ink">持っていくもの</h4>
-      <ul className="space-y-1 text-[13px] text-ink">
+      <h4 className="mb-1.5 mt-4 text-[13px] font-semibold text-ink [@media(max-height:720px)]:mt-2.5 [@media(max-height:720px)]:mb-1">持っていくもの</h4>
+      <ul className="space-y-1 text-[13px] text-ink [@media(max-height:720px)]:space-y-0 [@media(max-height:720px)]:text-[12px]">
         {BRING.map((b) => (
           <li key={b} className="flex gap-2">
             <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-light" />
@@ -103,8 +103,8 @@ function InquirySheet({ open, onClose, address, dept }: { open: boolean; onClose
           </li>
         ))}
       </ul>
-      <h4 className="mb-1.5 mt-4 text-[13px] font-semibold text-ink">聞くこと</h4>
-      <ol className="space-y-1.5 text-[13px] text-ink">
+      <h4 className="mb-1.5 mt-4 text-[13px] font-semibold text-ink [@media(max-height:720px)]:mt-2.5 [@media(max-height:720px)]:mb-1">聞くこと</h4>
+      <ol className="space-y-1.5 text-[13px] text-ink [@media(max-height:720px)]:space-y-0.5 [@media(max-height:720px)]:text-[12px]">
         {ASK.map((a, i) => (
           <li key={a} className="flex gap-2">
             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-mint text-[11px] text-brand">{i + 1}</span>
@@ -112,7 +112,7 @@ function InquirySheet({ open, onClose, address, dept }: { open: boolean; onClose
           </li>
         ))}
       </ol>
-      <button onClick={copy} className="bg-gold mt-5 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-[14px] font-semibold text-white">
+      <button onClick={copy} className="bg-gold mt-5 [@media(max-height:720px)]:mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-[14px] font-semibold text-white">
         <CopyIcon className="h-4 w-4" />
         {copied ? "コピーしました" : "FAX・メール用の依頼文をコピー"}
       </button>

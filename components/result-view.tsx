@@ -33,9 +33,9 @@ function Choose({ query, result, onPick }: { query: string; result: Extract<Look
   return (
     <section className={`${CARD} p-4`}>
       <p className="text-[14px] font-semibold text-ink">「{query}」に当てはまる場所が複数あります</p>
-      <p className="mt-1 text-[11px] text-muted">物件の場所を選んでください。都道府県から入れると一度で見つかります。</p>
+      <p className="mt-1 text-[11px] text-muted">物件の場所を選んでください。無ければ都道府県から入れ直すと一度で見つかります。</p>
       <ul className="mt-3 divide-y divide-line/70">
-        {result.candidates.map((c) => (
+        {result.candidates.slice(0, 7).map((c) => (
           <li key={c.matchedAddress}>
             <button onClick={() => onPick(c.matchedAddress)} className="flex w-full items-center gap-2 py-2.5 text-left text-[13px] text-ink">
               <PinOutlineIcon className="h-4 w-4 shrink-0 text-brand-light" />
@@ -80,7 +80,7 @@ function Found({ result }: { result: Extract<LookupResult, { status: "ok" }> }) 
   const primary = offline ? [] : result.links.filter((l) => l.kind !== "public_road");
   const secondary = offline ? [] : result.links.filter((l) => l.kind === "public_road");
   const hint = result.links.some((l) => l.pinpoint) && (
-    <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted">
+    <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted [@media(max-height:720px)]:hidden">
       <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
       利用規約に同意すると、物件の場所が地図の中央に出ます。
     </p>
@@ -88,13 +88,14 @@ function Found({ result }: { result: Extract<LookupResult, { status: "ok" }> }) 
   const contact = result.contact && <ContactCard contact={result.contact} city={m.name} address={result.matchedAddress} />;
 
   return (
-    <div className="space-y-2.5">
-      <section className={CARD}>
+    <div className="flex min-h-0 flex-1 flex-col gap-2.5 [&>*]:shrink-0">
+      <section className={`${CARD} flex min-h-0 flex-1 !shrink flex-col`}>
         <Place address={result.matchedAddress} approximate={result.approximate} actions={<><CopyButton text={result.matchedAddress} /><ShareButton result={result} /></>} />
-        <div className="border-t border-line/70 px-4 pb-4 pt-3">
+        <div className="flex min-h-0 flex-1 flex-col border-t border-line/70 px-4 pb-4 pt-3 [&>*]:shrink-0">
           <CityLine municipality={m} />
-          <div className="mt-2.5">
-            <MapPreview lat={result.lat} lng={result.lng} />
+          {/* 画面の高さに合わせて地図プレビューが伸び縮みする（スクロールさせない） */}
+          <div className="mt-2.5 flex min-h-[64px] flex-1 !shrink flex-col">
+            <MapPreview lat={result.lat} lng={result.lng} className="min-h-[64px] flex-1" />
           </div>
           {(primary.length > 0 || secondary.length > 0) && (
             <>
@@ -148,10 +149,10 @@ function Place({ address, approximate, actions }: { address: string; approximate
       {approximate ? (
         <p className="mt-1 flex gap-1 text-[10.5px] leading-[1.6] text-[#8a4f3a]">
           <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
-          番地が見つからず、町の中心を表示しています。地図で物件の場所を探してください。
+          番地が見つからず、町の中心を表示しています。
         </p>
       ) : (
-        <p className="mt-1 text-[10.5px] text-muted">※ 番地までは一致しないことがあります</p>
+        <p className="mt-1 text-[10.5px] text-muted [@media(max-height:720px)]:hidden">※ 番地までは一致しないことがあります</p>
       )}
     </div>
   );
@@ -181,7 +182,7 @@ function CityLine({ municipality: m }: { municipality: Municipality }) {
         <CoveragePill coverage={m.coverage} />
       </div>
       {(m.note || m.coverage !== "full") && (
-        <p className="mt-1.5 text-[10.5px] leading-[1.6] text-muted">{m.note ?? COVERAGE[m.coverage].long}</p>
+        <p className="mt-1.5 text-[10.5px] leading-[1.6] text-muted [@media(max-height:720px)]:hidden">{m.note ?? COVERAGE[m.coverage].long}</p>
       )}
     </div>
   );
@@ -245,7 +246,7 @@ function MapButton({ link, primary }: { link: ResolvedLink; primary?: boolean })
         <MapIcon className={`h-6 w-6 shrink-0 ${primary ? "" : "text-brand-light"}`} />
         <span className="min-w-0 flex-1">
           <span className="block text-[13.5px] font-semibold leading-snug">{link.label}</span>
-          <span className={`mt-0.5 block text-[10.5px] ${primary ? "text-white/85" : "text-muted"}`}>{sub}</span>
+          <span className={`mt-0.5 block text-[10.5px] [@media(max-height:720px)]:hidden ${primary ? "text-white/85" : "text-muted"}`}>{sub}</span>
         </span>
         <ChevronRightIcon className="h-4 w-4 shrink-0 opacity-80" />
       </a>
