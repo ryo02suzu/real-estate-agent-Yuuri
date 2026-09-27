@@ -308,3 +308,11 @@ describe("鹿沼市の分割図", () => {
     expect(link.url).toMatch(/shiteidourozu\/18\.pdf$/);
   });
 });
+
+describe("富岡市の分割図", () => {
+  it("富岡市役所（富岡1460-1）は No.20 の図", () => {
+    const [link] = buildLinks(findMunicipality("10210")!, 36.25943, 138.889542);
+    expect(link.sheet?.label).toBe("No.20");
+    expect(link.url).toMatch(/files\/20\.pdf$/);
+  });
+});
