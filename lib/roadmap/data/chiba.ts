@@ -2,6 +2,8 @@
 // 道路種別は「特定行政庁が市長の21市」は各市、それ以外は県の土木事務所が扱う（県「指定道路情報について」）。
 import type { Contact, MapLink, Municipality } from "../municipalities";
 import { alandis, geocloud, geocloudMp, sonicweb, wagmap } from "../vendors";
+import type { SheetIndex } from "../sheets";
+import SAKURA_SHEETS from "./sheets/sakura.json";
 
 const pref = "千葉県" as const;
 
@@ -86,7 +88,14 @@ const CITIES: Municipality[] = [
     codes: ["12212"],
     coverage: "partial",
     maps: [
-      { kind: "designated_only", label: "指定道路図（5号・2項のみ、地区別PDF）", build: null, url: "https://www.city.sakura.lg.jp/soshiki/kenchikushidoka/oshirase/3275.html", verified: false },
+      {
+        kind: "designated_only",
+        label: "指定道路図（5号・2項のみ、PDF）",
+        build: null,
+        url: "https://www.city.sakura.lg.jp/soshiki/kenchikushidoka/oshirase/3275.html",
+        verified: true,
+        sheets: SAKURA_SHEETS as SheetIndex,
+      },
     ],
     contact: { dept: "建築指導課 建築指導班", phone: "043-484-6169", note: "電話での照会は不可。窓口か千葉県電子申請サービスで照会（当日〜翌営業日に回答）", noPhoneInquiry: true },
   },

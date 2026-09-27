@@ -250,3 +250,17 @@ describe("北区の分割図", () => {
     expect(link.url).toMatch(/151-160\.pdf#page=2$/);
   });
 });
+
+describe("佐倉市の分割図", () => {
+  it("海隣寺町（佐倉城址の東）は D5 の図", () => {
+    const [link] = buildLinks(findMunicipality("12212")!, 35.72374, 140.22406);
+    expect(link.sheet?.label).toBe("D5");
+  });
+});
+
+describe("みどり市の分割図", () => {
+  it("笠懸町鹿の図 135 の中心は 135 番", () => {
+    const [cityMap] = buildLinks(findMunicipality("10212")!, 36.391248, 139.274078);
+    expect(cityMap.sheet?.label).toBe("135");
+  });
+});

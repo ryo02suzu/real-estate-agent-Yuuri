@@ -4,6 +4,7 @@
 import type { Contact, MapLink, Municipality } from "../municipalities";
 import { geocloud, wagmap } from "../vendors";
 import KIRYU_SHEETS from "./sheets/kiryu.json";
+import MIDORI_SHEETS from "./sheets/midori.json";
 import type { SheetIndex } from "../sheets";
 
 const pref = "群馬県" as const;
@@ -113,7 +114,14 @@ const limitedCity = (name: string, code: string, office: keyof typeof OFFICE, ci
   note: "市が公開しているのは位置指定道路の図。1号（公道）は載っていないので土木事務所で確認。",
 });
 
-const designated = (label: string, url: string): MapLink => ({ kind: "designated_only", label, build: null, url, verified: false });
+const designated = (label: string, url: string, sheets?: SheetIndex): MapLink => ({
+  kind: "designated_only",
+  label,
+  build: null,
+  url,
+  verified: !!sheets,
+  sheets,
+});
 
 const LIMITED_CITIES: Municipality[] = [
   limitedCity("沼田市", "10206", "numata", designated("指定道路図（沼田市・位置指定道路）", "https://www.city.numata.gunma.jp/jigyosha/1003548/1005936/1008826.html")),
@@ -121,7 +129,7 @@ const LIMITED_CITIES: Municipality[] = [
   limitedCity("藤岡市", "10209", "takasaki", designated("位置指定道路図（藤岡市・PDF）", "https://www.city.fujioka.gunma.jp/soshiki/toshikensetsubu/kenchiku/2/2/10028.html")),
   limitedCity("富岡市", "10210", "takasaki", designated("指定道路図（富岡市・位置指定道路）", "https://www.city.tomioka.lg.jp/www/contents/1585534668687/index.html")),
   limitedCity("安中市", "10211", "takasaki", designated("指定道路図（安中市・位置指定道路）", "https://www.city.annaka.lg.jp/jutaku/kenchiku/shiteidouro.html")),
-  limitedCity("みどり市", "10212", "ota", designated("指定道路図（みどり市・位置指定道路）", "https://www.city.midori.gunma.jp/sangyou/1001651/1001811/1002814.html")),
+  limitedCity("みどり市", "10212", "ota", designated("指定道路図（みどり市・位置指定道路）", "https://www.city.midori.gunma.jp/sangyou/1001651/1001811/1002814.html", MIDORI_SHEETS as SheetIndex)),
 ];
 
 // --- 県が扱う町村 --------------------------------------------------------------
