@@ -4,6 +4,7 @@ import type { Contact, MapLink, Municipality } from "../municipalities";
 import { alandis, geocloud, geocloudMp, sonicweb, wagmap } from "../vendors";
 import type { SheetIndex } from "../sheets";
 import SAKURA_SHEETS from "./sheets/sakura.json";
+import YACHIYO_SHEETS from "./sheets/yachiyo.json";
 
 const pref = "千葉県" as const;
 
@@ -104,7 +105,16 @@ const CITIES: Municipality[] = [
     name: "八千代市",
     codes: ["12221"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "建築基準法の道路種別（図郭番号から選ぶPDF）", build: null, url: "https://www.city.yachiyo.lg.jp/soshiki/44/3993.html", verified: false }],
+    maps: [
+      {
+        kind: "road_type",
+        label: "建築基準法の道路種別（PDF）",
+        build: null,
+        url: "https://www.city.yachiyo.lg.jp/soshiki/44/3993.html",
+        verified: true,
+        sheets: YACHIYO_SHEETS as SheetIndex,
+      },
+    ],
     contact: { dept: "建築指導課（新館5階）", phone: "047-421-6774", note: "電話・FAX・メール不可。窓口か電子申請（道路種別照会）で確認", noPhoneInquiry: true },
   },
   {

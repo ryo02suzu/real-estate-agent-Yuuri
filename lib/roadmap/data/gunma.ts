@@ -5,6 +5,7 @@ import type { Contact, MapLink, Municipality } from "../municipalities";
 import { geocloud, wagmap } from "../vendors";
 import KIRYU_SHEETS from "./sheets/kiryu.json";
 import MIDORI_SHEETS from "./sheets/midori.json";
+import ANNAKA_SHEETS from "./sheets/annaka.json";
 import type { SheetIndex } from "../sheets";
 
 const pref = "群馬県" as const;
@@ -128,7 +129,7 @@ const LIMITED_CITIES: Municipality[] = [
   limitedCity("渋川市", "10208", "maebashi", designated("位置指定道路（渋川市地図情報）", "https://www2.wagmap.jp/shibukawa/Portal")),
   limitedCity("藤岡市", "10209", "takasaki", designated("位置指定道路図（藤岡市・PDF）", "https://www.city.fujioka.gunma.jp/soshiki/toshikensetsubu/kenchiku/2/2/10028.html")),
   limitedCity("富岡市", "10210", "takasaki", designated("指定道路図（富岡市・位置指定道路）", "https://www.city.tomioka.lg.jp/www/contents/1585534668687/index.html")),
-  limitedCity("安中市", "10211", "takasaki", designated("指定道路図（安中市・位置指定道路）", "https://www.city.annaka.lg.jp/jutaku/kenchiku/shiteidouro.html")),
+  limitedCity("安中市", "10211", "takasaki", designated("指定道路図（安中市・位置指定道路）", "https://www.city.annaka.lg.jp/jutaku/kenchiku/shiteidouro.html", ANNAKA_SHEETS as SheetIndex)),
   limitedCity("みどり市", "10212", "ota", designated("指定道路図（みどり市・位置指定道路）", "https://www.city.midori.gunma.jp/sangyou/1001651/1001811/1002814.html", MIDORI_SHEETS as SheetIndex)),
 ];
 
