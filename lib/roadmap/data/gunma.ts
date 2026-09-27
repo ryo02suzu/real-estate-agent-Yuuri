@@ -7,6 +7,7 @@ import KIRYU_SHEETS from "./sheets/kiryu.json";
 import MIDORI_SHEETS from "./sheets/midori.json";
 import ANNAKA_SHEETS from "./sheets/annaka.json";
 import FUJIOKA_SHEETS from "./sheets/fujioka.json";
+import NUMATA_SHEETS from "./sheets/numata.json";
 import type { SheetIndex } from "../sheets";
 
 const pref = "群馬県" as const;
@@ -126,7 +127,7 @@ const designated = (label: string, url: string, sheets?: SheetIndex): MapLink =>
 });
 
 const LIMITED_CITIES: Municipality[] = [
-  limitedCity("沼田市", "10206", "numata", designated("指定道路図（沼田市・位置指定道路）", "https://www.city.numata.gunma.jp/jigyosha/1003548/1005936/1008826.html")),
+  limitedCity("沼田市", "10206", "numata", designated("指定道路図（沼田市・位置指定道路）", "https://www.city.numata.gunma.jp/jigyosha/1003548/1005936/1008826.html", NUMATA_SHEETS as SheetIndex)),
   limitedCity("渋川市", "10208", "maebashi", designated("位置指定道路（渋川市地図情報）", "https://www2.wagmap.jp/shibukawa/Portal")),
   limitedCity("藤岡市", "10209", "takasaki", designated("位置指定道路図（藤岡市・PDF）", "https://www.city.fujioka.gunma.jp/soshiki/toshikensetsubu/kenchiku/2/2/10028.html", FUJIOKA_SHEETS as SheetIndex)),
   limitedCity("富岡市", "10210", "takasaki", designated("指定道路図（富岡市・位置指定道路）", "https://www.city.tomioka.lg.jp/www/contents/1585534668687/index.html")),

@@ -292,3 +292,11 @@ describe("藤岡市の分割図", () => {
     expect(link.url).toContain("10028.html");
   });
 });
+
+describe("沼田市の分割図", () => {
+  it("沼田市役所（下之町888）は 9 番の図", () => {
+    const [link] = buildLinks(findMunicipality("10206")!, 36.644066, 139.043106);
+    expect(link.sheet?.label).toBe("9");
+    expect(link.url).toMatch(/826\/9\.pdf$/);
+  });
+});
