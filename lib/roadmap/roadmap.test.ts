@@ -279,3 +279,16 @@ describe("安中市の分割図", () => {
     expect(link.sheet?.label).toBe("46");
   });
 });
+
+describe("藤岡市の分割図", () => {
+  it("藤岡市役所（中栗須327）は No.11 の図", () => {
+    const [link] = buildLinks(findMunicipality("10209")!, 36.258377, 139.074493);
+    expect(link.sheet?.label).toBe("No.11");
+  });
+
+  it("図を位置合わせできなかった鬼石の中心部は一覧ページを開く", () => {
+    const [link] = buildLinks(findMunicipality("10209")!, 36.1545, 139.0585);
+    expect(link.sheet).toBeUndefined();
+    expect(link.url).toContain("10028.html");
+  });
+});
