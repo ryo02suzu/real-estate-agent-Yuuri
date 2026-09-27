@@ -316,3 +316,16 @@ describe("富岡市の分割図", () => {
     expect(link.url).toMatch(/files\/20\.pdf$/);
   });
 });
+
+describe("富士見市・新座市の分割図", () => {
+  it("富士見市役所（鶴馬1800-1）は 06 の図", () => {
+    const [link] = buildLinks(findMunicipality("11235")!, 35.856644, 139.549149);
+    expect(link.sheet?.label).toBe("06");
+  });
+
+  it("新座市役所（野火止1-1-1）は 09KD734 の図", () => {
+    const [link] = buildLinks(findMunicipality("11230")!, 35.79324, 139.56575);
+    expect(link.sheet?.label).toBe("09KD734");
+    expect(link.url).toMatch(/09kd734\.pdf$/);
+  });
+});

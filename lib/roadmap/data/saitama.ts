@@ -2,6 +2,9 @@
 // 窓口の部署・電話番号は県「建築行政の窓口」ページの一覧を基本に、市の道路種別案内ページで上書きしている。
 import type { Contact, MapLink, Municipality } from "../municipalities";
 import { alandis, arcgisExperience, cloudgis, geocloud, geocloudMp, openMap, sonicweb, wagmap } from "../vendors";
+import type { SheetIndex } from "../sheets";
+import FUJIMI_SHEETS from "./sheets/fujimi.json";
+import NIIZA_SHEETS from "./sheets/niiza.json";
 
 const pref = "埼玉県" as const;
 
@@ -113,7 +116,7 @@ const CITIES: Municipality[] = [
     codes: ["11230"],
     coverage: "partial",
     maps: [
-      { kind: "designated_only", label: "指定道路図（道路位置指定図）", build: null, url: "https://www.city.niiza.lg.jp/img/shiteidourozu/toshikeizu.html", verified: false },
+      { kind: "designated_only", label: "指定道路図（道路位置指定図・PDF）", build: null, url: "https://www.city.niiza.lg.jp/img/shiteidourozu/toshikeizu.html", verified: true, sheets: NIIZA_SHEETS as SheetIndex },
       { kind: "public_road", label: "にいざマップ（道路台帳）", build: null, url: "https://www.city.niiza.lg.jp/soshiki/33/niizamap-douro.html", verified: false },
     ],
     contact: { dept: "建築審査課", phone: "048-477-1111（代表）" },
@@ -209,10 +212,11 @@ const CITIES: Municipality[] = [
     maps: [
       {
         kind: "designated_only",
-        label: "道路位置指定の閲覧（図面番号から選ぶPDF）",
+        label: "道路位置指定の閲覧（PDF）",
         build: null,
         url: "https://www.city.fujimi.saitama.jp/kurashi_tetsuzuki/sumai/jyuutaku/shiteidouro-etsuran/shitei-douro-etsuran.html",
-        verified: false,
+        verified: true,
+        sheets: FUJIMI_SHEETS as SheetIndex,
       },
       { kind: "public_road", label: "路線網図（市道）", build: null, url: "https://www.city.fujimi.saitama.jp/kurashi_tetsuzuki/05douro/doro_kotsu/douromouzu.html", verified: false },
     ],
