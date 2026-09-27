@@ -300,3 +300,11 @@ describe("沼田市の分割図", () => {
     expect(link.url).toMatch(/826\/9\.pdf$/);
   });
 });
+
+describe("鹿沼市の分割図", () => {
+  it("鹿沼市役所（今宮町1688-1）は 18 番の図", () => {
+    const [link] = buildLinks(findMunicipality("09205")!, 36.566959, 139.743912);
+    expect(link.sheet?.label).toBe("18");
+    expect(link.url).toMatch(/shiteidourozu\/18\.pdf$/);
+  });
+});

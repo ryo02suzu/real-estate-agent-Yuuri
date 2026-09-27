@@ -3,6 +3,8 @@
 // それ以外の市町は県（令和7年4月から県庁の建築指導課に集約）が扱う。
 import type { Contact, MapLink, Municipality } from "../municipalities";
 import { sonicweb, wagmap } from "../vendors";
+import type { SheetIndex } from "../sheets";
+import KANUMA_SHEETS from "./sheets/kanuma.json";
 
 const pref = "栃木県" as const;
 
@@ -52,7 +54,16 @@ const CITIES: Municipality[] = [
     name: "鹿沼市",
     codes: ["09205"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "指定道路図（PDF・2023年3月時点）", build: null, url: "https://www.city.kanuma.tochigi.jp/0380/info-0000000267-1.html", verified: false }],
+    maps: [
+      {
+        kind: "road_type",
+        label: "指定道路図（PDF・2023年3月時点）",
+        build: null,
+        url: "https://www.city.kanuma.tochigi.jp/0380/info-0000000267-0.html",
+        verified: true,
+        sheets: KANUMA_SHEETS as SheetIndex,
+      },
+    ],
     contact: { dept: "建築指導課", phone: "0289-63-2242" },
     note: "図は2023年3月末時点。最新は建築指導課で確認。",
   },
