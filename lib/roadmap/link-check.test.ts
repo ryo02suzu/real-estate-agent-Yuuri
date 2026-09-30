@@ -15,6 +15,8 @@ type Row = { city: string; label: string; url: string; result: "ok" | "broken" |
 async function check(url: string): Promise<Pick<Row, "result" | "detail">> {
   try {
     const res = await fetch(url, { headers: { "User-Agent": UA, "Accept-Language": "ja" }, redirect: "follow", signal: AbortSignal.timeout(30_000) });
+    // 5xx は役所のサーバーの一時的な不調や途中の中継の問題が多いので「要確認」にとどめる
+    if (res.status >= 500) return { result: "unreachable", detail: `HTTP ${res.status}` };
     if (res.status >= 400) return { result: "broken", detail: `HTTP ${res.status}` };
     const type = res.headers.get("content-type") ?? "";
     if (type.includes("text/html")) {
@@ -26,6 +28,18 @@ async function check(url: string): Promise<Pick<Row, "result" | "detail">> {
   } catch (e) {
     // 海外の回線を断る役所もあるので、つながらないだけなら「要確認」にとどめる
     return { result: "unreachable", detail: e instanceof Error ? (e.cause instanceof Error ? e.cause.message : e.message) : String(e) };
+  }
+}
+
+/** ページに載っている PDF・PNG へのリンク（絶対URL） */
+async function pdfLinks(page: string): Promise<Set<string>> {
+  try {
+    const res = await fetch(page, { headers: { "User-Agent": UA, "Accept-Language": "ja" }, signal: AbortSignal.timeout(30_000) });
+    const html = await res.text();
+    const hrefs = [...html.matchAll(/href="([^"]+\.(?:pdf|png))"/gi)].map((m) => new URL(m[1], res.url).href.replace(/^http:/, "https:"));
+    return new Set(hrefs);
+  } catch {
+    return new Set();
   }
 }
 
@@ -57,6 +71,24 @@ describe.skipIf(!process.env.LINK_CHECK)("地図リンクの死活確認", () =>
       }),
     );
 
+    // 分割図の市は、市の一覧ページに載っているPDFと照らし合わせる（図の差し替えでファイル名が変わるため）
+    const renamed: string[] = [];
+    for (const m of MUNICIPALITIES) {
+      for (const map of m.maps) {
+        if (!map.sheets || !map.url) continue;
+        const ours = new Set(map.sheets.cells.map(([, url]) => url.split("#")[0]));
+        const onPage = await pdfLinks(map.url);
+        // 一覧ページから図に直接リンクしていない市（索引図PDFから選ぶ市など）は比べない
+        if ([...ours].filter((u) => onPage.has(u)).length < ours.size / 2) continue;
+        // 図が消えたときだけ知らせる（索引図や手続きの資料もページに並ぶので、増えただけでは知らせない）
+        const gone = [...ours].filter((u) => !onPage.has(u));
+        const ext = (u: string) => u.split(".").pop()!.toLowerCase();
+        const added = [...onPage].filter((u) => !ours.has(u) && gone.some((g) => ext(g) === ext(u)));
+        if (gone.length)
+          renamed.push(`| ${m.pref}${m.name} | ${gone.map((u) => u.split("/").pop()).join("<br>")} | ${added.map((u) => u.split("/").pop()).join("<br>") || "—"} |`);
+      }
+    }
+
     const broken = rows.filter((r) => r.result === "broken");
     const unreachable = rows.filter((r) => r.result === "unreachable");
     const line = (r: Row) => `| ${r.city} | ${r.label} | ${r.detail} | [開く](${r.url}) |`;
@@ -66,7 +98,10 @@ describe.skipIf(!process.env.LINK_CHECK)("地図リンクの死活確認", () =>
       `確認 ${rows.length} 件 / 壊れている ${broken.length} 件 / つながらない ${unreachable.length} 件`,
       ...(missing.length ? ["", `役所の座標が無く確認できなかった市区町村: ${missing.join("、")}（lib/roadmap/data/office-points.json に追加）`] : []),
       ...(broken.length ? ["", "## 壊れている", "", "| 市区町村 | 地図 | 内容 | URL |", "|---|---|---|---|", ...broken.map(line)] : []),
-      ...(unreachable.length ? ["", "## つながらない（一時的な障害や海外回線の遮断の可能性）", "", "| 市区町村 | 地図 | 内容 | URL |", "|---|---|---|---|", ...unreachable.map(line)] : []),
+      ...(unreachable.length ? ["", "## つながらない・サーバーエラー（一時的な障害や海外回線の遮断の可能性）", "", "| 市区町村 | 地図 | 内容 | URL |", "|---|---|---|---|", ...unreachable.map(line)] : []),
+      ...(renamed.length
+        ? ["", "## 分割図が市のページと食い違う（図の差し替え。lib/roadmap/data/sheets/ の URL を直す）", "", "| 市区町村 | 市のページから消えた図 | 差し替えの候補（市のページにだけあるファイル） |", "|---|---|---|", ...renamed]
+        : []),
     ].join("\n");
     writeFileSync("link-check-report.md", report + "\n");
     console.log(report);
