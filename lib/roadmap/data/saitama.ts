@@ -5,6 +5,7 @@ import { alandis, arcgisExperience, cloudgis, geocloud, geocloudMp, openMap, son
 import type { SheetIndex } from "../sheets";
 import FUJIMI_SHEETS from "./sheets/fujimi.json";
 import NIIZA_SHEETS from "./sheets/niiza.json";
+import SHIKI_SHEETS from "./sheets/shiki.json";
 
 const pref = "埼玉県" as const;
 
@@ -303,7 +304,15 @@ const CITIES: Municipality[] = [
     codes: ["11228"],
     coverage: "full",
     maps: [
-      { kind: "road_type", label: "指定道路図（地区別PDF）", build: null, url: "https://www.city.shiki.lg.jp/index.cfm/37,115163,349,1150,html", verified: false },
+      // 市は「都市計画図ベース」と「白図ベース」の2種類を出している。道路が見やすい白図ベースを開く
+      {
+        kind: "road_type",
+        label: "指定道路図（PDF）",
+        build: null,
+        url: "https://www.city.shiki.lg.jp/index.cfm/37,115163,349,1150,html",
+        verified: true,
+        sheets: SHIKI_SHEETS as SheetIndex,
+      },
     ],
     contact: { dept: "建築開発課", phone: "048-456-5372" },
   },

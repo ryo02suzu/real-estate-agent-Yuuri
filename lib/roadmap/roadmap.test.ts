@@ -353,3 +353,12 @@ describe("図の範囲（図と同じ範囲の地図を描くため）", () => {
     expect(e).toBeGreaterThan(139.330597);
   });
 });
+
+describe("志木市の分割図", () => {
+  it("志木市役所（中宗岡1-1-1）は 6 番の図（白図ベース）で、上端に近いので 3 番も出す", () => {
+    const [link] = buildLinks(findMunicipality("11228")!, 35.836521, 139.580322);
+    expect(link.sheet?.label).toBe("6");
+    expect(link.url).toMatch(/10253\.pdf$/);
+    expect(link.sheet?.neighbor?.label).toBe("3");
+  });
+});
