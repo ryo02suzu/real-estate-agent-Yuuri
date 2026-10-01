@@ -17,6 +17,7 @@ import {
   ShareIcon,
 } from "./icons";
 import { MapPreview } from "./map-preview";
+import { SheetPreview } from "./sheet-preview";
 
 const CARD = "shadow-soft rounded-2xl border border-white bg-white";
 
@@ -168,12 +169,8 @@ function Found({
         <div className="flex min-h-0 flex-1 flex-col border-t border-line/70 px-4 pb-4 pt-3 [&>*]:shrink-0">
           <CityLine municipality={m} />
           {/* 画面の高さに合わせて地図プレビューが伸び縮みする（スクロールさせない） */}
-          <div className="mt-2.5 flex min-h-[64px] flex-1 !shrink flex-col">
-            <MapPreview
-              lat={result.lat}
-              lng={result.lng}
-              className="min-h-[64px] flex-1"
-            />
+          <div className="mt-2.5 flex min-h-[64px] flex-1 !shrink flex-col [@media(max-height:720px)]:mt-1.5 [@media(max-height:720px)]:min-h-[52px]">
+            <Preview result={result} className="min-h-[64px] flex-1 [@media(max-height:720px)]:min-h-[52px]" />
           </div>
           {(primary.length > 0 || secondary.length > 0) && (
             <>
@@ -333,6 +330,51 @@ function ShareButton({
   );
 }
 
+/**
+ * 地図プレビュー。PDF の分割図を開く市では「図の範囲」（開く図と同じ範囲・北が上）を先に見せ、
+ * 「周辺」に切り替えられる。図を開いたあと、道路や川の形を見比べて物件の場所を探せる
+ */
+function Preview({
+  result,
+  className,
+  large,
+}: {
+  result: Extract<LookupResult, { status: "ok" }>;
+  className: string;
+  large?: boolean;
+}) {
+  const sheet = result.links.find((l) => l.sheet)?.sheet;
+  const [mode, setMode] = useState<"sheet" | "around">("sheet");
+  if (!sheet) return <MapPreview lat={result.lat} lng={result.lng} className={className} large={large} />;
+  const tab = (m: typeof mode, label: string) => (
+    <button
+      onClick={() => setMode(m)}
+      className={`rounded-full px-2.5 py-0.5 text-[10.5px] [@media(max-height:720px)]:py-0 [@media(max-height:720px)]:text-[10px] ${mode === m ? "bg-gold text-white" : "text-ink"}`}
+    >
+      {label}
+    </button>
+  );
+  // 地図の上には何も重ねない（ピンが隠れないように）。見出しと切り替えは地図の上の行に置く
+  return (
+    <div className={`flex flex-col ${className}`}>
+      <div className="mb-1.5 flex items-center justify-between gap-2 [@media(max-height:720px)]:mb-1">
+        <span className="truncate text-[11px] text-muted [@media(max-height:720px)]:text-[10px]">
+          {mode === "sheet" ? `図 ${sheet.label} と同じ範囲（北が上）` : "物件の周辺"}
+        </span>
+        <span className="flex shrink-0 rounded-full border border-line bg-white p-0.5">
+          {tab("sheet", "図の範囲")}
+          {tab("around", "周辺")}
+        </span>
+      </div>
+      {mode === "sheet" ? (
+        <SheetPreview lat={result.lat} lng={result.lng} sheet={sheet} className="min-h-0 flex-1" large={large} />
+      ) : (
+        <MapPreview lat={result.lat} lng={result.lng} className="min-h-0 flex-1" large={large} />
+      )}
+    </div>
+  );
+}
+
 function MapButton({
   link,
   primary,
@@ -350,7 +392,7 @@ function MapButton({
   // 複数ページのPDF（北区など）はページを添える。iPhone ではページ指定が効かないことがある
   const page = sheet?.url.match(/#page=(\d+)/)?.[1];
   const tip = sheet
-    ? `物件は図の${sheet.where}あたりです。${page ? `（PDFの${page}ページ目）` : ""}`
+    ? `物件は図の${sheet.where}あたりです${page ? `（PDFの${page}ページ目）` : ""}。地図の「図の範囲」が図と同じ範囲です。`
     : (link.tip ??
       (link.pinpoint
         ? undefined
@@ -462,7 +504,7 @@ function DesktopFound({ result }: { result: Extract<LookupResult, { status: "ok"
       </div>
 
       <section className={`${CARD} flex min-h-0 flex-col p-3`}>
-        <MapPreview lat={result.lat} lng={result.lng} className="min-h-0 flex-1" large />
+        <Preview result={result} className="min-h-0 flex-1" large />
       </section>
     </div>
   );

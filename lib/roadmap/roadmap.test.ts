@@ -329,3 +329,27 @@ describe("富士見市・新座市の分割図", () => {
     expect(link.url).toMatch(/09kd734\.pdf$/);
   });
 });
+
+describe("図の範囲（図と同じ範囲の地図を描くため）", () => {
+  it("物件は図の範囲の中にあり、港区の図は約750m×500m", () => {
+    const lat = 35.660464;
+    const lng = 139.729249;
+    const [link] = buildLinks(findMunicipality("13103")!, lat, lng);
+    const [n, w, s, e] = link.sheet!.bounds;
+    expect(lat).toBeLessThanOrEqual(n);
+    expect(lat).toBeGreaterThanOrEqual(s);
+    expect(lng).toBeGreaterThanOrEqual(w);
+    expect(lng).toBeLessThanOrEqual(e);
+    expect((e - w) * 111320 * Math.cos((lat * Math.PI) / 180)).toBeCloseTo(750, -2);
+    expect((n - s) * 110960).toBeCloseTo(500, -2);
+  });
+
+  it("索引図の座標で持つ桐生市でも、範囲が物件を囲む", () => {
+    const [link] = buildLinks(findMunicipality("10203")!, 36.405319, 139.330597);
+    const [n, w, s, e] = link.sheet!.bounds;
+    expect(n).toBeGreaterThan(36.405319);
+    expect(s).toBeLessThan(36.405319);
+    expect(w).toBeLessThan(139.330597);
+    expect(e).toBeGreaterThan(139.330597);
+  });
+});

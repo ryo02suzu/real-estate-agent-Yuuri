@@ -18,6 +18,8 @@ export type SheetHit = {
   url: string;
   /** 物件が図のどのあたりか（「左上」「中央」など） */
   where: string;
+  /** 図の範囲 [北端の緯度, 西端の経度, 南端の緯度, 東端の経度]。図と同じ範囲の地図を描くのに使う */
+  bounds: [number, number, number, number];
   /** 物件が図の端に近いとき、隣の図 */
   neighbor?: { label: string; url: string };
 };
@@ -29,6 +31,15 @@ function toIndex(ix: SheetIndex, lat: number, lng: number): [number, number] {
   const la = lat - c;
   const lo = lng - f;
   return [(e * la - b * lo) / det, (a * lo - d * la) / det];
+}
+
+/** 図の四隅を緯度経度にして、それを囲む範囲 [北, 西, 南, 東] */
+function boundsOf(ix: SheetIndex, [cx, cy, w, h]: readonly [number, number, number, number]): SheetHit["bounds"] {
+  const [[a, d], [b, e], [c, f]] = ix.M;
+  const corners = [-0.5, 0.5].flatMap((su) => [-0.5, 0.5].map((sv) => [cx + su * w, cy + sv * h]));
+  const lats = corners.map(([x, y]) => a * x + b * y + c);
+  const lngs = corners.map(([x, y]) => d * x + e * y + f);
+  return [Math.max(...lats), Math.min(...lngs), Math.min(...lats), Math.max(...lngs)];
 }
 
 const H = ["左", "中央", "右"];
@@ -47,13 +58,13 @@ function where(fx: number, fy: number): string {
 export function findSheet(ix: SheetIndex, lat: number, lng: number): SheetHit | undefined {
   const [x, y] = toIndex(ix, lat, lng);
   // 図の中心からのずれ（図の大きさで割った値。±0.5 以内ならその図の中）
-  const scored = ix.cells.map(([label, url, cx, cy, w = ix.w, h = ix.h]) => ({ label, url, u: (x - cx) / w, v: (y - cy) / h }));
+  const scored = ix.cells.map(([label, url, cx, cy, w = ix.w, h = ix.h]) => ({ label, url, u: (x - cx) / w, v: (y - cy) / h, cell: [cx, cy, w, h] as const }));
   const within = scored.filter((s) => Math.abs(s.u) <= 0.5 && Math.abs(s.v) <= 0.5);
   // 図どうしが重なる（のりしろがある）ときは、物件が中心寄りにある図を選ぶ
   const m = (s: (typeof scored)[number]) => Math.max(Math.abs(s.u), Math.abs(s.v));
   const inside = within.sort((a, b) => m(a) - m(b))[0];
   if (!inside) return undefined;
-  const hit: SheetHit = { label: inside.label, url: inside.url, where: where(inside.u + 0.5, inside.v + 0.5) };
+  const hit: SheetHit = { label: inside.label, url: inside.url, where: where(inside.u + 0.5, inside.v + 0.5), bounds: boundsOf(ix, inside.cell) };
   // 端から図の1割以内なら、そちら側の隣の図も出す（索引図の位置合わせの誤差を見込む）
   const edge = 0.4;
   if (Math.abs(inside.u) > edge || Math.abs(inside.v) > edge) {
