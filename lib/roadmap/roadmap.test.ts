@@ -362,3 +362,15 @@ describe("志木市の分割図", () => {
     expect(link.sheet?.neighbor?.label).toBe("3");
   });
 });
+
+describe("和光市の分割図", () => {
+  it("広沢1-5（市役所付近）は 35R の図（町名番地索引の和29・30・35・36の1つ）", () => {
+    const [link] = buildLinks(findMunicipality("11229")!, 35.779507, 139.604248);
+    expect(link.sheet?.label).toBe("35R");
+  });
+
+  it("和光市駅前は 25R の図", () => {
+    const [link] = buildLinks(findMunicipality("11229")!, 35.7878, 139.6125);
+    expect(link.sheet?.label).toBe("25R");
+  });
+});

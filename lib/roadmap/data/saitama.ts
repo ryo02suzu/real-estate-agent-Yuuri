@@ -6,6 +6,7 @@ import type { SheetIndex } from "../sheets";
 import FUJIMI_SHEETS from "./sheets/fujimi.json";
 import NIIZA_SHEETS from "./sheets/niiza.json";
 import SHIKI_SHEETS from "./sheets/shiki.json";
+import WAKO_SHEETS from "./sheets/wako.json";
 
 const pref = "埼玉県" as const;
 
@@ -324,10 +325,11 @@ const CITIES: Municipality[] = [
     maps: [
       {
         kind: "road_type",
-        label: "指定道路図（町名番地索引から選ぶPDF）",
+        label: "指定道路図（PDF）",
         build: null,
         url: "https://www.city.wako.lg.jp/machizukuri/jyutaku/1005858/1005864/1005865/1005867.html",
-        verified: false,
+        verified: true,
+        sheets: WAKO_SHEETS as SheetIndex,
       },
     ],
     contact: { dept: "建築課 審査住宅担当", phone: "048-424-9134" },
