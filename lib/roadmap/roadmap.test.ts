@@ -286,10 +286,9 @@ describe("藤岡市の分割図", () => {
     expect(link.sheet?.label).toBe("No.11");
   });
 
-  it("図を位置合わせできなかった鬼石の中心部は一覧ページを開く", () => {
+  it("鬼石の中心部は No.34 の図", () => {
     const [link] = buildLinks(findMunicipality("10209")!, 36.1545, 139.0585);
-    expect(link.sheet).toBeUndefined();
-    expect(link.url).toContain("10028.html");
+    expect(link.sheet?.label).toBe("No.34");
   });
 });
 
