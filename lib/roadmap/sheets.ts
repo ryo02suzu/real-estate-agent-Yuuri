@@ -9,6 +9,11 @@ export type SheetIndex = {
   /** 図1枚の、索引図上での幅と高さ */
   w: number;
   h: number;
+  /**
+   * PDF を直接開けず、地図システムで図を開いてもらう市の手順（{label} は図の名前に置き換える）。
+   * このときの URL は、その図の中心で開く地図システムの URL
+   */
+  howto?: string;
   /** [図の名前, PDFのURL, 中心x, 中心y, 幅, 高さ]。幅・高さが無ければ w, h を使う */
   cells: ([string, string, number, number] | [string, string, number, number, number, number])[];
 };
@@ -20,6 +25,8 @@ export type SheetHit = {
   where: string;
   /** 図の範囲 [北端の緯度, 西端の経度, 南端の緯度, 東端の経度]。図と同じ範囲の地図を描くのに使う */
   bounds: [number, number, number, number];
+  /** 地図システムで図を開いてもらう市の手順（SheetIndex.howto） */
+  howto?: string;
   /** 物件が図の端に近いとき、隣の図 */
   neighbor?: { label: string; url: string };
 };
@@ -65,6 +72,7 @@ export function findSheet(ix: SheetIndex, lat: number, lng: number): SheetHit | 
   const inside = within.sort((a, b) => m(a) - m(b))[0];
   if (!inside) return undefined;
   const hit: SheetHit = { label: inside.label, url: inside.url, where: where(inside.u + 0.5, inside.v + 0.5), bounds: boundsOf(ix, inside.cell) };
+  if (ix.howto) hit.howto = ix.howto.replaceAll("{label}", inside.label);
   // 端から図の1割以内なら、そちら側の隣の図も出す（索引図の位置合わせの誤差を見込む）
   const edge = 0.4;
   if (Math.abs(inside.u) > edge || Math.abs(inside.v) > edge) {

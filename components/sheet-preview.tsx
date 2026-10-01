@@ -103,6 +103,7 @@ export function SheetPreview({
         <SheetPreview lat={lat} lng={lng} sheet={sheet} zoomable={false} fitWidth />
         <p className="mt-2 text-[12px] leading-relaxed text-muted">
           北が上です。道路や川の形を PDF の図と見比べると、物件（●）の場所がすぐ見つかります。
+          {sheet.howto && <span className="mt-1 block text-brand">{sheet.howto}</span>}
         </p>
         <a
           href={sheet.url}
@@ -111,7 +112,7 @@ export function SheetPreview({
           className="bg-gold mt-3 flex items-center justify-center gap-2 rounded-xl py-3 text-[14px] font-semibold text-white"
         >
           <MapIcon className="h-5 w-5" />
-          図 {sheet.label} の PDF を開く
+          {sheet.howto ? `地図で図 ${sheet.label} を開く` : `図 ${sheet.label} の PDF を開く`}
         </a>
       </Sheet>
       <a

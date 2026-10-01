@@ -5,6 +5,7 @@ import { alandis, geocloud, geocloudMp, sonicweb, wagmap } from "../vendors";
 import type { SheetIndex } from "../sheets";
 import SAKURA_SHEETS from "./sheets/sakura.json";
 import YACHIYO_SHEETS from "./sheets/yachiyo.json";
+import YOTSUKAIDO_SHEETS from "./sheets/yotsukaido.json";
 
 const pref = "千葉県" as const;
 
@@ -213,7 +214,17 @@ const CITIES: Municipality[] = [
     name: "四街道市",
     codes: ["12228"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "建築基準法道路（指定道路図PDF）", build: null, url: "https://webgis.alandis.jp/yotsukaido12/portal/douro.html", verified: false }],
+    // 図面PDFは地図システムがその場で作る一時URLなので直接は開けない。物件の図の場所で地図を開き、図面番号を案内する
+    maps: [
+      {
+        kind: "road_type",
+        label: "建築基準法道路（指定道路図）",
+        build: null,
+        url: "https://webgis.alandis.jp/yotsukaido12/portal/douro.html",
+        verified: true,
+        sheets: YOTSUKAIDO_SHEETS as SheetIndex,
+      },
+    ],
     contact: {
       dept: "都市部 建築課",
       phone: "043-421-6144",

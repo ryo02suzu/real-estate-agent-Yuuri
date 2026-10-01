@@ -374,3 +374,12 @@ describe("和光市の分割図", () => {
     expect(link.sheet?.label).toBe("25R");
   });
 });
+
+describe("四街道市の指定道路図（地図システムで図を開く）", () => {
+  it("市役所付近は図面 13-1。地図はその図の中心で開き、図面番号の手順を出す", () => {
+    const [link] = buildLinks(findMunicipality("12228")!, 35.6697, 140.1679);
+    expect(link.sheet?.label).toBe("13-1");
+    expect(link.url).toContain("yotsukaido12/webgis181/index.php/autologin_jswebgis");
+    expect(link.sheet?.howto).toContain("13-1.pdf");
+  });
+});
