@@ -10,6 +10,7 @@ import { Sheet } from "./sheet";
 /** 問い合わせ先。部署名などの表と、ワンタップで発信できる電話ボタン */
 export function ContactCard({ contact, city, address }: { contact: Contact; city: string; address: string }) {
   const [memo, setMemo] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
   const phones = contact.phone ? parsePhones(contact.phone) : [];
   // 県の出先機関（「千葉県 ○○土木事務所」など）は市町村名を付けない
   const dept = /^(東京都|\S{2,3}県)\s/.test(contact.dept) ? contact.dept : `${city} ${contact.dept}`;
@@ -35,9 +36,12 @@ export function ContactCard({ contact, city, address }: { contact: Contact; city
         {contact.note && (
           <>
             <dt className="text-muted">備考</dt>
-            <dd className="flex gap-1.5 text-[#8a4f3a]">
-              <AlertIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              {contact.note}
+            {/* 背の低い画面では1行に省略し、タップで全文を出す（画面をスクロールさせない） */}
+            <dd className="min-w-0">
+              <button onClick={() => setNoteOpen(true)} className="flex w-full gap-1.5 text-left text-[#8a4f3a]">
+                <AlertIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0 [@media(max-height:720px)]:truncate">{contact.note}</span>
+              </button>
             </dd>
           </>
         )}
@@ -45,23 +49,29 @@ export function ContactCard({ contact, city, address }: { contact: Contact; city
 
       {(phones.length > 0 || contact.email) && (
         <div className="mt-2.5 space-y-2">
-          {phones.map((p, i) => (
-            // 1件目を金色の大きなボタンに。押すとそのまま発信画面になる
-            <a
-              key={p.number}
-              href={`tel:${p.number.replace(/-/g, "")}`}
-              className={
-                i === 0
-                  ? "bg-gold flex min-h-11 items-center gap-3 rounded-xl px-3.5 py-2 text-white shadow-[0_6px_16px_rgba(138,102,50,0.28)] active:scale-[0.99]"
-                  : "flex min-h-11 items-center gap-3 rounded-xl border border-line bg-white px-3.5 py-2 text-ink active:scale-[0.99]"
-              }
-            >
-              <PhoneIcon className="h-[18px] w-[18px] shrink-0" />
-              <span className="tabular flex-1 text-[17px] font-semibold tracking-[0.02em]">{p.number}</span>
-              <span className={`text-[11px] ${i === 0 ? "text-white/85" : "text-muted"}`}>{p.label ?? "電話する"}</span>
-              <ChevronRightIcon className="h-4 w-4 shrink-0 opacity-80" />
-            </a>
-          ))}
+          {phones.map((p, i) => {
+            // 1件目を金色の大きなボタンに。押すとそのまま発信画面になる。
+            // 道路種別を電話で答えない役所は、電話で聞けると誤解しないよう控えめな色と文言にする
+            const gold = i === 0 && !contact.noPhoneInquiry;
+            return (
+              <a
+                key={p.number}
+                href={`tel:${p.number.replace(/-/g, "")}`}
+                className={
+                  gold
+                    ? "bg-gold flex min-h-11 items-center gap-3 rounded-xl px-3.5 py-2 text-white shadow-[0_6px_16px_rgba(138,102,50,0.28)] active:scale-[0.99]"
+                    : "flex min-h-11 items-center gap-3 rounded-xl border border-line bg-white px-3.5 py-2 text-ink active:scale-[0.99]"
+                }
+              >
+                <PhoneIcon className="h-[18px] w-[18px] shrink-0" />
+                <span className="tabular flex-1 text-[17px] font-semibold tracking-[0.02em]">{p.number}</span>
+                <span className={`text-[11px] ${gold ? "text-white/85" : "text-muted"}`}>
+                  {p.label ?? (contact.noPhoneInquiry ? "窓口の確認用" : "電話する")}
+                </span>
+                <ChevronRightIcon className="h-4 w-4 shrink-0 opacity-80" />
+              </a>
+            );
+          })}
           {contact.noPhoneInquiry && !contact.note && (
             <p className="text-[10.5px] leading-relaxed text-muted">道路種別は電話では答えてもらえません（窓口の場所・時間の確認用）。</p>
           )}
@@ -75,6 +85,13 @@ export function ContactCard({ contact, city, address }: { contact: Contact; city
         </div>
       )}
       <InquirySheet open={memo} onClose={() => setMemo(false)} address={address} dept={dept} />
+      <Sheet title="問い合わせの注意" open={noteOpen} onClose={() => setNoteOpen(false)}>
+        <p className="text-[13px] leading-relaxed text-ink">{dept}</p>
+        <p className="mt-2 flex gap-1.5 text-[13px] leading-relaxed text-[#8a4f3a]">
+          <AlertIcon className="mt-1 h-3.5 w-3.5 shrink-0" />
+          {contact.note}
+        </p>
+      </Sheet>
     </section>
   );
 }
