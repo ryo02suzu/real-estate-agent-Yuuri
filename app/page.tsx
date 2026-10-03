@@ -259,7 +259,9 @@ export default function Home() {
       <footer className="relative px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-1">
         <p className="mx-auto flex max-w-md items-start gap-2 text-[10.5px] lg:max-w-5xl lg:justify-center leading-[1.7] text-muted">
           <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
-          表示される地図は参考情報です。重要事項説明などの最終確認は、必ず役所の窓口で行ってください。
+          <span className="[@media(max-height:720px)]:hidden">表示される地図は参考情報です。重要事項説明などの最終確認は、必ず役所の窓口で行ってください。</span>
+          {/* 背の低い画面では1行に */}
+          <span className="hidden [@media(max-height:720px)]:inline">地図は参考情報です。最終確認は必ず役所の窓口で。</span>
         </p>
       </footer>
 

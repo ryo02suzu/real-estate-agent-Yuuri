@@ -174,10 +174,10 @@ function Found({
           </div>
           {(primary.length > 0 || secondary.length > 0) && (
             <>
-              <h3 className="mb-1.5 mt-3 text-[12px] font-semibold text-ink">
+              <h3 className="mb-1.5 mt-3 text-[12px] font-semibold text-ink [@media(max-height:720px)]:hidden">
                 地図を開く
               </h3>
-              <div className="space-y-2">
+              <div className="space-y-2 [@media(max-height:720px)]:mt-2 [@media(max-height:720px)]:space-y-1.5">
                 {primary.map((l) => (
                   <MapButton key={l.url} link={l} primary />
                 ))}
@@ -396,7 +396,7 @@ function MapButton({
   const tip = sheet
     ? sheet.howto
       ? `${sheet.howto}物件は図の${sheet.where}あたりです。`
-      : `物件は図の${sheet.where}あたりです${page ? `（PDFの${page}ページ目）` : ""}。地図の「図の範囲」が図と同じ範囲です。`
+      : `物件は図の${sheet.where}あたりです${page ? `（PDFの${page}ページ目）` : ""}。`
     : (link.tip ??
       (link.pinpoint
         ? undefined
@@ -409,15 +409,15 @@ function MapButton({
         rel="noreferrer"
         className={
           primary
-            ? "bg-gold flex items-center gap-3 rounded-xl px-4 py-2.5 text-white shadow-[0_6px_16px_rgba(138,102,50,0.28)] active:scale-[0.99]"
-            : "flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-2.5 text-ink active:scale-[0.99]"
+            ? "bg-gold flex items-center gap-3 rounded-xl px-4 py-2.5 text-white shadow-[0_6px_16px_rgba(138,102,50,0.28)] active:scale-[0.99] [@media(max-height:720px)]:py-2"
+            : "flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-2.5 text-ink active:scale-[0.99] [@media(max-height:720px)]:py-2"
         }
       >
         <MapIcon
           className={`h-6 w-6 shrink-0 ${primary ? "" : "text-brand-light"}`}
         />
         <span className="min-w-0 flex-1">
-          <span className="block text-[13.5px] font-semibold leading-snug">
+          <span className="block text-[13.5px] font-semibold leading-snug [@media(max-height:720px)]:truncate">
             {link.label}
           </span>
           <span

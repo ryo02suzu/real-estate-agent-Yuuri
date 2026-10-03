@@ -93,7 +93,8 @@ export function SheetPreview({
       {zoomable && (
         <button
           onClick={() => setZoomed(true)}
-          className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-[11px] text-ink shadow-soft"
+          // 枠がとても低いとき（背の低い画面で地図ボタンが多い市）は、はみ出さないよう小さくする
+          className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-[11px] text-ink shadow-soft [@container(max-height:40px)]:bottom-1 [@container(max-height:40px)]:right-1 [@container(max-height:40px)]:py-0.5 [@container(max-height:40px)]:text-[10px]"
         >
           <ExpandIcon className="h-3.5 w-3.5" />
           大きく見る
