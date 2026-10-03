@@ -382,3 +382,23 @@ describe("四街道市の指定道路図（地図システムで図を開く）"
     expect(link.sheet?.howto).toContain("13-1.pdf");
   });
 });
+
+describe("日光市の指定道路図（画像）", () => {
+  it("市役所（今市本町1）は 図面10。図の端なので隣の 図面9 も出す", () => {
+    const [link] = buildLinks(findMunicipality("09206")!, 36.719971, 139.698029);
+    expect(link.sheet?.label).toBe("図面10");
+    expect(link.url).toMatch(/36\/10\.png$/);
+    expect(link.sheet?.neighbor?.label).toBe("図面9");
+  });
+
+  it("湯元は 図面3", () => {
+    const [link] = buildLinks(findMunicipality("09206")!, 36.812618, 139.42041);
+    expect(link.sheet?.label).toBe("図面3");
+  });
+
+  it("図の無い足尾は一覧ページを開く", () => {
+    const [link] = buildLinks(findMunicipality("09206")!, 36.645, 139.45);
+    expect(link.sheet).toBeUndefined();
+    expect(link.url).toContain("8377.html");
+  });
+});

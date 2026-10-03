@@ -5,6 +5,7 @@ import type { Contact, MapLink, Municipality } from "../municipalities";
 import { sonicweb, wagmap } from "../vendors";
 import type { SheetIndex } from "../sheets";
 import KANUMA_SHEETS from "./sheets/kanuma.json";
+import NIKKO_SHEETS from "./sheets/nikko.json";
 
 const pref = "栃木県" as const;
 
@@ -72,7 +73,17 @@ const CITIES: Municipality[] = [
     name: "日光市",
     codes: ["09206"],
     coverage: "partial",
-    maps: [{ kind: "designated_only", label: "指定道路図（画像・1項4号/5号/2項）", build: null, url: "https://www.city.nikko.lg.jp/soshiki/7/1035/6/8377.html", verified: false }],
+    // 図は全体図（索引）の枠ごとの大きな画像（6〜20MB）。足尾・栗山などは図が無く、一覧ページを開く
+    maps: [
+      {
+        kind: "designated_only",
+        label: "指定道路図（画像・1項4号/5号/2項）",
+        build: null,
+        url: "https://www.city.nikko.lg.jp/soshiki/7/1035/6/8377.html",
+        verified: true,
+        sheets: NIKKO_SHEETS as SheetIndex,
+      },
+    ],
     contact: { dept: "建設部 建築住宅課 建築指導係", phone: "0288-21-5197", note: "図で分からない道はフォームで照会・調査を依頼できる" },
   },
   { pref, name: "小山市", codes: ["09208"], coverage: "none", maps: [{ kind: "public_road", label: "認定道路情報（おやまわが街ガイド）", build: wagmap("oyamacity", 3, { scale: 2500 }), verified: true }], contact: { dept: "建築指導課 建築指導係（市役所4階）", phone: "0285-22-9233" } },
