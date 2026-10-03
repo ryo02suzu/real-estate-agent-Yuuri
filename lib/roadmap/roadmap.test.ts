@@ -84,6 +84,39 @@ describe("MUNICIPALITIES", () => {
     expect(resolveContact(m, "11103")!.dept).toContain("北部");
     expect(resolveContact(m, "11107")!.dept).toContain("南部"); // 浦和区
   });
+
+  it("さいたま市の道路種別は窓口のみ（電話の発信ボタンを出さない）", () => {
+    const m = findMunicipality("11103")!;
+    expect(resolveContact(m, "11103")).toMatchObject({ phone: "048-646-3237", noPhoneInquiry: true });
+    expect(resolveContact(m, "11107")).toMatchObject({ phone: "048-840-6237", noPhoneInquiry: true });
+  });
+});
+
+describe("都市計画区域外（国交省 令和6年都市計画現況調査の都市別一覧に無い市町村）", () => {
+  // 千葉6・東京5・群馬7・埼玉1。いずれも区域外に接道を求める条例（建築基準法68条の9）の適用も無い
+  const OUTSIDE = {
+    "12234": "南房総市", "12463": "鋸南町", "12342": "神崎町", "12422": "睦沢町", "12426": "長柄町", "12441": "大多喜町",
+    "13307": "檜原村", "13308": "奥多摩町", "13362": "利島村", "13382": "御蔵島村", "13402": "青ヶ島村",
+    "10366": "上野村", "10367": "神流町", "10383": "南牧村", "10428": "高山村", "10443": "片品村", "10444": "川場村", "10448": "昭和村",
+    "11369": "東秩父村",
+  };
+
+  it("区域外の町村は「都市計画区域外」で、道路種別の地図を出さない", () => {
+    for (const [code, name] of Object.entries(OUTSIDE)) {
+      const m = findMunicipality(code)!;
+      expect(m.name).toBe(name);
+      expect(m.coverage, name).toBe("outside");
+      expect(m.maps.filter((l) => l.kind !== "public_road"), name).toEqual([]);
+    }
+  });
+
+  it("区域外でも条例で接道義務がかかる町村（長瀞町・清川村・嬬恋村）は区域外にしない", () => {
+    for (const code of ["11363", "14402", "10425"]) {
+      const m = findMunicipality(code)!;
+      expect(m.coverage, m.name).not.toBe("outside");
+      expect(m.note, m.name).toContain("都市計画区域外");
+    }
+  });
 });
 
 describe("buildLinks", () => {
@@ -91,6 +124,13 @@ describe("buildLinks", () => {
     const [link] = buildLinks(findMunicipality("11202")!, KUMAGAYA_CITY_HALL.lat, KUMAGAYA_CITY_HALL.lng);
     expect(link.url).toBe("https://www2.wagmap.jp/kumagaya/Map?mid=170&mpx=139.388580&mpy=36.147129&mps=1000&gprj=2");
     expect(link.pinpoint).toBe(true);
+  });
+
+  it("つくば市の認定道路マップ（ArcGIS Experience）は地図ウィジェットの中心を指定して開く", () => {
+    const [link] = buildLinks(findMunicipality("08220")!, 36.083321, 140.076492);
+    expect(link.url).toBe(
+      "https://experience.arcgis.com/experience/1644185d62274db8aae9dca9574337ac/#widget_124=center:140.076492%2C36.083321%2C4326,scale:2500",
+    );
   });
 
   it("Sonicweb は世界測地系のまま URL を作る", () => {

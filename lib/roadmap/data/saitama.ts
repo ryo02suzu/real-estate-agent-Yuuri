@@ -24,8 +24,8 @@ const CITIES: Municipality[] = [
     ],
     // 西・北・大宮・見沼・岩槻区 = 北部建設事務所、中央・桜・浦和・南・緑区 = 南部建設事務所
     contactByCode: {
-      ...Object.fromEntries(["11101", "11102", "11103", "11104", "11110"].map((c) => [c, { dept: "北部建設事務所 建築指導課", phone: "048-646-3235" }])),
-      ...Object.fromEntries(["11105", "11106", "11107", "11108", "11109"].map((c) => [c, { dept: "南部建設事務所 建築指導課", phone: "048-840-6236" }])),
+      ...Object.fromEntries(["11101", "11102", "11103", "11104", "11110"].map((c) => [c, { dept: "北部建設事務所 建築指導課", phone: "048-646-3237", note: "道路種別は窓口のみ（電話・FAX・メール不可）", noPhoneInquiry: true }])),
+      ...Object.fromEntries(["11105", "11106", "11107", "11108", "11109"].map((c) => [c, { dept: "南部建設事務所 建築指導課", phone: "048-840-6237", note: "道路種別は窓口のみ（電話・FAX・メール不可）", noPhoneInquiry: true }])),
     },
     note: "ネットで分かるのは位置指定道路と市道認定まで。2項道路などは建設事務所で確認。",
   },
@@ -110,7 +110,12 @@ const CITIES: Municipality[] = [
       { kind: "designated_only", label: "位置指定道路情報", build: wagmap("kumagaya", 170), verified: true },
       { kind: "public_road", label: "道路台帳図・認定路線網図", build: wagmap("kumagaya", 90), verified: true },
     ],
-    contact: { dept: "建築審査課", phone: "0493-39-4809" },
+    contact: {
+      dept: "建築審査課",
+      phone: "0493-39-4809",
+      note: "電話だけの問い合わせは不可。窓口、FAX（0493-39-5603。回答は電話）、または市の電子申請「建築基準法上の道路種別」で照会",
+      noPhoneInquiry: true,
+    },
   },
   {
     pref,
@@ -470,7 +475,10 @@ const PREF_TOWNS: Municipality[] = [
   prefTown("ときがわ町", "11349", "higashimatsuyama"),
   prefTown("横瀬町", "11361", "chichibu"),
   prefTown("皆野町", "11362", "chichibu"),
-  prefTown("長瀞町", "11363", "chichibu"),
+  {
+    ...prefTown("長瀞町", "11363", "chichibu"),
+    note: "町全域が都市計画区域外だが、県条例（建築基準法68条の9）で接道義務（4m以上の道路に2m以上）がかかる。",
+  },
   prefTown("小鹿野町", "11365", "chichibu"),
   prefTown("美里町", "11381", "kumagaya"),
   prefTown("神川町", "11383", "kumagaya"),
@@ -478,8 +486,8 @@ const PREF_TOWNS: Municipality[] = [
   prefTown("寄居町", "11408", "kumagaya"),
   prefTown("伊奈町", "11301", "sugito"),
   prefTown("宮代町", "11442", "sugito"),
-  // 東秩父村は県の指定道路図に含まれていない
-  { pref, name: "東秩父村", codes: ["11369"], coverage: "none", maps: [], contact: OFFICE.higashimatsuyama },
+  // 東秩父村は全村が都市計画区域外で、区域外に接道を求める県条例（第5章の2）の適用区域にも入っていない
+  { pref, name: "東秩父村", codes: ["11369"], coverage: "outside", maps: [], contact: OFFICE.higashimatsuyama },
 ];
 
 export const SAITAMA: Municipality[] = [...CITIES, ...PREF_TOWNS];

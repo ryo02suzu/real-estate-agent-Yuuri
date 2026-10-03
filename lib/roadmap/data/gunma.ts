@@ -85,8 +85,8 @@ const CITIES: Municipality[] = [
     codes: ["10204"],
     coverage: "partial",
     maps: [PREF_ROAD_MAP],
-    contact: { dept: "都市計画部 建築指導課 建築指導係", phone: "0270-27-2762" },
-    note: "県の地図で指定道路の一部が確認できる。道路種別は建築指導課で確認。",
+    contact: { dept: "都市計画部 建築指導課 建築指導係", phone: "0270-27-2762", note: "道路種別は原則、窓口で回答", noPhoneInquiry: true },
+    note: "県の地図で指定道路の一部が確認できる。道路種別は建築指導課の窓口で確認。",
   },
   {
     pref,
@@ -94,7 +94,8 @@ const CITIES: Municipality[] = [
     codes: ["10205"],
     coverage: "none",
     maps: [],
-    contact: { dept: "建築指導課 建築行政係", phone: "0276-47-1871" },
+    contact: { dept: "都市政策部 建築指導課 審査係（本庁舎7階）", phone: "0276-47-1862" },
+    note: "市の案内では、市道で認定幅員・現況幅員とも明らかに4m以上なら42条1項1号（認定幅員は道路整備課）。それ以外は建築指導課 審査係に確認。",
   },
   {
     pref,
@@ -148,24 +149,38 @@ const prefTown = (name: string, code: string, office: keyof typeof OFFICE): Muni
   note: "県の地図は1項4号・5号・2項のみ。公道（1号）かどうかは土木事務所か町村で確認。",
 });
 
+/** 全域が都市計画区域外で、区域外の建築の条例も無い町村（県の建築形態規制一覧） */
+const outsideTown = (name: string, code: string, office: keyof typeof OFFICE): Municipality => ({
+  pref,
+  name,
+  codes: [code],
+  coverage: "outside",
+  maps: [],
+  contact: OFFICE[office],
+});
+
 const PREF_TOWNS: Municipality[] = [
   prefTown("榛東村", "10344", "maebashi"),
   prefTown("吉岡町", "10345", "maebashi"),
   prefTown("玉村町", "10464", "maebashi"),
-  prefTown("上野村", "10366", "takasaki"),
-  prefTown("神流町", "10367", "takasaki"),
+  outsideTown("上野村", "10366", "takasaki"),
+  outsideTown("神流町", "10367", "takasaki"),
   prefTown("下仁田町", "10382", "takasaki"),
-  prefTown("南牧村", "10383", "takasaki"),
+  outsideTown("南牧村", "10383", "takasaki"),
   prefTown("甘楽町", "10384", "takasaki"),
   prefTown("中之条町", "10421", "nakanojo"),
   prefTown("長野原町", "10424", "nakanojo"),
-  prefTown("嬬恋村", "10425", "nakanojo"),
+  {
+    ...prefTown("嬬恋村", "10425", "nakanojo"),
+    // 全域が都市計画区域外。別荘地などは知事指定区域で、建築基準法68条の9 の村条例（接道2m以上など）がかかる
+    note: "村全域が都市計画区域外。ただし別荘地など「嬬恋村における建築物の制限に関する条例」の区域（鎌原・田代・干俣・門貝・袋倉などの一部）は接道2m以上などの制限がある。区域かどうかと道路の扱いは中之条土木事務所で確認。",
+  },
   prefTown("草津町", "10426", "nakanojo"),
-  prefTown("高山村", "10428", "nakanojo"),
+  outsideTown("高山村", "10428", "nakanojo"),
   prefTown("東吾妻町", "10429", "nakanojo"),
-  prefTown("片品村", "10443", "numata"),
-  prefTown("川場村", "10444", "numata"),
-  prefTown("昭和村", "10448", "numata"),
+  outsideTown("片品村", "10443", "numata"),
+  outsideTown("川場村", "10444", "numata"),
+  outsideTown("昭和村", "10448", "numata"),
   prefTown("みなかみ町", "10449", "numata"),
   prefTown("板倉町", "10521", "ota"),
   prefTown("明和町", "10522", "ota"),

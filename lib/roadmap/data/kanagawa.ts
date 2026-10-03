@@ -185,7 +185,10 @@ const PREF_AREAS: Municipality[] = [
   prefArea("大磯町", "14341", "hiratsuka"),
   prefArea("二宮町", "14342", "hiratsuka"),
   prefArea("愛川町", "14401", "atsugi"),
-  prefArea("清川村", "14402", "atsugi"),
+  {
+    ...prefArea("清川村", "14402", "atsugi"),
+    note: "村全域が都市計画区域外だが、県の建築基準条例（建築基準法68条の9）で接道などの制限がかかる（自然公園の特別地域などを除く）。赤線や色の無い道は土木事務所で確認。",
+  },
   prefArea("海老名市", "14215", "atsugiEast"),
   prefArea("座間市", "14216", "atsugiEast"),
   prefArea("綾瀬市", "14218", "atsugiEast"),

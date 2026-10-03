@@ -2,7 +2,7 @@
 // 特定行政庁は水戸・日立・土浦・古河・高萩・北茨城・取手・つくば・ひたちなかの9市。
 // それ以外の35市町村は県（本庁の県央建築指導室と4つの県民センター）が扱う。
 import type { Contact, MapLink, Municipality } from "../municipalities";
-import { sonicweb, wagmap } from "../vendors";
+import { arcgisExperience, sonicweb, wagmap } from "../vendors";
 
 const pref = "茨城県" as const;
 
@@ -55,16 +55,36 @@ const CITIES: Municipality[] = [
   },
   onPrefMap("古河市", "08204", { dept: "建築指導課", phone: "0280-76-1511（代表）" }),
   { pref, name: "高萩市", codes: ["08214"], coverage: "none", maps: [], contact: { dept: "都市建設課 建築指導検査室（本庁舎2階）", phone: "0293-23-7032" } },
-  { pref, name: "北茨城市", codes: ["08215"], coverage: "none", maps: [], contact: { dept: "建築課", phone: "0293-43-1111（代表・内線254）" } },
+  {
+    pref,
+    name: "北茨城市",
+    codes: ["08215"],
+    coverage: "none",
+    maps: [],
+    contact: {
+      dept: "都市建設課",
+      phone: "0293-43-1111（代表）",
+      note: "市道（建設課）か農道（農林水産課）か、幅員を確かめてから窓口へ。現地確認が要ると回答に日数がかかる",
+      noPhoneInquiry: true,
+    },
+  },
   onPrefMap("取手市", "08217", { dept: "建築指導課", phone: "0297-74-2141（代表）" }),
   {
     pref,
     name: "つくば市",
     codes: ["08220"],
     coverage: "none",
-    maps: [],
+    maps: [
+      {
+        kind: "public_road",
+        label: "認定道路マップ（つくミル・市道）",
+        build: arcgisExperience("1644185d62274db8aae9dca9574337ac", "widget_124"),
+        verified: true,
+        tip: "最初に出る説明は「次へ」で閉じてください。道路番号のある線が市道です。",
+      },
+    ],
     contact: { dept: "建築指導課", phone: "029-883-1111（代表）" },
-    note: "市道かどうかは「つくミル」の認定道路マップで確認できるが、建築基準法の道路種別は窓口で確認。",
+    note: "地図で分かるのは市道かどうかと現況幅員まで。建築基準法の道路種別は建築指導課で確認。",
   },
   onPrefMap("ひたちなか市", "08221", { dept: "建築指導課 審査係", phone: "029-273-0111（代表・内線1351）" }),
 ];

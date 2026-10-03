@@ -39,7 +39,7 @@ const CITIES: Municipality[] = [
       noPhoneInquiry: true,
     },
   },
-  { pref, name: "足利市", codes: ["09202"], coverage: "none", maps: [{ kind: "public_road", label: "認定路線網図（市道）", build: sonicweb("ashikaga", "th_3"), verified: true }], contact: { dept: "都市建設部 建築指導課 建築指導担当", phone: "0284-20-2170" } },
+  { pref, name: "足利市", codes: ["09202"], coverage: "none", maps: [{ kind: "public_road", label: "認定路線網図（市道）", build: sonicweb("ashikaga", "th_3"), verified: true }, { kind: "public_road", label: "道路台帳図（市道の幅員）", build: sonicweb("ashikaga", "th_31"), verified: true }], contact: { dept: "都市建設部 建築指導課 建築指導担当", phone: "0284-20-2170" } },
   {
     pref,
     name: "栃木市",
@@ -87,7 +87,14 @@ const CITIES: Municipality[] = [
     contact: { dept: "建設部 建築住宅課 建築指導係", phone: "0288-21-5197", note: "図で分からない道はフォームで照会・調査を依頼できる" },
   },
   { pref, name: "小山市", codes: ["09208"], coverage: "none", maps: [{ kind: "public_road", label: "認定道路情報（おやまわが街ガイド）", build: wagmap("oyamacity", 3, { scale: 2500 }), verified: true }], contact: { dept: "建築指導課 建築指導係（市役所4階）", phone: "0285-22-9233" } },
-  { pref, name: "大田原市", codes: ["09210"], coverage: "none", maps: [], contact: { dept: "建築指導課", phone: "0287-23-1178" } },
+  {
+    pref,
+    name: "大田原市",
+    codes: ["09210"],
+    coverage: "none",
+    maps: [{ kind: "public_road", label: "市道・路線（おおたわらデジタルマップ）", build: wagmap("ohtawaracity", 11, { scale: 2500 }), verified: true }],
+    contact: { dept: "建設部 建築住宅課 審査係（本庁舎5階）", phone: "0287-23-1178" },
+  },
   { pref, name: "那須塩原市", codes: ["09213"], coverage: "none", maps: [], contact: { dept: "建築指導課", phone: "0287-62-7174" } },
 ];
 

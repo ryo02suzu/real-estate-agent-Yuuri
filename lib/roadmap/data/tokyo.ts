@@ -71,8 +71,13 @@ const WARDS: Municipality[] = [
     codes: ["13105"],
     coverage: "none",
     maps: [{ kind: "public_road", label: "道路台帳平面図（区道のみ）", build: null, url: "https://www.city.bunkyo.lg.jp/b034/p004775/index.html", verified: false }],
-    contact: { dept: "都市計画部 建築指導課 審査担当（シビックセンター18階）", phone: "03-5803-1263" },
-    note: "23区で唯一、指定道路図をネット公開していない。窓口で確認。",
+    contact: {
+      dept: "都市計画部 建築指導課 審査担当（シビックセンター18階）",
+      phone: "03-5803-1263",
+      note: "電話・メールでは答えてもらえない。窓口の閲覧端末で検索（8:30〜17:00）。来庁できなければFAX（03-5803-1358）に物件と路線を示したゼンリン地図と連絡先を送る",
+      noPhoneInquiry: true,
+    },
+    note: "23区で唯一、指定道路図をネット公開していない。区役所の閲覧端末かFAXで確認。",
   },
   {
     pref,
@@ -404,9 +409,9 @@ const TAMA_AREAS: Municipality[] = [
   tamaArea("あきる野市", "13228", "third"),
   tamaArea("瑞穂町", "13303", "third"),
   tamaArea("日の出町", "13305", "third"),
-  // 都の地図は「15市2町」が対象で、檜原村・奥多摩町は載っていない
-  { pref, name: "檜原村", codes: ["13307"], coverage: "none", maps: [], contact: TAMA_OFFICE.third },
-  { pref, name: "奥多摩町", codes: ["13308"], coverage: "none", maps: [], contact: TAMA_OFFICE.third },
+  // 檜原村・奥多摩町は都市計画区域が無い（都の地図も「15市2町」が対象で載っていない）
+  { pref, name: "檜原村", codes: ["13307"], coverage: "outside", maps: [], contact: TAMA_OFFICE.third },
+  { pref, name: "奥多摩町", codes: ["13308"], coverage: "outside", maps: [], contact: TAMA_OFFICE.third },
 ];
 
 // --- 島しょ（特定行政庁は東京都。窓口は各支庁の土木課） ------------------------
@@ -418,6 +423,7 @@ const ISLAND_OFFICE: Record<string, Contact> = {
   ogasawara: { dept: "東京都 小笠原支庁 土木課", phone: "04998-2-2123" },
 };
 
+/** 都市計画区域がある島（区域は島の一部だけのこともある） */
 const island = (name: string, code: string, office: keyof typeof ISLAND_OFFICE): Municipality => ({
   pref,
   name,
@@ -425,18 +431,29 @@ const island = (name: string, code: string, office: keyof typeof ISLAND_OFFICE):
   coverage: "none",
   maps: [],
   contact: ISLAND_OFFICE[office],
-  note: "島ごとに都市計画区域の有無が違う。接道の扱いも含めて支庁に確認。",
+  note: "都市計画区域は島の一部だけのこともある。区域の内外と接道の扱いを支庁に確認。",
 });
 
+/** 都市計画区域が無い村（利島・御蔵島・青ヶ島） */
+const outsideIsland = (name: string, code: string, office: keyof typeof ISLAND_OFFICE): Municipality => ({
+  pref,
+  name,
+  codes: [code],
+  coverage: "outside",
+  maps: [],
+  contact: ISLAND_OFFICE[office],
+});
+
+// 都市計画区域は「檜原村、奥多摩町、利島村、御蔵島村及び青ヶ島村を除く都内区市町村」（都の都市計画区域マスタープラン）
 const ISLANDS: Municipality[] = [
   island("大島町", "13361", "oshima"),
-  island("利島村", "13362", "oshima"),
+  outsideIsland("利島村", "13362", "oshima"),
   island("新島村", "13363", "oshima"),
   island("神津島村", "13364", "oshima"),
   island("三宅村", "13381", "miyake"),
-  island("御蔵島村", "13382", "miyake"),
+  outsideIsland("御蔵島村", "13382", "miyake"),
   island("八丈町", "13401", "hachijo"),
-  island("青ヶ島村", "13402", "hachijo"),
+  outsideIsland("青ヶ島村", "13402", "hachijo"),
   island("小笠原村", "13421", "ogasawara"),
 ];
 
