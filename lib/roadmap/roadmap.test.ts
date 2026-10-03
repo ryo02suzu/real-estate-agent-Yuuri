@@ -402,3 +402,11 @@ describe("日光市の指定道路図（画像）", () => {
     expect(link.url).toContain("8377.html");
   });
 });
+
+describe("日光市の図の境目", () => {
+  it("東照宮（山内2301）は図面5と6の境目。どちらかを開き、隣の図も出す", () => {
+    const [link] = buildLinks(findMunicipality("09206")!, 36.759941, 139.597214);
+    expect(["図面5", "図面6"]).toContain(link.sheet?.label);
+    expect(link.sheet?.neighbor).toBeDefined();
+  });
+});
