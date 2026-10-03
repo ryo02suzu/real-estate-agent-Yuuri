@@ -400,6 +400,7 @@ describe("日光市の指定道路図（画像）", () => {
     const [link] = buildLinks(findMunicipality("09206")!, 36.645, 139.45);
     expect(link.sheet).toBeUndefined();
     expect(link.url).toContain("8377.html");
+    expect(link.tip).toContain("問い合わせ先");
   });
 });
 

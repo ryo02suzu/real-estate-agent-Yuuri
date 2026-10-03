@@ -91,7 +91,8 @@ export function buildLinks(m: Municipality, lat: number, lng: number): ResolvedL
       url: sheet ? sheet.url : link.build ? link.build(lat, lng) : link.url!,
       pinpoint: link.build !== null,
       verified: link.verified,
-      tip: link.tip,
+      // 分割図の市で、どの図にも入らない場所（図の無い地域）は、一覧から探しても見つからないことを伝える
+      tip: link.sheets && !sheet ? "この場所を含む図は見つかりませんでした。一覧に無ければ、下の問い合わせ先で確認してください。" : link.tip,
       sheet,
     };
   });
