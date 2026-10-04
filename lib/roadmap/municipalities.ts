@@ -81,10 +81,10 @@ export type ResolvedLink = {
   sheet?: SheetHit;
 };
 
-/** 座標から、その市で開くべき地図のURL一覧を作る */
-export function buildLinks(m: Municipality, lat: number, lng: number): ResolvedLink[] {
+/** 座標から、その市で開くべき地図のURL一覧を作る。town（逆ジオコーダの町名）は地区ごとの図を選ぶのに使う */
+export function buildLinks(m: Municipality, lat: number, lng: number, town?: string): ResolvedLink[] {
   return m.maps.map((link) => {
-    const sheet = link.sheets && findSheet(link.sheets, lat, lng);
+    const sheet = link.sheets && findSheet(link.sheets, lat, lng, town);
     return {
       kind: link.kind,
       label: link.label,

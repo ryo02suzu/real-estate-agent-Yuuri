@@ -42,7 +42,7 @@ export async function lookup(address: string): Promise<LookupResult> {
     town: rev.town,
     approximate: isApproximate(address, geo.matchedAddress),
     municipality,
-    links: buildLinks(municipality, geo.lat, geo.lng),
+    links: buildLinks(municipality, geo.lat, geo.lng, rev.town),
     contact: resolveContact(municipality, rev.muniCd),
   };
 }

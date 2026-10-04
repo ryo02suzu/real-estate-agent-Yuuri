@@ -5,6 +5,7 @@ import { alandis, arcgisExperience, cloudgis, geocloud, geocloudMp, openMap, son
 import type { SheetIndex } from "../sheets";
 import FUJIMI_SHEETS from "./sheets/fujimi.json";
 import FUJIMI_ROSEN_SHEETS from "./sheets/fujimi-rosen.json";
+import FUJIMINO_SHEETS from "./sheets/fujimino.json";
 import SHIKI_SHEETS from "./sheets/shiki.json";
 import SOKA_SHEETS from "./sheets/soka.json";
 import WAKO_SHEETS from "./sheets/wako.json";
@@ -145,7 +146,16 @@ const CITIES: Municipality[] = [
     name: "久喜市",
     codes: ["11232"],
     coverage: "none",
-    maps: [],
+    maps: [
+      {
+        kind: "public_road",
+        label: "市道の認定路線図（地区別PDF）",
+        build: null,
+        url: "https://www.city.kuki.lg.jp/machizukuri/doro_kasen/road/1004392.html",
+        verified: true,
+        tip: "久喜・菖蒲・栗橋・鷲宮の地区ごとの図です。物件の地区の図を開いてください（久喜地区は約44MB）。",
+      },
+    ],
     contact: {
       dept: "まちづくり推進部 建築審査課 企画指導係",
       phone: "0480-22-1111（代表）",
@@ -224,7 +234,17 @@ const CITIES: Municipality[] = [
     name: "ふじみ野市",
     codes: ["11245"],
     coverage: "none",
-    maps: [],
+    maps: [
+      // 市全体で1枚（1/7,000）。図の中の町丁目名の位置から範囲を求め、物件が図のどのあたりかを出す
+      {
+        kind: "public_road",
+        label: "道路網図（市道・PDF）",
+        build: null,
+        url: "https://www.city.fujimino.saitama.jp/soshikiichiran/doroka/dorokanrigakari/2080.html",
+        verified: true,
+        sheets: FUJIMINO_SHEETS as SheetIndex,
+      },
+    ],
     contact: { dept: "建築課 建築指導係", phone: "049-220-2069", hours: "平日 8:30〜17:15" },
   },
   {

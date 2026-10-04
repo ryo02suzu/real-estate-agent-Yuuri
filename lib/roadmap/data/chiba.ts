@@ -3,6 +3,7 @@
 import type { Contact, MapLink, Municipality } from "../municipalities";
 import { alandis, geocloud, geocloudMp, sonicweb, wagmap } from "../vendors";
 import type { SheetIndex } from "../sheets";
+import NARASHINO_SHEETS from "./sheets/narashino.json";
 import SAKURA_SHEETS from "./sheets/sakura.json";
 import YACHIYO_SHEETS from "./sheets/yachiyo.json";
 import YOTSUKAIDO_SHEETS from "./sheets/yotsukaido.json";
@@ -139,7 +140,17 @@ const CITIES: Municipality[] = [
     name: "習志野市",
     codes: ["12216"],
     coverage: "none",
-    maps: [],
+    maps: [
+      // 地区ごとの6枚（1/10,000）。範囲が大きく重なるので、物件の町名でその地区の図を開く（docs/pdf-sheets.md）
+      {
+        kind: "public_road",
+        label: "市道認定網図（地区別）",
+        build: null,
+        url: "https://www.city.narashino.lg.jp/soshiki/doro/gyomu/seikatukankyo/doro/340620130815110633297.html",
+        verified: true,
+        sheets: NARASHINO_SHEETS as unknown as SheetIndex,
+      },
+    ],
     contact: { dept: "建築指導課（市庁舎4階）", phone: "047-453-9231" },
   },
   {

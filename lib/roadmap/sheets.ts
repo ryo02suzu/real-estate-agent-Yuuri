@@ -16,6 +16,11 @@ export type SheetIndex = {
   howto?: string;
   /** [図の名前, PDFのURL, 中心x, 中心y, 幅, 高さ]。幅・高さが無ければ w, h を使う */
   cells: ([string, string, number, number] | [string, string, number, number, number, number])[];
+  /**
+   * 地区ごとの図（範囲が大きく重なる）の市：図の名前 → その図が受け持つ町名（前方一致）。
+   * 物件の町名で図を選ぶ（習志野市）。町名が当たらなければ位置で選ぶ
+   */
+  towns?: Record<string, string[]>;
 };
 
 export type SheetHit = {
@@ -68,12 +73,22 @@ function where(fx: number, fy: number): string {
   return `${h}${v}`;
 }
 
+/** 町名の「ヶ」「ケ」の表記ゆれをそろえる（「袖ケ浦」と「袖ヶ浦」） */
+const normTown = (t: string) => t.replace(/[ヶヵ]/g, "ケ").replace(/\s/g, "");
+
 /** 物件の位置が載っている図。どの図にも入らなければ（図の無い区域）undefined */
-export function findSheet(ix: SheetIndex, lat: number, lng: number): SheetHit | undefined {
+export function findSheet(ix: SheetIndex, lat: number, lng: number, town?: string): SheetHit | undefined {
   const [x, y] = toIndex(ix, lat, lng);
   // 図の中心からのずれ（図の大きさで割った値。±0.5 以内ならその図の中）
   const scored = ix.cells.map(([label, url, cx, cy, w = ix.w, h = ix.h]) => ({ label, url, u: (x - cx) / w, v: (y - cy) / h, cell: [cx, cy, w, h] as const }));
-  const within = scored.filter((s) => Math.abs(s.u) <= 0.5 && Math.abs(s.v) <= 0.5);
+  let within = scored.filter((s) => Math.abs(s.u) <= 0.5 && Math.abs(s.v) <= 0.5);
+  // 地区ごとの図は、町名でその地区の図に絞る（その地区の図なら端でも隣の図は出さない）
+  let byTown = false;
+  if (ix.towns && town) {
+    const t = normTown(town);
+    const hits = within.filter((s) => ix.towns![s.label]?.some((p) => t.startsWith(normTown(p))));
+    if (hits.length) [within, byTown] = [hits, true];
+  }
   // 図どうしが重なる（のりしろがある）ときは、物件が中心寄りにある図を選ぶ
   const m = (s: (typeof scored)[number]) => Math.max(Math.abs(s.u), Math.abs(s.v));
   const inside = within.sort((a, b) => m(a) - m(b))[0];
@@ -83,7 +98,7 @@ export function findSheet(ix: SheetIndex, lat: number, lng: number): SheetHit | 
   if (ix.cells.length === 1) hit.whole = true;
   // 端から図の1割以内なら、そちら側の隣の図も出す（索引図の位置合わせの誤差を見込む）
   const edge = 0.4;
-  if (Math.abs(inside.u) > edge || Math.abs(inside.v) > edge) {
+  if (!byTown && (Math.abs(inside.u) > edge || Math.abs(inside.v) > edge)) {
     const su = Math.abs(inside.u) > edge ? Math.sign(inside.u) : 0;
     const sv = Math.abs(inside.v) > edge ? Math.sign(inside.v) : 0;
     const n =

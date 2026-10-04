@@ -431,6 +431,29 @@ describe("文京区の道路台帳平面図（500m×350m の格子）", () => {
   });
 });
 
+describe("習志野市の市道認定網図（地区ごとの6枚）", () => {
+  const m = () => findMunicipality("12216")!;
+  it("地区の図は範囲が大きく重なるので、町名でその地区の図を選ぶ（市役所＝鷺沼二丁目）", () => {
+    const [link] = buildLinks(m(), 35.681423, 140.026428, "鷺沼二丁目");
+    expect(link.sheet?.label).toBe("袖ケ浦・鷺沼ほか");
+    expect(link.url).toMatch(/\/sode\.pdf$/);
+    // その地区の図なら端でも隣の図は出さない
+    expect(link.sheet?.neighbor).toBeUndefined();
+  });
+  it("「袖ヶ浦」の表記ゆれでも同じ図。町名が無ければ位置で選ぶ", () => {
+    expect(buildLinks(m(), 35.6713, 140.0136, "袖ヶ浦一丁目")[0].sheet?.label).toBe("袖ケ浦・鷺沼ほか");
+    expect(buildLinks(m(), 35.681423, 140.026428)[0].sheet).toBeDefined();
+  });
+});
+
+describe("ふじみ野市の道路網図（市全体で1枚）", () => {
+  it("市役所（福岡1-1-1）は図の上の方（図は北が上）", () => {
+    const [link] = buildLinks(findMunicipality("11245")!, 35.879875, 139.519592);
+    expect(link.url).toMatch(/R8douromouzu\.pdf$/);
+    expect(link.sheet).toMatchObject({ whole: true, where: "上の方" });
+  });
+});
+
 describe("西東京市の道路種別図（市全体で1枚）", () => {
   it("田無駅は図の中央、ひばりヶ丘の北の方は上の方", () => {
     const m = findMunicipality("13229")!;
