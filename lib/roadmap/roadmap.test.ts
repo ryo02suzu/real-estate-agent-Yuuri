@@ -400,6 +400,15 @@ describe("館林市の道路台帳図（800m×600m の格子）", () => {
   });
 });
 
+describe("太田市の認定路線網図（1/5000 図郭）", () => {
+  it("太田市役所（浜町2-35）は 17 番の図の右上", () => {
+    const [link] = buildLinks(findMunicipality("10205")!, 36.291298, 139.37645);
+    expect(link.sheet?.label).toBe("17");
+    expect(link.sheet?.where).toBe("右上");
+    expect(link.url).toBe("https://www.city.ota.gunma.jp/uploaded/attachment/26175.pdf");
+  });
+});
+
 describe("富士見市の分割図", () => {
   it("富士見市役所（鶴馬1800-1）は 06 の図", () => {
     const [link] = buildLinks(findMunicipality("11235")!, 35.856644, 139.549149);

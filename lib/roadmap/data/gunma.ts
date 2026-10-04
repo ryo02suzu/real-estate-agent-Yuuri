@@ -10,6 +10,7 @@ import FUJIOKA_SHEETS from "./sheets/fujioka.json";
 import NUMATA_SHEETS from "./sheets/numata.json";
 import TOMIOKA_SHEETS from "./sheets/tomioka.json";
 import TATEBAYASHI_SHEETS from "./sheets/tatebayashi.json";
+import OTA_SHEETS from "./sheets/ota.json";
 import type { SheetIndex } from "../sheets";
 
 const pref = "群馬県" as const;
@@ -99,7 +100,17 @@ const CITIES: Municipality[] = [
     name: "太田市",
     codes: ["10205"],
     coverage: "none",
-    maps: [],
+    maps: [
+      // 図は国土基本図の 1/5000 図郭（IX系 4km×3km）。物件の載っている図を直接開く（docs/pdf-sheets.md）
+      {
+        kind: "public_road",
+        label: "認定路線網図（市道・PDF 1〜23MB）",
+        build: null,
+        url: "https://www.city.ota.gunma.jp/005gyosei/0110-001tosiseibi-road/2017-0724-1443-105.html",
+        verified: true,
+        sheets: OTA_SHEETS as SheetIndex,
+      },
+    ],
     contact: { dept: "都市政策部 建築指導課 審査係（本庁舎7階）", phone: "0276-47-1862" },
     note: "市の案内では、市道で認定幅員・現況幅員とも明らかに4m以上なら42条1項1号（認定幅員は道路整備課）。それ以外は建築指導課 審査係に確認。",
   },
