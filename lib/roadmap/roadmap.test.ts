@@ -387,6 +387,19 @@ describe("富岡市の分割図", () => {
   });
 });
 
+describe("館林市の道路台帳図（800m×600m の格子）", () => {
+  it("館林市役所（城町1-1）は K-9、館林駅は J-8 の左下の角（図葉割図の①）", () => {
+    const m = findMunicipality("10207")!;
+    const [hall] = buildLinks(m, 36.244713, 139.542114);
+    expect(hall.sheet?.label).toBe("K-9");
+    expect(hall.url).toBe("https://www.city.tatebayashi.gunma.jp/s066/kurashi/090/daityozu/K-9.pdf");
+    const [station] = buildLinks(m, 36.246787, 139.527856);
+    expect(station.sheet?.label).toBe("J-8");
+    expect(station.sheet?.where).toBe("左下");
+    expect(station.sheet?.neighbor).toBeDefined();
+  });
+});
+
 describe("富士見市の分割図", () => {
   it("富士見市役所（鶴馬1800-1）は 06 の図", () => {
     const [link] = buildLinks(findMunicipality("11235")!, 35.856644, 139.549149);

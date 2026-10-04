@@ -9,6 +9,7 @@ import ANNAKA_SHEETS from "./sheets/annaka.json";
 import FUJIOKA_SHEETS from "./sheets/fujioka.json";
 import NUMATA_SHEETS from "./sheets/numata.json";
 import TOMIOKA_SHEETS from "./sheets/tomioka.json";
+import TATEBAYASHI_SHEETS from "./sheets/tatebayashi.json";
 import type { SheetIndex } from "../sheets";
 
 const pref = "群馬県" as const;
@@ -107,7 +108,17 @@ const CITIES: Municipality[] = [
     name: "館林市",
     codes: ["10207"],
     coverage: "none",
-    maps: [],
+    maps: [
+      // 図は市独自の 800m×600m（1/1000）の格子。物件の載っている図を直接開く（docs/pdf-sheets.md）
+      {
+        kind: "public_road",
+        label: "道路台帳図（市道の路線番号・認定幅員）",
+        build: null,
+        url: "https://www.city.tatebayashi.gunma.jp/s066/kurashi/090/daityozu.html",
+        verified: true,
+        sheets: TATEBAYASHI_SHEETS as SheetIndex,
+      },
+    ],
     contact: { dept: "都市建設部 建築課 建築指導係", phone: "0276-72-4111（代表）" },
   },
 ];
