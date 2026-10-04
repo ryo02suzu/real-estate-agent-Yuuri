@@ -456,6 +456,28 @@ describe("志木市の分割図", () => {
   });
 });
 
+describe("草加市の道路台帳図（1/500 図郭）", () => {
+  it("草加市役所（高砂1-1-1）は 13-24、獨協大学前駅は 10-13、新田駅前は 06-22 の図", () => {
+    const m = findMunicipality("11221")!;
+    expect(buildLinks(m, 35.825054, 139.805649)[0].sheet?.label).toBe("13-24");
+    const [dokkyo] = buildLinks(m, 35.843204, 139.800823);
+    expect(dokkyo.sheet?.label).toBe("10-13");
+    expect(dokkyo.url).toBe("https://www.city.soka.saitama.jp/cont/s1901/daicho/pdf/10-13.pdf");
+    // 駅は図の下端から約5mなので、下の図も出す
+    expect(dokkyo.sheet?.neighbor?.label).toBe("10-18");
+    expect(buildLinks(m, 35.8539, 139.796219)[0].sheet?.label).toBe("06-22");
+  });
+
+  it("北西の端の 01 は図郭が東に3枚ずれている（01-23 の真下が 05-01）", () => {
+    const m = findMunicipality("11221")!;
+    const cell = (label: string) => (m.maps[0].sheets!.cells.find((c) => c[0] === label) as number[]).slice(2);
+    const [x1, y1] = cell("01-23");
+    const [x2, y2, , h] = cell("05-01");
+    expect(Math.abs(x1 - x2)).toBeLessThan(1e-5);
+    expect(y2 - y1).toBeCloseTo(h, 5);
+  });
+});
+
 describe("和光市の分割図", () => {
   it("広沢1-5（市役所付近）は 35R の図（町名番地索引の和29・30・35・36の1つ）", () => {
     const [link] = buildLinks(findMunicipality("11229")!, 35.779507, 139.604248);

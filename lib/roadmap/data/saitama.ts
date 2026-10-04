@@ -5,6 +5,7 @@ import { alandis, arcgisExperience, cloudgis, geocloud, geocloudMp, openMap, son
 import type { SheetIndex } from "../sheets";
 import FUJIMI_SHEETS from "./sheets/fujimi.json";
 import SHIKI_SHEETS from "./sheets/shiki.json";
+import SOKA_SHEETS from "./sheets/soka.json";
 import WAKO_SHEETS from "./sheets/wako.json";
 
 const pref = "埼玉県" as const;
@@ -78,7 +79,15 @@ const CITIES: Municipality[] = [
     codes: ["11221"],
     coverage: "none",
     maps: [
-      { kind: "public_road", label: "道路台帳図（市道）", build: null, url: "https://www.city.soka.saitama.jp/cont/s1901/daicho/PAGE000000000000081854.html", verified: false },
+      // 図は国土基本図の 1/500 図郭（IX系 400m×300m）。物件の載っている図を直接開く（docs/pdf-sheets.md）
+      {
+        kind: "public_road",
+        label: "道路台帳図（市道・1/500）",
+        build: null,
+        url: "https://www.city.soka.saitama.jp/cont/s1901/daicho/index.html",
+        verified: true,
+        sheets: SOKA_SHEETS as SheetIndex,
+      },
     ],
     contact: { dept: "建築安全課 建築指導係", phone: "048-922-1958", note: "建築基準法上の扱いは電話で確認できる" },
   },
