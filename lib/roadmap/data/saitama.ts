@@ -4,7 +4,6 @@ import type { Contact, MapLink, Municipality } from "../municipalities";
 import { alandis, arcgisExperience, cloudgis, geocloud, geocloudMp, openMap, sonicweb, wagmap } from "../vendors";
 import type { SheetIndex } from "../sheets";
 import FUJIMI_SHEETS from "./sheets/fujimi.json";
-import NIIZA_SHEETS from "./sheets/niiza.json";
 import SHIKI_SHEETS from "./sheets/shiki.json";
 import WAKO_SHEETS from "./sheets/wako.json";
 
@@ -51,7 +50,8 @@ const CITIES: Municipality[] = [
     codes: ["11208"],
     coverage: "none",
     maps: [
-      { kind: "public_road", label: "所沢市地理情報システム（市道）", build: null, url: "http://webgis.alandis.jp/tokorozawa11/alandis/portal/", verified: false },
+      // 1/1000 では背景図が出ないため 1/2500 で開く（市役所で中心一致）
+      { kind: "public_road", label: "認定路線網図（所沢市地理情報システム）", build: alandis("https://webgis.alandis.jp/tokorozawa11/alandis/webgis", "guest", "&li=3&si=0", 2500), verified: true },
     ],
     contact: {
       dept: "建築指導課（市役所低層棟2階）",
@@ -121,10 +121,12 @@ const CITIES: Municipality[] = [
     pref,
     name: "新座市",
     codes: ["11230"],
-    coverage: "partial",
+    coverage: "full",
+    // 2026年8月のにいざマップ刷新で「建築基準法指定道路図」（1項1号・3号・4号・5号・2項）が載った（市の掲載マップ一覧で確認）。
+    // それまでの位置指定道路の PDF（指定道路図－道路位置指定図）は内容が重なるので使わない
     maps: [
-      { kind: "designated_only", label: "指定道路図（道路位置指定図・PDF）", build: null, url: "https://www.city.niiza.lg.jp/img/shiteidourozu/toshikeizu.html", verified: true, sheets: NIIZA_SHEETS as SheetIndex },
-      { kind: "public_road", label: "にいざマップ（道路台帳）", build: null, url: "https://www.city.niiza.lg.jp/soshiki/33/niizamap-douro.html", verified: false },
+      { kind: "road_type", label: "建築基準法指定道路図（にいざマップ）", build: wagmap("niiza", 25), verified: true },
+      { kind: "public_road", label: "道路台帳図・境界確定図（にいざマップ）", build: wagmap("niiza", 21), verified: true },
     ],
     contact: { dept: "建築審査課", phone: "048-477-1111（代表）" },
   },

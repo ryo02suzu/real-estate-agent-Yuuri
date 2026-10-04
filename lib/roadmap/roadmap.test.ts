@@ -182,10 +182,11 @@ describe("buildLinks", () => {
     expect(link.url).toBe("https://www.sonicweb-asp.jp/sayama/map?theme=th_3&pos=139.412314%2C35.852903&scale=1000&layers=dm%2Cth_5");
   });
 
-  it("座標で開けない地図は入口の URL を返す", () => {
-    const [link] = buildLinks(findMunicipality("11208")!, 35.8, 139.47);
+  it("座標で開けない地図は入口の URL を返す（千葉県の指定道路情報地図）", () => {
+    const [link] = buildLinks(findMunicipality("12236")!, 35.897, 140.499); // 香取市
     expect(link.pinpoint).toBe(false);
-    expect(link.url).toContain("tokorozawa");
+    expect(link.url).toBe("https://ds.icba-info.jp/siteidouro/chiba/pref/");
+    expect(link.tip).toContain("住所コピー");
   });
 });
 
@@ -370,16 +371,25 @@ describe("富岡市の分割図", () => {
   });
 });
 
-describe("富士見市・新座市の分割図", () => {
+describe("富士見市の分割図", () => {
   it("富士見市役所（鶴馬1800-1）は 06 の図", () => {
     const [link] = buildLinks(findMunicipality("11235")!, 35.856644, 139.549149);
     expect(link.sheet?.label).toBe("06");
   });
+});
 
-  it("新座市役所（野火止1-1-1）は 09KD734 の図", () => {
-    const [link] = buildLinks(findMunicipality("11230")!, 35.79324, 139.56575);
-    expect(link.sheet?.label).toBe("09KD734");
-    expect(link.url).toMatch(/09kd734\.pdf$/);
+describe("新座市・所沢市", () => {
+  it("新座市はにいざマップの建築基準法指定道路図（全種別）を物件の位置で開く", () => {
+    const m = findMunicipality("11230")!;
+    expect(m.coverage).toBe("full");
+    const [link] = buildLinks(m, 35.79324, 139.56575);
+    expect(link.url).toBe("https://www2.wagmap.jp/niiza/Map?mid=25&mpx=139.565750&mpy=35.793240&mps=1000&gprj=2");
+  });
+
+  it("所沢市の認定路線網図は alandis の座標指定で 1/2500 で開く", () => {
+    const [link] = buildLinks(findMunicipality("11208")!, 35.799072, 139.467957);
+    expect(link.url).toMatch(/^https:\/\/webgis\.alandis\.jp\/tokorozawa11\/alandis\/webgis\/index\.php\/autologin_jswebgis\?ap=jsWebGIS&m=2&u=guest&x=15525501\.\d{3}&y=4273009\.\d{3}&s=2500&rs=3857&li=3&si=0$/);
+    expect(link.pinpoint).toBe(true);
   });
 });
 
