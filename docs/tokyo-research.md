@@ -90,7 +90,7 @@
 | alandis | 立川（u=kenchiku） | EPSG:3857 の x,y | |
 | machi-info 新版 | 板橋（map_id=100034） | `?map_id=&lt=緯度&lg=経度&z=` | 旧 machi-info.jp/machikado/itabashi_city は廃止（404） |
 | 独自 | 中央区 `chuo-map.jp/map.php?lat=&lon=` | | 表示図は画面で「【L】建築基準法上の道路種別」に切替 |
-| ArcGIS | 千代田（Enterprise の Experience）・八王子（Experience、widget_124）・豊島／日野（Web AppBuilder） | EB: `…/#widget_124=center:経度%2C緯度%2C4326,scale:2500` ／ WAB: `&center=経度,緯度,4326&scale=` | 八王子・豊島・日野は位置どおりに開くことを確認。千代田区の Enterprise 版は URL の位置指定をすべて無視するため入口を開き、画面の「住所検索」で探す |
+| ArcGIS | 千代田（Enterprise の Experience）・八王子（Experience、widget_124）・豊島／日野（Web AppBuilder） | EB: `…/#widget_124=center:経度%2C緯度%2C4326,scale:2500` ／ WAB: `&center=経度,緯度,4326&scale=` | 八王子・豊島・日野は位置どおりに開くことを確認。千代田区の区アプリ（Enterprise 上の Experience Builder 1.10）は URL の位置指定をすべて無視する（4326・平面直角IX系・extent とも）ため、アプリが使う公開 Web マップ（50d1206e…）を Map Viewer で `…/apps/mapviewer/index.html?webmap=ID&center=経度,緯度&scale=2500&marker=経度,緯度` として開く（区役所でピン・中心一致、スマホは最初に凡例が開く） |
 
 ## 注意
 

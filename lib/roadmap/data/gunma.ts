@@ -128,9 +128,20 @@ const designated = (label: string, url: string, sheets?: SheetIndex): MapLink =>
   sheets,
 });
 
+// 渋川市の地図システム（しぶかわ情報マップ）。位置指定道路は mid=175、市道の路線網は mid=421（どちらも市役所の位置で中心一致）
+const SHIBUKAWA_DESIGNATED: MapLink = {
+  kind: "designated_only",
+  label: "指定道路情報（しぶかわ情報マップ・位置指定道路）",
+  build: wagmap("shibukawa", 175, { scale: 2500 }),
+  verified: true,
+};
+
 const LIMITED_CITIES: Municipality[] = [
   limitedCity("沼田市", "10206", "numata", designated("指定道路図（沼田市・位置指定道路）", "https://www.city.numata.gunma.jp/jigyosha/1003548/1005936/1008826.html", NUMATA_SHEETS as SheetIndex)),
-  limitedCity("渋川市", "10208", "maebashi", designated("位置指定道路（渋川市地図情報）", "https://www2.wagmap.jp/shibukawa/Portal")),
+  {
+    ...limitedCity("渋川市", "10208", "maebashi", SHIBUKAWA_DESIGNATED),
+    maps: [SHIBUKAWA_DESIGNATED, PREF_ROAD_MAP, { kind: "public_road", label: "路線網情報（市道）", build: wagmap("shibukawa", 421, { scale: 2500 }), verified: true }],
+  },
   limitedCity("藤岡市", "10209", "takasaki", designated("位置指定道路図（藤岡市・PDF）", "https://www.city.fujioka.gunma.jp/soshiki/toshikensetsubu/kenchiku/2/2/10028.html", FUJIOKA_SHEETS as SheetIndex)),
   limitedCity("富岡市", "10210", "takasaki", designated("指定道路図（富岡市・位置指定道路）", "https://www.city.tomioka.lg.jp/www/contents/1585534668687/index.html", TOMIOKA_SHEETS as SheetIndex)),
   limitedCity("安中市", "10211", "takasaki", designated("指定道路図（安中市・位置指定道路）", "https://www.city.annaka.lg.jp/jutaku/kenchiku/shiteidouro.html", ANNAKA_SHEETS as SheetIndex)),

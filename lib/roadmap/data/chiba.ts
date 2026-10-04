@@ -268,7 +268,9 @@ const PREF_ROAD_MAP: MapLink = {
   label: "千葉県 指定道路情報地図（位置指定・2項など一部の路線）",
   build: null,
   url: "https://ds.icba-info.jp/siteidouro/chiba/pref/",
-  verified: false,
+  verified: true,
+  // 住所は「千葉県」付き・全角数字・「番地」付きのままでも検索できる（香取市役所で確認）
+  tip: "「同意する」を押し、左上の検索欄に、上の「住所コピー」で写した住所を貼り付けて検索してください。",
 };
 
 const prefArea = (name: string, code: string, office: keyof typeof OFFICE, partlyOutside = false): Municipality => ({

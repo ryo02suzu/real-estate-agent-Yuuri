@@ -99,6 +99,17 @@ export const arcgisWebApp =
   (lat, lng) =>
     `https://${host}/apps/webappviewer/index.html?id=${appId}&center=${lng.toFixed(6)},${lat.toFixed(6)},4326&scale=${scale}`;
 
+/**
+ * ArcGIS の Map Viewer（<ポータル>/apps/mapviewer/index.html?webmap=）。center=経度,緯度 と scale で開き、marker で物件にピンを立てる。
+ * 自治体の Experience Builder アプリが URL の位置指定を受け付けないとき、同じ公開 Web マップをこちらで開く（千代田区）
+ */
+export const arcgisMapViewer =
+  (portal: string, webmap: string, scale = 2500): Build =>
+  (lat, lng) => {
+    const c = `${lng.toFixed(6)},${lat.toFixed(6)}`;
+    return `${portal}/apps/mapviewer/index.html?webmap=${webmap}&center=${c}&scale=${scale}&marker=${c}`;
+  };
+
 /** machi-info の新版（<区>.machi-info.jp、Google マップ）。?map_id=&lt=緯度&lg=経度&z= */
 export const machiInfoMap =
   (host: string, mapId: number, zoom = 18): Build =>

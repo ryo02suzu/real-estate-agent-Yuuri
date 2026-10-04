@@ -15,7 +15,9 @@ const PREF_ROAD_MAP: MapLink = {
   label: "栃木県 指定道路台帳（位置指定道路の一部のみ）",
   build: null,
   url: "https://ds.icba-info.jp/siteidouro/tochigi/pref/",
-  verified: false,
+  verified: true,
+  // 住所は「栃木県」付き・全角数字・「番地」付きのままでも検索できる（真岡市役所で確認）
+  tip: "「同意する」を押し、左上の検索欄に、上の「住所コピー」で写した住所を貼り付けて検索してください。",
 };
 
 const OFFICE: Record<string, Contact> = {

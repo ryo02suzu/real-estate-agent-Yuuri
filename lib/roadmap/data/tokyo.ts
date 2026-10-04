@@ -4,7 +4,7 @@ import type { Contact, Municipality } from "../municipalities";
 import type { SheetIndex } from "../sheets";
 import MINATO_SHEETS from "./sheets/minato.json";
 import KITA_SHEETS from "./sheets/kita.json";
-import { alandis, arcgisExperience, arcgisWebApp, chuoMap, geocloud, geocloudMp, machiInfoMap, sonicweb, wagmap } from "../vendors";
+import { alandis, arcgisExperience, arcgisMapViewer, arcgisWebApp, chuoMap, geocloud, geocloudMp, machiInfoMap, sonicweb, wagmap } from "../vendors";
 
 const pref = "東京都" as const;
 
@@ -23,11 +23,11 @@ const WARDS: Municipality[] = [
       {
         kind: "road_type",
         label: "建築基準法上の道路種別（千代田区都市計画情報提供ポータル・ArcGIS）",
-        // この地図は URL での位置指定を受け付けない（4326・平面直角座標とも無視）。開いたら画面の「住所検索」で探す
-        build: null,
-        url: "https://tokei-gis2.chiyodatoshikei.jp/toshikei/apps/experiencebuilder/experience/?id=6ce28f9528e44850b850f0ce0f34eadc",
+        // 区のアプリ（Experience Builder 1.10、id=6ce28f9528e44850b850f0ce0f34eadc）は URL の位置指定を無視するため、
+        // アプリが使う公開 Web マップを Map Viewer で開く（区役所でピンと中心が一致、幅員の注記も出る）
+        build: arcgisMapViewer("https://tokei-gis2.chiyodatoshikei.jp/toshikei", "50d1206ec8bb4d43bf915ce299485351"),
         verified: true,
-        tip: "区全体の地図が開きます。画面の「住所検索」タブで住所を入れてください（読み込みに少し時間がかかります）。",
+        tip: "青いピンが物件です。スマホでは最初に凡例が開くので、「×」で閉じると地図が広がります。",
       },
     ],
     contact: { dept: "環境まちづくり部 建築指導課 建築審査係", phone: "03-5211-4308", email: "kenchikushidou@city.chiyoda.lg.jp" },

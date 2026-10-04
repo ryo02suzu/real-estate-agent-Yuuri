@@ -133,6 +133,20 @@ describe("buildLinks", () => {
     );
   });
 
+  it("千代田区は区のアプリと同じ公開 Web マップを Map Viewer で開き、物件にピンを立てる", () => {
+    const [link] = buildLinks(findMunicipality("13101")!, 35.694003, 139.753594);
+    expect(link.url).toBe(
+      "https://tokei-gis2.chiyodatoshikei.jp/toshikei/apps/mapviewer/index.html?webmap=50d1206ec8bb4d43bf915ce299485351&center=139.753594,35.694003&scale=2500&marker=139.753594,35.694003",
+    );
+    expect(link.pinpoint).toBe(true);
+  });
+
+  it("渋川市は位置指定道路と市道の路線網を、しぶかわ情報マップで物件の位置に開く", () => {
+    const links = buildLinks(findMunicipality("10208")!, 36.489445, 139.000565);
+    expect(links.map((l) => l.url.match(/mid=(\d+)/)?.[1])).toEqual(["175", "155", "421"]);
+    expect(links.every((l) => l.pinpoint)).toBe(true);
+  });
+
   it("Sonicweb は世界測地系のまま URL を作る", () => {
     const [link] = buildLinks(findMunicipality("11103")!, 35.904289, 139.624069);
     expect(link.url).toBe("https://www.sonicweb-asp.jp/saitama/map?theme=th_45&pos=139.624069%2C35.904289&scale=1000");
