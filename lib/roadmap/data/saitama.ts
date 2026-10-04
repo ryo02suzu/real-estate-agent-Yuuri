@@ -193,7 +193,7 @@ const CITIES: Municipality[] = [
     name: "深谷市",
     codes: ["11218"],
     coverage: "none",
-    maps: [],
+    maps: [{ kind: "public_road", label: "認定路線網図（ふかやMAP・市道）", build: geocloud("https://fukaya.geocloud.jp/webgis/", "t=roadmap&mp=36&op=70&vlf=-1"), verified: true }],
     contact: { dept: "建築住宅課", phone: "048-574-6655", note: "道路の扱いは電話・メール不可、窓口のみ", noPhoneInquiry: true },
   },
   {
@@ -255,9 +255,20 @@ const CITIES: Municipality[] = [
     pref,
     name: "行田市",
     codes: ["11206"],
-    coverage: "none",
-    maps: [],
-    contact: { dept: "建築開発課", phone: "048-556-1111（代表）" },
+    coverage: "full",
+    maps: [
+      // 2026-10: 両方とも地図中央の座標が物件の緯度経度と一致することを確認
+      {
+        kind: "road_type",
+        label: "建築基準法道路マップ（行田市）",
+        build: arcgisExperience("6c4876ec5f2f415c81f100bdc02a5b2f", "widget_124"),
+        verified: true,
+        tip: "「上記の利用条件に同意します」にチェックを入れて「OK」。地図の中心が物件です。",
+      },
+      { kind: "public_road", label: "道路台帳マップ（市道の網図）", build: arcgisExperience("e762b56d64564657894f2a0e52c0f719", "widget_124"), verified: true },
+    ],
+    contact: { dept: "建築開発課（前谷1-1）", phone: "048-550-1551", note: "道路種別は窓口のみ（電話・FAX・メール不可）", noPhoneInquiry: true },
+    note: "色の付いていない道は道路法の道路で、認定幅員4m以上なら42条1項1号。4m未満は建築開発課に相談票を出す。",
   },
   {
     pref,

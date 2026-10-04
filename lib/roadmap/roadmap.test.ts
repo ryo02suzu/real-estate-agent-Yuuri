@@ -409,6 +409,20 @@ describe("新座市・所沢市", () => {
   });
 });
 
+describe("行田市", () => {
+  it("建築基準法道路マップ（全種別）と道路台帳マップを物件の位置で開き、道路種別は窓口のみと示す", () => {
+    const m = findMunicipality("11206")!;
+    expect(m.coverage).toBe("full");
+    const [road, daicho] = buildLinks(m, 36.138775, 139.455521);
+    expect(road.url).toBe(
+      "https://experience.arcgis.com/experience/6c4876ec5f2f415c81f100bdc02a5b2f/#widget_124=center:139.455521%2C36.138775%2C4326,scale:2500",
+    );
+    expect(daicho.url).toContain("/experience/e762b56d64564657894f2a0e52c0f719/#widget_124=center:139.455521%2C36.138775");
+    expect([road.pinpoint, daicho.pinpoint]).toEqual([true, true]);
+    expect(m.contact?.noPhoneInquiry).toBe(true);
+  });
+});
+
 describe("図の範囲（図と同じ範囲の地図を描くため）", () => {
   it("物件は図の範囲の中にあり、港区の図は約750m×500m", () => {
     const lat = 35.660464;
