@@ -77,7 +77,8 @@ const CITIES: Municipality[] = [
     name: "鎌倉市",
     codes: ["14204"],
     coverage: "none",
-    maps: [],
+    // かまくらわが街マップ（wagmap kamakura-hazard）の道路水路等情報。市道の路線番号が分かる（市役所で中心一致）
+    maps: [{ kind: "public_road", label: "道路水路等情報（かまくらわが街マップ・市道の路線）", build: wagmap("kamakura-hazard", 221), verified: true }],
     contact: {
       dept: "都市調整部 建築指導課（本庁舎3階）",
       phone: "0467-61-3592",

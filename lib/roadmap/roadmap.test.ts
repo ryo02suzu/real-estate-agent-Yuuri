@@ -147,6 +147,22 @@ describe("buildLinks", () => {
     expect(links.every((l) => l.pinpoint)).toBe(true);
   });
 
+  it("宇都宮市の地図（machi-info 旧版）は日本測地系に換算した座標で開く", () => {
+    const [road, rosen] = buildLinks(findMunicipality("09201")!, 36.555946, 139.882828);
+    // 宇都宮市役所（旭1-1-5）。世界測地系のまま渡すと北西に約450mずれた西1丁目が開く
+    expect(road.url).toBe(
+      "https://www.machi-info.jp/machikado/utsunomiya_city/city_road/gis-road.html?mode=36&lon=139.886087&lat=36.552811&scale=2500",
+    );
+    expect(rosen.url).toContain("rosen.html?mode=54&lon=139.886087&lat=36.552811");
+  });
+
+  it("高崎市はまっぷdeたかさきの指定道路情報マップ（1項4号・5号）を物件の位置で開く", () => {
+    const m = findMunicipality("10202")!;
+    expect(m.coverage).toBe("partial");
+    const [link] = buildLinks(m, 36.321316, 139.003265);
+    expect(link.url).toBe("https://www.sonicweb-asp.jp/takasaki2/map?theme=th_57&pos=139.003265%2C36.321316&scale=1000");
+  });
+
   it("Sonicweb は世界測地系のまま URL を作る", () => {
     const [link] = buildLinks(findMunicipality("11103")!, 35.904289, 139.624069);
     expect(link.url).toBe("https://www.sonicweb-asp.jp/saitama/map?theme=th_45&pos=139.624069%2C35.904289&scale=1000");

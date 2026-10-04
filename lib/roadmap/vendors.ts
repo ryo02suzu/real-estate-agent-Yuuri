@@ -110,6 +110,25 @@ export const arcgisMapViewer =
     return `${portal}/apps/mapviewer/index.html?webmap=${webmap}&center=${c}&scale=${scale}&marker=${c}`;
   };
 
+/** 世界測地系 → 日本測地系（旧東京測地系）。国土地理院の簡易換算式（誤差は数 m） */
+export function toTokyoDatum(lat: number, lng: number): { lat: number; lng: number } {
+  return {
+    lat: lat + 0.00010696 * lat - 0.000017467 * lng - 0.004602,
+    lng: lng + 0.000046047 * lat + 0.000083049 * lng - 0.010041,
+  };
+}
+
+/**
+ * machi-info の旧版（<市>/index.jsp?mode=）。同意ページ（consentPath）が受け取ったパラメータを地図へ引き継ぐ。
+ * 座標は日本測地系（旧）として扱われるので換算して渡す（宇都宮市役所で確認。世界測地系のままだと北西に約450mずれる）
+ */
+export const machiInfoTokyo =
+  (city: string, consentPath: string, mode: number, scale = 2500): Build =>
+  (lat, lng) => {
+    const t = toTokyoDatum(lat, lng);
+    return `https://www.machi-info.jp/machikado/${city}/${consentPath}?mode=${mode}&lon=${t.lng.toFixed(6)}&lat=${t.lat.toFixed(6)}&scale=${scale}`;
+  };
+
 /** machi-info の新版（<区>.machi-info.jp、Google マップ）。?map_id=&lt=緯度&lg=経度&z= */
 export const machiInfoMap =
   (host: string, mapId: number, zoom = 18): Build =>

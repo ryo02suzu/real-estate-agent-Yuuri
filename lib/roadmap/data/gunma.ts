@@ -2,7 +2,7 @@
 // 特定行政庁は前橋・高崎・桐生・伊勢崎・太田・館林の6市。沼田・渋川・藤岡・富岡・安中・みどりの6市は限定特定行政庁
 // （小規模建築物だけ市）で、道路種別を含むそれ以外は県の土木事務所が扱う。
 import type { Contact, MapLink, Municipality } from "../municipalities";
-import { geocloud, wagmap } from "../vendors";
+import { geocloud, sonicweb, wagmap } from "../vendors";
 import KIRYU_SHEETS from "./sheets/kiryu.json";
 import MIDORI_SHEETS from "./sheets/midori.json";
 import ANNAKA_SHEETS from "./sheets/annaka.json";
@@ -52,14 +52,19 @@ const CITIES: Municipality[] = [
     pref,
     name: "高崎市",
     codes: ["10202"],
-    coverage: "none",
-    maps: [],
+    coverage: "partial",
+    // まっぷdeたかさき（Sonicweb takasaki2）。指定道路情報マップの凡例は 1項4号（2026年3月31日時点）と 1項5号（2017年3月31日時点）
+    maps: [
+      { kind: "designated_only", label: "指定道路情報マップ（まっぷdeたかさき・1項4号/5号）", build: sonicweb("takasaki2", "th_57"), verified: true },
+      { kind: "public_road", label: "市道路線網図（まっぷdeたかさき）", build: sonicweb("takasaki2", "th_52"), verified: true },
+    ],
     contact: {
       dept: "建築指導課",
       phone: "027-321-1271",
       email: "kenchikushidou@city.takasaki.gunma.jp",
       note: "電話だけでは確認不可。地図（1/500〜1/1000）・公図をFAXかメールで送れば電話で回答。未判定の道は道路相談票で約1か月",
     },
+    note: "地図で分かるのは位置指定道路（5号は2017年3月時点）と4号まで。2項道路や新しい指定は建築指導課で確認。",
   },
   {
     pref,

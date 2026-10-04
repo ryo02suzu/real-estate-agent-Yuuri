@@ -136,7 +136,11 @@ const CITIES: Municipality[] = [
     codes: ["11232"],
     coverage: "none",
     maps: [],
-    contact: { dept: "まちづくり推進部 建築審査課 企画指導係", phone: "0480-22-1111（代表）", note: "道路種別判定依頼書（付近見取図・公図・現況写真）の提出が必要" },
+    contact: {
+      dept: "まちづくり推進部 建築審査課 企画指導係",
+      phone: "0480-22-1111（代表）",
+      note: "判定済みの道は電話・窓口で回答。未判定の道は道路種別判定依頼書（見取図・公図・現況写真など）を出すと、調査のうえ後日電話で回答",
+    },
   },
   {
     pref,
@@ -170,7 +174,7 @@ const CITIES: Municipality[] = [
     name: "三郷市",
     codes: ["11237"],
     coverage: "none",
-    maps: [],
+    maps: [{ kind: "public_road", label: "認定路線網図（三郷市地図情報システム）", build: sonicweb("misato", "th_6"), verified: true }],
     contact: { dept: "開発指導課 建築指導係", phone: "048-930-7743", note: "地名地番を調べてから問い合わせる" },
   },
   {
@@ -197,7 +201,7 @@ const CITIES: Municipality[] = [
     name: "鴻巣市",
     codes: ["11217"],
     coverage: "none",
-    maps: [],
+    maps: [{ kind: "public_road", label: "認定路線網図（こうのとりっぷ）", build: sonicweb("konosu", "th_16"), verified: true }],
     contact: {
       dept: "建築住宅課（本庁舎2階30番窓口）",
       phone: "048-541-1321（代表）",

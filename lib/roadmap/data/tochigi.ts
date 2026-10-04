@@ -2,7 +2,7 @@
 // 特定行政庁は宇都宮・足利・栃木・佐野・鹿沼・日光・小山・大田原・那須塩原の9市。
 // それ以外の市町は県（令和7年4月から県庁の建築指導課に集約）が扱う。
 import type { Contact, MapLink, Municipality } from "../municipalities";
-import { sonicweb, wagmap } from "../vendors";
+import { machiInfoTokyo, sonicweb, wagmap } from "../vendors";
 import type { SheetIndex } from "../sheets";
 import KANUMA_SHEETS from "./sheets/kanuma.json";
 import NIKKO_SHEETS from "./sheets/nikko.json";
@@ -32,14 +32,19 @@ const CITIES: Municipality[] = [
     pref,
     name: "宇都宮市",
     codes: ["09201"],
-    coverage: "none",
-    maps: [],
+    coverage: "partial",
+    // 宇都宮まちかど情報マップ（machi-info 旧版、日本測地系）。建築基準法道路マップは 1項4号・5号の各一部（利用条件に明記）
+    maps: [
+      { kind: "designated_only", label: "建築基準法道路マップ（宇都宮まちかど情報マップ・4号/5号の一部）", build: machiInfoTokyo("utsunomiya_city", "city_road/gis-road.html", 36), verified: true },
+      { kind: "public_road", label: "市道認定路線マップ（宇都宮まちかど情報マップ）", build: machiInfoTokyo("utsunomiya_city", "rosen.html", 54), verified: true },
+    ],
     contact: {
       dept: "都市整備部 建築指導課 指導グループ（市役所11階）",
       phone: "028-632-2574",
       note: "電話では答えてもらえない。住宅地図・公図を持って窓口へ。判断できない道は道路調査で2週間〜1か月",
       noPhoneInquiry: true,
     },
+    note: "地図に載るのは位置指定道路などの一部だけ。色の無い道は建築指導課の窓口で確認。",
   },
   { pref, name: "足利市", codes: ["09202"], coverage: "none", maps: [{ kind: "public_road", label: "認定路線網図（市道）", build: sonicweb("ashikaga", "th_3"), verified: true }, { kind: "public_road", label: "道路台帳図（市道の幅員）", build: sonicweb("ashikaga", "th_31"), verified: true }], contact: { dept: "都市建設部 建築指導課 建築指導担当", phone: "0284-20-2170" } },
   {
