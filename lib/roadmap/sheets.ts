@@ -29,7 +29,14 @@ export type SheetHit = {
   howto?: string;
   /** 物件が図の端に近いとき、隣の図 */
   neighbor?: { label: string; url: string };
+  /** 市全体で1枚の図（西東京市など）。画面では「図 ○○」ではなく「市全体の図」と呼ぶ */
+  whole?: true;
 };
+
+/** 画面での図の呼び方。後ろに「と同じ範囲」などを続ける（「図 06-22 と…」「市全体の図と…」） */
+export function sheetName(s: SheetHit): string {
+  return s.whole ? "市全体の図" : `図 ${s.label} `;
+}
 
 /** 緯度経度 → 索引図の座標（M の逆変換） */
 function toIndex(ix: SheetIndex, lat: number, lng: number): [number, number] {
@@ -73,6 +80,7 @@ export function findSheet(ix: SheetIndex, lat: number, lng: number): SheetHit | 
   if (!inside) return undefined;
   const hit: SheetHit = { label: inside.label, url: inside.url, where: where(inside.u + 0.5, inside.v + 0.5), bounds: boundsOf(ix, inside.cell) };
   if (ix.howto) hit.howto = ix.howto.replaceAll("{label}", inside.label);
+  if (ix.cells.length === 1) hit.whole = true;
   // 端から図の1割以内なら、そちら側の隣の図も出す（索引図の位置合わせの誤差を見込む）
   const edge = 0.4;
   if (Math.abs(inside.u) > edge || Math.abs(inside.v) > edge) {

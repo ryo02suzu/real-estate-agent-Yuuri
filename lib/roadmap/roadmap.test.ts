@@ -405,6 +405,22 @@ describe("富士見市の分割図", () => {
     const [link] = buildLinks(findMunicipality("11235")!, 35.856644, 139.549149);
     expect(link.sheet?.label).toBe("06");
   });
+
+  it("路線網図（市全体で1枚）は、物件が図のどのあたりかを出す（市役所は中央）", () => {
+    const [, rosen] = buildLinks(findMunicipality("11235")!, 35.856644, 139.549149);
+    expect(rosen.url).toMatch(/rosenmouzu_R7\.pdf$/);
+    expect(rosen.sheet).toMatchObject({ whole: true, where: "中央" });
+  });
+});
+
+describe("西東京市の道路種別図（市全体で1枚）", () => {
+  it("田無駅は図の中央、ひばりヶ丘の北の方は上の方", () => {
+    const m = findMunicipality("13229")!;
+    const [tanashi] = buildLinks(m, 35.7272, 139.5398);
+    expect(tanashi.url).toMatch(/douroshubetu\.pdf$/);
+    expect(tanashi.sheet).toMatchObject({ whole: true, where: "中央" });
+    expect(buildLinks(m, 35.7593, 139.5404)[0].sheet?.where).toBe("上の方");
+  });
 });
 
 describe("新座市・所沢市", () => {

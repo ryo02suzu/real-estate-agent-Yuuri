@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- 外部タイル画像をそのまま並べるため */
 import { useState } from "react";
-import type { SheetHit } from "@/lib/roadmap/sheets";
+import { sheetName, type SheetHit } from "@/lib/roadmap/sheets";
 import { TILE, toWorldPixel } from "@/lib/tiles";
 import { ExpandIcon, MapIcon } from "./icons";
 import { Sheet } from "./sheet";
@@ -100,7 +100,7 @@ export function SheetPreview({
           大きく見る
         </button>
       )}
-      <Sheet title={`図 ${sheet.label} と同じ範囲`} open={zoomed} onClose={() => setZoomed(false)}>
+      <Sheet title={`${sheetName(sheet)}と同じ範囲`} open={zoomed} onClose={() => setZoomed(false)}>
         <SheetPreview lat={lat} lng={lng} sheet={sheet} zoomable={false} fitWidth />
         <p className="mt-2 text-[12px] leading-relaxed text-muted">
           北が上です。道路や川の形を PDF の図と見比べると、物件（●）の場所がすぐ見つかります。
@@ -113,7 +113,7 @@ export function SheetPreview({
           className="bg-gold mt-3 flex items-center justify-center gap-2 rounded-xl py-3 text-[14px] font-semibold text-white"
         >
           <MapIcon className="h-5 w-5" />
-          {sheet.howto ? `地図で図 ${sheet.label} を開く` : `図 ${sheet.label} の PDF を開く`}
+          {sheet.howto ? `地図で図 ${sheet.label} を開く` : `${sheetName(sheet)}の PDF を開く`}
         </a>
       </Sheet>
       <a

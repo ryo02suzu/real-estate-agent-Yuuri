@@ -4,6 +4,7 @@ import type { Contact, Municipality } from "../municipalities";
 import type { SheetIndex } from "../sheets";
 import MINATO_SHEETS from "./sheets/minato.json";
 import KITA_SHEETS from "./sheets/kita.json";
+import NISHITOKYO_SHEETS from "./sheets/nishitokyo.json";
 import { alandis, arcgisExperience, arcgisMapViewer, arcgisWebApp, chuoMap, geocloud, geocloudMp, machiInfoMap, sonicweb, wagmap } from "../vendors";
 
 const pref = "東京都" as const;
@@ -360,12 +361,13 @@ const TAMA_CITIES: Municipality[] = [
     maps: [
       {
         kind: "road_type",
-        label: "西東京市道路種別図（PDF・市全体で1枚）",
+        label: "西東京市道路種別図（PDF・約6.5MB）",
         build: null,
-        // 市全体の1枚。更新のたびにファイル名（日付）が変わるので、切れたら週次のリンク確認で分かる
-        url: "https://www.city.nishitokyo.lg.jp/siseizyoho/matidukuri/kentikusidou/dourosyubetu.files/20260701douroshubetu.pdf",
+        url: "https://www.city.nishitokyo.lg.jp/siseizyoho/matidukuri/kentikusidou/dourosyubetu.html",
         verified: true,
-        tip: "市全体の図が開きます（約6.5MB）。拡大して物件の場所を探してください。",
+        // 市全体の1枚（A0・約6.5MB）。図の中の町丁目名の位置から範囲を求め、物件が図のどのあたりかを出す。
+        // 更新のたびにファイル名（日付）が変わるので、切れたら週次のリンク確認で分かる
+        sheets: NISHITOKYO_SHEETS as SheetIndex,
       },
       { kind: "public_road", label: "道路網図（西東京市まちづくりマップ）", build: wagmap("nishitokyo", 2), verified: true },
     ],

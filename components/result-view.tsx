@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { LookupResult, Municipality, ResolvedLink } from "@/lib/roadmap";
+import { sheetName } from "@/lib/roadmap/sheets";
 import { buildSummary } from "@/lib/summary";
 import { ContactCard } from "./contact-card";
 import { COVERAGE, CoveragePill } from "./coverage";
@@ -359,7 +360,7 @@ function Preview({
     <div className={`flex flex-col ${className}`}>
       <div className="mb-1.5 flex items-center justify-between gap-2 [@media(max-height:720px)]:mb-1">
         <span className="truncate text-[11px] text-muted [@media(max-height:720px)]:text-[10px]">
-          {mode === "sheet" ? `図 ${sheet.label} と同じ範囲（北が上）` : "物件の周辺"}
+          {mode === "sheet" ? `${sheetName(sheet)}と同じ範囲（北が上）` : "物件の周辺"}
         </span>
         <span className="flex shrink-0 rounded-full border border-line bg-white p-0.5">
           {tab("sheet", "図の範囲")}
@@ -386,7 +387,9 @@ function MapButton({
   const sub = sheet
     ? sheet.howto
       ? `物件が載っている図（${sheet.label}）の場所で地図が開きます`
-      : `物件が載っている図（${sheet.label}）が開きます`
+      : sheet.whole
+        ? "市全体の図が開きます"
+        : `物件が載っている図（${sheet.label}）が開きます`
     : link.pinpoint
       ? "物件の場所が開きます"
       : "地図の入口が開きます";

@@ -4,6 +4,7 @@ import type { Contact, MapLink, Municipality } from "../municipalities";
 import { alandis, arcgisExperience, cloudgis, geocloud, geocloudMp, openMap, sonicweb, wagmap } from "../vendors";
 import type { SheetIndex } from "../sheets";
 import FUJIMI_SHEETS from "./sheets/fujimi.json";
+import FUJIMI_ROSEN_SHEETS from "./sheets/fujimi-rosen.json";
 import SHIKI_SHEETS from "./sheets/shiki.json";
 import SOKA_SHEETS from "./sheets/soka.json";
 import WAKO_SHEETS from "./sheets/wako.json";
@@ -240,7 +241,15 @@ const CITIES: Municipality[] = [
         verified: true,
         sheets: FUJIMI_SHEETS as SheetIndex,
       },
-      { kind: "public_road", label: "路線網図（市道）", build: null, url: "https://www.city.fujimi.saitama.jp/kurashi_tetsuzuki/05douro/doro_kotsu/douromouzu.html", verified: false },
+      // 市全体で1枚（1/10,000・約16MB）。図の枠の座標目盛（IX系）から範囲を求め、物件が図のどのあたりかを出す
+      {
+        kind: "public_road",
+        label: "路線網図（市道・PDF約16MB）",
+        build: null,
+        url: "https://www.city.fujimi.saitama.jp/kurashi_tetsuzuki/05douro/doro_kotsu/douromouzu.html",
+        verified: true,
+        sheets: FUJIMI_ROSEN_SHEETS as SheetIndex,
+      },
     ],
     contact: { dept: "建築指導課", phone: "049-251-2711（代表）" },
   },
