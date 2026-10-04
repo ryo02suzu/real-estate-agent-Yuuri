@@ -4,6 +4,7 @@ import type { Contact, Municipality } from "../municipalities";
 import type { SheetIndex } from "../sheets";
 import MINATO_SHEETS from "./sheets/minato.json";
 import KITA_SHEETS from "./sheets/kita.json";
+import BUNKYO_SHEETS from "./sheets/bunkyo.json";
 import NISHITOKYO_SHEETS from "./sheets/nishitokyo.json";
 import { alandis, arcgisExperience, arcgisMapViewer, arcgisWebApp, chuoMap, geocloud, geocloudMp, machiInfoMap, sonicweb, wagmap } from "../vendors";
 
@@ -71,7 +72,17 @@ const WARDS: Municipality[] = [
     name: "文京区",
     codes: ["13105"],
     coverage: "none",
-    maps: [{ kind: "public_road", label: "道路台帳平面図（区道のみ）", build: null, url: "https://www.city.bunkyo.lg.jp/b034/p004775/index.html", verified: false }],
+    maps: [
+      // 図は区独自の 500m×350m の格子（旧日本測地系の座標で区切られている）。物件の載っている図を直接開く（docs/pdf-sheets.md）
+      {
+        kind: "public_road",
+        label: "道路台帳平面図（区道・1/500）",
+        build: null,
+        url: "https://www.city.bunkyo.lg.jp/b034/p004775/index.html",
+        verified: true,
+        sheets: BUNKYO_SHEETS as SheetIndex,
+      },
+    ],
     contact: {
       dept: "都市計画部 建築指導課 審査担当（シビックセンター18階）",
       phone: "03-5803-1263",

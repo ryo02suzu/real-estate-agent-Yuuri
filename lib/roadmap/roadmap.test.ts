@@ -413,6 +413,15 @@ describe("富士見市の分割図", () => {
   });
 });
 
+describe("文京区の道路台帳平面図（500m×350m の格子）", () => {
+  it("文京シビックセンター（春日1-16-21）は 44-36 の図の右の方（図に「文京区役所」とある）", () => {
+    const [link] = buildLinks(findMunicipality("13105")!, 35.708336, 139.752411);
+    expect(link.sheet?.label).toBe("44-36");
+    expect(link.sheet?.where).toBe("右の方");
+    expect(link.url).toBe("https://www.city.bunkyo.lg.jp/shared/library/sosiki_busyo/dokan/tikei/44036.pdf");
+  });
+});
+
 describe("西東京市の道路種別図（市全体で1枚）", () => {
   it("田無駅は図の中央、ひばりヶ丘の北の方は上の方", () => {
     const m = findMunicipality("13229")!;
