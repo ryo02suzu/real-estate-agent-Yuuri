@@ -51,13 +51,14 @@
     - 見つかれば「地番で探した筆」として筆の中の点を物件の場所にし、筆の形を地図に重ねる。見つからなければ町の代表点のまま、理由（地番が無い／地図データが無い）と枝番違いの近い地番を出す。ついでに探しただけ（番地まで一致した住所）のときは、見つからなくても何も言わない。
     - 地図で選んだ地点も、その地点の筆の地番を出す（`parcelAt`）。PC の地図とスマホの「地図で選ぶ」は「筆・地番」で筆界を表示でき、クリックした筆・中央の筆の地番が出る。
     - 出典は利用規約どおり「「登記所備付地図データ」（法務省）を加工して作成」と版を、地図・結果・共有の文面に出す。法務局の証明ではない旨も添える。
-    - データの置き場所は `lib/roadmap/data/parcel-source.json`。最初は AMX プロジェクトの全国版（2024年4月公開版）。
+    - データの置き場所は `lib/roadmap/data/parcel-source.json`。最初は AMX プロジェクトの全国版（2024年4月公開版）。最新版は `.github/workflows/parcel-tiles.yml` が作って Cloudflare R2 に置き、このファイルを書き換える。
 
 ## 保守
 
 - **地図リンクの週次確認**: `.github/workflows/link-check.yml` が毎週月曜に `npm run check-links` を実行。役所の座標（`lib/roadmap/data/office-points.json`）でURLを作り、404・エラーページを検出すると失敗して通知される。
 - **図の差し替えの追従**: `.github/workflows/sheet-watch.yml` が毎週月曜に `npm run watch-sheets` を実行。PDF の図を並べた市の一覧ページのリンクを前回の記録（`lib/roadmap/data/sheet-pages.json`）と比べ、同じ文字のリンクが別のファイルに変わっていれば（年度だけ変わった図も）データの URL を書き換え、テストが通れば main に入れる。差し替え先が1つに決まらない図は Issue（ラベル「図の差し替え」）で知らせる。
 - **新しい地図の自動発見**: `.github/workflows/discover.yml` が毎週月曜に `npm run discover-maps` を実行。ArcGIS Online の検索と wagmap のポータルの地図一覧から「指定道路」「道路種別」「建築基準法」などの名前の地図を探し、まだアプリに入っていないものを Issue（ラベル「新しい地図」）で知らせる。アプリに入っている地図が中で使う Web マップ・レイヤは既知として除く。知らせた地図は `discover-seen.json` に記録し、使わないと決めた地図は `discover-ignore.json` に理由を書く。2026-10 の初回でつくば市の道路種別レイヤを見つけ、「全種別」に上げた。
+- **地番の地図データの更新**: `.github/workflows/parcel-tiles.yml`（毎年5月1日と手動）。G空間情報センターの公開 API で関東1都6県の地図XML（ログイン不要）を読み、都県ごとに `scripts/parcel-tiles/build_pref.py`（mojxml で筆に、tippecanoe でタイルに）でタイルを作り、tile-join で1つにまとめて Cloudflare R2 に置く。CORS を設定し、公開 URL で範囲指定して読めるのを確かめてから、`parcel-source.json` を書き換えて main に入れる。R2 の Secrets（R2_ACCOUNT_ID・R2_ACCESS_KEY_ID・R2_SECRET_ACCESS_KEY）と Variables（R2_PUBLIC_URL）が無ければ何もしない。
 - **CI**: `.github/workflows/ci.yml` がプッシュごとに型チェック・lint・テスト・ビルド。
 
 ## Won't（今は作らない）

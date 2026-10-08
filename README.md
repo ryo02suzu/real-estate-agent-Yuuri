@@ -23,6 +23,7 @@ npm run build    # 静的サイトを out/ に書き出す（Vercel 等にその
 | `lib/roadmap/data/` | 都道府県ごとの市町村データ。`vendors.ts` が地図システムごとのURL形式 |
 | `app/page.tsx`, `components/` | 画面（ホーム・結果・使い方・対応市一覧）。PC は地図が中心（`desktop-shell.tsx`）、動く地図は `live-map.tsx`（MapLibre GL） |
 | `lib/roadmap/parcel.ts`, `parcel-tiles.ts` | 地番検索（登記所備付地図データの筆のタイルを読む）。置き場所は `data/parcel-source.json` |
+| `scripts/parcel-tiles/` | 地番の地図データの最新版を作るスクリプト（`.github/workflows/parcel-tiles.yml` から使う） |
 | `lib/history.ts` | 直近5件の検索履歴（端末の localStorage のみ） |
 | `docs/features.md` | UIの機能要件 |
 | `docs/saitama-research.md`, `docs/chiba-research.md`, `docs/kanagawa-research.md`, `docs/tokyo-research.md`, `docs/kanto-north-research.md` | 市区町村ごとの調査結果と出典 |
