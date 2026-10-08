@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- 外部タイル画像をそのまま並べるため */
 import { tilesAround } from "@/lib/tiles";
-import { ExpandIcon, PinIcon } from "./icons";
+import { ExpandIcon, PinIcon, PinOutlineIcon } from "./icons";
 
 /** 地理院タイルで検索地点の周辺を表示する（確認用の静的プレビュー） */
 export function MapPreview({
@@ -10,12 +10,15 @@ export function MapPreview({
   lng,
   className = "h-[104px]",
   large,
+  onFix,
 }: {
   lat: number;
   lng: number;
   className?: string;
   /** PC の大きな枠：z18 のタイルを半分の大きさで 9×9 枚（1152px 四方） */
   large?: boolean;
+  /** 「場所を直す」（地図で物件の場所を選び直す） */
+  onFix?: () => void;
 }) {
   // z18 のタイルを半分の大きさで描く＝縮尺は z17 相当で、高精細画面でもくっきり
   const { tiles, size, offsetX, offsetY } = large
@@ -52,6 +55,15 @@ export function MapPreview({
         <ExpandIcon className="h-3.5 w-3.5" />
         地図を拡大
       </a>
+      {onFix && (
+        <button
+          onClick={onFix}
+          className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-brand shadow-soft"
+        >
+          <PinOutlineIcon className="h-3.5 w-3.5" />
+          場所を直す
+        </button>
+      )}
       <a
         href="https://maps.gsi.go.jp/development/ichiran.html"
         target="_blank"

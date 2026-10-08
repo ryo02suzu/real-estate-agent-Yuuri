@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import GSI_CODES from "./data/gsi-muni-codes.json";
-import { MUNICIPALITIES, buildLinks, findMunicipality, lookup, resolveContact } from "./index";
+import { MUNICIPALITIES, buildLinks, findMunicipality, lookup, lookupPoint, muniName, resolveContact } from "./index";
 
 // 熊谷市役所（宮町二丁目47）の国土地理院の座標
 const KUMAGAYA_CITY_HALL = { lat: 36.147129, lng: 139.38858 };
@@ -279,6 +279,37 @@ describe("lookup", () => {
   it("API がエラーなら例外を投げる", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 503 })));
     await expect(lookup("埼玉県熊谷市")).rejects.toThrow("503");
+  });
+});
+
+describe("lookupPoint（地図で選んだ地点）", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const stubRev = (rev: unknown) => vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => rev })));
+
+  it("市区町村と町名から住所を作り、その地点の地図リンクを返す（政令市は区まで）", async () => {
+    stubRev({ results: { muniCd: "11103", lv01Nm: "大門町三丁目" } });
+    const r = await lookupPoint(35.9063, 139.6239);
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.picked).toBe(true);
+    expect(r.approximate).toBe(false);
+    expect(r.matchedAddress).toBe("埼玉県さいたま市大宮区大門町三丁目");
+    expect(r.municipality.name).toBe("さいたま市");
+    expect(r.links[0].url).toContain("139.6239");
+  });
+
+  it("関東の外や海の上は unsupported", async () => {
+    stubRev({ results: { muniCd: "19201", lv01Nm: "丸の内一丁目" } });
+    expect((await lookupPoint(35.662257, 138.568449)).status).toBe("unsupported");
+    stubRev({});
+    const sea = await lookupPoint(35.3, 139.9);
+    expect(sea.status === "unsupported" && sea.matchedAddress).toBe("地図で選んだ地点");
+  });
+
+  it("市区町村コードの名前", () => {
+    expect(muniName("13101")).toBe("東京都千代田区");
+    expect(muniName("14131")).toBe("神奈川県川崎市川崎区");
+    expect(muniName("19201")).toBeUndefined();
   });
 });
 

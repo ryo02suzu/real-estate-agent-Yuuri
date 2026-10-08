@@ -5,7 +5,10 @@ const COVERAGE_SHORT = { full: "ネットで全種別が分かる", partial: "�
 
 export function buildSummary(result: Extract<LookupResult, { status: "ok" }>): string {
   const m = result.municipality;
-  const lines = [`【道路種別の確認先】${result.matchedAddress} 付近`, `${m.pref}${m.name}：${COVERAGE_SHORT[m.coverage]}`];
+  const lines = [`【道路種別の確認先】${result.matchedAddress} 付近`];
+  // 地図で選んだ地点は住所が町までなので、その地点を地理院地図で開けるようにする
+  if (result.picked) lines.push(`地図で選んだ地点：https://maps.gsi.go.jp/#18/${result.lat.toFixed(6)}/${result.lng.toFixed(6)}/`);
+  lines.push(`${m.pref}${m.name}：${COVERAGE_SHORT[m.coverage]}`);
   for (const l of result.links) lines.push(`・${l.label}${l.pinpoint ? "" : "（地図内で住所検索）"}\n  ${l.url}`);
   const c = result.contact;
   if (c) {

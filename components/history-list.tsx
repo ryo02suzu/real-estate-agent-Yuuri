@@ -1,9 +1,9 @@
-import type { HistoryItem } from "@/lib/history";
+import { historyKey, type HistoryItem } from "@/lib/history";
 import { CoverageBadge } from "./coverage";
-import { ChevronRightIcon, ClockIcon, PinIcon, TrashIcon } from "./icons";
+import { ChevronRightIcon, ClockIcon, MapIcon, PinIcon, TrashIcon } from "./icons";
 
 /** ホームの「直近の検索履歴」。横スクロールのチップ */
-export function HistoryChips({ items, onSelect, onShowAll }: { items: HistoryItem[]; onSelect: (address: string) => void; onShowAll: () => void }) {
+export function HistoryChips({ items, onSelect, onShowAll }: { items: HistoryItem[]; onSelect: (item: HistoryItem) => void; onShowAll: () => void }) {
   if (items.length === 0) return null;
   return (
     <section>
@@ -19,12 +19,13 @@ export function HistoryChips({ items, onSelect, onShowAll }: { items: HistoryIte
       </div>
       <ul className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1.5">
         {items.map((h) => (
-          <li key={h.address} className="shrink-0">
+          <li key={historyKey(h)} className="shrink-0">
             <button
-              onClick={() => onSelect(h.address)}
+              onClick={() => onSelect(h)}
               className="flex max-w-[13rem] items-center gap-1.5 rounded-full border border-line/60 bg-white px-3 py-1.5 text-[11.5px] text-ink shadow-soft hover:bg-mint/60"
             >
-              <PinIcon className="h-3.5 w-3.5 shrink-0 text-ink/70" />
+              {/* 地図で選んだ地点は地図のアイコン */}
+              {h.ll ? <MapIcon className="h-3.5 w-3.5 shrink-0 text-ink/70" /> : <PinIcon className="h-3.5 w-3.5 shrink-0 text-ink/70" />}
               <span className="truncate">{h.address}</span>
             </button>
           </li>
@@ -35,20 +36,23 @@ export function HistoryChips({ items, onSelect, onShowAll }: { items: HistoryIte
 }
 
 /** 「すべて見る」のシートの中身。市と公開レベルつき */
-export function HistoryList({ items, onSelect, onClear }: { items: HistoryItem[]; onSelect: (address: string) => void; onClear: () => void }) {
+export function HistoryList({ items, onSelect, onClear }: { items: HistoryItem[]; onSelect: (item: HistoryItem) => void; onClear: () => void }) {
   if (items.length === 0) return <p className="text-sm text-muted">まだ検索履歴はありません。</p>;
   return (
     <section>
       <ul className="space-y-2">
         {items.map((h) => (
-          <li key={h.address}>
+          <li key={historyKey(h)}>
             <button
-              onClick={() => onSelect(h.address)}
+              onClick={() => onSelect(h)}
               className="flex w-full items-center gap-3 rounded-2xl border border-line bg-white px-3 py-3 text-left hover:bg-mint/50"
             >
-              <PinIcon className="h-5 w-5 shrink-0 text-brand-light" />
+              {h.ll ? <MapIcon className="h-5 w-5 shrink-0 text-brand-light" /> : <PinIcon className="h-5 w-5 shrink-0 text-brand-light" />}
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm text-ink">{h.address}</span>
+                <span className="block truncate text-sm text-ink">
+                  {h.address}
+                  {h.ll && <span className="ml-1 text-xs text-muted">（地図で選択）</span>}
+                </span>
                 {/* 住所が見つからなかった検索は履歴に残さないので、市が無い＝未対応の市町村 */}
                 <span className="mt-1 flex items-center gap-1.5 text-xs text-muted">
                   {h.city ?? "未対応の市町村"}

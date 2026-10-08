@@ -7,7 +7,12 @@ export type HistoryItem = {
   city?: string;
   coverage?: Municipality["coverage"];
   at: number;
+  /** 地図で選んだ地点（[緯度, 経度]）。住所は町までなので、選び直すときはこの座標で調べる */
+  ll?: [number, number];
 };
+
+/** 同じ検索かどうか（地図で選んだ地点は座標で比べる） */
+export const historyKey = (h: HistoryItem) => (h.ll ? h.ll.join(",") : h.address);
 
 const KEY = "michilu:history";
 const MAX = 5;
@@ -22,9 +27,9 @@ export function loadHistory(): HistoryItem[] {
   }
 }
 
-/** 先頭に追加する。同じ住所は古い方を消す。保存後の一覧を返す */
+/** 先頭に追加する。同じ住所（地図で選んだ地点は同じ座標）は古い方を消す。保存後の一覧を返す */
 export function addHistory(item: HistoryItem): HistoryItem[] {
-  const next = [item, ...loadHistory().filter((h) => h.address !== item.address)].slice(0, MAX);
+  const next = [item, ...loadHistory().filter((h) => historyKey(h) !== historyKey(item))].slice(0, MAX);
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
   } catch {
