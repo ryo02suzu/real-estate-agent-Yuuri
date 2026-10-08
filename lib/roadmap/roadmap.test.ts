@@ -126,9 +126,16 @@ describe("buildLinks", () => {
     expect(link.pinpoint).toBe(true);
   });
 
-  it("つくば市の認定道路マップ（ArcGIS Experience）は地図ウィジェットの中心を指定して開く", () => {
-    const [link] = buildLinks(findMunicipality("08220")!, 36.083321, 140.076492);
-    expect(link.url).toBe(
+  it("つくば市はつくミル「都市計画・規制」（道路種別のレイヤ）と認定道路マップを、地図ウィジェットの中心を指定して開く", () => {
+    const m = findMunicipality("08220")!;
+    expect(m.coverage).toBe("full");
+    const [roadType, publicRoad] = buildLinks(m, 36.083321, 140.076492);
+    expect(roadType.kind).toBe("road_type");
+    expect(roadType.url).toBe(
+      "https://experience.arcgis.com/experience/049cc90fad1d44eaac93e9731810bd12/#widget_124=center:140.076492%2C36.083321%2C4326,scale:2500",
+    );
+    expect(roadType.tip).toContain("建築基準法道路種別");
+    expect(publicRoad.url).toBe(
       "https://experience.arcgis.com/experience/1644185d62274db8aae9dca9574337ac/#widget_124=center:140.076492%2C36.083321%2C4326,scale:2500",
     );
   });

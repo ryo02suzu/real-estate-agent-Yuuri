@@ -1,0 +1,59 @@
+# 毎週月曜の朝（日本時間 6:00）に、市区町村が新しく公開した道路の地図を探す（ArcGIS Online の検索と wagmap のポータル）。
+# まだアプリに入っていない地図が見つかったら Issue で知らせ、知らせた地図を data/discover-seen.json に記録して
+# main に入れる（次からは同じ地図を知らせない）。地図をアプリに入れるかどうかは人が確かめて決める。
+name: 新しい地図の自動発見
+
+on:
+  schedule:
+    - cron: "0 21 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+# 図の差し替えの追従と同時に main へ書き込まないようにする
+concurrency:
+  group: data-updates
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run discover-maps
+      - name: 知らせた地図の記録を main に入れる
+        run: |
+          if git diff --quiet -- lib/roadmap/data/discover-seen.json; then
+            echo "新しい地図なし"
+            exit 0
+          fi
+          npm test
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/roadmap/data/discover-seen.json
+          git commit -m "Record newly discovered road maps (automatic)" -m "$(cat discover-report.md)"
+          git pull --rebase
+          git push
+      - name: 結果を Summary に出し、見つかった地図があれば Issue で知らせる
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -f discover-report.md ] || exit 0
+          cat discover-report.md >> "$GITHUB_STEP_SUMMARY"
+          if [ "$(jq .found discover.json)" -eq 0 ]; then exit 0; fi
+          gh label create "新しい地図" --color 0E8A16 --description "新しく公開された道路の地図の自動発見" --force
+          issue=$(gh issue list --label "新しい地図" --state open --json number --jq '.[0].number')
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body-file discover-report.md
+          else
+            gh issue create --title "新しく公開された道路の地図（自動発見）" --label "新しい地図" --body-file discover-report.md
+          fi

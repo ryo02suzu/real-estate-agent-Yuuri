@@ -1,0 +1,13 @@
+{
+ "arcgis:66689f6ec7c14b06b8ca1deb813e9205": "日野市の道路種別図の作業用の複製。公開アプリ（08e3629b…）で対応済み",
+ "arcgis:8ff9ace372374b0cb0edeb1328fd1538": "豊島区の道路位置指定の廃止の記録（データだけ）。区の地図で全種別に対応済み",
+ "arcgis:fba6221230a84e4e9d073ce3fee2e3dc": "八王子市の地図ポータル（Hub サイト）。道路種別は指定道路マップ（98e34509…）で対応済み",
+ "wagmap:mapping-gunma.pref.gunma.jp/pref-gunma/7801": "群馬県の道路台帳図閲覧マップ。2026-10 時点では道路台帳図の図郭（区画の枠）しか載っていない",
+ "wagmap:www2.wagmap.jp/ibaraki/108": "五霞町の道路台帳。県の指定道路の地図（mid=30）に町の認定道路が載るので追加しない",
+ "wagmap:www2.wagmap.jp/ibaraki/89": "神栖市の道路台帳。県の指定道路の地図（mid=30）に市の認定道路が載るので追加しない",
+ "wagmap:www2.wagmap.jp/ibaraki/92": "行方市の認定路線網図。県の指定道路の地図（mid=30）に市の認定道路が載るので追加しない",
+ "wagmap:www2.wagmap.jp/ibaraki/94": "稲敷市の道路網図。県の指定道路の地図（mid=30）に市の認定道路が載るので追加しない",
+ "wagmap:www2.wagmap.jp/ibaraki/98": "小美玉市の路線網図。県の指定道路の地図（mid=30）に市の認定道路が載るので追加しない",
+ "wagmap:www2.wagmap.jp/inzai/4": "印西市の道路台帳平面図。市道かどうかは認定市道路網図（mid=2）で分かるので追加しない",
+ "wagmap:www2.wagmap.jp/kamakura-hazard/245": "鎌倉市の道路台帳・公共座標情報。市道の路線は道路水路等情報（mid=221）で分かるので追加しない"
+}

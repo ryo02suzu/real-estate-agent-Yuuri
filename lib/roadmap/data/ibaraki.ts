@@ -73,8 +73,16 @@ const CITIES: Municipality[] = [
     pref,
     name: "つくば市",
     codes: ["08220"],
-    coverage: "none",
+    coverage: "full",
     maps: [
+      {
+        // つくミル「都市計画・規制」の「建築基準法道路種別」レイヤ（1項1〜3・5号、2項、未判定。最初は非表示）。2026-10 の自動発見で判明
+        kind: "road_type",
+        label: "建築基準法道路種別（つくミル）",
+        build: arcgisExperience("049cc90fad1d44eaac93e9731810bd12", "widget_124"),
+        verified: true,
+        tip: "「次へ」→同意にチェックして「OK」。左下「…」→「地図を切り替える」で「建築基準法道路種別」にチェック。",
+      },
       {
         kind: "public_road",
         label: "認定道路マップ（つくミル・市道）",
@@ -84,7 +92,7 @@ const CITIES: Municipality[] = [
       },
     ],
     contact: { dept: "建築指導課", phone: "029-883-1111（代表）" },
-    note: "地図で分かるのは市道かどうかと現況幅員まで。建築基準法の道路種別は建築指導課で確認。",
+    note: "地図で「未判定」の道は建築指導課で確認。",
   },
   onPrefMap("ひたちなか市", "08221", { dept: "建築指導課 審査係", phone: "029-273-0111（代表・内線1351）" }),
 ];
