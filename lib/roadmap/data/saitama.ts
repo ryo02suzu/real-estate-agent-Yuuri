@@ -1,0 +1,548 @@
+// 埼玉県 全63市町村（2026-09 調査）。出典は docs/saitama-research.md。
+// 窓口の部署・電話番号は県「建築行政の窓口」ページの一覧を基本に、市の道路種別案内ページで上書きしている。
+import type { Contact, MapLink, Municipality } from "../municipalities";
+import { alandis, arcgisExperience, cloudgis, geocloud, geocloudMp, openMap, sonicweb, wagmap } from "../vendors";
+import type { SheetIndex } from "../sheets";
+import FUJIMI_SHEETS from "./sheets/fujimi.json";
+import FUJIMI_ROSEN_SHEETS from "./sheets/fujimi-rosen.json";
+import FUJIMINO_SHEETS from "./sheets/fujimino.json";
+import SHIKI_SHEETS from "./sheets/shiki.json";
+import SOKA_SHEETS from "./sheets/soka.json";
+import WAKO_SHEETS from "./sheets/wako.json";
+
+const pref = "埼玉県" as const;
+
+// --- 市・松伏町・杉戸町（道路種別は各市町が扱う） ------------------------------
+
+const CITIES: Municipality[] = [
+  {
+    pref,
+    name: "さいたま市",
+    codes: ["11101", "11102", "11103", "11104", "11105", "11106", "11107", "11108", "11109", "11110"],
+    coverage: "partial",
+    maps: [
+      { kind: "designated_only", label: "指定道路図（位置指定道路のみ）", build: sonicweb("saitama", "th_45"), verified: true },
+      { kind: "public_road", label: "認定路線（市道）", build: sonicweb("saitama", "th_31"), verified: true },
+    ],
+    // 西・北・大宮・見沼・岩槻区 = 北部建設事務所、中央・桜・浦和・南・緑区 = 南部建設事務所
+    contactByCode: {
+      ...Object.fromEntries(["11101", "11102", "11103", "11104", "11110"].map((c) => [c, { dept: "北部建設事務所 建築指導課", phone: "048-646-3237", note: "道路種別は窓口のみ（電話・FAX・メール不可）", noPhoneInquiry: true }])),
+      ...Object.fromEntries(["11105", "11106", "11107", "11108", "11109"].map((c) => [c, { dept: "南部建設事務所 建築指導課", phone: "048-840-6237", note: "道路種別は窓口のみ（電話・FAX・メール不可）", noPhoneInquiry: true }])),
+    },
+    note: "ネットで分かるのは位置指定道路と市道認定まで。2項道路などは建設事務所で確認。",
+  },
+  {
+    pref,
+    name: "川口市",
+    codes: ["11203"],
+    coverage: "partial",
+    maps: [{ kind: "road_type", label: "指定道路マップ", build: geocloud("https://kawaguchi.geocloud.jp/webgis/", "t=roadmap&mp=22&op=70&vlf=-1"), verified: true }],
+    contact: { dept: "建築安全課", phone: "048-242-6344（第1係）/ 048-258-1199（第2係）", hours: "9:00〜16:30" },
+  },
+  {
+    pref,
+    name: "川越市",
+    codes: ["11201"],
+    coverage: "none",
+    maps: [{ kind: "public_road", label: "道路台帳・網図（市道）", build: wagmap("kawagoe", 25), verified: true }],
+    contact: { dept: "建築指導課", phone: "049-224-8811" },
+  },
+  {
+    pref,
+    name: "所沢市",
+    codes: ["11208"],
+    coverage: "none",
+    maps: [
+      // 1/1000 では背景図が出ないため 1/2500 で開く（市役所で中心一致）
+      { kind: "public_road", label: "認定路線網図（所沢市地理情報システム）", build: alandis("https://webgis.alandis.jp/tokorozawa11/alandis/webgis", "guest", "&li=3&si=0", 2500), verified: true },
+    ],
+    contact: {
+      dept: "建築指導課（市役所低層棟2階）",
+      phone: "04-2998-9180",
+      email: "a9180@city.tokorozawa.lg.jp",
+      note: "電話は原則不可。メールは地番・地図・公図を添付、回答まで数日。",
+      noPhoneInquiry: true,
+    },
+  },
+  {
+    pref,
+    name: "越谷市",
+    codes: ["11222"],
+    coverage: "full",
+    maps: [
+      { kind: "road_type", label: "建築基準法上の道路種別", build: wagmap("koshigayacity", 31), verified: true },
+      { kind: "public_road", label: "道路台帳・認定路線", build: wagmap("koshigayacity", 5), verified: true },
+    ],
+    contact: { dept: "建築住宅課", phone: "048-964-2111（代表）" },
+  },
+  {
+    pref,
+    name: "草加市",
+    codes: ["11221"],
+    coverage: "none",
+    maps: [
+      // 図は国土基本図の 1/500 図郭（IX系 400m×300m）。物件の載っている図を直接開く（docs/pdf-sheets.md）
+      {
+        kind: "public_road",
+        label: "道路台帳図（市道・1/500）",
+        build: null,
+        url: "https://www.city.soka.saitama.jp/cont/s1901/daicho/index.html",
+        verified: true,
+        sheets: SOKA_SHEETS as SheetIndex,
+      },
+    ],
+    contact: { dept: "建築安全課 建築指導係", phone: "048-922-1958", note: "建築基準法上の扱いは電話で確認できる" },
+  },
+  {
+    pref,
+    name: "春日部市",
+    codes: ["11214"],
+    coverage: "full",
+    maps: [
+      { kind: "road_type", label: "建築基準法上の道路種別（かすかべオラナビ）", build: geocloudMp("kasukabe.geocloud.jp", 81), verified: true },
+      { kind: "public_road", label: "道路台帳参考図（市道）", build: geocloudMp("kasukabe.geocloud.jp", 11), verified: true },
+    ],
+    contact: { dept: "建築課 建築安全担当", phone: "048-796-8046", hours: "平日 8:30〜17:15", note: "地図に色が付いていない道は窓口で確認（電話不可）", noPhoneInquiry: true },
+  },
+  {
+    pref,
+    name: "上尾市",
+    codes: ["11219"],
+    coverage: "full",
+    maps: [{ kind: "road_type", label: "指定道路図（建築基準法道路種別）", build: wagmap("ageocity", 9), verified: true }],
+    contact: { dept: "建築安全課", phone: "048-775-8490" },
+  },
+  {
+    pref,
+    name: "熊谷市",
+    codes: ["11202"],
+    coverage: "partial",
+    maps: [
+      { kind: "designated_only", label: "位置指定道路情報", build: wagmap("kumagaya", 170), verified: true },
+      { kind: "public_road", label: "道路台帳図・認定路線網図", build: wagmap("kumagaya", 90), verified: true },
+    ],
+    contact: {
+      dept: "建築審査課",
+      phone: "0493-39-4809",
+      note: "電話だけの問い合わせは不可。窓口、FAX（0493-39-5603。回答は電話）、または市の電子申請「建築基準法上の道路種別」で照会",
+      noPhoneInquiry: true,
+    },
+  },
+  {
+    pref,
+    name: "新座市",
+    codes: ["11230"],
+    coverage: "full",
+    // 2026年8月のにいざマップ刷新で「建築基準法指定道路図」（1項1号・3号・4号・5号・2項）が載った（市の掲載マップ一覧で確認）。
+    // それまでの位置指定道路の PDF（指定道路図－道路位置指定図）は内容が重なるので使わない
+    maps: [
+      { kind: "road_type", label: "建築基準法指定道路図（にいざマップ）", build: wagmap("niiza", 25), verified: true },
+      { kind: "public_road", label: "道路台帳図・境界確定図（にいざマップ）", build: wagmap("niiza", 21), verified: true },
+    ],
+    contact: { dept: "建築審査課", phone: "048-477-1111（代表）" },
+  },
+  {
+    pref,
+    name: "久喜市",
+    codes: ["11232"],
+    coverage: "none",
+    maps: [
+      {
+        kind: "public_road",
+        label: "市道の認定路線図（地区別PDF）",
+        build: null,
+        url: "https://www.city.kuki.lg.jp/machizukuri/doro_kasen/road/1004392.html",
+        verified: true,
+        tip: "久喜・菖蒲・栗橋・鷲宮の地区ごとの図です。物件の地区の図を開いてください（久喜地区は約44MB）。",
+      },
+    ],
+    contact: {
+      dept: "まちづくり推進部 建築審査課 企画指導係",
+      phone: "0480-22-1111（代表）",
+      note: "判定済みの道は電話・窓口で回答。未判定の道は道路種別判定依頼書（見取図・公図・現況写真など）を出すと、調査のうえ後日電話で回答",
+    },
+  },
+  {
+    pref,
+    name: "狭山市",
+    codes: ["11215"],
+    coverage: "full",
+    maps: [{ kind: "road_type", label: "指定道路図（建築基準法上の道路）", build: sonicweb("sayama", "th_3", 1000, "dm%2Cth_5"), verified: true }],
+    contact: { dept: "都市建設部 建築住宅課", phone: "04-2946-8234", hours: "平日 9:00〜16:30" },
+  },
+  {
+    pref,
+    name: "入間市",
+    codes: ["11225"],
+    coverage: "none",
+    maps: [{ kind: "public_road", label: "認定路線マップ（市道）", build: wagmap("iruma", 3), verified: true }],
+    contact: { dept: "都市整備部 開発建築課", phone: "04-2964-1111（代表）" },
+  },
+  {
+    pref,
+    name: "朝霞市",
+    codes: ["11227"],
+    coverage: "full",
+    maps: [
+      { kind: "road_type", label: "建築基準法道路（公道・私道とも）", build: wagmap("asaka", 120), verified: true },
+      { kind: "public_road", label: "道路情報（市道）", build: wagmap("asaka", 81), verified: true },
+    ],
+    contact: { dept: "都市建設部 開発建築課", phone: "048-463-2585" },
+  },
+  {
+    pref,
+    name: "三郷市",
+    codes: ["11237"],
+    coverage: "none",
+    maps: [{ kind: "public_road", label: "認定路線網図（三郷市地図情報システム）", build: sonicweb("misato", "th_6"), verified: true }],
+    contact: { dept: "開発指導課 建築指導係", phone: "048-930-7743", note: "地名地番を調べてから問い合わせる" },
+  },
+  {
+    pref,
+    name: "戸田市",
+    codes: ["11224"],
+    coverage: "partial",
+    maps: [
+      { kind: "public_road", label: "いいとだマップ（道路路線図・認定幅員）", build: geocloudMp("e-toda.kukanjoho.jp", 401), verified: true },
+    ],
+    contact: { dept: "建築住宅課（本庁舎3階）", phone: "048-441-1800", hours: "平日 8:30〜17:15" },
+    note: "市道で認定・現況幅員4m以上なら42条1項1号（市の案内より）。位置指定道路（私道）は非公表なので問い合わせ。",
+  },
+  {
+    pref,
+    name: "深谷市",
+    codes: ["11218"],
+    coverage: "none",
+    maps: [{ kind: "public_road", label: "認定路線網図（ふかやMAP・市道）", build: geocloud("https://fukaya.geocloud.jp/webgis/", "t=roadmap&mp=36&op=70&vlf=-1"), verified: true }],
+    contact: { dept: "建築住宅課", phone: "048-574-6655", note: "道路の扱いは電話・メール不可、窓口のみ", noPhoneInquiry: true },
+  },
+  {
+    pref,
+    name: "鴻巣市",
+    codes: ["11217"],
+    coverage: "none",
+    maps: [{ kind: "public_road", label: "認定路線網図（こうのとりっぷ）", build: sonicweb("konosu", "th_16"), verified: true }],
+    contact: {
+      dept: "建築住宅課（本庁舎2階30番窓口）",
+      phone: "048-541-1321（代表）",
+      note: "電話・FAX・メール不可、窓口のみ。先に道路課（28番窓口）で査定状況を確認してから行く",
+      noPhoneInquiry: true,
+    },
+  },
+  {
+    pref,
+    name: "ふじみ野市",
+    codes: ["11245"],
+    coverage: "none",
+    maps: [
+      // 市全体で1枚（1/7,000）。図の中の町丁目名の位置から範囲を求め、物件が図のどのあたりかを出す
+      {
+        kind: "public_road",
+        label: "道路網図（市道・PDF）",
+        build: null,
+        url: "https://www.city.fujimino.saitama.jp/soshikiichiran/doroka/dorokanrigakari/2080.html",
+        verified: true,
+        sheets: FUJIMINO_SHEETS as SheetIndex,
+      },
+    ],
+    contact: { dept: "建築課 建築指導係", phone: "049-220-2069", hours: "平日 8:30〜17:15" },
+  },
+  {
+    pref,
+    name: "富士見市",
+    codes: ["11235"],
+    coverage: "partial",
+    maps: [
+      {
+        kind: "designated_only",
+        label: "道路位置指定の閲覧（PDF）",
+        build: null,
+        url: "https://www.city.fujimi.saitama.jp/kurashi_tetsuzuki/sumai/jyuutaku/shiteidouro-etsuran/shitei-douro-etsuran.html",
+        verified: true,
+        sheets: FUJIMI_SHEETS as SheetIndex,
+      },
+      // 市全体で1枚（1/10,000・約16MB）。図の枠の座標目盛（IX系）から範囲を求め、物件が図のどのあたりかを出す
+      {
+        kind: "public_road",
+        label: "路線網図（市道・PDF約16MB）",
+        build: null,
+        url: "https://www.city.fujimi.saitama.jp/kurashi_tetsuzuki/05douro/doro_kotsu/douromouzu.html",
+        verified: true,
+        sheets: FUJIMI_ROSEN_SHEETS as SheetIndex,
+      },
+    ],
+    contact: { dept: "建築指導課", phone: "049-251-2711（代表）" },
+  },
+  {
+    pref,
+    name: "加須市",
+    codes: ["11210"],
+    coverage: "none",
+    maps: [{ kind: "public_road", label: "かぞまっぷ 道路台帳図（参考）", build: wagmap("kazo", 4), verified: true }],
+    contact: { dept: "都市整備部 建築開発課（建築指導担当）", phone: "0480-62-1111（代表）", hours: "平日 8:30〜17:15" },
+  },
+  {
+    pref,
+    name: "坂戸市",
+    codes: ["11239"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "住宅政策課", phone: "049-283-1331（代表）" },
+  },
+  {
+    pref,
+    name: "行田市",
+    codes: ["11206"],
+    coverage: "full",
+    maps: [
+      // 2026-10: 両方とも地図中央の座標が物件の緯度経度と一致することを確認
+      {
+        kind: "road_type",
+        label: "建築基準法道路マップ（行田市）",
+        build: arcgisExperience("6c4876ec5f2f415c81f100bdc02a5b2f", "widget_124"),
+        verified: true,
+        tip: "「上記の利用条件に同意します」にチェックを入れて「OK」。地図の中心が物件です。",
+      },
+      { kind: "public_road", label: "道路台帳マップ（市道の網図）", build: arcgisExperience("e762b56d64564657894f2a0e52c0f719", "widget_124"), verified: true },
+    ],
+    contact: { dept: "建築開発課（前谷1-1）", phone: "048-550-1551", note: "道路種別は窓口のみ（電話・FAX・メール不可）", noPhoneInquiry: true },
+    note: "色の付いていない道は道路法の道路で、認定幅員4m以上なら42条1項1号。4m未満は建築開発課に相談票を出す。",
+  },
+  {
+    pref,
+    name: "秩父市",
+    codes: ["11207"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "建築住宅課", phone: "0494-22-2211（代表）" },
+  },
+  {
+    pref,
+    name: "飯能市",
+    codes: ["11209"],
+    coverage: "partial",
+    maps: [
+      { kind: "designated_only", label: "指定道路図（位置指定道路）", build: alandis("https://webgis.alandis.jp/hanno11/210/webgis", "shitei"), verified: true },
+      { kind: "public_road", label: "市道路線情報", build: alandis("https://webgis.alandis.jp/hanno11/210/webgis", "doro"), verified: true },
+    ],
+    contact: { dept: "建築課", phone: "042-973-2111（代表）", note: "電話では答えてもらえない。メールかFAXで問い合わせる", noPhoneInquiry: true },
+  },
+  {
+    pref,
+    name: "本庄市",
+    codes: ["11211"],
+    coverage: "partial",
+    maps: [{ kind: "designated_only", label: "位置指定道路", build: wagmap("honjo", 10), verified: true }],
+    contact: { dept: "建築開発課", phone: "0495-25-1111（代表）" },
+  },
+  {
+    pref,
+    name: "東松山市",
+    codes: ["11212"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "住宅建築課", phone: "0493-23-2221（代表）" },
+  },
+  {
+    pref,
+    name: "羽生市",
+    codes: ["11216"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "まちづくり政策課", phone: "048-561-1121（代表）" },
+  },
+  {
+    pref,
+    name: "蕨市",
+    codes: ["11223"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "都市整備部 建築課 建築開発指導係", phone: "048-433-7715" },
+  },
+  {
+    pref,
+    name: "志木市",
+    codes: ["11228"],
+    coverage: "full",
+    maps: [
+      // 市は「都市計画図ベース」と「白図ベース」の2種類を出している。道路が見やすい白図ベースを開く
+      {
+        kind: "road_type",
+        label: "指定道路図（PDF）",
+        build: null,
+        url: "https://www.city.shiki.lg.jp/index.cfm/37,115163,349,1150,html",
+        verified: true,
+        sheets: SHIKI_SHEETS as SheetIndex,
+      },
+    ],
+    contact: { dept: "建築開発課", phone: "048-456-5372" },
+  },
+  {
+    pref,
+    name: "和光市",
+    codes: ["11229"],
+    coverage: "full",
+    maps: [
+      {
+        kind: "road_type",
+        label: "指定道路図（PDF）",
+        build: null,
+        url: "https://www.city.wako.lg.jp/machizukuri/jyutaku/1005858/1005864/1005865/1005867.html",
+        verified: true,
+        sheets: WAKO_SHEETS as SheetIndex,
+      },
+    ],
+    contact: { dept: "建築課 審査住宅担当", phone: "048-424-9134" },
+  },
+  {
+    pref,
+    name: "桶川市",
+    codes: ["11231"],
+    coverage: "partial",
+    maps: [
+      { kind: "designated_only", label: "指定道路情報（位置指定道路）", build: cloudgis("okegawa.cloudgis.jp", "shitei"), verified: true },
+      { kind: "public_road", label: "市道認定（道路台帳・道路網図）", build: cloudgis("okegawa.cloudgis.jp", "road"), verified: true },
+    ],
+    contact: { dept: "建築課", phone: "048-786-3211（代表）" },
+  },
+  {
+    pref,
+    name: "北本市",
+    codes: ["11233"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "建築開発課 指導担当", phone: "048-594-5549" },
+  },
+  {
+    pref,
+    name: "八潮市",
+    codes: ["11234"],
+    coverage: "full",
+    maps: [{ kind: "road_type", label: "建築基準法道路種別（都市計画情報システム）", build: openMap("saitama-yashio", "建築基準法道路種別"), verified: true }],
+    contact: { dept: "住宅・建築課 建築担当", phone: "048-996-3596" },
+    note: "試行公開。土地区画整理事業区域内などは掲載保留あり。",
+  },
+  {
+    pref,
+    name: "蓮田市",
+    codes: ["11238"],
+    coverage: "partial",
+    maps: [{ kind: "road_type", label: "指定道路図（42条1項1〜5号。2項道路は載っていない）", build: sonicweb("hasuda", "th_10"), verified: true }],
+    contact: { dept: "建築指導課", phone: "048-768-3111（代表）" },
+    note: "地図に載るのは42条1項の道路の一部。2項道路や色の無い道は窓口で確認。",
+  },
+  {
+    pref,
+    name: "幸手市",
+    codes: ["11240"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "建築指導課", phone: "0480-43-1111（代表）" },
+  },
+  {
+    pref,
+    name: "鶴ヶ島市",
+    codes: ["11241"],
+    coverage: "none",
+    maps: [{ kind: "public_road", label: "道路台帳図・路線網図（市道）", build: wagmap("tsurugashima", 42), verified: true }],
+    contact: { dept: "都市計画課", phone: "049-271-1111（代表）" },
+  },
+  {
+    pref,
+    name: "日高市",
+    codes: ["11242"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "都市計画課", phone: "042-989-2111（代表）" },
+  },
+  {
+    pref,
+    name: "吉川市",
+    codes: ["11243"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "開発建築課", phone: "048-982-5111（代表）" },
+  },
+  {
+    pref,
+    name: "白岡市",
+    codes: ["11246"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "建築課", phone: "0480-31-8389（直通）", email: "kenchiku@city.shiraoka.lg.jp" },
+  },
+  {
+    pref,
+    name: "杉戸町",
+    codes: ["11464"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "建築課", phone: "0480-33-1111（代表）" },
+  },
+  {
+    pref,
+    name: "松伏町",
+    codes: ["11465"],
+    coverage: "none",
+    maps: [],
+    contact: { dept: "新市街地整備課", phone: "048-991-2711（代表）" },
+  },
+];
+
+// --- 県が特定行政庁の20町・1村（窓口は県の建築安全センター・駐在） -------------
+
+const OFFICE: Record<string, Contact> = {
+  kawagoe: { dept: "埼玉県 川越建築安全センター", phone: "049-243-2102" },
+  higashimatsuyama: { dept: "埼玉県 東松山駐在", phone: "0493-22-4340" },
+  kumagaya: { dept: "埼玉県 熊谷建築安全センター", phone: "048-533-8776" },
+  chichibu: { dept: "埼玉県 秩父駐在", phone: "0494-22-3777" },
+  sugito: { dept: "埼玉県 杉戸駐在", phone: "0480-34-2385" },
+};
+
+/** 県の指定道路図（試行）。20町の42条全種別を収録 */
+const PREF_ROAD_MAP: MapLink = {
+  kind: "road_type",
+  label: "埼玉県指定道路図（試行）",
+  build: arcgisExperience("a810ee78463c4ba9b5cbcbd3fe680416", "widget_34"),
+  verified: true,
+  tip: "「利用条件に同意します」にチェックを入れて「OK」。地図の読み込みに少し時間がかかります。",
+};
+
+const prefTown = (name: string, code: string, office: keyof typeof OFFICE): Municipality => ({
+  pref,
+  name,
+  codes: [code],
+  coverage: "full",
+  maps: [PREF_ROAD_MAP],
+  contact: OFFICE[office],
+});
+
+const PREF_TOWNS: Municipality[] = [
+  prefTown("三芳町", "11324", "kawagoe"),
+  prefTown("毛呂山町", "11326", "higashimatsuyama"),
+  prefTown("越生町", "11327", "higashimatsuyama"),
+  prefTown("滑川町", "11341", "higashimatsuyama"),
+  prefTown("嵐山町", "11342", "higashimatsuyama"),
+  prefTown("小川町", "11343", "higashimatsuyama"),
+  prefTown("川島町", "11346", "higashimatsuyama"),
+  prefTown("吉見町", "11347", "higashimatsuyama"),
+  prefTown("鳩山町", "11348", "higashimatsuyama"),
+  prefTown("ときがわ町", "11349", "higashimatsuyama"),
+  prefTown("横瀬町", "11361", "chichibu"),
+  prefTown("皆野町", "11362", "chichibu"),
+  {
+    ...prefTown("長瀞町", "11363", "chichibu"),
+    note: "町全域が都市計画区域外だが、県条例（建築基準法68条の9）で接道義務（4m以上の道路に2m以上）がかかる。",
+  },
+  prefTown("小鹿野町", "11365", "chichibu"),
+  prefTown("美里町", "11381", "kumagaya"),
+  prefTown("神川町", "11383", "kumagaya"),
+  prefTown("上里町", "11385", "kumagaya"),
+  prefTown("寄居町", "11408", "kumagaya"),
+  prefTown("伊奈町", "11301", "sugito"),
+  prefTown("宮代町", "11442", "sugito"),
+  // 東秩父村は全村が都市計画区域外で、区域外に接道を求める県条例（第5章の2）の適用区域にも入っていない
+  { pref, name: "東秩父村", codes: ["11369"], coverage: "outside", maps: [], contact: OFFICE.higashimatsuyama },
+];
+
+export const SAITAMA: Municipality[] = [...CITIES, ...PREF_TOWNS];
