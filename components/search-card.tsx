@@ -51,7 +51,7 @@ export function SearchCard({
           id="address"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="住所を入力（例：東京都渋谷区神南1-1-1）"
+          placeholder="住所・地番を入力（例：東京都渋谷区神南1-1-1）"
           autoComplete="off"
           enterKeyHint="search"
           className="min-w-0 flex-1 bg-transparent py-2 text-base text-ink outline-none placeholder:text-[12px] placeholder:text-muted/70"

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { LookupResult, Municipality, ResolvedLink } from "@/lib/roadmap";
+import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
+import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { sheetName } from "@/lib/roadmap/sheets";
 import { buildSummary } from "@/lib/summary";
 import { ContactCard } from "./contact-card";
@@ -40,7 +42,7 @@ export function ResultView({
   if (result.status === "not_found") return <NotFound query={query} />;
   if (result.status === "choose") return <Choose query={query} result={result} onPick={onPick} />;
   if (result.status === "unsupported") return <Unsupported result={result} onFix={onFix} />;
-  return desktop ? <DesktopFound result={result} /> : <Found result={result} onFix={onFix} />;
+  return desktop ? <DesktopFound result={result} onPick={onPick} /> : <Found result={result} onFix={onFix} onPick={onPick} />;
 }
 
 function NotFound({ query }: { query: string }) {
@@ -106,7 +108,7 @@ function Unsupported({
   const q = encodeURIComponent(`${city} 建築基準法 道路種別`);
   return (
     <section className={CARD}>
-      <Place address={result.matchedAddress} />
+      <PlaceHeader label="検索地点" address={result.matchedAddress} suffix="付近" />
       <div className="border-t border-line/70 p-4">
         <MapPreview lat={result.lat} lng={result.lng} onFix={onFix} />
         <p className="mt-4 font-bold text-ink">
@@ -132,9 +134,11 @@ function Unsupported({
 function Found({
   result,
   onFix,
+  onPick,
 }: {
   result: Extract<LookupResult, { status: "ok" }>;
   onFix?: () => void;
+  onPick: (address: string) => void;
 }) {
   const m = result.municipality;
   // ネットで分からない市は、地図ボタンを参考扱いにして問い合わせ先を先に見せる
@@ -165,13 +169,12 @@ function Found({
         className={`${CARD} flex min-h-0 flex-1 !shrink flex-col`}
       >
         <Place
-          address={result.matchedAddress}
-          approximate={result.approximate}
-          picked={result.picked}
+          result={result}
           fixable={!!onFix}
+          onPick={onPick}
           actions={
             <>
-              <CopyButton text={result.matchedAddress} />
+              <CopyButton text={copyText(result)} />
               <ShareButton result={result} />
             </>
           }
@@ -222,41 +225,122 @@ function Found({
   );
 }
 
-/**
- * 「検索地点」：国土地理院が解釈した住所。番地まで一致しないことがあるので「付近」。
- * 地図で選んだ地点は、住所が町名までなので「地図で選んだ地点」と出す
- */
-function Place({
-  address,
-  approximate,
-  picked,
-  fixable,
-  actions,
-}: {
-  address: string;
-  approximate?: boolean;
-  picked?: boolean;
-  /** 地図の「場所を直す」で選び直せる（その案内を添える） */
-  fixable?: boolean;
-  actions?: React.ReactNode;
-}) {
+/** 「住所コピー」で写す文字。地番で探した筆は地番まで（地図システムの住所検索に貼る） */
+function copyText(result: Extract<LookupResult, { status: "ok" }>): string {
+  const p = result.parcel;
+  return p && !result.picked && /^\d/.test(p.chibanRaw) ? `${result.matchedAddress}${p.chibanRaw}` : result.matchedAddress;
+}
+
+/** 見出し（「検索地点」など）と住所の2行 */
+function PlaceHeader({ label, address, suffix, actions }: { label: string; address: string; suffix: React.ReactNode; actions?: React.ReactNode }) {
   return (
-    <div className="px-4 pb-3 pt-3">
+    <>
       <div className="flex items-center justify-between gap-2">
         <p className="flex min-w-0 items-center gap-1 text-[11px] text-muted">
           <PinOutlineIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
-          <span className="whitespace-nowrap">{picked ? "地図で選んだ地点" : "検索地点"}</span>
+          <span className="whitespace-nowrap">{label}</span>
         </p>
         {actions && <span className="flex shrink-0 gap-1.5">{actions}</span>}
       </div>
       <p className="mt-1 text-[16px] font-semibold leading-snug text-ink">
-        {address}{" "}
-        <span className="whitespace-nowrap text-[13px] font-normal">付近</span>
+        {address} <span className="whitespace-nowrap text-[13px] font-normal">{suffix}</span>
       </p>
-      {approximate ? (
-        <p className="mt-1 flex gap-1 text-[10.5px] leading-[1.6] text-[#8a4f3a]">
+    </>
+  );
+}
+
+/** 筆の形の出典（登記所備付地図データ利用規約の出典と、加工したことの記載） */
+function ParcelCredit() {
+  return (
+    <>
+      <a href="https://front.geospatial.jp/moj-chizu-xml-readme/" target="_blank" rel="noreferrer" className="underline">
+        「登記所備付地図データ」（法務省）
+      </a>
+      を加工して作成（{PARCEL_DATA.edition}）
+    </>
+  );
+}
+
+/**
+ * 「検索地点」：国土地理院が解釈した住所。番地まで一致しないことがあるので「付近」。
+ * 地図で選んだ地点は住所が町名までなので「地図で選んだ地点」、地番で探した筆は「地番で探した筆」と地番を出す
+ */
+function Place({
+  result,
+  fixable,
+  onPick,
+  actions,
+  desktop,
+}: {
+  result: Extract<LookupResult, { status: "ok" }>;
+  /** PC のパネル（出典を本文に書く。スマホは地図プレビューの上に書く） */
+  desktop?: boolean;
+  /** 地図の「場所を直す」で選び直せる（その案内を添える） */
+  fixable?: boolean;
+  /** 近い地番を選んで探し直す */
+  onPick: (address: string) => void;
+  actions?: React.ReactNode;
+}) {
+  const { matchedAddress: address, approximate, picked, parcel, parcelMiss, parcelOthers } = result;
+  const found = parcel && !picked ? parcel : undefined;
+  const warn = "mt-1 flex gap-1 text-[10.5px] leading-[1.6] text-[#8a4f3a]";
+  const town = approximate ? "町の中心を表示しています。" : "";
+  return (
+    <div className="px-4 pb-3 pt-3">
+      <PlaceHeader
+        label={found ? "地番で探した筆" : picked ? "地図で選んだ地点" : "検索地点"}
+        address={address}
+        suffix={found ? <b className="text-[15px] font-semibold">{chibanLabel(found.chibanRaw)}</b> : "付近"}
+        actions={actions}
+      />
+      {found ? (
+        <p className={`mt-1 text-[10.5px] leading-[1.6] text-muted ${desktop || parcelOthers ? "" : "[@media(max-height:720px)]:hidden"}`}>
+          {desktop ? (
+            <>
+              筆の形は<ParcelCredit />。分筆などで変わっていることがあります。
+            </>
+          ) : (
+            `※ 筆は${PARCEL_DATA.edition}の地図。分筆などで変わることがあります`
+          )}
+          {!!parcelOthers && <span className="block text-[#8a4f3a]">同じ地番の筆がほかに{parcelOthers}件あります（小字違いなど）。</span>}
+        </p>
+      ) : parcelMiss ? (
+        <div className={warn}>
+          <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+          <span>
+            {parcelMiss.reason === "not_found"
+              ? `地番 ${parcelMiss.chiban} は見つかりません（${PARCEL_DATA.edition}の地図）。${town}`
+              : parcelMiss.reason === "no_map"
+                ? `この地域は地番の地図データがありません。${town}`
+                : `地番の地図データを読み込めませんでした。${town}`}
+            {parcelMiss.similar.length > 0 && (
+              <span className="mt-0.5 flex flex-wrap items-center gap-1">
+                近い地番：
+                {parcelMiss.similar.slice(0, 4).map((c) => (
+                  <button key={c} onClick={() => onPick(`地番 ${address}${c}`)} className="rounded-full bg-mint px-2 py-px font-semibold text-brand">
+                    {c}
+                  </button>
+                ))}
+              </span>
+            )}
+          </span>
+        </div>
+      ) : approximate ? (
+        <p className={warn}>
           <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
           {fixable ? "番地が見つからず、町の中心を表示しています。地図の「場所を直す」で物件の位置を選べます。" : "番地が見つからず、町の中心を表示しています。"}
+        </p>
+      ) : picked && parcel ? (
+        <p className="mt-1 truncate text-[10.5px] leading-[1.6] text-muted">
+          <b className="font-semibold text-ink">
+            この地点の筆：{chibanLabel(parcel.chibanRaw)}（{kuikiLabel(parcel.kuiki)}）
+          </b>
+          {desktop && (
+            <>
+              {" "}
+              <ParcelCredit />
+            </>
+          )}
         </p>
       ) : (
         <p className="mt-1 text-[10.5px] text-muted [@media(max-height:720px)]:hidden">
@@ -363,7 +447,7 @@ function Preview({
 }) {
   const sheet = result.links.find((l) => l.sheet)?.sheet;
   const [mode, setMode] = useState<"sheet" | "around">("sheet");
-  if (!sheet) return <MapPreview lat={result.lat} lng={result.lng} className={className} onFix={onFix} />;
+  if (!sheet) return <MapPreview lat={result.lat} lng={result.lng} className={className} onFix={onFix} parcel={result.parcel} />;
   const tab = (m: typeof mode, label: string) => (
     <button
       onClick={() => setMode(m)}
@@ -397,7 +481,7 @@ function Preview({
       {mode === "sheet" ? (
         <SheetPreview lat={result.lat} lng={result.lng} sheet={sheet} className="min-h-0 flex-1" />
       ) : (
-        <MapPreview lat={result.lat} lng={result.lng} className="min-h-0 flex-1" />
+        <MapPreview lat={result.lat} lng={result.lng} className="min-h-0 flex-1" parcel={result.parcel} />
       )}
     </div>
   );
@@ -490,7 +574,7 @@ function MapButton({
  * PC の結果（地図の左のパネルの中身）。検索地点・市・地図ボタン・問い合わせ先。
  * 物件の場所と図の範囲は、右の動く地図に出る（components/desktop-shell.tsx）
  */
-function DesktopFound({ result }: { result: Extract<LookupResult, { status: "ok" }> }) {
+function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { status: "ok" }>; onPick: (address: string) => void }) {
   const m = result.municipality;
   const offline = m.coverage === "none" || m.coverage === "outside";
   const primary = result.links.filter((l) => !offline && l.kind !== "public_road");
@@ -499,12 +583,12 @@ function DesktopFound({ result }: { result: Extract<LookupResult, { status: "ok"
     <div className="flex flex-col gap-3">
       <section className={CARD}>
         <Place
-          address={result.matchedAddress}
-          approximate={result.approximate}
-          picked={result.picked}
+          result={result}
+          onPick={onPick}
+          desktop
           actions={
             <>
-              <CopyButton text={result.matchedAddress} />
+              <CopyButton text={copyText(result)} />
               <ShareButton result={result} />
             </>
           }

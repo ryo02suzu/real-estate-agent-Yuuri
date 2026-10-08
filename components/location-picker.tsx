@@ -8,7 +8,7 @@ import { MapPanel } from "./map-panel";
 /** 町名まで読める程度に拡大してから選んでもらう */
 const MIN_ZOOM = 14;
 
-type Center = { lat: number; lng: number; zoom: number };
+type Center = { lat: number; lng: number; zoom: number; parcel?: string };
 
 /**
  * スマホの「地図で場所を選ぶ」画面（全画面）。地図を動かして中央の印を物件に合わせ、「この場所で調べる」。
@@ -67,13 +67,16 @@ export function LocationPicker({
         <MapPanel
           mode="crosshair"
           point={start}
-          onCenter={(lat, lng, zoom) => setCenter({ lat, lng, zoom })}
+          onCenter={(lat, lng, zoom, parcel) => setCenter({ lat, lng, zoom, parcel })}
           fallback={<p className="p-6 text-center text-sm text-muted">この端末では地図を表示できません。住所で検索してください。</p>}
         />
       </div>
       <div className="relative px-4 pb-[max(14px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-6px_20px_rgba(60,44,20,0.08)]">
         <p className="text-[11px] text-muted">{zoomedIn ? "地図を動かして、印の先を物件に合わせてください" : "地図を拡大して、物件の場所に印を合わせてください"}</p>
-        <p className="mt-1 h-6 truncate text-[15px] font-semibold text-ink">{zoomedIn ? place || "…" : ""}</p>
+        <p className="mt-1 h-6 truncate text-[15px] font-semibold text-ink">
+          {zoomedIn ? place || "…" : ""}
+          {zoomedIn && center?.parcel && <span className="ml-2 text-[12px] font-normal text-brand">{center.parcel}</span>}
+        </p>
         <button
           disabled={!zoomedIn}
           onClick={() => center && onPick(center.lat, center.lng)}

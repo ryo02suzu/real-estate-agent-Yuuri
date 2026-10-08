@@ -14,8 +14,11 @@
     "discover-maps": "DISCOVER=1 vitest run lib/roadmap/discover.test.ts"
   },
   "dependencies": {
+    "@mapbox/vector-tile": "3.0.0",
     "maplibre-gl": "6.10.0",
     "next": "16.3.8",
+    "pbf": "5.1.2",
+    "pmtiles": "4.5.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },

@@ -4,14 +4,18 @@
 //  - pin: 物件にピンを立てる。ピンをドラッグするか、地図をクリックして「ここで調べる」で場所を選び直せる（PC）
 //  - crosshair: 画面中央の印で場所を選ぶ（スマホの「地図で選ぶ」）
 import "maplibre-gl/dist/maplibre-gl.css";
-import { getVersion, MapLibreMap, Marker, NavigationControl, Popup, ScaleControl, setWorkerUrl, type GeoJSONSource } from "maplibre-gl";
+import { addProtocol, getVersion, MapLibreMap, Marker, NavigationControl, Popup, ScaleControl, setWorkerUrl, type GeoJSONSource } from "maplibre-gl";
+import { Protocol } from "pmtiles";
 import { useEffect, useRef, useState } from "react";
-import { BASEMAPS, KANTO_BOUNDS, gsiStyle, sheetFeatures, type Basemap } from "@/lib/map-style";
+import { BASEMAPS, KANTO_BOUNDS, PARCEL_MIN_ZOOM, gsiStyle, parcelFilter, sheetFeatures, type Basemap } from "@/lib/map-style";
+import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
 import { sheetName, type SheetHit } from "@/lib/roadmap/sheets";
-import { FrameIcon, LocateIcon, PinIcon } from "./icons";
+import { FrameIcon, LocateIcon, ParcelIcon, PinIcon } from "./icons";
 
 // 描画のワーカーは public/maplibre/<版>/ に置いてある（scripts/copy-maplibre-worker.mjs）
 setWorkerUrl(`/maplibre/${getVersion()}/maplibre-gl-worker.mjs`);
+// 筆のタイル（PMTiles）を pmtiles:// で読めるようにする
+addProtocol("pmtiles", new Protocol().tile);
 
 const LOCALE = {
   "AttributionControl.ToggleAttribution": "出典",
@@ -37,11 +41,13 @@ export type LiveMapProps = {
   point?: Point;
   /** PDF の分割図の市で、物件が載っている図（範囲の枠を重ねる） */
   sheet?: SheetHit;
+  /** 地番で見つけた筆・地図で選んだ地点の筆（強調する） */
+  parcel?: { kuiki: string; chibanRaw: string };
   mode?: "pin" | "crosshair";
   /** pin: ピンを動かした・クリックした地点で調べる */
   onPick?: (lat: number, lng: number) => void;
-  /** crosshair: 地図を動かし終えたときの中央の地点とズーム */
-  onCenter?: (lat: number, lng: number, zoom: number) => void;
+  /** crosshair: 地図を動かし終えたときの中央の地点とズーム（「筆・地番」を表示していれば、中央の筆の地番も） */
+  onCenter?: (lat: number, lng: number, zoom: number, parcel?: string) => void;
   /** 地図の上に重なるパネルの分だけ、中心をずらす */
   padding?: Partial<Padding>;
   /** 右上の道具（背景の切り替えなど）の位置 */
@@ -50,7 +56,7 @@ export type LiveMapProps = {
   onFail?: () => void;
 };
 
-export default function LiveMap({ point, sheet, mode = "pin", onPick, onCenter, padding, toolsClassName = "right-3 top-3", onFail }: LiveMapProps) {
+export default function LiveMap({ point, sheet, parcel, mode = "pin", onPick, onCenter, padding, toolsClassName = "right-3 top-3", onFail }: LiveMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const pinRef = useRef<Marker | null>(null);
@@ -58,6 +64,12 @@ export default function LiveMap({ point, sheet, mode = "pin", onPick, onCenter, 
   const [loaded, setLoaded] = useState(false);
   const [basemap, setBasemap] = useState<Basemap>("pale");
   const [locating, setLocating] = useState(false);
+  // 筆界と地番（登記所備付地図）を表示するか
+  const [parcels, setParcels] = useState(false);
+  const parcelsRef = useRef(false);
+  useEffect(() => {
+    parcelsRef.current = parcels;
+  });
   // 地図のイベントからは最新の関数を呼ぶ
   const cb = useRef({ onPick, onCenter, onFail });
   useEffect(() => {
@@ -102,12 +114,22 @@ export default function LiveMap({ point, sheet, mode = "pin", onPick, onCenter, 
     map.on("load", () => setLoaded(true));
     mapRef.current = map;
 
+    /** 画面上の点にある筆の「地番 354（熊谷市下奈良）」（筆界を表示しているときだけ） */
+    const parcelLabelAt = (pt: { x: number; y: number }) => {
+      if (!parcelsRef.current || map.getZoom() < PARCEL_MIN_ZOOM) return undefined;
+      const f = map.queryRenderedFeatures([pt.x, pt.y], { layers: ["fude-fill"] })[0];
+      const p = f?.properties as { 地番?: string; 地番区域?: string } | undefined;
+      return p?.地番 ? `${chibanLabel(String(p.地番))}（${kuikiLabel(String(p.地番区域 ?? ""))}）` : undefined;
+    };
+
     if (mode === "crosshair") {
       const report = () => {
         const c = map.getCenter();
-        cb.current.onCenter?.(c.lat, c.lng, map.getZoom());
+        cb.current.onCenter?.(c.lat, c.lng, map.getZoom(), parcelLabelAt(map.project(c)));
       };
       map.on("moveend", report);
+      // 筆のタイルを読み終えたら、中央の地番を出し直す
+      map.on("idle", report);
       map.once("load", report);
     } else {
       // クリックした地点に「ここで調べる」を出す（誤って選ばないよう、すぐには調べない）
@@ -116,9 +138,16 @@ export default function LiveMap({ point, sheet, mode = "pin", onPick, onCenter, 
         if (!cb.current.onPick) return;
         const box = document.createElement("div");
         box.className = "flex flex-col items-center gap-1.5 px-1 pt-1";
+        const label = parcelLabelAt(e.point);
         const note = document.createElement("p");
         note.className = "text-[11px] text-muted";
         note.textContent = "この地点の道路図を調べますか？";
+        if (label) {
+          const l = document.createElement("p");
+          l.className = "text-[12px] font-semibold text-ink";
+          l.textContent = label;
+          box.append(l);
+        }
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "bg-gold rounded-full px-4 py-1.5 text-[13px] font-semibold text-white";
@@ -192,6 +221,27 @@ export default function LiveMap({ point, sheet, mode = "pin", onPick, onCenter, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheetKey, loaded]);
 
+  // 見つけた筆の強調
+  const parcelKey = parcel ? `${parcel.kuiki}|${parcel.chibanRaw}` : "";
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded) return;
+    for (const id of ["fude-hit", "fude-hit-line"]) {
+      map.setFilter(id, parcelFilter(parcel));
+      map.setLayoutProperty(id, "visibility", parcel ? "visible" : "none");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parcelKey, loaded]);
+
+  // 筆界と地番の表示
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded) return;
+    for (const id of ["fude-fill", "fude-line"]) map.setLayoutProperty(id, "visibility", parcels ? "visible" : "none");
+    // 拡大していなければ、筆界が見える大きさまで寄る
+    if (parcels && map.getZoom() < PARCEL_MIN_ZOOM + 1) map.easeTo({ zoom: PARCEL_MIN_ZOOM + 1.5, duration: 700 });
+  }, [parcels, loaded]);
+
   // 背景（淡色・標準・写真）
   useEffect(() => {
     const map = mapRef.current;
@@ -224,7 +274,8 @@ export default function LiveMap({ point, sheet, mode = "pin", onPick, onCenter, 
     );
   };
 
-  const tool = "flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-[12px] text-ink shadow-soft hover:bg-mint";
+  const toolBase = "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] shadow-soft";
+  const tool = `${toolBase} bg-white/95 text-ink hover:bg-mint`;
   return (
     <div className="absolute inset-0">
       {/* MapLibre の CSS が地図の箱を position: relative にするので、絶対配置ではなく大きさで広げる */}
@@ -246,6 +297,10 @@ export default function LiveMap({ point, sheet, mode = "pin", onPick, onCenter, 
             </button>
           ))}
         </div>
+        <button onClick={() => setParcels((v) => !v)} aria-pressed={parcels} className={parcels ? `${toolBase} bg-gold text-white` : tool}>
+          <ParcelIcon className={`h-4 w-4 ${parcels ? "" : "text-brand"}`} />
+          筆・地番
+        </button>
         {mode === "pin" && point && (
           <button onClick={toPoint} className={tool}>
             <PinIcon className="h-4 w-4 text-brand" />
