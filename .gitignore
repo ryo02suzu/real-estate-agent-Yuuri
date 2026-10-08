@@ -44,3 +44,6 @@ sheet-watch-report.md
 sheet-watch.json
 discover-report.md
 discover.json
+
+# MapLibre のワーカー（npm run dev / build の前に node_modules から置く）
+/public/maplibre/

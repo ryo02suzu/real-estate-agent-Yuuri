@@ -28,6 +28,14 @@ describe("history", () => {
     ]);
   });
 
+  it("地図で選んだ地点は座標で区別する（同じ町の別の地点は両方残る）", () => {
+    addHistory({ address: "埼玉県熊谷市宮町二丁目", at: 1, ll: [36.1471, 139.3885] });
+    addHistory({ address: "埼玉県熊谷市宮町二丁目", at: 2, ll: [36.1475, 139.389] });
+    addHistory({ address: "埼玉県熊谷市宮町二丁目", at: 3 });
+    addHistory({ address: "埼玉県熊谷市宮町二丁目", at: 4, ll: [36.1471, 139.3885] });
+    expect(loadHistory().map((h) => h.at)).toEqual([4, 3, 2]);
+  });
+
   it("全消去できる", () => {
     addHistory({ address: "A", at: 1 });
     clearHistory();

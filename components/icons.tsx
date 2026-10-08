@@ -151,3 +151,19 @@ export const NoteIcon = ({ className }: P) => (
     <path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5" />
   </svg>
 );
+
+/** 現在地 */
+export const LocateIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <circle cx="12" cy="12" r="7" />
+    <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
+    <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+  </svg>
+);
+
+/** 図の範囲（四隅のかぎ） */
+export const FrameIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
+  </svg>
+);

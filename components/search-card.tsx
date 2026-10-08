@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CloseIcon, PasteIcon, PinIcon, SearchIcon } from "./icons";
+import { CloseIcon, MapIcon, PasteIcon, PinIcon, SearchIcon } from "./icons";
 
 type Props = {
   /** 結果画面の上に置く小さい版（貼り付けの行を出さない） */
@@ -10,6 +10,8 @@ type Props = {
   onChange: (v: string) => void;
   onSearch: () => void;
   loading: boolean;
+  /** 「地図で選ぶ」（住所の代わりに地図で場所を選ぶ） */
+  onMap?: () => void;
 };
 
 export function SearchCard({
@@ -18,6 +20,7 @@ export function SearchCard({
   onChange,
   onSearch,
   loading,
+  onMap,
 }: Props) {
   const [pasteError, setPasteError] = useState(false);
 
@@ -77,24 +80,30 @@ export function SearchCard({
         </button>
       </div>
       {!compact && (
-        <div className="mt-1.5 flex items-center justify-between px-3 text-[11px] text-muted">
-          <span>
+        <div className="mt-1.5 flex items-center justify-between gap-2 px-3 text-[11px] text-muted">
+          <span className="min-w-0">
             {pasteError
               ? "貼り付けできませんでした。入力欄を長押ししてください。"
               : loading
                 ? "検索中…"
-                : "住所を貼り付けて検索できます"}
+                : onMap
+                  ? "住所か地図で調べられます"
+                  : "住所を貼り付けて検索できます"}
           </span>
-          {!value && (
-            <button
-              type="button"
-              onClick={paste}
-              className="flex shrink-0 items-center gap-1 rounded-full bg-mint px-2.5 py-1 font-bold text-brand"
-            >
-              <PasteIcon className="h-3.5 w-3.5" />
-              貼り付け
-            </button>
-          )}
+          <span className="flex shrink-0 gap-1.5">
+            {onMap && (
+              <button type="button" onClick={onMap} className="flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 font-bold text-brand">
+                <MapIcon className="h-3.5 w-3.5" />
+                地図で選ぶ
+              </button>
+            )}
+            {!value && (
+              <button type="button" onClick={paste} className="flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 font-bold text-brand">
+                <PasteIcon className="h-3.5 w-3.5" />
+                貼り付け
+              </button>
+            )}
+          </span>
         </div>
       )}
     </form>

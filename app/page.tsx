@@ -1,19 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { DesktopHeader, Header } from "@/components/header";
+import { useCallback, useEffect, useState } from "react";
+import { DesktopShell } from "@/components/desktop-shell";
+import { Header } from "@/components/header";
 import { useDesktop } from "@/lib/use-desktop";
 import { HistoryChips, HistoryList } from "@/components/history-list";
 import { AlertIcon, AreaIcon, ChevronRightIcon, ClockIcon, InfoIcon, MapIcon } from "@/components/icons";
 import { MapIllustration, SkylineIllustration } from "@/components/illustrations";
 import { CitiesSheet, HelpSheet, MenuSheet, type SheetName } from "@/components/info-sheets";
+import { LocationPicker } from "@/components/location-picker";
 import { ResultView } from "@/components/result-view";
 import { SearchCard } from "@/components/search-card";
 import { Sheet } from "@/components/sheet";
 import { addHistory, clearHistory, loadHistory, type HistoryItem } from "@/lib/history";
-import { lookup, MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
+import { lookup, lookupPoint, MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
 
 type Shown = { query: string; result: LookupResult };
+/** 地図で選んだ地点の URL（?ll=緯度,経度）。小数5桁（約1m） */
+const llParam = (lat: number, lng: number) => `${lat.toFixed(5)},${lng.toFixed(5)}`;
+/** いまの画面が、ホームから何画面進んだところか（pushState で積んだ数） */
+function historyDepth(): number {
+  const d = (window.history.state as { depth?: unknown } | null)?.depth;
+  return typeof d === "number" ? d : 0;
+}
+function parseLl(v: string | null): [number, number] | null {
+  const m = v?.match(/^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/);
+  return m ? [Number(m[1]), Number(m[2])] : null;
+}
 
 const PREFS = [...new Set(MUNICIPALITIES.map((m) => m.pref))];
 // 関東の1都6県がそろったら地方名でまとめて表示する
@@ -33,33 +46,34 @@ export default function Home() {
   const [shown, setShown] = useState<Shown | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [sheet, setSheet] = useState<SheetName | "menu" | null>(null);
-  const pushed = useRef(false);
+  // スマホの「地図で選ぶ」画面（start: 最初に表示する地点）
+  const [picker, setPicker] = useState<{ start?: { lat: number; lng: number } } | null>(null);
   const desktop = useDesktop();
 
-  const search = useCallback(async (address: string, push: boolean) => {
-    const q = address.trim();
-    if (!q) return;
-    setInput(q);
+  /** 住所（q）か、地図で選んだ地点（ll）で調べて結果を出す */
+  const run = useCallback(async (target: { q: string } | { ll: [number, number] }, push: boolean) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await lookup(q);
-      setShown({ query: q, result });
+      const result = "q" in target ? await lookup(target.q) : await lookupPoint(...target.ll);
+      const query = "q" in target ? target.q : result.status === "ok" || result.status === "unsupported" ? result.matchedAddress : "";
+      setInput(query);
+      setShown({ query, result });
       if (result.status === "ok" || result.status === "unsupported") {
         setHistory(
           addHistory({
-            address: q,
+            address: query,
             city: result.status === "ok" ? result.municipality.name : undefined,
             coverage: result.status === "ok" ? result.municipality.coverage : undefined,
             at: Date.now(),
+            ...("ll" in target ? { ll: target.ll } : {}),
           }),
         );
       }
-      // 端末の「戻る」でホームに戻れるよう、結果画面を履歴に積む
-      if (push) {
-        window.history.pushState(null, "", `?q=${encodeURIComponent(q)}`);
-        pushed.current = true;
-      }
+      // 端末の「戻る」でひとつ前の画面に戻れるよう、結果画面を履歴に積む
+      const url = "q" in target ? `?q=${encodeURIComponent(target.q)}` : `?ll=${llParam(...target.ll)}`;
+      // depth: ホームから何画面進んだか（ロゴで一度にホームへ戻るのに使う）
+      if (push) window.history.pushState({ ...window.history.state, depth: historyDepth() + 1 }, "", url);
       window.scrollTo(0, 0);
     } catch {
       setError("通信に失敗しました。電波の良い場所でもう一度お試しください。");
@@ -68,28 +82,45 @@ export default function Home() {
     }
   }, []);
 
-  // 初回表示: 端末の履歴を読み、?q= 付きで開かれたらそのまま検索する
+  const search = useCallback(
+    (address: string, push: boolean) => {
+      const q = address.trim();
+      if (!q) return;
+      setInput(q);
+      return run({ q }, push);
+    },
+    [run],
+  );
+  const searchPoint = useCallback((lat: number, lng: number, push = true) => run({ ll: [lat, lng] }, push), [run]);
+  const pickHistory = (h: HistoryItem) => (h.ll ? searchPoint(h.ll[0], h.ll[1]) : search(h.address, true));
+
+  // 初回表示: 端末の履歴を読み、?q= / ?ll= 付きで開かれたらそのまま調べる
   useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get("q");
+    const fromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get("q");
+      const ll = parseLl(params.get("ll"));
+      if (q) void search(q, false);
+      else if (ll) void searchPoint(ll[0], ll[1], false);
+      return !!(q || ll);
+    };
     queueMicrotask(() => {
       setHistory(loadHistory());
-      if (q) void search(q, false);
+      fromUrl();
     });
     const onPop = () => {
-      const q = new URLSearchParams(window.location.search).get("q");
-      if (q) void search(q, false);
-      else setShown(null);
+      if (!fromUrl()) setShown(null);
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [search]);
+  }, [search, searchPoint]);
 
+  // ホームへ。結果画面を積んできた分だけ戻る（地図で選び直した画面も含めて一度に）
   function backHome() {
-    if (pushed.current) {
-      pushed.current = false;
-      window.history.back();
-    } else {
-      window.history.replaceState(null, "", window.location.pathname);
+    const depth = historyDepth();
+    if (depth > 0) window.history.go(-depth);
+    else {
+      window.history.replaceState(window.history.state, "", window.location.pathname);
       setShown(null);
     }
   }
@@ -104,9 +135,9 @@ export default function Home() {
       <Sheet title="検索履歴" open={sheet === "history"} onClose={() => setSheet(null)}>
         <HistoryList
           items={history}
-          onSelect={(a) => {
+          onSelect={(h) => {
             setSheet(null);
-            void search(a, true);
+            void pickHistory(h);
           }}
           onClear={() => {
             clearHistory();
@@ -119,53 +150,24 @@ export default function Home() {
 
   if (desktop) {
     return (
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <svg aria-hidden viewBox="0 0 400 400" className="pointer-events-none absolute -right-24 -top-24 h-[520px] w-[520px] text-brand-light/40">
-          <path d="M90 0 C130 150 250 250 400 290" stroke="currentColor" strokeWidth="1.2" fill="none" />
-        </svg>
-        <main className="relative mx-auto flex min-h-0 w-full max-w-[1280px] flex-1 flex-col px-10 pb-4 pt-6">
-          <DesktopHeader onHome={shown ? backHome : undefined} onOpen={open}>
-            {shown && (
-              <div className="max-w-2xl">
-                <SearchCard value={input} onChange={setInput} onSearch={() => search(input, true)} loading={loading} compact />
-              </div>
-            )}
-          </DesktopHeader>
-          {error && (
-            <div className="mt-4">
-              <ErrorLine text={error} />
-            </div>
-          )}
-          {shown ? (
-            <div className="mt-6 flex min-h-0 flex-1 flex-col">
-              {shown.result.status === "ok" ? (
-                <ResultView query={shown.query} result={shown.result} onPick={(a) => search(a, false)} desktop />
-              ) : (
-                <div className="mx-auto w-full max-w-xl">
-                  <ResultView query={shown.query} result={shown.result} onPick={(a) => search(a, false)} />
-                </div>
-              )}
-            </div>
-          ) : (
-            <DesktopHome
-              input={input}
-              setInput={setInput}
-              loading={loading}
-              onSearch={() => search(input, true)}
-              history={history}
-              onPick={(a) => search(a, true)}
-              onOpen={open}
-            />
-          )}
-        </main>
-        <footer className="relative px-10 pb-4">
-          <p className="mx-auto flex max-w-[1280px] items-center justify-center gap-2 text-[11.5px] text-muted">
-            <InfoIcon className="h-4 w-4 shrink-0" />
-            表示される地図は参考情報です。重要事項説明などの最終確認は、必ず役所の窓口で行ってください。
-          </p>
-        </footer>
+      <>
+        <DesktopShell
+          shown={shown}
+          input={input}
+          setInput={setInput}
+          loading={loading}
+          error={error}
+          history={history}
+          areaText={AREA_TEXT}
+          onSearch={() => search(input, true)}
+          onPickAddress={(a) => search(a, false)}
+          onPickPoint={(lat, lng) => searchPoint(lat, lng)}
+          onPickHistory={pickHistory}
+          onOpen={open}
+          onHome={shown ? backHome : undefined}
+        />
         {sheetsEl}
-      </div>
+      </>
     );
   }
 
@@ -184,14 +186,22 @@ export default function Home() {
           <div className="mt-3 flex min-h-0 flex-1 flex-col gap-2.5 [&>*]:shrink-0 [&>*:last-child]:shrink">
             <SearchCard value={input} onChange={setInput} onSearch={() => search(input, true)} loading={loading} compact />
             {error && <ErrorLine text={error} />}
-            <ResultView query={shown.query} result={shown.result} onPick={(a) => search(a, false)} />
+            <ResultView
+              query={shown.query}
+              result={shown.result}
+              onPick={(a) => search(a, false)}
+              onFix={() => {
+                const r = shown.result;
+                setPicker({ start: r.status === "ok" || r.status === "unsupported" ? { lat: r.lat, lng: r.lng } : undefined });
+              }}
+            />
           </div>
         ) : (
           <div className="mt-5 flex min-h-0 flex-1 flex-col gap-4 [@media(max-height:720px)]:mt-3 [@media(max-height:720px)]:gap-3 [&>*:not(:last-child)]:shrink-0">
-            <SearchCard value={input} onChange={setInput} onSearch={() => search(input, true)} loading={loading} />
+            <SearchCard value={input} onChange={setInput} onSearch={() => search(input, true)} loading={loading} onMap={() => setPicker({})} />
             {error && <ErrorLine text={error} />}
 
-            <HistoryChips items={history} onSelect={(a) => search(a, true)} onShowAll={() => open("history")} />
+            <HistoryChips items={history} onSelect={pickHistory} onShowAll={() => open("history")} />
 
             <button
               onClick={() => open("help")}
@@ -266,6 +276,16 @@ export default function Home() {
       </footer>
 
       {sheetsEl}
+      {picker && (
+        <LocationPicker
+          start={picker.start}
+          onClose={() => setPicker(null)}
+          onPick={(lat, lng) => {
+            setPicker(null);
+            void searchPoint(lat, lng);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -276,99 +296,5 @@ function ErrorLine({ text }: { text: string }) {
       <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
       {text}
     </p>
-  );
-}
-
-/** PC のホーム。左：見出し・検索・履歴、右：地図の絵とできること。下に街並み */
-function DesktopHome({
-  input,
-  setInput,
-  loading,
-  onSearch,
-  history,
-  onPick,
-  onOpen,
-}: {
-  input: string;
-  setInput: (v: string) => void;
-  loading: boolean;
-  onSearch: () => void;
-  history: HistoryItem[];
-  onPick: (address: string) => void;
-  onOpen: (name: SheetName) => void;
-}) {
-  return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
-      <div className="grid flex-1 grid-cols-[1.05fr_1fr] items-center gap-14">
-        <section>
-          <span className="mb-5 block h-px w-12 bg-brand-light" />
-          <h1 className="text-[38px] font-semibold leading-[1.45] tracking-[0.04em] text-ink xl:text-[44px]">
-            住所から、
-            <br />
-            道路種別の確認先へ。
-          </h1>
-          <p className="mt-4 text-[15px] leading-[1.9] text-muted">
-            国土地理院で物件の場所を調べ、市区町村の公式道路図をその場所で開きます。
-            <br />
-            ネットで分からない市は、窓口と聞くことを案内します。
-          </p>
-          <div className="mt-8">
-            <SearchCard value={input} onChange={setInput} onSearch={onSearch} loading={loading} />
-          </div>
-          <div className="mt-6">
-            <HistoryChips items={history.slice(0, 3)} onSelect={onPick} onShowAll={() => onOpen("history")} />
-          </div>
-          <dl className="mt-8 flex gap-10">
-            {[
-              [`${MUNICIPALITIES.length}`, "対応市区町村"],
-              [AREA_TEXT, "対応エリア"],
-              ["毎週", "地図リンクの自動確認"],
-            ].map(([v, k]) => (
-              <div key={k}>
-                <dt className="text-[11.5px] text-muted">{k}</dt>
-                <dd className="mt-0.5 text-[22px] font-semibold tracking-[0.02em] text-ink">{v}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-
-        <section className="flex flex-col gap-4">
-          <button
-            onClick={() => onOpen("help")}
-            className="shadow-soft relative flex h-[250px] w-full overflow-hidden rounded-3xl border border-white bg-white text-left"
-          >
-            <span className="relative z-10 flex-1 py-8 pl-8 pr-2 [text-shadow:0_0_10px_#fff,0_0_3px_#fff]">
-              <span className="mb-3 block h-px w-8 bg-brand-light" />
-              <span className="block text-[24px] font-semibold leading-[1.6] tracking-[0.04em] text-ink">
-                公式の地図で、
-                <br />
-                スムーズなご提案を。
-              </span>
-              <span className="mt-3 block text-[12.5px] leading-[1.8] text-muted">使い方を見る</span>
-            </span>
-            <MapIllustration className="absolute -right-6 top-0 h-full w-[60%] opacity-90" />
-          </button>
-          <div className="grid grid-cols-3 gap-4">
-            {FEATURES.map(({ key, title, body, Icon }) => (
-              <button
-                key={title}
-                onClick={() => onOpen(key)}
-                className="shadow-soft relative flex flex-col rounded-2xl border border-white bg-white p-4 pb-10 text-left transition hover:-translate-y-0.5"
-              >
-                <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-mint to-white text-brand-light">
-                  <Icon className="h-5 w-5" />
-                </span>
-                <span className="text-[14px] font-medium text-ink">{title}</span>
-                <span className="mt-1.5 text-[12px] leading-[1.7] text-muted">{body}</span>
-                <span className="absolute bottom-3 right-3 flex h-7 w-7 items-center justify-center rounded-full border border-line text-ink">
-                  <ChevronRightIcon className="h-3.5 w-3.5" />
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-      </div>
-      <SkylineIllustration className="pointer-events-none absolute -bottom-4 right-0 h-[130px] w-[520px] opacity-70" />
-    </div>
   );
 }

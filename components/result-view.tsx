@@ -26,18 +26,21 @@ export function ResultView({
   query,
   result,
   onPick,
+  onFix,
   desktop,
 }: {
   query: string;
   result: LookupResult;
   onPick: (address: string) => void;
-  /** PC（横長の画面）用の配置 */
+  /** 「場所を直す」：地図で物件の場所を選び直す（スマホは全画面の地図を開く） */
+  onFix?: () => void;
+  /** PC（地図の左のパネル）用の配置 */
   desktop?: boolean;
 }) {
   if (result.status === "not_found") return <NotFound query={query} />;
   if (result.status === "choose") return <Choose query={query} result={result} onPick={onPick} />;
-  if (result.status === "unsupported") return <Unsupported result={result} />;
-  return desktop ? <DesktopFound result={result} /> : <Found result={result} />;
+  if (result.status === "unsupported") return <Unsupported result={result} onFix={onFix} />;
+  return desktop ? <DesktopFound result={result} /> : <Found result={result} onFix={onFix} />;
 }
 
 function NotFound({ query }: { query: string }) {
@@ -91,8 +94,10 @@ function Choose({
 
 function Unsupported({
   result,
+  onFix,
 }: {
   result: Extract<LookupResult, { status: "unsupported" }>;
+  onFix?: () => void;
 }) {
   const city =
     result.matchedAddress
@@ -103,7 +108,7 @@ function Unsupported({
     <section className={CARD}>
       <Place address={result.matchedAddress} />
       <div className="border-t border-line/70 p-4">
-        <MapPreview lat={result.lat} lng={result.lng} />
+        <MapPreview lat={result.lat} lng={result.lng} onFix={onFix} />
         <p className="mt-4 font-bold text-ink">
           {city ? `${city}は` : "この市町村は"}まだ未対応です
         </p>
@@ -126,8 +131,10 @@ function Unsupported({
 
 function Found({
   result,
+  onFix,
 }: {
   result: Extract<LookupResult, { status: "ok" }>;
+  onFix?: () => void;
 }) {
   const m = result.municipality;
   // ネットで分からない市は、地図ボタンを参考扱いにして問い合わせ先を先に見せる
@@ -160,6 +167,8 @@ function Found({
         <Place
           address={result.matchedAddress}
           approximate={result.approximate}
+          picked={result.picked}
+          fixable={!!onFix}
           actions={
             <>
               <CopyButton text={result.matchedAddress} />
@@ -171,7 +180,7 @@ function Found({
           <CityLine municipality={m} />
           {/* 画面の高さに合わせて地図プレビューが伸び縮みする（スクロールさせない） */}
           <div className="mt-2.5 flex min-h-[64px] flex-1 !shrink flex-col [@media(max-height:720px)]:mt-1.5 [@media(max-height:720px)]:min-h-[52px]">
-            <Preview result={result} className="min-h-[64px] flex-1 [@media(max-height:720px)]:min-h-[52px]" />
+            <Preview result={result} onFix={onFix} className="min-h-[64px] flex-1 [@media(max-height:720px)]:min-h-[52px]" />
           </div>
           {(primary.length > 0 || secondary.length > 0) && (
             <>
@@ -213,24 +222,32 @@ function Found({
   );
 }
 
-/** 「検索地点」：国土地理院が解釈した住所。番地まで一致しないことがあるので「付近」 */
+/**
+ * 「検索地点」：国土地理院が解釈した住所。番地まで一致しないことがあるので「付近」。
+ * 地図で選んだ地点は、住所が町名までなので「地図で選んだ地点」と出す
+ */
 function Place({
   address,
   approximate,
+  picked,
+  fixable,
   actions,
 }: {
   address: string;
   approximate?: boolean;
+  picked?: boolean;
+  /** 地図の「場所を直す」で選び直せる（その案内を添える） */
+  fixable?: boolean;
   actions?: React.ReactNode;
 }) {
   return (
     <div className="px-4 pb-3 pt-3">
-      <div className="flex items-center justify-between">
-        <p className="flex items-center gap-1 text-[11px] text-muted">
-          <PinOutlineIcon className="h-3.5 w-3.5 text-brand-light" />
-          検索地点
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex min-w-0 items-center gap-1 text-[11px] text-muted">
+          <PinOutlineIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
+          <span className="whitespace-nowrap">{picked ? "地図で選んだ地点" : "検索地点"}</span>
         </p>
-        {actions && <span className="flex gap-1.5">{actions}</span>}
+        {actions && <span className="flex shrink-0 gap-1.5">{actions}</span>}
       </div>
       <p className="mt-1 text-[16px] font-semibold leading-snug text-ink">
         {address}{" "}
@@ -239,11 +256,11 @@ function Place({
       {approximate ? (
         <p className="mt-1 flex gap-1 text-[10.5px] leading-[1.6] text-[#8a4f3a]">
           <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
-          番地が見つからず、町の中心を表示しています。
+          {fixable ? "番地が見つからず、町の中心を表示しています。地図の「場所を直す」で物件の位置を選べます。" : "番地が見つからず、町の中心を表示しています。"}
         </p>
       ) : (
         <p className="mt-1 text-[10.5px] text-muted [@media(max-height:720px)]:hidden">
-          ※ 番地までは一致しないことがあります
+          {picked ? "※ 番地は分からないので、町名までを表示しています" : "※ 番地までは一致しないことがあります"}
         </p>
       )}
     </div>
@@ -338,15 +355,15 @@ function ShareButton({
 function Preview({
   result,
   className,
-  large,
+  onFix,
 }: {
   result: Extract<LookupResult, { status: "ok" }>;
   className: string;
-  large?: boolean;
+  onFix?: () => void;
 }) {
   const sheet = result.links.find((l) => l.sheet)?.sheet;
   const [mode, setMode] = useState<"sheet" | "around">("sheet");
-  if (!sheet) return <MapPreview lat={result.lat} lng={result.lng} className={className} large={large} />;
+  if (!sheet) return <MapPreview lat={result.lat} lng={result.lng} className={className} onFix={onFix} />;
   const tab = (m: typeof mode, label: string) => (
     <button
       onClick={() => setMode(m)}
@@ -362,15 +379,25 @@ function Preview({
         <span className="truncate text-[11px] text-muted [@media(max-height:720px)]:text-[10px]">
           {mode === "sheet" ? `${sheetName(sheet)}と同じ範囲（北が上）` : "物件の周辺"}
         </span>
-        <span className="flex shrink-0 rounded-full border border-line bg-white p-0.5">
-          {tab("sheet", "図の範囲")}
-          {tab("around", "周辺")}
+        <span className="flex shrink-0 items-center gap-1.5">
+          {onFix && (
+            <button
+              onClick={onFix}
+              className="rounded-full bg-mint px-2.5 py-0.5 text-[10.5px] font-semibold text-brand [@media(max-height:720px)]:py-0 [@media(max-height:720px)]:text-[10px]"
+            >
+              場所を直す
+            </button>
+          )}
+          <span className="flex rounded-full border border-line bg-white p-0.5">
+            {tab("sheet", "図の範囲")}
+            {tab("around", "周辺")}
+          </span>
         </span>
       </div>
       {mode === "sheet" ? (
-        <SheetPreview lat={result.lat} lng={result.lng} sheet={sheet} className="min-h-0 flex-1" large={large} />
+        <SheetPreview lat={result.lat} lng={result.lng} sheet={sheet} className="min-h-0 flex-1" />
       ) : (
-        <MapPreview lat={result.lat} lng={result.lng} className="min-h-0 flex-1" large={large} />
+        <MapPreview lat={result.lat} lng={result.lng} className="min-h-0 flex-1" />
       )}
     </div>
   );
@@ -460,8 +487,8 @@ function MapButton({
 }
 
 /**
- * PC の結果画面。左：検索地点・市・地図ボタン・問い合わせ先、右：大きな地図プレビュー。
- * 画面の高さいっぱいに収め、スクロールさせない
+ * PC の結果（地図の左のパネルの中身）。検索地点・市・地図ボタン・問い合わせ先。
+ * 物件の場所と図の範囲は、右の動く地図に出る（components/desktop-shell.tsx）
  */
 function DesktopFound({ result }: { result: Extract<LookupResult, { status: "ok" }> }) {
   const m = result.municipality;
@@ -469,50 +496,45 @@ function DesktopFound({ result }: { result: Extract<LookupResult, { status: "ok"
   const primary = result.links.filter((l) => !offline && l.kind !== "public_road");
   const others = result.links.filter((l) => offline || l.kind === "public_road");
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[minmax(380px,440px)_1fr] gap-6">
-      <div className="flex min-h-0 flex-col gap-4">
-        <section className={CARD}>
-          <Place
-            address={result.matchedAddress}
-            approximate={result.approximate}
-            actions={
-              <>
-                <CopyButton text={result.matchedAddress} />
-                <ShareButton result={result} />
-              </>
-            }
-          />
-          <div className="border-t border-line/70 px-4 pb-4 pt-3">
-            <CityLine municipality={m} />
-          </div>
-        </section>
-
-        {result.links.length > 0 && (
-          <section className={`${CARD} p-4`}>
-            <h3 className="mb-2 text-[13px] font-semibold text-ink">{offline ? "参考：公道（市道）かどうかの地図" : "地図を開く"}</h3>
-            <div className="space-y-2">
-              {primary.map((l) => (
-                <MapButton key={l.url} link={l} primary />
-              ))}
-              {others.map((l) => (
-                <MapButton key={l.url} link={l} />
-              ))}
-            </div>
-            {result.links.some((l) => l.pinpoint) && (
-              <p className="mt-2 flex gap-1.5 text-[11px] leading-[1.6] text-muted">
-                <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
-                地図は新しいタブで開きます。利用規約に同意すると、物件の場所が地図の中央に出ます。
-              </p>
-            )}
-          </section>
-        )}
-
-        {result.contact && <ContactCard contact={result.contact} city={m.name} address={result.matchedAddress} />}
-      </div>
-
-      <section className={`${CARD} flex min-h-0 flex-col p-3`}>
-        <Preview result={result} className="min-h-0 flex-1" large />
+    <div className="flex flex-col gap-3">
+      <section className={CARD}>
+        <Place
+          address={result.matchedAddress}
+          approximate={result.approximate}
+          picked={result.picked}
+          actions={
+            <>
+              <CopyButton text={result.matchedAddress} />
+              <ShareButton result={result} />
+            </>
+          }
+        />
+        <div className="border-t border-line/70 px-4 pb-4 pt-3">
+          <CityLine municipality={m} />
+        </div>
       </section>
+
+      {result.links.length > 0 && (
+        <section className={`${CARD} p-4`}>
+          <h3 className="mb-2 text-[13px] font-semibold text-ink">{offline ? "参考：公道（市道）かどうかの地図" : "地図を開く"}</h3>
+          <div className="space-y-2">
+            {primary.map((l) => (
+              <MapButton key={l.url} link={l} primary />
+            ))}
+            {others.map((l) => (
+              <MapButton key={l.url} link={l} />
+            ))}
+          </div>
+          {result.links.some((l) => l.pinpoint) && (
+            <p className="mt-2 flex gap-1.5 text-[11px] leading-[1.6] text-muted">
+              <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+              地図は新しいタブで開きます。利用規約に同意すると、物件の場所が地図の中央に出ます。
+            </p>
+          )}
+        </section>
+      )}
+
+      {result.contact && <ContactCard contact={result.contact} city={m.name} address={result.matchedAddress} />}
     </div>
   );
 }

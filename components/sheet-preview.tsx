@@ -16,16 +16,13 @@ export function SheetPreview({
   lng,
   sheet,
   className = "",
-  large,
-  zoomable = !large,
+  zoomable = true,
   fitWidth,
 }: {
   lat: number;
   lng: number;
   sheet: SheetHit;
   className?: string;
-  /** PC の大きな枠。1段細かいタイルを使う */
-  large?: boolean;
   /** 「大きく見る」ボタンを出すか */
   zoomable?: boolean;
   /** 高さを決めず、幅いっぱいに図の縦横比で描く（拡大表示用） */
@@ -33,9 +30,9 @@ export function SheetPreview({
 }) {
   const [zoomed, setZoomed] = useState(false);
   const [north, west, south, east] = sheet.bounds;
-  // タイルを縮めて描くと文字が小さく線がくっきりする。図の幅がスマホで約800px、PC で約1600px になるズーム
+  // タイルを縮めて描くと文字が小さく線がくっきりする。図の幅が約800px になるズーム
   const w0 = toWorldPixel(north, east, 0).x - toWorldPixel(north, west, 0).x;
-  const z = Math.min(18, Math.max(12, Math.round(Math.log2((large ? 1600 : 800) / w0))));
+  const z = Math.min(18, Math.max(12, Math.round(Math.log2(800 / w0))));
   const p0 = toWorldPixel(north, west, z);
   const p1 = toWorldPixel(south, east, z);
   const W = p1.x - p0.x;

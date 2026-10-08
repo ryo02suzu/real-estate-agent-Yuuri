@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/copy-maplibre-worker.mjs && next dev",
+    "build": "node scripts/copy-maplibre-worker.mjs && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
@@ -14,6 +14,7 @@
     "discover-maps": "DISCOVER=1 vitest run lib/roadmap/discover.test.ts"
   },
   "dependencies": {
+    "maplibre-gl": "6.10.0",
     "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8"
