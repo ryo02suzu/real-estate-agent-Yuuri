@@ -59,6 +59,7 @@ export function DesktopShell({
   const r = shown?.result;
   const point = r && (r.status === "ok" || r.status === "unsupported") ? { lat: r.lat, lng: r.lng } : undefined;
   const sheet = r?.status === "ok" ? r.links.find((l) => l.sheet)?.sheet : undefined;
+  const parcel = r?.status === "ok" ? r.parcel : undefined;
   const links: ["help" | "cities" | "history", string][] = [
     ["help", "使い方"],
     ["cities", "対応エリア"],
@@ -70,6 +71,7 @@ export function DesktopShell({
       <MapPanel
         point={point}
         sheet={sheet}
+        parcel={parcel}
         onPick={onPickPoint}
         padding={{ left: PANEL + GAP * 2, top: 64, right: 16, bottom: 16 }}
         toolsClassName="right-5 top-[76px]"

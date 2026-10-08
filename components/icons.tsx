@@ -167,3 +167,11 @@ export const FrameIcon = ({ className }: P) => (
     <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
   </svg>
 );
+
+/** 筆（土地の区画） */
+export const ParcelIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M3 6l7-3 11 4-2 13-9 1-7-4z" />
+    <path d="M10 3l1 9-8 3M11 12l10-5M11 12l-1 9" />
+  </svg>
+);

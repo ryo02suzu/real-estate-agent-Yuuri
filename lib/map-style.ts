@@ -1,7 +1,8 @@
 // 動く地図（MapLibre GL）の見た目。地理院タイル（淡色・標準・写真）を重ね、選んだものだけを表示する。
 // PDF の分割図の市では、物件が載っている図の範囲（枠と 3×3 の目安線）を重ねる。
 import type { FeatureCollection } from "geojson";
-import type { StyleSpecification } from "maplibre-gl";
+import type { FilterSpecification, StyleSpecification } from "maplibre-gl";
+import { PARCEL_DATA } from "./roadmap/parcel-data";
 import type { SheetHit } from "./roadmap/sheets";
 
 export type Basemap = "pale" | "std" | "photo";
@@ -19,6 +20,18 @@ export const KANTO_BOUNDS: [[number, number], [number, number]] = [
 ];
 
 const ATTRIBUTION = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">地理院タイル</a>';
+// 登記所備付地図データの利用規約どおり、出典と加工したことを書く
+const PARCEL_ATTRIBUTION = `<a href="https://front.geospatial.jp/moj-chizu-xml-readme/" target="_blank" rel="noreferrer">「登記所備付地図データ」（法務省）</a>を加工して作成（${PARCEL_DATA.edition}）`;
+
+/** 筆を地図に描く最小のズーム（タイルは z14〜16。z16 より細かいときは z16 を拡大して描く） */
+export const PARCEL_MIN_ZOOM = 15;
+
+/** 地番区域と地番で、ひとつの筆だけに絞る（見つけた筆を強調する）。何も無ければどれにも当たらない条件 */
+export function parcelFilter(p?: { kuiki: string; chibanRaw: string }): FilterSpecification {
+  return p
+    ? ["all", ["==", ["get", "地番区域"], p.kuiki], ["==", ["get", "地番"], p.chibanRaw]]
+    : ["==", ["get", "地番"], "\u0000"];
+}
 
 export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
   const keys = Object.keys(BASEMAPS) as Basemap[];
@@ -33,6 +46,8 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         ]),
       ),
       sheet: { type: "geojson", data: sheetFeatures() },
+      // 筆（土地の区画）。PMTiles を pmtiles:// で読む（components/live-map.tsx で読み方を登録する）
+      parcels: { type: "vector", url: `pmtiles://${PARCEL_DATA.url}`, attribution: PARCEL_ATTRIBUTION },
     },
     layers: [
       // 淡色地図に無いところ（海など）が白く抜けないよう、下に標準地図の色を敷く
@@ -52,6 +67,46 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         paint: { "line-color": "#8a6632", "line-width": 1, "line-opacity": 0.6, "line-dasharray": [3, 3] },
       },
       { id: "sheet-line", type: "line", source: "sheet", filter: ["==", ["get", "kind"], "frame"], paint: { "line-color": "#8a6632", "line-width": 2.5 } },
+      // 筆界（「筆・地番」で表示）。fude-fill は透明で、クリックした筆を拾うためのもの
+      {
+        id: "fude-fill",
+        type: "fill",
+        source: "parcels",
+        "source-layer": PARCEL_DATA.layer,
+        minzoom: PARCEL_MIN_ZOOM,
+        layout: { visibility: "none" },
+        paint: { "fill-color": "#000000", "fill-opacity": 0 },
+      },
+      {
+        id: "fude-line",
+        type: "line",
+        source: "parcels",
+        "source-layer": PARCEL_DATA.layer,
+        minzoom: PARCEL_MIN_ZOOM,
+        layout: { visibility: "none" },
+        paint: { "line-color": "#b0472a", "line-width": ["interpolate", ["linear"], ["zoom"], 15, 0.4, 18, 1.2], "line-opacity": 0.75 },
+      },
+      // 地番で見つけた筆・地図で選んだ地点の筆
+      {
+        id: "fude-hit",
+        type: "fill",
+        source: "parcels",
+        "source-layer": PARCEL_DATA.layer,
+        minzoom: 14,
+        filter: parcelFilter(),
+        layout: { visibility: "none" },
+        paint: { "fill-color": "#c49a5c", "fill-opacity": 0.28 },
+      },
+      {
+        id: "fude-hit-line",
+        type: "line",
+        source: "parcels",
+        "source-layer": PARCEL_DATA.layer,
+        minzoom: 14,
+        filter: parcelFilter(),
+        layout: { visibility: "none" },
+        paint: { "line-color": "#8a6632", "line-width": 3 },
+      },
     ],
   };
 }
