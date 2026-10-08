@@ -40,3 +40,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 link-check-report.md
+sheet-watch-report.md
+sheet-watch.json
+discover-report.md
+discover.json

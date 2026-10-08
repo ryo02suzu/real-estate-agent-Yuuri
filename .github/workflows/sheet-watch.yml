@@ -1,0 +1,63 @@
+# 毎週月曜の朝（日本時間 6:30）に、PDF の図を並べた市の一覧ページを見て、図の差し替え（ファイル名の変更）を追う。
+# 差し替え先が1つに決まったものは、データの URL を書き換え、テストが通れば main に直接入れる
+# （本番は Vercel が main から自動で作り直す）。差し替え先が決まらないものは Issue で知らせる。
+name: 図の差し替えの追従
+
+on:
+  schedule:
+    - cron: "30 21 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+# 地図の自動発見と同時に main へ書き込まないようにする
+concurrency:
+  group: data-updates
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run watch-sheets
+      - name: テストが通れば main に入れる
+        run: |
+          if git diff --quiet -- lib/roadmap/data; then
+            echo "データの変更なし"
+            exit 0
+          fi
+          npm test
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/roadmap/data
+          if [ "$(jq .replaced sheet-watch.json)" -gt 0 ]; then
+            git commit -m "Follow replaced PDF map sheets (automatic)" -m "$(cat sheet-watch-report.md)"
+          else
+            git commit -m "Record the PDF links on the city list pages (automatic)"
+          fi
+          git pull --rebase
+          git push
+      - name: 結果を Summary に出し、追えなかった図があれば Issue で知らせる
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -f sheet-watch-report.md ] || exit 0
+          cat sheet-watch-report.md >> "$GITHUB_STEP_SUMMARY"
+          if [ "$(jq '.unresolved + .replaced' sheet-watch.json)" -eq 0 ]; then exit 0; fi
+          gh label create "図の差し替え" --color FBCA04 --description "PDF の図の差し替えの自動追従" --force
+          issue=$(gh issue list --label "図の差し替え" --state open --json number --jq '.[0].number')
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body-file sheet-watch-report.md
+          else
+            gh issue create --title "PDF の図の差し替え（自動確認）" --label "図の差し替え" --body-file sheet-watch-report.md
+          fi

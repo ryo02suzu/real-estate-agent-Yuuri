@@ -9,6 +9,8 @@ npm install
 npm run dev      # http://localhost:3000
 npm test         # ロジックのユニットテスト
 npm run check-links  # 全地図リンクが開けるか確認（ネット接続が必要。毎週 GitHub Actions でも実行）
+npm run watch-sheets   # PDF の図の差し替え（ファイル名の変更）を追い、データの URL を書き換える（同上）
+npm run discover-maps  # 市区町村が新しく公開した道路の地図を探して discover-report.md に書く（同上）
 npm run build    # 静的サイトを out/ に書き出す（Vercel 等にそのまま置ける）
 ```
 
