@@ -8,7 +8,12 @@ import { Sheet } from "./sheet";
 
 /** 線の色の見本（地図の道路の線のように横長） */
 function Line({ color }: { color: string }) {
-  return <span className="mt-[7px] inline-block h-[5px] w-5 shrink-0 rounded-full border border-black/10" style={{ background: color }} />;
+  return (
+    <span
+      className="mt-[7px] inline-block h-[5px] w-5 shrink-0 rounded-full border border-black/10 [@media(max-height:720px)]:mt-[6px]"
+      style={{ background: color }}
+    />
+  );
 }
 
 /** 凡例の一覧（PC は地図ボタンの下にそのまま、スマホは下から出るシートの中） */
@@ -16,7 +21,15 @@ export function LegendList({ legend, compact }: { legend: LegendEntry[]; compact
   return (
     <ul className={compact ? "grid grid-cols-2 gap-x-3 gap-y-0.5" : "divide-y divide-line/70"}>
       {legend.map((e) => (
-        <li key={e.label} className={`flex gap-1.5 ${compact ? "text-[11px] leading-[1.55]" : "py-1.5 text-[12.5px] leading-[1.5]"} text-ink`}>
+        <li
+          key={e.label}
+          className={`flex gap-1.5 ${
+            compact
+              ? "text-[11px] leading-[1.55]"
+              : // 背の低い画面では、項目の多い凡例（豊島区など）もシートに収まるよう詰める
+                "py-1.5 text-[12.5px] leading-[1.5] [@media(max-height:720px)]:py-1 [@media(max-height:720px)]:text-[12px] [@media(max-height:720px)]:leading-[1.4]"
+          } text-ink`}
+        >
           <Line color={e.color} />
           <span className="min-w-0">{e.label}</span>
         </li>

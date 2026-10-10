@@ -5,7 +5,8 @@
 wagmap 系の地図（www2.wagmap.jp・マッピングぐんま・横浜市 iマッピー）は、地図の利用条件に同意したうえで
 レイヤ一覧（GetLayerTree）を読み、表示されるレイヤの凡例の名前と色を取る（色が画像のときは画像の色を数える）。
 茨城県の共同の地図はレイヤが「５号道路_水戸市」のように市町村ごとなので、市町村ごとに分ける。
-Sonicweb・ICBA・川崎市（GeoCloud）の凡例は画像や凡例欄を読んで書き写したもの（scripts/legends/manual.json、出典の URL つき）をそのまま入れる。
+そのほかの地図（Sonicweb・ICBA・ALANDIS・ArcGIS・PDF など）の凡例は、画像や凡例欄・設定を読んで書き写したもの
+（scripts/legends/manual.json、出典つき）をそのまま入れる。
 
   npm run legends        # 地図の一覧を書き出して、このスクリプトを実行する
 
@@ -81,6 +82,14 @@ def icon_color(host: str, slug: str, icon: str) -> str | None:
     return _icons[url]
 
 
+def hcodes(items):
+    """レイヤの中の凡例の項目（hcode）を、下の階層も含めて順に"""
+    for it in items or []:
+        if it.get("classname") == "hcode":
+            yield it
+        yield from hcodes(it.get("items"))
+
+
 def legend_of(host: str, slug: str, mid: str, extra: str) -> dict | None:
     tree = layer_tree(host, slug, mid)
     # 表示するレイヤ：URL の mcl で切り替えている地図はそのレイヤ、それ以外は最初から表示されているレイヤ
@@ -96,9 +105,8 @@ def legend_of(host: str, slug: str, mid: str, extra: str) -> dict | None:
                 if take and not (NOT_ROAD.search(lname) and not ROADISH.search(lname)):
                     m = re.match(r"(.+?)_(.+[市町村区])$", lname)
                     city = m.group(2) if m else None
-                    for h in it.get("items") or []:
-                        if h.get("classname") != "hcode":
-                            continue
+                    # 項目はレイヤの直下のことも、「種別 → 区分 → 項目」のように下の階層のこともある（小田原市・江戸川区など）
+                    for h in hcodes(it.get("items")):
                         label = norm(h.get("lname"))
                         if city:
                             label = re.sub(rf"_{re.escape(city)}$", "", label)

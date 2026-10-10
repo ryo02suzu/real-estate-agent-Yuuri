@@ -94,7 +94,8 @@ export function buildLinks(m: Municipality, lat: number, lng: number, town?: str
   return m.maps.map((link) => {
     const sheet = link.sheets && findSheet(link.sheets, lat, lng, town);
     const url = sheet ? sheet.url : link.build ? link.build(lat, lng) : link.url!;
-    const legend = legendFor(url, m.name);
+    // PDF を図ごとに開く市は、図の URL ではなく案内ページの URL で凡例を引く（凡例はどの図も同じ）
+    const legend = legendFor(url, m.name) ?? (sheet && link.url ? legendFor(link.url, m.name) : undefined);
     return {
       kind: link.kind,
       label: link.label,
