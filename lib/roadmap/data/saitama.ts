@@ -1,6 +1,7 @@
 // 埼玉県 全63市町村（2026-09 調査）。出典は docs/saitama-research.md。
 // 窓口の部署・電話番号は県「建築行政の窓口」ページの一覧を基本に、市の道路種別案内ページで上書きしている。
 import type { Contact, MapLink, Municipality } from "../municipalities";
+import type { RoadRead } from "../road-read";
 import { alandis, arcgisExperience, cloudgis, geocloud, geocloudMp, openMap, sonicweb, wagmap } from "../vendors";
 import type { SheetIndex } from "../sheets";
 import FUJIMI_SHEETS from "./sheets/fujimi.json";
@@ -13,6 +14,21 @@ import WAKO_SHEETS from "./sheets/wako.json";
 const pref = "埼玉県" as const;
 
 // --- 市・松伏町・杉戸町（道路種別は各市町が扱う） ------------------------------
+
+/** 行田市の建築基準法道路マップの種別ごとのレイヤ（Web マップ acd9fc98… から。色は地図の線の色） */
+const GYODA_ROADS: RoadRead = {
+  layers: [
+    { url: "https://services7.arcgis.com/JKleYwaFfRw5qtLg/arcgis/rest/services/ichishitei_houteigai_kijunhou_koutaigimu_view/FeatureServer/0", label: "法定外道路（42条2項外 基準法による許可要件により後退義務有り）", color: "#ffff00" },
+    { url: "https://services7.arcgis.com/JKleYwaFfRw5qtLg/arcgis/rest/services/ichishitei_houteigai_koutaigimu_view/FeatureServer/0", label: "法定外道路（42条2項外 後退指導有り）", color: "#9966ff" },
+    { url: "https://services7.arcgis.com/JKleYwaFfRw5qtLg/arcgis/rest/services/ichishitei_houteigai_view/FeatureServer/0", label: "法定外道路（42条2項外）", color: "#345da6" },
+    { url: "https://services7.arcgis.com/JKleYwaFfRw5qtLg/arcgis/rest/services/ichishitei_42jou2kou_view/FeatureServer/0", label: "42条2項", color: "#66ff33" },
+    { url: "https://services7.arcgis.com/JKleYwaFfRw5qtLg/arcgis/rest/services/ichishitei_42jou1kou5gou_view/FeatureServer/0", label: "42条1項5号", color: "#f5e258" },
+    { url: "https://services7.arcgis.com/JKleYwaFfRw5qtLg/arcgis/rest/services/ichishitei_42jou1kou4gou_view/FeatureServer/0", label: "42条1項4号", color: "#ff0000" },
+    { url: "https://services7.arcgis.com/JKleYwaFfRw5qtLg/arcgis/rest/services/ichishitei_42jou1kou3gou_view/FeatureServer/0", label: "42条1項3号", color: "#c65911" },
+    { url: "https://services7.arcgis.com/JKleYwaFfRw5qtLg/arcgis/rest/services/ichishitei_42jou1kou2gou_view/FeatureServer/0", label: "42条1項2号", color: "#ff9933" },
+    { url: "https://services7.arcgis.com/JKleYwaFfRw5qtLg/arcgis/rest/services/ichishitei_42jou1kou1gou_view/FeatureServer/0", label: "42条1項1号", color: "#ff66cc" },
+  ],
+};
 
 const CITIES: Municipality[] = [
   {
@@ -302,6 +318,7 @@ const CITIES: Municipality[] = [
         build: arcgisExperience("6c4876ec5f2f415c81f100bdc02a5b2f", "widget_124"),
         verified: true,
         tip: "「上記の利用条件に同意します」にチェックを入れて「OK」。地図の中心が物件です。",
+        read: GYODA_ROADS,
       },
       { kind: "public_road", label: "道路台帳マップ（市道の網図）", build: arcgisExperience("e762b56d64564657894f2a0e52c0f719", "widget_124"), verified: true },
     ],
@@ -508,12 +525,19 @@ const PREF_ROAD_MAP: MapLink = {
   tip: "「利用条件に同意します」にチェックを入れて「OK」。地図の読み込みに少し時間がかかります。",
 };
 
+/** 県の指定道路図の町ごとのレイヤ（種別は SYUBETU のコード、幅員は最小・最大）。物件のまわりの道路の種別を読む */
+const prefRoads = (town: string): RoadRead => ({
+  layers: [{ url: `https://services9.arcgis.com/n65w8AXGaYPTqFYI/arcgis/rest/services/${encodeURIComponent(town)}/FeatureServer/0` }],
+  field: "SYUBETU",
+  width: ["MIN_FUKUIN", "MAX_FUKUIN"],
+});
+
 const prefTown = (name: string, code: string, office: keyof typeof OFFICE): Municipality => ({
   pref,
   name,
   codes: [code],
   coverage: "full",
-  maps: [PREF_ROAD_MAP],
+  maps: [{ ...PREF_ROAD_MAP, read: prefRoads(name) }],
   contact: OFFICE[office],
 });
 

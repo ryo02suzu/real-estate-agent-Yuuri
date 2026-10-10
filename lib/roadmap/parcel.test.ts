@@ -4,6 +4,7 @@ import {
   chibanLabel,
   cityMatches,
   kuikiLabel,
+  adjacentParcels,
   parcelAt,
   kuikiParts,
   normalizeChiban,
@@ -237,5 +238,27 @@ describe("lookup で地番を探す", () => {
     const r = await lookup("埼玉県熊谷市下奈良391番地", { parcels: fakeSource({ [`${SX},${SY}`]: [{ kuiki: "熊谷市_下奈良___", chiban: "391-1" }] }) });
     expect(r.status === "ok" && r.approximate).toBe(true);
     expect(r.status === "ok" && r.parcelMiss).toEqual({ chiban: "391", reason: "not_found", similar: ["391-1"] });
+  });
+});
+
+describe("隣の筆", () => {
+  it("境界が接する筆だけを、地番の順に返す（離れた筆・自分は入れない）", async () => {
+    const K = "熊谷市_下奈良___";
+    // 真ん中の筆 10 のまわり：右に接する 11、上に接する 9-2、角だけ接する 12、少し離れた 13、地番の無い道路
+    const src = fakeSource({
+      [`${SX},${SY}`]: [
+        { kuiki: K, chiban: "10", polygon: box(SX, SY, 0.4, 0.4, 0.1, 0.1) },
+        { kuiki: K, chiban: "11", polygon: box(SX, SY, 0.5, 0.4, 0.1, 0.1) },
+        { kuiki: K, chiban: "9-2", polygon: box(SX, SY, 0.4, 0.5, 0.1, 0.05) },
+        { kuiki: K, chiban: "12", polygon: box(SX, SY, 0.3, 0.3, 0.1, 0.1) },
+        { kuiki: K, chiban: "13", polygon: box(SX, SY, 0.62, 0.4, 0.1, 0.1) },
+        { kuiki: K, chiban: "道-5", polygon: box(SX, SY, 0.4, 0.35, 0.1, 0.05) },
+      ],
+    });
+    const [w, s, e, n] = tileBounds(SX, SY);
+    const target = await parcelAt(s + (n - s) * 0.45, w + (e - w) * 0.45, src);
+    expect(target?.chiban).toBe("10");
+    const got = await adjacentParcels(target!, src);
+    expect(got.map((g) => g.chiban)).toEqual(["9-2", "11", "12", "道-5"]);
   });
 });

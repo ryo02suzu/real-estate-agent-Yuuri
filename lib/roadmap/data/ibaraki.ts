@@ -82,6 +82,17 @@ const CITIES: Municipality[] = [
         build: arcgisExperience("049cc90fad1d44eaac93e9731810bd12", "widget_124"),
         verified: true,
         tip: "「次へ」→同意にチェックして「OK」。左下「…」→「地図を切り替える」で「建築基準法道路種別」にチェック。",
+        // 「建築基準法道路種別」の種別ごとのレイヤ（Web マップ e96b7511… から）
+        read: {
+          layers: [
+            { url: "https://services6.arcgis.com/yogEhrEiATcZmbcU/arcgis/rest/services/kenchiku_kijunhou_douro_mihantei/FeatureServer/0", label: "未判定" },
+            { url: "https://services6.arcgis.com/yogEhrEiATcZmbcU/arcgis/rest/services/kenchiku_kijunhou_douro_42_2/FeatureServer/0", label: "第42条第2項", color: "#00b2eb" },
+            { url: "https://services6.arcgis.com/yogEhrEiATcZmbcU/arcgis/rest/services/kenchiku_kijunhou_douro_42_1_5/FeatureServer/0", label: "第42条第1項第5号", color: "#f09332" },
+            { url: "https://services6.arcgis.com/yogEhrEiATcZmbcU/arcgis/rest/services/kenchiku_kijunhou_douro_42_1_3/FeatureServer/0", label: "第42条第1項第3号", color: "#00eb00" },
+            { url: "https://services6.arcgis.com/yogEhrEiATcZmbcU/arcgis/rest/services/kenchiku_kijunhou_douro_42_1_2/FeatureServer/0", label: "第42条第1項第2号", color: "#c7e62f" },
+            { url: "https://services6.arcgis.com/yogEhrEiATcZmbcU/arcgis/rest/services/kenchiku_kijunhou_douro/FeatureServer/0", label: "第42条第1項第1号", color: "#006d00" },
+          ],
+        },
       },
       {
         kind: "public_road",

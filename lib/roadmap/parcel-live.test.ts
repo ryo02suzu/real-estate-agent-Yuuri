@@ -1,6 +1,8 @@
 // 地番検索を本物のデータ（国土地理院と、登記所備付地図のタイル）で確かめる。ネットにつなぐので PARCEL_LIVE=1 のときだけ
 import { describe, expect, it } from "vitest";
 import { lookup } from "./index";
+import { adjacentParcels } from "./parcel";
+import { pmtilesParcelSource } from "./parcel-tiles";
 
 const CASES: [string, string, string][] = [
   // [入力, 見つかるはずの地番区域, 地番]
@@ -20,6 +22,17 @@ describe.skipIf(!process.env.PARCEL_LIVE)("地番検索（本物のデータ）"
       console.log(input, `${Date.now() - t}ms`, r.status === "ok" ? (r.parcel ? `${r.parcel.kuiki} ${r.parcel.chiban} ${r.lat.toFixed(6)},${r.lng.toFixed(6)} pieces=${r.parcel.pieces.length}` : JSON.stringify(r.parcelMiss)) : r.status);
       expect(r.status === "ok" && r.parcel && [r.parcel.kuiki, r.parcel.chiban]).toEqual([kuiki, chiban]);
     });
+
+  it("隣の筆（熊谷市下奈良391-3）", { timeout: 120_000 }, async () => {
+    const r = await lookup("地番 埼玉県熊谷市下奈良391-3");
+    expect(r.status === "ok" && r.parcel?.chiban).toBe("391-3");
+    if (r.status !== "ok" || !r.parcel) return;
+    const n = await adjacentParcels(r.parcel, pmtilesParcelSource);
+    console.log("隣の筆", n.map((x) => x.chiban).join(" "));
+    expect(n.length).toBeGreaterThanOrEqual(2);
+    expect(n.length).toBeLessThan(20);
+    expect(n.every((x) => x.kuiki === "熊谷市_下奈良___")).toBe(true);
+  });
 
   it("地図データの無い地域（さいたま市大宮区の中心部）は no_map", { timeout: 120_000 }, async () => {
     const r = await lookup("地番 埼玉県さいたま市大宮区大門町3丁目1");

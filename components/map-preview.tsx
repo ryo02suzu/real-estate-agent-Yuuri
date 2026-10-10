@@ -13,6 +13,7 @@ export function MapPreview({
   className = "h-[104px]",
   large,
   onFix,
+  fixClassName = "",
   parcel,
 }: {
   lat: number;
@@ -22,6 +23,8 @@ export function MapPreview({
   large?: boolean;
   /** 「場所を直す」（地図で物件の場所を選び直す） */
   onFix?: () => void;
+  /** 「場所を直す」のボタンに足すクラス（背の低い画面では別の所に出すときに隠す） */
+  fixClassName?: string;
   /** 地番で見つけた筆・地図で選んだ地点の筆（形を重ねる） */
   parcel?: Parcel;
 }) {
@@ -100,7 +103,7 @@ export function MapPreview({
       {onFix && (
         <button
           onClick={onFix}
-          className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-brand shadow-soft"
+          className={`absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-brand shadow-soft ${fixClassName}`}
         >
           <PinOutlineIcon className="h-3.5 w-3.5" />
           場所を直す
