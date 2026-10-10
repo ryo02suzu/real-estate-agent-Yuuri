@@ -318,3 +318,69 @@ export function interiorPoint(pieces: ParcelPiece[]): { lat: number; lng: number
   for (let i = 0; i + 1 < xs.length; i += 2) if (xs[i + 1] - xs[i] > best[1] - best[0]) best = [xs[i], xs[i + 1]];
   return { lng: (best[0] + best[1]) / 2, lat: c[1] };
 }
+
+/** 隣の筆（境界が接している筆）。地番の無い道路・水路（「道-199」など）も含む */
+export type Neighbor = { kuiki: string; chiban: string };
+
+/**
+ * 筆に接している筆（謄本・公図を取るときの隣地の地番）。筆のあるタイルの中で、境界どうしが tolerance（m）以内に近づく筆を集める。
+ * 地番の順に返す（地番の無い道路・水路は最後）
+ */
+export async function adjacentParcels(target: Parcel, source: ParcelSource, toleranceM = 0.5): Promise<Neighbor[]> {
+  const rings = target.pieces.flatMap((p) => p.polygons.flat());
+  const lat0 = target.point.lat;
+  const pad = [toleranceM / (111_320 * Math.cos((lat0 * Math.PI) / 180)), toleranceM / 110_950];
+  const tb = bboxOf(rings);
+  const near = (b: [number, number, number, number]) => b[0] <= tb[2] + pad[0] && b[2] >= tb[0] - pad[0] && b[1] <= tb[3] + pad[1] && b[3] >= tb[1] - pad[1];
+  const seen = new Set([`${target.kuiki}|${target.chibanRaw}`]);
+  const out: Neighbor[] = [];
+  const tiles = new Map(target.pieces.map((p) => [p.tile.join(","), p.tile]));
+  for (const [x, y] of tiles.values()) {
+    for (const f of (await source.tile(x, y)) ?? []) {
+      const key = `${f.kuiki}|${f.chiban}`;
+      if (seen.has(key)) continue;
+      const fr = f.polygons().flat();
+      if (!fr.length || !near(bboxOf(fr)) || !ringsWithin(fr, rings, toleranceM, lat0)) continue;
+      seen.add(key);
+      out.push({ kuiki: f.kuiki, chiban: f.chiban });
+    }
+  }
+  // 地番のある筆が先、地番の無い道路・水路はあと
+  const numbered = (n: Neighbor) => (/^\d/.test(n.chiban) ? 0 : 1);
+  return out.sort((a, b) => numbered(a) - numbered(b) || a.kuiki.localeCompare(b.kuiki) || compareChiban(a.chiban, b.chiban));
+}
+
+/** 輪の集まりの範囲 [西, 南, 東, 北] */
+function bboxOf(rings: LngLat[][]): [number, number, number, number] {
+  const b: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const ring of rings)
+    for (const [x, y] of ring) {
+      if (x < b[0]) b[0] = x;
+      if (y < b[1]) b[1] = y;
+      if (x > b[2]) b[2] = x;
+      if (y > b[3]) b[3] = y;
+    }
+  return b;
+}
+
+/** 2つの輪の集まりの縁が、どこかで tolerance（m）以内に近づくか（頂点から相手の辺までの距離を両方向に見る） */
+function ringsWithin(a: LngLat[][], b: LngLat[][], toleranceM: number, lat0: number): boolean {
+  const kx = 111_320 * Math.cos((lat0 * Math.PI) / 180);
+  const ky = 110_950;
+  const close = (from: LngLat[][], to: LngLat[][]) => {
+    for (const ring of from)
+      for (const [px, py] of ring)
+        for (const r of to)
+          for (let i = 0; i + 1 < r.length; i++) {
+            const ax = (r[i][0] - px) * kx;
+            const ay = (r[i][1] - py) * ky;
+            const dx = (r[i + 1][0] - r[i][0]) * kx;
+            const dy = (r[i + 1][1] - r[i][1]) * ky;
+            const len = dx * dx + dy * dy;
+            const t = len === 0 ? 0 : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len));
+            if (Math.hypot(ax + t * dx, ay + t * dy) <= toleranceM) return true;
+          }
+    return false;
+  };
+  return close(a, b) || close(b, a);
+}

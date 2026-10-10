@@ -6,6 +6,7 @@ import { KANAGAWA } from "./data/kanagawa";
 import { SAITAMA } from "./data/saitama";
 import { TOCHIGI } from "./data/tochigi";
 import { TOKYO } from "./data/tokyo";
+import type { RoadRead } from "./road-read";
 import { findSheet, type SheetHit, type SheetIndex } from "./sheets";
 
 /** 地図に何が載っているか */
@@ -27,6 +28,8 @@ export type MapLink = {
   tip?: string;
   /** PDFの分割図で公開している市：どの図かを座標から求める索引（無ければ url の一覧ページを開く） */
   sheets?: SheetIndex;
+  /** 地図のデータ（公開の ArcGIS レイヤ）を読んで、物件のまわりの道路の種別を文字で出せる地図（lib/roadmap/road-read.ts） */
+  read?: RoadRead;
 };
 
 export type Contact = {
@@ -79,6 +82,8 @@ export type ResolvedLink = {
   tip?: string;
   /** 分割図の市で、物件が載っている図 */
   sheet?: SheetHit;
+  /** 物件のまわりの道路の種別を読めるとき、その読み方 */
+  read?: RoadRead;
 };
 
 /** 座標から、その市で開くべき地図のURL一覧を作る。town（逆ジオコーダの町名）は地区ごとの図を選ぶのに使う */
@@ -94,6 +99,7 @@ export function buildLinks(m: Municipality, lat: number, lng: number, town?: str
       // 分割図の市で、どの図にも入らない場所（図の無い地域）は、一覧から探しても見つからないことを伝える
       tip: link.sheets && !sheet ? "この場所を含む図は見つかりませんでした。一覧に無ければ、下の問い合わせ先で確認してください。" : link.tip,
       sheet,
+      ...(link.read ? { read: link.read } : {}),
     };
   });
 }

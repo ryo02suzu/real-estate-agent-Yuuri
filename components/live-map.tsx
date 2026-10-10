@@ -7,14 +7,14 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { addProtocol, getVersion, MapLibreMap, Marker, NavigationControl, Popup, ScaleControl, setWorkerUrl, type GeoJSONSource } from "maplibre-gl";
 import { Protocol } from "pmtiles";
 import { useEffect, useRef, useState } from "react";
-import { BASEMAPS, KANTO_BOUNDS, PARCEL_MIN_ZOOM, gsiStyle, parcelFilter, sheetFeatures, type Basemap } from "@/lib/map-style";
+import { BASEMAPS, KANTO_BOUNDS, PARCEL_MIN_ZOOM, ZONING_LAYERS, ZONING_MIN_ZOOM, gsiStyle, parcelFilter, sheetFeatures, type Basemap } from "@/lib/map-style";
 import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
 import { sheetName, type SheetHit } from "@/lib/roadmap/sheets";
-import { FrameIcon, LocateIcon, ParcelIcon, PinIcon } from "./icons";
+import { FrameIcon, LocateIcon, ParcelIcon, PinIcon, ZoningIcon } from "./icons";
 
 // 描画のワーカーは public/maplibre/<版>/ に置いてある（scripts/copy-maplibre-worker.mjs）
 setWorkerUrl(`/maplibre/${getVersion()}/maplibre-gl-worker.mjs`);
-// 筆のタイル（PMTiles）を pmtiles:// で読めるようにする
+// 筆・都市計画のタイル（PMTiles）を pmtiles:// で読めるようにする
 addProtocol("pmtiles", new Protocol().tile);
 
 const LOCALE = {
@@ -67,8 +67,12 @@ export default function LiveMap({ point, sheet, parcel, mode = "pin", onPick, on
   // 筆界と地番（登記所備付地図）を表示するか
   const [parcels, setParcels] = useState(false);
   const parcelsRef = useRef(false);
+  // 用途地域の塗り分けと都市計画道路を表示するか
+  const [zoning, setZoning] = useState(false);
+  const zoningRef = useRef(false);
   useEffect(() => {
     parcelsRef.current = parcels;
+    zoningRef.current = zoning;
   });
   // 地図のイベントからは最新の関数を呼ぶ
   const cb = useRef({ onPick, onCenter, onFail });
@@ -121,6 +125,12 @@ export default function LiveMap({ point, sheet, parcel, mode = "pin", onPick, on
       const p = f?.properties as { 地番?: string; 地番区域?: string } | undefined;
       return p?.地番 ? `${chibanLabel(String(p.地番))}（${kuikiLabel(String(p.地番区域 ?? ""))}）` : undefined;
     };
+    /** 画面上の点の用途地域「第１種低層住居専用地域 50/100」（用途地域を表示しているときだけ） */
+    const youtoLabelAt = (pt: { x: number; y: number }) => {
+      if (!zoningRef.current || map.getZoom() < ZONING_MIN_ZOOM) return undefined;
+      const p = map.queryRenderedFeatures([pt.x, pt.y], { layers: ["zoning-youto-fill"] })[0]?.properties as { name?: string; bcr?: number; far?: number } | undefined;
+      return p?.name ? `${p.name}${p.bcr && p.far ? ` ${p.bcr}/${p.far}` : ""}` : undefined;
+    };
 
     if (mode === "crosshair") {
       const report = () => {
@@ -138,11 +148,11 @@ export default function LiveMap({ point, sheet, parcel, mode = "pin", onPick, on
         if (!cb.current.onPick) return;
         const box = document.createElement("div");
         box.className = "flex flex-col items-center gap-1.5 px-1 pt-1";
-        const label = parcelLabelAt(e.point);
         const note = document.createElement("p");
         note.className = "text-[11px] text-muted";
         note.textContent = "この地点の道路図を調べますか？";
-        if (label) {
+        for (const label of [parcelLabelAt(e.point), youtoLabelAt(e.point)]) {
+          if (!label) continue;
           const l = document.createElement("p");
           l.className = "text-[12px] font-semibold text-ink";
           l.textContent = label;
@@ -242,6 +252,15 @@ export default function LiveMap({ point, sheet, parcel, mode = "pin", onPick, on
     if (parcels && map.getZoom() < PARCEL_MIN_ZOOM + 1) map.easeTo({ zoom: PARCEL_MIN_ZOOM + 1.5, duration: 700 });
   }, [parcels, loaded]);
 
+  // 用途地域の塗り分けと都市計画道路
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded) return;
+    for (const id of ZONING_LAYERS) map.setLayoutProperty(id, "visibility", zoning ? "visible" : "none");
+    // タイルは z15 だけなので、それより引いていれば寄る
+    if (zoning && map.getZoom() < ZONING_MIN_ZOOM + 0.5) map.easeTo({ zoom: ZONING_MIN_ZOOM + 1.5, duration: 700 });
+  }, [zoning, loaded]);
+
   // 背景（淡色・標準・写真）
   useEffect(() => {
     const map = mapRef.current;
@@ -300,6 +319,15 @@ export default function LiveMap({ point, sheet, parcel, mode = "pin", onPick, on
         <button onClick={() => setParcels((v) => !v)} aria-pressed={parcels} className={parcels ? `${toolBase} bg-gold text-white` : tool}>
           <ParcelIcon className={`h-4 w-4 ${parcels ? "" : "text-brand"}`} />
           筆・地番
+        </button>
+        <button
+          onClick={() => setZoning((v) => !v)}
+          aria-pressed={zoning}
+          className={zoning ? `${toolBase} bg-gold text-white` : tool}
+          title="用途地域の色分けと都市計画道路（点線）を表示"
+        >
+          <ZoningIcon className={`h-4 w-4 ${zoning ? "" : "text-brand"}`} />
+          用途地域
         </button>
         {mode === "pin" && point && (
           <button onClick={toPoint} className={tool}>

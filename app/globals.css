@@ -49,3 +49,25 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* スマホの結果の地図プレビューの枠。高さは画面に合わせて決まり、低すぎるときは地図を隠して細い行（.preview-slim）にする */
+.preview-box {
+  container-type: size;
+}
+.preview-slim {
+  display: none;
+}
+@container (max-height: 64px) {
+  .preview-map {
+    display: none;
+  }
+  .preview-slim {
+    display: flex;
+  }
+}
+/* 背の低い画面では「場所を直す」が都市計画の行にあるので、細い行は出さない */
+@media (max-height: 720px) {
+  .preview-slim {
+    display: none !important;
+  }
+}

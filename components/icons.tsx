@@ -175,3 +175,11 @@ export const ParcelIcon = ({ className }: P) => (
     <path d="M10 3l1 9-8 3M11 12l10-5M11 12l-1 9" />
   </svg>
 );
+
+/** 用途地域（色分けされた区域） */
+export const ZoningIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M3 12h9V3M12 12l9 5M12 12v9" />
+  </svg>
+);

@@ -1,9 +1,11 @@
 // 動く地図（MapLibre GL）の見た目。地理院タイル（淡色・標準・写真）を重ね、選んだものだけを表示する。
 // PDF の分割図の市では、物件が載っている図の範囲（枠と 3×3 の目安線）を重ねる。
 import type { FeatureCollection } from "geojson";
-import type { FilterSpecification, StyleSpecification } from "maplibre-gl";
+import type { ExpressionSpecification, FilterSpecification, StyleSpecification } from "maplibre-gl";
 import { PARCEL_DATA } from "./roadmap/parcel-data";
 import type { SheetHit } from "./roadmap/sheets";
+import { YOUTO_COLORS, ZONING_ZOOM } from "./roadmap/zoning";
+import { ZONING_DATA, zoningUrl } from "./roadmap/zoning-data";
 
 export type Basemap = "pale" | "std" | "photo";
 
@@ -25,6 +27,17 @@ const PARCEL_ATTRIBUTION = `<a href="https://front.geospatial.jp/moj-chizu-xml-r
 
 /** 筆を地図に描く最小のズーム（タイルは z14〜16。z16 より細かいときは z16 を拡大して描く） */
 export const PARCEL_MIN_ZOOM = 15;
+
+/** 用途地域を地図に塗る最小のズーム（タイルは z15 だけ） */
+export const ZONING_MIN_ZOOM = ZONING_ZOOM;
+
+const ZONING_ATTRIBUTION = `<a href="https://www.mlit.go.jp/toshi/tosiko/toshi_tosiko_tk_000087.html" target="_blank" rel="noreferrer">都市計画決定GISデータ（国土交通省）</a>を加工して作成（${ZONING_DATA.edition}）`;
+
+/** 用途地域の種類コード → 色（表から組み立てるので、型は組み立てたあとに付ける） */
+const youtoColor = ["match", ["get", "code"], ...Object.entries(YOUTO_COLORS).flatMap(([k, v]) => [Number(k), v]), "#cccccc"] as unknown as ExpressionSpecification;
+
+/** 用途地域・都市計画道路のレイヤ（「用途地域」で表示を切り替える） */
+export const ZONING_LAYERS = ["zoning-youto-fill", "zoning-youto-line", "zoning-douro"];
 
 /** 地番区域と地番で、ひとつの筆だけに絞る（見つけた筆を強調する）。何も無ければどれにも当たらない条件 */
 export function parcelFilter(p?: { kuiki: string; chibanRaw: string }): FilterSpecification {
@@ -48,6 +61,8 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
       sheet: { type: "geojson", data: sheetFeatures() },
       // 筆（土地の区画）。PMTiles を pmtiles:// で読む（components/live-map.tsx で読み方を登録する）
       parcels: { type: "vector", url: `pmtiles://${PARCEL_DATA.url}`, attribution: PARCEL_ATTRIBUTION },
+      // 用途地域など（アプリと同じサイトに置いた PMTiles）
+      zoning: { type: "vector", url: `pmtiles://${zoningUrl()}`, attribution: ZONING_ATTRIBUTION },
     },
     layers: [
       // 淡色地図に無いところ（海など）が白く抜けないよう、下に標準地図の色を敷く
@@ -58,6 +73,34 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         source: k,
         layout: { visibility: k === basemap ? ("visible" as const) : ("none" as const) },
       })),
+      // 用途地域の塗り分けと都市計画道路（「用途地域」で表示）
+      {
+        id: "zoning-youto-fill",
+        type: "fill",
+        source: "zoning",
+        "source-layer": "youto",
+        minzoom: ZONING_MIN_ZOOM,
+        layout: { visibility: "none" },
+        paint: { "fill-color": youtoColor, "fill-opacity": 0.32 },
+      },
+      {
+        id: "zoning-youto-line",
+        type: "line",
+        source: "zoning",
+        "source-layer": "youto",
+        minzoom: ZONING_MIN_ZOOM,
+        layout: { visibility: "none" },
+        paint: { "line-color": youtoColor, "line-width": 1.6, "line-opacity": 0.9 },
+      },
+      {
+        id: "zoning-douro",
+        type: "line",
+        source: "zoning",
+        "source-layer": "douro",
+        minzoom: ZONING_MIN_ZOOM,
+        layout: { visibility: "none" },
+        paint: { "line-color": "#7a3fa0", "line-width": 2.5, "line-opacity": 0.8, "line-dasharray": [2, 1.5] },
+      },
       { id: "sheet-fill", type: "fill", source: "sheet", filter: ["==", ["get", "kind"], "frame"], paint: { "fill-color": "#c49a5c", "fill-opacity": 0.06 } },
       {
         id: "sheet-grid",

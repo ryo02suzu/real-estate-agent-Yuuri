@@ -20,7 +20,11 @@ import {
   ShareIcon,
 } from "./icons";
 import { MapPreview } from "./map-preview";
+import { NearbyRoadsBlock, NearbyRoadsLine, useNearbyRoads, type RoadsState } from "./nearby-roads";
 import { SheetPreview } from "./sheet-preview";
+import { parcelLines, ParcelButton, ParcelCard, useParcelInfo, type ParcelInfo } from "./parcel-card";
+import { useCopy } from "./use-copy";
+import { useZoning, ZoningCard, ZoningLine, type ZoningState } from "./zoning-card";
 
 const CARD = "shadow-soft rounded-2xl border border-white bg-white";
 
@@ -141,6 +145,9 @@ function Found({
   onPick: (address: string) => void;
 }) {
   const m = result.municipality;
+  const zoning = useZoning(result.lat, result.lng, m);
+  const parcels = useParcelInfo(result);
+  const roads = useNearbyRoads(result.links, result.lat, result.lng);
   // ネットで分からない市は、地図ボタンを参考扱いにして問い合わせ先を先に見せる
   const offline = m.coverage === "none" || m.coverage === "outside";
   const primary = offline
@@ -149,7 +156,8 @@ function Found({
   const secondary = offline
     ? []
     : result.links.filter((l) => l.kind === "public_road");
-  const hint = result.links.some((l) => l.pinpoint) && (
+  // 地図ごとの操作メモ（同意の押し方など）があれば、同じことを言う一般の案内は出さない
+  const hint = result.links.some((l) => l.pinpoint) && !primary.some((l) => l.tip) && (
     <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted [@media(max-height:720px)]:hidden">
       <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
       利用規約に同意すると、物件の場所が地図の中央に出ます。
@@ -175,15 +183,32 @@ function Found({
           actions={
             <>
               <CopyButton text={copyText(result)} />
-              <ShareButton result={result} />
+              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} />
             </>
           }
         />
-        <div className="flex min-h-0 flex-1 flex-col border-t border-line/70 px-4 pb-4 pt-3 [&>*]:shrink-0">
+        <div className="flex min-h-0 flex-1 flex-col border-t border-line/70 px-4 pb-4 pt-3 [&>*]:shrink-0 [@media(max-height:720px)]:pb-3 [@media(max-height:720px)]:pt-2">
           <CityLine municipality={m} />
-          {/* 画面の高さに合わせて地図プレビューが伸び縮みする（スクロールさせない） */}
-          <div className="mt-2.5 flex min-h-[64px] flex-1 !shrink flex-col [@media(max-height:720px)]:mt-1.5 [@media(max-height:720px)]:min-h-[52px]">
-            <Preview result={result} onFix={onFix} className="min-h-[64px] flex-1 [@media(max-height:720px)]:min-h-[52px]" />
+          <div className="mt-2 flex gap-1.5 [@media(max-height:720px)]:mt-1">
+            <ZoningLine state={zoning} city={m.name} />
+            <ParcelButton info={parcels} />
+            {/* 背の低い画面では「場所を直す」をこの行に置く（地図プレビューが入らなくなっても使える） */}
+            {onFix && (
+              <button
+                onClick={onFix}
+                aria-label="場所を直す"
+                className="hidden shrink-0 items-center gap-1 rounded-lg bg-mint px-2 py-1 text-[11px] font-semibold leading-[1.5] text-brand [@media(max-height:720px)]:flex"
+              >
+                <PinOutlineIcon className="h-3.5 w-3.5" />
+                直す
+              </button>
+            )}
+          </div>
+          {/* 画面の高さに合わせて地図プレビューが伸び縮みする（スクロールさせない）。低すぎるときは地図を隠し、
+              「場所を直す」「場所を地図で見る」だけの細い行にする（背の低い画面では何も出さない。app/globals.css の .preview-box） */}
+          <div className="preview-box flex min-h-[36px] flex-1 !shrink flex-col [@media(max-height:720px)]:min-h-0">
+            <Preview result={result} onFix={onFix} fixInRow className="preview-map mt-2 min-h-0 flex-1 [@media(max-height:720px)]:mt-1.5" />
+            <SlimPreview result={result} onFix={onFix} />
           </div>
           {(primary.length > 0 || secondary.length > 0) && (
             <>
@@ -198,6 +223,7 @@ function Found({
                   <MapButton key={l.url} link={l} />
                 ))}
               </div>
+              <NearbyRoadsLine state={roads} />
               {hint}
             </>
           )}
@@ -386,30 +412,25 @@ function CityLine({ municipality: m }: { municipality: Municipality }) {
   );
 }
 
-/** クリップボードへ書き込み、2秒だけ「コピーしました」を出す */
-function useCopy() {
-  const [done, setDone] = useState(false);
-  const copy = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setDone(true);
-      setTimeout(() => setDone(false), 2000);
-    } catch {
-      window.prompt("コピーしてください", text);
-    }
-  };
-  return { done, copy };
-}
-
 /** 結果を報告・メモ用の文章にして共有（スマホ）またはコピー（PC） */
 function ShareButton({
   result,
+  zoning,
+  parcels,
+  roads,
 }: {
   result: Extract<LookupResult, { status: "ok" }>;
+  zoning: ZoningState;
+  parcels: ParcelInfo;
+  roads: RoadsState;
 }) {
   const { done, copy } = useCopy();
   const onClick = async () => {
-    const text = buildSummary(result);
+    const text = buildSummary(result, {
+      zoning: zoning.status === "ok" ? zoning : undefined,
+      parcels: parcels.status === "ok" ? { ...parcelLines(parcels), reference: parcels.kind === "address" } : undefined,
+      roads: roads.status === "ok" ? roads.roads : undefined,
+    });
     if (typeof navigator.share === "function") {
       try {
         await navigator.share({ text });
@@ -440,14 +461,17 @@ function Preview({
   result,
   className,
   onFix,
+  fixInRow,
 }: {
   result: Extract<LookupResult, { status: "ok" }>;
   className: string;
   onFix?: () => void;
+  /** 背の低い画面では「場所を直す」を上の行に出すので、ここでは出さない */
+  fixInRow?: boolean;
 }) {
   const sheet = result.links.find((l) => l.sheet)?.sheet;
   const [mode, setMode] = useState<"sheet" | "around">("sheet");
-  if (!sheet) return <MapPreview lat={result.lat} lng={result.lng} className={className} onFix={onFix} parcel={result.parcel} />;
+  if (!sheet) return <MapPreview lat={result.lat} lng={result.lng} className={className} onFix={onFix} fixClassName={fixInRow ? "[@media(max-height:720px)]:hidden" : ""} parcel={result.parcel} />;
   const tab = (m: typeof mode, label: string) => (
     <button
       onClick={() => setMode(m)}
@@ -467,7 +491,7 @@ function Preview({
           {onFix && (
             <button
               onClick={onFix}
-              className="rounded-full bg-mint px-2.5 py-0.5 text-[10.5px] font-semibold text-brand [@media(max-height:720px)]:py-0 [@media(max-height:720px)]:text-[10px]"
+              className={`rounded-full bg-mint px-2.5 py-0.5 text-[10.5px] font-semibold text-brand [@media(max-height:720px)]:py-0 [@media(max-height:720px)]:text-[10px] ${fixInRow ? "[@media(max-height:720px)]:hidden" : ""}`}
             >
               場所を直す
             </button>
@@ -483,6 +507,29 @@ function Preview({
       ) : (
         <MapPreview lat={result.lat} lng={result.lng} className="min-h-0 flex-1" parcel={result.parcel} />
       )}
+    </div>
+  );
+}
+
+/** 地図プレビューが入らないほど狭いときの代わり（「場所を直す」と、地理院地図をその場所で開く） */
+function SlimPreview({ result, onFix }: { result: Extract<LookupResult, { status: "ok" }>; onFix?: () => void }) {
+  return (
+    <div className="preview-slim mt-2 items-center gap-1.5">
+      {onFix && (
+        <button onClick={onFix} className="flex items-center gap-1 rounded-full bg-mint px-3 py-1 text-[11px] font-semibold text-brand">
+          <PinOutlineIcon className="h-3.5 w-3.5" />
+          場所を直す
+        </button>
+      )}
+      <a
+        href={`https://maps.gsi.go.jp/#17/${result.lat.toFixed(6)}/${result.lng.toFixed(6)}/`}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center gap-1 rounded-full border border-line px-3 py-1 text-[11px] text-ink"
+      >
+        <MapIcon className="h-3.5 w-3.5 text-brand-light" />
+        場所を地図で見る
+      </a>
     </div>
   );
 }
@@ -576,6 +623,9 @@ function MapButton({
  */
 function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { status: "ok" }>; onPick: (address: string) => void }) {
   const m = result.municipality;
+  const zoning = useZoning(result.lat, result.lng, m);
+  const parcels = useParcelInfo(result);
+  const roads = useNearbyRoads(result.links, result.lat, result.lng);
   const offline = m.coverage === "none" || m.coverage === "outside";
   const primary = result.links.filter((l) => !offline && l.kind !== "public_road");
   const others = result.links.filter((l) => offline || l.kind === "public_road");
@@ -589,7 +639,7 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
           actions={
             <>
               <CopyButton text={copyText(result)} />
-              <ShareButton result={result} />
+              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} />
             </>
           }
         />
@@ -609,6 +659,7 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
               <MapButton key={l.url} link={l} />
             ))}
           </div>
+          <NearbyRoadsBlock state={roads} />
           {result.links.some((l) => l.pinpoint) && (
             <p className="mt-2 flex gap-1.5 text-[11px] leading-[1.6] text-muted">
               <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
@@ -617,6 +668,10 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
           )}
         </section>
       )}
+
+      <ZoningCard state={zoning} city={m.name} />
+
+      <ParcelCard info={parcels} />
 
       {result.contact && <ContactCard contact={result.contact} city={m.name} address={result.matchedAddress} />}
     </div>
