@@ -3,6 +3,7 @@
 // 謄本・公図を取るときの地番。物件の筆と、境界が接する隣の筆の地番を並べ、コピーと登記情報提供サービスへの入口を出す。
 // 筆は登記所備付地図データ（lib/roadmap/parcel.ts）。住所で調べたときは、住所の地点にある筆を参考として出す
 import { useEffect, useState } from "react";
+import { withRetry } from "@/lib/retry";
 import type { LookupResult } from "@/lib/roadmap";
 import { adjacentParcels, chibanLabel, kuikiLabel, parcelAt, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
@@ -28,13 +29,13 @@ export function useParcelInfo(result: Ok): ParcelInfo {
   const [state, setState] = useState<{ key: string; value: ParcelInfo }>();
   useEffect(() => {
     let alive = true;
-    (async () => {
+    withRetry(async () => {
       const p = parcel ?? (await parcelAt(lat, lng, pmtilesParcelSource));
       if (!p) return { status: "none" } as const;
       const kind: ParcelKind = picked ? "picked" : parcel ? "chiban" : "address";
       const neighbors = await adjacentParcels(p, pmtilesParcelSource);
       return { status: "ok", parcel: p, kind, neighbors } as const;
-    })()
+    })
       .catch(() => ({ status: "none" }) as const)
       .then((value) => alive && setState({ key, value }));
     return () => {

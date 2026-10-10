@@ -50,3 +50,6 @@ discover.json
 
 # Python のキャッシュ（scripts/ の作業用スクリプト）
 __pycache__/
+
+# 作業用（npm run legends などの中間ファイル）
+/work/

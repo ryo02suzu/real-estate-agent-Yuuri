@@ -6,6 +6,7 @@ import { KANAGAWA } from "./data/kanagawa";
 import { SAITAMA } from "./data/saitama";
 import { TOCHIGI } from "./data/tochigi";
 import { TOKYO } from "./data/tokyo";
+import { legendFor, type LegendEntry } from "./legends";
 import type { RoadRead } from "./road-read";
 import { findSheet, type SheetHit, type SheetIndex } from "./sheets";
 
@@ -84,22 +85,28 @@ export type ResolvedLink = {
   sheet?: SheetHit;
   /** 物件のまわりの道路の種別を読めるとき、その読み方 */
   read?: RoadRead;
+  /** 地図の線の色と種別（凡例を文字にしたもの。data/legends.json） */
+  legend?: LegendEntry[];
 };
 
 /** 座標から、その市で開くべき地図のURL一覧を作る。town（逆ジオコーダの町名）は地区ごとの図を選ぶのに使う */
 export function buildLinks(m: Municipality, lat: number, lng: number, town?: string): ResolvedLink[] {
   return m.maps.map((link) => {
     const sheet = link.sheets && findSheet(link.sheets, lat, lng, town);
+    const url = sheet ? sheet.url : link.build ? link.build(lat, lng) : link.url!;
+    // PDF を図ごとに開く市は、図の URL ではなく案内ページの URL で凡例を引く（凡例はどの図も同じ）
+    const legend = legendFor(url, m.name) ?? (sheet && link.url ? legendFor(link.url, m.name) : undefined);
     return {
       kind: link.kind,
       label: link.label,
-      url: sheet ? sheet.url : link.build ? link.build(lat, lng) : link.url!,
+      url,
       pinpoint: link.build !== null,
       verified: link.verified,
       // 分割図の市で、どの図にも入らない場所（図の無い地域）は、一覧から探しても見つからないことを伝える
       tip: link.sheets && !sheet ? "この場所を含む図は見つかりませんでした。一覧に無ければ、下の問い合わせ先で確認してください。" : link.tip,
       sheet,
       ...(link.read ? { read: link.read } : {}),
+      ...(legend ? { legend } : {}),
     };
   });
 }
