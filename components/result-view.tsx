@@ -19,6 +19,7 @@ import {
   SearchIcon,
   ShareIcon,
 } from "./icons";
+import { LegendBlock, LegendButton } from "./legend";
 import { MapPreview } from "./map-preview";
 import { NearbyRoadsBlock, NearbyRoadsLine, useNearbyRoads, type RoadsState } from "./nearby-roads";
 import { SheetPreview } from "./sheet-preview";
@@ -205,7 +206,8 @@ function Found({
             )}
           </div>
           {/* 画面の高さに合わせて地図プレビューが伸び縮みする（スクロールさせない）。低すぎるときは地図を隠し、
-              「場所を直す」「場所を地図で見る」だけの細い行にする（背の低い画面では何も出さない。app/globals.css の .preview-box） */}
+              「場所を直す」「場所を地図で見る」だけの細い行にする（背の低い画面では「場所を直す」は上の行にあるので
+              「場所を地図で見る」だけ。細い行も入らなければ何も出さない。app/globals.css の .preview-box） */}
           <div className="preview-box flex min-h-[36px] flex-1 !shrink flex-col [@media(max-height:720px)]:min-h-0">
             <Preview result={result} onFix={onFix} fixInRow className="preview-map mt-2 min-h-0 flex-1 [@media(max-height:720px)]:mt-1.5" />
             <SlimPreview result={result} onFix={onFix} />
@@ -514,9 +516,9 @@ function Preview({
 /** 地図プレビューが入らないほど狭いときの代わり（「場所を直す」と、地理院地図をその場所で開く） */
 function SlimPreview({ result, onFix }: { result: Extract<LookupResult, { status: "ok" }>; onFix?: () => void }) {
   return (
-    <div className="preview-slim mt-2 items-center gap-1.5">
+    <div className="preview-slim my-auto items-center gap-1.5">
       {onFix && (
-        <button onClick={onFix} className="flex items-center gap-1 rounded-full bg-mint px-3 py-1 text-[11px] font-semibold text-brand">
+        <button onClick={onFix} className="flex items-center gap-1 rounded-full bg-mint px-3 py-1 text-[11px] font-semibold text-brand [@media(max-height:720px)]:hidden">
           <PinOutlineIcon className="h-3.5 w-3.5" />
           場所を直す
         </button>
@@ -537,9 +539,12 @@ function SlimPreview({ result, onFix }: { result: Extract<LookupResult, { status
 function MapButton({
   link,
   primary,
+  desktop,
 }: {
   link: ResolvedLink;
   primary?: boolean;
+  /** PC：色の見方（凡例）をボタンの下にそのまま出す（スマホは「色の見方」を押すとシートで出す） */
+  desktop?: boolean;
 }) {
   const sheet = link.sheet;
   const sub = sheet
@@ -589,7 +594,7 @@ function MapButton({
         </span>
         <ChevronRightIcon className="h-4 w-4 shrink-0 opacity-80" />
       </a>
-      {tip && (
+      {(tip || (link.legend && !desktop)) && (
         <p className="mt-1 flex gap-1 px-1 text-[10.5px] leading-[1.6] text-brand">
           <span className="shrink-0">▶︎</span>
           <span>
@@ -610,9 +615,11 @@ function MapButton({
                 も確認してください。
               </>
             )}
+            {link.legend && !desktop && <LegendButton legend={link.legend} title={link.label} />}
           </span>
         </p>
       )}
+      {link.legend && desktop && <LegendBlock legend={link.legend} />}
     </div>
   );
 }
@@ -653,10 +660,10 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
           <h3 className="mb-2 text-[13px] font-semibold text-ink">{offline ? "参考：公道（市道）かどうかの地図" : "地図を開く"}</h3>
           <div className="space-y-2">
             {primary.map((l) => (
-              <MapButton key={l.url} link={l} primary />
+              <MapButton key={l.url} link={l} primary desktop />
             ))}
             {others.map((l) => (
-              <MapButton key={l.url} link={l} />
+              <MapButton key={l.url} link={l} desktop />
             ))}
           </div>
           <NearbyRoadsBlock state={roads} />

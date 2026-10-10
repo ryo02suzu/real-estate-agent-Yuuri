@@ -13,6 +13,7 @@ npm run watch-sheets   # PDF の図の差し替え（ファイル名の変更）
 npm run discover-maps  # 市区町村が新しく公開した道路の地図を探して discover-report.md に書く（同上）
 PARCEL_LIVE=1 npx vitest run lib/roadmap/parcel-live.test.ts  # 地番検索を本物のデータで確かめる
 ROAD_LIVE=1 npx vitest run lib/roadmap/road-read-live.test.ts   # 道路種別の読み取りを本物の地図データで確かめる
+npm run legends        # 道路種別の地図の凡例（色 → 種別）を読み直して data/legends.json を作り直す（Pillow が要る）
 npm run build    # 静的サイトを out/ に書き出す（Vercel 等にそのまま置ける）
 ```
 
@@ -27,6 +28,7 @@ npm run build    # 静的サイトを out/ に書き出す（Vercel 等にその
 | `scripts/parcel-tiles/` | 地番の地図データの最新版を作るスクリプト（`.github/workflows/parcel-tiles.yml` から使う） |
 | `lib/roadmap/zoning.ts`, `zoning-tiles.ts` | 地点の都市計画（用途地域・建ぺい率・容積率・防火など）。タイルは `public/data/`、置き場所は `data/zoning-source.json`、市区町村ごとのデータの有無と時点は `data/zoning-status.json` |
 | `scripts/zoning-tiles/` | 都市計画のタイルを国土交通省の全国データから作るスクリプト（`.github/workflows/zoning-tiles.yml` が毎月更新を確かめる） |
+| `lib/roadmap/legends.ts` | 道路種別の地図の凡例（線の色 → 種別）を文字で出す。データは `data/legends.json`（`scripts/legends/build.py` で作る） |
 | `lib/roadmap/road-read.ts` | 市の道路種別の地図データ（公開の ArcGIS レイヤ）を読み、物件のまわりの道路の種別・方角・距離を出す（埼玉県の20町・行田市・つくば市） |
 | `lib/history.ts` | 直近5件の検索履歴（端末の localStorage のみ） |
 | `docs/features.md` | UIの機能要件 |

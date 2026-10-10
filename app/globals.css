@@ -57,7 +57,8 @@ body {
 .preview-slim {
   display: none;
 }
-@container (max-height: 64px) {
+/* ピン（高さ32px・地図の真ん中が先）の頭が大きく切れる高さなら、地図を隠して細い行にする */
+@container (max-height: 59px) {
   .preview-map {
     display: none;
   }
@@ -65,9 +66,9 @@ body {
     display: flex;
   }
 }
-/* 背の低い画面では「場所を直す」が都市計画の行にあるので、細い行は出さない */
-@media (max-height: 720px) {
+/* 細い行も入らない高さ（背の低い画面だけ起きる）なら、何も出さない */
+@container (max-height: 31px) {
   .preview-slim {
-    display: none !important;
+    display: none;
   }
 }

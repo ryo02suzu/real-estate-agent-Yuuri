@@ -11,7 +11,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "check-links": "LINK_CHECK=1 vitest run lib/roadmap/link-check.test.ts",
     "watch-sheets": "SHEET_WATCH=1 vitest run lib/roadmap/sheet-watch.test.ts",
-    "discover-maps": "DISCOVER=1 vitest run lib/roadmap/discover.test.ts"
+    "discover-maps": "DISCOVER=1 vitest run lib/roadmap/discover.test.ts",
+    "legends": "mkdir -p work && LEGEND_MAPS=work/legend-maps.json vitest run lib/roadmap/legend-maps.test.ts && python3 scripts/legends/build.py work/legend-maps.json"
   },
   "dependencies": {
     "@mapbox/vector-tile": "3.0.0",

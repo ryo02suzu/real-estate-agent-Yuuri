@@ -3,6 +3,7 @@
 // 物件のまわりの道路の種別（市の地図データを読んだもの）。地図の色を見比べなくても、種別・方角・距離が文字で分かる。
 // 読めるのは公開の ArcGIS レイヤがある市町だけ（lib/roadmap/road-read.ts）。前面道路の判定や接道の判断はしない
 import { useEffect, useState } from "react";
+import { withRetry } from "@/lib/retry";
 import type { ResolvedLink } from "@/lib/roadmap";
 import { readRoads, ROAD_RADIUS_M, type NearbyRoad, type RoadRead } from "@/lib/roadmap/road-read";
 import { ChevronRightIcon, InfoIcon } from "./icons";
@@ -19,7 +20,7 @@ export function useNearbyRoads(links: ResolvedLink[], lat: number, lng: number):
   useEffect(() => {
     if (!read || !link) return;
     let alive = true;
-    readRoads(read, lat, lng)
+    withRetry(() => readRoads(read, lat, lng))
       .then((roads) => alive && setState({ key, value: { status: "ok", roads, label: link.label } }))
       .catch(() => alive && setState({ key, value: { status: "error" } }));
     return () => {

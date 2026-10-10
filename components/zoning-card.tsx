@@ -3,6 +3,7 @@
 // 物件の地点の都市計画（用途地域・建ぺい率・容積率・防火・高度地区など）。国土交通省の都市計画決定GISデータを
 // アプリと同じサイトに置いたタイルから読む（lib/roadmap/zoning.ts）。道路種別の結果を先に出し、こちらは後から読み込む
 import { useEffect, useState } from "react";
+import { withRetry } from "@/lib/retry";
 import type { Municipality } from "@/lib/roadmap";
 import { statusFor, zoningAt, zoningChips, zoningRows, type Zoning, type ZoningStatus } from "@/lib/roadmap/zoning";
 import { ZONING_DATA } from "@/lib/roadmap/zoning-data";
@@ -19,7 +20,7 @@ export function useZoning(lat: number, lng: number, municipality: Municipality):
   const [state, setState] = useState<{ key: string; value: ZoningState }>();
   useEffect(() => {
     let alive = true;
-    Promise.all([zoningAt(lat, lng, pmtilesZoningSource), import("@/lib/roadmap/data/zoning-status.json")])
+    Promise.all([withRetry(() => zoningAt(lat, lng, pmtilesZoningSource)), import("@/lib/roadmap/data/zoning-status.json")])
       .then(([zoning, mod]) => {
         if (!alive) return;
         const st = statusFor(codes.split(","), mod.default as Record<string, ZoningStatus>);
