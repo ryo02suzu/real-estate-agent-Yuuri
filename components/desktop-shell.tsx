@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { HistoryItem } from "@/lib/history";
 import { webglAvailable } from "@/lib/map-style";
 import { MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
@@ -56,6 +56,22 @@ export function DesktopShell({
 }) {
   // 動く地図が使えない端末では、地図で選び直す案内を出さない
   const [live] = useState(() => typeof document !== "undefined" && webglAvailable());
+  // 「/」で住所の入力欄へ（続けて次の物件を調べやすく）。入力中やシートの中では何もしない
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (document.querySelector("[role=dialog]")) return;
+      const input = document.getElementById("address") as HTMLInputElement | null;
+      if (!input) return;
+      e.preventDefault();
+      input.focus();
+      input.select();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
   const r = shown?.result;
   const point = r && (r.status === "ok" || r.status === "unsupported") ? { lat: r.lat, lng: r.lng } : undefined;
   const sheet = r?.status === "ok" ? r.links.find((l) => l.sheet)?.sheet : undefined;
@@ -121,7 +137,7 @@ export function DesktopShell({
               {live && shown.result.status === "ok" && (
                 <p className="mb-2 flex gap-1.5 text-[11.5px] leading-[1.6] text-muted">
                   <PinIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />
-                  場所がずれていたら、地図のピンをドラッグするか、地図をクリックして選び直せます。
+                  場所がずれていたら、地図のピンを動かすかクリックで選び直せます。
                 </p>
               )}
               <ResultView query={shown.query} result={shown.result} onPick={onPickAddress} desktop />

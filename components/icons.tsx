@@ -114,6 +114,13 @@ export const ShareIcon = ({ className }: P) => (
   </svg>
 );
 
+export const PrintIcon = ({ className }: P) => (
+  <svg {...base} className={className}>
+    <path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
+    <path d="M7 14h10v7H7z" />
+  </svg>
+);
+
 export const MenuIcon = ({ className }: P) => (
   <svg {...base} strokeWidth={1.8} className={className}>
     <path d="M4 7h16M4 12h16M4 17h16" />

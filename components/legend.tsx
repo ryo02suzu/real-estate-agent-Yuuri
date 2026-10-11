@@ -45,7 +45,11 @@ export function LegendButton({ legend, title }: { legend: LegendEntry[]; title: 
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button onClick={() => setOpen(true)} className="ml-1 whitespace-nowrap font-semibold text-brand underline underline-offset-2">
+      {/* 文字は小さいので、押せる範囲を上下左右に広げる（見た目は変えない） */}
+      <button
+        onClick={() => setOpen(true)}
+        className="relative ml-1 whitespace-nowrap font-semibold text-brand underline underline-offset-2 after:absolute after:-inset-x-2 after:-inset-y-2.5 after:content-['']"
+      >
         色の見方
       </button>
       <Sheet title="地図の色の見方" open={open} onClose={() => setOpen(false)}>

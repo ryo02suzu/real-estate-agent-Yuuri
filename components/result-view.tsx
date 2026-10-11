@@ -16,6 +16,7 @@ import {
   InfoIcon,
   MapIcon,
   PinOutlineIcon,
+  PrintIcon,
   SearchIcon,
   ShareIcon,
 } from "./icons";
@@ -24,6 +25,7 @@ import { MapPreview } from "./map-preview";
 import { NearbyRoadsBlock, NearbyRoadsLine, useNearbyRoads, type RoadsState } from "./nearby-roads";
 import { SheetPreview } from "./sheet-preview";
 import { parcelLines, ParcelButton, ParcelCard, useParcelInfo, type ParcelInfo } from "./parcel-card";
+import { PrintSheet } from "./print-sheet";
 import { useCopy } from "./use-copy";
 import { useZoning, ZoningCard, ZoningLine, type ZoningState } from "./zoning-card";
 
@@ -171,6 +173,8 @@ function Found({
       address={result.matchedAddress}
     />
   );
+  // 印刷・PDF 保存用の調査メモ（画面には出ない。iPhone の共有 → プリントでも同じメモになる）
+  const print = <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} />;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5 [&>*]:shrink-0">
@@ -249,6 +253,7 @@ function Found({
           </section>
         )}
       </div>
+      {print}
     </div>
   );
 }
@@ -420,11 +425,14 @@ function ShareButton({
   zoning,
   parcels,
   roads,
+  desktop,
 }: {
   result: Extract<LookupResult, { status: "ok" }>;
   zoning: ZoningState;
   parcels: ParcelInfo;
   roads: RoadsState;
+  /** PC：共有の画面は出さず、メールやチャットに貼れるようコピーする */
+  desktop?: boolean;
 }) {
   const { done, copy } = useCopy();
   const onClick = async () => {
@@ -433,7 +441,7 @@ function ShareButton({
       parcels: parcels.status === "ok" ? { ...parcelLines(parcels), reference: parcels.kind === "address" } : undefined,
       roads: roads.status === "ok" ? roads.roads : undefined,
     });
-    if (typeof navigator.share === "function") {
+    if (!desktop && typeof navigator.share === "function") {
       try {
         await navigator.share({ text });
         return;
@@ -449,8 +457,8 @@ function ShareButton({
       onClick={onClick}
       className="flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[11px] text-brand"
     >
-      <ShareIcon className="h-3.5 w-3.5" />
-      {done ? "コピー済" : "結果を共有"}
+      {desktop ? <CopyIcon className="h-3.5 w-3.5" /> : <ShareIcon className="h-3.5 w-3.5" />}
+      {done ? "コピー済" : desktop ? "結果をコピー" : "結果を共有"}
     </button>
   );
 }
@@ -636,6 +644,8 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
   const offline = m.coverage === "none" || m.coverage === "outside";
   const primary = result.links.filter((l) => !offline && l.kind !== "public_road");
   const others = result.links.filter((l) => offline || l.kind === "public_road");
+  // 要点の行から、パネルの下のほうのカード（都市計画・地番）まで動かす
+  const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   return (
     <div className="flex flex-col gap-3">
       <section className={CARD}>
@@ -646,12 +656,18 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
           actions={
             <>
               <CopyButton text={copyText(result)} />
-              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} />
+              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} desktop />
+              <PrintButton />
             </>
           }
         />
         <div className="border-t border-line/70 px-4 pb-4 pt-3">
           <CityLine municipality={m} />
+          {/* 要点（スマホと同じ1行）。最初の画面で用途地域・建ぺい率・容積率と地番が分かる */}
+          <div className="mt-2.5 flex gap-1.5">
+            <ZoningLine state={zoning} city={m.name} onOpen={() => jump("pc-zoning")} />
+            <ParcelButton info={parcels} onOpen={() => jump("pc-parcel")} />
+          </div>
         </div>
       </section>
 
@@ -676,11 +692,32 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
         </section>
       )}
 
-      <ZoningCard state={zoning} city={m.name} />
+      <div id="pc-zoning" className="scroll-mt-3">
+        <ZoningCard state={zoning} city={m.name} />
+      </div>
 
-      <ParcelCard info={parcels} />
+      {parcels.status !== "none" && (
+        <div id="pc-parcel" className="scroll-mt-3">
+          <ParcelCard info={parcels} />
+        </div>
+      )}
 
       {result.contact && <ContactCard contact={result.contact} city={m.name} address={result.matchedAddress} />}
+      <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} />
     </div>
+  );
+}
+
+/** PC：調査メモを印刷・PDF 保存する（印刷用の1枚は components/print-sheet.tsx）。見出しの行が窮屈なのでアイコンだけ */
+function PrintButton() {
+  return (
+    <button
+      onClick={() => window.print()}
+      aria-label="調査メモを印刷"
+      title="調査メモを印刷・PDF保存"
+      className="flex items-center rounded-full border border-line px-2 py-1 text-brand lg:hover:bg-mint"
+    >
+      <PrintIcon className="h-3.5 w-3.5" />
+    </button>
   );
 }

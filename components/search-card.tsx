@@ -39,6 +39,8 @@ export function SearchCard({
     <form
       onSubmit={(e) => {
         e.preventDefault();
+        // スマホ・タブレットは検索したらキーボードを閉じる（開いたままだと結果の下半分が隠れる）
+        if (window.matchMedia("(pointer: coarse)").matches) (document.activeElement as HTMLElement | null)?.blur();
         onSearch();
       }}
     >

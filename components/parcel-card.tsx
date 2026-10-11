@@ -55,28 +55,36 @@ export function parcelLines(info: Extract<ParcelInfo, { status: "ok" }>): { targ
   return { target: numbered(target) ? line(target) : undefined, neighbors: info.neighbors.filter(numbered).map(line) };
 }
 
-/** スマホ：都市計画の行の右に置く小さなボタン。押すと一覧が下から出る */
-export function ParcelButton({ info }: { info: ParcelInfo }) {
+/**
+ * 都市計画の行の右に置く小さなボタン。スマホは押すと一覧が下から出る。
+ * PC は onOpen（パネルの中の地番のカードまで動かす）を渡し、物件の筆の地番も出す（住所の地点の筆は参考なので出さない）
+ */
+export function ParcelButton({ info, onOpen }: { info: ParcelInfo; onOpen?: () => void }) {
   const [open, setOpen] = useState(false);
   if (info.status === "none") return null;
+  const chiban = onOpen && info.status === "ok" && info.kind !== "address" && /^\d/.test(info.parcel.chibanRaw) ? chibanLabel(info.parcel.chibanRaw) : undefined;
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => (onOpen ? onOpen() : setOpen(true))}
         disabled={info.status !== "ok"}
-        className="flex shrink-0 items-center gap-1 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-[11px] leading-[1.5] text-ink disabled:text-muted"
+        className="flex shrink-0 items-center gap-1 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-[11px] leading-[1.5] text-ink disabled:text-muted lg:hover:border-brand-light/60"
       >
         <ParcelIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
-        {info.status === "ok" ? (
+        {info.status !== "ok" ? (
+          "地番…"
+        ) : chiban ? (
+          <>
+            <b className="font-semibold">{chiban}</b>
+          </>
+        ) : (
           <>
             地番<span className="[@media(max-height:720px)]:hidden">・隣地</span>
           </>
-        ) : (
-          "地番…"
         )}
         {info.status === "ok" && <ChevronRightIcon className="h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
-      {info.status === "ok" && (
+      {info.status === "ok" && !onOpen && (
         <Sheet title="謄本・公図を取るときの地番" open={open} onClose={() => setOpen(false)}>
           <ParcelDetail info={info} />
         </Sheet>
