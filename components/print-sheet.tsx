@@ -1,0 +1,295 @@
+"use client";
+
+// 印刷・PDF 保存用の「調査メモ」。画面（地図・パネル・シート）は印刷せず、これだけを A4 に出す（app/globals.css の @media print）。
+// 役所調査に持っていけるよう、地図の URL・色の見方・都市計画・地番・問い合わせ先・窓口で聞くことと、回答を書き込む欄をまとめる
+import { useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
+import { ASK, BRING } from "@/lib/inquiry";
+import type { LookupResult, MapKind } from "@/lib/roadmap";
+import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
+import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
+import { zoningRows } from "@/lib/roadmap/zoning";
+import { ZONING_CREDIT } from "@/lib/roadmap/zoning-data";
+import { COVERAGE } from "./coverage";
+import { MapPreview } from "./map-preview";
+import type { RoadsState } from "./nearby-roads";
+import { parcelLines, type ParcelInfo } from "./parcel-card";
+import type { ZoningState } from "./zoning-card";
+
+type Ok = Extract<LookupResult, { status: "ok" }>;
+
+const KIND: Record<MapKind, string> = {
+  road_type: "道路種別",
+  designated_only: "位置指定道路など一部",
+  public_road: "公道（市道）かどうか",
+};
+
+const noop = () => () => {};
+
+/** 結果の画面に置く。印刷のときだけ出る（画面には出ない） */
+export function PrintSheet(props: { result: Ok; zoning: ZoningState; parcels: ParcelInfo; roads: RoadsState }) {
+  // document.body に出す（画面の作りの外に置き、印刷では画面の作りを丸ごと隠す）。サーバーでは何も出さない
+  const client = useSyncExternalStore(
+    noop,
+    () => true,
+    () => false,
+  );
+  if (!client) return null;
+  return createPortal(<Memo {...props} />, document.body);
+}
+
+function Memo({ result, zoning, parcels, roads }: { result: Ok; zoning: ZoningState; parcels: ParcelInfo; roads: RoadsState }) {
+  // 調べた日時（印刷した日ではなく、この結果を出した日時）
+  const [at] = useState(() => new Date());
+  const m = result.municipality;
+  const p = result.parcel;
+  const found = p && !result.picked ? p : undefined;
+  const c = result.contact;
+  const dept = c ? (/^(東京都|\S{2,3}県)\s/.test(c.dept) ? c.dept : `${m.name} ${c.dept}`) : undefined;
+  const lines = parcels.status === "ok" ? parcelLines(parcels) : undefined;
+  const date = `${at.getFullYear()}年${at.getMonth() + 1}月${at.getDate()}日 ${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
+
+  return (
+    <div className="print-sheet bg-white text-[11.5px] leading-[1.6] text-[#1d1b18]">
+      <header className="flex items-end justify-between gap-4 border-b-2 border-[#9a7442] pb-1.5">
+        <div className="min-w-0">
+          <p className="text-[10px] tracking-[0.1em] text-[#7a6a55]">道路種別・都市計画の調査メモ</p>
+          <h1 className="text-[17px] font-bold leading-snug">
+            {result.matchedAddress}
+            {found ? ` ${chibanLabel(found.chibanRaw)}` : <span className="text-[13px] font-normal">{result.picked ? "（地図で選んだ地点）" : " 付近"}</span>}
+          </h1>
+        </div>
+        <p className="shrink-0 text-right text-[10px] leading-[1.5] text-[#7a6a55]">
+          調べた日時 {date}
+          <br />
+          MICHILU（michilu.vercel.app）
+        </p>
+      </header>
+
+      {/* 物件：場所の表と地図 */}
+      <section className="mt-2.5 flex gap-4">
+        <dl className="grid min-w-0 flex-1 grid-cols-[7.5em_1fr] content-start gap-x-2 gap-y-1">
+          <dt className="text-[#7a6a55]">市区町村</dt>
+          <dd>
+            {m.pref}
+            {m.name}（{COVERAGE[m.coverage].pill}）
+          </dd>
+          {found ? (
+            <>
+              <dt className="text-[#7a6a55]">地番で探した筆</dt>
+              <dd>
+                {kuikiLabel(found.kuiki)} {chibanLabel(found.chibanRaw)}
+              </dd>
+            </>
+          ) : (
+            p && (
+              <>
+                <dt className="text-[#7a6a55]">この地点の筆</dt>
+                <dd>
+                  {kuikiLabel(p.kuiki)} {chibanLabel(p.chibanRaw)}
+                </dd>
+              </>
+            )
+          )}
+          <dt className="text-[#7a6a55]">緯度・経度</dt>
+          <dd className="tabular">
+            {result.lat.toFixed(6)}, {result.lng.toFixed(6)}
+          </dd>
+          <dt className="text-[#7a6a55]">地理院地図</dt>
+          <dd className="break-all text-[10px]">{`https://maps.gsi.go.jp/#18/${result.lat.toFixed(6)}/${result.lng.toFixed(6)}/`}</dd>
+          {(m.note || m.coverage !== "full") && (
+            <>
+              <dt className="text-[#7a6a55]">市の案内</dt>
+              <dd className="text-[10.5px]">{m.note ?? COVERAGE[m.coverage].long}</dd>
+            </>
+          )}
+          {result.approximate && (
+            <>
+              <dt className="text-[#7a6a55]">注意</dt>
+              <dd className="text-[10.5px] text-[#8a4f3a]">番地が見つからず、町の中心の位置です。物件の場所を確かめてください。</dd>
+            </>
+          )}
+        </dl>
+        <MapPreview lat={result.lat} lng={result.lng} parcel={p} bare className="h-[150px] w-[230px] shrink-0" />
+      </section>
+
+      {/* 道路種別の地図 */}
+      {result.links.length > 0 && (
+        <Block title="道路種別を確かめる地図">
+          <ol className="space-y-2">
+            {result.links.map((l) => (
+              <li key={l.url} className="break-inside-avoid">
+                <p className="font-semibold">
+                  {l.label}
+                  <span className="ml-1.5 rounded border border-[#d8ccb8] px-1 text-[9.5px] font-normal text-[#7a6a55]">{KIND[l.kind]}</span>
+                </p>
+                <p className="break-all text-[9.5px] leading-[1.45] text-[#5d5143]">{l.url}</p>
+                {l.sheet && (
+                  <p className="text-[10.5px]">
+                    物件が載っている図：{l.sheet.whole ? "市全体の図" : l.sheet.label}（図の{l.sheet.where}あたり）
+                    {l.sheet.neighbor && `。端に近いので隣の図 ${l.sheet.neighbor.label} も確認`}
+                  </p>
+                )}
+                {(l.sheet?.howto || l.tip) && <p className="text-[10.5px] text-[#5d5143]">開き方：{l.sheet?.howto ?? l.tip}</p>}
+                {!l.pinpoint && !l.sheet && <p className="text-[10.5px] text-[#5d5143]">地図の住所検索に住所を入れて探してください。</p>}
+                {l.legend && (
+                  <div className="mt-1 rounded border border-[#e6ddcf] px-2 py-1">
+                    <p className="text-[9.5px] text-[#7a6a55]">地図の色の見方（地図の凡例を文字にしたもの）</p>
+                    <ul className="grid grid-cols-3 gap-x-3">
+                      {l.legend.map((e) => (
+                        <li key={e.label} className="flex gap-1.5 text-[9.5px] leading-[1.5]">
+                          <span className="mt-[5px] inline-block h-[4px] w-4 shrink-0 rounded-full border border-black/15" style={{ background: e.color }} />
+                          <span className="min-w-0">{e.label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ol>
+          {roads.status === "ok" && (
+            <div className="mt-2 break-inside-avoid">
+              <p className="font-semibold">物件のまわりの道路（市の地図データ・{roads.roads.length ? "近い順" : "50m以内に無し"}）</p>
+              {roads.roads.length > 0 ? (
+                <ul className="grid grid-cols-2 gap-x-4 text-[10.5px]">
+                  {roads.roads.map((r) => (
+                    <li key={`${r.label}|${r.direction}|${r.distance}`}>
+                      {r.direction === "地点上" ? "地点の上" : `${r.direction} 約${Math.max(1, Math.round(r.distance))}m`}：{r.label}
+                      {r.width && `（幅員 ${r.width}）`}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[10.5px]">物件から50m以内に、地図で色の付いた道路はありません。</p>
+              )}
+            </div>
+          )}
+        </Block>
+      )}
+
+      <div className="mt-3 grid grid-cols-2 gap-4">
+        {/* 都市計画 */}
+        <Block title="都市計画（参考）" flush>
+          {zoning.status === "ok" ? (
+            <>
+              <dl className="divide-y divide-[#eee6da]">
+                {zoningRows(zoning.zoning, zoning.st).map((r) => (
+                  <div key={r.label + r.value} className="flex gap-2 py-0.5">
+                    <dt className="w-[7.5em] shrink-0 text-[10.5px] text-[#7a6a55]">{r.label}</dt>
+                    <dd className={`min-w-0 flex-1 font-semibold ${r.warn ? "text-[#8a4f3a]" : ""}`}>{r.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-1 text-[9px] leading-[1.5] text-[#7a6a55]">
+                {zoning.st?.asOf && `${zoning.st.city}のデータは${zoning.st.asOf}時点。`}
+                建ぺい率・容積率は都市計画で定めた数値（角地緩和や前面道路の幅による制限は含まない）。
+              </p>
+            </>
+          ) : (
+            <p className="text-[10.5px] text-[#7a6a55]">{zoning.status === "loading" ? "読み込み中でした。画面の表示が終わってから印刷し直してください。" : "データを読み込めませんでした。"}</p>
+          )}
+        </Block>
+
+        {/* 地番 */}
+        <Block title="謄本・公図を取るときの地番" flush>
+          {parcels.status === "ok" && lines ? (
+            <>
+              <p className="text-[10px] text-[#7a6a55]">{parcels.kind === "address" ? "住所の地点にある筆（参考。住居表示と地番は別）" : "物件の筆"}</p>
+              <p className="font-semibold">{lines.target ?? `${kuikiLabel(parcels.parcel.kuiki)} ${chibanLabel(parcels.parcel.chibanRaw)}`}</p>
+              <p className="mt-1 text-[10px] text-[#7a6a55]">境界が接している筆（{lines.neighbors.length}）</p>
+              <p className="text-[10.5px]">{lines.neighbors.length ? lines.neighbors.join("、") : "地図データの中には見つかりませんでした"}</p>
+            </>
+          ) : (
+            <p className="text-[10.5px] text-[#7a6a55]">
+              {parcels.status === "loading" ? "読み込み中でした。画面の表示が終わってから印刷し直してください。" : "この場所の地番の地図データはありません。"}
+            </p>
+          )}
+        </Block>
+      </div>
+
+      {/* 問い合わせ先と窓口での確認 */}
+      {c && dept && (
+        <Block title="問い合わせ先">
+          <div className="grid grid-cols-[1fr_1fr] gap-4">
+            <dl className="grid grid-cols-[4.5em_1fr] content-start gap-x-2 gap-y-0.5">
+              <dt className="text-[#7a6a55]">部署名</dt>
+              <dd className="font-semibold">{dept}</dd>
+              {c.phone && (
+                <>
+                  <dt className="text-[#7a6a55]">電話</dt>
+                  <dd className="tabular">
+                    {c.phone}
+                    {c.noPhoneInquiry && <span className="text-[10px]">（道路種別は電話では答えてもらえない）</span>}
+                  </dd>
+                </>
+              )}
+              {c.email && (
+                <>
+                  <dt className="text-[#7a6a55]">メール</dt>
+                  <dd className="break-all">{c.email}</dd>
+                </>
+              )}
+              {c.hours && (
+                <>
+                  <dt className="text-[#7a6a55]">受付時間</dt>
+                  <dd>{c.hours}</dd>
+                </>
+              )}
+              {c.note && (
+                <>
+                  <dt className="text-[#7a6a55]">備考</dt>
+                  <dd className="text-[10.5px] text-[#8a4f3a]">{c.note}</dd>
+                </>
+              )}
+            </dl>
+            <div className="text-[10.5px]">
+              <p className="text-[10px] text-[#7a6a55]">持っていくもの</p>
+              <ul>
+                {BRING.map((b) => (
+                  <li key={b}>□ {b}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </Block>
+      )}
+
+      <Block title="窓口で聞くこと・回答メモ">
+        <ol className="space-y-1">
+          {ASK.map((a, i) => (
+            <li key={a} className="break-inside-avoid">
+              <p className="text-[10.5px]">
+                {i + 1}. {a}
+              </p>
+              <p className="mt-2 border-b border-dotted border-[#b9ad9b]" />
+            </li>
+          ))}
+        </ol>
+        <p className="mt-3 flex gap-6 text-[10.5px] text-[#5d5143]">
+          <span className="flex-1 border-b border-[#b9ad9b] pb-0.5">対応した窓口・担当者：</span>
+          <span className="w-[40%] border-b border-[#b9ad9b] pb-0.5">確認した日：</span>
+        </p>
+      </Block>
+
+      <footer className="mt-3 border-t border-[#d8ccb8] pt-1.5 text-[8.5px] leading-[1.55] text-[#7a6a55]">
+        <p>
+          ※ 地図や都市計画・地番は参考情報です。重要事項説明などの最終確認は、必ず役所の窓口・法務局で行ってください。道路種別・接道の判断はこのメモでは行っていません。
+        </p>
+        <p>
+          地図：地理院タイル（国土地理院）。{zoning.status === "ok" && `都市計画の${ZONING_CREDIT}。`}
+          {(p || parcels.status === "ok") && `筆の${PARCEL_CREDIT}。`}
+        </p>
+      </footer>
+    </div>
+  );
+}
+
+function Block({ title, children, flush }: { title: string; children: React.ReactNode; flush?: boolean }) {
+  return (
+    <section className={`${flush ? "" : "mt-3"} break-inside-avoid`}>
+      <h2 className="mb-1 border-l-[3px] border-[#9a7442] pl-1.5 text-[12.5px] font-bold">{title}</h2>
+      {children}
+    </section>
+  );
+}

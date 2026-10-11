@@ -36,19 +36,22 @@ export function useZoning(lat: number, lng: number, municipality: Municipality):
   return state?.key === key ? state.value : { status: "loading" };
 }
 
-/** スマホ：用途地域などを1行に並べ、押すと詳しい一覧を下から出す */
-export function ZoningLine({ state, city }: { state: ZoningState; city: string }) {
+/**
+ * 用途地域などを1行に並べる。スマホは押すと詳しい一覧を下から出す。
+ * PC は onOpen（パネルの中の都市計画のカードまで動かす）を渡す
+ */
+export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: string; onOpen?: () => void }) {
   const [open, setOpen] = useState(false);
   const chips = state.status === "ok" ? zoningChips(state.zoning) : [];
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => (onOpen ? onOpen() : setOpen(true))}
         disabled={state.status !== "ok"}
-        className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-left text-[11px] leading-[1.5] text-ink"
+        className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-left text-[11px] leading-[1.5] text-ink lg:hover:border-brand-light/60"
       >
         <ZoningIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
-        <span className={`shrink-0 text-muted ${state.status === "ok" ? "[@media(max-height:720px)]:hidden" : ""}`}>都市計画</span>
+        <span className={`shrink-0 text-muted ${state.status === "ok" && !onOpen ? "[@media(max-height:720px)]:hidden" : ""}`}>都市計画</span>
         {state.status === "loading" && <span className="truncate text-muted">確認中…</span>}
         {state.status === "error" && <span className="truncate text-muted">データを読み込めませんでした</span>}
         {state.status === "ok" && (
@@ -66,7 +69,7 @@ export function ZoningLine({ state, city }: { state: ZoningState; city: string }
         )}
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
-      {state.status === "ok" && (
+      {state.status === "ok" && !onOpen && (
         <Sheet title="都市計画（参考）" open={open} onClose={() => setOpen(false)}>
           <ZoningDetail zoning={state.zoning} st={state.st} city={city} />
         </Sheet>

@@ -15,6 +15,7 @@ export function MapPreview({
   onFix,
   fixClassName = "",
   parcel,
+  bare,
 }: {
   lat: number;
   lng: number;
@@ -27,6 +28,8 @@ export function MapPreview({
   fixClassName?: string;
   /** 地番で見つけた筆・地図で選んだ地点の筆（形を重ねる） */
   parcel?: Parcel;
+  /** 印刷用：「地図を拡大」と、地図の上の出典を出さない（出典は印刷の1枚の下に書く） */
+  bare?: boolean;
 }) {
   // z18 のタイルを半分の大きさで描く＝縮尺は z17 相当で、高精細画面でもくっきり
   const radius = large ? 4 : 2;
@@ -91,15 +94,17 @@ export function MapPreview({
       </div>
       <PinIcon className={`absolute left-1/2 top-1/2 ${large ? "h-12 w-12" : "h-8 w-8"} -translate-x-1/2 -translate-y-full text-brand drop-shadow`} />
       {/* 地理院地図をその場所で開く（周辺を広く見たいとき） */}
-      <a
-        href={`https://maps.gsi.go.jp/#17/${lat.toFixed(6)}/${lng.toFixed(6)}/`}
-        target="_blank"
-        rel="noreferrer"
-        className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-[11px] text-ink shadow-soft"
-      >
-        <ExpandIcon className="h-3.5 w-3.5" />
-        地図を拡大
-      </a>
+      {!bare && (
+        <a
+          href={`https://maps.gsi.go.jp/#17/${lat.toFixed(6)}/${lng.toFixed(6)}/`}
+          target="_blank"
+          rel="noreferrer"
+          className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-[11px] text-ink shadow-soft"
+        >
+          <ExpandIcon className="h-3.5 w-3.5" />
+          地図を拡大
+        </a>
+      )}
       {onFix && (
         <button
           onClick={onFix}
@@ -109,15 +114,18 @@ export function MapPreview({
           場所を直す
         </button>
       )}
-      <a
-        href="https://maps.gsi.go.jp/development/ichiran.html"
-        target="_blank"
-        rel="noreferrer"
-        className="absolute left-1 top-1 rounded bg-white/80 px-1.5 text-[9px] text-muted"
-      >
-        地理院タイル
-      </a>
-      {parcel && (
+      {/* 出典。印刷用（bare）はページの下にまとめて書くので、地図の上には出さない */}
+      {!bare && (
+        <a
+          href="https://maps.gsi.go.jp/development/ichiran.html"
+          target="_blank"
+          rel="noreferrer"
+          className="absolute left-1 top-1 rounded bg-white/80 px-1.5 text-[9px] text-muted"
+        >
+          地理院タイル
+        </a>
+      )}
+      {parcel && !bare && (
         // 登記所備付地図データ利用規約の出典と、加工したことの記載
         <a
           href="https://front.geospatial.jp/moj-chizu-xml-readme/"
