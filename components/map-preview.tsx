@@ -16,6 +16,7 @@ export function MapPreview({
   fixClassName = "",
   parcel,
   bare,
+  onExpand,
 }: {
   lat: number;
   lng: number;
@@ -30,6 +31,8 @@ export function MapPreview({
   parcel?: Parcel;
   /** 印刷用：「地図を拡大」と、地図の上の出典を出さない（出典は印刷の1枚の下に書く） */
   bare?: boolean;
+  /** 「地図を拡大」で MICHILU の中の動く地図を開く（無ければ地理院地図をその場所で開く） */
+  onExpand?: () => void;
 }) {
   // z18 のタイルを半分の大きさで描く＝縮尺は z17 相当で、高精細画面でもくっきり
   const radius = large ? 4 : 2;
@@ -93,8 +96,17 @@ export function MapPreview({
         )}
       </div>
       <PinIcon className={`absolute left-1/2 top-1/2 ${large ? "h-12 w-12" : "h-8 w-8"} -translate-x-1/2 -translate-y-full text-brand drop-shadow`} />
-      {/* 地理院地図をその場所で開く（周辺を広く見たいとき） */}
-      {!bare && (
+      {/* MICHILU の中の動く地図か、地理院地図をその場所で開く（周辺を広く見たいとき） */}
+      {!bare && onExpand && (
+        <button
+          onClick={() => onExpand()}
+          className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-[11px] text-ink shadow-soft"
+        >
+          <ExpandIcon className="h-3.5 w-3.5" />
+          地図を拡大
+        </button>
+      )}
+      {!bare && !onExpand && (
         <a
           href={`https://maps.gsi.go.jp/#17/${lat.toFixed(6)}/${lng.toFixed(6)}/`}
           target="_blank"

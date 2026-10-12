@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
 import type { ResolvedLink } from "@/lib/roadmap";
 import { readRoads, ROAD_RADIUS_M, type NearbyRoad, type RoadRead } from "@/lib/roadmap/road-read";
-import { ChevronRightIcon, InfoIcon } from "./icons";
+import { ChevronRightIcon, InfoIcon, MapIcon } from "./icons";
 import { Sheet } from "./sheet";
 
 export type RoadsState = { status: "none" } | { status: "loading" } | { status: "error" } | { status: "ok"; roads: NearbyRoad[]; label: string };
@@ -36,8 +36,8 @@ export function useNearbyRoads(links: ResolvedLink[], lat: number, lng: number):
 /** 「北 約6m」 */
 const where = (r: NearbyRoad) => (r.direction === "地点上" ? "地点の上" : `${r.direction} 約${Math.max(1, Math.round(r.distance))}m`);
 
-/** スマホ：地図ボタンの下の1行。押すと一覧が下から出る */
-export function NearbyRoadsLine({ state }: { state: RoadsState }) {
+/** スマホ：地図ボタンの下の1行。押すと一覧が下から出る。onShowMap があれば、一覧から MICHILU の地図に道路種別を描いて見られる */
+export function NearbyRoadsLine({ state, onShowMap }: { state: RoadsState; onShowMap?: () => void }) {
   const [open, setOpen] = useState(false);
   if (state.status === "none") return null;
   const first = state.status === "ok" ? state.roads[0] : undefined;
@@ -64,6 +64,18 @@ export function NearbyRoadsLine({ state }: { state: RoadsState }) {
       </button>
       {state.status === "ok" && (
         <Sheet title="物件のまわりの道路（地図データ）" open={open} onClose={() => setOpen(false)}>
+          {onShowMap && (
+            <button
+              onClick={() => {
+                setOpen(false);
+                onShowMap();
+              }}
+              className="bg-gold mb-2 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[14px] font-semibold text-white shadow-[0_6px_16px_rgba(138,102,50,0.28)]"
+            >
+              <MapIcon className="h-4 w-4" />
+              地図に道路種別の色を出して見る
+            </button>
+          )}
           <NearbyRoadsList state={state} />
         </Sheet>
       )}

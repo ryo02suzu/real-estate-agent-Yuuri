@@ -39,6 +39,15 @@ const youtoColor = ["match", ["get", "code"], ...Object.entries(YOUTO_COLORS).fl
 /** 用途地域・都市計画道路のレイヤ（「用途地域」で表示を切り替える） */
 export const ZONING_LAYERS = ["zoning-youto-fill", "zoning-youto-line", "zoning-douro"];
 
+/** 都市計画道路の線の色（地図と凡例） */
+export const DOURO_COLOR = "#7a3fa0";
+
+/** 道路種別（市の公開データ）を描く最小のズーム。引いた地図では読む量が多すぎるので、町の中を見ているときだけ */
+export const ROAD_MIN_ZOOM = 16;
+
+/** 道路種別のレイヤ（「道路種別」で表示を切り替える）。道路の区域の面と、線 */
+export const ROAD_LAYERS = ["road-fill", "road-outline", "road-line"];
+
 /** 地番区域と地番で、ひとつの筆だけに絞る（見つけた筆を強調する）。何も無ければどれにも当たらない条件 */
 export function parcelFilter(p?: { kuiki: string; chibanRaw: string }): FilterSpecification {
   return p
@@ -63,6 +72,8 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
       parcels: { type: "vector", url: `pmtiles://${PARCEL_DATA.url}`, attribution: PARCEL_ATTRIBUTION },
       // 用途地域など（アプリと同じサイトに置いた PMTiles）
       zoning: { type: "vector", url: `pmtiles://${zoningUrl()}`, attribution: ZONING_ATTRIBUTION },
+      // 道路種別。市の公開データを見ている範囲の分だけ読んで入れる（components/live-map.tsx）
+      roads: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
     },
     layers: [
       // 淡色地図に無いところ（海など）が白く抜けないよう、下に標準地図の色を敷く
@@ -99,7 +110,7 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         "source-layer": "douro",
         minzoom: ZONING_MIN_ZOOM,
         layout: { visibility: "none" },
-        paint: { "line-color": "#7a3fa0", "line-width": 2.5, "line-opacity": 0.8, "line-dasharray": [2, 1.5] },
+        paint: { "line-color": DOURO_COLOR, "line-width": 2.5, "line-opacity": 0.8, "line-dasharray": [2, 1.5] },
       },
       { id: "sheet-fill", type: "fill", source: "sheet", filter: ["==", ["get", "kind"], "frame"], paint: { "fill-color": "#c49a5c", "fill-opacity": 0.06 } },
       {
@@ -128,6 +139,31 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         minzoom: PARCEL_MIN_ZOOM,
         layout: { visibility: "none" },
         paint: { "line-color": "#b0472a", "line-width": ["interpolate", ["linear"], ["zoom"], 15, 0.4, 18, 1.2], "line-opacity": 0.75 },
+      },
+      // 道路種別（「道路種別」で表示）。面は薄く塗って縁取り、線は太めに。色は市の地図の凡例の色
+      {
+        id: "road-fill",
+        type: "fill",
+        source: "roads",
+        filter: ["==", ["geometry-type"], "Polygon"],
+        layout: { visibility: "none" },
+        paint: { "fill-color": ["get", "color"], "fill-opacity": 0.45 },
+      },
+      {
+        id: "road-outline",
+        type: "line",
+        source: "roads",
+        filter: ["==", ["geometry-type"], "Polygon"],
+        layout: { visibility: "none" },
+        paint: { "line-color": ["get", "color"], "line-width": 1.2, "line-opacity": 0.9 },
+      },
+      {
+        id: "road-line",
+        type: "line",
+        source: "roads",
+        filter: ["==", ["geometry-type"], "LineString"],
+        layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": ["get", "color"], "line-width": ["interpolate", ["linear"], ["zoom"], 16, 3, 19, 6], "line-opacity": 0.9 },
       },
       // 地番で見つけた筆・地図で選んだ地点の筆
       {

@@ -27,6 +27,7 @@ type Shown = { query: string; result: LookupResult };
  */
 export function DesktopShell({
   shown,
+  focus,
   input,
   setInput,
   loading,
@@ -41,6 +42,8 @@ export function DesktopShell({
   onHome,
 }: {
   shown: Shown | null;
+  /** 住所で調べた回数（変わると地図が物件の場所へ戻る） */
+  focus: number;
   input: string;
   setInput: (v: string) => void;
   loading: boolean;
@@ -76,6 +79,9 @@ export function DesktopShell({
   const point = r && (r.status === "ok" || r.status === "unsupported") ? { lat: r.lat, lng: r.lng } : undefined;
   const sheet = r?.status === "ok" ? r.links.find((l) => l.sheet)?.sheet : undefined;
   const parcel = r?.status === "ok" ? r.parcel : undefined;
+  // 道路種別を読める市なら、地図の「道路種別」で描けるようにする
+  const roadLink = r?.status === "ok" ? r.links.find((l) => l.read) : undefined;
+  const roads = r?.status === "ok" && roadLink?.read ? { read: roadLink.read, city: r.municipality.name } : undefined;
   const links: ["help" | "cities" | "history", string][] = [
     ["help", "使い方"],
     ["cities", "対応エリア"],
@@ -88,6 +94,8 @@ export function DesktopShell({
         point={point}
         sheet={sheet}
         parcel={parcel}
+        roads={roads}
+        focusKey={focus}
         onPick={onPickPoint}
         padding={{ left: PANEL + GAP * 2, top: 64, right: 16, bottom: 16 }}
         toolsClassName="right-5 top-[76px]"

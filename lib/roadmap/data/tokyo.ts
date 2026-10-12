@@ -1,6 +1,7 @@
 // 東京都 全62区市町村（2026-09 調査）。出典は docs/tokyo-research.md。
 // 23区: 各区が特定行政庁。多摩: 特定行政庁の11市は各市、それ以外の15市2町・檜原村・奥多摩町は都の多摩建築指導事務所。島しょは都（各支庁の土木課が窓口）。
 import type { Contact, Municipality } from "../municipalities";
+import type { RoadRead } from "../road-read";
 import type { SheetIndex } from "../sheets";
 import MINATO_SHEETS from "./sheets/minato.json";
 import KITA_SHEETS from "./sheets/kita.json";
@@ -14,6 +15,51 @@ const pref = "東京都" as const;
 
 /** 窓口のみで電話では道路種別を答えない区の注意書き */
 const COUNTER_ONLY = "道路種別は電話・FAX・メールでは答えてもらえない。窓口で確認";
+
+// --- 道路種別を読める区市の公開レイヤ（物件のまわりの道路・MICHILU の地図の道路種別。色は各区市の地図の凡例） ---
+
+const CHIYODA_ROADS_URL = "https://tokei-gis2.chiyodatoshikei.jp/server/rest/services/Map_services/dourosyubetsu/MapServer";
+/** 千代田区：種別ごとのレイヤ（Web マップ 50d1206e… の描き方の色） */
+const CHIYODA_ROADS: RoadRead = {
+  layers: [
+    { url: `${CHIYODA_ROADS_URL}/0`, label: "42条1項1号", color: "#2ca40b" },
+    { url: `${CHIYODA_ROADS_URL}/1`, label: "42条1項2号", color: "#98c000" },
+    { url: `${CHIYODA_ROADS_URL}/2`, label: "42条1項3号", color: "#4dff7b" },
+    { url: `${CHIYODA_ROADS_URL}/3`, label: "42条1項4号", color: "#ff7100" },
+    { url: `${CHIYODA_ROADS_URL}/4`, label: "42条1項5号", color: "#fdb000" },
+    { url: `${CHIYODA_ROADS_URL}/5`, label: "42条2項", color: "#61dcff" },
+    { url: `${CHIYODA_ROADS_URL}/6`, label: "42条3項", color: "#005ff3" },
+  ],
+};
+
+const TOSHIMA_ROADS_URL = "https://services2.arcgis.com/2wbHtbUHUqXgDY7E/arcgis/rest/services";
+/**
+ * 豊島区：指定道路（2〜5号・2項・通路・水路・廃止部分の線。種別は CODE1 のコードを凡例で名前にする）、
+ * 公道・都道国道・4号（未完了）・区有通路の面、告示建築線（Web マップ 3a97a4b2… から）
+ */
+const TOSHIMA_ROADS: RoadRead = {
+  layers: [
+    { url: `${TOSHIMA_ROADS_URL}/公開用道路種別２/FeatureServer/1`, field: "CODE1" },
+    { url: `${TOSHIMA_ROADS_URL}/公開用道路種別２/FeatureServer/3`, label: "42条1項1号(4m以上の公道)", color: "#ccedff" },
+    { url: `${TOSHIMA_ROADS_URL}/都道国道/FeatureServer/0`, field: "コード2" },
+    { url: `${TOSHIMA_ROADS_URL}/公開用道路種別２/FeatureServer/2`, label: "42条1項4号(未完了)", color: "#d3ffbe" },
+    { url: `${TOSHIMA_ROADS_URL}/告示建築線/FeatureServer/0`, label: "42条1項5号(告示建築線)", color: "#73004c" },
+    { url: `${TOSHIMA_ROADS_URL}/公開用道路種別２/FeatureServer/4`, label: "区有通路", color: "#fbc4bb" },
+  ],
+};
+
+const HINO_ROADS_URL = "https://services5.arcgis.com/akSheMdmUZiKa4BM/arcgis/rest/services";
+/** 日野市：種別ごとの面のレイヤ（Web マップ 8132b277… から。色は市の地図の凡例） */
+const HINO_ROADS: RoadRead = {
+  layers: [
+    { url: `${HINO_ROADS_URL}/建築基準法道路第42条1項1号/FeatureServer/0`, label: "42条1項1号", color: "#8f3b03" },
+    { url: `${HINO_ROADS_URL}/12/FeatureServer/0`, label: "42条1項2号", color: "#ed9209" },
+    { url: `${HINO_ROADS_URL}/建築基準法道路第42条1項3号/FeatureServer/0`, label: "42条1項3号", color: "#0070ff" },
+    { url: `${HINO_ROADS_URL}/建築基準法道路第42条1項4号/FeatureServer/0`, label: "42条1項4号", color: "#ffb5f5" },
+    { url: `${HINO_ROADS_URL}/建築基準法道路第42条1項5号/FeatureServer/0`, label: "42条1項5号", color: "#ff0000" },
+    { url: `${HINO_ROADS_URL}/建築基準法道路第42条2項/FeatureServer/0`, label: "42条2項", color: "#00ff00" },
+  ],
+};
 
 const WARDS: Municipality[] = [
   {
@@ -30,6 +76,7 @@ const WARDS: Municipality[] = [
         build: arcgisMapViewer("https://tokei-gis2.chiyodatoshikei.jp/toshikei", "50d1206ec8bb4d43bf915ce299485351"),
         verified: true,
         tip: "青いピンが物件です。スマホでは最初に凡例が開くので、「×」で閉じると地図が広がります。",
+        read: CHIYODA_ROADS,
       },
     ],
     contact: { dept: "環境まちづくり部 建築指導課 建築審査係", phone: "03-5211-4308", email: "kenchikushidou@city.chiyoda.lg.jp" },
@@ -189,6 +236,7 @@ const WARDS: Municipality[] = [
         build: arcgisWebApp("toshisei.maps.arcgis.com", "c4832f4fda79495fab7b83e2001817a5"),
         verified: true,
         tip: "最初は路線番号が出ます。右上のレイヤ一覧（重なった四角のボタン）で、道路種別のレイヤを表示してください。",
+        read: TOSHIMA_ROADS,
       },
     ],
     contact: { dept: "都市整備部 建築課", phone: "03-3981-1111（代表）" },
@@ -351,6 +399,7 @@ const TAMA_CITIES: Municipality[] = [
         label: "道路種別図（地図検索・試行・ArcGIS）",
         build: arcgisWebApp("hinocity.maps.arcgis.com", "08e3629b00114275925dbb849668e12c"),
         verified: true,
+        read: HINO_ROADS,
       },
     ],
     contact: { dept: "まちづくり部 建築指導課", phone: "042-587-6211", note: "道路の扱いは電話・メールでは答えてもらえない。窓口で確認", noPhoneInquiry: true },
