@@ -213,3 +213,10 @@ export const LandPriceIcon = ({ className }: P) => (
     <path d="M7 3l5 7 5-7M12 10v8M8 11.5h8M8 15h8M3 21h18" />
   </svg>
 );
+
+/** 学区（校舎と旗） */
+export const SchoolIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M3 21h18M5 21V11l7-4 7 4v10M12 7V3l4 1.5L12 6M10 21v-5h4v5M8 13h.01M16 13h.01" />
+  </svg>
+);

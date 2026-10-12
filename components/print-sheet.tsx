@@ -11,6 +11,8 @@ import { BUILDING_CREDIT } from "@/lib/roadmap/building-data";
 import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, HAZARD_TABLE_NOTE, hazardRows, wagamachiUrl } from "@/lib/roadmap/hazard";
 import { changeText, distanceText, kindText, priceText } from "@/lib/roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "@/lib/roadmap/land-price-data";
+import { schoolLine } from "@/lib/roadmap/school";
+import { SCHOOL_CREDIT } from "@/lib/roadmap/school-data";
 import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
 import { zoningRows } from "@/lib/roadmap/zoning";
@@ -19,6 +21,7 @@ import { COVERAGE } from "./coverage";
 import type { BuildingState } from "./building-card";
 import type { HazardState } from "./hazard-card";
 import type { LandPriceState } from "./land-price-card";
+import type { SchoolState } from "./school-card";
 import { MapPreview } from "./map-preview";
 import type { RoadsState } from "./nearby-roads";
 import { parcelLines, type ParcelInfo } from "./parcel-card";
@@ -43,6 +46,7 @@ export function PrintSheet(props: {
   hazard: HazardState;
   building: BuildingState;
   landPrice: LandPriceState;
+  schools: SchoolState;
 }) {
   // document.body に出す（画面の作りの外に置き、印刷では画面の作りを丸ごと隠す）。サーバーでは何も出さない
   const client = useSyncExternalStore(
@@ -62,6 +66,7 @@ function Memo({
   hazard,
   building,
   landPrice,
+  schools,
 }: {
   result: Ok;
   zoning: ZoningState;
@@ -70,6 +75,7 @@ function Memo({
   hazard: HazardState;
   building: BuildingState;
   landPrice: LandPriceState;
+  schools: SchoolState;
 }) {
   const bHit = building.status === "ok" ? building.result.hit : undefined;
   // 近くの地価：一番近い地価公示と地価調査を1つずつ（1枚に収めるため）
@@ -146,6 +152,16 @@ function Memo({
                     {kindText(h.kind)} {h.no}（{h.usage}・{h.bearing}へ{distanceText(h.distance)}）：<b>{priceText(h.price)}</b>（前年比 {changeText(h.change)}・{h.year}年）
                   </span>
                 ))}
+              </dd>
+            </>
+          )}
+          {schools.status === "ok" && (
+            <>
+              <dt className="text-[#7a6a55]">学区（参考）</dt>
+              <dd>
+                {[schools.schools.elementary && `小学校：${schoolLine(schools.schools.elementary)}`, schools.schools.junior && `中学校：${schoolLine(schools.schools.junior)}`]
+                  .filter(Boolean)
+                  .join("　")}
               </dd>
             </>
           )}
@@ -368,6 +384,7 @@ function Memo({
           {hazard.status === "ok" && `災害リスクの${HAZARD_CREDIT}。`}
           {bHit && `建物の${BUILDING_CREDIT}。`}
           {prices.length > 0 && `地価の${LAND_PRICE_CREDIT}（標準地・基準地の価格で、物件の価格ではありません）。`}
+          {schools.status === "ok" && `学区の${SCHOOL_CREDIT}（指定校は教育委員会で確認）。`}
           {(p || parcels.status === "ok") && `筆の${PARCEL_CREDIT}。`}
         </p>
       </footer>

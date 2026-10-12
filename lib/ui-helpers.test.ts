@@ -176,8 +176,37 @@ describe("buildSummary", () => {
         "・地価公示 千代田-5（住宅地・北東へ約900m）：300万円/m²（前年比 新規、2026年1月1日時点）\n",
     );
     expect(text).not.toContain("千代田-9");
+    // 学区は渡していないので出さない
+    expect(text).not.toContain("【学区");
     expect(text).toContain("※地価の出典：「国土数値情報（地価公示データ・都道府県地価調査データ）」（国土交通省");
     expect(text).toContain("物件そのものの価格ではありません");
+  });
+});
+
+describe("buildSummary の学区", () => {
+  it("小学校区・中学校区を添える（データの年と、教育委員会で確かめる旨も）", () => {
+    const m = findMunicipality("13104")!;
+    const text = buildSummary(
+      {
+        status: "ok",
+        lat: 35.7128,
+        lng: 139.7046,
+        matchedAddress: "東京都新宿区高田馬場一丁目",
+        town: "高田馬場一丁目",
+        approximate: false,
+        municipality: m,
+        links: buildLinks(m, 35.7128, 139.7046),
+      },
+      {
+        schools: {
+          elementary: { kind: "小学校", name: "戸塚第二小学校", owner: "新宿区立", city: "13104", distance: 120 },
+          junior: { kind: "中学校", name: "西早稲田中学校", owner: "新宿区", city: "13104", distance: 739 },
+        },
+      },
+    );
+    expect(text).toContain("【学区（参考・令和5年度（2023年度）のデータ）】\n・小学校：戸塚第二小学校（新宿区立・直線約120m）\n・中学校：西早稲田中学校（新宿区・直線約740m）");
+    expect(text).toContain("※学区の出典：「国土数値情報（小学校区データ・中学校区データ・学校データ）」（国土交通省");
+    expect(text).toContain("指定校は教育委員会で確認を");
   });
 });
 

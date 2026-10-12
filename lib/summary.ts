@@ -5,6 +5,8 @@ import { BUILDING_CREDIT } from "./roadmap/building-data";
 import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, hazardRows, wagamachiUrl, type Elevation, type HazardMaps, type HazardReport } from "./roadmap/hazard";
 import { asOfText, changeText, distanceText, kindText, priceText, type LandPriceHit } from "./roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
+import { schoolLine, type Schools } from "./roadmap/school";
+import { SCHOOL_CREDIT, SCHOOL_DATA } from "./roadmap/school-data";
 import { chibanLabel, kuikiLabel } from "./roadmap/parcel";
 import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
@@ -16,7 +18,8 @@ const COVERAGE_SHORT = { full: "ネットで全種別が分かる", partial: "�
 /**
  * zoning：地点の都市計画、parcels：謄本・公図用の「所在 地番」の行（物件の筆と隣の筆。reference は住所の地点の筆で参考）、
  * roads：市の地図データで読んだ、物件のまわりの道路の種別、hazard：国のハザードマップのデータで読んだ地点の災害リスクと、
- * 市区町村のハザードマップのページ、landPrice：近くの地価公示・地価調査の地点（近い順）。読み込めていれば添える
+ * 市区町村のハザードマップのページ、landPrice：近くの地価公示・地価調査の地点（近い順）、schools：地点の小学校区・中学校区。
+ * 読み込めていれば添える
  */
 export function buildSummary(
   result: Extract<LookupResult, { status: "ok" }>,
@@ -27,6 +30,7 @@ export function buildSummary(
     hazard,
     building,
     landPrice,
+    schools,
   }: {
     zoning?: { zoning: Zoning; st?: ZoningStatus };
     parcels?: { target?: string; neighbors: string[]; reference: boolean };
@@ -34,6 +38,7 @@ export function buildSummary(
     hazard?: { report: HazardReport; elevation: Elevation | null; maps: HazardMaps; muniCd: string };
     building?: BuildingResult;
     landPrice?: LandPriceHit[];
+    schools?: Schools;
   } = {},
 ): string {
   const m = result.municipality;
@@ -74,6 +79,11 @@ export function buildSummary(
     for (const h of prices)
       lines.push(`・${kindText(h.kind)} ${h.no}（${h.usage}・${h.bearing}へ${distanceText(h.distance)}）：${priceText(h.price)}（前年比 ${changeText(h.change)}、${asOfText(h)}）`);
   }
+  if (schools?.elementary || schools?.junior) {
+    lines.push(`【学区（参考・${SCHOOL_DATA.edition}のデータ）】`);
+    if (schools.elementary) lines.push(`・小学校：${schoolLine(schools.elementary)}`);
+    if (schools.junior) lines.push(`・中学校：${schoolLine(schools.junior)}`);
+  }
   const withParcels = !!parcels && (!!parcels.target || parcels.neighbors.length > 0);
   if (parcels && withParcels) {
     lines.push(`【謄本・公図用の地番${parcels.reference ? "（住所の地点の筆・参考）" : ""}】`);
@@ -86,5 +96,6 @@ export function buildSummary(
   if (hazard) lines.push(`※災害リスクの${HAZARD_CREDIT}。`);
   if (hit) lines.push(`※建物の${BUILDING_CREDIT}。`);
   if (prices.length) lines.push(`※地価の${LAND_PRICE_CREDIT}。物件そのものの価格ではありません。`);
+  if (schools?.elementary || schools?.junior) lines.push(`※学区の${SCHOOL_CREDIT}。学区は見直されることがあります。指定校は教育委員会で確認を。`);
   return lines.join("\n");
 }
