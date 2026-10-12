@@ -75,9 +75,11 @@ body {
 
 /*
  * 印刷・PDF 保存：結果が出ていれば、画面（地図・パネル・シート）は出さず、調査メモ（components/print-sheet.tsx）だけを A4 に出す。
+ * 案内図のシートを開いているあいだ（body の data-print="guide"）は、調査メモの代わりに案内図（components/guide-map.tsx）を出す。
  * 結果が出ていない画面（ホーム・候補選び）は、これまでどおり画面をそのまま印刷する
  */
-.print-sheet {
+.print-sheet,
+.print-guide {
   display: none;
 }
 @media print {
@@ -94,12 +96,20 @@ body {
   body:has(> .print-sheet) {
     display: block !important;
   }
-  body:has(> .print-sheet) > :not(.print-sheet) {
+  body:has(> .print-sheet) > :not(.print-sheet, .print-guide) {
     display: none !important;
   }
   .print-sheet {
     display: block;
     /* 凡例の色・用途地域の色を印刷でも出す */
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  body[data-print="guide"] > .print-sheet {
+    display: none !important;
+  }
+  body[data-print="guide"] > .print-guide {
+    display: block;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }

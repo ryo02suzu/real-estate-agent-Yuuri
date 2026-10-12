@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { showHazardOnMap, showLandPriceOnMap } from "@/lib/map-style";
 import type { LookupResult, Municipality, ResolvedLink } from "@/lib/roadmap";
 import type { HazardKind } from "@/lib/roadmap/hazard";
@@ -11,6 +11,7 @@ import { buildSummary } from "@/lib/summary";
 import { BuildingCard, BuildingSection, useBuilding, type BuildingState } from "./building-card";
 import { ContactCard } from "./contact-card";
 import { COVERAGE, CoveragePill } from "./coverage";
+import { GuideMapSheet } from "./guide-map";
 import { HazardCard, HazardLine, useHazard, type HazardState } from "./hazard-card";
 import {
   AlertIcon,
@@ -743,7 +744,7 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
             <>
               <CopyButton text={copyText(result)} />
               <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} desktop />
-              <PrintButton />
+              <PrintMenu result={result} />
             </>
           }
         />
@@ -821,16 +822,60 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
   );
 }
 
-/** PC：調査メモを印刷・PDF 保存する（印刷用の1枚は components/print-sheet.tsx）。見出しの行が窮屈なのでアイコンだけ */
-function PrintButton() {
+/** PC：調査メモ（components/print-sheet.tsx）か案内図（components/guide-map.tsx）を印刷・PDF 保存する。見出しの行が窮屈なのでアイコンだけで、押すと選ぶ */
+function PrintMenu({ result }: { result: Extract<LookupResult, { status: "ok" }> }) {
+  const [menu, setMenu] = useState(false);
+  const [guide, setGuide] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  // 選ぶ欄の外を押すか Esc で閉じる
+  useEffect(() => {
+    if (!menu) return;
+    const onDown = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setMenu(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
+  const item = "flex items-center gap-2 rounded-lg px-3 py-1.5 text-left hover:bg-mint";
   return (
-    <button
-      onClick={() => window.print()}
-      aria-label="調査メモを印刷"
-      title="調査メモを印刷・PDF保存"
-      className="flex items-center rounded-full border border-line px-2 py-1 text-brand lg:hover:bg-mint"
-    >
-      <PrintIcon className="h-3.5 w-3.5" />
-    </button>
+    <span ref={ref} className="relative">
+      <button
+        onClick={() => setMenu((v) => !v)}
+        aria-label="印刷"
+        aria-expanded={menu}
+        title="調査メモ・案内図を印刷・PDF保存"
+        className="flex items-center rounded-full border border-line px-2 py-1 text-brand lg:hover:bg-mint"
+      >
+        <PrintIcon className="h-3.5 w-3.5" />
+      </button>
+      {menu && (
+        <span className="absolute right-0 top-full z-40 mt-1 flex w-max flex-col rounded-xl border border-line bg-white p-1 text-[12.5px] text-ink shadow-soft">
+          <button
+            className={item}
+            onClick={() => {
+              setMenu(false);
+              window.print();
+            }}
+          >
+            <PrintIcon className="h-3.5 w-3.5 text-brand" />
+            調査メモを印刷
+          </button>
+          <button
+            className={item}
+            onClick={() => {
+              setMenu(false);
+              setGuide(true);
+            }}
+          >
+            <MapIcon className="h-3.5 w-3.5 text-brand" />
+            案内図を印刷…
+          </button>
+        </span>
+      )}
+      <GuideMapSheet result={result} open={guide} onClose={() => setGuide(false)} />
+    </span>
   );
 }
