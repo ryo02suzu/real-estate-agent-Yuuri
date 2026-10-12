@@ -36,6 +36,7 @@ export function ResultView({
   result,
   onPick,
   onFix,
+  onExpand,
   desktop,
 }: {
   query: string;
@@ -43,13 +44,15 @@ export function ResultView({
   onPick: (address: string) => void;
   /** 「場所を直す」：地図で物件の場所を選び直す（スマホは全画面の地図を開く） */
   onFix?: () => void;
+  /** 「地図を拡大」：MICHILU の中の動く地図で物件のまわりを見る（スマホ）。withRoads なら道路種別を重ねて開く */
+  onExpand?: (withRoads?: boolean) => void;
   /** PC（地図の左のパネル）用の配置 */
   desktop?: boolean;
 }) {
   if (result.status === "not_found") return <NotFound query={query} />;
   if (result.status === "choose") return <Choose query={query} result={result} onPick={onPick} />;
   if (result.status === "unsupported") return <Unsupported result={result} onFix={onFix} />;
-  return desktop ? <DesktopFound result={result} onPick={onPick} /> : <Found result={result} onFix={onFix} onPick={onPick} />;
+  return desktop ? <DesktopFound result={result} onPick={onPick} /> : <Found result={result} onFix={onFix} onExpand={onExpand} onPick={onPick} />;
 }
 
 function NotFound({ query }: { query: string }) {
@@ -141,10 +144,12 @@ function Unsupported({
 function Found({
   result,
   onFix,
+  onExpand,
   onPick,
 }: {
   result: Extract<LookupResult, { status: "ok" }>;
   onFix?: () => void;
+  onExpand?: (withRoads?: boolean) => void;
   onPick: (address: string) => void;
 }) {
   const m = result.municipality;
@@ -213,8 +218,8 @@ function Found({
               「場所を直す」「場所を地図で見る」だけの細い行にする（背の低い画面では「場所を直す」は上の行にあるので
               「場所を地図で見る」だけ。細い行も入らなければ何も出さない。app/globals.css の .preview-box） */}
           <div className="preview-box flex min-h-[36px] flex-1 !shrink flex-col [@media(max-height:720px)]:min-h-0">
-            <Preview result={result} onFix={onFix} fixInRow className="preview-map mt-2 min-h-0 flex-1 [@media(max-height:720px)]:mt-1.5" />
-            <SlimPreview result={result} onFix={onFix} />
+            <Preview result={result} onFix={onFix} onExpand={onExpand} fixInRow className="preview-map mt-2 min-h-0 flex-1 [@media(max-height:720px)]:mt-1.5" />
+            <SlimPreview result={result} onFix={onFix} onExpand={onExpand} />
           </div>
           {(primary.length > 0 || secondary.length > 0) && (
             <>
@@ -229,7 +234,7 @@ function Found({
                   <MapButton key={l.url} link={l} />
                 ))}
               </div>
-              <NearbyRoadsLine state={roads} />
+              <NearbyRoadsLine state={roads} onShowMap={onExpand && (() => onExpand(true))} />
               {hint}
             </>
           )}
@@ -471,17 +476,30 @@ function Preview({
   result,
   className,
   onFix,
+  onExpand,
   fixInRow,
 }: {
   result: Extract<LookupResult, { status: "ok" }>;
   className: string;
   onFix?: () => void;
+  onExpand?: () => void;
   /** 背の低い画面では「場所を直す」を上の行に出すので、ここでは出さない */
   fixInRow?: boolean;
 }) {
   const sheet = result.links.find((l) => l.sheet)?.sheet;
   const [mode, setMode] = useState<"sheet" | "around">("sheet");
-  if (!sheet) return <MapPreview lat={result.lat} lng={result.lng} className={className} onFix={onFix} fixClassName={fixInRow ? "[@media(max-height:720px)]:hidden" : ""} parcel={result.parcel} />;
+  if (!sheet)
+    return (
+      <MapPreview
+        lat={result.lat}
+        lng={result.lng}
+        className={className}
+        onFix={onFix}
+        onExpand={onExpand}
+        fixClassName={fixInRow ? "[@media(max-height:720px)]:hidden" : ""}
+        parcel={result.parcel}
+      />
+    );
   const tab = (m: typeof mode, label: string) => (
     <button
       onClick={() => setMode(m)}
@@ -515,14 +533,14 @@ function Preview({
       {mode === "sheet" ? (
         <SheetPreview lat={result.lat} lng={result.lng} sheet={sheet} className="min-h-0 flex-1" />
       ) : (
-        <MapPreview lat={result.lat} lng={result.lng} className="min-h-0 flex-1" parcel={result.parcel} />
+        <MapPreview lat={result.lat} lng={result.lng} className="min-h-0 flex-1" parcel={result.parcel} onExpand={onExpand} />
       )}
     </div>
   );
 }
 
-/** 地図プレビューが入らないほど狭いときの代わり（「場所を直す」と、地理院地図をその場所で開く） */
-function SlimPreview({ result, onFix }: { result: Extract<LookupResult, { status: "ok" }>; onFix?: () => void }) {
+/** 地図プレビューが入らないほど狭いときの代わり（「場所を直す」と、地図をその場所で開く） */
+function SlimPreview({ result, onFix, onExpand }: { result: Extract<LookupResult, { status: "ok" }>; onFix?: () => void; onExpand?: () => void }) {
   return (
     <div className="preview-slim my-auto items-center gap-1.5">
       {onFix && (
@@ -531,15 +549,22 @@ function SlimPreview({ result, onFix }: { result: Extract<LookupResult, { status
           場所を直す
         </button>
       )}
-      <a
-        href={`https://maps.gsi.go.jp/#17/${result.lat.toFixed(6)}/${result.lng.toFixed(6)}/`}
-        target="_blank"
-        rel="noreferrer"
-        className="flex items-center gap-1 rounded-full border border-line px-3 py-1 text-[11px] text-ink"
-      >
-        <MapIcon className="h-3.5 w-3.5 text-brand-light" />
-        場所を地図で見る
-      </a>
+      {onExpand ? (
+        <button onClick={() => onExpand()} className="flex items-center gap-1 rounded-full border border-line px-3 py-1 text-[11px] text-ink">
+          <MapIcon className="h-3.5 w-3.5 text-brand-light" />
+          場所を地図で見る
+        </button>
+      ) : (
+        <a
+          href={`https://maps.gsi.go.jp/#17/${result.lat.toFixed(6)}/${result.lng.toFixed(6)}/`}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-1 rounded-full border border-line px-3 py-1 text-[11px] text-ink"
+        >
+          <MapIcon className="h-3.5 w-3.5 text-brand-light" />
+          場所を地図で見る
+        </a>
+      )}
     </div>
   );
 }

@@ -183,6 +183,13 @@ export const ParcelIcon = ({ className }: P) => (
   </svg>
 );
 
+/** 道路種別（道） */
+export const RoadIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M8 3 4 21M16 3l4 18M12 4v3M12 11v3M12 18v3" />
+  </svg>
+);
+
 /** 用途地域（色分けされた区域） */
 export const ZoningIcon = ({ className }: P) => (
   <svg {...base} strokeWidth={1.8} className={className}>

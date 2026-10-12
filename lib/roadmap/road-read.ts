@@ -1,10 +1,15 @@
 // 市の道路種別の地図データ（ArcGIS のフィーチャレイヤ。CORS で誰でも読める公開データ）を読み、
 // 物件の地点のまわりにある道路の種別・方角・距離を文字で出す。地図の色を見比べなくても分かるように。
+// 見ている範囲の道路の形も読み、MICHILU の地図に種別の色で描く（readRoadShapes）。
 // 読むのは地図に載っている道路だけ。どれが前面道路か、幅員・接道の判断はしない（最終確認は窓口）
+import type { Feature, FeatureCollection, MultiLineString, MultiPolygon } from "geojson";
 import type { LngLat } from "./parcel";
 
-/** レイヤ1つ。label があればそのレイヤの道路はすべてその種別（行田市・つくば市は種別ごとのレイヤ。color は地図の線の色） */
-export type RoadLayer = { url: string; label?: string; color?: string };
+/**
+ * レイヤ1つ。label があればそのレイヤの道路はすべてその種別（行田市・つくば市は種別ごとのレイヤ。color は地図の線の色）。
+ * field は種別のコードの属性（レイヤごとに違うとき。無ければ RoadRead.field）
+ */
+export type RoadLayer = { url: string; label?: string; color?: string; field?: string };
 
 export type RoadRead = {
   layers: RoadLayer[];
@@ -69,6 +74,7 @@ export async function readRoads(read: RoadRead, lat: number, lng: number, { fetc
   await Promise.all(
     read.layers.map(async (layer) => {
       const legend = layer.label ? undefined : await legendOf(layer.url, fetchFn);
+      const field = layer.field ?? read.field;
       const q = new URLSearchParams({
         f: "json",
         geometry: JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 } }),
@@ -77,7 +83,7 @@ export async function readRoads(read: RoadRead, lat: number, lng: number, { fetc
         spatialRel: "esriSpatialRelIntersects",
         distance: String(ROAD_RADIUS_M),
         units: "esriSRUnit_Meter",
-        outFields: [read.field, ...(read.width ?? [])].filter(Boolean).join(",") || "*",
+        outFields: [field, ...(read.width ?? [])].filter(Boolean).join(",") || "*",
         returnGeometry: "true",
         outSR: "4326",
         resultRecordCount: "50",
@@ -90,8 +96,10 @@ export async function readRoads(read: RoadRead, lat: number, lng: number, { fetc
         const lines = f.geometry?.paths ?? f.geometry?.rings ?? [];
         if (!lines.length) continue;
         const near = nearest(p, lines);
-        const code = read.field ? String(f.attributes[read.field] ?? "").trim() : "";
+        const code = field ? String(f.attributes[field] ?? "").trim() : "";
         const entry = legend?.get(code);
+        // 凡例に無いコードの道路は、市の地図にも描かれないので出さない
+        if (!layer.label && legend?.size && !entry) continue;
         const label = layer.label ?? entry?.label ?? code;
         if (!label) continue;
         const [w1, w2] = (read.width ?? []).map((k) => Number(f.attributes[k]) || 0);
@@ -109,6 +117,85 @@ export async function readRoads(read: RoadRead, lat: number, lng: number, { fetc
   found.sort((a, b) => a.distance - b.distance);
   const seen = new Set<string>();
   return found.filter((r) => !seen.has(`${r.label}|${r.direction}`) && seen.add(`${r.label}|${r.direction}`)).slice(0, limit);
+}
+
+/** 地図に描く道路の属性：種別（凡例の名前）・短い呼び方・色 */
+export type RoadShapeProps = { label: string; short: string; color: string };
+
+/** 1回に読む件数（ArcGIS の上限は 1000〜2000）と、読む回数の上限 */
+const PAGE = 1000;
+const MAX_PAGES = 4;
+/** 描くときの形の間引き（度。約0.4m） */
+const SIMPLIFY_DEG = 0.000004;
+
+/** 読んだ道路の形。truncated は、件数の上限で読み切れなかったレイヤがあるとき（範囲の一部の道路が無い） */
+export type RoadShapes = FeatureCollection<MultiLineString | MultiPolygon, RoadShapeProps> & { truncated: boolean };
+
+/**
+ * 範囲（[西, 南, 東, 北]）の中の道路を読み、地図に描ける形（GeoJSON）にする。線は線のまま、道路の区域の面は面のまま。
+ * 種別・色の決め方は readRoads と同じ（レイヤの label・color か、凡例のコード）
+ */
+export async function readRoadShapes(read: RoadRead, bbox: [number, number, number, number], { fetchFn = fetch as Fetch } = {}): Promise<RoadShapes> {
+  const features: Feature<MultiLineString | MultiPolygon, RoadShapeProps>[] = [];
+  let truncated = false;
+  await Promise.all(
+    read.layers.map(async (layer) => {
+      const legend = layer.label ? undefined : await legendOf(layer.url, fetchFn);
+      const field = layer.field ?? read.field;
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const q = new URLSearchParams({
+          f: "json",
+          geometry: bbox.join(","),
+          geometryType: "esriGeometryEnvelope",
+          inSR: "4326",
+          spatialRel: "esriSpatialRelIntersects",
+          outFields: field ?? "",
+          returnGeometry: "true",
+          outSR: "4326",
+          geometryPrecision: "7",
+          maxAllowableOffset: String(SIMPLIFY_DEG),
+          resultOffset: String(page * PAGE),
+          resultRecordCount: String(PAGE),
+        });
+        const res = await fetchFn(`${layer.url}/query?${q}`);
+        if (!res.ok) throw new Error(`road layer ${res.ok}`);
+        const data = (await res.json()) as {
+          error?: unknown;
+          exceededTransferLimit?: boolean;
+          features?: { attributes?: Record<string, unknown>; geometry?: { paths?: LngLat[][]; rings?: LngLat[][] } }[];
+        };
+        if (data.error) throw new Error("road layer error");
+        for (const f of data.features ?? []) {
+          const code = field ? String(f.attributes?.[field] ?? "").trim() : "";
+          const entry = legend?.get(code);
+          if (!layer.label && legend?.size && !entry) continue;
+          const label = layer.label ?? entry?.label ?? code;
+          if (!label) continue;
+          const props: RoadShapeProps = { label, short: roadShort(label), color: layer.color ?? entry?.color ?? legend?.simpleColor ?? "#8a6632" };
+          const g = f.geometry;
+          if (g?.paths?.length) features.push({ type: "Feature", properties: props, geometry: { type: "MultiLineString", coordinates: g.paths } });
+          else if (g?.rings?.length) features.push({ type: "Feature", properties: props, geometry: { type: "MultiPolygon", coordinates: ringsToPolygons(g.rings) } });
+        }
+        if (!data.exceededTransferLimit || (data.features?.length ?? 0) < PAGE) break;
+        if (page === MAX_PAGES - 1) truncated = true;
+      }
+    }),
+  );
+  return { type: "FeatureCollection", features, truncated };
+}
+
+/** ArcGIS の rings（外周は時計回り、穴は反時計回り）を、GeoJSON の多角形の並びにする */
+export function ringsToPolygons(rings: LngLat[][]): LngLat[][][] {
+  const polys: LngLat[][][] = [];
+  for (const ring of rings) {
+    // 辺ごとの (x2 - x1)(y2 + y1) の和が正なら時計回り（経度・緯度のまま、北が上）
+    let sum = 0;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) sum += (ring[i][0] - ring[j][0]) * (ring[i][1] + ring[j][1]);
+    const clockwise = sum > 0;
+    if (clockwise || polys.length === 0) polys.push([ring]);
+    else polys[polys.length - 1].push(ring);
+  }
+  return polys;
 }
 
 function widthLabel(a: number, b: number): string | undefined {

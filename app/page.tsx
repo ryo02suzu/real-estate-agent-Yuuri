@@ -8,6 +8,7 @@ import { HistoryChips, HistoryList } from "@/components/history-list";
 import { AlertIcon, AreaIcon, ChevronRightIcon, ClockIcon, InfoIcon, MapIcon } from "@/components/icons";
 import { MapIllustration, SkylineIllustration } from "@/components/illustrations";
 import { CitiesSheet, HelpSheet, MenuSheet, type SheetName } from "@/components/info-sheets";
+import { FullMap } from "@/components/full-map";
 import { LocationPicker } from "@/components/location-picker";
 import { ResultView } from "@/components/result-view";
 import { SearchCard } from "@/components/search-card";
@@ -48,6 +49,10 @@ export default function Home() {
   const [sheet, setSheet] = useState<SheetName | "menu" | null>(null);
   // スマホの「地図で選ぶ」画面（start: 最初に表示する地点）
   const [picker, setPicker] = useState<{ start?: { lat: number; lng: number } } | null>(null);
+  // 住所で調べた回数。変わると PC の地図が物件の場所へ戻る（同じ住所で調べ直したときも）
+  const [focus, setFocus] = useState(0);
+  // スマホの「地図を拡大」（MICHILU の中の動く地図）。roads: 道路種別を重ねて開く
+  const [fullMap, setFullMap] = useState<{ roads?: boolean } | null>(null);
   const desktop = useDesktop();
 
   /** 住所（q）か、地図で選んだ地点（ll）で調べて結果を出す */
@@ -59,6 +64,7 @@ export default function Home() {
       const query = "q" in target ? target.q : result.status === "ok" || result.status === "unsupported" ? result.matchedAddress : "";
       setInput(query);
       setShown({ query, result });
+      if ("q" in target) setFocus((n) => n + 1);
       if (result.status === "ok" || result.status === "unsupported") {
         setHistory(
           addHistory({
@@ -153,6 +159,7 @@ export default function Home() {
       <>
         <DesktopShell
           shown={shown}
+          focus={focus}
           input={input}
           setInput={setInput}
           loading={loading}
@@ -194,6 +201,7 @@ export default function Home() {
                 const r = shown.result;
                 setPicker({ start: r.status === "ok" || r.status === "unsupported" ? { lat: r.lat, lng: r.lng } : undefined });
               }}
+              onExpand={(roads) => setFullMap({ roads })}
             />
           </div>
         ) : (
@@ -285,6 +293,9 @@ export default function Home() {
             void searchPoint(lat, lng);
           }}
         />
+      )}
+      {fullMap && shown?.result.status === "ok" && (
+        <FullMap result={shown.result} withRoads={fullMap.roads} onClose={() => setFullMap(null)} onPick={(lat, lng) => void searchPoint(lat, lng)} />
       )}
     </div>
   );

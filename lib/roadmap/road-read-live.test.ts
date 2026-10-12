@@ -1,13 +1,14 @@
-// 道路種別の読み取りを本物の地図データ（埼玉県・行田市・つくば市の公開 ArcGIS レイヤ）で確かめる。ネットにつなぐので ROAD_LIVE=1 のときだけ
+// 道路種別の読み取りを本物の地図データ（埼玉県・行田市・つくば市・千代田区・豊島区・日野市の公開 ArcGIS レイヤ）で確かめる。ネットにつなぐので ROAD_LIVE=1 のときだけ
 import { describe, expect, it } from "vitest";
 import { MUNICIPALITIES } from "./municipalities";
-import { readRoads, type RoadLayer } from "./road-read";
+import { readRoads, readRoadShapes, type RoadLayer } from "./road-read";
 
-/** レイヤの最初の道路の、線の途中の点（そこを物件の地点にする） */
+/** レイヤの最初の道路の、線の途中の点（面なら外周の辺の途中。そこを物件の地点にする） */
 async function pointOn(layer: RoadLayer, where = "1=1"): Promise<{ lat: number; lng: number }> {
   const q = new URLSearchParams({ f: "json", where, returnGeometry: "true", outSR: "4326", resultRecordCount: "1" });
-  const d = (await (await fetch(`${layer.url}/query?${q}`)).json()) as { features: { geometry: { paths: number[][][] } }[] };
-  const path = d.features[0].geometry.paths[0];
+  const d = (await (await fetch(`${layer.url}/query?${q}`)).json()) as { features: { geometry: { paths?: number[][][]; rings?: number[][][] } }[] };
+  const g = d.features[0].geometry;
+  const path = (g.paths ?? g.rings)![0];
   const [a, b] = [path[0], path[Math.min(1, path.length - 1)]];
   return { lng: (a[0] + b[0]) / 2, lat: (a[1] + b[1]) / 2 };
 }
@@ -37,6 +38,9 @@ describe.skipIf(!process.env.ROAD_LIVE)("道路種別の読み取り（本物の
   for (const [city, label] of [
     ["行田市", "42条2項"],
     ["つくば市", "第42条第2項"],
+    ["千代田区", "42条2項"],
+    ["豊島区", "42条1項5号(告示建築線)"],
+    ["日野市", "42条2項"],
   ] as const)
     it(`${city}：${label} の上の地点`, { timeout: 60_000 }, async () => {
       const read = readOf(city);
@@ -45,5 +49,17 @@ describe.skipIf(!process.env.ROAD_LIVE)("道路種別の読み取り（本物の
       const roads = await readRoads(read, p.lat, p.lng);
       console.log(city, roads.map((r) => `${r.direction} ${r.distance.toFixed(1)}m ${r.label}`).join(" / "));
       expect(roads.find((r) => r.label === label)?.distance).toBeLessThan(1.5);
+    });
+
+  for (const city of ["千代田区", "豊島区", "日野市", "三芳町"])
+    it(`${city}：地点のまわり 300m 四方の道路の形を、種別と色つきで読める`, { timeout: 60_000 }, async () => {
+      const read = readOf(city);
+      const p = await pointOn(read.layers[0]);
+      const d = 0.0018;
+      const fc = await readRoadShapes(read, [p.lng - d, p.lat - d, p.lng + d, p.lat + d]);
+      const kinds = [...new Set(fc.features.map((f) => `${f.properties.short}:${f.properties.color}:${f.geometry.type}`))];
+      console.log(city, fc.features.length, kinds.join(" / "));
+      expect(fc.features.length).toBeGreaterThan(0);
+      for (const f of fc.features) expect(f.properties.color).toMatch(/^#[0-9a-f]{6}$/);
     });
 });

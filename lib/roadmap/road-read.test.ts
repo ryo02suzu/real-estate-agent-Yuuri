@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { nearest, readRoads, roadShort, type RoadRead } from "./road-read";
+import { nearest, readRoads, readRoadShapes, ringsToPolygons, roadShort, type RoadRead } from "./road-read";
 
 const LAT = 35.82;
 const LNG = 139.55;
@@ -53,6 +53,8 @@ describe("地図データを読む", () => {
               { attributes: { SYUBETU: "130", MIN_FUKUIN: 0, MAX_FUKUIN: 0 }, geometry: { paths: [line(0, -20)] } },
               // 同じ種別・同じ方角の続き（まとめる）
               { attributes: { SYUBETU: "180", MIN_FUKUIN: 0, MAX_FUKUIN: 0 }, geometry: { paths: [line(0, 9)] } },
+              // 凡例に無いコード（市の地図にも描かれない）
+              { attributes: { SYUBETU: "999", MIN_FUKUIN: 0, MAX_FUKUIN: 0 }, geometry: { paths: [line(0, 2)] } },
             ],
           }
         : {
@@ -95,5 +97,81 @@ describe("地図データを読む", () => {
   it("サーバのエラーは失敗として返す", async () => {
     const f = vi.fn(async () => ({ ok: true, json: async () => ({ error: { code: 400 } }) }));
     await expect(readRoads({ layers: [{ url: `${LAYER}y`, label: "x" }] }, LAT, LNG, { fetchFn: f })).rejects.toThrow();
+  });
+});
+
+describe("地図に描く道路の形", () => {
+  const LAYER = "https://example.com/arcgis/rest/services/区/FeatureServer/1";
+  const BBOX: [number, number, number, number] = [139.7, 35.7, 139.71, 35.71];
+  // 時計回り（外周）と反時計回り（穴）
+  const outer = [
+    [0, 0],
+    [0, 1],
+    [1, 1],
+    [1, 0],
+    [0, 0],
+  ];
+  const hole = [
+    [0.2, 0.2],
+    [0.8, 0.2],
+    [0.8, 0.8],
+    [0.2, 0.8],
+    [0.2, 0.2],
+  ];
+  const outer2 = outer.map(([x, y]) => [x + 2, y]);
+
+  it("ArcGIS の rings を、外周ごとの多角形（穴つき）に分ける", () => {
+    expect(ringsToPolygons([outer, hole, outer2] as [number, number][][])).toEqual([[outer, hole], [outer2]]);
+  });
+
+  it("範囲の中の線と面を、凡例の種別名・色をつけて返す。続きがあれば次のページも読む", async () => {
+    const queries: URL[] = [];
+    const f = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => {
+        if (!url.includes("/query?"))
+          return { drawingInfo: { renderer: { type: "uniqueValue", uniqueValueInfos: [{ value: "210", label: "42条2項(公道)", symbol: { color: [38, 115, 0, 255] } }] } } };
+        const u = new URL(url);
+        queries.push(u);
+        const offset = Number(u.searchParams.get("resultOffset"));
+        // 1ページ目は上限いっぱい（続きあり）、2ページ目で終わり
+        if (offset === 0)
+          return {
+            exceededTransferLimit: true,
+            features: Array.from({ length: 1000 }, () => ({ attributes: { CODE1: "210" }, geometry: { paths: [[[139.701, 35.701], [139.702, 35.701]]] } })),
+          };
+        return { features: [{ attributes: { CODE1: "210" }, geometry: { rings: [outer] } }, { attributes: { CODE1: "999" }, geometry: { paths: [[[0, 0], [1, 1]]] } }] };
+      },
+    }));
+    const fc = await readRoadShapes({ layers: [{ url: LAYER, field: "CODE1" }] }, BBOX, { fetchFn: f });
+    expect(queries.map((q) => q.searchParams.get("resultOffset"))).toEqual(["0", "1000"]);
+    expect(fc.truncated).toBe(false);
+    expect(queries[0].searchParams.get("geometry")).toBe("139.7,35.7,139.71,35.71");
+    expect(queries[0].searchParams.get("geometryType")).toBe("esriGeometryEnvelope");
+    expect(queries[0].searchParams.get("outFields")).toBe("CODE1");
+    // 1000本の線と1つの面。凡例に無いコード（999）は、市の地図にも描かれないので入れない
+    expect(fc.features.length).toBe(1001);
+    expect(fc.features[0]).toMatchObject({ geometry: { type: "MultiLineString" }, properties: { label: "42条2項(公道)", short: "2項道路", color: "#267300" } });
+    expect(fc.features[1000]).toMatchObject({ geometry: { type: "MultiPolygon", coordinates: [[outer]] }, properties: { short: "2項道路" } });
+  });
+
+  it("上限まで読んでも続きがあれば、読み切れなかったと返す", async () => {
+    const full = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ exceededTransferLimit: true, features: Array.from({ length: 1000 }, () => ({ attributes: {}, geometry: { paths: [[[0, 0], [1, 1]]] } })) }),
+    }));
+    const fc = await readRoadShapes({ layers: [{ url: `${LAYER}z`, label: "42条2項" }] }, BBOX, { fetchFn: full });
+    expect(full).toHaveBeenCalledTimes(4);
+    expect(fc.features.length).toBe(4000);
+    expect(fc.truncated).toBe(true);
+  });
+
+  it("種別ごとのレイヤは、レイヤの名前と色を使う。サーバのエラーは失敗にする", async () => {
+    const ok = vi.fn(async () => ({ ok: true, json: async () => ({ features: [{ attributes: {}, geometry: { rings: [outer] } }] }) }));
+    const fc = await readRoadShapes({ layers: [{ url: `${LAYER}x`, label: "42条1項1号", color: "#8f3b03" }] }, BBOX, { fetchFn: ok });
+    expect(fc.features).toEqual([{ type: "Feature", properties: { label: "42条1項1号", short: "1項1号", color: "#8f3b03" }, geometry: { type: "MultiPolygon", coordinates: [[outer]] } }]);
+    expect(fc.truncated).toBe(false);
+    const bad = vi.fn(async () => ({ ok: true, json: async () => ({ error: { code: 400 } }) }));
+    await expect(readRoadShapes({ layers: [{ url: `${LAYER}y`, label: "x" }] }, BBOX, { fetchFn: bad })).rejects.toThrow();
   });
 });
