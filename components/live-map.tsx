@@ -4,13 +4,13 @@
 //  - pin: 物件にピンを立てる。ピンをドラッグするか、地図をクリックして「ここで調べる」で場所を選び直せる（PC）
 //  - crosshair: 画面中央の印で場所を選ぶ（スマホの「地図で選ぶ」）
 import "maplibre-gl/dist/maplibre-gl.css";
-import { addProtocol, getVersion, MapLibreMap, Marker, NavigationControl, Popup, ScaleControl, setWorkerUrl, type GeoJSONSource } from "maplibre-gl";
+import { addProtocol, getVersion, MapLibreMap, Marker, NavigationControl, Popup, ScaleControl, setWorkerUrl, type GeoJSONSource, type PointLike } from "maplibre-gl";
 import { Protocol } from "pmtiles";
 import { useEffect, useRef, useState } from "react";
 import { BASEMAPS, KANTO_BOUNDS, PARCEL_MIN_ZOOM, ZONING_LAYERS, ZONING_MIN_ZOOM, gsiStyle, parcelFilter, sheetFeatures, type Basemap } from "@/lib/map-style";
 import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
 import { sheetName, type SheetHit } from "@/lib/roadmap/sheets";
-import { FrameIcon, LocateIcon, ParcelIcon, PinIcon, ZoningIcon } from "./icons";
+import { FrameIcon, InfoIcon, LocateIcon, ParcelIcon, PinIcon, ZoningIcon } from "./icons";
 
 // 描画のワーカーは public/maplibre/<版>/ に置いてある（scripts/copy-maplibre-worker.mjs）
 setWorkerUrl(`/maplibre/${getVersion()}/maplibre-gl-worker.mjs`);
@@ -35,6 +35,44 @@ const PIN_SVG =
 
 type Point = { lat: number; lng: number };
 type Padding = { top: number; bottom: number; left: number; right: number };
+
+/**
+ * 「筆・地番」「用途地域」で重ねるデータ。表示しても地図に何も出ないときは、その理由を地図の上に出す（PC は道具の下、「地図で選ぶ」は左上）
+ * （筆の地図データは公共座標の図面だけで、公図しか無い所は抜けている。用途地域は調整区域などに無い）
+ */
+const OVERLAYS = {
+  parcels: {
+    label: "筆・地番",
+    source: "parcels",
+    /** 何か描かれているかを調べるレイヤ */
+    layers: ["fude-fill"],
+    minZoom: PARCEL_MIN_ZOOM,
+    none: ["この辺りはデータがありません", "公図（任意座標）の地域は載っていません"],
+  },
+  zoning: {
+    label: "用途地域",
+    source: "zoning",
+    layers: ["zoning-youto-fill", "zoning-douro"],
+    minZoom: ZONING_MIN_ZOOM,
+    none: ["この辺りは色分けがありません", "市街化調整区域・都市計画区域外か、データの無い地域です"],
+  },
+} as const;
+type Overlay = keyof typeof OVERLAYS;
+const OVERLAY_KEYS = Object.keys(OVERLAYS) as Overlay[];
+/** 何も出ていない理由：引きすぎ・読み込み中・データの無い地域・読み込みの失敗 */
+type OverlayNote = "zoom" | "loading" | "none" | "error";
+
+/** これより引いて（関東全体などを）見ているときは、筆・用途地域を表示しても寄らない（寄った先が物件の辺りとは限らない） */
+const AUTO_ZOOM_FROM = 12;
+
+/** 何か描かれているかを先に調べる点（見ている範囲の中での位置。中央と4か所） */
+const SAMPLE_POINTS = [
+  [0.5, 0.5],
+  [0.25, 0.25],
+  [0.75, 0.25],
+  [0.25, 0.75],
+  [0.75, 0.75],
+] as const;
 
 export type LiveMapProps = {
   /** 物件の位置。無ければ関東全体を表示する */
@@ -74,6 +112,9 @@ export default function LiveMap({ point, sheet, parcel, mode = "pin", onPick, on
     parcelsRef.current = parcels;
     zoningRef.current = zoning;
   });
+  // 筆・用途地域を表示しているのに何も出ていないときの理由
+  const [notes, setNotes] = useState<Partial<Record<Overlay, OverlayNote>>>({});
+  const setNote = (k: Overlay, v?: OverlayNote) => setNotes((s) => (s[k] === v ? s : { ...s, [k]: v }));
   // 地図のイベントからは最新の関数を呼ぶ
   const cb = useRef({ onPick, onCenter, onFail });
   useEffect(() => {
@@ -131,6 +172,41 @@ export default function LiveMap({ point, sheet, parcel, mode = "pin", onPick, on
       const p = map.queryRenderedFeatures([pt.x, pt.y], { layers: ["zoning-youto-fill"] })[0]?.properties as { name?: string; bcr?: number; far?: number } | undefined;
       return p?.name ? `${p.name}${p.bcr && p.far ? ` ${p.bcr}/${p.far}` : ""}` : undefined;
     };
+
+    // 筆・用途地域を表示しているのに地図に何も描かれていなければ、地図が落ち着いたところで理由を出す
+    const failed: Record<Overlay, boolean> = { parcels: false, zoning: false };
+    const overlayOf = (sourceId?: string) => OVERLAY_KEYS.find((k) => OVERLAYS[k].source === sourceId);
+    map.on("error", (e) => {
+      const k = overlayOf((e as { sourceId?: string }).sourceId);
+      if (k) failed[k] = true;
+      // 聞き手がいると MapLibre は自分ではエラーを出さなくなるので、これまでどおり出す
+      console.error(e.error);
+    });
+    map.on("sourcedata", (e) => {
+      const k = e.tile ? overlayOf(e.sourceId) : undefined;
+      if (k) failed[k] = false;
+    });
+    map.on("idle", () => {
+      // パネルに隠れていない範囲だけを見る
+      const { top = 0, bottom = 0, left = 0, right = 0 } = map.getPadding();
+      const { clientWidth: w, clientHeight: h } = map.getContainer();
+      const [x0, y0, x1, y1] = [left, top, Math.max(left, w - right), Math.max(top, h - bottom)];
+      const box: [PointLike, PointLike] = [
+        [x0, y0],
+        [x1, y1],
+      ];
+      /** 見ている範囲に何か描かれているか。筆の多い所で範囲全体を調べると重いので、先に中央と4か所の点で調べる */
+      const drawn = (layers: string[]) =>
+        SAMPLE_POINTS.some(([fx, fy]) => map.queryRenderedFeatures([x0 + (x1 - x0) * fx, y0 + (y1 - y0) * fy], { layers }).length > 0) ||
+        map.queryRenderedFeatures(box, { layers }).length > 0;
+      for (const k of OVERLAY_KEYS) {
+        if (!(k === "parcels" ? parcelsRef : zoningRef).current) continue;
+        const o = OVERLAYS[k];
+        if (map.getZoom() < o.minZoom) setNote(k, "zoom");
+        else if (drawn([...o.layers])) setNote(k, undefined);
+        else setNote(k, failed[k] ? "error" : "none");
+      }
+    });
 
     if (mode === "crosshair") {
       const report = () => {
@@ -248,8 +324,9 @@ export default function LiveMap({ point, sheet, parcel, mode = "pin", onPick, on
     const map = mapRef.current;
     if (!map || !loaded) return;
     for (const id of ["fude-fill", "fude-line"]) map.setLayoutProperty(id, "visibility", parcels ? "visible" : "none");
-    // 拡大していなければ、筆界が見える大きさまで寄る
-    if (parcels && map.getZoom() < PARCEL_MIN_ZOOM + 1) map.easeTo({ zoom: PARCEL_MIN_ZOOM + 1.5, duration: 700 });
+    // 町を見ているくらいまで拡大していれば、筆界が見える大きさまで寄る
+    const z = map.getZoom();
+    if (parcels && z >= AUTO_ZOOM_FROM && z < PARCEL_MIN_ZOOM + 1) map.easeTo({ zoom: PARCEL_MIN_ZOOM + 1.5, duration: 700 });
   }, [parcels, loaded]);
 
   // 用途地域の塗り分けと都市計画道路
@@ -258,8 +335,17 @@ export default function LiveMap({ point, sheet, parcel, mode = "pin", onPick, on
     if (!map || !loaded) return;
     for (const id of ZONING_LAYERS) map.setLayoutProperty(id, "visibility", zoning ? "visible" : "none");
     // タイルは z15 だけなので、それより引いていれば寄る
-    if (zoning && map.getZoom() < ZONING_MIN_ZOOM + 0.5) map.easeTo({ zoom: ZONING_MIN_ZOOM + 1.5, duration: 700 });
+    const z = map.getZoom();
+    if (zoning && z >= AUTO_ZOOM_FROM && z < ZONING_MIN_ZOOM + 0.5) map.easeTo({ zoom: ZONING_MIN_ZOOM + 1.5, duration: 700 });
   }, [zoning, loaded]);
+
+  /** 「筆・地番」「用途地域」を押したとき。すぐに「読み込んでいます」などを出し、地図が落ち着いたら中身を見て出し直す */
+  const toggleOverlay = (k: Overlay) => {
+    const on = !(k === "parcels" ? parcels : zoning);
+    (k === "parcels" ? setParcels : setZoning)(on);
+    const z = mapRef.current?.getZoom() ?? 0;
+    setNote(k, !on ? undefined : z < AUTO_ZOOM_FROM ? "zoom" : "loading");
+  };
 
   // 背景（淡色・標準・写真）
   useEffect(() => {
@@ -293,6 +379,30 @@ export default function LiveMap({ point, sheet, parcel, mode = "pin", onPick, on
     );
   };
 
+  // 筆・用途地域を表示しているのに何も出ていないときの理由
+  const overlayNotes = OVERLAY_KEYS.map((k) => {
+    const note = (k === "parcels" ? parcels : zoning) ? notes[k] : undefined;
+    if (!note) return null;
+    const o = OVERLAYS[k];
+    const [text, sub] =
+      note === "zoom"
+        ? ["地図を拡大すると表示されます"]
+        : note === "loading"
+          ? ["読み込んでいます…"]
+          : note === "error"
+            ? ["読み込めませんでした", "通信の状態を確かめてください"]
+            : o.none;
+    return (
+      <p key={k} className={`flex ${mode === "pin" ? "max-w-[248px]" : ""} items-start gap-1.5 rounded-xl bg-white/95 px-3 py-1.5 text-[11px] leading-[1.5] text-ink shadow-soft`}>
+        <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0 text-brand" />
+        <span>
+          <b className="font-semibold">{o.label}</b>：{text}
+          {sub && <span className="block text-muted">{sub}</span>}
+        </span>
+      </p>
+    );
+  });
+
   const toolBase = "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] shadow-soft";
   const tool = `${toolBase} bg-white/95 text-ink hover:bg-mint`;
   return (
@@ -316,12 +426,12 @@ export default function LiveMap({ point, sheet, parcel, mode = "pin", onPick, on
             </button>
           ))}
         </div>
-        <button onClick={() => setParcels((v) => !v)} aria-pressed={parcels} className={parcels ? `${toolBase} bg-gold text-white` : tool}>
+        <button onClick={() => toggleOverlay("parcels")} aria-pressed={parcels} className={parcels ? `${toolBase} bg-gold text-white` : tool}>
           <ParcelIcon className={`h-4 w-4 ${parcels ? "" : "text-brand"}`} />
           筆・地番
         </button>
         <button
-          onClick={() => setZoning((v) => !v)}
+          onClick={() => toggleOverlay("zoning")}
           aria-pressed={zoning}
           className={zoning ? `${toolBase} bg-gold text-white` : tool}
           title="用途地域の色分けと都市計画道路（点線）を表示"
@@ -347,7 +457,19 @@ export default function LiveMap({ point, sheet, parcel, mode = "pin", onPick, on
             現在地
           </button>
         )}
+        {/* 筆・用途地域を表示しているのに何も出ていないときの理由（ボタンの並びが動かないよう、いちばん下に出す） */}
+        {mode === "pin" && (
+          <div role="status" className="pointer-events-none flex flex-col items-end gap-2">
+            {overlayNotes}
+          </div>
+        )}
       </div>
+      {mode === "crosshair" && (
+        // 「地図で選ぶ」では、中央の印に重ならないよう地図の左上（右の道具の手前まで）に出す
+        <div role="status" className="pointer-events-none absolute left-3 right-44 top-3 flex flex-col items-start gap-2">
+          {overlayNotes}
+        </div>
+      )}
     </div>
   );
 }
