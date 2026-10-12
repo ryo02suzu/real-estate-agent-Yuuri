@@ -1,0 +1,44 @@
+# 毎月2日の朝（日本時間 6:15）に、市区町村のハザードマップのページの一覧（わがまちハザードマップのリンク先、国のオープンデータ）を
+# 読み直し、変わっていれば lib/roadmap/data/hazard-maps.json を書き換えて、テストが通れば main に入れる
+# （本番は Vercel が main から自動で作り直す）。
+name: 市区町村のハザードマップの一覧
+
+on:
+  schedule:
+    - cron: "15 21 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# ほかのデータの自動更新と同時に main へ書き込まないようにする
+concurrency:
+  group: data-updates
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: python3 scripts/hazard-maps/build.py
+      - name: ページが変わっていれば、テストが通れば main に入れる
+        run: |
+          # 取得日だけが変わったときは入れない
+          if git diff -U0 -- lib/roadmap/data/hazard-maps.json | grep '^[+-] ' | grep -v '"updated"' | grep -q .; then
+            npm test
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add lib/roadmap/data/hazard-maps.json
+            git commit -m "Update the municipal hazard map pages (automatic)"
+            git pull --rebase
+            git push
+          else
+            echo "ハザードマップのページの変更なし"
+          fi

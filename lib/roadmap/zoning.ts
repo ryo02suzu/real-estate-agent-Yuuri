@@ -1,6 +1,7 @@
 // 物件の地点にかかる都市計画（用途地域・建ぺい率・容積率・防火地域・高度地区など）。
 // 国土交通省「都市計画決定GISデータ」をタイルにしたもの（scripts/zoning-tiles/build.py）を読み、地点を含む区域を拾う。
 // データは「概ねの位置」で、市によっては古い・欠けているので、画面では参考として出し、最終確認は市の窓口・都市計画図で行う
+import { cityCode } from "./codes";
 import { tileOf, type LngLat, type Polygon } from "./parcel";
 
 /** 地点の判定に使うタイルのズーム（約 0.3m の精度） */
@@ -165,15 +166,11 @@ export function zoningFrom(features: ZoningFeature[], p: LngLat): Zoning {
 
 const sameYouto = (a: Youto, b: Youto) => a.code === b.code && a.name === b.name && a.far === b.far && a.bcr === b.bcr;
 
-// 政令市はデータが市全体で1つ（区ごとではない）。区のコードから市のコードを引く
-const DESIGNATED = ["11100", "12100", "14100", "14130", "14150"];
-
-/** 市区町村（国土地理院の muniCd）のデータの有無と時点。データの一覧に無い市区町村は undefined */
+/** 市区町村（国土地理院の muniCd）のデータの有無と時点。データの一覧に無い市区町村は undefined。政令市はデータが市全体で1つ（区ごとではない） */
 export function statusFor(codes: string[], all: Record<string, ZoningStatus>): ZoningStatus | undefined {
   for (const c of codes) {
     if (all[c]) return all[c];
-    const city = DESIGNATED.filter((d) => d.slice(0, 3) === c.slice(0, 3) && d <= c).pop();
-    if (city && all[city]) return all[city];
+    if (all[cityCode(c)]) return all[cityCode(c)];
   }
   return undefined;
 }

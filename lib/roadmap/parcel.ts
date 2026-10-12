@@ -11,6 +11,12 @@ export type LngLat = [number, number];
 /** ポリゴン（外周と穴の輪の配列） */
 export type Polygon = LngLat[][];
 
+/**
+ * 公図（任意座標）を道路縁に合わせて置いた、推定の位置の筆の確かさ（lib/roadmap/kozu-data.ts）。
+ * "high"：道路縁によく合い、ほかの置き方とはっきり差がある（港北区で 9 割が 1.5m 以内）。"low"：それより確かさが低い（2〜5m ずれることが多い）
+ */
+export type Estimated = "high" | "low";
+
 export type ParcelFeature = {
   /** 地番区域（「熊谷市_下奈良___」「川口市_青木_２丁目__」：市区町村_大字_丁目_小字） */
   kuiki: string;
@@ -18,6 +24,8 @@ export type ParcelFeature = {
   chiban: string;
   /** 筆の形（必要になったときだけ作る） */
   polygons: () => Polygon[];
+  /** 公図（任意座標）を道路縁に合わせて置いた、推定の位置の筆とその確かさ */
+  estimated?: Estimated;
 };
 
 export type ParcelSource = {
@@ -37,6 +45,8 @@ export type Parcel = {
   pieces: ParcelPiece[];
   /** 筆の中の代表点（物件の場所として使う） */
   point: { lat: number; lng: number };
+  /** 公図から推定した位置の筆（数mずれることがある）とその確かさ */
+  estimated?: Estimated;
 };
 
 export type ParcelSearch =
@@ -157,6 +167,7 @@ export async function searchParcel(
   const seen = new Set<string>();
   const hits = new Map<string, ParcelPiece[]>();
   const raw = new Map<string, string>();
+  const estimated = new Map<string, Estimated>();
   const similar = new Set<string>();
   let focus: [number, number] = [sx, sy];
   let closest = Number.POSITIVE_INFINITY;
@@ -175,6 +186,7 @@ export async function searchParcel(
         if (c === want) {
           hits.set(f.kuiki, [...(hits.get(f.kuiki) ?? []), { polygons: f.polygons(), tile: [x, y] }]);
           raw.set(f.kuiki, f.chiban);
+          if (f.estimated) estimated.set(f.kuiki, f.estimated);
           continue;
         }
         const b = baseNumber(c);
@@ -222,7 +234,11 @@ export async function searchParcel(
     await visit(more);
     pieces.push(...hits.get(kuiki)!.slice(before));
   }
-  return { status: "found", parcel: { kuiki, chiban: want, chibanRaw: raw.get(kuiki)!, pieces, point: interiorPoint(pieces) }, others: ranked.length - 1 };
+  return {
+    status: "found",
+    parcel: { kuiki, chiban: want, chibanRaw: raw.get(kuiki)!, pieces, point: interiorPoint(pieces), ...(estimated.has(kuiki) ? { estimated: estimated.get(kuiki) } : {}) },
+    others: ranked.length - 1,
+  };
 }
 
 /** 地点を含む筆（地図で選んだ地点の地番を出す）。地図データの無い地域や、筆の無い所なら null */
@@ -235,7 +251,7 @@ export async function parcelAt(lat: number, lng: number, source: ParcelSource): 
     const pieces: ParcelPiece[] = [{ polygons, tile: [x, y] }];
     for (const [nx, ny] of neighborsToComplete(pieces))
       for (const g of (await source.tile(nx, ny)) ?? []) if (g.kuiki === f.kuiki && g.chiban === f.chiban) pieces.push({ polygons: g.polygons(), tile: [nx, ny] });
-    return { kuiki: f.kuiki, chiban: normalizeChiban(f.chiban), chibanRaw: f.chiban, pieces, point: { lat, lng } };
+    return { kuiki: f.kuiki, chiban: normalizeChiban(f.chiban), chibanRaw: f.chiban, pieces, point: { lat, lng }, ...(f.estimated ? { estimated: f.estimated } : {}) };
   }
   return null;
 }
@@ -246,6 +262,16 @@ export function chibanLabel(chiban: string): string {
   if (/^水/.test(chiban)) return "水路（地番なし）";
   if (/^筆界未定/.test(chiban)) return "筆界未定地";
   return `地番 ${chiban}`;
+}
+
+/** 公図から推定した位置の筆に添える印 */
+export function estimatedMark(p: { estimated?: Estimated }): string {
+  return p.estimated === "low" ? "（推定・確度低）" : p.estimated ? "（推定）" : "";
+}
+
+/** 公図から推定した位置の筆の、ずれの目安（見出しや注記に添える） */
+export function estimatedNote(e: Estimated): string {
+  return e === "low" ? "確度が低く、5m前後ずれることあり" : "数mずれることあり";
 }
 
 /** 地番区域を「熊谷市下奈良」「川口市青木２丁目」のように読める形に */

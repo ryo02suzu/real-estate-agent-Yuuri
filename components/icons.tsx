@@ -197,3 +197,26 @@ export const ZoningIcon = ({ className }: P) => (
     <path d="M3 12h9V3M12 12l9 5M12 12v9" />
   </svg>
 );
+
+/** 災害リスク（家と水面） */
+export const HazardIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M6 12V8l6-5 6 5v4" />
+    <path d="M2 16c1.7 0 1.7-1.5 3.3-1.5s1.7 1.5 3.4 1.5 1.6-1.5 3.3-1.5 1.7 1.5 3.3 1.5 1.7-1.5 3.4-1.5S20.3 16 22 16" />
+    <path d="M2 20.5c1.7 0 1.7-1.5 3.3-1.5s1.7 1.5 3.4 1.5 1.6-1.5 3.3-1.5 1.7 1.5 3.3 1.5 1.7-1.5 3.4-1.5 1.6 1.5 3.3 1.5" />
+  </svg>
+);
+
+/** 地価（円の印と地面） */
+export const LandPriceIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M7 3l5 7 5-7M12 10v8M8 11.5h8M8 15h8M3 21h18" />
+  </svg>
+);
+
+/** 学区（校舎と旗） */
+export const SchoolIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M3 21h18M5 21V11l7-4 7 4v10M12 7V3l4 1.5L12 6M10 21v-5h4v5M8 13h.01M16 13h.01" />
+  </svg>
+);

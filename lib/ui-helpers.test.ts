@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parsePhones } from "./phone";
 import { buildLinks, findMunicipality, resolveContact } from "./roadmap";
+import { HAZARDS } from "./roadmap/hazard";
 import { buildSummary } from "./summary";
 import { TILE, tilesAround, toWorldPixel } from "./tiles";
 
@@ -82,6 +83,154 @@ describe("buildSummary", () => {
       links: buildLinks(m, 36.147129, 139.38858),
     });
     expect(text.split("\n")[1]).toBe("地図で選んだ地点：https://maps.gsi.go.jp/#18/36.147129/139.388580/");
+  });
+
+  it("災害リスク（国のデータ）と、市区町村のハザードマップのページを添える", () => {
+    const m = findMunicipality("13123")!;
+    const flood = HAZARDS.flood.layers[0];
+    const text = buildSummary(
+      {
+        status: "ok",
+        lat: 35.6838,
+        lng: 139.8641,
+        matchedAddress: "東京都江戸川区船堀四丁目1番1号",
+        town: "船堀四丁目",
+        approximate: false,
+        municipality: m,
+        links: buildLinks(m, 35.6838, 139.8641),
+      },
+      {
+        hazard: {
+          report: { flood: { status: "ok", hits: [{ layer: flood, at: flood.classes.find((c) => c.label === "3〜5m") }] }, dosha: { status: "ok", hits: [] } },
+          elevation: { value: -1, source: "5mメッシュ（航空レーザ測量）" },
+          maps: { flood: "https://example.jp/hm.html", takashio: "https://example.jp/hm.html", naisui: "https://example.jp/naisui.html" },
+          muniCd: "13123",
+        },
+      },
+    );
+    expect(text).toContain("【災害リスク（国のデータ・参考）】\n・洪水（想定最大規模）：浸水 3〜5m\n・土砂災害警戒区域等：区域外\n・地面の高さ（標高）：約-1.0m");
+    expect(text).toContain("・江戸川区の洪水・高潮のハザードマップ\n  https://example.jp/hm.html");
+    expect(text).toContain("・江戸川区の内水のハザードマップ\n  https://example.jp/naisui.html");
+    expect(text).toContain("※災害リスクの出典：「ハザードマップポータルサイト」");
+    expect(text).toContain("重要事項説明には使えません");
+  });
+
+  it("地点の建物（PLATEAU）を1行で添える", () => {
+    const m = findMunicipality("13116")!;
+    const text = buildSummary(
+      {
+        status: "ok",
+        lat: 35.73135,
+        lng: 139.71985,
+        matchedAddress: "東京都豊島区東池袋四丁目",
+        town: "東池袋四丁目",
+        approximate: false,
+        municipality: m,
+        links: buildLinks(m, 35.73135, 139.71985),
+      },
+      {
+        building: {
+          hit: {
+            building: { point: [139.71995, 35.73142], box: [-26, -25, 26, 25], name: "ヴァンガードタワー", usage: "共同住宅", above: 38, below: 3, structure: "耐火構造", height: 105.9 },
+            distance: 12,
+            onParcel: true,
+          },
+          others: [],
+        },
+      },
+    );
+    expect(text).toContain("【建物（PLATEAU・参考）】ヴァンガードタワー・共同住宅・地上38階・地下3階・耐火構造・高さ約105.9m");
+    expect(text).toContain("※建物の出典：「3D都市モデル（Project PLATEAU）」（国土交通省");
+  });
+
+  it("近くの地価（地価公示・地価調査）を3地点まで添える", () => {
+    const m = findMunicipality("13101")!;
+    const hit = (no: string, kind: "公示" | "調査", price: number, distance: number, change?: number) => ({
+      kind,
+      no,
+      point: [139.7448, 35.6901] as [number, number],
+      price,
+      change,
+      usage: "住宅地" as const,
+      year: 2026,
+      history: [],
+      distance,
+      bearing: "北東",
+    });
+    const text = buildSummary(
+      {
+        status: "ok",
+        lat: 35.6895,
+        lng: 139.7441,
+        matchedAddress: "東京都千代田区三番町",
+        town: "三番町",
+        approximate: false,
+        municipality: m,
+        links: buildLinks(m, 35.6895, 139.7441),
+      },
+      { landPrice: [hit("千代田-1", "公示", 4_410_000, 92, 11.4), hit("千代田(都)-1", "調査", 5_700_000, 640, 11.8), hit("千代田-5", "公示", 3_000_000, 900), hit("千代田-9", "公示", 2_000_000, 1500)] },
+    );
+    expect(text).toContain(
+      "【近くの地価（標準地・基準地の価格・参考）】\n・地価公示 千代田-1（住宅地・北東へ約90m）：441万円/m²（前年比 +11.4%、2026年1月1日時点）\n" +
+        "・地価調査 千代田(都)-1（住宅地・北東へ約640m）：570万円/m²（前年比 +11.8%、2026年7月1日時点）\n" +
+        "・地価公示 千代田-5（住宅地・北東へ約900m）：300万円/m²（前年比 新規、2026年1月1日時点）\n",
+    );
+    expect(text).not.toContain("千代田-9");
+    // 学区は渡していないので出さない
+    expect(text).not.toContain("【学区");
+    expect(text).toContain("※地価の出典：「国土数値情報（地価公示データ・都道府県地価調査データ）」（国土交通省");
+    expect(text).toContain("物件そのものの価格ではありません");
+  });
+});
+
+describe("buildSummary の地番", () => {
+  it("公図から推定した筆は、確かさに合わせてずれの目安を添え、出典も付ける", () => {
+    const m = findMunicipality("14109")!;
+    const result = {
+      status: "ok" as const,
+      lat: 35.5536,
+      lng: 139.6467,
+      matchedAddress: "神奈川県横浜市港北区日吉五丁目",
+      town: "日吉五丁目",
+      approximate: false,
+      municipality: m,
+      links: buildLinks(m, 35.5536, 139.6467),
+    };
+    const parcels = (estimated?: "high" | "low") => ({ parcels: { target: "横浜市港北区日吉５丁目 1234", neighbors: ["1233"], reference: false, estimated } });
+    const low = buildSummary(result, parcels("low"));
+    expect(low).toContain("【謄本・公図用の地番（公図から推定した位置・確度が低く、5m前後ずれることあり）】\n・物件：横浜市港北区日吉５丁目 1234");
+    expect(low).toContain("国土地理院の基盤地図情報（道路縁）に合わせて MICHILU が推定の位置に置いたもの");
+    expect(buildSummary(result, parcels("high"))).toContain("【謄本・公図用の地番（公図から推定した位置・数mずれることあり）】");
+    const plain = buildSummary(result, parcels());
+    expect(plain).toContain("【謄本・公図用の地番】");
+    expect(plain).not.toContain("基盤地図情報");
+  });
+});
+
+describe("buildSummary の学区", () => {
+  it("小学校区・中学校区を添える（データの年と、教育委員会で確かめる旨も）", () => {
+    const m = findMunicipality("13104")!;
+    const text = buildSummary(
+      {
+        status: "ok",
+        lat: 35.7128,
+        lng: 139.7046,
+        matchedAddress: "東京都新宿区高田馬場一丁目",
+        town: "高田馬場一丁目",
+        approximate: false,
+        municipality: m,
+        links: buildLinks(m, 35.7128, 139.7046),
+      },
+      {
+        schools: {
+          elementary: { kind: "小学校", name: "戸塚第二小学校", owner: "新宿区立", city: "13104", distance: 120 },
+          junior: { kind: "中学校", name: "西早稲田中学校", owner: "新宿区", city: "13104", distance: 739 },
+        },
+      },
+    );
+    expect(text).toContain("【学区（参考・令和5年度（2023年度）のデータ）】\n・小学校：戸塚第二小学校（新宿区立・直線約120m）\n・中学校：西早稲田中学校（新宿区・直線約740m）");
+    expect(text).toContain("※学区の出典：「国土数値情報（小学校区データ・中学校区データ・学校データ）」（国土交通省");
+    expect(text).toContain("指定校は教育委員会で確認を");
   });
 });
 

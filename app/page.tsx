@@ -9,8 +9,9 @@ import { AlertIcon, AreaIcon, ChevronRightIcon, ClockIcon, InfoIcon, MapIcon } f
 import { MapIllustration, SkylineIllustration } from "@/components/illustrations";
 import { CitiesSheet, HelpSheet, MenuSheet, type SheetName } from "@/components/info-sheets";
 import { FullMap } from "@/components/full-map";
+import { GuideMapSheet } from "@/components/guide-map";
 import { LocationPicker } from "@/components/location-picker";
-import { ResultView } from "@/components/result-view";
+import { ResultView, type MapOpen } from "@/components/result-view";
 import { SearchCard } from "@/components/search-card";
 import { Sheet } from "@/components/sheet";
 import { addHistory, clearHistory, loadHistory, type HistoryItem } from "@/lib/history";
@@ -47,12 +48,14 @@ export default function Home() {
   const [shown, setShown] = useState<Shown | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [sheet, setSheet] = useState<SheetName | "menu" | null>(null);
+  // スマホの「案内図」（メニューから開く。PC は結果の印刷の欄から）
+  const [guide, setGuide] = useState(false);
   // スマホの「地図で選ぶ」画面（start: 最初に表示する地点）
   const [picker, setPicker] = useState<{ start?: { lat: number; lng: number } } | null>(null);
   // 住所で調べた回数。変わると PC の地図が物件の場所へ戻る（同じ住所で調べ直したときも）
   const [focus, setFocus] = useState(0);
   // スマホの「地図を拡大」（MICHILU の中の動く地図）。roads: 道路種別を重ねて開く
-  const [fullMap, setFullMap] = useState<{ roads?: boolean } | null>(null);
+  const [fullMap, setFullMap] = useState<MapOpen | null>(null);
   const desktop = useDesktop();
 
   /** 住所（q）か、地図で選んだ地点（ll）で調べて結果を出す */
@@ -135,7 +138,22 @@ export default function Home() {
 
   const sheetsEl = (
     <>
-      <MenuSheet open={sheet === "menu"} onClose={() => setSheet(null)} onOpen={open} />
+      <MenuSheet
+        open={sheet === "menu"}
+        onClose={() => setSheet(null)}
+        onOpen={open}
+        onPrint={
+          shown?.result.status === "ok"
+            ? (kind) => {
+                // 調査メモはそのまま印刷する（押した操作の中で呼ぶ。iPhone はプリントの画面から PDF にもできる）
+                if (kind === "memo") window.print();
+                else setGuide(true);
+                setSheet(null);
+              }
+            : undefined
+        }
+      />
+      {shown?.result.status === "ok" && <GuideMapSheet result={shown.result} open={guide} onClose={() => setGuide(false)} />}
       <HelpSheet open={sheet === "help"} onClose={() => setSheet(null)} />
       <CitiesSheet open={sheet === "cities"} onClose={() => setSheet(null)} />
       <Sheet title="検索履歴" open={sheet === "history"} onClose={() => setSheet(null)}>
@@ -201,7 +219,7 @@ export default function Home() {
                 const r = shown.result;
                 setPicker({ start: r.status === "ok" || r.status === "unsupported" ? { lat: r.lat, lng: r.lng } : undefined });
               }}
-              onExpand={(roads) => setFullMap({ roads })}
+              onExpand={(o) => setFullMap(o ?? {})}
             />
           </div>
         ) : (
@@ -295,7 +313,14 @@ export default function Home() {
         />
       )}
       {fullMap && shown?.result.status === "ok" && (
-        <FullMap result={shown.result} withRoads={fullMap.roads} onClose={() => setFullMap(null)} onPick={(lat, lng) => void searchPoint(lat, lng)} />
+        <FullMap
+          result={shown.result}
+          withRoads={fullMap.roads}
+          hazard={fullMap.hazard}
+          landPrice={fullMap.landPrice}
+          onClose={() => setFullMap(null)}
+          onPick={(lat, lng) => void searchPoint(lat, lng)}
+        />
       )}
     </div>
   );

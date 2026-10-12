@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { MUNICIPALITIES, type Municipality } from "@/lib/roadmap";
 import { CoverageBadge } from "./coverage";
-import { AreaIcon, ChevronRightIcon, ClockIcon, InfoIcon } from "./icons";
+import { AreaIcon, ChevronRightIcon, ClockIcon, InfoIcon, MapIcon, PrintIcon } from "./icons";
 import { Sheet } from "./sheet";
 
 const ORDER: Municipality["coverage"][] = ["full", "partial", "none", "outside"];
@@ -78,15 +78,40 @@ export function HelpSheet({ open, onClose }: { open: boolean; onClose: () => voi
 
 export type SheetName = "help" | "cities" | "history";
 
-export function MenuSheet({ open, onClose, onOpen }: { open: boolean; onClose: () => void; onOpen: (s: SheetName) => void }) {
+export function MenuSheet({
+  open,
+  onClose,
+  onOpen,
+  onPrint,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onOpen: (s: SheetName) => void;
+  /** 結果が出ているとき：案内図・調査メモを印刷・PDF 保存する */
+  onPrint?: (kind: "guide" | "memo") => void;
+}) {
   const items: [SheetName, string, typeof InfoIcon][] = [
     ["help", "使い方", InfoIcon],
     ["cities", "対応している市区町村", AreaIcon],
     ["history", "検索履歴", ClockIcon],
   ];
+  const prints: ["guide" | "memo", string, typeof InfoIcon][] = [
+    ["guide", "案内図を印刷・PDF保存", MapIcon],
+    ["memo", "調査メモを印刷・PDF保存", PrintIcon],
+  ];
   return (
     <Sheet title="メニュー" open={open} onClose={onClose}>
       <ul className="divide-y divide-line">
+        {onPrint &&
+          prints.map(([kind, label, Icon]) => (
+            <li key={kind}>
+              <button onClick={() => onPrint(kind)} className="flex w-full items-center gap-3 py-4 text-left text-ink [@media(max-height:720px)]:py-3">
+                <Icon className="h-5 w-5 text-brand-light" />
+                <span className="flex-1">{label}</span>
+                <ChevronRightIcon className="h-4 w-4 text-muted" />
+              </button>
+            </li>
+          ))}
         {items.map(([key, label, Icon]) => (
           <li key={key}>
             <button onClick={() => onOpen(key)} className="flex w-full items-center gap-3 py-4 text-left text-ink">

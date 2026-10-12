@@ -3,7 +3,9 @@
 // 動く地図（MapLibre GL ＋ 地理院タイル）。重いので next/dynamic で必要になったときだけ読み込む（components/map-panel.tsx）。
 //  - pin: 物件にピンを立てる。ピンをドラッグするか、地図をクリックして「ここで調べる」で場所を選び直せる（PC・スマホの「地図を拡大」）
 //  - crosshair: 画面中央の印で場所を選ぶ（スマホの「地図で選ぶ」）
-// 右上の道具で、筆・地番、用途地域、道路種別（市の公開データがある所だけ）を重ねられる。重ねた色の凡例も出す
+// 右上の道具で、筆・地番、用途地域、道路種別（市の公開データがある所だけ）、建物（PLATEAU）、地価（地価公示・地価調査）、
+// ハザード（国の重ねるハザードマップ）を重ねられる。
+// 重ねた色の凡例も出す
 import "maplibre-gl/dist/maplibre-gl.css";
 import { addProtocol, getVersion, MapLibreMap, Marker, NavigationControl, Popup, ScaleControl, setWorkerUrl, type GeoJSONSource, type PointLike } from "maplibre-gl";
 import { Protocol } from "pmtiles";
@@ -11,9 +13,20 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   BASEMAPS,
+  BUILDING_LAYERS,
+  BUILDING_MIN_ZOOM,
   DOURO_COLOR,
+  HAZARD_EVENT,
+  hazardLayerId,
   KANTO_BOUNDS,
+  KOZU_COLORS,
+  LAND_PRICE_EVENT,
+  LAND_PRICE_LAYERS,
+  LAND_PRICE_MIN_ZOOM,
+  PARCEL_HIT_LAYERS,
+  PARCEL_LAYERS,
   PARCEL_MIN_ZOOM,
+  PARCEL_PICK_LAYERS,
   ROAD_LAYERS,
   ROAD_MIN_ZOOM,
   ZONING_LAYERS,
@@ -23,11 +36,18 @@ import {
   sheetFeatures,
   type Basemap,
 } from "@/lib/map-style";
+import { buildingAt, buildingSummary, USAGE_GROUPS } from "@/lib/roadmap/building";
+import { BUILDING_DATA, hasBuildings } from "@/lib/roadmap/building-data";
+import { hasKozu } from "@/lib/roadmap/kozu-data";
+import { pmtilesBuildingSource } from "@/lib/roadmap/building-tiles";
+import { HAZARD_KINDS, HAZARD_LAYERS, hazardAt, hazardPointLabel, HAZARDS, type HazardKind } from "@/lib/roadmap/hazard";
+import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
+import { LAND_USAGE_COLORS, landPriceSummary, usageFromCode } from "@/lib/roadmap/land-price";
 import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
 import { readRoadShapes, type RoadRead } from "@/lib/roadmap/road-read";
 import { sheetName, type SheetHit } from "@/lib/roadmap/sheets";
 import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
-import { FrameIcon, InfoIcon, LocateIcon, ParcelIcon, PinIcon, RoadIcon, ZoningIcon } from "./icons";
+import { BuildingIcon, ChevronRightIcon, FrameIcon, HazardIcon, InfoIcon, LandPriceIcon, LocateIcon, ParcelIcon, PinIcon, RoadIcon, ZoningIcon } from "./icons";
 import { MapLegend, type LegendItem } from "./map-legend";
 
 // 描画のワーカーは public/maplibre/<版>/ に置いてある（scripts/copy-maplibre-worker.mjs）
@@ -64,14 +84,14 @@ const OVERLAYS = {
     label: "筆・地番",
     source: "parcels",
     /** 表示を切り替えるレイヤ */
-    show: ["fude-fill", "fude-line"],
+    show: PARCEL_LAYERS,
     /** 何か描かれているかを調べるレイヤ */
-    layers: ["fude-fill"],
+    layers: PARCEL_PICK_LAYERS,
     minZoom: PARCEL_MIN_ZOOM,
     /** 押したとき、これより引いていれば zoomTo まで寄る */
     zoomBelow: PARCEL_MIN_ZOOM + 1,
     zoomTo: PARCEL_MIN_ZOOM + 1.5,
-    none: ["この辺りはデータがありません", "公図（任意座標）の地域は載っていません"],
+    none: ["この辺りはデータがありません", hasKozu() ? "公図（任意座標）の地域は、推定の位置に置けた所だけ点線で出ます" : "公図（任意座標）の地域は載っていません"],
   },
   zoning: {
     label: "用途地域",
@@ -93,6 +113,27 @@ const OVERLAYS = {
     zoomBelow: ROAD_MIN_ZOOM + 0.5,
     zoomTo: ROAD_MIN_ZOOM + 1,
     none: ["この辺りは色の付いた道路がありません", "色の無い道の種別は、窓口で確認してください"],
+  },
+  buildings: {
+    label: "建物",
+    source: "buildings",
+    show: BUILDING_LAYERS,
+    layers: ["bldg-dot"],
+    minZoom: BUILDING_MIN_ZOOM,
+    zoomBelow: BUILDING_MIN_ZOOM + 0.5,
+    zoomTo: BUILDING_MIN_ZOOM + 1,
+    none: ["この辺りは PLATEAU の建物データがありません", "PLATEAU のある市区町村だけ出ます"],
+  },
+  landPrice: {
+    label: "地価",
+    source: "landprice",
+    show: LAND_PRICE_LAYERS,
+    layers: ["lpt-dot", "lp-dot"],
+    minZoom: LAND_PRICE_MIN_ZOOM,
+    // 地点は町の中にまばらなので、押しても寄らない
+    zoomBelow: 0,
+    zoomTo: 0,
+    none: ["この辺りは地価公示・地価調査の地点がありません", "少し引くと、近くの地点が出ます"],
   },
 } as const;
 type Overlay = keyof typeof OVERLAYS;
@@ -119,6 +160,30 @@ const SAMPLE_POINTS = [
   [0.75, 0.75],
 ] as const;
 
+/** ハザードの凡例。土砂災害は種類ごとに特別警戒区域・警戒区域（指定予定の薄い色は凡例の注記で） */
+function hazardLegend(kind: HazardKind): LegendItem[] {
+  const layers = HAZARDS[kind].layers;
+  // 家屋倒壊は同じ赤で、氾濫流は丸の模様、河岸侵食は塗り
+  if (kind === "kaoku")
+    return [
+      { label: "氾濫流（赤い丸の模様）", short: "氾濫流（丸の模様）", color: "#ff0000", kind: "line" },
+      { label: "河岸侵食（赤い塗り）", short: "河岸侵食（塗り）", color: "#ff0000", kind: "area" },
+    ];
+  if (kind === "dosha")
+    return layers.flatMap((l) =>
+      l.classes
+        .filter((c) => !c.sub)
+        .map((c) => ({ label: `${l.name}：${c.label}`, short: `${l.name.replace(/地の崩壊$/, "")}・${c.short}`, color: c.color, kind: "area" as const })),
+    );
+  return layers.flatMap((l) => l.classes.map((c) => ({ label: c.label, short: c.short, color: c.color, kind: "area" as const })));
+}
+
+/** ハザードの凡例の注記 */
+const HAZARD_FOOT: Partial<Record<HazardKind, string>> = {
+  dosha: "薄い色は指定予定の区域。",
+  keizoku: "「2週間以上」の色でも4週間以上のことがあります。",
+};
+
 export type LiveMapProps = {
   /** 物件の位置。無ければ関東全体を表示する */
   point?: Point;
@@ -144,10 +209,31 @@ export type LiveMapProps = {
   /** スマホの全画面の地図。理由と凡例を左上に出す（右の道具・中央のピンと重ならないよう）。crosshair はいつもこの形 */
   compact?: boolean;
   /** 最初から重ねておくもの（「近くの道路」から開いたときの道路種別など） */
-  initial?: Partial<Record<"parcels" | "zoning" | "roads", boolean>>;
+  initial?: Partial<Record<"parcels" | "zoning" | "roads" | "buildings" | "landPrice", boolean>>;
   /** 凡例を地図の外（この要素の中）に出す。スマホの全画面の地図で、凡例が地図とピンを隠さないように */
   legendTarget?: HTMLElement | null;
+  /** 最初から重ねておくハザードの種類（スマホの災害リスクの一覧から「地図」で開いたとき） */
+  initialHazard?: HazardKind;
+  /** 最初に見せる地価の地点（[経度, 緯度]。スマホの地価の一覧から「地図」で開いたとき）。物件と両方が見える範囲にする */
+  initialLandPrice?: [number, number];
 };
+
+/** 地価の地点と物件が両方見える範囲へ（物件が無ければ地点へ寄る） */
+function fitLandPrice(map: MapLibreMap, [plng, plat]: [number, number], point?: Point) {
+  if (!point) {
+    map.flyTo({ center: [plng, plat], zoom: 15, duration: 900 });
+    return;
+  }
+  const cam = map.cameraForBounds(
+    [
+      [Math.min(point.lng, plng), Math.min(point.lat, plat)],
+      [Math.max(point.lng, plng), Math.max(point.lat, plat)],
+    ],
+    { padding: 80, maxZoom: 16 },
+  );
+  // 地理院タイルの文字が引き伸ばされてぼやけないよう、ズームは整数に（少し引く側へ）
+  if (cam) map.flyTo({ ...cam, zoom: Math.floor(cam.zoom ?? 15), duration: 900 });
+}
 
 export default function LiveMap({
   point,
@@ -164,6 +250,8 @@ export default function LiveMap({
   compact = mode === "crosshair",
   initial,
   legendTarget,
+  initialHazard,
+  initialLandPrice,
 }: LiveMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -173,8 +261,9 @@ export default function LiveMap({
   const [basemap, setBasemap] = useState<Basemap>("pale");
   const [locating, setLocating] = useState(false);
   // 筆界と地番（登記所備付地図）・用途地域の塗り分けと都市計画道路・道路種別を表示するか（道路種別は読める市だけ）
-  const [shown, setShown] = useState<Record<Overlay, boolean>>(() => ({ parcels: false, zoning: false, roads: false, ...initial }));
-  const on: Record<Overlay, boolean> = { ...shown, roads: shown.roads && !!roads };
+  const [shown, setShown] = useState<Record<Overlay, boolean>>(() => ({ parcels: false, zoning: false, roads: false, buildings: false, landPrice: false, ...initial }));
+  // 道路種別は読める市だけ、建物は PLATEAU のタイルがあるときだけ
+  const on: Record<Overlay, boolean> = { ...shown, roads: shown.roads && !!roads, buildings: shown.buildings && hasBuildings() };
   const onRef = useRef(on);
   useEffect(() => {
     onRef.current = on;
@@ -189,10 +278,19 @@ export default function LiveMap({
   const setLegendOf = (k: "zoning" | "roads", items?: LegendItem[]) =>
     setLegend((s) => (JSON.stringify(s[k]) === JSON.stringify(items) ? s : { ...s, [k]: items }));
   // 読み込みに失敗したデータ（地図のエラーと、道路種別の読み込み）
-  const failed = useRef<Record<Overlay, boolean>>({ parcels: false, zoning: false, roads: false });
+  const failed = useRef<Record<Overlay, boolean>>({ parcels: false, zoning: false, roads: false, buildings: false, landPrice: false });
   // 道路種別を読んでいる最中か（読み終えるまで「読み込んでいます」のまま）。件数の上限で読み切れなかったか
   const roadsLoading = useRef(false);
   const roadsTruncated = useRef(false);
+  // 重ねているハザードの種類（null は重ねていない）。「ハザード」を押し直したときは前の種類に戻す
+  const [hazard, setHazard] = useState<HazardKind | null>(initialHazard ?? null);
+  const lastHazard = useRef<HazardKind>(initialHazard ?? "flood");
+  // 種類を選ぶ欄（選ぶときだけ開く。開いたままだと、地図をタップした地点の吹き出しに重なる）
+  const [hazardMenu, setHazardMenu] = useState(false);
+  const hazardRef = useRef(hazard);
+  useEffect(() => {
+    hazardRef.current = hazard;
+  });
   // 地図のイベントからは最新の関数を呼ぶ
   const cb = useRef({ onPick, onCenter, onFail });
   useEffect(() => {
@@ -235,14 +333,21 @@ export default function LiveMap({
     map.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
     map.addControl(new ScaleControl({ maxWidth: 110 }), "bottom-right");
     map.on("load", () => setLoaded(true));
+    // スマホの狭い地図では、出典（地理院タイル・PLATEAU・登記所備付地図など）の帯を最初から畳んでおく（ⓘ で開ける）。
+    // 開いたままだと地図の下の方を大きく隠す。MapLibre は地図を動かすと畳むが、最初は開いている
+    if (compact) map.once("idle", () => map.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show"));
+    // 地図を触ったら、ハザードの種類を選ぶ欄は閉じる
+    map.on("dragstart", () => setHazardMenu(false));
+    map.on("click", () => setHazardMenu(false));
     mapRef.current = map;
 
     /** 画面上の点にある筆の「地番 354（熊谷市下奈良）」（筆界を表示しているときだけ） */
     const parcelLabelAt = (pt: { x: number; y: number }) => {
       if (!onRef.current.parcels || map.getZoom() < PARCEL_MIN_ZOOM) return undefined;
-      const f = map.queryRenderedFeatures([pt.x, pt.y], { layers: ["fude-fill"] })[0];
+      const f = map.queryRenderedFeatures([pt.x, pt.y], { layers: PARCEL_PICK_LAYERS })[0];
       const p = f?.properties as { 地番?: string; 地番区域?: string } | undefined;
-      return p?.地番 ? `${chibanLabel(String(p.地番))}（${kuikiLabel(String(p.地番区域 ?? ""))}）` : undefined;
+      const est = f?.layer.id === "kozu-fill" ? (Number(f.properties?.q) === 2 ? "・公図から推定・確度低" : "・公図から推定") : "";
+      return p?.地番 ? `${chibanLabel(String(p.地番))}（${kuikiLabel(String(p.地番区域 ?? ""))}${est}）` : undefined;
     };
     /** 画面上の点の用途地域「第１種低層住居専用地域 50/100」（用途地域を表示しているときだけ） */
     const youtoLabelAt = (pt: { x: number; y: number }) => {
@@ -261,6 +366,19 @@ export default function LiveMap({
         { layers: ["road-line", "road-fill"] },
       )[0]?.properties as { label?: string } | undefined;
       return p?.label ? `道路：${p.label}` : undefined;
+    };
+    /** 画面上の点の地価の地点「地価公示 千代田-1（住宅地）441万円/m²（+11.4%）」（地価を表示しているときだけ。点なので広めに拾う） */
+    const landPriceLabelAt = (pt: { x: number; y: number }) => {
+      if (!onRef.current.landPrice || map.getZoom() < LAND_PRICE_MIN_ZOOM) return undefined;
+      const p = map.queryRenderedFeatures(
+        [
+          [pt.x - 8, pt.y - 8],
+          [pt.x + 8, pt.y + 8],
+        ],
+        { layers: ["lp-dot", "lpt-dot"] },
+      )[0]?.properties as { k?: number; no?: string; p?: number; c?: number; u?: string } | undefined;
+      if (!p?.no || !p.p) return undefined;
+      return landPriceSummary({ kind: p.k === 1 ? "調査" : "公示", no: p.no, usage: usageFromCode(String(p.u ?? "0")), price: p.p, change: p.c });
     };
 
     // 表示しているのに地図に何も描かれていなければ、地図が落ち着いたところで理由を出す。描かれていれば凡例を出す
@@ -340,12 +458,33 @@ export default function LiveMap({
         const note = document.createElement("p");
         note.className = "text-[11px] text-muted";
         note.textContent = "この地点の道路図を調べますか？";
-        for (const label of [parcelLabelAt(e.point), youtoLabelAt(e.point), roadLabelAt(e.point)]) {
+        for (const label of [parcelLabelAt(e.point), youtoLabelAt(e.point), roadLabelAt(e.point), landPriceLabelAt(e.point)]) {
           if (!label) continue;
           const l = document.createElement("p");
-          l.className = "text-[12px] font-semibold text-ink";
+          l.className = "max-w-[17em] text-center text-[12px] font-semibold text-ink";
           l.textContent = label;
           box.append(l);
+        }
+        // 建物を表示していれば、その地点の建物（PLATEAU。タイルを読むので、あとから入れる）
+        if (onRef.current.buildings && map.getZoom() >= BUILDING_MIN_ZOOM) {
+          const l = document.createElement("p");
+          l.className = "max-w-[16em] text-center text-[12px] font-semibold text-ink";
+          l.textContent = "建物：確認中…";
+          box.append(l);
+          buildingAt(e.lngLat.lat, e.lngLat.lng, pmtilesBuildingSource)
+            .then((r) => (l.textContent = r?.hit ? `建物：${buildingSummary(r.hit.building)}` : "建物：この地点には無し"))
+            .catch(() => (l.textContent = "建物：読み込めませんでした"));
+        }
+        // 重ねているハザードの、その地点の区分（タイルの色を読むので、あとから入れる）
+        const hk = hazardRef.current;
+        if (hk) {
+          const l = document.createElement("p");
+          l.className = "text-[12px] font-semibold text-ink";
+          l.textContent = `${HAZARDS[hk].short}：確認中…`;
+          box.append(l);
+          hazardAt(e.lngLat.lat, e.lngLat.lng, browserTileFetcher, [hk])
+            .then((r) => (l.textContent = hazardPointLabel(hk, r[hk]) ?? ""))
+            .catch(() => (l.textContent = `${HAZARDS[hk].short}：読み込めませんでした`));
         }
         const btn = document.createElement("button");
         btn.type = "button";
@@ -433,7 +572,7 @@ export default function LiveMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !loaded) return;
-    for (const id of ["fude-hit", "fude-hit-line"]) {
+    for (const id of PARCEL_HIT_LAYERS) {
       map.setFilter(id, parcelFilter(parcel));
       map.setLayoutProperty(id, "visibility", parcel ? "visible" : "none");
     }
@@ -445,9 +584,66 @@ export default function LiveMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !loaded) return;
-    for (const k of OVERLAY_KEYS) for (const id of OVERLAYS[k].show) map.setLayoutProperty(id, "visibility", on[k] ? "visible" : "none");
+    // 建物のレイヤは、PLATEAU のタイルがあるときだけ地図にある
+    for (const k of OVERLAY_KEYS) for (const id of OVERLAYS[k].show) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on[k] ? "visible" : "none");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onKey, loaded]);
+
+  // ハザード：選んだ種類のタイルだけ表示する
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded) return;
+    const shown = new Set(hazard ? HAZARDS[hazard].layers.map((l) => l.id) : []);
+    for (const l of HAZARD_LAYERS) map.setLayoutProperty(hazardLayerId(l.id), "visibility", shown.has(l.id) ? "visible" : "none");
+  }, [hazard, loaded]);
+
+  // PC：パネルの「地図に重ねる」。その種類を重ね、物件の辺り（町が見える大きさ）を見せる
+  useEffect(() => {
+    const onShow = (e: Event) => {
+      const kind = (e as CustomEvent<HazardKind>).detail;
+      if (!HAZARDS[kind]) return;
+      lastHazard.current = kind;
+      setHazard(kind);
+      const map = mapRef.current;
+      if (!map || lat === undefined || lng === undefined) return;
+      if (map.getZoom() > 16 || map.getZoom() < 14 || !map.getBounds().contains([lng, lat])) map.flyTo({ center: [lng, lat], zoom: 16, duration: 900 });
+    };
+    window.addEventListener(HAZARD_EVENT, onShow);
+    return () => window.removeEventListener(HAZARD_EVENT, onShow);
+  }, [lat, lng]);
+
+  // パネルの地価の一覧の「地図」。地価を重ね、物件とその地点が両方見えるようにする
+  useEffect(() => {
+    const onShow = (e: Event) => {
+      setShown((s) => ({ ...s, landPrice: true }));
+      if (mapRef.current) fitLandPrice(mapRef.current, (e as CustomEvent<[number, number]>).detail, point);
+    };
+    window.addEventListener(LAND_PRICE_EVENT, onShow);
+    return () => window.removeEventListener(LAND_PRICE_EVENT, onShow);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lat, lng]);
+  // スマホの地価の一覧から開いたときは、地図を読み終えたところで同じようにする（1回だけ）
+  const firstLandPrice = useRef(initialLandPrice);
+  useEffect(() => {
+    const p = firstLandPrice.current;
+    if (!mapRef.current || !loaded || !p) return;
+    firstLandPrice.current = undefined;
+    fitLandPrice(mapRef.current, p, point);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
+
+  /** 「ハザード」：重ねていなければ前の種類（最初は洪水）を重ねて種類の欄を開く。重ねていれば欄を開け閉めする */
+  const toggleHazard = () => {
+    if (hazard) return setHazardMenu((o) => !o);
+    setHazard(lastHazard.current);
+    setHazardMenu(true);
+  };
+  /** 種類を選ぶ（null は重ねない） */
+  const pickHazard = (k: HazardKind | null) => {
+    if (k) lastHazard.current = k;
+    setHazard(k);
+    setHazardMenu(false);
+  };
 
   // 道路種別：見ている範囲（少し広め）の道路を市の公開データから読んで描く。読んだ範囲の中を動くあいだは読み直さない
   const roadsKey = roads ? roads.read.layers.map((l) => l.url).join(",") : "";
@@ -512,7 +708,7 @@ export default function LiveMap({
     // 関東全体のように引いた地図では寄らない（寄った先が物件の辺りとは限らない）
     if (next && z >= AUTO_ZOOM_FROM && z < OVERLAYS[k].zoomBelow) map?.easeTo({ zoom: OVERLAYS[k].zoomTo, duration: 700 });
     setNote(k, !next ? undefined : z < AUTO_ZOOM_FROM ? "zoom" : "loading");
-    if (!next && k !== "parcels") setLegendOf(k, undefined);
+    if (!next && (k === "zoning" || k === "roads")) setLegendOf(k, undefined);
   };
 
   // 背景（淡色・標準・写真）
@@ -573,11 +769,52 @@ export default function LiveMap({
     );
   });
 
-  // 凡例（用途地域・道路種別）。道路種別は、どの市のデータかと「参考」であることを添える
+  // 凡例（用途地域・道路種別・ハザード）。道路種別は、どの市のデータかと「参考」であることを添える。
+  // ハザードは国のデータで、重要事項説明には市区町村のハザードマップを使うことを添える
   const legends = [
+    hazard && (
+      <MapLegend
+        key="hazard"
+        title={HAZARDS[hazard].legend}
+        items={hazardLegend(hazard)}
+        compact={compact}
+        foot={`${HAZARD_FOOT[hazard] ?? ""}国の重ねるハザードマップ（参考）。色の無い所は区域外かデータ無し。重要事項説明は市区町村のハザードマップで`}
+      />
+    ),
+    on.parcels && hasKozu() && (
+      <MapLegend
+        key="parcels"
+        title="筆界"
+        items={[
+          { label: "登記所備付地図", short: "登記所の地図", color: "#b0472a", kind: "line" as const },
+          { label: "公図から推定した位置", short: "公図（推定）", color: KOZU_COLORS.high, kind: "dash" as const },
+          { label: "推定（確度低）", short: "推定・確度低", color: KOZU_COLORS.low, kind: "dash" as const },
+        ]}
+        compact={compact}
+        foot="点線は、公図（任意座標）の形を道路の縁に合わせて置いた推定の位置です。数m（薄い点線は5m前後）ずれることがあります。謄本・公図で確かめてください"
+      />
+    ),
     on.zoning && legend.zoning && <MapLegend key="zoning" title="用途地域の色" items={legend.zoning} compact={compact} />,
+    on.buildings && (
+      <MapLegend
+        key="buildings"
+        title="建物の用途（PLATEAU）"
+        items={Object.values(USAGE_GROUPS).map((g) => ({ label: g.label, short: g.label.replace(/・.*$/, ""), color: g.color, kind: "dot" as const }))}
+        compact={compact}
+        foot={`点は建物の代表点。拡大すると用途と階数（名前のある建物は名前）が出ます。国土交通省 PLATEAU の3D都市モデル（参考${BUILDING_DATA.edition ? `・${BUILDING_DATA.edition}` : ""}）`}
+      />
+    ),
     on.roads && legend.roads && roads && (
       <MapLegend key="roads" title="道路種別の色" items={legend.roads} compact={compact} foot={`${roads.city}の地図データ（参考）。最終確認は窓口で`} />
+    ),
+    on.landPrice && (
+      <MapLegend
+        key="landPrice"
+        title="地価（円/m²）"
+        items={Object.entries(LAND_USAGE_COLORS).map(([label, color]) => ({ label, short: label.replace(/地$/, ""), color, kind: "dot" as const }))}
+        compact={compact}
+        foot="地価公示（1月1日時点）と、縁の濃い点は都道府県地価調査（7月1日時点）。その地域の標準的な土地の価格で、物件の価格ではありません"
+      />
     ),
   ];
 
@@ -627,6 +864,56 @@ export default function LiveMap({
             <RoadIcon className={`h-4 w-4 ${on.roads ? "" : "text-brand"}`} />
             道路種別
           </button>
+        )}
+        {hasBuildings() && (
+          <button
+            onClick={() => toggleOverlay("buildings")}
+            aria-pressed={on.buildings}
+            className={on.buildings ? `${toolBase} bg-gold text-white` : tool}
+            title="建物の用途・階数（国土交通省 PLATEAU の3D都市モデル）を表示"
+          >
+            <BuildingIcon className={`h-4 w-4 ${on.buildings ? "" : "text-brand"}`} />
+            建物
+          </button>
+        )}
+        <button
+          onClick={() => toggleOverlay("landPrice")}
+          aria-pressed={on.landPrice}
+          className={on.landPrice ? `${toolBase} bg-gold text-white` : tool}
+          title="地価公示・都道府県地価調査の地点と価格（円/m²）を表示"
+        >
+          <LandPriceIcon className={`h-4 w-4 ${on.landPrice ? "" : "text-brand"}`} />
+          地価
+        </button>
+        <button
+          onClick={toggleHazard}
+          aria-pressed={!!hazard}
+          aria-expanded={hazardMenu}
+          className={hazard ? `${toolBase} bg-gold text-white` : tool}
+          title="洪水・土砂災害などの想定区域（国の重ねるハザードマップ）を表示"
+        >
+          <HazardIcon className={`h-4 w-4 ${hazard ? "" : "text-brand"}`} />
+          {hazard ? `ハザード：${HAZARDS[hazard].short}` : "ハザード"}
+          {hazard && <ChevronRightIcon className={`-mr-1 h-3.5 w-3.5 transition-transform ${hazardMenu ? "-rotate-90" : "rotate-90"}`} />}
+        </button>
+        {hazardMenu && (
+          // 種類を選ぶ（iPhone で拡大されないよう、選択欄ではなくボタンを並べる）
+          <div role="group" aria-label="ハザードの種類" className="grid grid-cols-2 gap-0.5 rounded-2xl bg-white/95 p-1 shadow-soft">
+            {HAZARD_KINDS.map((k) => (
+              <button
+                key={k}
+                onClick={() => pickHazard(k)}
+                aria-pressed={hazard === k}
+                title={HAZARDS[k].label}
+                className={`rounded-full px-2.5 py-1 text-[11.5px] leading-tight ${hazard === k ? "bg-gold text-white" : "text-ink hover:bg-mint"}`}
+              >
+                {HAZARDS[k].short}
+              </button>
+            ))}
+            <button onClick={() => pickHazard(null)} className="rounded-full px-2.5 py-1 text-[11.5px] leading-tight text-muted hover:bg-mint">
+              重ねない
+            </button>
+          </div>
         )}
         {mode === "pin" && point && (
           <button onClick={toPoint} className={tool}>

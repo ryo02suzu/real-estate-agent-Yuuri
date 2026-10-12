@@ -6,11 +6,23 @@ import { useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { ASK, BRING } from "@/lib/inquiry";
 import type { LookupResult, MapKind } from "@/lib/roadmap";
-import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
+import { buildingSummary } from "@/lib/roadmap/building";
+import { BUILDING_CREDIT } from "@/lib/roadmap/building-data";
+import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, HAZARD_TABLE_NOTE, hazardRows, wagamachiUrl } from "@/lib/roadmap/hazard";
+import { changeText, distanceText, kindText, priceText } from "@/lib/roadmap/land-price";
+import { LAND_PRICE_CREDIT } from "@/lib/roadmap/land-price-data";
+import { schoolLine } from "@/lib/roadmap/school";
+import { SCHOOL_CREDIT } from "@/lib/roadmap/school-data";
+import { KOZU_CREDIT } from "@/lib/roadmap/kozu-data";
+import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel } from "@/lib/roadmap/parcel";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
 import { zoningRows } from "@/lib/roadmap/zoning";
 import { ZONING_CREDIT } from "@/lib/roadmap/zoning-data";
 import { COVERAGE } from "./coverage";
+import type { BuildingState } from "./building-card";
+import type { HazardState } from "./hazard-card";
+import type { LandPriceState } from "./land-price-card";
+import type { SchoolState } from "./school-card";
 import { MapPreview } from "./map-preview";
 import type { RoadsState } from "./nearby-roads";
 import { parcelLines, type ParcelInfo } from "./parcel-card";
@@ -27,7 +39,16 @@ const KIND: Record<MapKind, string> = {
 const noop = () => () => {};
 
 /** 結果の画面に置く。印刷のときだけ出る（画面には出ない） */
-export function PrintSheet(props: { result: Ok; zoning: ZoningState; parcels: ParcelInfo; roads: RoadsState }) {
+export function PrintSheet(props: {
+  result: Ok;
+  zoning: ZoningState;
+  parcels: ParcelInfo;
+  roads: RoadsState;
+  hazard: HazardState;
+  building: BuildingState;
+  landPrice: LandPriceState;
+  schools: SchoolState;
+}) {
   // document.body に出す（画面の作りの外に置き、印刷では画面の作りを丸ごと隠す）。サーバーでは何も出さない
   const client = useSyncExternalStore(
     noop,
@@ -38,7 +59,29 @@ export function PrintSheet(props: { result: Ok; zoning: ZoningState; parcels: Pa
   return createPortal(<Memo {...props} />, document.body);
 }
 
-function Memo({ result, zoning, parcels, roads }: { result: Ok; zoning: ZoningState; parcels: ParcelInfo; roads: RoadsState }) {
+function Memo({
+  result,
+  zoning,
+  parcels,
+  roads,
+  hazard,
+  building,
+  landPrice,
+  schools,
+}: {
+  result: Ok;
+  zoning: ZoningState;
+  parcels: ParcelInfo;
+  roads: RoadsState;
+  hazard: HazardState;
+  building: BuildingState;
+  landPrice: LandPriceState;
+  schools: SchoolState;
+}) {
+  const bHit = building.status === "ok" ? building.result.hit : undefined;
+  // 近くの地価：一番近い地価公示と地価調査を1つずつ（1枚に収めるため）
+  const hits = landPrice.status === "ok" ? landPrice.hits : [];
+  const prices = [hits.find((h) => h.kind === "公示"), hits.find((h) => h.kind === "調査")].filter((h) => h !== undefined);
   // 調べた日時（印刷した日ではなく、この結果を出した日時）
   const [at] = useState(() => new Date());
   const m = result.municipality;
@@ -53,10 +96,10 @@ function Memo({ result, zoning, parcels, roads }: { result: Ok; zoning: ZoningSt
     <div className="print-sheet bg-white text-[11.5px] leading-[1.6] text-[#1d1b18]">
       <header className="flex items-end justify-between gap-4 border-b-2 border-[#9a7442] pb-1.5">
         <div className="min-w-0">
-          <p className="text-[10px] tracking-[0.1em] text-[#7a6a55]">道路種別・都市計画の調査メモ</p>
+          <p className="text-[10px] tracking-[0.1em] text-[#7a6a55]">道路種別・都市計画・災害リスクの調査メモ</p>
           <h1 className="text-[17px] font-bold leading-snug">
             {result.matchedAddress}
-            {found ? ` ${chibanLabel(found.chibanRaw)}` : <span className="text-[13px] font-normal">{result.picked ? "（地図で選んだ地点）" : " 付近"}</span>}
+            {found ? ` ${chibanLabel(found.chibanRaw)}${estimatedMark(found)}` : <span className="text-[13px] font-normal">{result.picked ? "（地図で選んだ地点）" : " 付近"}</span>}
           </h1>
         </div>
         <p className="shrink-0 text-right text-[10px] leading-[1.5] text-[#7a6a55]">
@@ -79,6 +122,7 @@ function Memo({ result, zoning, parcels, roads }: { result: Ok; zoning: ZoningSt
               <dt className="text-[#7a6a55]">地番で探した筆</dt>
               <dd>
                 {kuikiLabel(found.kuiki)} {chibanLabel(found.chibanRaw)}
+                {estimatedMark(found)}
               </dd>
             </>
           ) : (
@@ -87,9 +131,42 @@ function Memo({ result, zoning, parcels, roads }: { result: Ok; zoning: ZoningSt
                 <dt className="text-[#7a6a55]">この地点の筆</dt>
                 <dd>
                   {kuikiLabel(p.kuiki)} {chibanLabel(p.chibanRaw)}
+                  {estimatedMark(p)}
                 </dd>
               </>
             )
+          )}
+          {bHit && (
+            <>
+              <dt className="text-[#7a6a55]">建物（参考）</dt>
+              <dd>
+                {buildingSummary(bHit.building)}
+                {bHit.building.height ? `・高さ約${bHit.building.height.toFixed(1)}m` : ""}
+                <span className="text-[10px] text-[#7a6a55]">（PLATEAU・推定）</span>
+              </dd>
+            </>
+          )}
+          {prices.length > 0 && (
+            <>
+              <dt className="text-[#7a6a55]">近くの地価（参考）</dt>
+              <dd>
+                {prices.map((h) => (
+                  <span key={h.no} className="block">
+                    {kindText(h.kind)} {h.no}（{h.usage}・{h.bearing}へ{distanceText(h.distance)}）：<b>{priceText(h.price)}</b>（前年比 {changeText(h.change)}・{h.year}年）
+                  </span>
+                ))}
+              </dd>
+            </>
+          )}
+          {schools.status === "ok" && (
+            <>
+              <dt className="text-[#7a6a55]">学区（参考）</dt>
+              <dd>
+                {[schools.schools.elementary && `小学校：${schoolLine(schools.schools.elementary)}`, schools.schools.junior && `中学校：${schoolLine(schools.schools.junior)}`]
+                  .filter(Boolean)
+                  .join("　")}
+              </dd>
+            </>
           )}
           <dt className="text-[#7a6a55]">緯度・経度</dt>
           <dd className="tabular">
@@ -195,7 +272,10 @@ function Memo({ result, zoning, parcels, roads }: { result: Ok; zoning: ZoningSt
         <Block title="謄本・公図を取るときの地番" flush>
           {parcels.status === "ok" && lines ? (
             <>
-              <p className="text-[10px] text-[#7a6a55]">{parcels.kind === "address" ? "住所の地点にある筆（参考。住居表示と地番は別）" : "物件の筆"}</p>
+              <p className="text-[10px] text-[#7a6a55]">
+                {parcels.kind === "address" ? "住所の地点にある筆（参考。住居表示と地番は別）" : "物件の筆"}
+                {parcels.parcel.estimated && `・公図から推定した位置（${estimatedNote(parcels.parcel.estimated)}）`}
+              </p>
               <p className="font-semibold">{lines.target ?? `${kuikiLabel(parcels.parcel.kuiki)} ${chibanLabel(parcels.parcel.chibanRaw)}`}</p>
               <p className="mt-1 text-[10px] text-[#7a6a55]">境界が接している筆（{lines.neighbors.length}）</p>
               <p className="text-[10.5px]">{lines.neighbors.length ? lines.neighbors.join("、") : "地図データの中には見つかりませんでした"}</p>
@@ -207,6 +287,35 @@ function Memo({ result, zoning, parcels, roads }: { result: Ok; zoning: ZoningSt
           )}
         </Block>
       </div>
+
+      {/* 災害リスク（国のデータ）と、重要事項説明に使う市区町村のハザードマップ */}
+      <Block title="災害リスク（国のデータ・参考）">
+        {hazard.status === "ok" ? (
+          <>
+            <dl className="grid grid-cols-2 gap-x-4">
+              {hazardRows(hazard.report, hazard.elevation).map((r) => (
+                <div key={r.kind} className="flex gap-2 border-b border-[#eee6da] py-0.5">
+                  <dt className="w-[7em] shrink-0 text-[10px] text-[#7a6a55]">{r.name}</dt>
+                  <dd className={`min-w-0 flex-1 text-[10.5px] font-semibold ${r.warn ? "text-[#8a4f3a]" : ""}`}>{r.value}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-1 text-[10px] text-[#5d5143]">
+              {HAZARD_TABLE_NOTE}。重要事項説明は{m.name}のハザードマップで確認：
+            </p>
+            <ul className="text-[9.5px] leading-[1.45] text-[#5d5143]">
+              {groupHazardMaps(hazard.maps).map((g) => (
+                <li key={g.url} className="break-all">
+                  {g.kinds.map((k) => HAZARD_MAP_LABELS[k]).join("・")}：{g.url}
+                </li>
+              ))}
+              <li className="break-all">わがまちハザードマップ（国の一覧）：{wagamachiUrl(hazard.muniCd)}</li>
+            </ul>
+          </>
+        ) : (
+          <p className="text-[10.5px] text-[#7a6a55]">{hazard.status === "loading" ? "読み込み中でした。画面の表示が終わってから印刷し直してください。" : "データを読み込めませんでした。"}</p>
+        )}
+      </Block>
 
       {/* 問い合わせ先と窓口での確認 */}
       {c && dept && (
@@ -274,11 +383,16 @@ function Memo({ result, zoning, parcels, roads }: { result: Ok; zoning: ZoningSt
 
       <footer className="mt-3 border-t border-[#d8ccb8] pt-1.5 text-[8.5px] leading-[1.55] text-[#7a6a55]">
         <p>
-          ※ 地図や都市計画・地番は参考情報です。重要事項説明などの最終確認は、必ず役所の窓口・法務局で行ってください。道路種別・接道の判断はこのメモでは行っていません。
+          ※ 地図や都市計画・地番・災害リスクは参考情報です。重要事項説明などの最終確認は、必ず役所の窓口・法務局で行ってください。道路種別・接道の判断はこのメモでは行っていません。
         </p>
         <p>
           地図：地理院タイル（国土地理院）。{zoning.status === "ok" && `都市計画の${ZONING_CREDIT}。`}
+          {hazard.status === "ok" && `災害リスクの${HAZARD_CREDIT}。`}
+          {bHit && `建物の${BUILDING_CREDIT}。`}
+          {prices.length > 0 && `地価の${LAND_PRICE_CREDIT}（標準地・基準地の価格で、物件の価格ではありません）。`}
+          {schools.status === "ok" && `学区の${SCHOOL_CREDIT}（指定校は教育委員会で確認）。`}
           {(p || parcels.status === "ok") && `筆の${PARCEL_CREDIT}。`}
+          {(p?.estimated || (parcels.status === "ok" && parcels.parcel.estimated)) && `${KOZU_CREDIT}。`}
         </p>
       </footer>
     </div>

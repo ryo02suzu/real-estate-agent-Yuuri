@@ -6,8 +6,8 @@ export type LegendItem = {
   /** 短い名前（例：1種低層、2項道路）。スマホの狭い凡例に使う */
   short: string;
   color: string;
-  /** 見本の形：面（薄い塗り）・線・点線 */
-  kind: "area" | "line" | "dash";
+  /** 見本の形：面（薄い塗り）・線・点線・点 */
+  kind: "area" | "line" | "dash" | "dot";
 };
 
 /** スマホの凡例に並べる数（それより多いときは「ほか○種類」） */
@@ -17,6 +17,7 @@ function Swatch({ item }: { item: LegendItem }) {
   if (item.kind === "area")
     return <span aria-hidden className="h-3 w-4 shrink-0 rounded-[3px] border-[1.5px]" style={{ borderColor: item.color, background: `${item.color}88` }} />;
   if (item.kind === "dash") return <span aria-hidden className="w-4 shrink-0 border-t-[3px] border-dashed" style={{ borderColor: item.color }} />;
+  if (item.kind === "dot") return <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full border border-white shadow-[0_0_0_1px_rgba(0,0,0,0.12)]" style={{ background: item.color }} />;
   return <span aria-hidden className="h-[4px] w-4 shrink-0 rounded-full" style={{ background: item.color }} />;
 }
 

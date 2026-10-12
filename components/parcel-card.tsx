@@ -5,7 +5,8 @@
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
 import type { LookupResult } from "@/lib/roadmap";
-import { adjacentParcels, chibanLabel, kuikiLabel, parcelAt, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
+import { KOZU_DATA } from "@/lib/roadmap/kozu-data";
+import { adjacentParcels, chibanLabel, estimatedMark, kuikiLabel, parcelAt, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
 import { ChevronRightIcon, CopyIcon, ExternalIcon, InfoIcon, ParcelIcon } from "./icons";
@@ -59,10 +60,23 @@ export function parcelLines(info: Extract<ParcelInfo, { status: "ok" }>): { targ
  * 都市計画の行の右に置く小さなボタン。スマホは押すと一覧が下から出る。
  * PC は onOpen（パネルの中の地番のカードまで動かす）を渡し、物件の筆の地番も出す（住所の地点の筆は参考なので出さない）
  */
-export function ParcelButton({ info, onOpen }: { info: ParcelInfo; onOpen?: () => void }) {
+export function ParcelButton({
+  info,
+  onOpen,
+  extra,
+  withBuilding,
+}: {
+  info: ParcelInfo;
+  onOpen?: () => void;
+  /** スマホの一覧の下に添えるもの（地点の建物） */
+  extra?: React.ReactNode;
+  /** 一覧に建物も入っている（ボタンを「地番・建物」にする） */
+  withBuilding?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   if (info.status === "none") return null;
-  const chiban = onOpen && info.status === "ok" && info.kind !== "address" && /^\d/.test(info.parcel.chibanRaw) ? chibanLabel(info.parcel.chibanRaw) : undefined;
+  const chiban =
+    onOpen && info.status === "ok" && info.kind !== "address" && /^\d/.test(info.parcel.chibanRaw) ? `${chibanLabel(info.parcel.chibanRaw)}${estimatedMark(info.parcel)}` : undefined;
   return (
     <>
       <button
@@ -79,7 +93,7 @@ export function ParcelButton({ info, onOpen }: { info: ParcelInfo; onOpen?: () =
           </>
         ) : (
           <>
-            地番<span className="[@media(max-height:720px)]:hidden">・隣地</span>
+            地番<span className="[@media(max-height:720px)]:hidden">{withBuilding ? "・建物" : "・隣地"}</span>
           </>
         )}
         {info.status === "ok" && <ChevronRightIcon className="h-3.5 w-3.5 shrink-0 text-muted" />}
@@ -87,6 +101,7 @@ export function ParcelButton({ info, onOpen }: { info: ParcelInfo; onOpen?: () =
       {info.status === "ok" && !onOpen && (
         <Sheet title="謄本・公図を取るときの地番" open={open} onClose={() => setOpen(false)}>
           <ParcelDetail info={info} />
+          {extra}
         </Sheet>
       )}
     </>
@@ -122,8 +137,18 @@ function ParcelDetail({ info }: { info: Extract<ParcelInfo, { status: "ok" }> })
   const town = kuikiLabel(parcel.kuiki);
   return (
     <div>
-      <p className="text-[11px] text-muted">{KIND_LABEL[kind]}</p>
+      <p className="text-[11px] text-muted">
+        {KIND_LABEL[kind]}
+        {parcel.estimated && `・公図から推定した位置${parcel.estimated === "low" ? "（確度低）" : ""}`}
+      </p>
       <Row kuiki={parcel.kuiki} chiban={parcel.chibanRaw} strong />
+      {parcel.estimated && (
+        <p className="mt-0.5 text-[10.5px] leading-[1.55] text-[#8a4f3a]">
+          {parcel.estimated === "low"
+            ? "この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置で、合わせ方の確かさが低いため、5m前後ずれて隣の筆の地番になっていることがあります。隣の筆も候補にして、謄本・公図で確かめてください。"
+            : "この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、数mずれて隣の筆の地番になることがあります。謄本・公図で確かめてください。"}
+        </p>
+      )}
       {kind === "address" && (
         <p className="mt-0.5 text-[10.5px] leading-[1.55] text-[#8a4f3a]">
           住居表示の住所と地番は別のものです。物件の土地かどうかは、公図や登記で確かめてください。
@@ -163,7 +188,9 @@ function ParcelDetail({ info }: { info: Extract<ParcelInfo, { status: "ok" }> })
       <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted">
         <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
         <span>
-          筆は「登記所備付地図データ」（法務省）を加工して作成（{PARCEL_DATA.edition}）。分筆・合筆などで変わっていることがあります。証明書として使う謄本（登記事項証明書）は、法務局で請求してください。
+          筆は「登記所備付地図データ」（法務省）を加工して作成（{parcel.estimated ? KOZU_DATA.edition || PARCEL_DATA.edition : PARCEL_DATA.edition}）。
+          {parcel.estimated && "公図の筆は、国土地理院の基盤地図情報（道路縁）に合わせて位置を推定しています。"}
+          分筆・合筆などで変わっていることがあります。証明書として使う謄本（登記事項証明書）は、法務局で請求してください。
         </span>
       </p>
     </div>
