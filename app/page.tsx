@@ -9,6 +9,7 @@ import { AlertIcon, AreaIcon, ChevronRightIcon, ClockIcon, InfoIcon, MapIcon } f
 import { MapIllustration, SkylineIllustration } from "@/components/illustrations";
 import { CitiesSheet, HelpSheet, MenuSheet, type SheetName } from "@/components/info-sheets";
 import { FullMap } from "@/components/full-map";
+import { openDraft } from "@/components/draft-sheet";
 import { GuideMapSheet } from "@/components/guide-map";
 import { LocationPicker } from "@/components/location-picker";
 import { ResultView, type MapOpen } from "@/components/result-view";
@@ -147,6 +148,7 @@ export default function Home() {
             ? (kind) => {
                 // 調査メモはそのまま印刷する（押した操作の中で呼ぶ。iPhone はプリントの画面から PDF にもできる）
                 if (kind === "memo") window.print();
+                else if (kind === "draft") openDraft();
                 else setGuide(true);
                 setSheet(null);
               }

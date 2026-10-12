@@ -7,10 +7,12 @@ import type { HazardKind } from "@/lib/roadmap/hazard";
 import { chibanLabel, estimatedMark, kuikiLabel } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { sheetName } from "@/lib/roadmap/sheets";
+import type { DraftInput } from "@/lib/draft";
 import { buildSummary } from "@/lib/summary";
 import { BuildingCard, BuildingSection, useBuilding, type BuildingState } from "./building-card";
 import { ContactCard } from "./contact-card";
 import { COVERAGE, CoveragePill } from "./coverage";
+import { DRAFT_EVENT, DraftSheet } from "./draft-sheet";
 import { GuideMapSheet } from "./guide-map";
 import { HazardCard, HazardLine, useHazard, type HazardState } from "./hazard-card";
 import {
@@ -20,6 +22,7 @@ import {
   CopyIcon,
   InfoIcon,
   MapIcon,
+  NoteIcon,
   PinOutlineIcon,
   PrintIcon,
   SearchIcon,
@@ -195,6 +198,13 @@ function Found({
   );
   // 印刷・PDF 保存用の調査メモ（画面には出ない。iPhone の共有 → プリントでも同じメモになる）
   const print = <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} />;
+  // 重説・物件概要の下書き（メニューから開く）
+  const [draft, setDraft] = useState(false);
+  useEffect(() => {
+    const open = () => setDraft(true);
+    window.addEventListener(DRAFT_EVENT, open);
+    return () => window.removeEventListener(DRAFT_EVENT, open);
+  }, []);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5 [&>*]:shrink-0">
@@ -287,6 +297,7 @@ function Found({
         )}
       </div>
       {print}
+      <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools })} open={draft} onClose={() => setDraft(false)} />
     </div>
   );
 }
@@ -470,6 +481,35 @@ function CityLine({ municipality: m, lowSlot }: { municipality: Municipality; lo
   );
 }
 
+/** 読み込めた結果だけを、共有の文面・重説の下書きに渡す形にする（読み込み中・失敗は渡さない） */
+function loaded({
+  zoning,
+  parcels,
+  roads,
+  hazard,
+  building,
+  landPrice,
+  schools,
+}: {
+  zoning: ZoningState;
+  parcels: ParcelInfo;
+  roads: RoadsState;
+  hazard: HazardState;
+  building: BuildingState;
+  landPrice: LandPriceState;
+  schools: SchoolState;
+}): DraftInput {
+  return {
+    zoning: zoning.status === "ok" ? zoning : undefined,
+    parcels: parcels.status === "ok" ? { ...parcelLines(parcels), reference: parcels.kind === "address", estimated: parcels.parcel.estimated } : undefined,
+    roads: roads.status === "ok" ? roads.roads : undefined,
+    hazard: hazard.status === "ok" ? hazard : undefined,
+    building: building.status === "ok" ? building.result : undefined,
+    landPrice: landPrice.status === "ok" ? landPrice.hits : undefined,
+    schools: schools.status === "ok" ? schools.schools : undefined,
+  };
+}
+
 /** 結果を報告・メモ用の文章にして共有（スマホ）またはコピー（PC） */
 function ShareButton({
   result,
@@ -495,15 +535,7 @@ function ShareButton({
 }) {
   const { done, copy } = useCopy();
   const onClick = async () => {
-    const text = buildSummary(result, {
-      zoning: zoning.status === "ok" ? zoning : undefined,
-      parcels: parcels.status === "ok" ? { ...parcelLines(parcels), reference: parcels.kind === "address", estimated: parcels.parcel.estimated } : undefined,
-      roads: roads.status === "ok" ? roads.roads : undefined,
-      hazard: hazard.status === "ok" ? hazard : undefined,
-      building: building.status === "ok" ? building.result : undefined,
-      landPrice: landPrice.status === "ok" ? landPrice.hits : undefined,
-      schools: schools.status === "ok" ? schools.schools : undefined,
-    });
+    const text = buildSummary(result, loaded({ zoning, parcels, roads, hazard, building, landPrice, schools }));
     if (!desktop && typeof navigator.share === "function") {
       try {
         await navigator.share({ text });
@@ -728,6 +760,7 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
   const building = useBuilding(result, parcels);
   const landPrice = useLandPrices(result.lat, result.lng);
   const schools = useSchools(result.lat, result.lng);
+  const [draft, setDraft] = useState(false);
   const offline = m.coverage === "none" || m.coverage === "outside";
   const primary = result.links.filter((l) => !offline && l.kind !== "public_road");
   const others = result.links.filter((l) => offline || l.kind === "public_road");
@@ -744,7 +777,8 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
             <>
               <CopyButton text={copyText(result)} />
               <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} desktop />
-              <PrintMenu result={result} />
+              <PrintMenu result={result} onDraft={() => setDraft(true)} />
+              <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools })} open={draft} onClose={() => setDraft(false)} />
             </>
           }
         />
@@ -822,8 +856,11 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
   );
 }
 
-/** PC：調査メモ（components/print-sheet.tsx）か案内図（components/guide-map.tsx）を印刷・PDF 保存する。見出しの行が窮屈なのでアイコンだけで、押すと選ぶ */
-function PrintMenu({ result }: { result: Extract<LookupResult, { status: "ok" }> }) {
+/**
+ * PC：調査メモ（components/print-sheet.tsx）・案内図（components/guide-map.tsx）の印刷・PDF 保存と、重説・物件概要の下書き（onDraft）。
+ * 見出しの行が窮屈なのでアイコンだけで、押すと選ぶ
+ */
+function PrintMenu({ result, onDraft }: { result: Extract<LookupResult, { status: "ok" }>; onDraft: () => void }) {
   const [menu, setMenu] = useState(false);
   const [guide, setGuide] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
@@ -846,7 +883,7 @@ function PrintMenu({ result }: { result: Extract<LookupResult, { status: "ok" }>
         onClick={() => setMenu((v) => !v)}
         aria-label="印刷"
         aria-expanded={menu}
-        title="調査メモ・案内図を印刷・PDF保存"
+        title="調査メモ・案内図の印刷・PDF保存、重説・物件概要の下書き"
         className="flex items-center rounded-full border border-line px-2 py-1 text-brand lg:hover:bg-mint"
       >
         <PrintIcon className="h-3.5 w-3.5" />
@@ -872,6 +909,16 @@ function PrintMenu({ result }: { result: Extract<LookupResult, { status: "ok" }>
           >
             <MapIcon className="h-3.5 w-3.5 text-brand" />
             案内図を印刷…
+          </button>
+          <button
+            className={item}
+            onClick={() => {
+              setMenu(false);
+              onDraft();
+            }}
+          >
+            <NoteIcon className="h-3.5 w-3.5 text-brand" />
+            重説・物件概要の下書き…
           </button>
         </span>
       )}
