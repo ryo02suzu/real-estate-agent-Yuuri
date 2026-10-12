@@ -299,6 +299,7 @@ export default function Home() {
           result={shown.result}
           withRoads={fullMap.roads}
           hazard={fullMap.hazard}
+          landPrice={fullMap.landPrice}
           onClose={() => setFullMap(null)}
           onPick={(lat, lng) => void searchPoint(lat, lng)}
         />

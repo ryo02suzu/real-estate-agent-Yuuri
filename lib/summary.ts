@@ -3,6 +3,8 @@ import type { LookupResult } from "./roadmap";
 import { buildingSummary, type BuildingResult } from "./roadmap/building";
 import { BUILDING_CREDIT } from "./roadmap/building-data";
 import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, hazardRows, wagamachiUrl, type Elevation, type HazardMaps, type HazardReport } from "./roadmap/hazard";
+import { asOfText, changeText, distanceText, kindText, priceText, type LandPriceHit } from "./roadmap/land-price";
+import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
 import { chibanLabel, kuikiLabel } from "./roadmap/parcel";
 import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
@@ -14,7 +16,7 @@ const COVERAGE_SHORT = { full: "ネットで全種別が分かる", partial: "�
 /**
  * zoning：地点の都市計画、parcels：謄本・公図用の「所在 地番」の行（物件の筆と隣の筆。reference は住所の地点の筆で参考）、
  * roads：市の地図データで読んだ、物件のまわりの道路の種別、hazard：国のハザードマップのデータで読んだ地点の災害リスクと、
- * 市区町村のハザードマップのページ。読み込めていれば添える
+ * 市区町村のハザードマップのページ、landPrice：近くの地価公示・地価調査の地点（近い順）。読み込めていれば添える
  */
 export function buildSummary(
   result: Extract<LookupResult, { status: "ok" }>,
@@ -24,12 +26,14 @@ export function buildSummary(
     roads,
     hazard,
     building,
+    landPrice,
   }: {
     zoning?: { zoning: Zoning; st?: ZoningStatus };
     parcels?: { target?: string; neighbors: string[]; reference: boolean };
     roads?: NearbyRoad[];
     hazard?: { report: HazardReport; elevation: Elevation | null; maps: HazardMaps; muniCd: string };
     building?: BuildingResult;
+    landPrice?: LandPriceHit[];
   } = {},
 ): string {
   const m = result.municipality;
@@ -63,6 +67,13 @@ export function buildSummary(
   }
   const hit = building?.hit;
   if (hit) lines.push(`【建物（PLATEAU・参考）】${buildingSummary(hit.building)}${hit.building.height ? `・高さ約${hit.building.height.toFixed(1)}m` : ""}`);
+  // 近くの地価（共有の文面は3地点まで）
+  const prices = (landPrice ?? []).slice(0, 3);
+  if (prices.length) {
+    lines.push("【近くの地価（標準地・基準地の価格・参考）】");
+    for (const h of prices)
+      lines.push(`・${kindText(h.kind)} ${h.no}（${h.usage}・${h.bearing}へ${distanceText(h.distance)}）：${priceText(h.price)}（前年比 ${changeText(h.change)}、${asOfText(h)}）`);
+  }
   const withParcels = !!parcels && (!!parcels.target || parcels.neighbors.length > 0);
   if (parcels && withParcels) {
     lines.push(`【謄本・公図用の地番${parcels.reference ? "（住所の地点の筆・参考）" : ""}】`);
@@ -74,5 +85,6 @@ export function buildSummary(
   if (zoning) lines.push(`※都市計画の${ZONING_CREDIT}。`);
   if (hazard) lines.push(`※災害リスクの${HAZARD_CREDIT}。`);
   if (hit) lines.push(`※建物の${BUILDING_CREDIT}。`);
+  if (prices.length) lines.push(`※地価の${LAND_PRICE_CREDIT}。物件そのものの価格ではありません。`);
   return lines.join("\n");
 }

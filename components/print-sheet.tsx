@@ -9,6 +9,8 @@ import type { LookupResult, MapKind } from "@/lib/roadmap";
 import { buildingSummary } from "@/lib/roadmap/building";
 import { BUILDING_CREDIT } from "@/lib/roadmap/building-data";
 import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, HAZARD_TABLE_NOTE, hazardRows, wagamachiUrl } from "@/lib/roadmap/hazard";
+import { changeText, distanceText, kindText, priceText } from "@/lib/roadmap/land-price";
+import { LAND_PRICE_CREDIT } from "@/lib/roadmap/land-price-data";
 import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
 import { zoningRows } from "@/lib/roadmap/zoning";
@@ -16,6 +18,7 @@ import { ZONING_CREDIT } from "@/lib/roadmap/zoning-data";
 import { COVERAGE } from "./coverage";
 import type { BuildingState } from "./building-card";
 import type { HazardState } from "./hazard-card";
+import type { LandPriceState } from "./land-price-card";
 import { MapPreview } from "./map-preview";
 import type { RoadsState } from "./nearby-roads";
 import { parcelLines, type ParcelInfo } from "./parcel-card";
@@ -32,7 +35,15 @@ const KIND: Record<MapKind, string> = {
 const noop = () => () => {};
 
 /** 結果の画面に置く。印刷のときだけ出る（画面には出ない） */
-export function PrintSheet(props: { result: Ok; zoning: ZoningState; parcels: ParcelInfo; roads: RoadsState; hazard: HazardState; building: BuildingState }) {
+export function PrintSheet(props: {
+  result: Ok;
+  zoning: ZoningState;
+  parcels: ParcelInfo;
+  roads: RoadsState;
+  hazard: HazardState;
+  building: BuildingState;
+  landPrice: LandPriceState;
+}) {
   // document.body に出す（画面の作りの外に置き、印刷では画面の作りを丸ごと隠す）。サーバーでは何も出さない
   const client = useSyncExternalStore(
     noop,
@@ -50,6 +61,7 @@ function Memo({
   roads,
   hazard,
   building,
+  landPrice,
 }: {
   result: Ok;
   zoning: ZoningState;
@@ -57,8 +69,12 @@ function Memo({
   roads: RoadsState;
   hazard: HazardState;
   building: BuildingState;
+  landPrice: LandPriceState;
 }) {
   const bHit = building.status === "ok" ? building.result.hit : undefined;
+  // 近くの地価：一番近い地価公示と地価調査を1つずつ（1枚に収めるため）
+  const hits = landPrice.status === "ok" ? landPrice.hits : [];
+  const prices = [hits.find((h) => h.kind === "公示"), hits.find((h) => h.kind === "調査")].filter((h) => h !== undefined);
   // 調べた日時（印刷した日ではなく、この結果を出した日時）
   const [at] = useState(() => new Date());
   const m = result.municipality;
@@ -118,6 +134,18 @@ function Memo({
                 {buildingSummary(bHit.building)}
                 {bHit.building.height ? `・高さ約${bHit.building.height.toFixed(1)}m` : ""}
                 <span className="text-[10px] text-[#7a6a55]">（PLATEAU・推定）</span>
+              </dd>
+            </>
+          )}
+          {prices.length > 0 && (
+            <>
+              <dt className="text-[#7a6a55]">近くの地価（参考）</dt>
+              <dd>
+                {prices.map((h) => (
+                  <span key={h.no} className="block">
+                    {kindText(h.kind)} {h.no}（{h.usage}・{h.bearing}へ{distanceText(h.distance)}）：<b>{priceText(h.price)}</b>（前年比 {changeText(h.change)}・{h.year}年）
+                  </span>
+                ))}
               </dd>
             </>
           )}
@@ -339,6 +367,7 @@ function Memo({
           地図：地理院タイル（国土地理院）。{zoning.status === "ok" && `都市計画の${ZONING_CREDIT}。`}
           {hazard.status === "ok" && `災害リスクの${HAZARD_CREDIT}。`}
           {bHit && `建物の${BUILDING_CREDIT}。`}
+          {prices.length > 0 && `地価の${LAND_PRICE_CREDIT}（標準地・基準地の価格で、物件の価格ではありません）。`}
           {(p || parcels.status === "ok") && `筆の${PARCEL_CREDIT}。`}
         </p>
       </footer>

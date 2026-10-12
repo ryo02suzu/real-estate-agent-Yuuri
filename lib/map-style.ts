@@ -5,6 +5,8 @@ import type { ExpressionSpecification, FilterSpecification, LayerSpecification, 
 import { BUILDING_ZOOM, USAGE_GROUPS, usageGroup, usageShort } from "./roadmap/building";
 import { BUILDING_DATA, buildingUrl, hasBuildings } from "./roadmap/building-data";
 import { HAZARD_LAYERS, HAZARD_ZOOM, hazardTileUrl, type HazardKind } from "./roadmap/hazard";
+import { LAND_PRICE_ZOOM, LAND_USAGE_COLORS } from "./roadmap/land-price";
+import { LAND_PRICE_DATA, landPriceUrl } from "./roadmap/land-price-data";
 import { PARCEL_DATA } from "./roadmap/parcel-data";
 import type { SheetHit } from "./roadmap/sheets";
 import { YOUTO_COLORS, ZONING_ZOOM } from "./roadmap/zoning";
@@ -82,6 +84,83 @@ const buildingText = [
   ["concat", usageText, ["case", ["has", "f"], ["concat", " ", ["to-string", ["get", "f"]], "F"], ""]],
 ] as unknown as ExpressionSpecification;
 
+// 地価公示・都道府県地価調査（国土数値情報。CC BY 4.0 のとおり、加工したことを書く）
+const LAND_PRICE_ATTRIBUTION = `<a href="https://nlftp.mlit.go.jp/ksj/" target="_blank" rel="noreferrer">「国土数値情報（地価公示・都道府県地価調査）」（国土交通省）</a>を加工して作成`;
+
+/** 地価（「地価」で表示を切り替える）。引いた地図（z8〜12 の pt）と、寄った地図（z13 の lp）の点と価格の文字 */
+export const LAND_PRICE_LAYERS = ["lpt-dot", "lpt-label", "lp-dot", "lp-label"];
+
+/** 地価の点を出す最小のズーム（関東の全体を見ているときは出さない） */
+export const LAND_PRICE_MIN_ZOOM = 9;
+
+/** 用途の数字（標準地番号の数字）→ 点の色 */
+const landUsageColor = [
+  "match",
+  ["get", "u"],
+  "5",
+  LAND_USAGE_COLORS.商業地,
+  "9",
+  LAND_USAGE_COLORS.工業地,
+  "3",
+  LAND_USAGE_COLORS.宅地見込地,
+  LAND_USAGE_COLORS.住宅地,
+] as unknown as ExpressionSpecification;
+/** 価格の短い文字（「441万」「45.5万」「8350円」） */
+const landPriceText = [
+  "case",
+  [">=", ["get", "p"], 1000000],
+  ["concat", ["to-string", ["round", ["/", ["get", "p"], 10000]]], "万"],
+  [">=", ["get", "p"], 10000],
+  ["concat", ["to-string", ["/", ["round", ["/", ["get", "p"], 1000]], 10]], "万"],
+  ["concat", ["to-string", ["get", "p"]], "円"],
+] as unknown as ExpressionSpecification;
+
+function landPriceLayers(): LayerSpecification[] {
+  const dot = (id: string, layer: string, zoom: { minzoom?: number; maxzoom?: number }): LayerSpecification => ({
+    id,
+    type: "circle",
+    source: "landprice",
+    "source-layer": layer,
+    ...zoom,
+    layout: { visibility: "none" },
+    paint: {
+      "circle-color": landUsageColor,
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 3, 13, 5.5, 17, 7],
+      // 地価調査（基準地）は縁を濃くして見分ける
+      "circle-stroke-color": ["case", ["==", ["get", "k"], 1], "#3b3328", "#ffffff"],
+      "circle-stroke-width": 1.5,
+    },
+  });
+  const label = (id: string, layer: string, zoom: { minzoom?: number; maxzoom?: number }): LayerSpecification => ({
+    id,
+    type: "symbol",
+    source: "landprice",
+    "source-layer": layer,
+    ...zoom,
+    layout: {
+      visibility: "none",
+      "text-field": landPriceText,
+      "text-font": ["NotoSansCJKjp-Regular"],
+      "text-size": ["interpolate", ["linear"], ["zoom"], 11, 10, 16, 12.5],
+      "text-anchor": "top",
+      "text-offset": [0, 0.6],
+    },
+    paint: { "text-color": "#3b3328", "text-halo-color": "#ffffff", "text-halo-width": 1.5 },
+  });
+  return [
+    dot("lpt-dot", LAND_PRICE_DATA.smallLayer, { minzoom: LAND_PRICE_MIN_ZOOM, maxzoom: LAND_PRICE_ZOOM }),
+    label("lpt-label", LAND_PRICE_DATA.smallLayer, { minzoom: 11, maxzoom: LAND_PRICE_ZOOM }),
+    dot("lp-dot", LAND_PRICE_DATA.layer, { minzoom: LAND_PRICE_ZOOM }),
+    label("lp-label", LAND_PRICE_DATA.layer, { minzoom: LAND_PRICE_ZOOM }),
+  ];
+}
+
+/** 地図で地価の地点を見せる（パネルの一覧の「地図」。地図は別に読み込むので、ページのイベントで伝える） */
+export const LAND_PRICE_EVENT = "michilu:land-price";
+export function showLandPriceOnMap(point: [number, number]) {
+  window.dispatchEvent(new CustomEvent<[number, number]>(LAND_PRICE_EVENT, { detail: point }));
+}
+
 /** PC：パネルの「地図に重ねる」から、地図にハザードを重ねる（地図は別に読み込むので、ページのイベントで伝える） */
 export const HAZARD_EVENT = "michilu:hazard";
 export function showHazardOnMap(kind: HazardKind) {
@@ -126,6 +205,8 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
       ),
       // 建物（PLATEAU）。データの置き場所が決まるまでは無し
       ...(buildings ? { buildings: { type: "vector" as const, url: `pmtiles://${buildingUrl()}`, attribution: BUILDING_ATTRIBUTION } } : {}),
+      // 地価公示・地価調査（アプリと同じサイトに置いた PMTiles）
+      landprice: { type: "vector", url: `pmtiles://${landPriceUrl()}`, attribution: LAND_PRICE_ATTRIBUTION },
     },
     layers: [
       // 淡色地図に無いところ（海など）が白く抜けないよう、下に標準地図の色を敷く
@@ -263,6 +344,8 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
             },
           ] satisfies LayerSpecification[])
         : []),
+      // 地価公示・地価調査（「地価」で表示）。用途の色の点と価格
+      ...landPriceLayers(),
       // 地番で見つけた筆・地図で選んだ地点の筆
       {
         id: "fude-hit",

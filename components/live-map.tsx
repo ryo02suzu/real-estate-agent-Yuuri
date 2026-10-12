@@ -3,7 +3,8 @@
 // 動く地図（MapLibre GL ＋ 地理院タイル）。重いので next/dynamic で必要になったときだけ読み込む（components/map-panel.tsx）。
 //  - pin: 物件にピンを立てる。ピンをドラッグするか、地図をクリックして「ここで調べる」で場所を選び直せる（PC・スマホの「地図を拡大」）
 //  - crosshair: 画面中央の印で場所を選ぶ（スマホの「地図で選ぶ」）
-// 右上の道具で、筆・地番、用途地域、道路種別（市の公開データがある所だけ）、建物（PLATEAU）、ハザード（国の重ねるハザードマップ）を重ねられる。
+// 右上の道具で、筆・地番、用途地域、道路種別（市の公開データがある所だけ）、建物（PLATEAU）、地価（地価公示・地価調査）、
+// ハザード（国の重ねるハザードマップ）を重ねられる。
 // 重ねた色の凡例も出す
 import "maplibre-gl/dist/maplibre-gl.css";
 import { addProtocol, getVersion, MapLibreMap, Marker, NavigationControl, Popup, ScaleControl, setWorkerUrl, type GeoJSONSource, type PointLike } from "maplibre-gl";
@@ -18,6 +19,9 @@ import {
   HAZARD_EVENT,
   hazardLayerId,
   KANTO_BOUNDS,
+  LAND_PRICE_EVENT,
+  LAND_PRICE_LAYERS,
+  LAND_PRICE_MIN_ZOOM,
   PARCEL_MIN_ZOOM,
   ROAD_LAYERS,
   ROAD_MIN_ZOOM,
@@ -33,11 +37,12 @@ import { BUILDING_DATA, hasBuildings } from "@/lib/roadmap/building-data";
 import { pmtilesBuildingSource } from "@/lib/roadmap/building-tiles";
 import { HAZARD_KINDS, HAZARD_LAYERS, hazardAt, hazardPointLabel, HAZARDS, type HazardKind } from "@/lib/roadmap/hazard";
 import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
+import { LAND_USAGE_COLORS, landPriceSummary, usageFromCode } from "@/lib/roadmap/land-price";
 import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
 import { readRoadShapes, type RoadRead } from "@/lib/roadmap/road-read";
 import { sheetName, type SheetHit } from "@/lib/roadmap/sheets";
 import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
-import { BuildingIcon, ChevronRightIcon, FrameIcon, HazardIcon, InfoIcon, LocateIcon, ParcelIcon, PinIcon, RoadIcon, ZoningIcon } from "./icons";
+import { BuildingIcon, ChevronRightIcon, FrameIcon, HazardIcon, InfoIcon, LandPriceIcon, LocateIcon, ParcelIcon, PinIcon, RoadIcon, ZoningIcon } from "./icons";
 import { MapLegend, type LegendItem } from "./map-legend";
 
 // 描画のワーカーは public/maplibre/<版>/ に置いてある（scripts/copy-maplibre-worker.mjs）
@@ -114,6 +119,17 @@ const OVERLAYS = {
     zoomTo: BUILDING_MIN_ZOOM + 1,
     none: ["この辺りは PLATEAU の建物データがありません", "PLATEAU のある市区町村だけ出ます"],
   },
+  landPrice: {
+    label: "地価",
+    source: "landprice",
+    show: LAND_PRICE_LAYERS,
+    layers: ["lpt-dot", "lp-dot"],
+    minZoom: LAND_PRICE_MIN_ZOOM,
+    // 地点は町の中にまばらなので、押しても寄らない
+    zoomBelow: 0,
+    zoomTo: 0,
+    none: ["この辺りは地価公示・地価調査の地点がありません", "少し引くと、近くの地点が出ます"],
+  },
 } as const;
 type Overlay = keyof typeof OVERLAYS;
 const OVERLAY_KEYS = Object.keys(OVERLAYS) as Overlay[];
@@ -188,12 +204,31 @@ export type LiveMapProps = {
   /** スマホの全画面の地図。理由と凡例を左上に出す（右の道具・中央のピンと重ならないよう）。crosshair はいつもこの形 */
   compact?: boolean;
   /** 最初から重ねておくもの（「近くの道路」から開いたときの道路種別など） */
-  initial?: Partial<Record<"parcels" | "zoning" | "roads" | "buildings", boolean>>;
+  initial?: Partial<Record<"parcels" | "zoning" | "roads" | "buildings" | "landPrice", boolean>>;
   /** 凡例を地図の外（この要素の中）に出す。スマホの全画面の地図で、凡例が地図とピンを隠さないように */
   legendTarget?: HTMLElement | null;
   /** 最初から重ねておくハザードの種類（スマホの災害リスクの一覧から「地図」で開いたとき） */
   initialHazard?: HazardKind;
+  /** 最初に見せる地価の地点（[経度, 緯度]。スマホの地価の一覧から「地図」で開いたとき）。物件と両方が見える範囲にする */
+  initialLandPrice?: [number, number];
 };
+
+/** 地価の地点と物件が両方見える範囲へ（物件が無ければ地点へ寄る） */
+function fitLandPrice(map: MapLibreMap, [plng, plat]: [number, number], point?: Point) {
+  if (!point) {
+    map.flyTo({ center: [plng, plat], zoom: 15, duration: 900 });
+    return;
+  }
+  const cam = map.cameraForBounds(
+    [
+      [Math.min(point.lng, plng), Math.min(point.lat, plat)],
+      [Math.max(point.lng, plng), Math.max(point.lat, plat)],
+    ],
+    { padding: 80, maxZoom: 16 },
+  );
+  // 地理院タイルの文字が引き伸ばされてぼやけないよう、ズームは整数に（少し引く側へ）
+  if (cam) map.flyTo({ ...cam, zoom: Math.floor(cam.zoom ?? 15), duration: 900 });
+}
 
 export default function LiveMap({
   point,
@@ -211,6 +246,7 @@ export default function LiveMap({
   initial,
   legendTarget,
   initialHazard,
+  initialLandPrice,
 }: LiveMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -220,7 +256,7 @@ export default function LiveMap({
   const [basemap, setBasemap] = useState<Basemap>("pale");
   const [locating, setLocating] = useState(false);
   // 筆界と地番（登記所備付地図）・用途地域の塗り分けと都市計画道路・道路種別を表示するか（道路種別は読める市だけ）
-  const [shown, setShown] = useState<Record<Overlay, boolean>>(() => ({ parcels: false, zoning: false, roads: false, buildings: false, ...initial }));
+  const [shown, setShown] = useState<Record<Overlay, boolean>>(() => ({ parcels: false, zoning: false, roads: false, buildings: false, landPrice: false, ...initial }));
   // 道路種別は読める市だけ、建物は PLATEAU のタイルがあるときだけ
   const on: Record<Overlay, boolean> = { ...shown, roads: shown.roads && !!roads, buildings: shown.buildings && hasBuildings() };
   const onRef = useRef(on);
@@ -237,7 +273,7 @@ export default function LiveMap({
   const setLegendOf = (k: "zoning" | "roads", items?: LegendItem[]) =>
     setLegend((s) => (JSON.stringify(s[k]) === JSON.stringify(items) ? s : { ...s, [k]: items }));
   // 読み込みに失敗したデータ（地図のエラーと、道路種別の読み込み）
-  const failed = useRef<Record<Overlay, boolean>>({ parcels: false, zoning: false, roads: false, buildings: false });
+  const failed = useRef<Record<Overlay, boolean>>({ parcels: false, zoning: false, roads: false, buildings: false, landPrice: false });
   // 道路種別を読んでいる最中か（読み終えるまで「読み込んでいます」のまま）。件数の上限で読み切れなかったか
   const roadsLoading = useRef(false);
   const roadsTruncated = useRef(false);
@@ -325,6 +361,19 @@ export default function LiveMap({
       )[0]?.properties as { label?: string } | undefined;
       return p?.label ? `道路：${p.label}` : undefined;
     };
+    /** 画面上の点の地価の地点「地価公示 千代田-1（住宅地）441万円/m²（+11.4%）」（地価を表示しているときだけ。点なので広めに拾う） */
+    const landPriceLabelAt = (pt: { x: number; y: number }) => {
+      if (!onRef.current.landPrice || map.getZoom() < LAND_PRICE_MIN_ZOOM) return undefined;
+      const p = map.queryRenderedFeatures(
+        [
+          [pt.x - 8, pt.y - 8],
+          [pt.x + 8, pt.y + 8],
+        ],
+        { layers: ["lp-dot", "lpt-dot"] },
+      )[0]?.properties as { k?: number; no?: string; p?: number; c?: number; u?: string } | undefined;
+      if (!p?.no || !p.p) return undefined;
+      return landPriceSummary({ kind: p.k === 1 ? "調査" : "公示", no: p.no, usage: usageFromCode(String(p.u ?? "0")), price: p.p, change: p.c });
+    };
 
     // 表示しているのに地図に何も描かれていなければ、地図が落ち着いたところで理由を出す。描かれていれば凡例を出す
     const overlayOf = (sourceId?: string) => OVERLAY_KEYS.find((k) => OVERLAYS[k].source === sourceId);
@@ -403,10 +452,10 @@ export default function LiveMap({
         const note = document.createElement("p");
         note.className = "text-[11px] text-muted";
         note.textContent = "この地点の道路図を調べますか？";
-        for (const label of [parcelLabelAt(e.point), youtoLabelAt(e.point), roadLabelAt(e.point)]) {
+        for (const label of [parcelLabelAt(e.point), youtoLabelAt(e.point), roadLabelAt(e.point), landPriceLabelAt(e.point)]) {
           if (!label) continue;
           const l = document.createElement("p");
-          l.className = "text-[12px] font-semibold text-ink";
+          l.className = "max-w-[17em] text-center text-[12px] font-semibold text-ink";
           l.textContent = label;
           box.append(l);
         }
@@ -556,6 +605,26 @@ export default function LiveMap({
     window.addEventListener(HAZARD_EVENT, onShow);
     return () => window.removeEventListener(HAZARD_EVENT, onShow);
   }, [lat, lng]);
+
+  // パネルの地価の一覧の「地図」。地価を重ね、物件とその地点が両方見えるようにする
+  useEffect(() => {
+    const onShow = (e: Event) => {
+      setShown((s) => ({ ...s, landPrice: true }));
+      if (mapRef.current) fitLandPrice(mapRef.current, (e as CustomEvent<[number, number]>).detail, point);
+    };
+    window.addEventListener(LAND_PRICE_EVENT, onShow);
+    return () => window.removeEventListener(LAND_PRICE_EVENT, onShow);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lat, lng]);
+  // スマホの地価の一覧から開いたときは、地図を読み終えたところで同じようにする（1回だけ）
+  const firstLandPrice = useRef(initialLandPrice);
+  useEffect(() => {
+    const p = firstLandPrice.current;
+    if (!mapRef.current || !loaded || !p) return;
+    firstLandPrice.current = undefined;
+    fitLandPrice(mapRef.current, p, point);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
 
   /** 「ハザード」：重ねていなければ前の種類（最初は洪水）を重ねて種類の欄を開く。重ねていれば欄を開け閉めする */
   const toggleHazard = () => {
@@ -719,6 +788,15 @@ export default function LiveMap({
     on.roads && legend.roads && roads && (
       <MapLegend key="roads" title="道路種別の色" items={legend.roads} compact={compact} foot={`${roads.city}の地図データ（参考）。最終確認は窓口で`} />
     ),
+    on.landPrice && (
+      <MapLegend
+        key="landPrice"
+        title="地価（円/m²）"
+        items={Object.entries(LAND_USAGE_COLORS).map(([label, color]) => ({ label, short: label.replace(/地$/, ""), color, kind: "dot" as const }))}
+        compact={compact}
+        foot="地価公示（1月1日時点）と、縁の濃い点は都道府県地価調査（7月1日時点）。その地域の標準的な土地の価格で、物件の価格ではありません"
+      />
+    ),
   ];
 
   const toolBase = "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] shadow-soft";
@@ -779,6 +857,15 @@ export default function LiveMap({
             建物
           </button>
         )}
+        <button
+          onClick={() => toggleOverlay("landPrice")}
+          aria-pressed={on.landPrice}
+          className={on.landPrice ? `${toolBase} bg-gold text-white` : tool}
+          title="地価公示・都道府県地価調査の地点と価格（円/m²）を表示"
+        >
+          <LandPriceIcon className={`h-4 w-4 ${on.landPrice ? "" : "text-brand"}`} />
+          地価
+        </button>
         <button
           onClick={toggleHazard}
           aria-pressed={!!hazard}

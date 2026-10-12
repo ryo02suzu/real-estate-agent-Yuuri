@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { showHazardOnMap } from "@/lib/map-style";
+import { showHazardOnMap, showLandPriceOnMap } from "@/lib/map-style";
 import type { LookupResult, Municipality, ResolvedLink } from "@/lib/roadmap";
 import type { HazardKind } from "@/lib/roadmap/hazard";
 import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
@@ -24,6 +24,7 @@ import {
   SearchIcon,
   ShareIcon,
 } from "./icons";
+import { LandPriceCard, LandPriceLine, useLandPrices, type LandPriceState } from "./land-price-card";
 import { LegendBlock, LegendButton } from "./legend";
 import { MapPreview } from "./map-preview";
 import { NearbyRoadsBlock, NearbyRoadsLine, useNearbyRoads, type RoadsState } from "./nearby-roads";
@@ -36,7 +37,7 @@ import { useZoning, ZoningCard, ZoningLine, type ZoningState } from "./zoning-ca
 const CARD = "shadow-soft rounded-2xl border border-white bg-white";
 
 /** スマホの全画面の地図を開くときに重ねておくもの */
-export type MapOpen = { roads?: boolean; hazard?: HazardKind };
+export type MapOpen = { roads?: boolean; hazard?: HazardKind; /** 地価を重ね、この地点（[経度, 緯度]）も見えるように開く */ landPrice?: [number, number] };
 
 export function ResultView({
   query,
@@ -165,6 +166,7 @@ function Found({
   const roads = useNearbyRoads(result.links, result.lat, result.lng);
   const hazard = useHazard(result.lat, result.lng, m);
   const building = useBuilding(result, parcels);
+  const landPrice = useLandPrices(result.lat, result.lng);
   const expand = onExpand && (() => onExpand());
   // ネットで分からない市は、地図ボタンを参考扱いにして問い合わせ先を先に見せる
   const offline = m.coverage === "none" || m.coverage === "outside";
@@ -189,7 +191,7 @@ function Found({
     />
   );
   // 印刷・PDF 保存用の調査メモ（画面には出ない。iPhone の共有 → プリントでも同じメモになる）
-  const print = <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} />;
+  const print = <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} />;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5 [&>*]:shrink-0">
@@ -203,7 +205,7 @@ function Found({
           actions={
             <>
               <CopyButton text={copyText(result)} />
-              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} />
+              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} />
             </>
           }
         />
@@ -228,8 +230,10 @@ function Found({
               </button>
             )}
           </div>
-          <div className="mt-1.5 flex [@media(max-height:720px)]:hidden">
-            <HazardLine state={hazard} city={m.name} onShowMap={onExpand && ((k) => onExpand({ hazard: k }))} />
+          {/* 災害リスクと、その右に近くの地価（行を増やさない。背の低い画面では出さず、地価は地図の「地価」と共有・印刷で見る） */}
+          <div className="mt-1.5 flex gap-1.5 [@media(max-height:720px)]:hidden">
+            <HazardLine state={hazard} city={m.name} compact onShowMap={onExpand && ((k) => onExpand({ hazard: k }))} />
+            <LandPriceLine state={landPrice} compact onShowMap={onExpand && ((p) => onExpand({ landPrice: p }))} />
           </div>
           {/* 画面の高さに合わせて地図プレビューが伸び縮みする（スクロールさせない）。低すぎるときは地図を隠し、
               「場所を直す」「場所を地図で見る」だけの細い行にする（背の低い画面では「場所を直す」は上の行にあるので
@@ -458,6 +462,7 @@ function ShareButton({
   roads,
   hazard,
   building,
+  landPrice,
   desktop,
 }: {
   result: Extract<LookupResult, { status: "ok" }>;
@@ -466,6 +471,7 @@ function ShareButton({
   roads: RoadsState;
   hazard: HazardState;
   building: BuildingState;
+  landPrice: LandPriceState;
   /** PC：共有の画面は出さず、メールやチャットに貼れるようコピーする */
   desktop?: boolean;
 }) {
@@ -477,6 +483,7 @@ function ShareButton({
       roads: roads.status === "ok" ? roads.roads : undefined,
       hazard: hazard.status === "ok" ? hazard : undefined,
       building: building.status === "ok" ? building.result : undefined,
+      landPrice: landPrice.status === "ok" ? landPrice.hits : undefined,
     });
     if (!desktop && typeof navigator.share === "function") {
       try {
@@ -700,6 +707,7 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
   const roads = useNearbyRoads(result.links, result.lat, result.lng);
   const hazard = useHazard(result.lat, result.lng, m);
   const building = useBuilding(result, parcels);
+  const landPrice = useLandPrices(result.lat, result.lng);
   const offline = m.coverage === "none" || m.coverage === "outside";
   const primary = result.links.filter((l) => !offline && l.kind !== "public_road");
   const others = result.links.filter((l) => offline || l.kind === "public_road");
@@ -715,7 +723,7 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
           actions={
             <>
               <CopyButton text={copyText(result)} />
-              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} desktop />
+              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} desktop />
               <PrintButton />
             </>
           }
@@ -730,6 +738,11 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
           <div className="mt-1.5 flex">
             <HazardLine state={hazard} city={m.name} onOpen={() => jump("pc-hazard")} />
           </div>
+          {!(landPrice.status === "ok" && landPrice.hits.length === 0) && (
+            <div className="mt-1.5 flex">
+              <LandPriceLine state={landPrice} onOpen={() => jump("pc-land-price")} />
+            </div>
+          )}
         </div>
       </section>
 
@@ -770,8 +783,12 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
 
       <BuildingCard state={building} />
 
+      <div id="pc-land-price" className="scroll-mt-3">
+        <LandPriceCard state={landPrice} onShowMap={showLandPriceOnMap} />
+      </div>
+
       {result.contact && <ContactCard contact={result.contact} city={m.name} address={result.matchedAddress} />}
-      <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} />
+      <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} />
     </div>
   );
 }

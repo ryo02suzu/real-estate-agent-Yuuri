@@ -206,3 +206,10 @@ export const HazardIcon = ({ className }: P) => (
     <path d="M2 20.5c1.7 0 1.7-1.5 3.3-1.5s1.7 1.5 3.4 1.5 1.6-1.5 3.3-1.5 1.7 1.5 3.3 1.5 1.7-1.5 3.4-1.5 1.6 1.5 3.3 1.5" />
   </svg>
 );
+
+/** 地価（円の印と地面） */
+export const LandPriceIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M7 3l5 7 5-7M12 10v8M8 11.5h8M8 15h8M3 21h18" />
+  </svg>
+);

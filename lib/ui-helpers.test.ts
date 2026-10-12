@@ -142,6 +142,43 @@ describe("buildSummary", () => {
     expect(text).toContain("【建物（PLATEAU・参考）】ヴァンガードタワー・共同住宅・地上38階・地下3階・耐火構造・高さ約105.9m");
     expect(text).toContain("※建物の出典：「3D都市モデル（Project PLATEAU）」（国土交通省");
   });
+
+  it("近くの地価（地価公示・地価調査）を3地点まで添える", () => {
+    const m = findMunicipality("13101")!;
+    const hit = (no: string, kind: "公示" | "調査", price: number, distance: number, change?: number) => ({
+      kind,
+      no,
+      point: [139.7448, 35.6901] as [number, number],
+      price,
+      change,
+      usage: "住宅地" as const,
+      year: 2026,
+      history: [],
+      distance,
+      bearing: "北東",
+    });
+    const text = buildSummary(
+      {
+        status: "ok",
+        lat: 35.6895,
+        lng: 139.7441,
+        matchedAddress: "東京都千代田区三番町",
+        town: "三番町",
+        approximate: false,
+        municipality: m,
+        links: buildLinks(m, 35.6895, 139.7441),
+      },
+      { landPrice: [hit("千代田-1", "公示", 4_410_000, 92, 11.4), hit("千代田(都)-1", "調査", 5_700_000, 640, 11.8), hit("千代田-5", "公示", 3_000_000, 900), hit("千代田-9", "公示", 2_000_000, 1500)] },
+    );
+    expect(text).toContain(
+      "【近くの地価（標準地・基準地の価格・参考）】\n・地価公示 千代田-1（住宅地・北東へ約90m）：441万円/m²（前年比 +11.4%、2026年1月1日時点）\n" +
+        "・地価調査 千代田(都)-1（住宅地・北東へ約640m）：570万円/m²（前年比 +11.8%、2026年7月1日時点）\n" +
+        "・地価公示 千代田-5（住宅地・北東へ約900m）：300万円/m²（前年比 新規、2026年1月1日時点）\n",
+    );
+    expect(text).not.toContain("千代田-9");
+    expect(text).toContain("※地価の出典：「国土数値情報（地価公示データ・都道府県地価調査データ）」（国土交通省");
+    expect(text).toContain("物件そのものの価格ではありません");
+  });
 });
 
 describe("buildInquiryText", () => {

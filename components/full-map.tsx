@@ -18,6 +18,7 @@ export function FullMap({
   result,
   withRoads,
   hazard,
+  landPrice,
   onClose,
   onPick,
 }: {
@@ -26,6 +27,8 @@ export function FullMap({
   withRoads?: boolean;
   /** このハザードを重ねて開く（災害リスクの一覧から開いたとき） */
   hazard?: HazardKind;
+  /** 地価を重ね、この地点（[経度, 緯度]）も見えるように開く（地価の一覧の「地図」から開いたとき） */
+  landPrice?: [number, number];
   onClose: () => void;
   onPick: (lat: number, lng: number) => void;
 }) {
@@ -56,8 +59,9 @@ export function FullMap({
           parcel={result.parcel}
           roads={roads}
           compact
-          initial={withRoads && roads ? { roads: true } : undefined}
+          initial={withRoads && roads ? { roads: true } : landPrice ? { landPrice: true } : undefined}
           initialHazard={hazard}
+          initialLandPrice={landPrice}
           legendTarget={legendSlot}
           onPick={(lat, lng) => {
             onClose();
@@ -70,7 +74,7 @@ export function FullMap({
       <div className="max-h-[38vh] overflow-y-auto px-4 pb-[max(10px,env(safe-area-inset-bottom))] pt-2">
         <div ref={setLegendSlot} className="empty:hidden [&:not(:empty)]:mb-2" />
         <p className="text-[10.5px] leading-[1.6] text-muted">
-          地図をタップすると、その地点の地番・用途地域・道路種別・建物・ハザード（表示中のもの）と「ここで調べる」が出ます。地図は参考情報です。最終確認は窓口で。
+          地図をタップすると、その地点の地番・用途地域・道路種別・建物・地価・ハザード（表示中のもの）と「ここで調べる」が出ます。地図は参考情報です。最終確認は窓口で。
         </p>
       </div>
     </div>
