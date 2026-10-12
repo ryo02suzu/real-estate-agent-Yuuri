@@ -1,7 +1,8 @@
 // 動く地図（MapLibre GL）の見た目。地理院タイル（淡色・標準・写真）を重ね、選んだものだけを表示する。
 // PDF の分割図の市では、物件が載っている図の範囲（枠と 3×3 の目安線）を重ねる。
 import type { FeatureCollection } from "geojson";
-import type { ExpressionSpecification, FilterSpecification, StyleSpecification } from "maplibre-gl";
+import type { ExpressionSpecification, FilterSpecification, LayerSpecification, StyleSpecification } from "maplibre-gl";
+import { HAZARD_LAYERS, HAZARD_ZOOM, hazardTileUrl, type HazardKind } from "./roadmap/hazard";
 import { PARCEL_DATA } from "./roadmap/parcel-data";
 import type { SheetHit } from "./roadmap/sheets";
 import { YOUTO_COLORS, ZONING_ZOOM } from "./roadmap/zoning";
@@ -48,6 +49,18 @@ export const ROAD_MIN_ZOOM = 16;
 /** 道路種別のレイヤ（「道路種別」で表示を切り替える）。道路の区域の面と、線 */
 export const ROAD_LAYERS = ["road-fill", "road-outline", "road-line"];
 
+// 国の重ねるハザードマップ（オープンデータ。公共データ利用規約のとおり出典を書く）
+const HAZARD_ATTRIBUTION = '<a href="https://disaportal.gsi.go.jp/" target="_blank" rel="noreferrer">ハザードマップポータルサイト</a>';
+
+/** ハザードのレイヤ（タイルの置き場所ごとに1つ。「ハザード」で選んだ種類のものだけ表示する） */
+export const hazardLayerId = (tileId: string) => `hz-${tileId}`;
+
+/** PC：パネルの「地図に重ねる」から、地図にハザードを重ねる（地図は別に読み込むので、ページのイベントで伝える） */
+export const HAZARD_EVENT = "michilu:hazard";
+export function showHazardOnMap(kind: HazardKind) {
+  window.dispatchEvent(new CustomEvent<HazardKind>(HAZARD_EVENT, { detail: kind }));
+}
+
 /** 地番区域と地番で、ひとつの筆だけに絞る（見つけた筆を強調する）。何も無ければどれにも当たらない条件 */
 export function parcelFilter(p?: { kuiki: string; chibanRaw: string }): FilterSpecification {
   return p
@@ -74,6 +87,13 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
       zoning: { type: "vector", url: `pmtiles://${zoningUrl()}`, attribution: ZONING_ATTRIBUTION },
       // 道路種別。市の公開データを見ている範囲の分だけ読んで入れる（components/live-map.tsx）
       roads: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+      // 洪水・土砂災害などの想定区域（z17 まで。それより拡大したときは z17 のタイルを引き伸ばす）
+      ...Object.fromEntries(
+        HAZARD_LAYERS.map((l) => [
+          hazardLayerId(l.id),
+          { type: "raster" as const, tiles: [hazardTileUrl(l.id)], tileSize: 256, minzoom: l.minzoom, maxzoom: HAZARD_ZOOM, attribution: HAZARD_ATTRIBUTION },
+        ]),
+      ),
     },
     layers: [
       // 淡色地図に無いところ（海など）が白く抜けないよう、下に標準地図の色を敷く
@@ -84,6 +104,16 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         source: k,
         layout: { visibility: k === basemap ? ("visible" as const) : ("none" as const) },
       })),
+      // 洪水・土砂災害などの想定区域（「ハザード」で選んだ種類だけ表示）。背景の地図の上、ほかの重ねるものの下
+      ...HAZARD_LAYERS.map(
+        (l): LayerSpecification => ({
+          id: hazardLayerId(l.id),
+          type: "raster",
+          source: hazardLayerId(l.id),
+          layout: { visibility: "none" },
+          paint: { "raster-opacity": 0.72 },
+        }),
+      ),
       // 用途地域の塗り分けと都市計画道路（「用途地域」で表示）
       {
         id: "zoning-youto-fill",

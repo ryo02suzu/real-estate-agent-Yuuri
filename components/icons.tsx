@@ -197,3 +197,12 @@ export const ZoningIcon = ({ className }: P) => (
     <path d="M3 12h9V3M12 12l9 5M12 12v9" />
   </svg>
 );
+
+/** 災害リスク（家と水面） */
+export const HazardIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M6 12V8l6-5 6 5v4" />
+    <path d="M2 16c1.7 0 1.7-1.5 3.3-1.5s1.7 1.5 3.4 1.5 1.6-1.5 3.3-1.5 1.7 1.5 3.3 1.5 1.7-1.5 3.4-1.5S20.3 16 22 16" />
+    <path d="M2 20.5c1.7 0 1.7-1.5 3.3-1.5s1.7 1.5 3.4 1.5 1.6-1.5 3.3-1.5 1.7 1.5 3.3 1.5 1.7-1.5 3.4-1.5 1.6 1.5 3.3 1.5" />
+  </svg>
+);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parsePhones } from "./phone";
 import { buildLinks, findMunicipality, resolveContact } from "./roadmap";
+import { HAZARDS } from "./roadmap/hazard";
 import { buildSummary } from "./summary";
 import { TILE, tilesAround, toWorldPixel } from "./tiles";
 
@@ -82,6 +83,36 @@ describe("buildSummary", () => {
       links: buildLinks(m, 36.147129, 139.38858),
     });
     expect(text.split("\n")[1]).toBe("地図で選んだ地点：https://maps.gsi.go.jp/#18/36.147129/139.388580/");
+  });
+
+  it("災害リスク（国のデータ）と、市区町村のハザードマップのページを添える", () => {
+    const m = findMunicipality("13123")!;
+    const flood = HAZARDS.flood.layers[0];
+    const text = buildSummary(
+      {
+        status: "ok",
+        lat: 35.6838,
+        lng: 139.8641,
+        matchedAddress: "東京都江戸川区船堀四丁目1番1号",
+        town: "船堀四丁目",
+        approximate: false,
+        municipality: m,
+        links: buildLinks(m, 35.6838, 139.8641),
+      },
+      {
+        hazard: {
+          report: { flood: { status: "ok", hits: [{ layer: flood, at: flood.classes.find((c) => c.label === "3〜5m") }] }, dosha: { status: "ok", hits: [] } },
+          elevation: { value: -1, source: "5mメッシュ（航空レーザ測量）" },
+          maps: { flood: "https://example.jp/hm.html", takashio: "https://example.jp/hm.html", naisui: "https://example.jp/naisui.html" },
+          muniCd: "13123",
+        },
+      },
+    );
+    expect(text).toContain("【災害リスク（国のデータ・参考）】\n・洪水（想定最大規模）：浸水 3〜5m\n・土砂災害警戒区域等：区域外\n・地面の高さ（標高）：約-1.0m");
+    expect(text).toContain("・江戸川区の洪水・高潮のハザードマップ\n  https://example.jp/hm.html");
+    expect(text).toContain("・江戸川区の内水のハザードマップ\n  https://example.jp/naisui.html");
+    expect(text).toContain("※災害リスクの出典：「ハザードマップポータルサイト」");
+    expect(text).toContain("重要事項説明には使えません");
   });
 });
 

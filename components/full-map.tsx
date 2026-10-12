@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { LookupResult } from "@/lib/roadmap";
+import type { HazardKind } from "@/lib/roadmap/hazard";
 import { CloseIcon, MapIcon } from "./icons";
 import { MapPanel } from "./map-panel";
 import { MapPreview } from "./map-preview";
@@ -10,18 +11,21 @@ type Ok = Extract<LookupResult, { status: "ok" }>;
 
 /**
  * スマホの「地図を拡大」：物件のまわりを MICHILU の中の動く地図で見る（全画面）。
- * PC の地図と同じく、筆・地番、用途地域、道路種別（市の公開データがある所だけ）を重ねて凡例を出せる。
+ * PC の地図と同じく、筆・地番、用途地域、道路種別（市の公開データがある所だけ）、ハザードを重ねて凡例を出せる。
  * 地図をタップして「ここで調べる」か、ピンを動かすと、その地点で調べ直す（地図は閉じる）
  */
 export function FullMap({
   result,
   withRoads,
+  hazard,
   onClose,
   onPick,
 }: {
   result: Ok;
   /** 道路種別を重ねて開く（「近くの道路」の一覧から開いたとき） */
   withRoads?: boolean;
+  /** このハザードを重ねて開く（災害リスクの一覧から開いたとき） */
+  hazard?: HazardKind;
   onClose: () => void;
   onPick: (lat: number, lng: number) => void;
 }) {
@@ -53,6 +57,7 @@ export function FullMap({
           roads={roads}
           compact
           initial={withRoads && roads ? { roads: true } : undefined}
+          initialHazard={hazard}
           legendTarget={legendSlot}
           onPick={(lat, lng) => {
             onClose();
@@ -65,7 +70,7 @@ export function FullMap({
       <div className="max-h-[38vh] overflow-y-auto px-4 pb-[max(10px,env(safe-area-inset-bottom))] pt-2">
         <div ref={setLegendSlot} className="empty:hidden [&:not(:empty)]:mb-2" />
         <p className="text-[10.5px] leading-[1.6] text-muted">
-          地図をタップすると、その地点の地番・用途地域・道路種別（表示中のもの）と「ここで調べる」が出ます。地図は参考情報です。最終確認は窓口で。
+          地図をタップすると、その地点の地番・用途地域・道路種別・ハザード（表示中のもの）と「ここで調べる」が出ます。地図は参考情報です。最終確認は窓口で。
         </p>
       </div>
     </div>

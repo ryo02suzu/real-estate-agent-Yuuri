@@ -1,5 +1,6 @@
 // 調べた結果を、メモや報告にそのまま貼れる文章にする
 import type { LookupResult } from "./roadmap";
+import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, hazardRows, wagamachiUrl, type Elevation, type HazardMaps, type HazardReport } from "./roadmap/hazard";
 import { chibanLabel, kuikiLabel } from "./roadmap/parcel";
 import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
@@ -10,7 +11,8 @@ const COVERAGE_SHORT = { full: "ネットで全種別が分かる", partial: "�
 
 /**
  * zoning：地点の都市計画、parcels：謄本・公図用の「所在 地番」の行（物件の筆と隣の筆。reference は住所の地点の筆で参考）、
- * roads：市の地図データで読んだ、物件のまわりの道路の種別。読み込めていれば添える
+ * roads：市の地図データで読んだ、物件のまわりの道路の種別、hazard：国のハザードマップのデータで読んだ地点の災害リスクと、
+ * 市区町村のハザードマップのページ。読み込めていれば添える
  */
 export function buildSummary(
   result: Extract<LookupResult, { status: "ok" }>,
@@ -18,7 +20,13 @@ export function buildSummary(
     zoning,
     parcels,
     roads,
-  }: { zoning?: { zoning: Zoning; st?: ZoningStatus }; parcels?: { target?: string; neighbors: string[]; reference: boolean }; roads?: NearbyRoad[] } = {},
+    hazard,
+  }: {
+    zoning?: { zoning: Zoning; st?: ZoningStatus };
+    parcels?: { target?: string; neighbors: string[]; reference: boolean };
+    roads?: NearbyRoad[];
+    hazard?: { report: HazardReport; elevation: Elevation | null; maps: HazardMaps; muniCd: string };
+  } = {},
 ): string {
   const m = result.municipality;
   const p = result.parcel;
@@ -42,6 +50,13 @@ export function buildSummary(
     for (const r of zoningRows(zoning.zoning, zoning.st)) lines.push(`・${r.label}：${r.value}`);
     if (zoning.st?.asOf) lines.push(`  （${zoning.st.city}のデータは${zoning.st.asOf}時点）`);
   }
+  if (hazard) {
+    lines.push("【災害リスク（国のデータ・参考）】");
+    for (const r of hazardRows(hazard.report, hazard.elevation)) lines.push(`・${r.label}：${r.value}`);
+    const groups = groupHazardMaps(hazard.maps);
+    for (const g of groups) lines.push(`・${m.name}の${g.kinds.map((k) => HAZARD_MAP_LABELS[k]).join("・")}のハザードマップ\n  ${g.url}`);
+    if (!groups.length) lines.push(`・${m.name}のハザードマップ（わがまちハザードマップ）\n  ${wagamachiUrl(hazard.muniCd)}`);
+  }
   const withParcels = !!parcels && (!!parcels.target || parcels.neighbors.length > 0);
   if (parcels && withParcels) {
     lines.push(`【謄本・公図用の地番${parcels.reference ? "（住所の地点の筆・参考）" : ""}】`);
@@ -51,5 +66,6 @@ export function buildSummary(
   lines.push("※地図は参考図。最終確認は窓口で。");
   if (p || withParcels) lines.push(`※筆の${PARCEL_CREDIT}。`);
   if (zoning) lines.push(`※都市計画の${ZONING_CREDIT}。`);
+  if (hazard) lines.push(`※災害リスクの${HAZARD_CREDIT}。`);
   return lines.join("\n");
 }

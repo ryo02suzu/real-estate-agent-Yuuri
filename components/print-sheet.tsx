@@ -6,11 +6,13 @@ import { useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { ASK, BRING } from "@/lib/inquiry";
 import type { LookupResult, MapKind } from "@/lib/roadmap";
+import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, HAZARD_TABLE_NOTE, hazardRows, wagamachiUrl } from "@/lib/roadmap/hazard";
 import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
 import { zoningRows } from "@/lib/roadmap/zoning";
 import { ZONING_CREDIT } from "@/lib/roadmap/zoning-data";
 import { COVERAGE } from "./coverage";
+import type { HazardState } from "./hazard-card";
 import { MapPreview } from "./map-preview";
 import type { RoadsState } from "./nearby-roads";
 import { parcelLines, type ParcelInfo } from "./parcel-card";
@@ -27,7 +29,7 @@ const KIND: Record<MapKind, string> = {
 const noop = () => () => {};
 
 /** 結果の画面に置く。印刷のときだけ出る（画面には出ない） */
-export function PrintSheet(props: { result: Ok; zoning: ZoningState; parcels: ParcelInfo; roads: RoadsState }) {
+export function PrintSheet(props: { result: Ok; zoning: ZoningState; parcels: ParcelInfo; roads: RoadsState; hazard: HazardState }) {
   // document.body に出す（画面の作りの外に置き、印刷では画面の作りを丸ごと隠す）。サーバーでは何も出さない
   const client = useSyncExternalStore(
     noop,
@@ -38,7 +40,7 @@ export function PrintSheet(props: { result: Ok; zoning: ZoningState; parcels: Pa
   return createPortal(<Memo {...props} />, document.body);
 }
 
-function Memo({ result, zoning, parcels, roads }: { result: Ok; zoning: ZoningState; parcels: ParcelInfo; roads: RoadsState }) {
+function Memo({ result, zoning, parcels, roads, hazard }: { result: Ok; zoning: ZoningState; parcels: ParcelInfo; roads: RoadsState; hazard: HazardState }) {
   // 調べた日時（印刷した日ではなく、この結果を出した日時）
   const [at] = useState(() => new Date());
   const m = result.municipality;
@@ -53,7 +55,7 @@ function Memo({ result, zoning, parcels, roads }: { result: Ok; zoning: ZoningSt
     <div className="print-sheet bg-white text-[11.5px] leading-[1.6] text-[#1d1b18]">
       <header className="flex items-end justify-between gap-4 border-b-2 border-[#9a7442] pb-1.5">
         <div className="min-w-0">
-          <p className="text-[10px] tracking-[0.1em] text-[#7a6a55]">道路種別・都市計画の調査メモ</p>
+          <p className="text-[10px] tracking-[0.1em] text-[#7a6a55]">道路種別・都市計画・災害リスクの調査メモ</p>
           <h1 className="text-[17px] font-bold leading-snug">
             {result.matchedAddress}
             {found ? ` ${chibanLabel(found.chibanRaw)}` : <span className="text-[13px] font-normal">{result.picked ? "（地図で選んだ地点）" : " 付近"}</span>}
@@ -208,6 +210,35 @@ function Memo({ result, zoning, parcels, roads }: { result: Ok; zoning: ZoningSt
         </Block>
       </div>
 
+      {/* 災害リスク（国のデータ）と、重要事項説明に使う市区町村のハザードマップ */}
+      <Block title="災害リスク（国のデータ・参考）">
+        {hazard.status === "ok" ? (
+          <>
+            <dl className="grid grid-cols-2 gap-x-4">
+              {hazardRows(hazard.report, hazard.elevation).map((r) => (
+                <div key={r.kind} className="flex gap-2 border-b border-[#eee6da] py-0.5">
+                  <dt className="w-[7em] shrink-0 text-[10px] text-[#7a6a55]">{r.name}</dt>
+                  <dd className={`min-w-0 flex-1 text-[10.5px] font-semibold ${r.warn ? "text-[#8a4f3a]" : ""}`}>{r.value}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-1 text-[10px] text-[#5d5143]">
+              {HAZARD_TABLE_NOTE}。重要事項説明は{m.name}のハザードマップで確認：
+            </p>
+            <ul className="text-[9.5px] leading-[1.45] text-[#5d5143]">
+              {groupHazardMaps(hazard.maps).map((g) => (
+                <li key={g.url} className="break-all">
+                  {g.kinds.map((k) => HAZARD_MAP_LABELS[k]).join("・")}：{g.url}
+                </li>
+              ))}
+              <li className="break-all">わがまちハザードマップ（国の一覧）：{wagamachiUrl(hazard.muniCd)}</li>
+            </ul>
+          </>
+        ) : (
+          <p className="text-[10.5px] text-[#7a6a55]">{hazard.status === "loading" ? "読み込み中でした。画面の表示が終わってから印刷し直してください。" : "データを読み込めませんでした。"}</p>
+        )}
+      </Block>
+
       {/* 問い合わせ先と窓口での確認 */}
       {c && dept && (
         <Block title="問い合わせ先">
@@ -274,10 +305,11 @@ function Memo({ result, zoning, parcels, roads }: { result: Ok; zoning: ZoningSt
 
       <footer className="mt-3 border-t border-[#d8ccb8] pt-1.5 text-[8.5px] leading-[1.55] text-[#7a6a55]">
         <p>
-          ※ 地図や都市計画・地番は参考情報です。重要事項説明などの最終確認は、必ず役所の窓口・法務局で行ってください。道路種別・接道の判断はこのメモでは行っていません。
+          ※ 地図や都市計画・地番・災害リスクは参考情報です。重要事項説明などの最終確認は、必ず役所の窓口・法務局で行ってください。道路種別・接道の判断はこのメモでは行っていません。
         </p>
         <p>
           地図：地理院タイル（国土地理院）。{zoning.status === "ok" && `都市計画の${ZONING_CREDIT}。`}
+          {hazard.status === "ok" && `災害リスクの${HAZARD_CREDIT}。`}
           {(p || parcels.status === "ok") && `筆の${PARCEL_CREDIT}。`}
         </p>
       </footer>

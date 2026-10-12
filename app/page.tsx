@@ -10,7 +10,7 @@ import { MapIllustration, SkylineIllustration } from "@/components/illustrations
 import { CitiesSheet, HelpSheet, MenuSheet, type SheetName } from "@/components/info-sheets";
 import { FullMap } from "@/components/full-map";
 import { LocationPicker } from "@/components/location-picker";
-import { ResultView } from "@/components/result-view";
+import { ResultView, type MapOpen } from "@/components/result-view";
 import { SearchCard } from "@/components/search-card";
 import { Sheet } from "@/components/sheet";
 import { addHistory, clearHistory, loadHistory, type HistoryItem } from "@/lib/history";
@@ -52,7 +52,7 @@ export default function Home() {
   // 住所で調べた回数。変わると PC の地図が物件の場所へ戻る（同じ住所で調べ直したときも）
   const [focus, setFocus] = useState(0);
   // スマホの「地図を拡大」（MICHILU の中の動く地図）。roads: 道路種別を重ねて開く
-  const [fullMap, setFullMap] = useState<{ roads?: boolean } | null>(null);
+  const [fullMap, setFullMap] = useState<MapOpen | null>(null);
   const desktop = useDesktop();
 
   /** 住所（q）か、地図で選んだ地点（ll）で調べて結果を出す */
@@ -201,7 +201,7 @@ export default function Home() {
                 const r = shown.result;
                 setPicker({ start: r.status === "ok" || r.status === "unsupported" ? { lat: r.lat, lng: r.lng } : undefined });
               }}
-              onExpand={(roads) => setFullMap({ roads })}
+              onExpand={(o) => setFullMap(o ?? {})}
             />
           </div>
         ) : (
@@ -295,7 +295,13 @@ export default function Home() {
         />
       )}
       {fullMap && shown?.result.status === "ok" && (
-        <FullMap result={shown.result} withRoads={fullMap.roads} onClose={() => setFullMap(null)} onPick={(lat, lng) => void searchPoint(lat, lng)} />
+        <FullMap
+          result={shown.result}
+          withRoads={fullMap.roads}
+          hazard={fullMap.hazard}
+          onClose={() => setFullMap(null)}
+          onPick={(lat, lng) => void searchPoint(lat, lng)}
+        />
       )}
     </div>
   );

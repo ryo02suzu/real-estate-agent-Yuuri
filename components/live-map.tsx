@@ -3,7 +3,8 @@
 // 動く地図（MapLibre GL ＋ 地理院タイル）。重いので next/dynamic で必要になったときだけ読み込む（components/map-panel.tsx）。
 //  - pin: 物件にピンを立てる。ピンをドラッグするか、地図をクリックして「ここで調べる」で場所を選び直せる（PC・スマホの「地図を拡大」）
 //  - crosshair: 画面中央の印で場所を選ぶ（スマホの「地図で選ぶ」）
-// 右上の道具で、筆・地番、用途地域、道路種別（市の公開データがある所だけ）を重ねられる。重ねた色の凡例も出す
+// 右上の道具で、筆・地番、用途地域、道路種別（市の公開データがある所だけ）、ハザード（国の重ねるハザードマップ）を重ねられる。
+// 重ねた色の凡例も出す
 import "maplibre-gl/dist/maplibre-gl.css";
 import { addProtocol, getVersion, MapLibreMap, Marker, NavigationControl, Popup, ScaleControl, setWorkerUrl, type GeoJSONSource, type PointLike } from "maplibre-gl";
 import { Protocol } from "pmtiles";
@@ -12,6 +13,8 @@ import { createPortal } from "react-dom";
 import {
   BASEMAPS,
   DOURO_COLOR,
+  HAZARD_EVENT,
+  hazardLayerId,
   KANTO_BOUNDS,
   PARCEL_MIN_ZOOM,
   ROAD_LAYERS,
@@ -23,11 +26,13 @@ import {
   sheetFeatures,
   type Basemap,
 } from "@/lib/map-style";
+import { HAZARD_KINDS, HAZARD_LAYERS, hazardAt, hazardPointLabel, HAZARDS, type HazardKind } from "@/lib/roadmap/hazard";
+import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
 import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
 import { readRoadShapes, type RoadRead } from "@/lib/roadmap/road-read";
 import { sheetName, type SheetHit } from "@/lib/roadmap/sheets";
 import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
-import { FrameIcon, InfoIcon, LocateIcon, ParcelIcon, PinIcon, RoadIcon, ZoningIcon } from "./icons";
+import { ChevronRightIcon, FrameIcon, HazardIcon, InfoIcon, LocateIcon, ParcelIcon, PinIcon, RoadIcon, ZoningIcon } from "./icons";
 import { MapLegend, type LegendItem } from "./map-legend";
 
 // 描画のワーカーは public/maplibre/<版>/ に置いてある（scripts/copy-maplibre-worker.mjs）
@@ -119,6 +124,30 @@ const SAMPLE_POINTS = [
   [0.75, 0.75],
 ] as const;
 
+/** ハザードの凡例。土砂災害は種類ごとに特別警戒区域・警戒区域（指定予定の薄い色は凡例の注記で） */
+function hazardLegend(kind: HazardKind): LegendItem[] {
+  const layers = HAZARDS[kind].layers;
+  // 家屋倒壊は同じ赤で、氾濫流は丸の模様、河岸侵食は塗り
+  if (kind === "kaoku")
+    return [
+      { label: "氾濫流（赤い丸の模様）", short: "氾濫流（丸の模様）", color: "#ff0000", kind: "line" },
+      { label: "河岸侵食（赤い塗り）", short: "河岸侵食（塗り）", color: "#ff0000", kind: "area" },
+    ];
+  if (kind === "dosha")
+    return layers.flatMap((l) =>
+      l.classes
+        .filter((c) => !c.sub)
+        .map((c) => ({ label: `${l.name}：${c.label}`, short: `${l.name.replace(/地の崩壊$/, "")}・${c.short}`, color: c.color, kind: "area" as const })),
+    );
+  return layers.flatMap((l) => l.classes.map((c) => ({ label: c.label, short: c.short, color: c.color, kind: "area" as const })));
+}
+
+/** ハザードの凡例の注記 */
+const HAZARD_FOOT: Partial<Record<HazardKind, string>> = {
+  dosha: "薄い色は指定予定の区域。",
+  keizoku: "「2週間以上」の色でも4週間以上のことがあります。",
+};
+
 export type LiveMapProps = {
   /** 物件の位置。無ければ関東全体を表示する */
   point?: Point;
@@ -147,6 +176,8 @@ export type LiveMapProps = {
   initial?: Partial<Record<"parcels" | "zoning" | "roads", boolean>>;
   /** 凡例を地図の外（この要素の中）に出す。スマホの全画面の地図で、凡例が地図とピンを隠さないように */
   legendTarget?: HTMLElement | null;
+  /** 最初から重ねておくハザードの種類（スマホの災害リスクの一覧から「地図」で開いたとき） */
+  initialHazard?: HazardKind;
 };
 
 export default function LiveMap({
@@ -164,6 +195,7 @@ export default function LiveMap({
   compact = mode === "crosshair",
   initial,
   legendTarget,
+  initialHazard,
 }: LiveMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -193,6 +225,15 @@ export default function LiveMap({
   // 道路種別を読んでいる最中か（読み終えるまで「読み込んでいます」のまま）。件数の上限で読み切れなかったか
   const roadsLoading = useRef(false);
   const roadsTruncated = useRef(false);
+  // 重ねているハザードの種類（null は重ねていない）。「ハザード」を押し直したときは前の種類に戻す
+  const [hazard, setHazard] = useState<HazardKind | null>(initialHazard ?? null);
+  const lastHazard = useRef<HazardKind>(initialHazard ?? "flood");
+  // 種類を選ぶ欄（選ぶときだけ開く。開いたままだと、地図をタップした地点の吹き出しに重なる）
+  const [hazardMenu, setHazardMenu] = useState(false);
+  const hazardRef = useRef(hazard);
+  useEffect(() => {
+    hazardRef.current = hazard;
+  });
   // 地図のイベントからは最新の関数を呼ぶ
   const cb = useRef({ onPick, onCenter, onFail });
   useEffect(() => {
@@ -235,6 +276,9 @@ export default function LiveMap({
     map.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
     map.addControl(new ScaleControl({ maxWidth: 110 }), "bottom-right");
     map.on("load", () => setLoaded(true));
+    // 地図を触ったら、ハザードの種類を選ぶ欄は閉じる
+    map.on("dragstart", () => setHazardMenu(false));
+    map.on("click", () => setHazardMenu(false));
     mapRef.current = map;
 
     /** 画面上の点にある筆の「地番 354（熊谷市下奈良）」（筆界を表示しているときだけ） */
@@ -347,6 +391,17 @@ export default function LiveMap({
           l.textContent = label;
           box.append(l);
         }
+        // 重ねているハザードの、その地点の区分（タイルの色を読むので、あとから入れる）
+        const hk = hazardRef.current;
+        if (hk) {
+          const l = document.createElement("p");
+          l.className = "text-[12px] font-semibold text-ink";
+          l.textContent = `${HAZARDS[hk].short}：確認中…`;
+          box.append(l);
+          hazardAt(e.lngLat.lat, e.lngLat.lng, browserTileFetcher, [hk])
+            .then((r) => (l.textContent = hazardPointLabel(hk, r[hk]) ?? ""))
+            .catch(() => (l.textContent = `${HAZARDS[hk].short}：読み込めませんでした`));
+        }
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "bg-gold rounded-full px-4 py-1.5 text-[13px] font-semibold text-white";
@@ -448,6 +503,42 @@ export default function LiveMap({
     for (const k of OVERLAY_KEYS) for (const id of OVERLAYS[k].show) map.setLayoutProperty(id, "visibility", on[k] ? "visible" : "none");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onKey, loaded]);
+
+  // ハザード：選んだ種類のタイルだけ表示する
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded) return;
+    const shown = new Set(hazard ? HAZARDS[hazard].layers.map((l) => l.id) : []);
+    for (const l of HAZARD_LAYERS) map.setLayoutProperty(hazardLayerId(l.id), "visibility", shown.has(l.id) ? "visible" : "none");
+  }, [hazard, loaded]);
+
+  // PC：パネルの「地図に重ねる」。その種類を重ね、物件の辺り（町が見える大きさ）を見せる
+  useEffect(() => {
+    const onShow = (e: Event) => {
+      const kind = (e as CustomEvent<HazardKind>).detail;
+      if (!HAZARDS[kind]) return;
+      lastHazard.current = kind;
+      setHazard(kind);
+      const map = mapRef.current;
+      if (!map || lat === undefined || lng === undefined) return;
+      if (map.getZoom() > 16 || map.getZoom() < 14 || !map.getBounds().contains([lng, lat])) map.flyTo({ center: [lng, lat], zoom: 16, duration: 900 });
+    };
+    window.addEventListener(HAZARD_EVENT, onShow);
+    return () => window.removeEventListener(HAZARD_EVENT, onShow);
+  }, [lat, lng]);
+
+  /** 「ハザード」：重ねていなければ前の種類（最初は洪水）を重ねて種類の欄を開く。重ねていれば欄を開け閉めする */
+  const toggleHazard = () => {
+    if (hazard) return setHazardMenu((o) => !o);
+    setHazard(lastHazard.current);
+    setHazardMenu(true);
+  };
+  /** 種類を選ぶ（null は重ねない） */
+  const pickHazard = (k: HazardKind | null) => {
+    if (k) lastHazard.current = k;
+    setHazard(k);
+    setHazardMenu(false);
+  };
 
   // 道路種別：見ている範囲（少し広め）の道路を市の公開データから読んで描く。読んだ範囲の中を動くあいだは読み直さない
   const roadsKey = roads ? roads.read.layers.map((l) => l.url).join(",") : "";
@@ -573,8 +664,18 @@ export default function LiveMap({
     );
   });
 
-  // 凡例（用途地域・道路種別）。道路種別は、どの市のデータかと「参考」であることを添える
+  // 凡例（用途地域・道路種別・ハザード）。道路種別は、どの市のデータかと「参考」であることを添える。
+  // ハザードは国のデータで、重要事項説明には市区町村のハザードマップを使うことを添える
   const legends = [
+    hazard && (
+      <MapLegend
+        key="hazard"
+        title={HAZARDS[hazard].legend}
+        items={hazardLegend(hazard)}
+        compact={compact}
+        foot={`${HAZARD_FOOT[hazard] ?? ""}国の重ねるハザードマップ（参考）。色の無い所は区域外かデータ無し。重要事項説明は市区町村のハザードマップで`}
+      />
+    ),
     on.zoning && legend.zoning && <MapLegend key="zoning" title="用途地域の色" items={legend.zoning} compact={compact} />,
     on.roads && legend.roads && roads && (
       <MapLegend key="roads" title="道路種別の色" items={legend.roads} compact={compact} foot={`${roads.city}の地図データ（参考）。最終確認は窓口で`} />
@@ -627,6 +728,36 @@ export default function LiveMap({
             <RoadIcon className={`h-4 w-4 ${on.roads ? "" : "text-brand"}`} />
             道路種別
           </button>
+        )}
+        <button
+          onClick={toggleHazard}
+          aria-pressed={!!hazard}
+          aria-expanded={hazardMenu}
+          className={hazard ? `${toolBase} bg-gold text-white` : tool}
+          title="洪水・土砂災害などの想定区域（国の重ねるハザードマップ）を表示"
+        >
+          <HazardIcon className={`h-4 w-4 ${hazard ? "" : "text-brand"}`} />
+          {hazard ? `ハザード：${HAZARDS[hazard].short}` : "ハザード"}
+          {hazard && <ChevronRightIcon className={`-mr-1 h-3.5 w-3.5 transition-transform ${hazardMenu ? "-rotate-90" : "rotate-90"}`} />}
+        </button>
+        {hazardMenu && (
+          // 種類を選ぶ（iPhone で拡大されないよう、選択欄ではなくボタンを並べる）
+          <div role="group" aria-label="ハザードの種類" className="grid grid-cols-2 gap-0.5 rounded-2xl bg-white/95 p-1 shadow-soft">
+            {HAZARD_KINDS.map((k) => (
+              <button
+                key={k}
+                onClick={() => pickHazard(k)}
+                aria-pressed={hazard === k}
+                title={HAZARDS[k].label}
+                className={`rounded-full px-2.5 py-1 text-[11.5px] leading-tight ${hazard === k ? "bg-gold text-white" : "text-ink hover:bg-mint"}`}
+              >
+                {HAZARDS[k].short}
+              </button>
+            ))}
+            <button onClick={() => pickHazard(null)} className="rounded-full px-2.5 py-1 text-[11.5px] leading-tight text-muted hover:bg-mint">
+              重ねない
+            </button>
+          </div>
         )}
         {mode === "pin" && point && (
           <button onClick={toPoint} className={tool}>
