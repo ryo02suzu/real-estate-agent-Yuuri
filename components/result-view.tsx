@@ -8,6 +8,7 @@ import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { sheetName } from "@/lib/roadmap/sheets";
 import { buildSummary } from "@/lib/summary";
+import { BuildingCard, BuildingSection, useBuilding, type BuildingState } from "./building-card";
 import { ContactCard } from "./contact-card";
 import { COVERAGE, CoveragePill } from "./coverage";
 import { HazardCard, HazardLine, useHazard, type HazardState } from "./hazard-card";
@@ -163,6 +164,7 @@ function Found({
   const parcels = useParcelInfo(result);
   const roads = useNearbyRoads(result.links, result.lat, result.lng);
   const hazard = useHazard(result.lat, result.lng, m);
+  const building = useBuilding(result, parcels);
   const expand = onExpand && (() => onExpand());
   // ネットで分からない市は、地図ボタンを参考扱いにして問い合わせ先を先に見せる
   const offline = m.coverage === "none" || m.coverage === "outside";
@@ -187,7 +189,7 @@ function Found({
     />
   );
   // 印刷・PDF 保存用の調査メモ（画面には出ない。iPhone の共有 → プリントでも同じメモになる）
-  const print = <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} />;
+  const print = <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} />;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5 [&>*]:shrink-0">
@@ -201,7 +203,7 @@ function Found({
           actions={
             <>
               <CopyButton text={copyText(result)} />
-              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} />
+              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} />
             </>
           }
         />
@@ -213,7 +215,7 @@ function Found({
           />
           <div className="mt-2 flex gap-1.5 [@media(max-height:720px)]:mt-1">
             <ZoningLine state={zoning} city={m.name} />
-            <ParcelButton info={parcels} />
+            <ParcelButton info={parcels} extra={<BuildingSection state={building} />} withBuilding={building.status !== "none"} />
             {/* 背の低い画面では「場所を直す」をこの行に置く（地図プレビューが入らなくなっても使える） */}
             {onFix && (
               <button
@@ -455,6 +457,7 @@ function ShareButton({
   parcels,
   roads,
   hazard,
+  building,
   desktop,
 }: {
   result: Extract<LookupResult, { status: "ok" }>;
@@ -462,6 +465,7 @@ function ShareButton({
   parcels: ParcelInfo;
   roads: RoadsState;
   hazard: HazardState;
+  building: BuildingState;
   /** PC：共有の画面は出さず、メールやチャットに貼れるようコピーする */
   desktop?: boolean;
 }) {
@@ -472,6 +476,7 @@ function ShareButton({
       parcels: parcels.status === "ok" ? { ...parcelLines(parcels), reference: parcels.kind === "address" } : undefined,
       roads: roads.status === "ok" ? roads.roads : undefined,
       hazard: hazard.status === "ok" ? hazard : undefined,
+      building: building.status === "ok" ? building.result : undefined,
     });
     if (!desktop && typeof navigator.share === "function") {
       try {
@@ -694,6 +699,7 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
   const parcels = useParcelInfo(result);
   const roads = useNearbyRoads(result.links, result.lat, result.lng);
   const hazard = useHazard(result.lat, result.lng, m);
+  const building = useBuilding(result, parcels);
   const offline = m.coverage === "none" || m.coverage === "outside";
   const primary = result.links.filter((l) => !offline && l.kind !== "public_road");
   const others = result.links.filter((l) => offline || l.kind === "public_road");
@@ -709,7 +715,7 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
           actions={
             <>
               <CopyButton text={copyText(result)} />
-              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} desktop />
+              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} desktop />
               <PrintButton />
             </>
           }
@@ -762,8 +768,10 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
         </div>
       )}
 
+      <BuildingCard state={building} />
+
       {result.contact && <ContactCard contact={result.contact} city={m.name} address={result.matchedAddress} />}
-      <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} />
+      <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} />
     </div>
   );
 }

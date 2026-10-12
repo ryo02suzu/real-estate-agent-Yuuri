@@ -1,0 +1,155 @@
+# 国土交通省 PLATEAU（3D都市モデル）の建物を、建物ごとの代表点と属性（用途・階数・構造・高さなど）だけのタイル（PMTiles）にして
+# Cloudflare R2 に置く。PLATEAU のデータカタログ API で最新版の建築物モデル（3D Tiles・LOD1）の一覧を取り、都県ごとに
+# scripts/building-tiles/build.py でタイルを作って（並行）、最後に関東1都6県を1つにまとめる。置き終えたら
+# lib/roadmap/data/building-source.json（置き場所・時点・データのある市区町村）を書き換え、テストが通れば main に入れる。
+# PLATEAU は毎年いくつかの市区町村が加わり、更新されるので、3か月ごとに作り直す。
+#
+# 必要な設定は地番の地図データ（parcel-tiles.yml）と同じ。無ければ何もしないで終わる:
+#   Secrets:   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+#   Variables: R2_PUBLIC_URL（バケットの公開 URL）、R2_BUCKET（省略時 michilu-chiban）
+name: 建物のデータ（PLATEAU）
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 19 15 1,4,7,10 *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: building-tiles
+  cancel-in-progress: false
+
+env:
+  R2_BUCKET: ${{ vars.R2_BUCKET || 'michilu-chiban' }}
+  R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: auto
+  # 新しい AWS CLI が既定で付けるチェックサムを R2 は受け付けないことがある
+  AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+  AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+  TIPPECANOE_VERSION: "2.79.0"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.c.outputs.ready }}
+      stamp: ${{ steps.c.outputs.stamp }}
+    steps:
+      - id: c
+        env:
+          ACCOUNT: ${{ secrets.R2_ACCOUNT_ID }}
+        run: |
+          echo "stamp=$(TZ=Asia/Tokyo date +%Y%m%d)" >> "$GITHUB_OUTPUT"
+          if [ -n "$ACCOUNT" ] && [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ] && [ -n "$R2_PUBLIC_URL" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::R2 の設定（Secrets: R2_ACCOUNT_ID・R2_ACCESS_KEY_ID・R2_SECRET_ACCESS_KEY、Variables: R2_PUBLIC_URL）が無いので何もしません"
+          fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        pref: ["08", "09", "10", "11", "12", "13", "14"]
+    env:
+      STAMP: ${{ needs.check.outputs.stamp }}
+      R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        id: tippecanoe
+        with:
+          path: ~/tippecanoe-bin
+          key: tippecanoe-${{ env.TIPPECANOE_VERSION }}-${{ runner.os }}
+      - name: tippecanoe を作る
+        if: steps.tippecanoe.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$TIPPECANOE_VERSION" https://github.com/felt/tippecanoe.git /tmp/tippecanoe
+          make -C /tmp/tippecanoe -j"$(nproc)"
+          mkdir -p ~/tippecanoe-bin && cp /tmp/tippecanoe/tippecanoe /tmp/tippecanoe/tile-join ~/tippecanoe-bin/
+      - run: echo "$HOME/tippecanoe-bin" >> "$GITHUB_PATH"
+      - name: 都県のタイルを作る
+        run: python3 scripts/building-tiles/build.py --pref ${{ matrix.pref }} --out "work/bldg-${{ matrix.pref }}.pmtiles" --work work
+      - name: R2 に置く（建物の無い都県は置かない）
+        run: |
+          f="work/bldg-${{ matrix.pref }}.pmtiles"
+          [ -f "$f" ] || { echo "建物なし"; exit 0; }
+          aws s3 cp "$f" "s3://$R2_BUCKET/buildings/$STAMP/pref-${{ matrix.pref }}.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+
+  merge:
+    needs: [check, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      STAMP: ${{ needs.check.outputs.stamp }}
+      R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        id: tippecanoe
+        with:
+          path: ~/tippecanoe-bin
+          key: tippecanoe-${{ env.TIPPECANOE_VERSION }}-${{ runner.os }}
+      - name: tippecanoe を作る
+        if: steps.tippecanoe.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$TIPPECANOE_VERSION" https://github.com/felt/tippecanoe.git /tmp/tippecanoe
+          make -C /tmp/tippecanoe -j"$(nproc)"
+          mkdir -p ~/tippecanoe-bin && cp /tmp/tippecanoe/tippecanoe /tmp/tippecanoe/tile-join ~/tippecanoe-bin/
+      - run: echo "$HOME/tippecanoe-bin" >> "$GITHUB_PATH"
+      - name: 関東1都6県を1つにまとめて R2 に置く
+        run: |
+          mkdir -p work
+          aws s3 cp "s3://$R2_BUCKET/buildings/$STAMP/" work/ --recursive --exclude "*" --include "pref-*.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+          ls -la work
+          ls work/pref-13.pmtiles >/dev/null || { echo "::error::東京都のタイルがありません"; exit 1; }
+          tile-join -q --force --no-tile-size-limit -o "work/kanto-$STAMP.pmtiles" \
+            -n "MICHILU buildings (PLATEAU) $STAMP" \
+            -A '<a href="https://www.mlit.go.jp/plateau/">「3D都市モデル（Project PLATEAU）」（国土交通省）</a>を加工して作成' \
+            work/pref-*.pmtiles
+          ls -la "work/kanto-$STAMP.pmtiles"
+          aws s3 cp "work/kanto-$STAMP.pmtiles" "s3://$R2_BUCKET/buildings/kanto-$STAMP.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
+            --content-type application/octet-stream --cache-control "public, max-age=86400"
+      - name: ブラウザから範囲指定で読めるようにする（CORS）
+        run: |
+          cat > cors.json <<'JSON'
+          {"CORSRules":[{"AllowedOrigins":["*"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["Range","If-Match","If-None-Match"],"ExposeHeaders":["Content-Range","Content-Length","ETag","Accept-Ranges"],"MaxAgeSeconds":86400}]}
+          JSON
+          aws s3api put-bucket-cors --bucket "$R2_BUCKET" --cors-configuration file://cors.json --endpoint-url "$R2_ENDPOINT"
+      - name: 公開 URL で読めるか確かめる
+        run: |
+          url="${R2_PUBLIC_URL%/}/buildings/kanto-$STAMP.pmtiles"
+          curl -sS -r 0-6 -H "Origin: https://michilu.vercel.app" -D headers.txt -o head.bin "$url"
+          cat headers.txt
+          grep -qi "^HTTP/.* 206" headers.txt || { echo "::error::範囲指定で読めません: $url"; exit 1; }
+          grep -qi "^access-control-allow-origin:" headers.txt || { echo "::error::CORS のヘッダがありません"; exit 1; }
+          [ "$(head -c 7 head.bin)" = "PMTiles" ] || { echo "::error::PMTiles ではありません"; exit 1; }
+          echo "URL=$url" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: アプリの置き場所を書き換え、テストが通れば main に入れる
+        run: |
+          codes=$(python3 scripts/building-tiles/build.py --list-codes 08,09,10,11,12,13,14)
+          edition="$(echo "$STAMP" | sed -E 's/^([0-9]{4})([0-9]{2}).*/\1年\2月時点/; s/年0/年/')"
+          printf '{\n "url": "%s",\n "edition": "%s",\n "codes": %s\n}\n' "$URL" "$edition" "$codes" > lib/roadmap/data/building-source.json
+          cat lib/roadmap/data/building-source.json | head -c 400
+          if git diff --quiet; then echo "変更なし"; exit 0; fi
+          npm ci
+          npm test
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/roadmap/data/building-source.json
+          git commit -m "Use the $STAMP PLATEAU building data on R2 (automatic)"
+          git pull --rebase
+          git push

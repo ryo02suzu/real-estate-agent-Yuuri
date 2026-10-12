@@ -1,5 +1,7 @@
 // 調べた結果を、メモや報告にそのまま貼れる文章にする
 import type { LookupResult } from "./roadmap";
+import { buildingSummary, type BuildingResult } from "./roadmap/building";
+import { BUILDING_CREDIT } from "./roadmap/building-data";
 import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, hazardRows, wagamachiUrl, type Elevation, type HazardMaps, type HazardReport } from "./roadmap/hazard";
 import { chibanLabel, kuikiLabel } from "./roadmap/parcel";
 import { PARCEL_CREDIT } from "./roadmap/parcel-data";
@@ -21,11 +23,13 @@ export function buildSummary(
     parcels,
     roads,
     hazard,
+    building,
   }: {
     zoning?: { zoning: Zoning; st?: ZoningStatus };
     parcels?: { target?: string; neighbors: string[]; reference: boolean };
     roads?: NearbyRoad[];
     hazard?: { report: HazardReport; elevation: Elevation | null; maps: HazardMaps; muniCd: string };
+    building?: BuildingResult;
   } = {},
 ): string {
   const m = result.municipality;
@@ -57,6 +61,8 @@ export function buildSummary(
     for (const g of groups) lines.push(`・${m.name}の${g.kinds.map((k) => HAZARD_MAP_LABELS[k]).join("・")}のハザードマップ\n  ${g.url}`);
     if (!groups.length) lines.push(`・${m.name}のハザードマップ（わがまちハザードマップ）\n  ${wagamachiUrl(hazard.muniCd)}`);
   }
+  const hit = building?.hit;
+  if (hit) lines.push(`【建物（PLATEAU・参考）】${buildingSummary(hit.building)}${hit.building.height ? `・高さ約${hit.building.height.toFixed(1)}m` : ""}`);
   const withParcels = !!parcels && (!!parcels.target || parcels.neighbors.length > 0);
   if (parcels && withParcels) {
     lines.push(`【謄本・公図用の地番${parcels.reference ? "（住所の地点の筆・参考）" : ""}】`);
@@ -67,5 +73,6 @@ export function buildSummary(
   if (p || withParcels) lines.push(`※筆の${PARCEL_CREDIT}。`);
   if (zoning) lines.push(`※都市計画の${ZONING_CREDIT}。`);
   if (hazard) lines.push(`※災害リスクの${HAZARD_CREDIT}。`);
+  if (hit) lines.push(`※建物の${BUILDING_CREDIT}。`);
   return lines.join("\n");
 }

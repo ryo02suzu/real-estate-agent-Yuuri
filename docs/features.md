@@ -103,6 +103,14 @@
     - 一覧（`data/hazard-maps.json`）は国のオープンデータの CSV（洪水・内水・高潮・津波・土砂災害）から `scripts/hazard-maps/build.py` で作る。2026-10 時点で関東の314市区町村。洪水のページが無いのは島しょ部・山間の19町村（わがまちハザードマップへのリンクだけ出す）。
     - 出典は「ハザードマップポータルサイト」を加工して作成、と種類ごとの作成者（洪水：国土交通省 各地方整備局等・都道府県、内水：市町村、高潮・津波：都道府県、土砂災害：国土数値情報をもとに国土地理院が加工）。ため池・大規模盛土造成地・液状化は第三者の権利があるデータなので使っていない。
 
+27. **建物（PLATEAU）**（`lib/roadmap/building.ts`、`components/building-card.tsx`）: 国土交通省 PLATEAU の3D都市モデルの建物の属性（用途・階数・構造（防火上の区分）・高さ・建築面積の目安・延べ面積・調査年・名称）を出す。
+    - データ：建物の 3D Tiles（LOD1）の b3dm から、頭と属性の表（バッチ表）だけを範囲指定で読み、形（glTF）は読まない。属性の表には建物ごとの代表点と範囲（_x・_y・_xmin…_ymax）があるので、代表点の点と属性・範囲（代表点からの m）だけのタイル（PMTiles・z17）にする（`scripts/building-tiles/build.py`）。関東で PLATEAU のある166市区町村（政令市は区）。試しに作った大宮区・豊島区・江戸川区（約24万棟）で 4.5MB。
+    - 地点の建物：地点を範囲に含む建物のうち、物件の筆（地番）の中に代表点があるものを先に、次に地点が範囲の内側の深い所にあるものを選ぶ（形を持たないので「推定」）。大宮区・豊島区・江戸川区で、代表点から範囲の角へ 25% 寄った地点の 99.5%、45% の地点の 93% でその建物を選ぶ（範囲の小ささで選ぶと 82〜83%）。駅のような大きな複合施設は範囲がいくつも重なり、外れることがある。同じ筆の上のほかの建物も添える。
+    - 入っている項目は市区町村で違う（東京23区・さいたま市は用途・階数・構造・延べ面積まで、横浜市・千葉市は高さと用途くらい）。名前はほとんど無い（池袋駅のまわりでも 920 棟中 9 棟。駅・交番・郵便局など）ので、住宅地図の建物名の代わりにはならない。
+    - 画面：PC はパネルのカード、スマホは「地番・隣地」の一覧の下。共有の文面・調査メモ（物件の表）にも1行。地図の「建物」で、代表点を用途の色の点で出し、拡大すると「共同住宅 5F」（名前のある建物は名前）の文字も出す（文字は国土地理院の Noto の字形。漢字・かなは端末の文字で描く）。地図をクリックした地点の建物も出す。
+    - 出典は「3D都市モデル（Project PLATEAU）」（国土交通省）を加工して作成（公共データ利用規約・CC BY 互換）。登記・建築確認の内容とは異なることがある旨を添える。
+    - `data/building-source.json` の url が空のあいだは建物の機能を出さない（ワークフローが R2 に置いて書き換える）。
+
 ## 保守
 
 - **地図リンクの週次確認**: `.github/workflows/link-check.yml` が毎週月曜に `npm run check-links` を実行。役所の座標（`lib/roadmap/data/office-points.json`）でURLを作り、404・エラーページを検出すると失敗して通知される。
@@ -110,6 +118,7 @@
 - **新しい地図の自動発見**: `.github/workflows/discover.yml` が毎週月曜に `npm run discover-maps` を実行。ArcGIS Online の検索と wagmap のポータルの地図一覧から「指定道路」「道路種別」「建築基準法」などの名前の地図を探し、まだアプリに入っていないものを Issue（ラベル「新しい地図」）で知らせる。アプリに入っている地図が中で使う Web マップ・レイヤは既知として除く。知らせた地図は `discover-seen.json` に記録し、使わないと決めた地図は `discover-ignore.json` に理由を書く。2026-10 の初回でつくば市の道路種別レイヤを見つけ、「全種別」に上げた。
 - **地番の地図データの更新**: `.github/workflows/parcel-tiles.yml`（毎年5月1日と手動）。G空間情報センターの公開 API で関東1都6県の地図XML（ログイン不要）を読み、都県ごとに `scripts/parcel-tiles/build_pref.py`（mojxml で筆に、tippecanoe でタイルに）でタイルを作り、tile-join で1つにまとめて Cloudflare R2 に置く。CORS を設定し、公開 URL で範囲指定して読めるのを確かめてから、`parcel-source.json` を書き換えて main に入れる。R2 の Secrets（R2_ACCOUNT_ID・R2_ACCESS_KEY_ID・R2_SECRET_ACCESS_KEY）と Variables（R2_PUBLIC_URL）が無ければ何もしない。
 - **都市計画のデータの更新**: `.github/workflows/zoning-tiles.yml` が毎月2日に、G空間情報センターの全国データ（GeoJSON）の更新日時を `zoning-source.json` と比べ、更新されていれば `scripts/zoning-tiles/build.py --install` で関東分のタイルを作り直して `public/data/` に置き（版ごとにファイル名を変える）、データの有無・時点の一覧（国交省の Excel）から `zoning-status.json` を作り直す。テスト（東京駅が商業地域・防火地域など、実データで確かめる）が通れば main に入れる。外部のストレージや鍵は要らない。
+- **建物のデータ（PLATEAU）**: `.github/workflows/building-tiles.yml`（1・4・7・10月の15日と手動）。PLATEAU のデータカタログ API で最新版の建築物モデルの一覧を取り、都県ごとに `scripts/building-tiles/build.py` でタイルを作り、tile-join でまとめて R2 に置く（地番と同じバケット・設定）。公開 URL で範囲指定して読めるのを確かめてから、`building-source.json`（置き場所・時点・データのある市区町村）を書き換えて main に入れる。
 - **市区町村のハザードマップの一覧**: `.github/workflows/hazard-maps.yml` が毎月2日に `scripts/hazard-maps/build.py` で国の一覧（わがまちハザードマップのリンク先の CSV）を読み直し、ページが変わっていればテストが通ったあと main に入れる（取得日だけの変更は入れない）。
 - **地図の凡例の作り直し**: `npm run legends`（手動）。道路種別の地図の一覧を書き出し、`scripts/legends/build.py` が wagmap 系の地図の凡例を読み直して `data/legends.json` を書き換える（読めなかった地図は前回の凡例を残す。Pillow が要る）。
 - **CI**: `.github/workflows/ci.yml` がプッシュごとに型チェック・lint・テスト・ビルド。

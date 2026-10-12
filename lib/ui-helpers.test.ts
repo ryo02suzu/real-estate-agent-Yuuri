@@ -114,6 +114,34 @@ describe("buildSummary", () => {
     expect(text).toContain("※災害リスクの出典：「ハザードマップポータルサイト」");
     expect(text).toContain("重要事項説明には使えません");
   });
+
+  it("地点の建物（PLATEAU）を1行で添える", () => {
+    const m = findMunicipality("13116")!;
+    const text = buildSummary(
+      {
+        status: "ok",
+        lat: 35.73135,
+        lng: 139.71985,
+        matchedAddress: "東京都豊島区東池袋四丁目",
+        town: "東池袋四丁目",
+        approximate: false,
+        municipality: m,
+        links: buildLinks(m, 35.73135, 139.71985),
+      },
+      {
+        building: {
+          hit: {
+            building: { point: [139.71995, 35.73142], box: [-26, -25, 26, 25], name: "ヴァンガードタワー", usage: "共同住宅", above: 38, below: 3, structure: "耐火構造", height: 105.9 },
+            distance: 12,
+            onParcel: true,
+          },
+          others: [],
+        },
+      },
+    );
+    expect(text).toContain("【建物（PLATEAU・参考）】ヴァンガードタワー・共同住宅・地上38階・地下3階・耐火構造・高さ約105.9m");
+    expect(text).toContain("※建物の出典：「3D都市モデル（Project PLATEAU）」（国土交通省");
+  });
 });
 
 describe("buildInquiryText", () => {

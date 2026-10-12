@@ -59,7 +59,19 @@ export function parcelLines(info: Extract<ParcelInfo, { status: "ok" }>): { targ
  * 都市計画の行の右に置く小さなボタン。スマホは押すと一覧が下から出る。
  * PC は onOpen（パネルの中の地番のカードまで動かす）を渡し、物件の筆の地番も出す（住所の地点の筆は参考なので出さない）
  */
-export function ParcelButton({ info, onOpen }: { info: ParcelInfo; onOpen?: () => void }) {
+export function ParcelButton({
+  info,
+  onOpen,
+  extra,
+  withBuilding,
+}: {
+  info: ParcelInfo;
+  onOpen?: () => void;
+  /** スマホの一覧の下に添えるもの（地点の建物） */
+  extra?: React.ReactNode;
+  /** 一覧に建物も入っている（ボタンを「地番・建物」にする） */
+  withBuilding?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   if (info.status === "none") return null;
   const chiban = onOpen && info.status === "ok" && info.kind !== "address" && /^\d/.test(info.parcel.chibanRaw) ? chibanLabel(info.parcel.chibanRaw) : undefined;
@@ -79,7 +91,7 @@ export function ParcelButton({ info, onOpen }: { info: ParcelInfo; onOpen?: () =
           </>
         ) : (
           <>
-            地番<span className="[@media(max-height:720px)]:hidden">・隣地</span>
+            地番<span className="[@media(max-height:720px)]:hidden">{withBuilding ? "・建物" : "・隣地"}</span>
           </>
         )}
         {info.status === "ok" && <ChevronRightIcon className="h-3.5 w-3.5 shrink-0 text-muted" />}
@@ -87,6 +99,7 @@ export function ParcelButton({ info, onOpen }: { info: ParcelInfo; onOpen?: () =
       {info.status === "ok" && !onOpen && (
         <Sheet title="謄本・公図を取るときの地番" open={open} onClose={() => setOpen(false)}>
           <ParcelDetail info={info} />
+          {extra}
         </Sheet>
       )}
     </>

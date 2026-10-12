@@ -2,6 +2,8 @@
 // PDF の分割図の市では、物件が載っている図の範囲（枠と 3×3 の目安線）を重ねる。
 import type { FeatureCollection } from "geojson";
 import type { ExpressionSpecification, FilterSpecification, LayerSpecification, StyleSpecification } from "maplibre-gl";
+import { BUILDING_ZOOM, USAGE_GROUPS, usageGroup, usageShort } from "./roadmap/building";
+import { BUILDING_DATA, buildingUrl, hasBuildings } from "./roadmap/building-data";
 import { HAZARD_LAYERS, HAZARD_ZOOM, hazardTileUrl, type HazardKind } from "./roadmap/hazard";
 import { PARCEL_DATA } from "./roadmap/parcel-data";
 import type { SheetHit } from "./roadmap/sheets";
@@ -55,6 +57,31 @@ const HAZARD_ATTRIBUTION = '<a href="https://disaportal.gsi.go.jp/" target="_bla
 /** ハザードのレイヤ（タイルの置き場所ごとに1つ。「ハザード」で選んだ種類のものだけ表示する） */
 export const hazardLayerId = (tileId: string) => `hz-${tileId}`;
 
+// 3D都市モデル（PLATEAU）の建物（公共データ利用規約のとおり、加工したことを書く）
+const BUILDING_ATTRIBUTION = `<a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noreferrer">「3D都市モデル（Project PLATEAU）」（国土交通省）</a>を加工して作成${
+  BUILDING_DATA.edition ? `（${BUILDING_DATA.edition}）` : ""
+}`;
+
+/** 建物（「建物」で表示を切り替える）。代表点の点と、用途・階数の文字 */
+export const BUILDING_LAYERS = ["bldg-dot", "bldg-label"];
+
+/** 建物の点・文字を出す最小のズーム（タイルは z17 だけ） */
+export const BUILDING_MIN_ZOOM = BUILDING_ZOOM;
+
+// 用途（PLATEAU の bldg:usage の名前）→ 色・短い名前。地図の式は名前そのもので引くので、よく出る名前を並べる
+const USAGES = [
+  "住宅", "共同住宅", "店舗等併用住宅", "店舗等併用共同住宅", "作業所併用住宅", "業務施設", "商業施設", "宿泊施設", "商業系複合施設",
+  "官公庁施設", "文教厚生施設", "運輸倉庫施設", "工場", "農林漁業用施設", "供給処理施設", "防衛施設",
+];
+const usageColor = ["match", ["get", "u"], ...USAGES.flatMap((u) => [u, USAGE_GROUPS[usageGroup(u)].color]), USAGE_GROUPS.other.color] as unknown as ExpressionSpecification;
+const usageText = ["match", ["get", "u"], ...USAGES.flatMap((u) => [u, usageShort(u)]), ["coalesce", ["get", "u"], ""]] as unknown as ExpressionSpecification;
+/** 地図の文字：名前があれば名前、無ければ「共同住宅 5F」 */
+const buildingText = [
+  "coalesce",
+  ["get", "nm"],
+  ["concat", usageText, ["case", ["has", "f"], ["concat", " ", ["to-string", ["get", "f"]], "F"], ""]],
+] as unknown as ExpressionSpecification;
+
 /** PC：パネルの「地図に重ねる」から、地図にハザードを重ねる（地図は別に読み込むので、ページのイベントで伝える） */
 export const HAZARD_EVENT = "michilu:hazard";
 export function showHazardOnMap(kind: HazardKind) {
@@ -70,8 +97,11 @@ export function parcelFilter(p?: { kuiki: string; chibanRaw: string }): FilterSp
 
 export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
   const keys = Object.keys(BASEMAPS) as Basemap[];
+  const buildings = hasBuildings();
   return {
     version: 8,
+    // 建物の文字に使う（漢字・かなは端末の文字で描くので、ここから読むのは数字・英字の分だけ）
+    glyphs: "https://maps.gsi.go.jp/xyz/noto-jp/{fontstack}/{range}.pbf",
     sources: {
       ...Object.fromEntries(
         keys.map((k) => [
@@ -94,6 +124,8 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
           { type: "raster" as const, tiles: [hazardTileUrl(l.id)], tileSize: 256, minzoom: l.minzoom, maxzoom: HAZARD_ZOOM, attribution: HAZARD_ATTRIBUTION },
         ]),
       ),
+      // 建物（PLATEAU）。データの置き場所が決まるまでは無し
+      ...(buildings ? { buildings: { type: "vector" as const, url: `pmtiles://${buildingUrl()}`, attribution: BUILDING_ATTRIBUTION } } : {}),
     },
     layers: [
       // 淡色地図に無いところ（海など）が白く抜けないよう、下に標準地図の色を敷く
@@ -195,6 +227,42 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
         paint: { "line-color": ["get", "color"], "line-width": ["interpolate", ["linear"], ["zoom"], 16, 3, 19, 6], "line-opacity": 0.9 },
       },
+      // 建物（「建物」で表示）。代表点を用途の色の点で、z17.5 からは「共同住宅 5F」のような文字も
+      ...(buildings
+        ? ([
+            {
+              id: "bldg-dot",
+              type: "circle",
+              source: "buildings",
+              "source-layer": BUILDING_DATA.layer,
+              minzoom: BUILDING_MIN_ZOOM,
+              layout: { visibility: "none" },
+              paint: {
+                "circle-color": usageColor,
+                "circle-radius": ["interpolate", ["linear"], ["zoom"], 17, 3.2, 19, 5],
+                "circle-stroke-color": "#ffffff",
+                "circle-stroke-width": 1,
+              },
+            },
+            {
+              id: "bldg-label",
+              type: "symbol",
+              source: "buildings",
+              "source-layer": BUILDING_DATA.layer,
+              minzoom: BUILDING_MIN_ZOOM + 0.5,
+              layout: {
+                visibility: "none",
+                "text-field": buildingText,
+                "text-font": ["NotoSansCJKjp-Regular"],
+                "text-size": ["interpolate", ["linear"], ["zoom"], 17.5, 10, 19, 12],
+                "text-anchor": "top",
+                "text-offset": [0, 0.5],
+                "text-max-width": 7,
+              },
+              paint: { "text-color": "#3b3328", "text-halo-color": "#ffffff", "text-halo-width": 1.4 },
+            },
+          ] satisfies LayerSpecification[])
+        : []),
       // 地番で見つけた筆・地図で選んだ地点の筆
       {
         id: "fude-hit",

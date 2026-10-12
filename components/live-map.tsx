@@ -3,7 +3,7 @@
 // 動く地図（MapLibre GL ＋ 地理院タイル）。重いので next/dynamic で必要になったときだけ読み込む（components/map-panel.tsx）。
 //  - pin: 物件にピンを立てる。ピンをドラッグするか、地図をクリックして「ここで調べる」で場所を選び直せる（PC・スマホの「地図を拡大」）
 //  - crosshair: 画面中央の印で場所を選ぶ（スマホの「地図で選ぶ」）
-// 右上の道具で、筆・地番、用途地域、道路種別（市の公開データがある所だけ）、ハザード（国の重ねるハザードマップ）を重ねられる。
+// 右上の道具で、筆・地番、用途地域、道路種別（市の公開データがある所だけ）、建物（PLATEAU）、ハザード（国の重ねるハザードマップ）を重ねられる。
 // 重ねた色の凡例も出す
 import "maplibre-gl/dist/maplibre-gl.css";
 import { addProtocol, getVersion, MapLibreMap, Marker, NavigationControl, Popup, ScaleControl, setWorkerUrl, type GeoJSONSource, type PointLike } from "maplibre-gl";
@@ -12,6 +12,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   BASEMAPS,
+  BUILDING_LAYERS,
+  BUILDING_MIN_ZOOM,
   DOURO_COLOR,
   HAZARD_EVENT,
   hazardLayerId,
@@ -26,13 +28,16 @@ import {
   sheetFeatures,
   type Basemap,
 } from "@/lib/map-style";
+import { buildingAt, buildingSummary, USAGE_GROUPS } from "@/lib/roadmap/building";
+import { BUILDING_DATA, hasBuildings } from "@/lib/roadmap/building-data";
+import { pmtilesBuildingSource } from "@/lib/roadmap/building-tiles";
 import { HAZARD_KINDS, HAZARD_LAYERS, hazardAt, hazardPointLabel, HAZARDS, type HazardKind } from "@/lib/roadmap/hazard";
 import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
 import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
 import { readRoadShapes, type RoadRead } from "@/lib/roadmap/road-read";
 import { sheetName, type SheetHit } from "@/lib/roadmap/sheets";
 import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
-import { ChevronRightIcon, FrameIcon, HazardIcon, InfoIcon, LocateIcon, ParcelIcon, PinIcon, RoadIcon, ZoningIcon } from "./icons";
+import { BuildingIcon, ChevronRightIcon, FrameIcon, HazardIcon, InfoIcon, LocateIcon, ParcelIcon, PinIcon, RoadIcon, ZoningIcon } from "./icons";
 import { MapLegend, type LegendItem } from "./map-legend";
 
 // 描画のワーカーは public/maplibre/<版>/ に置いてある（scripts/copy-maplibre-worker.mjs）
@@ -98,6 +103,16 @@ const OVERLAYS = {
     zoomBelow: ROAD_MIN_ZOOM + 0.5,
     zoomTo: ROAD_MIN_ZOOM + 1,
     none: ["この辺りは色の付いた道路がありません", "色の無い道の種別は、窓口で確認してください"],
+  },
+  buildings: {
+    label: "建物",
+    source: "buildings",
+    show: BUILDING_LAYERS,
+    layers: ["bldg-dot"],
+    minZoom: BUILDING_MIN_ZOOM,
+    zoomBelow: BUILDING_MIN_ZOOM + 0.5,
+    zoomTo: BUILDING_MIN_ZOOM + 1,
+    none: ["この辺りは PLATEAU の建物データがありません", "PLATEAU のある市区町村だけ出ます"],
   },
 } as const;
 type Overlay = keyof typeof OVERLAYS;
@@ -173,7 +188,7 @@ export type LiveMapProps = {
   /** スマホの全画面の地図。理由と凡例を左上に出す（右の道具・中央のピンと重ならないよう）。crosshair はいつもこの形 */
   compact?: boolean;
   /** 最初から重ねておくもの（「近くの道路」から開いたときの道路種別など） */
-  initial?: Partial<Record<"parcels" | "zoning" | "roads", boolean>>;
+  initial?: Partial<Record<"parcels" | "zoning" | "roads" | "buildings", boolean>>;
   /** 凡例を地図の外（この要素の中）に出す。スマホの全画面の地図で、凡例が地図とピンを隠さないように */
   legendTarget?: HTMLElement | null;
   /** 最初から重ねておくハザードの種類（スマホの災害リスクの一覧から「地図」で開いたとき） */
@@ -205,8 +220,9 @@ export default function LiveMap({
   const [basemap, setBasemap] = useState<Basemap>("pale");
   const [locating, setLocating] = useState(false);
   // 筆界と地番（登記所備付地図）・用途地域の塗り分けと都市計画道路・道路種別を表示するか（道路種別は読める市だけ）
-  const [shown, setShown] = useState<Record<Overlay, boolean>>(() => ({ parcels: false, zoning: false, roads: false, ...initial }));
-  const on: Record<Overlay, boolean> = { ...shown, roads: shown.roads && !!roads };
+  const [shown, setShown] = useState<Record<Overlay, boolean>>(() => ({ parcels: false, zoning: false, roads: false, buildings: false, ...initial }));
+  // 道路種別は読める市だけ、建物は PLATEAU のタイルがあるときだけ
+  const on: Record<Overlay, boolean> = { ...shown, roads: shown.roads && !!roads, buildings: shown.buildings && hasBuildings() };
   const onRef = useRef(on);
   useEffect(() => {
     onRef.current = on;
@@ -221,7 +237,7 @@ export default function LiveMap({
   const setLegendOf = (k: "zoning" | "roads", items?: LegendItem[]) =>
     setLegend((s) => (JSON.stringify(s[k]) === JSON.stringify(items) ? s : { ...s, [k]: items }));
   // 読み込みに失敗したデータ（地図のエラーと、道路種別の読み込み）
-  const failed = useRef<Record<Overlay, boolean>>({ parcels: false, zoning: false, roads: false });
+  const failed = useRef<Record<Overlay, boolean>>({ parcels: false, zoning: false, roads: false, buildings: false });
   // 道路種別を読んでいる最中か（読み終えるまで「読み込んでいます」のまま）。件数の上限で読み切れなかったか
   const roadsLoading = useRef(false);
   const roadsTruncated = useRef(false);
@@ -276,6 +292,9 @@ export default function LiveMap({
     map.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
     map.addControl(new ScaleControl({ maxWidth: 110 }), "bottom-right");
     map.on("load", () => setLoaded(true));
+    // スマホの狭い地図では、出典（地理院タイル・PLATEAU・登記所備付地図など）の帯を最初から畳んでおく（ⓘ で開ける）。
+    // 開いたままだと地図の下の方を大きく隠す。MapLibre は地図を動かすと畳むが、最初は開いている
+    if (compact) map.once("idle", () => map.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show"));
     // 地図を触ったら、ハザードの種類を選ぶ欄は閉じる
     map.on("dragstart", () => setHazardMenu(false));
     map.on("click", () => setHazardMenu(false));
@@ -391,6 +410,16 @@ export default function LiveMap({
           l.textContent = label;
           box.append(l);
         }
+        // 建物を表示していれば、その地点の建物（PLATEAU。タイルを読むので、あとから入れる）
+        if (onRef.current.buildings && map.getZoom() >= BUILDING_MIN_ZOOM) {
+          const l = document.createElement("p");
+          l.className = "max-w-[16em] text-center text-[12px] font-semibold text-ink";
+          l.textContent = "建物：確認中…";
+          box.append(l);
+          buildingAt(e.lngLat.lat, e.lngLat.lng, pmtilesBuildingSource)
+            .then((r) => (l.textContent = r?.hit ? `建物：${buildingSummary(r.hit.building)}` : "建物：この地点には無し"))
+            .catch(() => (l.textContent = "建物：読み込めませんでした"));
+        }
         // 重ねているハザードの、その地点の区分（タイルの色を読むので、あとから入れる）
         const hk = hazardRef.current;
         if (hk) {
@@ -500,7 +529,8 @@ export default function LiveMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !loaded) return;
-    for (const k of OVERLAY_KEYS) for (const id of OVERLAYS[k].show) map.setLayoutProperty(id, "visibility", on[k] ? "visible" : "none");
+    // 建物のレイヤは、PLATEAU のタイルがあるときだけ地図にある
+    for (const k of OVERLAY_KEYS) for (const id of OVERLAYS[k].show) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on[k] ? "visible" : "none");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onKey, loaded]);
 
@@ -603,7 +633,7 @@ export default function LiveMap({
     // 関東全体のように引いた地図では寄らない（寄った先が物件の辺りとは限らない）
     if (next && z >= AUTO_ZOOM_FROM && z < OVERLAYS[k].zoomBelow) map?.easeTo({ zoom: OVERLAYS[k].zoomTo, duration: 700 });
     setNote(k, !next ? undefined : z < AUTO_ZOOM_FROM ? "zoom" : "loading");
-    if (!next && k !== "parcels") setLegendOf(k, undefined);
+    if (!next && (k === "zoning" || k === "roads")) setLegendOf(k, undefined);
   };
 
   // 背景（淡色・標準・写真）
@@ -677,6 +707,15 @@ export default function LiveMap({
       />
     ),
     on.zoning && legend.zoning && <MapLegend key="zoning" title="用途地域の色" items={legend.zoning} compact={compact} />,
+    on.buildings && (
+      <MapLegend
+        key="buildings"
+        title="建物の用途（PLATEAU）"
+        items={Object.values(USAGE_GROUPS).map((g) => ({ label: g.label, short: g.label.replace(/・.*$/, ""), color: g.color, kind: "dot" as const }))}
+        compact={compact}
+        foot={`点は建物の代表点。拡大すると用途と階数（名前のある建物は名前）が出ます。国土交通省 PLATEAU の3D都市モデル（参考${BUILDING_DATA.edition ? `・${BUILDING_DATA.edition}` : ""}）`}
+      />
+    ),
     on.roads && legend.roads && roads && (
       <MapLegend key="roads" title="道路種別の色" items={legend.roads} compact={compact} foot={`${roads.city}の地図データ（参考）。最終確認は窓口で`} />
     ),
@@ -727,6 +766,17 @@ export default function LiveMap({
           >
             <RoadIcon className={`h-4 w-4 ${on.roads ? "" : "text-brand"}`} />
             道路種別
+          </button>
+        )}
+        {hasBuildings() && (
+          <button
+            onClick={() => toggleOverlay("buildings")}
+            aria-pressed={on.buildings}
+            className={on.buildings ? `${toolBase} bg-gold text-white` : tool}
+            title="建物の用途・階数（国土交通省 PLATEAU の3D都市モデル）を表示"
+          >
+            <BuildingIcon className={`h-4 w-4 ${on.buildings ? "" : "text-brand"}`} />
+            建物
           </button>
         )}
         <button

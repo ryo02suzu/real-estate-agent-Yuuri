@@ -6,12 +6,15 @@ import { useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { ASK, BRING } from "@/lib/inquiry";
 import type { LookupResult, MapKind } from "@/lib/roadmap";
+import { buildingSummary } from "@/lib/roadmap/building";
+import { BUILDING_CREDIT } from "@/lib/roadmap/building-data";
 import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, HAZARD_TABLE_NOTE, hazardRows, wagamachiUrl } from "@/lib/roadmap/hazard";
 import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
 import { zoningRows } from "@/lib/roadmap/zoning";
 import { ZONING_CREDIT } from "@/lib/roadmap/zoning-data";
 import { COVERAGE } from "./coverage";
+import type { BuildingState } from "./building-card";
 import type { HazardState } from "./hazard-card";
 import { MapPreview } from "./map-preview";
 import type { RoadsState } from "./nearby-roads";
@@ -29,7 +32,7 @@ const KIND: Record<MapKind, string> = {
 const noop = () => () => {};
 
 /** 結果の画面に置く。印刷のときだけ出る（画面には出ない） */
-export function PrintSheet(props: { result: Ok; zoning: ZoningState; parcels: ParcelInfo; roads: RoadsState; hazard: HazardState }) {
+export function PrintSheet(props: { result: Ok; zoning: ZoningState; parcels: ParcelInfo; roads: RoadsState; hazard: HazardState; building: BuildingState }) {
   // document.body に出す（画面の作りの外に置き、印刷では画面の作りを丸ごと隠す）。サーバーでは何も出さない
   const client = useSyncExternalStore(
     noop,
@@ -40,7 +43,22 @@ export function PrintSheet(props: { result: Ok; zoning: ZoningState; parcels: Pa
   return createPortal(<Memo {...props} />, document.body);
 }
 
-function Memo({ result, zoning, parcels, roads, hazard }: { result: Ok; zoning: ZoningState; parcels: ParcelInfo; roads: RoadsState; hazard: HazardState }) {
+function Memo({
+  result,
+  zoning,
+  parcels,
+  roads,
+  hazard,
+  building,
+}: {
+  result: Ok;
+  zoning: ZoningState;
+  parcels: ParcelInfo;
+  roads: RoadsState;
+  hazard: HazardState;
+  building: BuildingState;
+}) {
+  const bHit = building.status === "ok" ? building.result.hit : undefined;
   // 調べた日時（印刷した日ではなく、この結果を出した日時）
   const [at] = useState(() => new Date());
   const m = result.municipality;
@@ -92,6 +110,16 @@ function Memo({ result, zoning, parcels, roads, hazard }: { result: Ok; zoning: 
                 </dd>
               </>
             )
+          )}
+          {bHit && (
+            <>
+              <dt className="text-[#7a6a55]">建物（参考）</dt>
+              <dd>
+                {buildingSummary(bHit.building)}
+                {bHit.building.height ? `・高さ約${bHit.building.height.toFixed(1)}m` : ""}
+                <span className="text-[10px] text-[#7a6a55]">（PLATEAU・推定）</span>
+              </dd>
+            </>
           )}
           <dt className="text-[#7a6a55]">緯度・経度</dt>
           <dd className="tabular">
@@ -310,6 +338,7 @@ function Memo({ result, zoning, parcels, roads, hazard }: { result: Ok; zoning: 
         <p>
           地図：地理院タイル（国土地理院）。{zoning.status === "ok" && `都市計画の${ZONING_CREDIT}。`}
           {hazard.status === "ok" && `災害リスクの${HAZARD_CREDIT}。`}
+          {bHit && `建物の${BUILDING_CREDIT}。`}
           {(p || parcels.status === "ok") && `筆の${PARCEL_CREDIT}。`}
         </p>
       </footer>

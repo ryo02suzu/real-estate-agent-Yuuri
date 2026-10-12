@@ -70,7 +70,7 @@ export function FullMap({
       <div className="max-h-[38vh] overflow-y-auto px-4 pb-[max(10px,env(safe-area-inset-bottom))] pt-2">
         <div ref={setLegendSlot} className="empty:hidden [&:not(:empty)]:mb-2" />
         <p className="text-[10.5px] leading-[1.6] text-muted">
-          地図をタップすると、その地点の地番・用途地域・道路種別・ハザード（表示中のもの）と「ここで調べる」が出ます。地図は参考情報です。最終確認は窓口で。
+          地図をタップすると、その地点の地番・用途地域・道路種別・建物・ハザード（表示中のもの）と「ここで調べる」が出ます。地図は参考情報です。最終確認は窓口で。
         </p>
       </div>
     </div>
