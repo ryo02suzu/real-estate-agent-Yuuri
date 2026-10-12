@@ -347,8 +347,29 @@ def tiles_for(area, z: int = 18) -> list[tuple[int, int]]:
     return [(int(x), int(y)) for x, y in zip(xs[keep], ys[keep])]
 
 
+# タイルから残すもの（線は class → 置き場の名前、点は class → (置き場の名前, 属性)）。
+# 置き方に使うのは道路縁・水涯線（r）。建物の外周（b）・町字界（c）・住居表示の街区線（s）・街区符号（a）・町字の名前（t）も、
+# 国土地理院に読み直しに行かずに後で使えるよう、同じタイルから残しておく
+FGD_LINES = {"RdEdg": "r", "WL": "r", "BldL": "b", "CommBdry": "c", "SBBdry": "s"}
+FGD_POINTS = {"SBAPt": ("a", "sbaNo"), "CommPt": ("t", "name")}
+
+
+def fgd_tile(data: dict) -> dict:
+    """基盤地図情報のタイル（GeoJSON）から残す線と点（経緯度のまま）"""
+    out: dict[str, list] = {k: [] for k in ("r", "b", "c", "s", "a", "t")}
+    for f in data["features"]:
+        pr, g = f["properties"], f["geometry"]
+        cls = pr.get("class")
+        if cls in FGD_LINES and g["type"] == "LineString":
+            out[FGD_LINES[cls]].append(g["coordinates"])
+        elif cls in FGD_POINTS and g["type"] == "Point":
+            k, attr = FGD_POINTS[cls]
+            out[k].append([*g["coordinates"][:2], pr.get(attr) or ""])
+    return out
+
+
 def fetch_fgd(tiles: list[tuple[int, int]], cache: str, threads: int = 4, rate: float = float(os.environ.get("KOZU_FGD_RATE", "8"))) -> tuple[list[np.ndarray], int]:
-    """道路縁（RdEdg）・水涯線（WL）の線（平面直角座標の m）と、新しく読んだタイルの数。読んだタイルは cache に置く。
+    """道路縁（RdEdg）・水涯線（WL）の線（平面直角座標の m）と、新しく読んだタイルの数。読んだタイルは cache に置く（fgd_tile の形）。
     国土地理院に負担をかけないよう、1秒に rate 枚まで"""
     os.makedirs(cache, exist_ok=True)
     lock = threading.Lock()
@@ -358,7 +379,9 @@ def fetch_fgd(tiles: list[tuple[int, int]], cache: str, threads: int = 4, rate: 
     def one(xy):
         x, y = xy
         p = os.path.join(cache, f"{x}_{y}.json")
-        if not os.path.exists(p):
+        d = json.load(open(p)) if os.path.exists(p) else None
+        # 前の形（道路縁・水涯線だけの配列）は、建物などを残すために読み直す
+        if not isinstance(d, dict):
             with lock:
                 wait = last[0] + 1 / rate - time.time()
                 if wait > 0:
@@ -370,16 +393,13 @@ def fetch_fgd(tiles: list[tuple[int, int]], cache: str, threads: int = 4, rate: 
                 if e.code != 404:
                     raise
                 data = {"features": []}
-            lines = []
-            for f in data["features"]:
-                if f["properties"].get("class") in ("RdEdg", "WL") and f["geometry"]["type"] == "LineString":
-                    lines.append(f["geometry"]["coordinates"])
+            d = fgd_tile(data)
             with open(p + ".part", "w") as fo:
-                json.dump(lines, fo)
+                json.dump(d, fo, separators=(",", ":"))
             os.replace(p + ".part", p)
             with lock:
                 new[0] += 1
-        return json.load(open(p))
+        return d["r"]
 
     out = []
     with cf.ThreadPoolExecutor(threads) as ex:
