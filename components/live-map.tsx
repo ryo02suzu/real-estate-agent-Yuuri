@@ -19,10 +19,14 @@ import {
   HAZARD_EVENT,
   hazardLayerId,
   KANTO_BOUNDS,
+  KOZU_COLORS,
   LAND_PRICE_EVENT,
   LAND_PRICE_LAYERS,
   LAND_PRICE_MIN_ZOOM,
+  PARCEL_HIT_LAYERS,
+  PARCEL_LAYERS,
   PARCEL_MIN_ZOOM,
+  PARCEL_PICK_LAYERS,
   ROAD_LAYERS,
   ROAD_MIN_ZOOM,
   ZONING_LAYERS,
@@ -34,6 +38,7 @@ import {
 } from "@/lib/map-style";
 import { buildingAt, buildingSummary, USAGE_GROUPS } from "@/lib/roadmap/building";
 import { BUILDING_DATA, hasBuildings } from "@/lib/roadmap/building-data";
+import { hasKozu } from "@/lib/roadmap/kozu-data";
 import { pmtilesBuildingSource } from "@/lib/roadmap/building-tiles";
 import { HAZARD_KINDS, HAZARD_LAYERS, hazardAt, hazardPointLabel, HAZARDS, type HazardKind } from "@/lib/roadmap/hazard";
 import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
@@ -79,14 +84,14 @@ const OVERLAYS = {
     label: "筆・地番",
     source: "parcels",
     /** 表示を切り替えるレイヤ */
-    show: ["fude-fill", "fude-line"],
+    show: PARCEL_LAYERS,
     /** 何か描かれているかを調べるレイヤ */
-    layers: ["fude-fill"],
+    layers: PARCEL_PICK_LAYERS,
     minZoom: PARCEL_MIN_ZOOM,
     /** 押したとき、これより引いていれば zoomTo まで寄る */
     zoomBelow: PARCEL_MIN_ZOOM + 1,
     zoomTo: PARCEL_MIN_ZOOM + 1.5,
-    none: ["この辺りはデータがありません", "公図（任意座標）の地域は載っていません"],
+    none: ["この辺りはデータがありません", hasKozu() ? "公図（任意座標）の地域は、推定の位置に置けた所だけ点線で出ます" : "公図（任意座標）の地域は載っていません"],
   },
   zoning: {
     label: "用途地域",
@@ -339,9 +344,10 @@ export default function LiveMap({
     /** 画面上の点にある筆の「地番 354（熊谷市下奈良）」（筆界を表示しているときだけ） */
     const parcelLabelAt = (pt: { x: number; y: number }) => {
       if (!onRef.current.parcels || map.getZoom() < PARCEL_MIN_ZOOM) return undefined;
-      const f = map.queryRenderedFeatures([pt.x, pt.y], { layers: ["fude-fill"] })[0];
+      const f = map.queryRenderedFeatures([pt.x, pt.y], { layers: PARCEL_PICK_LAYERS })[0];
       const p = f?.properties as { 地番?: string; 地番区域?: string } | undefined;
-      return p?.地番 ? `${chibanLabel(String(p.地番))}（${kuikiLabel(String(p.地番区域 ?? ""))}）` : undefined;
+      const est = f?.layer.id === "kozu-fill" ? (Number(f.properties?.q) === 2 ? "・公図から推定・確度低" : "・公図から推定") : "";
+      return p?.地番 ? `${chibanLabel(String(p.地番))}（${kuikiLabel(String(p.地番区域 ?? ""))}${est}）` : undefined;
     };
     /** 画面上の点の用途地域「第１種低層住居専用地域 50/100」（用途地域を表示しているときだけ） */
     const youtoLabelAt = (pt: { x: number; y: number }) => {
@@ -566,7 +572,7 @@ export default function LiveMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !loaded) return;
-    for (const id of ["fude-hit", "fude-hit-line"]) {
+    for (const id of PARCEL_HIT_LAYERS) {
       map.setFilter(id, parcelFilter(parcel));
       map.setLayoutProperty(id, "visibility", parcel ? "visible" : "none");
     }
@@ -773,6 +779,19 @@ export default function LiveMap({
         items={hazardLegend(hazard)}
         compact={compact}
         foot={`${HAZARD_FOOT[hazard] ?? ""}国の重ねるハザードマップ（参考）。色の無い所は区域外かデータ無し。重要事項説明は市区町村のハザードマップで`}
+      />
+    ),
+    on.parcels && hasKozu() && (
+      <MapLegend
+        key="parcels"
+        title="筆界"
+        items={[
+          { label: "登記所備付地図", short: "登記所の地図", color: "#b0472a", kind: "line" as const },
+          { label: "公図から推定した位置", short: "公図（推定）", color: KOZU_COLORS.high, kind: "dash" as const },
+          { label: "推定（確度低）", short: "推定・確度低", color: KOZU_COLORS.low, kind: "dash" as const },
+        ]}
+        compact={compact}
+        foot="点線は、公図（任意座標）の形を道路の縁に合わせて置いた推定の位置です。数m（薄い点線は5m前後）ずれることがあります。謄本・公図で確かめてください"
       />
     ),
     on.zoning && legend.zoning && <MapLegend key="zoning" title="用途地域の色" items={legend.zoning} compact={compact} />,

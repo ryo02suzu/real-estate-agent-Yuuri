@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import KOZU_SOURCE from "./data/kozu-source.json";
 import { lookup } from "./index";
+import { mergeParcelSources } from "./parcel-tiles";
 import {
   chibanLabel,
   cityMatches,
+  estimatedMark,
+  estimatedNote,
   kuikiLabel,
   adjacentParcels,
   parcelAt,
@@ -173,6 +177,41 @@ describe("地点の筆", () => {
     expect((await parcelAt(at(0.75, 0.3).lat, at(0.75, 0.3).lng, src))?.chibanRaw).toBe("道-5");
   });
 
+  it("公図から推定した位置の筆のタイルを合わせて読み、推定の印（確かさ）を付ける", async () => {
+    const [w, s, e, n] = tileBounds(SX, SY);
+    const at = (fx: number, fy: number) => ({ lat: s + (n - s) * fy, lng: w + (e - w) * fx });
+    const pub = fakeSource({ [`${SX},${SY}`]: [{ kuiki: "川口市_青木_２丁目__", chiban: "217-8", polygon: box(SX, SY, 0.1, 0.1, 0.3, 0.3) }] });
+    const kozu: ParcelSource = {
+      tile: async (x, y) =>
+        x === SX && y === SY
+          ? [
+              { kuiki: "横浜市港北区_日吉_５丁目__", chiban: "1234", polygons: () => [box(SX, SY, 0.6, 0.6, 0.3, 0.3)], estimated: "high" },
+              { kuiki: "横浜市港北区_日吉_５丁目__", chiban: "1240", polygons: () => [box(SX, SY, 0.6, 0.1, 0.3, 0.3)], estimated: "low" },
+            ]
+          : null,
+    };
+    const src = mergeParcelSources(pub, kozu);
+    const a = await parcelAt(at(0.2, 0.2).lat, at(0.2, 0.2).lng, src);
+    expect(a?.chibanRaw).toBe("217-8");
+    expect(a?.estimated).toBeUndefined();
+    expect(estimatedMark(a!)).toBe("");
+    const b = await parcelAt(at(0.7, 0.7).lat, at(0.7, 0.7).lng, src);
+    expect(b).toMatchObject({ chibanRaw: "1234", estimated: "high" });
+    expect(estimatedMark(b!)).toBe("（推定）");
+    const c = await parcelAt(at(0.7, 0.2).lat, at(0.7, 0.2).lng, src);
+    expect(c).toMatchObject({ chibanRaw: "1240", estimated: "low" });
+    expect(estimatedMark(c!)).toBe("（推定・確度低）");
+    expect(estimatedNote("low")).toContain("5m");
+    const r = await searchParcel({ city: "横浜市港北区", town: "日吉5丁目", chiban: "1234" }, START, src);
+    expect(r.status === "found" && r.parcel.estimated).toBe("high");
+    const r2 = await searchParcel({ city: "横浜市港北区", town: "日吉5丁目", chiban: "1240" }, START, src);
+    expect(r2.status === "found" && r2.parcel.estimated).toBe("low");
+    // どちらにもタイルが無ければ、地図データの無い地域
+    expect(await mergeParcelSources({ tile: async () => null }, { tile: async () => null }).tile(0, 0)).toBeNull();
+    // 推定の筆のタイルが読めなくても、登記所備付地図の筆は出す
+    expect(await mergeParcelSources(pub, { tile: async () => Promise.reject(new Error("x")) }).tile(SX, SY)).toHaveLength(1);
+  });
+
   it("地番の呼び方", () => {
     expect(chibanLabel("391-3")).toBe("地番 391-3");
     expect(chibanLabel("道-5")).toBe("道路（地番なし）");
@@ -260,5 +299,17 @@ describe("隣の筆", () => {
     expect(target?.chiban).toBe("10");
     const got = await adjacentParcels(target!, src);
     expect(got.map((g) => g.chiban)).toEqual(["9-2", "11", "12", "道-5"]);
+  });
+});
+
+describe("公図から推定した筆のデータの置き場所（data/kozu-source.json）", () => {
+  it("置き場所は空（まだ作っていない）か R2 の PMTiles。データのある市区町村は5桁のコード", () => {
+    expect(KOZU_SOURCE.url === "" || /^https:\/\/.+\.pmtiles$/.test(KOZU_SOURCE.url)).toBe(true);
+    for (const c of KOZU_SOURCE.codes) expect(c).toMatch(/^(0[89]|1[0-4])\d{3}$/);
+    if (KOZU_SOURCE.url) {
+      expect(KOZU_SOURCE.edition).toMatch(/^\d{4}年\d{1,2}月公開版$/);
+      // 1都3県の公図の地域の多く（置けた筆のある市区町村）
+      expect(KOZU_SOURCE.codes.length).toBeGreaterThan(50);
+    }
   });
 });

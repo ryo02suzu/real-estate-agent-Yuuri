@@ -183,6 +183,30 @@ describe("buildSummary", () => {
   });
 });
 
+describe("buildSummary の地番", () => {
+  it("公図から推定した筆は、確かさに合わせてずれの目安を添え、出典も付ける", () => {
+    const m = findMunicipality("14109")!;
+    const result = {
+      status: "ok" as const,
+      lat: 35.5536,
+      lng: 139.6467,
+      matchedAddress: "神奈川県横浜市港北区日吉五丁目",
+      town: "日吉五丁目",
+      approximate: false,
+      municipality: m,
+      links: buildLinks(m, 35.5536, 139.6467),
+    };
+    const parcels = (estimated?: "high" | "low") => ({ parcels: { target: "横浜市港北区日吉５丁目 1234", neighbors: ["1233"], reference: false, estimated } });
+    const low = buildSummary(result, parcels("low"));
+    expect(low).toContain("【謄本・公図用の地番（公図から推定した位置・確度が低く、5m前後ずれることあり）】\n・物件：横浜市港北区日吉５丁目 1234");
+    expect(low).toContain("国土地理院の基盤地図情報（道路縁）に合わせて MICHILU が推定の位置に置いたもの");
+    expect(buildSummary(result, parcels("high"))).toContain("【謄本・公図用の地番（公図から推定した位置・数mずれることあり）】");
+    const plain = buildSummary(result, parcels());
+    expect(plain).toContain("【謄本・公図用の地番】");
+    expect(plain).not.toContain("基盤地図情報");
+  });
+});
+
 describe("buildSummary の学区", () => {
   it("小学校区・中学校区を添える（データの年と、教育委員会で確かめる旨も）", () => {
     const m = findMunicipality("13104")!;

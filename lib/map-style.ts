@@ -5,6 +5,7 @@ import type { ExpressionSpecification, FilterSpecification, LayerSpecification, 
 import { BUILDING_ZOOM, USAGE_GROUPS, usageGroup, usageShort } from "./roadmap/building";
 import { BUILDING_DATA, buildingUrl, hasBuildings } from "./roadmap/building-data";
 import { HAZARD_LAYERS, HAZARD_ZOOM, hazardTileUrl, type HazardKind } from "./roadmap/hazard";
+import { KOZU_DATA, hasKozu, kozuUrl } from "./roadmap/kozu-data";
 import { LAND_PRICE_ZOOM, LAND_USAGE_COLORS } from "./roadmap/land-price";
 import { LAND_PRICE_DATA, landPriceUrl } from "./roadmap/land-price-data";
 import { PARCEL_DATA } from "./roadmap/parcel-data";
@@ -29,6 +30,18 @@ export const KANTO_BOUNDS: [[number, number], [number, number]] = [
 const ATTRIBUTION = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">地理院タイル</a>';
 // 登記所備付地図データの利用規約どおり、出典と加工したことを書く
 const PARCEL_ATTRIBUTION = `<a href="https://front.geospatial.jp/moj-chizu-xml-readme/" target="_blank" rel="noreferrer">「登記所備付地図データ」（法務省）</a>を加工して作成（${PARCEL_DATA.edition}）`;
+
+// 公図（任意座標）を道路縁に合わせて推定の位置に置いた筆（登記所備付地図データの利用規約どおり、加工したことを書く）
+const KOZU_ATTRIBUTION = `公図の推定位置：<a href="https://front.geospatial.jp/moj-chizu-xml-readme/" target="_blank" rel="noreferrer">「登記所備付地図データ」（法務省）</a>を基盤地図情報（国土地理院）に合わせて加工`;
+
+/** 公図から推定した位置の筆の線の色（確かさが高い・低い） */
+export const KOZU_COLORS = { high: "#7a4fb0", low: "#b9a2d8" };
+/** 筆のレイヤ（「筆・地番」で表示を切り替える）。推定の筆のデータがあれば点線の筆も */
+export const PARCEL_LAYERS = hasKozu() ? ["fude-fill", "fude-line", "kozu-fill", "kozu-line"] : ["fude-fill", "fude-line"];
+/** 地点の筆を拾うレイヤ */
+export const PARCEL_PICK_LAYERS = hasKozu() ? ["fude-fill", "kozu-fill"] : ["fude-fill"];
+/** 地番で見つけた筆・地図で選んだ地点の筆を強調するレイヤ */
+export const PARCEL_HIT_LAYERS = hasKozu() ? ["fude-hit", "fude-hit-line", "kozu-hit", "kozu-hit-line"] : ["fude-hit", "fude-hit-line"];
 
 /** 筆を地図に描く最小のズーム（タイルは z14〜16。z16 より細かいときは z16 を拡大して描く） */
 export const PARCEL_MIN_ZOOM = 15;
@@ -205,6 +218,8 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
       ),
       // 建物（PLATEAU）。データの置き場所が決まるまでは無し
       ...(buildings ? { buildings: { type: "vector" as const, url: `pmtiles://${buildingUrl()}`, attribution: BUILDING_ATTRIBUTION } } : {}),
+      // 公図の推定位置の筆（データの置き場所が決まるまでは無し）
+      ...(hasKozu() ? { kozu: { type: "vector" as const, url: `pmtiles://${kozuUrl()}`, attribution: KOZU_ATTRIBUTION } } : {}),
       // 地価公示・地価調査（アプリと同じサイトに置いた PMTiles）
       landprice: { type: "vector", url: `pmtiles://${landPriceUrl()}`, attribution: LAND_PRICE_ATTRIBUTION },
     },
@@ -283,6 +298,35 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         layout: { visibility: "none" },
         paint: { "line-color": "#b0472a", "line-width": ["interpolate", ["linear"], ["zoom"], 15, 0.4, 18, 1.2], "line-opacity": 0.75 },
       },
+      // 公図から推定した位置の筆（点線。数mずれることがある）
+      ...(hasKozu()
+        ? ([
+            {
+              id: "kozu-fill",
+              type: "fill",
+              source: "kozu",
+              "source-layer": KOZU_DATA.layer,
+              minzoom: PARCEL_MIN_ZOOM,
+              layout: { visibility: "none" },
+              paint: { "fill-color": "#000000", "fill-opacity": 0 },
+            },
+            {
+              id: "kozu-line",
+              type: "line",
+              source: "kozu",
+              "source-layer": KOZU_DATA.layer,
+              minzoom: PARCEL_MIN_ZOOM,
+              layout: { visibility: "none" },
+              paint: {
+                // 位置合わせの確かさ（q）が低いものは薄く
+                "line-color": ["match", ["get", "q"], 2, KOZU_COLORS.low, KOZU_COLORS.high],
+                "line-width": ["interpolate", ["linear"], ["zoom"], 15, 0.4, 18, 1.2],
+                "line-opacity": 0.8,
+                "line-dasharray": [3, 2],
+              },
+            },
+          ] satisfies LayerSpecification[])
+        : []),
       // 道路種別（「道路種別」で表示）。面は薄く塗って縁取り、線は太めに。色は市の地図の凡例の色
       {
         id: "road-fill",
@@ -367,6 +411,30 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         layout: { visibility: "none" },
         paint: { "line-color": "#8a6632", "line-width": 3 },
       },
+      ...(hasKozu()
+        ? ([
+            {
+              id: "kozu-hit",
+              type: "fill",
+              source: "kozu",
+              "source-layer": KOZU_DATA.layer,
+              minzoom: 14,
+              filter: parcelFilter(),
+              layout: { visibility: "none" },
+              paint: { "fill-color": "#c49a5c", "fill-opacity": 0.28 },
+            },
+            {
+              id: "kozu-hit-line",
+              type: "line",
+              source: "kozu",
+              "source-layer": KOZU_DATA.layer,
+              minzoom: 14,
+              filter: parcelFilter(),
+              layout: { visibility: "none" },
+              paint: { "line-color": "#8a6632", "line-width": 3, "line-dasharray": [2, 1] },
+            },
+          ] satisfies LayerSpecification[])
+        : []),
     ],
   };
 }

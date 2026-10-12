@@ -1,0 +1,236 @@
+# 公図（登記所備付地図データのうち任意座標系の図面）の筆を、国土地理院の基盤地図情報の道路縁に合わせて推定の位置に置き、
+# タイル（PMTiles）にして Cloudflare R2 に置く（scripts/kozu-tiles/kozu.py）。
+#   plan:  都県の地図XMLの zip を大きさで束ねてジョブに分ける（大きい市区町村は図面を何組かに分ける）
+#   build: ジョブごとに置く（並行。1つ数時間）。国土地理院から読んだ道路縁は R2 に置き、次からはそれを使う
+#   merge: 全てのジョブの結果をまとめ（ジョブをまたいで重なった切れ端を外す）、タイルにして R2 に置き、
+#          lib/roadmap/data/kozu-source.json（置き場所・版・データのある市区町村）を書き換え、テストが通れば main に入れる
+# 1都3県で約80ジョブ・半日ほどかかる（公開リポジトリなので GitHub Actions の分は無料）。
+# 地図データの新しい版（毎年4月）が出たあと、地番の地図データ（5月1日）に続けて作り直す。
+#
+# 必要な設定は地番の地図データ（parcel-tiles.yml）と同じ。無ければ何もしないで終わる:
+#   Secrets:   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+#   Variables: R2_PUBLIC_URL（バケットの公開 URL）、R2_BUCKET（省略時 michilu-chiban）
+name: 公図の筆の推定位置
+
+on:
+  workflow_dispatch:
+    inputs:
+      prefs:
+        description: 都県コード（カンマ区切り。13 東京・14 神奈川・11 埼玉・12 千葉・08 茨城・09 栃木・10 群馬）
+        default: "13,14,11,12"
+      year:
+        description: 地図データの年度版（G空間情報センターの zip 名の末尾の年。空なら一番新しい年）
+        required: false
+  schedule:
+    - cron: "0 18 10 5 *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kozu-tiles
+  cancel-in-progress: false
+
+env:
+  R2_BUCKET: ${{ vars.R2_BUCKET || 'michilu-chiban' }}
+  R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: auto
+  # 新しい AWS CLI が既定で付けるチェックサムを R2 は受け付けないことがある
+  AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+  AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+  TIPPECANOE_VERSION: "2.79.0"
+  PREFS: ${{ inputs.prefs || '13,14,11,12' }}
+  # ジョブごとの結果の置き場（失敗したジョブだけやり直しても、同じ所に置く）
+  PARTS: kozu/run-${{ github.run_id }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.c.outputs.ready }}
+      stamp: ${{ steps.c.outputs.stamp }}
+    steps:
+      - id: c
+        env:
+          ACCOUNT: ${{ secrets.R2_ACCOUNT_ID }}
+        run: |
+          echo "stamp=$(TZ=Asia/Tokyo date +%Y%m%d)" >> "$GITHUB_OUTPUT"
+          if [ -n "$ACCOUNT" ] && [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ] && [ -n "$R2_PUBLIC_URL" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::R2 の設定（Secrets: R2_ACCOUNT_ID・R2_ACCESS_KEY_ID・R2_SECRET_ACCESS_KEY、Variables: R2_PUBLIC_URL）が無いので何もしません"
+          fi
+
+  plan:
+    needs: check
+    if: needs.check.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      chunks: ${{ steps.p.outputs.chunks }}
+      year: ${{ steps.p.outputs.year }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: scripts/kozu-tiles/requirements.txt
+      - run: pip install -r scripts/kozu-tiles/requirements.txt
+      - name: ジョブの分け方を決める
+        id: p
+        env:
+          YEAR: ${{ inputs.year }}
+        run: |
+          python3 scripts/kozu-tiles/kozu.py --plan "$PREFS" ${YEAR:+--year "$YEAR"} > plan.json
+          cat plan.json
+          echo "year=$(jq -r .year plan.json)" >> "$GITHUB_OUTPUT"
+          echo "chunks=$(jq -c .chunks plan.json)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: [check, plan]
+    runs-on: ubuntu-latest
+    # ジョブの時間の上限（6時間）より前に、置けた分で終える（kozu.py --minutes）
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      # 同時に動かすジョブの数（ほかの CI の分を空けておく）。国土地理院へは 1ジョブ 1秒に KOZU_FGD_RATE 枚まで
+      max-parallel: 18
+      matrix:
+        codes: ${{ fromJSON(needs.plan.outputs.chunks) }}
+    env:
+      YEAR: ${{ needs.plan.outputs.year }}
+      CODES: ${{ matrix.codes }}
+      ID: ${{ strategy.job-index }}
+      KOZU_FGD_RATE: "3"
+      R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: scripts/kozu-tiles/requirements.txt
+      - run: pip install -r scripts/kozu-tiles/requirements.txt
+      - name: 前に国土地理院から読んだ道路縁を R2 から戻す
+        run: |
+          mkdir -p work/fgd18 work/src
+          args=()
+          for item in ${CODES//,/ }; do
+            code="${item%%:*}"
+            args+=(--include "fgd18-$code.tar.gz" --include "fgd18-$code-*.tar.gz")
+          done
+          aws s3 cp "s3://$R2_BUCKET/kozu-src/" work/src/ --recursive --exclude "*" "${args[@]}" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+          for f in work/src/*.tar.gz; do
+            if [ -f "$f" ]; then tar xzf "$f" -C work/fgd18; fi
+          done
+          rm -rf work/src
+          echo "道路縁のタイル（前に読んだ分）: $(ls work/fgd18 | wc -l)"
+      - name: 公図の筆を置く
+        run: |
+          python3 scripts/kozu-tiles/kozu.py --codes "$CODES" --year "$YEAR" --work work --jobs "$(nproc)" --minutes 320 \
+            --out "work/kozu-$ID.geojsonl" --frags "work/frags-$ID.jsonl" --stats "work/stats-$ID.json"
+      - name: 新しく読んだ道路縁を R2 に置く（次からは国土地理院に読みに行かない）
+        if: always()
+        run: |
+          for list in work/fgd18-*.txt; do
+            [ -f "$list" ] || continue
+            name="$(basename "$list" .txt)"
+            tar czf "work/$name.tar.gz" -C work/fgd18 -T "$list"
+            aws s3 cp "work/$name.tar.gz" "s3://$R2_BUCKET/kozu-src/$name.tar.gz" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+          done
+      - name: 結果を R2 に置く
+        run: |
+          cat "work/stats-$ID.json"
+          gzip -f "work/kozu-$ID.geojsonl" "work/frags-$ID.jsonl"
+          for f in "work/kozu-$ID.geojsonl.gz" "work/frags-$ID.jsonl.gz" "work/stats-$ID.json"; do
+            aws s3 cp "$f" "s3://$R2_BUCKET/$PARTS/$(basename "$f")" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+          done
+
+  merge:
+    needs: [check, plan, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      STAMP: ${{ needs.check.outputs.stamp }}
+      YEAR: ${{ needs.plan.outputs.year }}
+      R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+    steps:
+      - uses: actions/checkout@v4
+      - name: 作業用のディスクを空ける
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: scripts/kozu-tiles/requirements.txt
+      - run: pip install -r scripts/kozu-tiles/requirements.txt
+      - uses: actions/cache@v4
+        id: tippecanoe
+        with:
+          path: ~/tippecanoe-bin
+          key: tippecanoe-${{ env.TIPPECANOE_VERSION }}-${{ runner.os }}
+      - name: tippecanoe を作る
+        if: steps.tippecanoe.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$TIPPECANOE_VERSION" https://github.com/felt/tippecanoe.git /tmp/tippecanoe
+          make -C /tmp/tippecanoe -j"$(nproc)"
+          mkdir -p ~/tippecanoe-bin && cp /tmp/tippecanoe/tippecanoe /tmp/tippecanoe/tile-join ~/tippecanoe-bin/
+      - run: echo "$HOME/tippecanoe-bin" >> "$GITHUB_PATH"
+      - name: ジョブの結果をまとめる（ジョブをまたいで重なった切れ端を外す）
+        run: |
+          mkdir -p work/parts
+          aws s3 cp "s3://$R2_BUCKET/$PARTS/" work/parts/ --recursive --endpoint-url "$R2_ENDPOINT" --only-show-errors
+          ls work/parts | wc -l
+          python3 scripts/kozu-tiles/kozu.py --resolve work/parts --out work/kozu.geojsonl --stats work/kozu-stats.json
+          rm -rf work/parts
+      - name: タイルにして R2 に置く
+        run: |
+          # z16 は全ての筆を入れる（地番検索に使う。地番の筆のタイルと同じ形）。z14・15 は表示用で、混んだタイルは間引いてよい
+          tippecanoe -o "work/kanto-$STAMP.pmtiles" --force -l kozu -Z14 -z16 -P \
+            --drop-densest-as-needed --maximum-tile-bytes=2500000 \
+            --no-line-simplification --no-tiny-polygon-reduction-at-maximum-zoom -q \
+            -n "MICHILU kozu (estimated) $STAMP" \
+            -A '<a href="https://front.geospatial.jp/moj-chizu-xml-readme/">「登記所備付地図データ」（法務省）</a>を基盤地図情報（国土地理院）に合わせて加工して作成' \
+            work/kozu.geojsonl
+          ls -la "work/kanto-$STAMP.pmtiles"
+          aws s3 cp "work/kanto-$STAMP.pmtiles" "s3://$R2_BUCKET/kozu/kanto-$STAMP.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
+            --content-type application/octet-stream --cache-control "public, max-age=86400"
+          aws s3 cp work/kozu-stats.json "s3://$R2_BUCKET/kozu/kanto-$STAMP.json" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+      - name: ブラウザから範囲指定で読めるようにする（CORS）
+        run: |
+          cat > cors.json <<'JSON'
+          {"CORSRules":[{"AllowedOrigins":["*"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["Range","If-Match","If-None-Match"],"ExposeHeaders":["Content-Range","Content-Length","ETag","Accept-Ranges"],"MaxAgeSeconds":86400}]}
+          JSON
+          aws s3api put-bucket-cors --bucket "$R2_BUCKET" --cors-configuration file://cors.json --endpoint-url "$R2_ENDPOINT"
+      - name: 公開 URL で読めるか確かめる
+        run: |
+          url="${R2_PUBLIC_URL%/}/kozu/kanto-$STAMP.pmtiles"
+          curl -sS -r 0-6 -H "Origin: https://michilu.vercel.app" -D headers.txt -o head.bin "$url"
+          cat headers.txt
+          grep -qi "^HTTP/.* 206" headers.txt || { echo "::error::範囲指定で読めません: $url"; exit 1; }
+          grep -qi "^access-control-allow-origin:" headers.txt || { echo "::error::CORS のヘッダがありません"; exit 1; }
+          [ "$(head -c 7 head.bin)" = "PMTiles" ] || { echo "::error::PMTiles ではありません"; exit 1; }
+          echo "URL=$url" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: アプリの置き場所を書き換え、テストが通れば main に入れる
+        run: |
+          codes=$(jq -c .codes work/kozu-stats.json)
+          printf '{\n "url": "%s",\n "edition": "%s年4月公開版",\n "codes": %s\n}\n' "$URL" "$YEAR" "$codes" > lib/roadmap/data/kozu-source.json
+          head -c 400 lib/roadmap/data/kozu-source.json
+          if git diff --quiet; then echo "変更なし"; exit 0; fi
+          npm ci
+          npm test
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/roadmap/data/kozu-source.json
+          git commit -m "Use the $STAMP estimated kozu parcel data on R2 (automatic)"
+          git pull --rebase
+          git push
+      - name: ジョブごとの結果を消す
+        run: aws s3 rm "s3://$R2_BUCKET/$PARTS/" --recursive --endpoint-url "$R2_ENDPOINT" --only-show-errors
