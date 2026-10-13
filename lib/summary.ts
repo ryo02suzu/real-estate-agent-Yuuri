@@ -5,8 +5,8 @@ import { BUILDING_CREDIT } from "./roadmap/building-data";
 import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, hazardRows, wagamachiUrl, type Elevation, type HazardMaps, type HazardReport } from "./roadmap/hazard";
 import { asOfText, changeText, distanceText, kindText, priceText, type LandPriceHit } from "./roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
-import { schoolLine, type Schools } from "./roadmap/school";
-import { SCHOOL_CREDIT, SCHOOL_DATA } from "./roadmap/school-data";
+import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
+import { SCHOOL_DATA } from "./roadmap/school-data";
 import { STATION_CREDIT, stationLine, type StationWalk } from "./roadmap/walk";
 import { KOZU_CREDIT } from "./roadmap/kozu-data";
 import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel, type Estimated } from "./roadmap/parcel";
@@ -105,7 +105,7 @@ export function buildSummary(
   if (hazard) lines.push(`※災害リスクの${HAZARD_CREDIT}。`);
   if (hit) lines.push(`※建物の${BUILDING_CREDIT}。`);
   if (prices.length) lines.push(`※地価の${LAND_PRICE_CREDIT}。物件そのものの価格ではありません。`);
-  if (schools?.elementary || schools?.junior) lines.push(`※学区の${SCHOOL_CREDIT}。学区は見直されることがあります。指定校は教育委員会で確認を。`);
+  if (schools?.elementary || schools?.junior) lines.push(`※学区の${schoolCredit(schools)}。学区は見直されることがあります。指定校は教育委員会で確認を。`);
   if (stations?.length) lines.push(`※駅の${STATION_CREDIT}。駅の出入口までではないので、広告には実際の道路距離で。`);
   return lines.join("\n");
 }

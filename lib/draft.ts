@@ -10,8 +10,7 @@ import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
 import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel, type Estimated } from "./roadmap/parcel";
 import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
-import { schoolLine, type Schools } from "./roadmap/school";
-import { SCHOOL_CREDIT } from "./roadmap/school-data";
+import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
 import { lineLabel, STATION_CREDIT, type StationWalk } from "./roadmap/walk";
 import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
 import { ZONING_CREDIT } from "./roadmap/zoning-data";
@@ -138,7 +137,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   if (hazard) credit(`災害リスクの${HAZARD_CREDIT}`);
   if (hit) credit(`建物の${BUILDING_CREDIT}`);
   if (near) credit(`地価の${LAND_PRICE_CREDIT}`);
-  if (schools?.elementary || schools?.junior) credit(`学区の${SCHOOL_CREDIT}`);
+  if (schools?.elementary || schools?.junior) credit(`学区の${schoolCredit(schools)}`);
   if (stations?.length) credit(`駅の${STATION_CREDIT}`);
   if (credits.length) sections.push({ title: "出典", rows: credits });
   return sections;

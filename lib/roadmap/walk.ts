@@ -23,8 +23,10 @@ export type StationWalk = {
 };
 
 export const STATION_DATA = { url: SOURCE.url, year: SOURCE.year };
+/** 道のりの出典（駅・学校までの徒歩の目安） */
+export const ROAD_CREDIT = "道のりは地理院地図Vector（国土地理院）の道路中心線から求めた目安";
 /** 出典（CC BY 4.0 と国土地理院の出典表示のとおり、加工したことを書く） */
-export const STATION_CREDIT = `出典：「国土数値情報（鉄道データ）」（国土交通省、https://nlftp.mlit.go.jp/ksj/）を加工して作成（${SOURCE.year}年）。道のりは地理院地図Vector（国土地理院）の道路中心線から求めた目安`;
+export const STATION_CREDIT = `出典：「国土数値情報（鉄道データ）」（国土交通省、https://nlftp.mlit.go.jp/ksj/）を加工して作成（${SOURCE.year}年）。${ROAD_CREDIT}`;
 
 /** 調べる駅：直線でこの距離（m）までの駅を、近い順にこの数まで */
 const MAX_STRAIGHT = 2000;
@@ -35,6 +37,9 @@ const ROAD_TILE = (x: number, y: number) => `https://cyberjapandata.gsi.go.jp/xy
 
 /** 道路距離から徒歩の分数（不動産広告の決まり：80m を1分、1分未満は1分に切り上げ） */
 export const walkMinutes = (meters: number) => Math.max(1, Math.ceil(meters / 80));
+
+/** 道のりを使うか：直線の 3 倍（近い所は直線＋600m）を超える道のりは、道がつながっていない（川・線路の向こうなど）とみなす */
+export const routedOk = (meters: number | undefined, straight: number): meters is number => meters !== undefined && meters <= Math.max(straight * 3, straight + 600);
 
 /** 「東急東横線」「JR横浜線」「都営新宿線」（事業者の名前が路線名の頭にあれば重ねない） */
 export function lineLabel([line, op]: [string, string]): string {
@@ -149,47 +154,60 @@ export function walkDistances(lines: LngLat[][], from: LngLat, targets: { id: nu
           if (d <= 2 && !adj[i].some(([k]) => k === j)) link(i, j, d);
         }
   });
-  /** 格子の r 周り目（r=0 は点のある格子）の辺のうち、点にいちばん近い辺と、その上の点（t：辺の上の位置） */
-  const ring = (p: XY, r: number) => {
-    let best: { d: number; si: number; t: number } | undefined;
+  type Near = { d: number; si: number; t: number; foot: XY };
+  /** 格子の r0〜r1 周り目（0 は点のある格子）の辺と、点からの距離・辺の上のいちばん近い点（近い順） */
+  const scan = (p: XY, r0: number, r1: number): Near[] => {
+    const out: Near[] = [];
+    const seen = new Set<number>();
     const cx = Math.floor(p[0] / CELL);
     const cy = Math.floor(p[1] / CELL);
-    for (let gx = cx - r; gx <= cx + r; gx++)
-      for (let gy = cy - r; gy <= cy + r; gy++) {
-        if (Math.max(Math.abs(gx - cx), Math.abs(gy - cy)) !== r) continue;
+    for (let gx = cx - r1; gx <= cx + r1; gx++)
+      for (let gy = cy - r1; gy <= cy + r1; gy++) {
+        if (Math.max(Math.abs(gx - cx), Math.abs(gy - cy)) < r0) continue;
         for (const si of grid.get(`${gx},${gy}`) ?? []) {
+          if (seen.has(si)) continue;
+          seen.add(si);
           const [a, b] = segs[si];
           const [x0, y0] = pos[a];
           const [x1, y1] = pos[b];
           const L2 = (x1 - x0) ** 2 + (y1 - y0) ** 2;
           const t = L2 ? Math.max(0, Math.min(1, ((p[0] - x0) * (x1 - x0) + (p[1] - y0) * (y1 - y0)) / L2)) : 0;
-          const d = Math.hypot(x0 + t * (x1 - x0) - p[0], y0 + t * (y1 - y0) - p[1]);
-          if (!best || d < best.d) best = { d, si, t };
+          const foot: XY = [x0 + t * (x1 - x0), y0 + t * (y1 - y0)];
+          out.push({ d: Math.hypot(foot[0] - p[0], foot[1] - p[1]), si, t, foot });
         }
       }
-    return best;
+    return out.sort((a, b) => a.d - b.d);
   };
-  // 点をいちばん近い辺に下ろし、そこに新しい点を作って辺の両端とつなぐ（道路に出るまでの直線も足す）。300m 以内に道が無ければ undefined
+  /**
+   * 点を近くの道路に下ろし、そこに新しい点を作って辺の両端とつなぐ（道路に出るまでの直線も足す）。いちばん近い道路が行き止まりや
+   * 敷地の中の通路で遠回りになることがあるので、いちばん近い辺より 30m 遠いまでの道路（4か所まで）にもつなぐ。300m 以内に道が無ければ undefined
+   */
   const attach = (p: XY): number | undefined => {
-    let best: { d: number; si: number; t: number } | undefined;
-    for (let r = 0; r <= 15 && !best; r++) {
-      best = ring(p, r);
-      // 見つかった周りの外側に、もっと近い辺があることがある
-      const more = best && ring(p, r + 1);
-      if (best && more && more.d < best.d) best = more;
+    let first: Near[] = [];
+    for (let r = 0; r <= 15 && !first.length; r++) first = scan(p, r, r);
+    if (!first.length) return undefined;
+    // 見つかった周りの外側に、もっと近い辺があることがある
+    const all = scan(p, 0, Math.ceil((first[0].d + 30) / CELL) + 1);
+    if (all[0].d > 300) return undefined;
+    const picked: Near[] = [];
+    for (const c of all) {
+      if (c.d > all[0].d + 30 || picked.length >= 4) break;
+      // 同じ道路の続きの辺（下ろした点が近い）は1つでよい
+      if (picked.some((q) => Math.hypot(q.foot[0] - c.foot[0], q.foot[1] - c.foot[1]) < 15)) continue;
+      picked.push(c);
     }
-    if (!best || best.d > 300) return undefined;
-    const [a, b] = segs[best.si];
-    const foot: XY = [pos[a][0] + best.t * (pos[b][0] - pos[a][0]), pos[a][1] + best.t * (pos[b][1] - pos[a][1])];
-    const f = pos.length;
-    pos.push(foot);
-    adj.push([]);
-    link(f, a, Math.hypot(foot[0] - pos[a][0], foot[1] - pos[a][1]));
-    link(f, b, Math.hypot(foot[0] - pos[b][0], foot[1] - pos[b][1]));
     const s = pos.length;
     pos.push(p);
     adj.push([]);
-    link(s, f, best.d);
+    for (const c of picked) {
+      const [a, b] = segs[c.si];
+      const f = pos.length;
+      pos.push(c.foot);
+      adj.push([]);
+      link(f, a, Math.hypot(c.foot[0] - pos[a][0], c.foot[1] - pos[a][1]));
+      link(f, b, Math.hypot(c.foot[0] - pos[b][0], c.foot[1] - pos[b][1]));
+      link(s, f, c.d);
+    }
     return s;
   };
 
@@ -302,6 +320,31 @@ function tileOfZ(lat: number, lng: number, z: number): [number, number] {
   return [Math.floor(((lng + 180) / 360) * n), Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n)];
 }
 
+/** 点を囲む範囲（+250m）の道路のタイル。多すぎる（25枚を超える。4km 四方くらい）ときは読まない */
+function roadTiles(pts: LngLat[]): [number, number][] {
+  const pad = 0.003;
+  const west = Math.min(...pts.map((p) => p[0])) - pad;
+  const east = Math.max(...pts.map((p) => p[0])) + pad;
+  const south = Math.min(...pts.map((p) => p[1])) - pad;
+  const north = Math.max(...pts.map((p) => p[1])) + pad;
+  const [x0, y0] = tileOfZ(north, west, ROAD_ZOOM);
+  const [x1, y1] = tileOfZ(south, east, ROAD_ZOOM);
+  const tiles: [number, number][] = [];
+  for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) tiles.push([x, y]);
+  return tiles.length <= 25 ? tiles : [];
+}
+
+/**
+ * 物件から目的地（駅のホームの点・学校など）までの道路距離（m）。国土地理院の道路のタイルを読む（読んだタイルは駅と学校で使い回す）。
+ * タイルが読めない・遠すぎる・道がつながらない目的地は入れない
+ */
+export async function walkTo(lat: number, lng: number, targets: { id: number; points: LngLat[] }[]): Promise<Map<number, number>> {
+  const tiles = roadTiles([[lng, lat], ...targets.flatMap((t) => t.points)]);
+  const got = await Promise.allSettled(tiles.map(([x, y]) => roadTile(x, y)));
+  const lines = got.flatMap((g) => (g.status === "fulfilled" ? g.value : []));
+  return lines.length ? walkDistances(lines, [lng, lat], targets) : new Map();
+}
+
 /**
  * 物件の近くの駅と徒歩の目安（近い順に3つまで）。道路のタイルが読めない・道がつながらない駅は直線距離の目安（routed: false）。
  * 2km 以内に駅が無ければ、いちばん近い駅（20km まで）の直線距離だけ。それも無ければ空
@@ -312,29 +355,12 @@ export async function nearestStations(lat: number, lng: number): Promise<Station
   if (!near.length) return [];
   // 歩いて行ける範囲に駅が無い（いちばん近い駅でも遠い）ときは、直線距離だけ
   if (near[0].straight > MAX_STRAIGHT) return [{ name: near[0].station.n, lines: near[0].station.l, meters: near[0].straight, minutes: walkMinutes(near[0].straight), straight: near[0].straight, routed: false }];
-  // 物件と駅の点を囲む範囲（+250m）のタイル
-  const pts: LngLat[] = [[lng, lat], ...near.flatMap((n) => n.station.p)];
-  const pad = 0.003;
-  const west = Math.min(...pts.map((p) => p[0])) - pad;
-  const east = Math.max(...pts.map((p) => p[0])) + pad;
-  const south = Math.min(...pts.map((p) => p[1])) - pad;
-  const north = Math.max(...pts.map((p) => p[1])) + pad;
-  const [x0, y0] = tileOfZ(north, west, ROAD_ZOOM);
-  const [x1, y1] = tileOfZ(south, east, ROAD_ZOOM);
-  const tiles: [number, number][] = [];
-  for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) tiles.push([x, y]);
-  let lines: LngLat[][] = [];
-  if (tiles.length <= 25) {
-    const got = await Promise.allSettled(tiles.map(([x, y]) => roadTile(x, y)));
-    lines = got.flatMap((g) => (g.status === "fulfilled" ? g.value : []));
-  }
-  const dist = lines.length ? walkDistances(lines, [lng, lat], near.map((n, id) => ({ id, points: n.station.p }))) : new Map<number, number>();
+  const dist = await walkTo(lat, lng, near.map((n, id) => ({ id, points: n.station.p })));
   return near
     .map((n, id) => {
       const d = dist.get(id);
-      // 道のりが直線の 3 倍を超えるのは、道がつながっていない（川・線路の向こうなど）とみなして直線の目安にする
-      const routed = d !== undefined && d <= Math.max(n.straight * 3, n.straight + 600);
-      const meters = routed ? d! : n.straight;
+      const routed = routedOk(d, n.straight);
+      const meters = routed ? d : n.straight;
       return { name: n.station.n, lines: n.station.l, meters, minutes: walkMinutes(meters), straight: n.straight, routed };
     })
     .sort((a, b) => Number(b.routed) - Number(a.routed) || a.meters - b.meters)

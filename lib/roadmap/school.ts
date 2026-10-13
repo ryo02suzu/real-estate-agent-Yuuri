@@ -1,7 +1,9 @@
 // 物件の地点の小学校区・中学校区（通学区域）。国土数値情報の学校区（scripts/school-districts/build.py。z14 のタイル）から、
-// 地点を含む区域の学校名・設置者・所在地と、学校までの直線距離を出す。区域は市区町村の教育委員会の資料をもとにした令和5年度の
+// 地点を含む区域の学校名・設置者・所在地と、学校までの距離（道路をたどった徒歩の目安。たどれなければ直線）を出す。区域は市区町村の教育委員会の資料をもとにした令和5年度の
 // データで、見直されることがある。指定校は教育委員会で確かめるよう添える（市区町村によってはデータの利用条件でもそう求めている）
 import type { LngLat, Polygon } from "./parcel";
+import { SCHOOL_CREDIT } from "./school-data";
+import { ROAD_CREDIT, routedOk, walkMinutes, walkTo } from "./walk";
 import { inPolygon } from "./zoning";
 
 /** 学校区のタイルのズーム（z14 だけ） */
@@ -32,6 +34,8 @@ export type SchoolSource = { tile(x: number, y: number): Promise<SchoolArea[] | 
 export type SchoolHit = School & {
   /** 物件から学校までの直線距離（m）。学校の位置が分からなければ無し */
   distance?: number;
+  /** 学校（の位置の点）までの道路距離（m）と徒歩の分数（80m を1分）。道路をたどれなければ無し */
+  walk?: { meters: number; minutes: number };
 };
 
 export type Schools = { elementary?: SchoolHit; junior?: SchoolHit };
@@ -72,6 +76,22 @@ export async function schoolsAt(lat: number, lng: number, source: SchoolSource):
   return out;
 }
 
+/**
+ * 学校までの道路距離（国土地理院の道路中心線。lib/roadmap/walk.ts）を足す。道がつながらない・遠回りすぎる学校は直線のまま。
+ * 道路のタイルが読めなくても、学区はそのまま返す
+ */
+export async function withSchoolWalks(lat: number, lng: number, schools: Schools, walk = walkTo): Promise<Schools> {
+  const hits = [schools.elementary, schools.junior];
+  const targets = hits.flatMap((h, id) => (h?.point ? [{ id, points: [h.point] }] : []));
+  if (!targets.length) return schools;
+  const dist = await walk(lat, lng, targets).catch(() => new Map<number, number>());
+  const add = (h: SchoolHit | undefined, id: number): SchoolHit | undefined => {
+    const d = dist.get(id);
+    return h && h.distance !== undefined && routedOk(d, h.distance) ? { ...h, walk: { meters: d, minutes: walkMinutes(d) } } : h;
+  };
+  return { elementary: add(schools.elementary, 0), junior: add(schools.junior, 1) };
+}
+
 // ---- 画面に出す文字 ----
 
 /** 「約450m」「約1.2km」（直線） */
@@ -80,10 +100,21 @@ export function schoolDistanceText(m?: number): string | undefined {
   return m < 1000 ? `約${Math.max(10, Math.round(m / 10) * 10)}m` : `約${(Math.round(m / 100) / 10).toFixed(1)}km`;
 }
 
-/** 1行（「戸塚第二小学校（新宿区立・直線約450m）」） */
+/** 距離（「徒歩約8分・約620m」。道路をたどれなければ「直線約450m」） */
+export function schoolWayText(s: SchoolHit): string | undefined {
+  if (s.walk) return `徒歩約${s.walk.minutes}分・${schoolDistanceText(s.walk.meters)}`;
+  return s.distance !== undefined ? `直線${schoolDistanceText(s.distance)}` : undefined;
+}
+
+/** 1行（「戸塚第二小学校（新宿区立・徒歩約8分・約620m）」） */
 export function schoolLine(s: SchoolHit): string {
-  const extra = [s.owner, s.distance !== undefined ? `直線${schoolDistanceText(s.distance)}` : undefined].filter(Boolean).join("・");
+  const extra = [s.owner, schoolWayText(s)].filter(Boolean).join("・");
   return extra ? `${s.name}（${extra}）` : s.name;
+}
+
+/** 学区の出典（共有・印刷・下書き）。徒歩の目安を出したときは道のりの出典も */
+export function schoolCredit(s: Schools): string {
+  return s.elementary?.walk || s.junior?.walk ? `${SCHOOL_CREDIT}。${ROAD_CREDIT}` : SCHOOL_CREDIT;
 }
 
 /** 短い名前（「戸塚第二小」）。スマホの狭い所に */
