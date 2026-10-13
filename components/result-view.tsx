@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { showHazardOnMap, showLandPriceOnMap } from "@/lib/map-style";
 import type { LookupResult, Municipality, ResolvedLink } from "@/lib/roadmap";
 import type { HazardKind } from "@/lib/roadmap/hazard";
@@ -36,6 +36,7 @@ import { SheetPreview } from "./sheet-preview";
 import { parcelLines, ParcelButton, ParcelCard, useParcelInfo, type ParcelInfo } from "./parcel-card";
 import { PrintSheet } from "./print-sheet";
 import { SchoolButton, SchoolCard, useSchools, type SchoolState } from "./school-card";
+import { StationCard, StationLine, useStations, type StationState } from "./station-card";
 import { useCopy } from "./use-copy";
 import { useZoning, ZoningCard, ZoningLine, type ZoningState } from "./zoning-card";
 
@@ -173,7 +174,10 @@ function Found({
   const building = useBuilding(result, parcels);
   const landPrice = useLandPrices(result.lat, result.lng);
   const schools = useSchools(result.lat, result.lng);
+  const stations = useStations(result.lat, result.lng);
   const expand = onExpand && (() => onExpand());
+  const body = useRef<HTMLDivElement>(null);
+  useFit(body);
   // ネットで分からない市は、地図ボタンを参考扱いにして問い合わせ先を先に見せる
   const offline = m.coverage === "none" || m.coverage === "outside";
   const primary = offline
@@ -184,7 +188,7 @@ function Found({
     : result.links.filter((l) => l.kind === "public_road");
   // 地図ごとの操作メモ（同意の押し方など）があれば、同じことを言う一般の案内は出さない
   const hint = result.links.some((l) => l.pinpoint) && !primary.some((l) => l.tip) && (
-    <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted [@media(max-height:720px)]:hidden">
+    <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted short:hidden">
       <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
       利用規約に同意すると、物件の場所が地図の中央に出ます。
     </p>
@@ -197,7 +201,7 @@ function Found({
     />
   );
   // 印刷・PDF 保存用の調査メモ（画面には出ない。iPhone の共有 → プリントでも同じメモになる）
-  const print = <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} />;
+  const print = <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} />;
   // 重説・物件概要の下書き（メニューから開く）
   const [draft, setDraft] = useState(false);
   useEffect(() => {
@@ -218,53 +222,54 @@ function Found({
           actions={
             <>
               <CopyButton text={copyText(result)} />
-              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} />
+              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} />
             </>
           }
         />
-        <div className="flex min-h-0 flex-1 flex-col border-t border-line/70 px-4 pb-4 pt-3 [&>*]:shrink-0 [@media(max-height:720px)]:pb-3 [@media(max-height:720px)]:pt-2">
-          {/* 背の低い画面では、災害リスクを市の行の右に入れる（行を1つ減らす） */}
+        <div ref={body} className="flex min-h-0 flex-1 flex-col border-t border-line/70 px-4 pb-4 pt-3 [&>*]:shrink-0 short:pb-3 short:pt-2">
+          {/* 背の低い画面（入りきらないときも）では、災害リスクを市の行の右に入れる（行を1つ減らす） */}
           <CityLine
             municipality={m}
             lowSlot={<HazardLine state={hazard} city={m.name} compact onShowMap={onExpand && ((k) => onExpand({ hazard: k }))} />}
           />
-          <div className="mt-2 flex gap-1.5 [@media(max-height:720px)]:mt-1">
+          <div className="mt-2 flex gap-1.5 short:mt-1">
             <ZoningLine state={zoning} city={m.name} />
             <ParcelButton info={parcels} extra={<BuildingSection state={building} />} withBuilding={building.status !== "none"} />
-            {/* 学区（データの無い所では出さない。背の低い画面では出さず、共有・印刷で見る） */}
-            <span className="contents [@media(max-height:720px)]:hidden">
-              <SchoolButton state={schools} />
-            </span>
             {/* 背の低い画面では「場所を直す」をこの行に置く（地図プレビューが入らなくなっても使える） */}
             {onFix && (
               <button
                 onClick={onFix}
                 aria-label="場所を直す"
-                className="hidden shrink-0 items-center gap-1 rounded-lg bg-mint px-2 py-1 text-[11px] font-semibold leading-[1.5] text-brand [@media(max-height:720px)]:flex"
+                className="hidden shrink-0 items-center gap-1 rounded-lg bg-mint px-2 py-1 text-[11px] font-semibold leading-[1.5] text-brand short:flex"
               >
                 <PinOutlineIcon className="h-3.5 w-3.5" />
                 直す
               </button>
             )}
           </div>
-          {/* 災害リスクと、その右に近くの地価（行を増やさない。背の低い画面では出さず、地価は地図の「地価」と共有・印刷で見る） */}
-          <div className="mt-1.5 flex gap-1.5 [@media(max-height:720px)]:hidden">
+          {/* 災害リスクと、その右に近くの地価（背の低い画面・入りきらないときは出さず、地価は地図の「地価」と共有・印刷で見る） */}
+          <div className="mt-1.5 flex gap-1.5 short:hidden">
             <HazardLine state={hazard} city={m.name} compact onShowMap={onExpand && ((k) => onExpand({ hazard: k }))} />
             <LandPriceLine state={landPrice} compact onShowMap={onExpand && ((p) => onExpand({ landPrice: p }))} />
+          </div>
+          {/* 最寄り駅と学区（背の低い画面・入りきらないときは出さず、共有・印刷・重説の下書きで見る） */}
+          <div className="mt-1.5 flex gap-1.5 tight:hidden">
+            <StationLine state={stations} />
+            <SchoolButton state={schools} />
           </div>
           {/* 画面の高さに合わせて地図プレビューが伸び縮みする（スクロールさせない）。低すぎるときは地図を隠し、
               「場所を直す」「場所を地図で見る」だけの細い行にする（背の低い画面では「場所を直す」は上の行にあるので
               「場所を地図で見る」だけ。細い行も入らなければ何も出さない。app/globals.css の .preview-box） */}
-          <div className="preview-box flex min-h-[36px] flex-1 !shrink flex-col [@media(max-height:720px)]:min-h-0">
-            <Preview result={result} onFix={onFix} onExpand={expand} fixInRow className="preview-map mt-2 min-h-0 flex-1 [@media(max-height:720px)]:mt-1.5" />
+          <div className="preview-box flex min-h-[36px] flex-1 !shrink flex-col short:min-h-0">
+            <Preview result={result} onFix={onFix} onExpand={expand} fixInRow className="preview-map mt-2 min-h-0 flex-1 short:mt-1.5" />
             <SlimPreview result={result} onFix={onFix} onExpand={expand} />
           </div>
           {(primary.length > 0 || secondary.length > 0) && (
             <>
-              <h3 className="mb-1.5 mt-3 text-[12px] font-semibold text-ink [@media(max-height:720px)]:hidden">
+              <h3 className="mb-1.5 mt-3 text-[12px] font-semibold text-ink snug:hidden">
                 地図を開く
               </h3>
-              <div className="space-y-2 [@media(max-height:720px)]:mt-2 [@media(max-height:720px)]:space-y-1.5">
+              <div className="space-y-2 short:mt-2 short:space-y-1.5">
                 {primary.map((l) => (
                   <MapButton key={l.url} link={l} primary />
                 ))}
@@ -297,9 +302,50 @@ function Found({
         )}
       </div>
       {print}
-      <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools })} open={draft} onClose={() => setDraft(false)} />
+      <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations })} open={draft} onClose={() => setDraft(false)} />
     </div>
   );
+}
+
+/**
+ * スマホの結果が画面の高さに入りきらないとき（地図のボタンが多い市など）、body に data-fit を付けて詰める。
+ * snug（「地図を開く」の見出しと地図ボタンの説明を外す）→ short（背の低い画面と同じ並びで、最寄り駅の行は残す）→ tight の順（app/globals.css）。
+ * あとから届くデータで中身が変わるたび（描画のたび）と、文字の読み込み・画面の大きさが変わったときに測り直す
+ */
+function useFit(ref: React.RefObject<HTMLDivElement | null>) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const data = document.body.dataset;
+    // 中身の下端が、下の余白（padding）に食い込んでいないか
+    const fits = () => {
+      const bottom = el.getBoundingClientRect().bottom - parseFloat(getComputedStyle(el).paddingBottom);
+      return [...el.children].every((c) => c.getBoundingClientRect().bottom <= bottom + 1);
+    };
+    const fit = () => {
+      for (const level of ["", "snug", "short", "tight"]) {
+        if (level) data.fit = level;
+        else delete data.fit;
+        if (fits()) return;
+      }
+    };
+    fit();
+    // ResizeObserver の中で大きさを変えると観測が回り続けるので、次の描画の前に測り直す
+    let frame = 0;
+    const later = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(fit);
+    };
+    const ro = new ResizeObserver(later);
+    for (const c of el.children) ro.observe(c);
+    addEventListener("resize", later);
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+      removeEventListener("resize", later);
+      delete data.fit;
+    };
+  });
 }
 
 /** 「住所コピー」で写す文字。地番で探した筆は地番まで（地図システムの住所検索に貼る） */
@@ -363,7 +409,7 @@ function Place({
   const warn = "mt-1 flex gap-1 text-[10.5px] leading-[1.6] text-[#8a4f3a]";
   const town = approximate ? "町の中心を表示しています。" : "";
   return (
-    <div className="px-4 pb-3 pt-3 [@media(max-height:720px)]:pb-2">
+    <div className="px-4 pb-3 pt-3 short:pb-2">
       <PlaceHeader
         label={found ? "地番で探した筆" : picked ? "地図で選んだ地点" : "検索地点"}
         address={address}
@@ -380,7 +426,7 @@ function Place({
         actions={actions}
       />
       {found ? (
-        <p className={`mt-1 text-[10.5px] leading-[1.6] text-muted ${desktop || parcelOthers ? "" : "[@media(max-height:720px)]:hidden"}`}>
+        <p className={`mt-1 text-[10.5px] leading-[1.6] text-muted ${desktop || parcelOthers ? "" : "short:hidden"}`}>
           {desktop ? (
             <>
               筆の形は<ParcelCredit />。分筆などで変わっていることがあります。
@@ -429,7 +475,7 @@ function Place({
           )}
         </p>
       ) : (
-        <p className="mt-1 text-[10.5px] text-muted [@media(max-height:720px)]:hidden">
+        <p className="mt-1 text-[10.5px] text-muted short:hidden">
           {picked ? "※ 番地は分からないので、町名までを表示しています" : "※ 番地までは一致しないことがあります"}
         </p>
       )}
@@ -457,9 +503,9 @@ function CopyButton({ text }: { text: string }) {
  */
 function CityLine({ municipality: m, lowSlot }: { municipality: Municipality; lowSlot?: React.ReactNode }) {
   // Tailwind はソースの文字そのままのクラスしか作らないので、組み立てずに書く
-  const lowRow = lowSlot ? "[@media(max-height:720px)]:flex-nowrap [@media(max-height:720px)]:gap-x-2" : "";
-  const lowIcon = lowSlot ? "[@media(max-height:720px)]:hidden" : "";
-  const lowName = lowSlot ? "[@media(max-height:720px)]:text-[15px]" : "";
+  const lowRow = lowSlot ? "short:flex-nowrap short:gap-x-2" : "";
+  const lowIcon = lowSlot ? "short:hidden" : "";
+  const lowName = lowSlot ? "short:text-[15px]" : "";
   return (
     <div>
       <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 ${lowRow}`}>
@@ -470,10 +516,10 @@ function CityLine({ municipality: m, lowSlot }: { municipality: Municipality; lo
           <span className={`text-[16px] font-semibold text-ink ${lowName}`}>{m.name}</span>
         </span>
         <CoveragePill coverage={m.coverage} shortWhenLow={!!lowSlot} />
-        {lowSlot && <span className="hidden min-w-0 flex-1 [@media(max-height:720px)]:flex">{lowSlot}</span>}
+        {lowSlot && <span className="hidden min-w-0 flex-1 short:flex">{lowSlot}</span>}
       </div>
       {(m.note || m.coverage !== "full") && (
-        <p className="mt-1.5 text-[10.5px] leading-[1.6] text-muted [@media(max-height:720px)]:hidden">
+        <p className="mt-1.5 text-[10.5px] leading-[1.6] text-muted short:hidden">
           {m.note ?? COVERAGE[m.coverage].long}
         </p>
       )}
@@ -490,6 +536,7 @@ function loaded({
   building,
   landPrice,
   schools,
+  stations,
 }: {
   zoning: ZoningState;
   parcels: ParcelInfo;
@@ -498,6 +545,7 @@ function loaded({
   building: BuildingState;
   landPrice: LandPriceState;
   schools: SchoolState;
+  stations?: StationState;
 }): DraftInput {
   return {
     zoning: zoning.status === "ok" ? zoning : undefined,
@@ -507,6 +555,7 @@ function loaded({
     building: building.status === "ok" ? building.result : undefined,
     landPrice: landPrice.status === "ok" ? landPrice.hits : undefined,
     schools: schools.status === "ok" ? schools.schools : undefined,
+    stations: stations?.status === "ok" ? stations.stations : undefined,
   };
 }
 
@@ -520,6 +569,7 @@ function ShareButton({
   building,
   landPrice,
   schools,
+  stations,
   desktop,
 }: {
   result: Extract<LookupResult, { status: "ok" }>;
@@ -530,12 +580,13 @@ function ShareButton({
   building: BuildingState;
   landPrice: LandPriceState;
   schools: SchoolState;
+  stations: StationState;
   /** PC：共有の画面は出さず、メールやチャットに貼れるようコピーする */
   desktop?: boolean;
 }) {
   const { done, copy } = useCopy();
   const onClick = async () => {
-    const text = buildSummary(result, loaded({ zoning, parcels, roads, hazard, building, landPrice, schools }));
+    const text = buildSummary(result, loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations }));
     if (!desktop && typeof navigator.share === "function") {
       try {
         await navigator.share({ text });
@@ -586,14 +637,14 @@ function Preview({
         className={className}
         onFix={onFix}
         onExpand={onExpand}
-        fixClassName={fixInRow ? "[@media(max-height:720px)]:hidden" : ""}
+        fixClassName={fixInRow ? "short:hidden" : ""}
         parcel={result.parcel}
       />
     );
   const tab = (m: typeof mode, label: string) => (
     <button
       onClick={() => setMode(m)}
-      className={`rounded-full px-2.5 py-0.5 text-[10.5px] [@media(max-height:720px)]:py-0 [@media(max-height:720px)]:text-[10px] ${mode === m ? "bg-gold text-white" : "text-ink"}`}
+      className={`rounded-full px-2.5 py-0.5 text-[10.5px] short:py-0 short:text-[10px] ${mode === m ? "bg-gold text-white" : "text-ink"}`}
     >
       {label}
     </button>
@@ -601,15 +652,15 @@ function Preview({
   // 地図の上には何も重ねない（ピンが隠れないように）。見出しと切り替えは地図の上の行に置く
   return (
     <div className={`flex flex-col ${className}`}>
-      <div className="mb-1.5 flex items-center justify-between gap-2 [@media(max-height:720px)]:mb-1">
-        <span className="truncate text-[11px] text-muted [@media(max-height:720px)]:text-[10px]">
+      <div className="mb-1.5 flex items-center justify-between gap-2 short:mb-1">
+        <span className="truncate text-[11px] text-muted short:text-[10px]">
           {mode === "sheet" ? `${sheetName(sheet)}と同じ範囲（北が上）` : "物件の周辺"}
         </span>
         <span className="flex shrink-0 items-center gap-1.5">
           {onFix && (
             <button
               onClick={onFix}
-              className={`rounded-full bg-mint px-2.5 py-0.5 text-[10.5px] font-semibold text-brand [@media(max-height:720px)]:py-0 [@media(max-height:720px)]:text-[10px] ${fixInRow ? "[@media(max-height:720px)]:hidden" : ""}`}
+              className={`rounded-full bg-mint px-2.5 py-0.5 text-[10.5px] font-semibold text-brand short:py-0 short:text-[10px] ${fixInRow ? "short:hidden" : ""}`}
             >
               場所を直す
             </button>
@@ -634,7 +685,7 @@ function SlimPreview({ result, onFix, onExpand }: { result: Extract<LookupResult
   return (
     <div className="preview-slim my-auto items-center gap-1.5">
       {onFix && (
-        <button onClick={onFix} className="flex items-center gap-1 rounded-full bg-mint px-3 py-1 text-[11px] font-semibold text-brand [@media(max-height:720px)]:hidden">
+        <button onClick={onFix} className="flex items-center gap-1 rounded-full bg-mint px-3 py-1 text-[11px] font-semibold text-brand short:hidden">
           <PinOutlineIcon className="h-3.5 w-3.5" />
           場所を直す
         </button>
@@ -698,19 +749,19 @@ function MapButton({
         rel="noreferrer"
         className={
           primary
-            ? "bg-gold flex items-center gap-3 rounded-xl px-4 py-2.5 text-white shadow-[0_6px_16px_rgba(138,102,50,0.28)] active:scale-[0.99] [@media(max-height:720px)]:py-2"
-            : "flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-2.5 text-ink active:scale-[0.99] [@media(max-height:720px)]:py-2"
+            ? "bg-gold flex items-center gap-3 rounded-xl px-4 py-2.5 text-white shadow-[0_6px_16px_rgba(138,102,50,0.28)] active:scale-[0.99] snug:py-2"
+            : "flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-2.5 text-ink active:scale-[0.99] snug:py-2"
         }
       >
         <MapIcon
           className={`h-6 w-6 shrink-0 ${primary ? "" : "text-brand-light"}`}
         />
         <span className="min-w-0 flex-1">
-          <span className="block text-[13.5px] font-semibold leading-snug [@media(max-height:720px)]:truncate">
+          <span className="block text-[13.5px] font-semibold leading-snug short:truncate">
             {link.label}
           </span>
           <span
-            className={`mt-0.5 block text-[10.5px] [@media(max-height:720px)]:hidden ${primary ? "text-white/85" : "text-muted"}`}
+            className={`mt-0.5 block text-[10.5px] snug:hidden ${primary ? "text-white/85" : "text-muted"}`}
           >
             {sub}
           </span>
@@ -760,6 +811,7 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
   const building = useBuilding(result, parcels);
   const landPrice = useLandPrices(result.lat, result.lng);
   const schools = useSchools(result.lat, result.lng);
+  const stations = useStations(result.lat, result.lng);
   const [draft, setDraft] = useState(false);
   const offline = m.coverage === "none" || m.coverage === "outside";
   const primary = result.links.filter((l) => !offline && l.kind !== "public_road");
@@ -776,9 +828,9 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
           actions={
             <>
               <CopyButton text={copyText(result)} />
-              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} desktop />
+              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} desktop />
               <PrintMenu result={result} onDraft={() => setDraft(true)} />
-              <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools })} open={draft} onClose={() => setDraft(false)} />
+              <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations })} open={draft} onClose={() => setDraft(false)} />
             </>
           }
         />
@@ -795,6 +847,11 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
           {!(landPrice.status === "ok" && landPrice.hits.length === 0) && (
             <div className="mt-1.5 flex">
               <LandPriceLine state={landPrice} onOpen={() => jump("pc-land-price")} />
+            </div>
+          )}
+          {!(stations.status === "ok" && stations.stations.length === 0) && (
+            <div className="mt-1.5 flex">
+              <StationLine state={stations} onOpen={() => jump("pc-station")} />
             </div>
           )}
           {(schools.status === "ok" || schools.status === "loading") && (
@@ -846,12 +903,16 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
         <LandPriceCard state={landPrice} onShowMap={showLandPriceOnMap} />
       </div>
 
+      <div id="pc-station" className="scroll-mt-3">
+        <StationCard state={stations} />
+      </div>
+
       <div id="pc-school" className="scroll-mt-3">
         <SchoolCard state={schools} />
       </div>
 
       {result.contact && <ContactCard contact={result.contact} city={m.name} address={result.matchedAddress} />}
-      <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} />
+      <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} />
     </div>
   );
 }

@@ -1,0 +1,59 @@
+# 毎月6日の朝（日本時間 6:25）に、国土数値情報に新しい年の鉄道データ（N02。駅と路線。毎年春ごろ公開）が出たかを見て、
+# 出ていれば関東1都6県とそのまわりの駅のデータ（最寄り駅・徒歩の目安に使う）を作り直し、アプリ（public/data/）に入れる。
+# テストが通れば main に直接入れる（本番は Vercel が main から自動で作り直す）。外部のストレージや鍵は要らない。
+name: 駅のデータ（最新版）
+
+on:
+  schedule:
+    - cron: "25 21 5 * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 新しい年が無くても作り直す
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+# ほかのデータ更新と同時に main へ書き込まないようにする
+concurrency:
+  group: data-updates
+  cancel-in-progress: false
+
+jobs:
+  stations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 新しい年のデータが出たか
+        id: c
+        run: |
+          python3 scripts/stations/build.py --check
+          if [ "${{ inputs.force }}" = "true" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+      - name: 駅のデータを作ってアプリに入れる
+        if: steps.c.outputs.changed == 'true'
+        run: |
+          python3 scripts/stations/build.py --install
+          ls -la public/data
+      - uses: actions/setup-node@v4
+        if: steps.c.outputs.changed == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - name: テストが通れば main に入れる
+        if: steps.c.outputs.changed == 'true'
+        run: |
+          if git diff --quiet && [ -z "$(git status --porcelain public/data)" ]; then echo "変更なし"; exit 0; fi
+          npm ci
+          npm test
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A public/data lib/roadmap/data/station-source.json
+          git commit -m "Update the station data: $(jq -r .year lib/roadmap/data/station-source.json) (automatic)"
+          git pull --rebase
+          git push

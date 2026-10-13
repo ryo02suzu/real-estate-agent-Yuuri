@@ -220,3 +220,10 @@ export const SchoolIcon = ({ className }: P) => (
     <path d="M3 21h18M5 21V11l7-4 7 4v10M12 7V3l4 1.5L12 6M10 21v-5h4v5M8 13h.01M16 13h.01" />
   </svg>
 );
+
+export const TrainIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <rect x="5" y="3" width="14" height="13" rx="3" />
+    <path d="M5 10h14M9 13h.01M15 13h.01M8 20l2-4M16 20l-2-4" />
+  </svg>
+);

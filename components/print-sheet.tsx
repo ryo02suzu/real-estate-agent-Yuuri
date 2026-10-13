@@ -13,6 +13,7 @@ import { changeText, distanceText, kindText, priceText } from "@/lib/roadmap/lan
 import { LAND_PRICE_CREDIT } from "@/lib/roadmap/land-price-data";
 import { schoolLine } from "@/lib/roadmap/school";
 import { SCHOOL_CREDIT } from "@/lib/roadmap/school-data";
+import { STATION_CREDIT, stationLine } from "@/lib/roadmap/walk";
 import { KOZU_CREDIT } from "@/lib/roadmap/kozu-data";
 import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel } from "@/lib/roadmap/parcel";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
@@ -23,6 +24,7 @@ import type { BuildingState } from "./building-card";
 import type { HazardState } from "./hazard-card";
 import type { LandPriceState } from "./land-price-card";
 import type { SchoolState } from "./school-card";
+import type { StationState } from "./station-card";
 import { MapPreview } from "./map-preview";
 import type { RoadsState } from "./nearby-roads";
 import { parcelLines, type ParcelInfo } from "./parcel-card";
@@ -48,6 +50,7 @@ export function PrintSheet(props: {
   building: BuildingState;
   landPrice: LandPriceState;
   schools: SchoolState;
+  stations: StationState;
 }) {
   // document.body に出す（画面の作りの外に置き、印刷では画面の作りを丸ごと隠す）。サーバーでは何も出さない
   const client = useSyncExternalStore(
@@ -68,6 +71,7 @@ function Memo({
   building,
   landPrice,
   schools,
+  stations,
 }: {
   result: Ok;
   zoning: ZoningState;
@@ -77,7 +81,9 @@ function Memo({
   building: BuildingState;
   landPrice: LandPriceState;
   schools: SchoolState;
+  stations: StationState;
 }) {
+  const walks = stations.status === "ok" ? stations.stations : [];
   const bHit = building.status === "ok" ? building.result.hit : undefined;
   // 近くの地価：一番近い地価公示と地価調査を1つずつ（1枚に収めるため）
   const hits = landPrice.status === "ok" ? landPrice.hits : [];
@@ -166,6 +172,12 @@ function Memo({
                   .filter(Boolean)
                   .join("　")}
               </dd>
+            </>
+          )}
+          {walks.length > 0 && (
+            <>
+              <dt className="text-[#7a6a55]">最寄り駅（目安）</dt>
+              <dd>{walks.map(stationLine).join("　")}</dd>
             </>
           )}
           <dt className="text-[#7a6a55]">緯度・経度</dt>
@@ -391,6 +403,7 @@ function Memo({
           {bHit && `建物の${BUILDING_CREDIT}。`}
           {prices.length > 0 && `地価の${LAND_PRICE_CREDIT}（標準地・基準地の価格で、物件の価格ではありません）。`}
           {schools.status === "ok" && `学区の${SCHOOL_CREDIT}（指定校は教育委員会で確認）。`}
+          {walks.length > 0 && `駅の${STATION_CREDIT}（徒歩は道路距離 80m を1分。駅の出入口までではない）。`}
           {(p || parcels.status === "ok") && `筆の${PARCEL_CREDIT}。`}
           {(p?.estimated || (parcels.status === "ok" && parcels.parcel.estimated)) && `${KOZU_CREDIT}。`}
         </p>

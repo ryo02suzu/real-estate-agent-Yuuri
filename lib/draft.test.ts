@@ -70,6 +70,22 @@ describe("重説・物件概要の下書き", () => {
     expect(text).not.toMatch(/再建築(可|不可)|建築可能|接道義務を満たす/);
   });
 
+  it("最寄り駅は物件概要の「交通」に、広告の書き方で並べる（要確認・出典付き）", () => {
+    const text = draftText(
+      buildDraft(base, {
+        stations: [
+          { name: "半蔵門", lines: [["半蔵門線", "東京メトロ"]], meters: 778, minutes: 10, straight: 603, routed: true },
+          { name: "九段下", lines: [["東西線", "東京メトロ"], ["新宿線", "都営"]], meters: 826, minutes: 11, straight: 649, routed: true },
+          { name: "石原", lines: [["秩父本線", "秩父鉄道"]], meters: 3956, minutes: 50, straight: 3956, routed: false },
+        ],
+      }),
+    );
+    expect(text).toContain("交通：東京メトロ半蔵門線「半蔵門」駅 徒歩約10分（道路距離 約780m・駅の出入口までではない目安）【要確認】");
+    expect(text).toContain("交通：東京メトロ東西線・都営新宿線「九段下」駅 徒歩約11分");
+    expect(text).toContain("交通：秩父鉄道秩父本線「石原」駅 直線約4.0km（歩いて行ける範囲に駅なし・直線距離）【要確認】");
+    expect(text).toContain("駅の出典：「国土数値情報（鉄道データ）」");
+  });
+
   it("データの無い欄は「要確認」と確かめる先", () => {
     const text = draftText(buildDraft({ ...base, approximate: true }));
     expect(text).toContain("所在（住所）：東京都千代田区三番町 付近（番地まで見つからず、町の中心の位置）【要確認】");

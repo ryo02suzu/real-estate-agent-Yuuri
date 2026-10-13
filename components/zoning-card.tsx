@@ -51,7 +51,7 @@ export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: 
         className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-left text-[11px] leading-[1.5] text-ink lg:hover:border-brand-light/60"
       >
         <ZoningIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
-        <span className={`shrink-0 text-muted ${state.status === "ok" && !onOpen ? "[@media(max-height:720px)]:hidden" : ""}`}>都市計画</span>
+        <span className={`shrink-0 text-muted ${state.status === "ok" && !onOpen ? "short:hidden" : ""}`}>都市計画</span>
         {state.status === "loading" && <span className="truncate text-muted">確認中…</span>}
         {state.status === "error" && <span className="truncate text-muted">データを読み込めませんでした</span>}
         {state.status === "ok" && (

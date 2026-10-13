@@ -59,8 +59,8 @@ export function CoveragePill({ coverage, shortWhenLow }: { coverage: Coverage; s
       <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] text-white ${c.dot}`}>{coverage === "full" ? "✓" : coverage === "partial" ? "−" : "!"}</span>
       {shortWhenLow ? (
         <>
-          <span className="[@media(max-height:720px)]:hidden">{c.pill}</span>
-          <span className="hidden whitespace-nowrap [@media(max-height:720px)]:inline">{c.short}</span>
+          <span className="short:hidden">{c.pill}</span>
+          <span className="hidden whitespace-nowrap short:inline">{c.short}</span>
         </>
       ) : (
         c.pill

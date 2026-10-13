@@ -12,6 +12,7 @@ import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
 import { schoolLine, type Schools } from "./roadmap/school";
 import { SCHOOL_CREDIT } from "./roadmap/school-data";
+import { lineLabel, STATION_CREDIT, type StationWalk } from "./roadmap/walk";
 import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
 import { ZONING_CREDIT } from "./roadmap/zoning-data";
 
@@ -27,12 +28,13 @@ export type DraftInput = {
   building?: BuildingResult;
   landPrice?: LandPriceHit[];
   schools?: Schools;
+  stations?: StationWalk[];
 };
 
 const CHECK = "要確認";
 
 /** 重要事項説明書（法令上の制限・道路・災害）と販売図面（物件概要）の欄の並びの下書き */
-export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zoning, parcels, roads, hazard, building, landPrice, schools }: DraftInput = {}): DraftSection[] {
+export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zoning, parcels, roads, hazard, building, landPrice, schools, stations }: DraftInput = {}): DraftSection[] {
   const m = result.municipality;
   const p = result.parcel;
   const found = p && !result.picked ? p : undefined;
@@ -108,6 +110,14 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
 
   // 販売図面（物件概要）
   const outline: DraftRow[] = [];
+  // 交通（広告の書き方：「東急東横線「菊名」駅 徒歩8分」。徒歩は道路距離 80m を1分の目安）
+  for (const s of stations ?? [])
+    outline.push({
+      label: "交通",
+      value: `${s.lines.map(lineLabel).join("・")}「${s.name}」駅 ${s.routed ? `徒歩約${s.minutes}分` : `直線約${(s.meters / 1000).toFixed(1)}km`}`,
+      note: s.routed ? `道路距離 約${Math.round(s.meters / 10) * 10}m・駅の出入口までではない目安` : "歩いて行ける範囲に駅なし・直線距離",
+      check: true,
+    });
   const y = zoning?.zoning.youto[0];
   if (y) outline.push({ label: "用途地域・建ぺい率・容積率", value: `${zoning!.zoning.youto.map((o) => o.name).join("／")}${y.bcr ? `／建ぺい率${y.bcr}%` : ""}${y.far ? `／容積率${y.far}%` : ""}` });
   if (zoning?.zoning.bouka) outline.push({ label: "防火指定", value: zoning.zoning.bouka });
@@ -129,6 +139,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   if (hit) credit(`建物の${BUILDING_CREDIT}`);
   if (near) credit(`地価の${LAND_PRICE_CREDIT}`);
   if (schools?.elementary || schools?.junior) credit(`学区の${SCHOOL_CREDIT}`);
+  if (stations?.length) credit(`駅の${STATION_CREDIT}`);
   if (credits.length) sections.push({ title: "出典", rows: credits });
   return sections;
 }

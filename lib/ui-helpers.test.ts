@@ -183,6 +183,33 @@ describe("buildSummary", () => {
   });
 });
 
+describe("buildSummary の最寄り駅", () => {
+  it("徒歩の目安（道路距離 80m を1分）と、直線の目安・出典を添える", () => {
+    const m = findMunicipality("14109")!;
+    const text = buildSummary(
+      {
+        status: "ok",
+        lat: 35.5146,
+        lng: 139.6218,
+        matchedAddress: "神奈川県横浜市港北区大豆戸町",
+        town: "大豆戸町",
+        approximate: false,
+        municipality: m,
+        links: buildLinks(m, 35.5146, 139.6218),
+      },
+      {
+        stations: [
+          { name: "新横浜", lines: [["ブルーライン", "横浜市営"], ["横浜線", "JR東日本"]], meters: 838, minutes: 11, straight: 750, routed: true },
+          { name: "菊名", lines: [["東横線", "東急"]], meters: 2380, minutes: 30, straight: 2380, routed: false },
+        ],
+      },
+    );
+    expect(text).toContain("【最寄り駅（徒歩の目安・道路距離 80m を1分）】\n・新横浜駅（横浜市営ブルーライン・JR横浜線）徒歩約11分（約840m）\n・菊名駅（東急東横線）直線約2.4km");
+    expect(text).toContain("※駅の出典：「国土数値情報（鉄道データ）」（国土交通省");
+    expect(text).toContain("広告には実際の道路距離で");
+  });
+});
+
 describe("buildSummary の地番", () => {
   it("公図から推定した筆は、確かさに合わせてずれの目安を添え、出典も付ける", () => {
     const m = findMunicipality("14109")!;

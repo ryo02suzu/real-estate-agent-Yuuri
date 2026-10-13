@@ -7,6 +7,7 @@ import { asOfText, changeText, distanceText, kindText, priceText, type LandPrice
 import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
 import { schoolLine, type Schools } from "./roadmap/school";
 import { SCHOOL_CREDIT, SCHOOL_DATA } from "./roadmap/school-data";
+import { STATION_CREDIT, stationLine, type StationWalk } from "./roadmap/walk";
 import { KOZU_CREDIT } from "./roadmap/kozu-data";
 import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel, type Estimated } from "./roadmap/parcel";
 import { PARCEL_CREDIT } from "./roadmap/parcel-data";
@@ -32,6 +33,7 @@ export function buildSummary(
     building,
     landPrice,
     schools,
+    stations,
   }: {
     zoning?: { zoning: Zoning; st?: ZoningStatus };
     parcels?: { target?: string; neighbors: string[]; reference: boolean; estimated?: Estimated };
@@ -40,6 +42,7 @@ export function buildSummary(
     building?: BuildingResult;
     landPrice?: LandPriceHit[];
     schools?: Schools;
+    stations?: StationWalk[];
   } = {},
 ): string {
   const m = result.municipality;
@@ -80,6 +83,10 @@ export function buildSummary(
     for (const h of prices)
       lines.push(`・${kindText(h.kind)} ${h.no}（${h.usage}・${h.bearing}へ${distanceText(h.distance)}）：${priceText(h.price)}（前年比 ${changeText(h.change)}、${asOfText(h)}）`);
   }
+  if (stations?.length) {
+    lines.push("【最寄り駅（徒歩の目安・道路距離 80m を1分）】");
+    for (const s of stations) lines.push(`・${stationLine(s)}`);
+  }
   if (schools?.elementary || schools?.junior) {
     lines.push(`【学区（参考・${SCHOOL_DATA.edition}のデータ）】`);
     if (schools.elementary) lines.push(`・小学校：${schoolLine(schools.elementary)}`);
@@ -99,5 +106,6 @@ export function buildSummary(
   if (hit) lines.push(`※建物の${BUILDING_CREDIT}。`);
   if (prices.length) lines.push(`※地価の${LAND_PRICE_CREDIT}。物件そのものの価格ではありません。`);
   if (schools?.elementary || schools?.junior) lines.push(`※学区の${SCHOOL_CREDIT}。学区は見直されることがあります。指定校は教育委員会で確認を。`);
+  if (stations?.length) lines.push(`※駅の${STATION_CREDIT}。駅の出入口までではないので、広告には実際の道路距離で。`);
   return lines.join("\n");
 }

@@ -93,7 +93,7 @@ export function ParcelButton({
           </>
         ) : (
           <>
-            地番<span className="[@media(max-height:720px)]:hidden">{withBuilding ? "・建物" : "・隣地"}</span>
+            地番<span className="short:hidden">{withBuilding ? "・建物" : "・隣地"}</span>
           </>
         )}
         {info.status === "ok" && <ChevronRightIcon className="h-3.5 w-3.5 shrink-0 text-muted" />}
