@@ -83,6 +83,7 @@ jobs:
       chunks: ${{ steps.p.outputs.chunks }}
       all: ${{ steps.p.outputs.all }}
       year: ${{ steps.p.outputs.year }}
+      rate: ${{ steps.p.outputs.rate }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -109,6 +110,10 @@ jobs:
           fi
           cat chunks.json
           echo "chunks=$(cat chunks.json)" >> "$GITHUB_OUTPUT"
+          # 国土地理院へは全体で1秒に36枚まで（18ジョブなら1ジョブ2枚。やり直しのようにジョブが少ないときは1ジョブ8枚まで）
+          n=$(jq length chunks.json)
+          [ "$n" -gt 0 ] || { echo "::error::ジョブがありません"; exit 1; }
+          echo "rate=$(( n >= 18 ? 2 : (36 / n > 8 ? 8 : 36 / n) ))" >> "$GITHUB_OUTPUT"
 
   build:
     needs: [check, plan]
@@ -117,7 +122,7 @@ jobs:
     timeout-minutes: 355
     strategy:
       fail-fast: false
-      # 同時に動かすジョブの数（ほかの CI の分を空けておく）。国土地理院へは 1ジョブ 1秒に KOZU_FGD_RATE 枚まで
+      # 同時に動かすジョブの数（ほかの CI の分を空けておく）。国土地理院へは 1ジョブ 1秒に KOZU_FGD_RATE 枚まで（plan で決める）
       max-parallel: 18
       matrix:
         codes: ${{ fromJSON(needs.plan.outputs.chunks) }}
@@ -126,7 +131,7 @@ jobs:
       CODES: ${{ matrix.codes }}
       # 前の回の置き場に足しても名前がぶつからないよう、回の番号を付ける
       ID: ${{ github.run_id }}-${{ strategy.job-index }}
-      KOZU_FGD_RATE: "2"
+      KOZU_FGD_RATE: ${{ needs.plan.outputs.rate }}
       R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     steps:
       - uses: actions/checkout@v4
