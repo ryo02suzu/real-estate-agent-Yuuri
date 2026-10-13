@@ -4,8 +4,12 @@
 #   build: ジョブごとに置く（並行。1つ数時間）。国土地理院から読んだ道路縁は R2 に置き、次からはそれを使う
 #   merge: 全てのジョブの結果をまとめ（ジョブをまたいで重なった切れ端を外す）、タイルにして R2 に置き、
 #          lib/roadmap/data/kozu-source.json（置き場所・版・データのある市区町村）を書き換え、テストが通れば main に入れる
-# 1都3県で約80ジョブ・半日ほどかかる（公開リポジトリなので GitHub Actions の分は無料）。
-# 地図データの新しい版（毎年4月）が出たあと、地番の地図データ（5月1日）に続けて作り直す。
+# 1都3県で約80ジョブ・初めは1日ほどかかる（公開リポジトリなので GitHub Actions の分は無料）。国土地理院から読んだ道路縁は
+# R2 に残るので、2回目からは速い。地図データの新しい版（毎年4月）が出たあと、地番の地図データ（5月1日）に続けて作り直す。
+#
+# 時間切れ・失敗したジョブがあっても、置けた分でまとめて main に入れ、ジョブごとの結果（parts）は消さずに残す。
+# まとめのログの「結果の無いジョブ」を Run workflow の chunks に、parts に置き場（kozu/run-…）を入れて動かすと、
+# そのジョブだけやり直して前の結果に足し、まとめ直す。
 #
 # 必要な設定は地番の地図データ（parcel-tiles.yml）と同じ。無ければ何もしないで終わる:
 #   Secrets:   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
@@ -20,6 +24,12 @@ on:
         default: "13,14,11,12"
       year:
         description: 地図データの年度版（G空間情報センターの zip 名の末尾の年。空なら一番新しい年）
+        required: false
+      chunks:
+        description: やり直すジョブだけ（例「11207,11361;14150:2/3」。; でジョブを分ける）。空なら都県の全部
+        required: false
+      parts:
+        description: 前の回のジョブごとの結果の置き場（例 kozu/run-38289741426）。やり直した分を足してまとめる。空ならこの回の置き場
         required: false
   schedule:
     - cron: "0 18 10 5 *"
@@ -42,8 +52,8 @@ env:
   AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
   TIPPECANOE_VERSION: "2.79.0"
   PREFS: ${{ inputs.prefs || '13,14,11,12' }}
-  # ジョブごとの結果の置き場（失敗したジョブだけやり直しても、同じ所に置く）
-  PARTS: kozu/run-${{ github.run_id }}
+  # ジョブごとの結果の置き場（失敗したジョブだけやり直しても、同じ所に置く。前の回の置き場に足すこともできる）
+  PARTS: ${{ inputs.parts || format('kozu/run-{0}', github.run_id) }}
 
 jobs:
   check:
@@ -56,7 +66,8 @@ jobs:
         env:
           ACCOUNT: ${{ secrets.R2_ACCOUNT_ID }}
         run: |
-          echo "stamp=$(TZ=Asia/Tokyo date +%Y%m%d)" >> "$GITHUB_OUTPUT"
+          # 同じ日にまとめ直しても前のファイルを上書きしない（ブラウザが読みかけのタイルと混ざらない）
+          echo "stamp=$(TZ=Asia/Tokyo date +%Y%m%d-%H%M)" >> "$GITHUB_OUTPUT"
           if [ -n "$ACCOUNT" ] && [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ] && [ -n "$R2_PUBLIC_URL" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
@@ -70,6 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       chunks: ${{ steps.p.outputs.chunks }}
+      all: ${{ steps.p.outputs.all }}
       year: ${{ steps.p.outputs.year }}
     steps:
       - uses: actions/checkout@v4
@@ -83,11 +95,20 @@ jobs:
         id: p
         env:
           YEAR: ${{ inputs.year }}
+          CHUNKS: ${{ inputs.chunks }}
         run: |
           python3 scripts/kozu-tiles/kozu.py --plan "$PREFS" ${YEAR:+--year "$YEAR"} > plan.json
           cat plan.json
           echo "year=$(jq -r .year plan.json)" >> "$GITHUB_OUTPUT"
-          echo "chunks=$(jq -c .chunks plan.json)" >> "$GITHUB_OUTPUT"
+          echo "all=$(jq -c .chunks plan.json)" >> "$GITHUB_OUTPUT"
+          if [ -n "$CHUNKS" ]; then
+            # 指定したジョブだけ（前の回の時間切れ・失敗のやり直し）
+            jq -cn --arg s "$CHUNKS" '$s | split(";") | map(gsub("\\s"; "")) | map(select(length > 0))' > chunks.json
+          else
+            jq -c .chunks plan.json > chunks.json
+          fi
+          cat chunks.json
+          echo "chunks=$(cat chunks.json)" >> "$GITHUB_OUTPUT"
 
   build:
     needs: [check, plan]
@@ -103,7 +124,8 @@ jobs:
     env:
       YEAR: ${{ needs.plan.outputs.year }}
       CODES: ${{ matrix.codes }}
-      ID: ${{ strategy.job-index }}
+      # 前の回の置き場に足しても名前がぶつからないよう、回の番号を付ける
+      ID: ${{ github.run_id }}-${{ strategy.job-index }}
       KOZU_FGD_RATE: "2"
       R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     steps:
@@ -138,7 +160,13 @@ jobs:
           for list in work/fgd18-*.txt; do
             [ -f "$list" ] || continue
             name="$(basename "$list" .txt)"
-            tar czf "work/$name.tar.gz" -C work/fgd18 -T "$list"
+            # 読み終える前に止められたときは、読めたタイルだけ
+            while read -r f; do
+              if [ -f "work/fgd18/$f" ]; then echo "$f"; fi
+            done < "$list" > "work/$name.have"
+            echo "$name: $(wc -l < "work/$name.have")/$(wc -l < "$list")"
+            [ -s "work/$name.have" ] || continue
+            tar czf "work/$name.tar.gz" -C work/fgd18 -T "work/$name.have"
             aws s3 cp "work/$name.tar.gz" "s3://$R2_BUCKET/kozu-src/$name.tar.gz" --endpoint-url "$R2_ENDPOINT" --only-show-errors
           done
       - name: 結果を R2 に置く
@@ -151,11 +179,15 @@ jobs:
 
   merge:
     needs: [check, plan, build]
+    # 時間切れ・失敗したジョブがあっても、置けた分でまとめる（取り消したときはまとめない）
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
       STAMP: ${{ needs.check.outputs.stamp }}
       YEAR: ${{ needs.plan.outputs.year }}
+      # 都県の全部のジョブ（前の回に足すときも、全部のうち結果の無いものを出す）
+      ALL_CHUNKS: ${{ needs.plan.outputs.all }}
       R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
     steps:
       - uses: actions/checkout@v4
@@ -184,6 +216,20 @@ jobs:
           mkdir -p work/parts
           aws s3 cp "s3://$R2_BUCKET/$PARTS/" work/parts/ --recursive --endpoint-url "$R2_ENDPOINT" --only-show-errors
           ls work/parts | wc -l
+          ls work/parts/stats-*.json > /dev/null || { echo "::error::ジョブの結果がありません"; exit 1; }
+          # 結果の無い市区町村（時間切れで始められなかった・失敗した）。やり直すときの chunks の書き方で出す
+          python3 - <<'PY'
+          import glob, json, os
+          done = {}
+          for p in glob.glob("work/parts/stats-*.json"):
+              done.update(json.load(open(p, encoding="utf-8")))
+          def label(item):
+              code, _, part = item.partition(":")
+              return code + ("-" + part.replace("/", "of") if part else "")
+          miss = [i for c in json.loads(os.environ["ALL_CHUNKS"]) for i in c.split(",") if set(done.get(label(i), {"cut": True})) <= {"cut", "error"}]
+          if miss:
+              print(f"::warning::結果の無いジョブ {len(miss)}（時間切れ・失敗）。Run workflow の chunks に「{';'.join(miss)}」、parts に「{os.environ['PARTS']}」を入れるとやり直せます")
+          PY
           python3 scripts/kozu-tiles/kozu.py --resolve work/parts --out work/kozu.geojsonl --stats work/kozu-stats.json
           rm -rf work/parts
       - name: タイルにして R2 に置く
@@ -232,5 +278,6 @@ jobs:
           git commit -m "Use the $STAMP estimated kozu parcel data on R2 (automatic)"
           git pull --rebase
           git push
-      - name: ジョブごとの結果を消す
+      - name: ジョブごとの結果を消す（時間切れ・失敗したジョブがあれば、やり直して足せるよう残す）
+        if: needs.build.result == 'success'
         run: aws s3 rm "s3://$R2_BUCKET/$PARTS/" --recursive --endpoint-url "$R2_ENDPOINT" --only-show-errors

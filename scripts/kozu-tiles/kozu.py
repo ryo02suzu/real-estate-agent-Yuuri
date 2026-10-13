@@ -368,13 +368,17 @@ def fgd_tile(data: dict) -> dict:
     return out
 
 
-def fetch_fgd(tiles: list[tuple[int, int]], cache: str, threads: int = 4, rate: float = float(os.environ.get("KOZU_FGD_RATE", "8"))) -> tuple[list[np.ndarray], int]:
-    """道路縁（RdEdg）・水涯線（WL）の線（平面直角座標の m）と、新しく読んだタイルの数。読んだタイルは cache に置く（fgd_tile の形）。
-    国土地理院に負担をかけないよう、1秒に rate 枚まで"""
+def fetch_fgd(
+    tiles: list[tuple[int, int]], cache: str, threads: int = 4, rate: float = float(os.environ.get("KOZU_FGD_RATE", "8")), stop: float | None = None
+) -> tuple[list[np.ndarray], int, set[tuple[int, int]]]:
+    """道路縁（RdEdg）・水涯線（WL）の線（平面直角座標の m）と、新しく読んだタイルの数と、読まずに飛ばしたタイル。
+    読んだタイルは cache に置く（fgd_tile の形）。国土地理院に負担をかけないよう、1秒に rate 枚まで。
+    stop（time.time() の値）を過ぎたら、まだ読んでいないタイルは読まない（置く時間を残す。読めた分は次の回に使う）"""
     os.makedirs(cache, exist_ok=True)
     lock = threading.Lock()
     last = [0.0]
     new = [0]
+    skipped: set[tuple[int, int]] = set()
 
     def one(xy):
         x, y = xy
@@ -382,6 +386,10 @@ def fetch_fgd(tiles: list[tuple[int, int]], cache: str, threads: int = 4, rate: 
         d = json.load(open(p)) if os.path.exists(p) else None
         # 前の形（道路縁・水涯線だけの配列）は、建物などを残すために読み直す
         if not isinstance(d, dict):
+            if stop is not None and time.time() > stop:
+                with lock:
+                    skipped.add(xy)
+                return []
             with lock:
                 wait = last[0] + 1 / rate - time.time()
                 if wait > 0:
@@ -407,7 +415,7 @@ def fetch_fgd(tiles: list[tuple[int, int]], cache: str, threads: int = 4, rate: 
             for ln in lines:
                 xs, ys = TO_M.transform([q[0] for q in ln], [q[1] for q in ln])
                 out.append(np.column_stack([xs, ys]))
-    return out, new[0]
+    return out, new[0], skipped
 
 
 def densify(lines: list[np.ndarray], step: float) -> np.ndarray:
@@ -655,6 +663,10 @@ def out_of_time(deadline: float | None, margin: float = 0) -> bool:
     return deadline is not None and time.time() > deadline - margin
 
 
+# 国土地理院から道路縁を読むのは、締め切りのこの秒数前まで（残りの時間で、読めた範囲の切れ端を置く）
+FETCH_MARGIN = 90 * 60
+
+
 def place_city(code: str, label: str, sheets: dict[str, list[dict]], towns: dict, jobs: int, work: str, public: list, deadline: float | None = None, min_parcels: int = 6):
     """市区町村（の図面の組）の任意座標系の図面の筆を置く。置けた筆（平面直角座標）、置いた切れ端の形、数。
     deadline（time.time() の値）を過ぎたら、そこまでに置けたものだけで終える"""
@@ -690,12 +702,23 @@ def place_city(code: str, label: str, sheets: dict[str, list[dict]], towns: dict
     area = unary_union([v["window"] for v in info.values()]).buffer(200)
     tiles = tiles_for(area)
     t0 = time.time()
-    lines, new = fetch_fgd(tiles, os.path.join(work, "fgd18"))
+    # 使うタイルの一覧（ワークフローが組ごとに、読めているものをまとめて R2 に置き、次からは国土地理院に読みに行かない）。
+    # 読んでいる途中でジョブが止められても読めた分を残せるよう、読む前に書いておく
+    listing = os.path.join(work, f"fgd18-{label}.txt")
+    with open(listing, "w") as f:
+        f.write("".join(f"{x}_{y}.json\n" for x, y in tiles))
+    lines, new, skipped = fetch_fgd(tiles, os.path.join(work, "fgd18"), stop=deadline - FETCH_MARGIN if deadline else None)
     stats["fgd_new"] = new
-    if new:
-        # 使ったタイルの一覧（ワークフローが組ごとにまとめて R2 に置き、次からは国土地理院に読みに行かない）
-        with open(os.path.join(work, f"fgd18-{label}.txt"), "w") as f:
-            f.write("".join(f"{x}_{y}.json\n" for x, y in tiles))
+    if not new:
+        os.remove(listing)
+    if skipped:
+        # 道路縁がそろわない切れ端は調べない（読めた所の道路に、違う置き方で合ってしまう）
+        stats["cut"] = True
+        stats["fgd_skipped"] = len(skipped)
+        before = len(info)
+        info = {k: v for k, v in info.items() if skipped.isdisjoint(tiles_for(v["window"]))}
+        stats["searched"] = len(info)
+        log(f"::warning::{label}: 時間切れで道路縁のタイル {len(skipped)}/{len(tiles)} を読めず、{before - len(info)} の切れ端は調べません（読めた分は次の回に使う）")
     pts = densify(lines, STEP)
     order = np.argsort(pts[:, 0])
     cover = public_cover(public)
