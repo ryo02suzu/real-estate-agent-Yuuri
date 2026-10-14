@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { MUNICIPALITIES, type Municipality } from "@/lib/roadmap";
 import { CoverageBadge } from "./coverage";
-import { AreaIcon, ChevronRightIcon, ClockIcon, InfoIcon, MapIcon, PrintIcon } from "./icons";
+import { AreaIcon, ChevronRightIcon, ClockIcon, InfoIcon, MapIcon, NoteIcon, PrintIcon } from "./icons";
 import { Sheet } from "./sheet";
 
 const ORDER: Municipality["coverage"][] = ["full", "partial", "none", "outside"];
@@ -87,15 +87,16 @@ export function MenuSheet({
   open: boolean;
   onClose: () => void;
   onOpen: (s: SheetName) => void;
-  /** 結果が出ているとき：案内図・調査メモを印刷・PDF 保存する */
-  onPrint?: (kind: "guide" | "memo") => void;
+  /** 結果が出ているとき：案内図・調査メモを印刷・PDF 保存する、重説・物件概要の下書きを開く */
+  onPrint?: (kind: "guide" | "memo" | "draft") => void;
 }) {
   const items: [SheetName, string, typeof InfoIcon][] = [
     ["help", "使い方", InfoIcon],
     ["cities", "対応している市区町村", AreaIcon],
     ["history", "検索履歴", ClockIcon],
   ];
-  const prints: ["guide" | "memo", string, typeof InfoIcon][] = [
+  const prints: ["guide" | "memo" | "draft", string, typeof InfoIcon][] = [
+    ["draft", "重説・物件概要の下書き", NoteIcon],
     ["guide", "案内図を印刷・PDF保存", MapIcon],
     ["memo", "調査メモを印刷・PDF保存", PrintIcon],
   ];

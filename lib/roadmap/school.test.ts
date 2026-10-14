@@ -2,7 +2,7 @@ import { open, stat } from "node:fs/promises";
 import type { Source } from "pmtiles";
 import { describe, expect, it } from "vitest";
 import SRC from "./data/school-source.json";
-import { SCHOOL_ZOOM, schoolDistanceText, schoolLine, schoolShort, schoolsAt, type SchoolArea } from "./school";
+import { SCHOOL_ZOOM, schoolCredit, schoolDistanceText, schoolLine, schoolShort, schoolsAt, withSchoolWalks, type SchoolArea } from "./school";
 import { schoolTileSource } from "./school-tiles";
 import { tileOf } from "./parcel";
 import type { LngLat } from "./parcel";
@@ -53,6 +53,36 @@ describe("地点の学区", () => {
     expect(schoolLine({ kind: "中学校", name: "青木中学校", city: "11203" })).toBe("青木中学校");
     expect(schoolShort("戸塚第二小学校")).toBe("戸塚第二小");
     expect(schoolShort("九段中等教育学校")).toBe("九段中等教育学校");
+    expect(schoolLine({ kind: "小学校", name: "九段小学校", owner: "千代田区立", city: "13101", distance: 316, walk: { meters: 452, minutes: 6 } })).toBe(
+      "九段小学校（千代田区立・徒歩約6分・約450m）",
+    );
+  });
+
+  it("学校までの道のり：道路でたどれた学校は徒歩の目安、遠回りすぎる・たどれない学校は直線のまま", async () => {
+    const schools = {
+      elementary: { kind: "小学校" as const, name: "九段小学校", city: "13101", point: [139.75, 35.69] as LngLat, distance: 300 },
+      junior: { kind: "中学校" as const, name: "麹町中学校", city: "13101", point: [139.74, 35.68] as LngLat, distance: 500 },
+    };
+    // 小学校は 450m の道のり、中学校は直線の3倍を超える（川の向こうなど）
+    const w = await withSchoolWalks(35.69, 139.745, schools, async (_lat, _lng, targets) => {
+      expect(targets.map((t) => t.id)).toEqual([0, 1]);
+      return new Map([
+        [0, 450],
+        [1, 1600],
+      ]);
+    });
+    expect(w.elementary?.walk).toEqual({ meters: 450, minutes: 6 });
+    expect(w.junior?.walk).toBeUndefined();
+    expect(schoolCredit(w)).toContain("道のりは地理院地図Vector（国土地理院）の道路中心線から求めた目安");
+    expect(schoolCredit(schools)).not.toContain("道のり");
+    // 道路のタイルが読めなくても学区はそのまま
+    const failed = await withSchoolWalks(35.69, 139.745, schools, async () => {
+      throw new Error("road tile 503");
+    });
+    expect(failed).toEqual(schools);
+    // 学校の位置が分からなければ、道のりは調べない
+    const nopoint = { elementary: { kind: "小学校" as const, name: "青木小学校", city: "11203" } };
+    expect(await withSchoolWalks(35.8, 139.7, nopoint, async () => Promise.reject(new Error("呼ばない")))).toBe(nopoint);
   });
 });
 

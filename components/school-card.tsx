@@ -1,10 +1,12 @@
 "use client";
 
-// 物件の地点の小学校区・中学校区（国土数値情報の学校区。lib/roadmap/school.ts）。学校名・設置者・所在地と、学校までの直線距離。
+// 物件の地点の小学校区・中学校区（国土数値情報の学校区。lib/roadmap/school.ts）。学校名・設置者・所在地と、学校までの距離
+// （道路をたどった徒歩の目安。たどれなければ直線）。
 // 令和5年度のデータで、学区は見直されることがあり、学校選択制の市区町村もあるので、指定校は教育委員会で確かめるよう添える
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
-import { schoolDistanceText, schoolShort, schoolsAt, type SchoolHit, type Schools } from "@/lib/roadmap/school";
+import { schoolShort, schoolsAt, schoolWayText, withSchoolWalks, type SchoolHit, type Schools } from "@/lib/roadmap/school";
+import { ROAD_CREDIT } from "@/lib/roadmap/walk";
 import { SCHOOL_DATA } from "@/lib/roadmap/school-data";
 import { pmtilesSchoolSource } from "@/lib/roadmap/school-tiles";
 import { ChevronRightIcon, InfoIcon, SchoolIcon } from "./icons";
@@ -19,7 +21,15 @@ export function useSchools(lat: number, lng: number): SchoolState {
   useEffect(() => {
     let alive = true;
     withRetry(() => schoolsAt(lat, lng, pmtilesSchoolSource))
-      .then((s) => alive && setState({ key, value: s && (s.elementary || s.junior) ? { status: "ok", schools: s } : { status: "none" } }))
+      .then((s) => {
+        if (!alive) return;
+        if (!s || !(s.elementary || s.junior)) return setState({ key, value: { status: "none" } });
+        setState({ key, value: { status: "ok", schools: s } });
+        // 学校までの道のり（駅と同じ道路のタイル。読めたら直線の距離から差し替える）
+        withSchoolWalks(lat, lng, s)
+          .then((w) => alive && w !== s && setState({ key, value: { status: "ok", schools: w } }))
+          .catch(() => {});
+      })
       .catch(() => alive && setState({ key, value: { status: "error" } }));
     return () => {
       alive = false;
@@ -38,7 +48,7 @@ function Row({ label, s }: { label: string; s?: SchoolHit }) {
         {s ? (
           <>
             <b className="font-semibold">{s.name}</b>
-            {s.distance !== undefined && <span className="ml-1.5 text-[11.5px] text-muted">直線{schoolDistanceText(s.distance)}</span>}
+            {schoolWayText(s) && <span className="ml-1.5 text-[11.5px] text-muted">{schoolWayText(s)}</span>}
             <span className="block text-[11px] leading-[1.5] text-muted">{[s.owner, s.address].filter(Boolean).join("・")}</span>
           </>
         ) : (
@@ -62,13 +72,13 @@ export function SchoolDetail({ schools }: { schools: Schools }) {
       <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted">
         <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
         <span>
-          {SCHOOL_DATA.edition}の市区町村の資料をもとにした通学区域です。学区は見直されることがあり、学校選択制の市区町村もあります。指定校は市区町村の教育委員会で確かめてください。距離は学校までの直線です。
+          {SCHOOL_DATA.edition}の市区町村の資料をもとにした通学区域です。学区は見直されることがあり、学校選択制の市区町村もあります。指定校は市区町村の教育委員会で確かめてください。徒歩は国土地理院の地図の道路をたどった、学校の位置（敷地の中の点）までの目安です（道路距離 80m を1分）。道をたどれないときは直線距離です。
           <span className="mt-1 block">
             出典：
             <a href="https://nlftp.mlit.go.jp/ksj/" target="_blank" rel="noreferrer" className="underline">
               「国土数値情報（小学校区データ・中学校区データ・学校データ）」（国土交通省）
             </a>
-            を加工して作成
+            を加工して作成{(schools.elementary?.walk || schools.junior?.walk) && `。${ROAD_CREDIT}`}
           </span>
         </span>
       </p>

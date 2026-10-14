@@ -1,7 +1,7 @@
 // 動く地図（MapLibre GL）の見た目。地理院タイル（淡色・標準・写真）を重ね、選んだものだけを表示する。
 // PDF の分割図の市では、物件が載っている図の範囲（枠と 3×3 の目安線）を重ねる。
 import type { FeatureCollection } from "geojson";
-import type { ExpressionSpecification, FilterSpecification, LayerSpecification, StyleSpecification } from "maplibre-gl";
+import type { ExpressionSpecification, FilterSpecification, LayerSpecification, StyleSpecification, SymbolLayerSpecification } from "maplibre-gl";
 import { BUILDING_ZOOM, USAGE_GROUPS, usageGroup, usageShort } from "./roadmap/building";
 import { BUILDING_DATA, buildingUrl, hasBuildings } from "./roadmap/building-data";
 import { HAZARD_LAYERS, HAZARD_ZOOM, hazardTileUrl, type HazardKind } from "./roadmap/hazard";
@@ -37,7 +37,9 @@ const KOZU_ATTRIBUTION = `公図の推定位置：<a href="https://front.geospat
 /** 公図から推定した位置の筆の線の色（確かさが高い・低い） */
 export const KOZU_COLORS = { high: "#7a4fb0", low: "#b9a2d8" };
 /** 筆のレイヤ（「筆・地番」で表示を切り替える）。推定の筆のデータがあれば点線の筆も */
-export const PARCEL_LAYERS = hasKozu() ? ["fude-fill", "fude-line", "kozu-fill", "kozu-line"] : ["fude-fill", "fude-line"];
+export const PARCEL_LAYERS = hasKozu()
+  ? ["fude-fill", "fude-line", "fude-label", "kozu-fill", "kozu-line", "kozu-label"]
+  : ["fude-fill", "fude-line", "fude-label"];
 /** 地点の筆を拾うレイヤ */
 export const PARCEL_PICK_LAYERS = hasKozu() ? ["fude-fill", "kozu-fill"] : ["fude-fill"];
 /** 地番で見つけた筆・地図で選んだ地点の筆を強調するレイヤ */
@@ -45,6 +47,17 @@ export const PARCEL_HIT_LAYERS = hasKozu() ? ["fude-hit", "fude-hit-line", "kozu
 
 /** 筆を地図に描く最小のズーム（タイルは z14〜16。z16 より細かいときは z16 を拡大して描く） */
 export const PARCEL_MIN_ZOOM = 15;
+/** 筆の中に地番を書く最小のズーム（重なる地番は地図が間引く） */
+export const PARCEL_LABEL_ZOOM = 17;
+/** 地番を書く筆（道路・水路など地番の無い筆は書かない） */
+const CHIBAN_LABEL_FILTER: FilterSpecification = ["!", ["in", ["slice", ["to-string", ["get", "地番"]], 0, 1], ["literal", ["道", "水", "無", "長"]]]];
+const chibanLabelLayout = {
+  visibility: "none" as const,
+  "text-field": ["get", "地番"],
+  "text-font": ["NotoSansCJKjp-Regular"],
+  "text-size": ["interpolate", ["linear"], ["zoom"], 17, 9.5, 19, 12.5],
+  "text-padding": 1,
+} satisfies SymbolLayerSpecification["layout"];
 
 /** 用途地域を地図に塗る最小のズーム（タイルは z15 だけ） */
 export const ZONING_MIN_ZOOM = ZONING_ZOOM;
@@ -298,6 +311,17 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         layout: { visibility: "none" },
         paint: { "line-color": "#b0472a", "line-width": ["interpolate", ["linear"], ["zoom"], 15, 0.4, 18, 1.2], "line-opacity": 0.75 },
       },
+      // 筆の中の地番（ブルーマップのように。拡大したときだけ）
+      {
+        id: "fude-label",
+        type: "symbol",
+        source: "parcels",
+        "source-layer": PARCEL_DATA.layer,
+        minzoom: PARCEL_LABEL_ZOOM,
+        filter: CHIBAN_LABEL_FILTER,
+        layout: chibanLabelLayout,
+        paint: { "text-color": "#8a3a22", "text-halo-color": "#ffffff", "text-halo-width": 1.3 },
+      },
       // 公図から推定した位置の筆（点線。数mずれることがある）
       ...(hasKozu()
         ? ([
@@ -324,6 +348,16 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
                 "line-opacity": 0.8,
                 "line-dasharray": [3, 2],
               },
+            },
+            {
+              id: "kozu-label",
+              type: "symbol",
+              source: "kozu",
+              "source-layer": KOZU_DATA.layer,
+              minzoom: PARCEL_LABEL_ZOOM,
+              filter: CHIBAN_LABEL_FILTER,
+              layout: chibanLabelLayout,
+              paint: { "text-color": ["match", ["get", "q"], 2, "#8f78b8", "#5b3690"], "text-halo-color": "#ffffff", "text-halo-width": 1.3 },
             },
           ] satisfies LayerSpecification[])
         : []),

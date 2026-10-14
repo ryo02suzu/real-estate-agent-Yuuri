@@ -19,6 +19,37 @@
   --font-latin: var(--font-jost), sans-serif;
 }
 
+/*
+ * スマホの結果の画面を高さに収める詰め方。背の低い画面（高さ720px以下。iPhone SE など）はいつも詰める。
+ * それより高い画面でも、地図のボタンが多い市などで入りきらなければ、body の data-fit（components/result-view.tsx の useFit）で
+ * snug（「地図を開く」の見出しと地図ボタンの説明を外す）→ short（背の低い画面と同じ並び。ただし最寄り駅の行は残す）
+ * → tight（背の低い画面と同じ）の順に詰める
+ */
+@custom-variant snug {
+  @media (max-height: 720px) {
+    @slot;
+  }
+  &:where(body[data-fit] *) {
+    @slot;
+  }
+}
+@custom-variant short {
+  @media (max-height: 720px) {
+    @slot;
+  }
+  &:where(body[data-fit="short"] *, body[data-fit="tight"] *) {
+    @slot;
+  }
+}
+@custom-variant tight {
+  @media (max-height: 720px) {
+    @slot;
+  }
+  &:where(body[data-fit="tight"] *) {
+    @slot;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
