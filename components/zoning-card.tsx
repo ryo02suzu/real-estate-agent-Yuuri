@@ -1,17 +1,21 @@
 "use client";
 
 // 物件の地点の都市計画（用途地域・建ぺい率・容積率・防火・高度地区など）。国土交通省の都市計画決定GISデータを
-// アプリと同じサイトに置いたタイルから読む（lib/roadmap/zoning.ts）。道路種別の結果を先に出し、こちらは後から読み込む
+// アプリと同じサイトに置いたタイルから読む（lib/roadmap/zoning.ts）。道路種別の結果を先に出し、こちらは後から読み込む。
+// 盛土規制法の規制区域（国土数値情報。lib/roadmap/morido.ts）も同じ一覧に添える
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
 import type { Municipality } from "@/lib/roadmap";
+import { MORIDO_DATA, MORIDO_SOURCE, moridoAt, moridoDetail, moridoNote, moridoNotice, moridoValue, type Morido } from "@/lib/roadmap/morido";
+import { pmtilesMoridoSource } from "@/lib/roadmap/morido-tiles";
 import { statusFor, zoningAt, zoningChips, zoningRows, type Zoning, type ZoningStatus } from "@/lib/roadmap/zoning";
 import { ZONING_DATA } from "@/lib/roadmap/zoning-data";
 import { pmtilesZoningSource } from "@/lib/roadmap/zoning-tiles";
 import { AlertIcon, ChevronRightIcon, InfoIcon, ZoningIcon } from "./icons";
 import { Sheet } from "./sheet";
 
-export type ZoningState = { status: "loading" } | { status: "error" } | { status: "ok"; zoning: Zoning; st?: ZoningStatus };
+/** morido：盛土規制法の区域（読めなければ無し） */
+export type ZoningState = { status: "loading" } | { status: "error" } | { status: "ok"; zoning: Zoning; st?: ZoningStatus; morido?: Morido };
 
 /** 地点の都市計画を読む（市区町村のデータの有無と時点も） */
 export function useZoning(lat: number, lng: number, municipality: Municipality): ZoningState {
@@ -20,11 +24,16 @@ export function useZoning(lat: number, lng: number, municipality: Municipality):
   const [state, setState] = useState<{ key: string; value: ZoningState }>();
   useEffect(() => {
     let alive = true;
-    Promise.all([withRetry(() => zoningAt(lat, lng, pmtilesZoningSource)), import("@/lib/roadmap/data/zoning-status.json")])
-      .then(([zoning, mod]) => {
+    Promise.all([
+      withRetry(() => zoningAt(lat, lng, pmtilesZoningSource)),
+      import("@/lib/roadmap/data/zoning-status.json"),
+      // 盛土規制法の区域は読めなくても都市計画は出す
+      withRetry(() => moridoAt(lat, lng, codes.split(",")[0], pmtilesMoridoSource)).catch(() => null),
+    ])
+      .then(([zoning, mod, morido]) => {
         if (!alive) return;
         const st = statusFor(codes.split(","), mod.default as Record<string, ZoningStatus>);
-        setState({ key, value: zoning ? { status: "ok", zoning, st } : { status: "error" } });
+        setState({ key, value: zoning ? { status: "ok", zoning, st, morido: morido ?? undefined } : { status: "error" } });
       })
       .catch(() => alive && setState({ key, value: { status: "error" } }));
     return () => {
@@ -71,7 +80,7 @@ export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: 
       </button>
       {state.status === "ok" && !onOpen && (
         <Sheet title="都市計画（参考）" open={open} onClose={() => setOpen(false)}>
-          <ZoningDetail zoning={state.zoning} st={state.st} city={city} />
+          <ZoningDetail zoning={state.zoning} st={state.st} city={city} morido={state.morido} />
         </Sheet>
       )}
     </>
@@ -88,45 +97,87 @@ export function ZoningCard({ state, city }: { state: ZoningState; city: string }
       </h3>
       {state.status === "loading" && <p className="text-[12px] text-muted">都市計画を確認しています…</p>}
       {state.status === "error" && <p className="text-[12px] text-muted">都市計画のデータを読み込めませんでした。時間をおいて調べ直してください。</p>}
-      {state.status === "ok" && <ZoningDetail zoning={state.zoning} st={state.st} city={city} />}
+      {state.status === "ok" && <ZoningDetail zoning={state.zoning} st={state.st} city={city} morido={state.morido} />}
     </section>
   );
 }
 
-function ZoningDetail({ zoning, st, city }: { zoning: Zoning; st?: ZoningStatus; city: string }) {
+// 一覧の行の形。シートで画面に入りきらなければ詰める（dense・denser は components/sheet.tsx の useDense）
+const ROW = "flex gap-3 py-1.5 dense:py-1 denser:py-[3px]";
+const LABEL = "w-[8.6em] shrink-0 text-[11.5px] leading-[1.6] text-muted denser:text-[11px]";
+const VALUE = "text-[13px] font-semibold leading-[1.5] denser:text-[12.5px] denser:leading-[1.4]";
+const SUB = "mt-0.5 block text-[10.5px] leading-[1.55] text-muted dense:mt-0 dense:leading-[1.45] denser:text-[10px]";
+
+function ZoningDetail({ zoning, st, city, morido }: { zoning: Zoning; st?: ZoningStatus; city: string; morido?: Morido }) {
   const rows = zoningRows(zoning, st);
   return (
     <div>
       <dl className="divide-y divide-line/70">
         {rows.map((r) => (
-          <div key={r.label + r.value} className="flex gap-3 py-1.5">
-            <dt className="w-[8.2em] shrink-0 text-[11.5px] leading-[1.6] text-muted">{r.label}</dt>
+          <div key={r.label + r.value} className={ROW}>
+            <dt className={LABEL}>{r.label}</dt>
             <dd className="min-w-0 flex-1">
-              <span className={`flex items-start gap-1.5 text-[13px] font-semibold leading-[1.5] ${r.warn ? "text-[#8a4f3a]" : "text-ink"}`}>
-                {r.color && <span className="mt-[5px] h-2.5 w-2.5 shrink-0 rounded-sm border border-black/10" style={{ background: r.color }} />}
-                {r.warn && !r.color && <AlertIcon className="mt-[3px] h-3.5 w-3.5 shrink-0" />}
+              <span className={`flex items-start gap-1.5 ${VALUE} ${r.warn ? "text-[#8a4f3a]" : "text-ink"}`}>
+                {r.color && <span className="mt-[5px] h-2.5 w-2.5 shrink-0 rounded-sm border border-black/10 denser:mt-[4px]" style={{ background: r.color }} />}
+                {r.warn && !r.color && <AlertIcon className="mt-[3px] h-3.5 w-3.5 shrink-0 denser:mt-[2px]" />}
                 <span>{r.value}</span>
               </span>
-              {r.sub && <span className="mt-0.5 block text-[10.5px] leading-[1.55] text-muted">{r.sub}</span>}
+              {r.sub && <span className={SUB}>{r.sub}</span>}
             </dd>
           </div>
         ))}
+        {morido && <MoridoRow morido={morido} />}
       </dl>
-      <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted">
+      <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted dense:mt-1.5 dense:leading-[1.5] denser:text-[10px]">
         <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
         <span>
           {st ? `${st.city}のデータは${st.asOf ? `${st.asOf}時点` : "時点の記載なし"}。` : `${city}は国のデータに載っていません。`}
           {st?.note && `${st.note.replace(/。?$/, "。")}`}
           地図上の区域は概ねの位置で、実際の範囲や最新の決定と異なることがあります。重要事項説明などの最終確認は、{city}の都市計画の窓口・都市計画図で行ってください。
-          <span className="mt-1 block">
+          <span className="mt-1 block dense:mt-0.5">
             出典：
             <a href="https://www.mlit.go.jp/toshi/tosiko/toshi_tosiko_tk_000087.html" target="_blank" rel="noreferrer" className="underline">
-              都市計画決定GISデータ（国土交通省）
+              都市計画決定GISデータ
             </a>
-            を加工して作成（{ZONING_DATA.edition}）
+            （{ZONING_DATA.edition}）
+            {morido && (
+              <>
+                、
+                <a href={MORIDO_SOURCE.url} target="_blank" rel="noreferrer" className="underline">
+                  {MORIDO_SOURCE.name}
+                </a>
+                （{MORIDO_DATA.asOf}時点）
+              </>
+            )}
+            （{morido ? "いずれも" : ""}国土交通省）を加工して作成
           </span>
         </span>
       </p>
+    </div>
+  );
+}
+
+/** 盛土規制法の区域の行（国のデータ・参考）。区域を指定した都県・市と、その地図・資料へのリンク */
+function MoridoRow({ morido }: { morido: Morido }) {
+  const a = morido.area;
+  return (
+    <div className={ROW}>
+      <dt className={LABEL}>盛土規制法</dt>
+      <dd className="min-w-0 flex-1">
+        <span className={`block ${VALUE} text-ink`}>
+          {moridoValue(morido)}
+          {morido.link && (
+            <a href={morido.link.url} target="_blank" rel="noreferrer" className="ml-2 whitespace-nowrap text-[11px] text-brand underline">
+              {/^https:\/\/www2\.wagmap/.test(morido.link.url) ? "地図で見る" : "区域の資料"}
+            </a>
+          )}
+        </span>
+        <span className={SUB}>
+          {a ? (a.notice ? moridoNotice(morido) : moridoDetail(morido)) : `区域の指定は${morido.authority}`}
+          <br />
+          {moridoNote(morido.authority)}
+        </span>
+      </dd>
     </div>
   );
 }

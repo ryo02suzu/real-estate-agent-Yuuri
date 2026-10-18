@@ -12,6 +12,7 @@ import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
 import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
 import { lineLabel, STATION_CREDIT, type StationWalk } from "./roadmap/walk";
+import { MORIDO_CREDIT, moridoCaution, moridoDetail, moridoValue, type Morido } from "./roadmap/morido";
 import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
 import { ZONING_CREDIT } from "./roadmap/zoning-data";
 
@@ -20,7 +21,7 @@ export type DraftRow = { label: string; value: string; note?: string; check?: bo
 export type DraftSection = { title: string; rows: DraftRow[] };
 
 export type DraftInput = {
-  zoning?: { zoning: Zoning; st?: ZoningStatus };
+  zoning?: { zoning: Zoning; st?: ZoningStatus; morido?: Morido };
   parcels?: { target?: string; neighbors: string[]; reference: boolean; estimated?: Estimated };
   roads?: NearbyRoad[];
   hazard?: { report: HazardReport; elevation: Elevation | null; maps: HazardMaps; muniCd: string };
@@ -76,7 +77,13 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     }
     if (zoning.st?.asOf) law.push({ label: "データの時点", value: `${zoning.st.city}：${zoning.st.asOf}` });
   } else law.push({ label: "用途地域など", value: CHECK, note: "都市計画のデータを読み込めませんでした。市の都市計画図で確認", check: true });
-  sections.push({ title: "都市計画法・建築基準法に基づく制限（参考）", rows: law });
+  // その他の法令：盛土規制法の区域（国のデータ。重要事項説明の根拠には使えないので、指定した都県・市の資料で確かめる）
+  const md = zoning?.morido;
+  if (md) {
+    law.push({ label: "宅地造成及び特定盛土等規制法", value: `${moridoValue(md)}（国のデータ・参考）`, note: `${moridoDetail(md)}。${moridoCaution(md.authority)}`, check: true });
+    if (md.link) law.push({ label: "盛土規制法の確認先", value: md.link.label, note: md.link.url });
+  } else law.push({ label: "宅地造成及び特定盛土等規制法", value: CHECK, note: "区域を指定した都県・市（盛土規制法の担当課）で確認", check: true });
+  sections.push({ title: "法令に基づく制限の概要（参考）", rows: law });
 
   // 敷地と道路との関係
   const road: DraftRow[] = [];
@@ -134,6 +141,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   if (p || parcels) credit(`筆の${PARCEL_CREDIT}`);
   if (p?.estimated || parcels?.estimated) credit(KOZU_CREDIT);
   if (zoning) credit(`都市計画の${ZONING_CREDIT}`);
+  if (md) credit(`盛土規制法の区域の${MORIDO_CREDIT}`);
   if (hazard) credit(`災害リスクの${HAZARD_CREDIT}`);
   if (hit) credit(`建物の${BUILDING_CREDIT}`);
   if (near) credit(`地価の${LAND_PRICE_CREDIT}`);

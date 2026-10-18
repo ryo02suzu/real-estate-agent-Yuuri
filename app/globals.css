@@ -50,6 +50,21 @@
   }
 }
 
+/*
+ * シート（components/sheet.tsx）の中身が画面に入りきらないときの詰め方。Sheet が data-dense を付ける：
+ * dense（"1"。行の間を詰める）→ denser（"2"。文字も少し小さくする）
+ */
+@custom-variant dense {
+  &:where([data-dense] *) {
+    @slot;
+  }
+}
+@custom-variant denser {
+  &:where([data-dense="2"] *) {
+    @slot;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

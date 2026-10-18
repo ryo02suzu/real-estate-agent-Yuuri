@@ -219,7 +219,14 @@ export function zoningRows(z: Zoning, st: ZoningStatus | undefined): ZoningRow[]
     const plans = z.others.filter((o) => o.layer === "chikukei");
     rows.push({ label: "地区計画", value: plans.length ? plans.map((o) => o.name ?? "区域内").join("／") : none("chikukei"), warn: plans.length > 0 });
   }
-  for (const o of z.others.filter((o) => o.layer !== "chikukei")) rows.push({ label: o.label, value: o.name ?? "区域内" });
+  // 同じ種類（立地適正化計画の居住誘導区域と都市機能誘導区域など）は1行にまとめる
+  const others = new Map<string, string[]>();
+  for (const o of z.others.filter((o) => o.layer !== "chikukei")) {
+    const names = others.get(o.label) ?? [];
+    if (!names.includes(o.name ?? "区域内")) names.push(o.name ?? "区域内");
+    others.set(o.label, names);
+  }
+  for (const [label, names] of others) rows.push({ label, value: names.join("・") });
   if (z.road !== undefined) {
     rows.push({
       label: "都市計画道路",

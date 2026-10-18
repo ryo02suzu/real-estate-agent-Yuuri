@@ -36,7 +36,15 @@ describe("重説・物件概要の下書き", () => {
         parcel: { kuiki: "千代田区_三番町___", chiban: "2-1", chibanRaw: "2-1", pieces: [], point: { lat: 35.6895, lng: 139.7441 } },
       },
       {
-        zoning: { zoning, st },
+        zoning: {
+          zoning,
+          st,
+          morido: {
+            area: { kind: "宅地造成等工事規制区域", city: "13101", level: "A", notice: "東京都告示第852号", since: "2024-07-31" },
+            authority: "東京都",
+            link: { label: "東京都の盛土規制法の地図", url: "https://www2.wagmap.jp/tokyo_tokeizu/Map?mid=4" },
+          },
+        },
         parcels: { target: "千代田区三番町 2-1", neighbors: ["千代田区三番町 2-2", "千代田区三番町 3"], reference: false },
         roads: [{ label: "法第42条第1項第1号道路", short: "1項1号", direction: "北", distance: 4.2, width: "6.0m" } as never],
         hazard: {
@@ -49,7 +57,7 @@ describe("重説・物件概要の下書き", () => {
     );
     const titles = draft.map((s) => s.title);
     expect(titles[0]).toBe("物件の表示");
-    expect(titles).toContain("都市計画法・建築基準法に基づく制限（参考）");
+    expect(titles).toContain("法令に基づく制限の概要（参考）");
     const text = draftText(draft, new Date(2026, 9, 12));
     expect(text.startsWith("【重説・物件概要の下書き（MICHILU・2026年10月12日）】")).toBe(true);
     expect(text).toContain("所在（地番）：千代田区三番町 2-1");
@@ -60,6 +68,11 @@ describe("重説・物件概要の下書き", () => {
     expect(text).toContain("容積率：400%（指定）（前面道路の幅による制限・角地の緩和は含まない）");
     expect(text).toContain("防火・準防火：準防火地域");
     expect(text).toContain("地区計画：番町地区地区計画");
+    expect(text).toContain(
+      "宅地造成及び特定盛土等規制法：宅地造成等工事規制区域（国のデータ・参考）（東京都が指定（東京都告示第852号・2024年7月31日から）。国のデータ（2025年7月18日時点）の概略の区域で、法的図書ではありません。重要事項説明には東京都（盛土規制法の担当課）の資料で確かめてください）【要確認】",
+    );
+    expect(text).toContain("盛土規制法の確認先：東京都の盛土規制法の地図（https://www2.wagmap.jp/tokyo_tokeizu/Map?mid=4）");
+    expect(text).toContain("盛土規制法の区域の出典：「国土数値情報（宅地造成等工事規制区域・特定盛土等規制区域データ）」");
     expect(text).toContain("北の道路（約4m）：法第42条第1項第1号道路・幅員 6.0m【要確認】");
     expect(text).toContain("■ハザードマップ（重要事項説明で所在地を示す市区町村の地図）\n洪水・内水：千代田区のハザードマップ（https://example.jp/hm.html）");
     expect(text).toContain("■災害リスク（国のデータ・参考）\n洪水（想定最大規模）：浸水 0.5〜3m");
@@ -91,6 +104,7 @@ describe("重説・物件概要の下書き", () => {
     expect(text).toContain("所在（住所）：東京都千代田区三番町 付近（番地まで見つからず、町の中心の位置）【要確認】");
     expect(text).toContain("所在（地番）：要確認（登記・公図で確認）");
     expect(text).toContain("用途地域など：要確認");
+    expect(text).toContain("宅地造成及び特定盛土等規制法：要確認（区域を指定した都県・市（盛土規制法の担当課）で確認）");
     expect(text).toContain("道路の種別・幅員：要確認（市の道路種別の地図・窓口で確認）");
     expect(text).toContain("ハザードマップ：要確認");
     expect(text).not.toContain("■出典");

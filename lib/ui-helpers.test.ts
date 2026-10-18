@@ -183,6 +183,31 @@ describe("buildSummary", () => {
   });
 });
 
+describe("buildSummary の盛土規制法", () => {
+  it("区域（国のデータ・参考）と、確かめる先の都県・市", () => {
+    const m = findMunicipality("14109")!;
+    const result = {
+      status: "ok" as const,
+      lat: 35.5146,
+      lng: 139.6218,
+      matchedAddress: "神奈川県横浜市港北区大豆戸町",
+      town: "大豆戸町",
+      approximate: false,
+      municipality: m,
+      links: buildLinks(m, 35.5146, 139.6218),
+    };
+    const zoning = { youto: [], youtoNear: [], tokei: true, jyuntoshi: false, koudoti: false, others: [] };
+    const text = buildSummary(result, {
+      zoning: { zoning, morido: { area: { kind: "宅地造成等工事規制区域", city: "14109", level: "B", notice: "横浜市告示第113号", since: "2025-04-01" }, authority: "横浜市" } },
+    });
+    expect(text).toContain("・盛土規制法：宅地造成等工事規制区域（横浜市が指定・参考）");
+    expect(text).toContain("※盛土規制法の区域の出典：「国土数値情報（宅地造成等工事規制区域・特定盛土等規制区域データ）」");
+    expect(text).toContain("重要事項説明には横浜市の資料で確認を");
+    const outside = buildSummary(result, { zoning: { zoning, morido: { authority: "水戸市" } } });
+    expect(outside).toContain("・盛土規制法：区域外（2025年7月18日時点の国のデータ・参考）");
+  });
+});
+
 describe("buildSummary の最寄り駅", () => {
   it("徒歩の目安（道路距離 80m を1分）と、直線の目安・出典を添える", () => {
     const m = findMunicipality("14109")!;

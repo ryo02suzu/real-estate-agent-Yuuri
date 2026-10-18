@@ -19,7 +19,7 @@ export const openDraft = () => window.dispatchEvent(new Event(DRAFT_EVENT));
 /** タブの短い名前（見出しの頭から） */
 const TAB_NAMES: [RegExp, string][] = [
   [/^物件/, "所在"],
-  [/^都市計画/, "法令制限"],
+  [/^法令/, "法令制限"],
   [/^敷地と道路/, "道路"],
   [/^ハザードマップ/, "ハザードマップ"],
   [/^災害リスク/, "災害（参考）"],

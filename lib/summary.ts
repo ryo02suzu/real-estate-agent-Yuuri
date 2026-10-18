@@ -12,6 +12,7 @@ import { KOZU_CREDIT } from "./roadmap/kozu-data";
 import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel, type Estimated } from "./roadmap/parcel";
 import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
+import { MORIDO_CREDIT, moridoLine, type Morido } from "./roadmap/morido";
 import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
 import { ZONING_CREDIT } from "./roadmap/zoning-data";
 
@@ -35,7 +36,7 @@ export function buildSummary(
     schools,
     stations,
   }: {
-    zoning?: { zoning: Zoning; st?: ZoningStatus };
+    zoning?: { zoning: Zoning; st?: ZoningStatus; morido?: Morido };
     parcels?: { target?: string; neighbors: string[]; reference: boolean; estimated?: Estimated };
     roads?: NearbyRoad[];
     hazard?: { report: HazardReport; elevation: Elevation | null; maps: HazardMaps; muniCd: string };
@@ -66,6 +67,7 @@ export function buildSummary(
     lines.push("【都市計画（参考）】");
     for (const r of zoningRows(zoning.zoning, zoning.st)) lines.push(`・${r.label}：${r.value}`);
     if (zoning.st?.asOf) lines.push(`  （${zoning.st.city}のデータは${zoning.st.asOf}時点）`);
+    if (zoning.morido) lines.push(`・盛土規制法：${moridoLine(zoning.morido)}`);
   }
   if (hazard) {
     lines.push("【災害リスク（国のデータ・参考）】");
@@ -102,6 +104,7 @@ export function buildSummary(
   if (p || withParcels) lines.push(`※筆の${PARCEL_CREDIT}。`);
   if (p?.estimated || parcels?.estimated) lines.push(`※${KOZU_CREDIT}。`);
   if (zoning) lines.push(`※都市計画の${ZONING_CREDIT}。`);
+  if (zoning?.morido) lines.push(`※盛土規制法の区域の${MORIDO_CREDIT}。概略の区域で、重要事項説明には${zoning.morido.authority}の資料で確認を。`);
   if (hazard) lines.push(`※災害リスクの${HAZARD_CREDIT}。`);
   if (hit) lines.push(`※建物の${BUILDING_CREDIT}。`);
   if (prices.length) lines.push(`※地価の${LAND_PRICE_CREDIT}。物件そのものの価格ではありません。`);

@@ -16,6 +16,7 @@ import { STATION_CREDIT, stationLine } from "@/lib/roadmap/walk";
 import { KOZU_CREDIT } from "@/lib/roadmap/kozu-data";
 import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel } from "@/lib/roadmap/parcel";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
+import { MORIDO_CREDIT, moridoLine } from "@/lib/roadmap/morido";
 import { zoningRows } from "@/lib/roadmap/zoning";
 import { ZONING_CREDIT } from "@/lib/roadmap/zoning-data";
 import { COVERAGE } from "./coverage";
@@ -268,6 +269,12 @@ function Memo({
                     <dd className={`min-w-0 flex-1 font-semibold ${r.warn ? "text-[#8a4f3a]" : ""}`}>{r.value}</dd>
                   </div>
                 ))}
+                {zoning.morido && (
+                  <div className="flex gap-2 py-0.5">
+                    <dt className="w-[7.5em] shrink-0 text-[10.5px] text-[#7a6a55]">盛土規制法</dt>
+                    <dd className="min-w-0 flex-1 font-semibold">{moridoLine(zoning.morido)}</dd>
+                  </div>
+                )}
               </dl>
               <p className="mt-1 text-[9px] leading-[1.5] text-[#7a6a55]">
                 {zoning.st?.asOf && `${zoning.st.city}のデータは${zoning.st.asOf}時点。`}
@@ -398,6 +405,7 @@ function Memo({
         </p>
         <p>
           地図：地理院タイル（国土地理院）。{zoning.status === "ok" && `都市計画の${ZONING_CREDIT}。`}
+          {zoning.status === "ok" && zoning.morido && `盛土規制法の区域の${MORIDO_CREDIT}（概略の区域で、重要事項説明の根拠には使えません）。`}
           {hazard.status === "ok" && `災害リスクの${HAZARD_CREDIT}。`}
           {bHit && `建物の${BUILDING_CREDIT}。`}
           {prices.length > 0 && `地価の${LAND_PRICE_CREDIT}（標準地・基準地の価格で、物件の価格ではありません）。`}
