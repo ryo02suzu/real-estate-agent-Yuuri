@@ -60,13 +60,14 @@ export const openMap =
     `https://open-map.jp/${slug}/index.html#lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&z=${zoom}&layers=${encodeURIComponent(layer)}`;
 
 /**
- * geocloud 旧版（…/webgis/?mp=…）。&ll=緯度,経度&z= で開く。
+ * geocloud 旧版（…/webgis/?mp=…）。&ll=緯度,経度&z= で開く。query の vlf=<地図ID>-<版>-<16進>で、表示するレイヤを選べる
+ * （16進の各ビットが表示切替の上からの順。町田市で確認）。
  * 自動ブラウザには 403 を返すため、確認は iPhone の User-Agent で行った（川口・市川）。
  */
 export const geocloud =
-  (webgisUrl: string, query: string): Build =>
+  (webgisUrl: string, query: string, zoom = 18): Build =>
   (lat, lng) =>
-    `${webgisUrl}?${query}&z=18&ll=${lat.toFixed(6)}%2C${lng.toFixed(6)}`;
+    `${webgisUrl}?${query}&z=${zoom}&ll=${lat.toFixed(6)}%2C${lng.toFixed(6)}`;
 
 /** geocloud 新版（https://<市>.geocloud.jp/mp/<地図ID>、戸田市の e-toda.kukanjoho.jp も同じ）。?z=&ll=緯度,経度 */
 export const geocloudMp =

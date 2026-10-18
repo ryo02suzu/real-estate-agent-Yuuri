@@ -2,7 +2,7 @@
 // 供給施設及び排水施設」の欄の下調べ）。前面道路の本管・口径・引込みの有無は地図だけでは分からないことがあり、
 // 市町村の上下水道の担当（水道局・下水道課）で確かめる旨を添える。地図のデータは取り込まない
 import type { Municipality } from "./municipalities";
-import { sonicweb, wagmap } from "./vendors";
+import { geocloud, sonicweb, wagmap } from "./vendors";
 
 type Build = (lat: number, lng: number) => string;
 
@@ -42,6 +42,7 @@ const MAPS: Record<string, SuidoMap[]> = {
   東京都青梅市: [sewer("下水道情報", w("omecity", 47))],
   東京都小平市: [sewer("公共下水道台帳施設平面図", s("kodaira", "th_26"))],
   東京都多摩市: [sewer("下水道台帳（汚水）", s("tama", "th_21"))],
+  東京都町田市: [sewer("下水道台帳図", geocloud("https://machida.kukanjoho.jp/webgis/", "mp=45"))],
   神奈川県厚木市: [sewer("下水道情報", w("atsugi", 5))],
   神奈川県秦野市: [sewer("公共下水道台帳（汚水）参考図", w("hadano", 14))],
   神奈川県鎌倉市: [sewer("公共下水道情報", w("kamakura-hazard", 242))],

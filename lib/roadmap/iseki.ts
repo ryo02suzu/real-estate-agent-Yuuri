@@ -4,7 +4,7 @@
 // 埼玉・千葉・茨城・群馬は県の地図が県内全域（埼玉は川越市を除く）を載せている。東京都は都の地図が全域を載せているが
 // 地点で開けないので、地点で開ける区市の地図があればそちらを使う。神奈川・栃木は県の地図が無く、見つかった市町の地図だけ
 import type { Municipality, Prefecture } from "./municipalities";
-import { arcgisExperience, geocloudMp, sonicweb, wagmap } from "./vendors";
+import { arcgisExperience, geocloud, geocloudMp, sonicweb, wagmap } from "./vendors";
 
 type Build = (lat: number, lng: number) => string;
 
@@ -58,6 +58,12 @@ const CITY_MAPS: Record<string, IsekiMap> = {
   東京都狛江市: { name: "狛江市地図情報サービス（埋蔵文化財包蔵地マップ）", build: wagmap("komaecity", 90, { scale: 2500 }), tip: AGREE },
   東京都清瀬市: { name: "きよせデジマップ（清瀬市遺跡）", build: sonicweb("kiyose", "th_24", 2500) },
   東京都多摩市: { name: "多摩市地理情報システム（埋蔵文化財包蔵地）", build: sonicweb("tama", "th_15", 2500), tip: AGREE },
+  // 「その他の土地規制」の地図の、遺跡・地形図・注記だけを出す（景観の区域の色で遺跡が隠れないように）。遺跡は z16 まで描かれる
+  東京都町田市: {
+    name: "地図情報まちだ（その他の土地規制・遺跡）",
+    build: geocloud("https://machida.kukanjoho.jp/webgis/", "mp=53&vlf=53-36-000160", 16),
+    tip: AGREE,
+  },
   神奈川県横浜市: { name: "文化財ハマSite（横浜市行政地図情報提供システム）", build: wagmap("yokohama", 9, { host: "https://wwwm.city.yokohama.lg.jp", scale: 2500 }) },
   神奈川県鎌倉市: { name: "かまくらわが街マップ（遺跡地図）", build: wagmap("kamakura-hazard", 246, { scale: 2500 }) },
   神奈川県秦野市: { name: "はだのWEBマップ（埋蔵文化財包蔵地）", build: wagmap("hadano", 8, { scale: 2500 }) },

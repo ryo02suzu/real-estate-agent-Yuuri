@@ -12,6 +12,9 @@ describe("上下水道の台帳の地図", () => {
     expect(suidoFor({ pref: "千葉県", name: "柏市" }, 35.8676, 139.9757)[0].url).toBe(
       "https://www.sonicweb-asp.jp/kashiwa/map?theme=th_11&pos=139.975700%2C35.867600&scale=1000",
     );
+    expect(suidoFor({ pref: "東京都", name: "町田市" }, 35.546552, 139.438774)).toEqual([
+      { kind: "下水道", name: "町田市の下水道台帳図", url: "https://machida.kukanjoho.jp/webgis/?mp=45&z=18&ll=35.546552%2C139.438774" },
+    ]);
   });
 
   it("台帳の地図が見つかっていない市区町村は空", () => {

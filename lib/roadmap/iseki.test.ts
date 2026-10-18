@@ -33,6 +33,10 @@ describe("埋蔵文化財の確認先", () => {
     const chiyoda = at("東京都", "千代田区", 35.6895, 139.7441);
     expect(chiyoda.map).toMatchObject({ name: "東京都遺跡地図", url: "https://tokyo-iseki.metro.tokyo.lg.jp/", at: false });
     expect(isekiLine(chiyoda)).toBe("東京都遺跡地図で確認");
+    // 町田市は「その他の土地規制」の地図を、遺跡のレイヤだけにして開く
+    expect(at("東京都", "町田市", 35.5658, 139.4426).map?.url).toBe(
+      "https://machida.kukanjoho.jp/webgis/?mp=53&vlf=53-36-000160&z=16&ll=35.565800%2C139.442600",
+    );
   });
 
   it("神奈川・栃木は見つかった市の地図だけ。無い市は教育委員会", () => {
