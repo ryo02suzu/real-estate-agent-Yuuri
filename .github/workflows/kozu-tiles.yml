@@ -289,8 +289,12 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add lib/roadmap/data/kozu-source.json
           git commit -m "Use the $STAMP estimated kozu parcel data on R2 (automatic)"
-          git pull --rebase
-          git push
+          # 長い実行のあいだに別の実行（merge_only など）が kozu-source.json を書き換えていても、この実行で作った版にする
+          # （まとめは R2 にある全部のジョブの結果から作るので、こちらが新しい）。rebase の -X theirs は、載せ直す側（この実行）を取る
+          for i in 1 2 3; do
+            git pull --rebase -X theirs && git push && break
+            sleep 10
+          done
       - name: ジョブごとの結果を消す（結果の無いジョブがあれば、やり直して足せるよう残す）
         if: needs.build.result == 'success' && steps.resolve.outputs.missing == '0'
         run: aws s3 rm "s3://$R2_BUCKET/$PARTS/" --recursive --endpoint-url "$R2_ENDPOINT" --only-show-errors
