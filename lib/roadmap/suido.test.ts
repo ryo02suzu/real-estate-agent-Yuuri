@@ -21,6 +21,8 @@ describe("上下水道の台帳の地図", () => {
     expect(suidoFor({ pref: "埼玉県", name: "深谷市" }, 36.1873, 139.2705)[0].url).toBe("https://fukaya.geocloud.jp/webgis/?mp=39&z=18&ll=36.187300%2C139.270500");
     expect(suidoFor({ pref: "埼玉県", name: "白岡市" }, 36.0245, 139.6698).map((l) => l.name)).toEqual(["白岡市の公共下水道台帳", "白岡市の上水道台帳"]);
     expect(suidoFor({ pref: "東京都", name: "国立市" }, 35.6902, 139.446)[0].url).toBe("https://kunitachi.geocloud.jp/webgis/?mp=9&z=18&ll=35.690200%2C139.446000");
+    expect(suidoFor({ pref: "茨城県", name: "笠間市" }, 36.3472, 140.3058).map((l) => l.kind)).toEqual(["下水道", "上水道"]);
+    expect(suidoFor({ pref: "群馬県", name: "藤岡市" }, 36.2606, 139.0762)[0].url).toBe("https://www2.wagmap.jp/fujioka/Map?mid=15&mpx=139.076200&mpy=36.260600&mps=1000&gprj=2");
   });
 
   it("台帳の地図が見つかっていない市区町村は空", () => {

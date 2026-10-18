@@ -118,6 +118,15 @@ describe("重説・物件概要の下書き", () => {
     expect(text).toContain("駅の出典：「国土数値情報（鉄道データ）」");
   });
 
+  it("市町村が地番図を公開していれば、物件の表示に地番の参考図の URL を入れる", () => {
+    const kumagaya = findMunicipality("11202")!;
+    const text = draftText(buildDraft({ ...base, lat: 36.153221, lng: 139.392611, municipality: kumagaya, links: buildLinks(kumagaya, 36.153221, 139.392611) }));
+    expect(text).toContain(
+      "地番の参考図：熊谷市の地番情報（https://www2.wagmap.jp/kumagaya/Map?mid=260&mpx=139.392611&mpy=36.153221&mps=1000&gprj=2）（市町村が公開している地番の参考図。登記の地番・筆の形と違うことがあるので、謄本・公図で確認）",
+    );
+    expect(draftText(buildDraft(base))).not.toContain("地番の参考図");
+  });
+
   it("国土数値情報の出典が2つ以上なら1つの文にまとめる（時点の入れ子のかっこ・あとの文も残す）", () => {
     const land = { kind: "公示" as const, no: "千代田-1", point: [139.7448, 35.6901] as [number, number], price: 4_410_000, change: 11.4, usage: "住宅地" as const, year: 2026, history: [], distance: 92, bearing: "北東" };
     const station = { name: "半蔵門", lines: [["半蔵門線", "東京メトロ"]] as [string, string][], meters: 778, minutes: 10, straight: 603, routed: true };

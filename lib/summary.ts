@@ -12,6 +12,7 @@ import { KOZU_CREDIT } from "./roadmap/kozu-data";
 import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel, type Estimated } from "./roadmap/parcel";
 import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
+import { CHIBANZU_NOTE, chibanzuFor } from "./roadmap/chibanzu";
 import { HOUREI_CREDIT, HOUREI_SHORT, houreiGroups, houreiLine, houreiNotesLine, type Hourei } from "./roadmap/hourei";
 import { isekiFor, isekiLine } from "./roadmap/iseki";
 import { suidoFor } from "./roadmap/suido";
@@ -116,6 +117,9 @@ export function buildSummary(
     if (parcels.target) lines.push(`・物件：${parcels.target}`);
     if (parcels.neighbors.length) lines.push(`・隣地：${parcels.neighbors.join("、")}`);
   }
+  // 市町村の地番図（物件の場所で開く URL）。地図データに筆が無いときの確認先にもなる
+  const chibanzu = chibanzuFor(m, result.lat, result.lng);
+  if (chibanzu) lines.push(`【地番の参考図】${chibanzu.name}：${chibanzu.url}`, `  （${CHIBANZU_NOTE}）`);
   lines.push("※地図は参考図。最終確認は窓口で。");
   if (p || withParcels) lines.push(`※筆の${PARCEL_CREDIT}。`);
   if (p?.estimated || parcels?.estimated) lines.push(`※${KOZU_CREDIT}。`);

@@ -231,6 +231,23 @@ describe("buildSummary の盛土規制法", () => {
     expect(text.match(/※神奈川県の区域のデータについて：区域の形状は概略であるため/g)).toHaveLength(1);
   });
 
+  it("市町村の地番図（物件の場所で開く URL）", () => {
+    const m = findMunicipality("11202")!;
+    const result = {
+      status: "ok" as const,
+      lat: 36.153221,
+      lng: 139.392611,
+      matchedAddress: "埼玉県熊谷市宮町二丁目",
+      town: "宮町二丁目",
+      approximate: false,
+      municipality: m,
+      links: buildLinks(m, 36.153221, 139.392611),
+    };
+    expect(buildSummary(result, {})).toContain(
+      "【地番の参考図】熊谷市の地番情報：https://www2.wagmap.jp/kumagaya/Map?mid=260&mpx=139.392611&mpy=36.153221&mps=1000&gprj=2\n  （市町村が公開している地番の参考図。",
+    );
+  });
+
   it("埋蔵文化財の確認先（市の遺跡地図を物件の場所で開く URL と教育委員会）", () => {
     const m = findMunicipality("14109")!;
     const result = {

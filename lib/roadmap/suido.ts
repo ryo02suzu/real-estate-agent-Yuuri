@@ -42,6 +42,8 @@ const MAPS: Record<string, SuidoMap[]> = {
   茨城県水戸市: [sewer("公共下水道台帳図", w("ibaraki", 93)), water("上水道台帳図", w("ibaraki", 141))],
   茨城県土浦市: [sewer("下水道台帳図", w("ibaraki", 96))],
   茨城県五霞町: [sewer("下水道台帳図", w("ibaraki", 109))],
+  茨城県常陸大宮市: [sewer("下水道台帳", w("hitachiomiyacity", 303))],
+  茨城県笠間市: [sewer("公共下水道施設", w("kasamacity", 107)), water("水道", w("kasamacity", 106))],
   東京都国立市: [sewer("下水道台帳", geocloud("https://kunitachi.geocloud.jp/webgis/", "mp=9"))],
   東京都国分寺市: [sewer("下水道施設平面図", w("kokubunji", 12))],
   東京都三鷹市: [sewer("下水道台帳図", w("mitakacity", 2000))],
@@ -65,6 +67,10 @@ const MAPS: Record<string, SuidoMap[]> = {
   栃木県佐野市: [sewer("下水道マップ", s("sano", "th_18"))],
   栃木県日光市: [water("水道管網図", w("nikko", 105))],
   栃木県下野市: [sewer("公共下水道", s("shimotsuke", "th_42")), water("上水道", s("shimotsuke", "th_44"))],
+  群馬県藤岡市: [sewer("下水道台帳", w("fujioka", 15))],
+  群馬県みどり市: [sewer("下水道情報", w("midoricity", 60))],
+  群馬県東吾妻町: [sewer("公共下水道汚水台帳図", w("higashiagatsuma", 2))],
+  群馬県邑楽町: [sewer("下水道台帳", w("ora", 4))],
 };
 
 /** 台帳の地図を書いた市区町村（テストで市区町村の一覧と突き合わせる） */

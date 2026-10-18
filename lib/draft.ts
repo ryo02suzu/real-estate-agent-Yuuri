@@ -12,6 +12,7 @@ import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
 import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
 import { lineLabel, STATION_CREDIT, type StationWalk } from "./roadmap/walk";
+import { CHIBANZU_NOTE, chibanzuFor } from "./roadmap/chibanzu";
 import { HOUREI_CREDIT, HOUREI_LAWS, houreiAsOf, houreiCaution, houreiGroups, houreiNotesLine, houreiOffice, PREF_NAMES, type Hourei, type HoureiKind } from "./roadmap/hourei";
 import { isekiFor } from "./roadmap/iseki";
 import { suidoFor } from "./roadmap/suido";
@@ -62,6 +63,8 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     });
   else place.push({ label: "所在（地番）", value: CHECK, note: "登記・公図で確認", check: true });
   if (parcels?.neighbors.length) place.push({ label: "隣地の地番", value: parcels.neighbors.join("、"), note: "境界が接している筆（地図データから）" });
+  const chibanzu = chibanzuFor(m, result.lat, result.lng);
+  if (chibanzu) place.push({ label: "地番の参考図", value: `${chibanzu.name}（${chibanzu.url}）`, note: CHIBANZU_NOTE });
   place.push({ label: "緯度・経度", value: `${result.lat.toFixed(6)}, ${result.lng.toFixed(6)}` });
   sections.push({ title: "物件の表示", rows: place });
 

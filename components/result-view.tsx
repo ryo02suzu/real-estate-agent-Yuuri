@@ -3,13 +3,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { showHazardOnMap, showLandPriceOnMap } from "@/lib/map-style";
 import type { LookupResult, Municipality, ResolvedLink } from "@/lib/roadmap";
+import { chibanzuFor } from "@/lib/roadmap/chibanzu";
 import type { HazardKind } from "@/lib/roadmap/hazard";
 import { chibanLabel, estimatedMark, kuikiLabel } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { sheetName } from "@/lib/roadmap/sheets";
 import type { DraftInput } from "@/lib/draft";
 import { buildSummary } from "@/lib/summary";
-import { BuildingCard, BuildingSection, useBuilding, type BuildingState } from "./building-card";
+import { BuildingCard, BuildingDetail, useBuilding, type BuildingState } from "./building-card";
 import { ContactCard } from "./contact-card";
 import { COVERAGE, CoveragePill } from "./coverage";
 import { DRAFT_EVENT, DraftSheet } from "./draft-sheet";
@@ -234,7 +235,12 @@ function Found({
           />
           <div className="mt-2 flex gap-1.5 short:mt-1">
             <ZoningLine state={zoning} city={m.name} />
-            <ParcelButton info={parcels} extra={<BuildingSection state={building} />} withBuilding={building.status !== "none"} />
+            <ParcelButton
+              info={parcels}
+              extra={building.status !== "none" && <BuildingDetail state={building} />}
+              withBuilding={building.status !== "none"}
+              chibanzu={chibanzuFor(m, result.lat, result.lng)}
+            />
             {/* 背の低い画面では「場所を直す」をこの行に置く（地図プレビューが入らなくなっても使える） */}
             {onFix && (
               <button
@@ -807,6 +813,7 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
   const zoning = useZoning(result.lat, result.lng, m);
   const parcels = useParcelInfo(result);
   const roads = useNearbyRoads(result.links, result.lat, result.lng);
+  const chibanzu = chibanzuFor(m, result.lat, result.lng);
   const hazard = useHazard(result.lat, result.lng, m);
   const building = useBuilding(result, parcels);
   const landPrice = useLandPrices(result.lat, result.lng);
@@ -839,7 +846,7 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
           {/* 要点（スマホと同じ行）。最初の画面で用途地域・建ぺい率・容積率と地番、災害リスクが分かる */}
           <div className="mt-2.5 flex gap-1.5">
             <ZoningLine state={zoning} city={m.name} onOpen={() => jump("pc-zoning")} />
-            <ParcelButton info={parcels} onOpen={() => jump("pc-parcel")} />
+            <ParcelButton info={parcels} onOpen={() => jump("pc-parcel")} chibanzu={chibanzu} />
           </div>
           <div className="mt-1.5 flex">
             <HazardLine state={hazard} city={m.name} onOpen={() => jump("pc-hazard")} />
@@ -891,9 +898,9 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
         <HazardCard state={hazard} city={m.name} onShowMap={showHazardOnMap} />
       </div>
 
-      {parcels.status !== "none" && (
+      {(parcels.status !== "none" || chibanzu) && (
         <div id="pc-parcel" className="scroll-mt-3">
-          <ParcelCard info={parcels} />
+          <ParcelCard info={parcels} chibanzu={chibanzu} />
         </div>
       )}
 
