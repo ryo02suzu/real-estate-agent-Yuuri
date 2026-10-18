@@ -5,7 +5,7 @@ import { CloseIcon } from "./icons";
 
 /**
  * 中身が画面に入りきらなければ、data-dense を "1" → "2" → "3" と付けて詰める（globals.css の dense・denser・densest。
- * 詰め方を書いた中身だけが詰まる）。読み込みで中身が変わったときや画面の向きを変えたときも測り直す
+ * 詰め方を書いた中身だけが詰まる。"3" ではシートを画面の上近くまで伸ばす）。読み込みで中身が変わったときや画面の向きを変えたときも測り直す
  */
 function useDense(ref: React.RefObject<HTMLDivElement | null>, open: boolean) {
   useLayoutEffect(() => {
@@ -54,7 +54,7 @@ export function Sheet({ title, open, onClose, children }: { title: string; open:
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center lg:items-center" role="dialog" aria-modal="true" aria-label={title}>
       <button aria-label="閉じる" className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div ref={body} className="relative max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl lg:max-w-lg lg:rounded-3xl lg:pb-6 bg-white px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4 shadow-xl [@media(max-height:720px)]:pt-2">
+      <div ref={body} className="relative max-h-[92dvh] w-full data-[dense=3]:max-h-[calc(100dvh_-_max(24px,env(safe-area-inset-top)_+_8px))] max-w-md overflow-y-auto rounded-t-3xl lg:max-w-lg lg:rounded-3xl lg:pb-6 bg-white px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4 shadow-xl [@media(max-height:720px)]:pt-2">
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line lg:hidden [@media(max-height:720px)]:mb-1 densest:mb-0.5" />
         <div className="mb-4 flex items-center justify-between [@media(max-height:720px)]:mb-2 densest:mb-0.5">
           <h2 className="text-lg font-bold text-ink densest:text-base">{title}</h2>

@@ -207,6 +207,30 @@ describe("buildSummary の盛土規制法", () => {
     expect(outside).toContain("・盛土規制法：区域外（2025年7月18日時点の国のデータ・参考）");
   });
 
+  it("砂防指定地・急傾斜地などの区域と、神奈川県が求める特記事項", () => {
+    const m = findMunicipality("14109")!;
+    const result = {
+      status: "ok" as const,
+      lat: 35.5146,
+      lng: 139.6218,
+      matchedAddress: "神奈川県横浜市港北区大豆戸町",
+      town: "大豆戸町",
+      approximate: false,
+      municipality: m,
+      links: buildLinks(m, 35.5146, 139.6218),
+    };
+    const zoning = { youto: [], youtoNear: [], tokei: true, jyuntoshi: false, koudoti: false, others: [] };
+    const hit = { kind: "急傾斜地崩壊危険区域" as const, name: "大豆戸町", notice: "第220号", since: "1994-03-25", pref: "14" };
+    const saigai = { ...hit, kind: "災害危険区域" as const, notice: "第220号(急傾斜)", rule: "神奈川県建築基準条例" };
+    const text = buildSummary(result, { zoning: { zoning, hourei: { pref: "14", hits: [hit, saigai], missing: [] } } });
+    expect(text).toContain(
+      "・砂防・急傾斜地など：急傾斜地崩壊危険区域・災害危険区域（国のデータ・参考）\n  （急傾斜地：大豆戸町（第220号・1994年3月25日））\n  （災害危険区域：急傾斜地崩壊危険区域と同じ区域（神奈川県建築基準条例））",
+    );
+    expect(text).toContain("※砂防指定地などの区域の出典：「国土数値情報（砂防指定地データ・地すべり防止区域データ・急傾斜地崩壊危険区域データ・災害危険区域データ）」");
+    // 地すべり・急傾斜地の神奈川県の特記事項は同じ文なので1つ
+    expect(text.match(/※神奈川県の区域のデータについて：区域の形状は概略であるため/g)).toHaveLength(1);
+  });
+
   it("埋蔵文化財の確認先（市の遺跡地図を物件の場所で開く URL と教育委員会）", () => {
     const m = findMunicipality("14109")!;
     const result = {

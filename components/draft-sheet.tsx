@@ -78,7 +78,8 @@ function DraftBody({ sections }: { sections: DraftSection[] }) {
           <h3 className="text-[12.5px] font-bold">{s.title}</h3>
           <button onClick={() => part.copy(sectionLines(s).join("\n"))} className="flex shrink-0 items-center gap-1 rounded-full border border-line px-2 py-0.5 text-[11px] text-brand">
             <CopyIcon className="h-3 w-3" />
-            {part.done ? "コピー済" : "この欄をコピー"}
+            {/* 詰めるときは「コピー」だけにして、欄の見出しを1行に収める */}
+            {part.done ? "コピー済" : <span><span className="densest:hidden">この欄を</span>コピー</span>}
           </button>
         </div>
         {/^出典/.test(s.title) ? (

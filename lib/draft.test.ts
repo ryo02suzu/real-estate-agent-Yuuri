@@ -44,6 +44,11 @@ describe("重説・物件概要の下書き", () => {
             authority: "東京都",
             link: { label: "東京都の盛土規制法の地図", url: "https://www2.wagmap.jp/tokyo_tokeizu/Map?mid=4" },
           },
+          hourei: {
+            pref: "13",
+            hits: [{ kind: "急傾斜地崩壊危険区域", name: "三番町1丁目", pref: "13", notice: "第605号", since: "2005-04-06" }],
+            missing: [],
+          },
         },
         parcels: { target: "千代田区三番町 2-1", neighbors: ["千代田区三番町 2-2", "千代田区三番町 3"], reference: false },
         roads: [{ label: "法第42条第1項第1号道路", short: "1項1号", direction: "北", distance: 4.2, width: "6.0m" } as never],
@@ -73,7 +78,20 @@ describe("重説・物件概要の下書き", () => {
       "宅地造成及び特定盛土等規制法：宅地造成等工事規制区域（国のデータ・参考）（東京都が指定（東京都告示第852号・2024年7月31日から）。国のデータ（2025年7月18日時点）の概略の区域で、法的図書ではありません。重要事項説明には東京都（盛土規制法の担当課）の資料で確かめてください）【要確認】",
     );
     expect(text).toContain("盛土規制法の確認先：東京都の盛土規制法の地図（https://www2.wagmap.jp/tokyo_tokeizu/Map?mid=4）");
-    expect(text).toContain("盛土規制法の区域の出典：「国土数値情報（宅地造成等工事規制区域・特定盛土等規制区域データ）」");
+    // 国土数値情報のデータの出典は1つの文にまとめる
+    expect(text).toContain(
+      "国土数値情報の出典：「国土数値情報」（国土交通省、https://nlftp.mlit.go.jp/ksj/）を加工して作成（盛土規制法の区域：宅地造成等工事規制区域・特定盛土等規制区域データ（2025年7月18日時点）／砂防指定地などの区域：砂防指定地データ・地すべり防止区域データ・急傾斜地崩壊危険区域データ・災害危険区域データ",
+    );
+    // 砂防指定地・急傾斜地などは区域内・区域外とも国のデータの参考。東京都が求める特記事項は出典の欄に、どちらの区域の文かを添えて
+    expect(text).toContain(
+      "急傾斜地法（急傾斜地崩壊危険区域）：区域内（国のデータ・参考）（三番町1丁目（第605号・2005年4月6日）。国のデータ（2021年度）の概略の区域。重要事項説明には東京都（砂防の担当）の資料で確認）【要確認】",
+    );
+    expect(text).toContain("東京都の区域のデータについて：（急傾斜地）提供しているデータは、令和2年6月5日現在のもので");
+    expect(text).toContain("お問合せをお願いします。（地すべり）平成29年5月19日現在のもので");
+    expect(text).toContain("地すべり等防止法（地すべり防止区域）：区域外（国のデータ・参考）（2021年度の国のデータでは区域外。");
+    expect(text).toContain("砂防法（砂防指定地）：区域外（国のデータ・参考）（平成30年3月末時点の国のデータでは区域外。");
+    expect(text).toContain("建築基準法39条（災害危険区域）：区域外（国のデータ・参考）（2021年度の国のデータでは区域外。概略の区域で、重要事項説明には東京都・千代田区（建築の担当）で確認）【要確認】");
+
     expect(text).toContain("北の道路（約4m）：法第42条第1項第1号道路・幅員 6.0m【要確認】");
     expect(text).toContain("■ハザードマップ（重要事項説明で所在地を示す市区町村の地図）\n洪水・内水：千代田区のハザードマップ（https://example.jp/hm.html）");
     expect(text).toContain("■災害リスク（国のデータ・参考）\n洪水（想定最大規模）：浸水 0.5〜3m");
@@ -100,12 +118,22 @@ describe("重説・物件概要の下書き", () => {
     expect(text).toContain("駅の出典：「国土数値情報（鉄道データ）」");
   });
 
+  it("国土数値情報の出典が2つ以上なら1つの文にまとめる（時点の入れ子のかっこ・あとの文も残す）", () => {
+    const land = { kind: "公示" as const, no: "千代田-1", point: [139.7448, 35.6901] as [number, number], price: 4_410_000, change: 11.4, usage: "住宅地" as const, year: 2026, history: [], distance: 92, bearing: "北東" };
+    const station = { name: "半蔵門", lines: [["半蔵門線", "東京メトロ"]] as [string, string][], meters: 778, minutes: 10, straight: 603, routed: true };
+    const text = draftText(buildDraft(base, { landPrice: [land], stations: [station] }));
+    const line = text.split("\n").find((l) => l.startsWith("国土数値情報の出典："))!;
+    expect(line).toMatch(/^国土数値情報の出典：「国土数値情報」（国土交通省、https:\/\/nlftp\.mlit\.go\.jp\/ksj\/）を加工して作成（地価：地価公示データ・都道府県地価調査データ（.+）／駅：鉄道データ（\d{4}年））。道のりは/);
+    expect(text).not.toContain("駅の出典：");
+  });
+
   it("データの無い欄は「要確認」と確かめる先", () => {
     const text = draftText(buildDraft({ ...base, approximate: true }));
     expect(text).toContain("所在（住所）：東京都千代田区三番町 付近（番地まで見つからず、町の中心の位置）【要確認】");
     expect(text).toContain("所在（地番）：要確認（登記・公図で確認）");
     expect(text).toContain("用途地域など：要確認");
     expect(text).toContain("宅地造成及び特定盛土等規制法：要確認（区域を指定した都県・市（盛土規制法の担当課）で確認）");
+    expect(text).toContain("急傾斜地法（急傾斜地崩壊危険区域）：要確認（区域を指定した都県・市で確認）");
     // 埋蔵文化財は都市計画が読めなくても、確かめる窓口と遺跡地図を出す（千代田区は都の地図。地点では開けない）
     expect(text).toContain("文化財保護法（埋蔵文化財包蔵地）：要確認（包蔵地（遺跡）に入るかは千代田区の教育委員会（文化財の担当）で確認）");
     expect(text).toContain("遺跡地図：東京都遺跡地図（https://tokyo-iseki.metro.tokyo.lg.jp/）");

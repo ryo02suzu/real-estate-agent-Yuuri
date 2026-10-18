@@ -16,6 +16,7 @@ import { STATION_CREDIT, stationLine } from "@/lib/roadmap/walk";
 import { KOZU_CREDIT } from "@/lib/roadmap/kozu-data";
 import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel } from "@/lib/roadmap/parcel";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
+import { HOUREI_CREDIT, houreiLine, houreiNote } from "@/lib/roadmap/hourei";
 import { isekiFor, isekiLine } from "@/lib/roadmap/iseki";
 import { MORIDO_CREDIT, moridoLine } from "@/lib/roadmap/morido";
 import { zoningRows } from "@/lib/roadmap/zoning";
@@ -276,6 +277,13 @@ function Memo({
                     <dd className="min-w-0 flex-1 font-semibold">{moridoLine(zoning.morido)}</dd>
                   </div>
                 )}
+                {/* 砂防指定地・急傾斜地などは、区域に入っているときだけ（1枚に収めるため） */}
+                {!!zoning.hourei?.hits.length && (
+                  <div className="flex gap-2 py-0.5">
+                    <dt className="w-[7.5em] shrink-0 text-[10.5px] text-[#7a6a55]">法令の区域</dt>
+                    <dd className="min-w-0 flex-1 font-semibold text-[#8a4f3a]">{houreiLine(zoning.hourei)}</dd>
+                  </div>
+                )}
                 <div className="flex gap-2 py-0.5">
                   <dt className="w-[7.5em] shrink-0 text-[10.5px] text-[#7a6a55]">埋蔵文化財</dt>
                   <dd className="min-w-0 flex-1 font-semibold">{isekiLine(isekiFor(m, result.lat, result.lng))}</dd>
@@ -411,6 +419,9 @@ function Memo({
         <p>
           地図：地理院タイル（国土地理院）。{zoning.status === "ok" && `都市計画の${ZONING_CREDIT}。`}
           {zoning.status === "ok" && zoning.morido && `盛土規制法の区域の${MORIDO_CREDIT}（概略の区域で、重要事項説明の根拠には使えません）。`}
+          {zoning.status === "ok" &&
+            !!zoning.hourei?.hits.length &&
+            `砂防指定地などの区域の${HOUREI_CREDIT}（概略の区域で、重要事項説明の根拠には使えません）。${[...new Set(zoning.hourei.hits.map((h) => houreiNote(h.kind, h.pref)).filter(Boolean))].join("")}`}
           {hazard.status === "ok" && `災害リスクの${HAZARD_CREDIT}。`}
           {bHit && `建物の${BUILDING_CREDIT}。`}
           {prices.length > 0 && `地価の${LAND_PRICE_CREDIT}（標準地・基準地の価格で、物件の価格ではありません）。`}

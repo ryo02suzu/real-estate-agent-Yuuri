@@ -12,6 +12,7 @@ import { KOZU_CREDIT } from "./roadmap/kozu-data";
 import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel, type Estimated } from "./roadmap/parcel";
 import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
+import { HOUREI_CREDIT, HOUREI_SHORT, houreiGroups, houreiLine, houreiNotesLine, type Hourei } from "./roadmap/hourei";
 import { isekiFor, isekiLine } from "./roadmap/iseki";
 import { suidoFor } from "./roadmap/suido";
 import { MORIDO_CREDIT, moridoLine, type Morido } from "./roadmap/morido";
@@ -38,7 +39,7 @@ export function buildSummary(
     schools,
     stations,
   }: {
-    zoning?: { zoning: Zoning; st?: ZoningStatus; morido?: Morido };
+    zoning?: { zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei };
     parcels?: { target?: string; neighbors: string[]; reference: boolean; estimated?: Estimated };
     roads?: NearbyRoad[];
     hazard?: { report: HazardReport; elevation: Elevation | null; maps: HazardMaps; muniCd: string };
@@ -70,6 +71,10 @@ export function buildSummary(
     for (const r of zoningRows(zoning.zoning, zoning.st)) lines.push(`・${r.label}：${r.value}`);
     if (zoning.st?.asOf) lines.push(`  （${zoning.st.city}のデータは${zoning.st.asOf}時点）`);
     if (zoning.morido) lines.push(`・盛土規制法：${moridoLine(zoning.morido)}`);
+    if (zoning.hourei) {
+      lines.push(`・砂防・急傾斜地など：${houreiLine(zoning.hourei)}`);
+      for (const g of houreiGroups(zoning.hourei.hits)) lines.push(`  （${HOUREI_SHORT[g.kind]}：${g.text}）`);
+    }
   }
   // 埋蔵文化財の確認先（都県・市の遺跡地図と教育委員会）。都市計画が読めなくても出す
   const iseki = isekiFor(m, result.lat, result.lng);
@@ -116,6 +121,13 @@ export function buildSummary(
   if (p?.estimated || parcels?.estimated) lines.push(`※${KOZU_CREDIT}。`);
   if (zoning) lines.push(`※都市計画の${ZONING_CREDIT}。`);
   if (zoning?.morido) lines.push(`※盛土規制法の区域の${MORIDO_CREDIT}。概略の区域で、重要事項説明には${zoning.morido.authority}の資料で確認を。`);
+  const hr = zoning?.hourei;
+  if (hr) {
+    lines.push(`※砂防指定地などの区域の${HOUREI_CREDIT}。概略の区域で、重要事項説明には指定した都県・市の資料で確認を。`);
+    // 都県が利用条件で求める特記事項（区域外と書くときも、データの時点などを添える）
+    const notes = houreiNotesLine(hr.pref);
+    if (notes) lines.push(`※${notes}`);
+  }
   lines.push(`※遺跡地図は包蔵地の概要を示すもの。包蔵地（遺跡）に入るかは${iseki.office}で確認を。`);
   if (hazard) lines.push(`※災害リスクの${HAZARD_CREDIT}。`);
   if (hit) lines.push(`※建物の${BUILDING_CREDIT}。`);
