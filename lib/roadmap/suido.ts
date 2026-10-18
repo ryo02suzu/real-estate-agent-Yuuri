@@ -2,7 +2,7 @@
 // 供給施設及び排水施設」の欄の下調べ）。前面道路の本管・口径・引込みの有無は地図だけでは分からないことがあり、
 // 市町村の上下水道の担当（水道局・下水道課）で確かめる旨を添える。地図のデータは取り込まない
 import type { Municipality } from "./municipalities";
-import { geocloud, sonicweb, wagmap } from "./vendors";
+import { geocloud, geocloudMp, sonicweb, wagmap } from "./vendors";
 
 type Build = (lat: number, lng: number) => string;
 
@@ -24,6 +24,11 @@ const MAPS: Record<string, SuidoMap[]> = {
   埼玉県川越市: [sewer("下水道台帳マップ", w("kawagoe", 303))],
   埼玉県加須市: [sewer("下水道台帳図", w("kazo", 55)), water("水道配管図", w("kazo", 53))],
   埼玉県熊谷市: [sewer("下水道台帳", w("kumagaya", 150))],
+  埼玉県深谷市: [sewer("下水道台帳", geocloud("https://fukaya.geocloud.jp/webgis/", "mp=39"))],
+  埼玉県白岡市: [
+    sewer("公共下水道台帳", geocloud("https://shiraoka.geocloud.jp/webgis/", "mp=21")),
+    water("上水道台帳", geocloud("https://shiraoka.geocloud.jp/webgis/", "mp=20")),
+  ],
   埼玉県蓮田市: [sewer("下水道台帳図", s("hasuda", "th_33")), water("水道台帳図", s("hasuda", "th_38"))],
   埼玉県鴻巣市: [sewer("下水道台帳", s("konosu", "th_36")), water("水道台帳", s("konosu", "th_32"))],
   埼玉県三郷市: [sewer("下水道台帳", s("misato", "th_7"))],
@@ -32,10 +37,12 @@ const MAPS: Record<string, SuidoMap[]> = {
   千葉県木更津市: [sewer("下水道情報", w("kisarazu", 6))],
   千葉県茂原市: [sewer("下水道管網図", w("mobara", 18))],
   千葉県柏市: [sewer("下水道台帳図", s("kashiwa", "th_11")), water("上水道台帳図", s("kashiwa", "th_36"))],
+  千葉県我孫子市: [sewer("公共下水道台帳（汚水）", geocloudMp("abiko.geocloud.jp", 30))],
   千葉県浦安市: [sewer("下水道台帳図（汚水）", s("urayasu", "th_92"))],
   茨城県水戸市: [sewer("公共下水道台帳図", w("ibaraki", 93)), water("上水道台帳図", w("ibaraki", 141))],
   茨城県土浦市: [sewer("下水道台帳図", w("ibaraki", 96))],
   茨城県五霞町: [sewer("下水道台帳図", w("ibaraki", 109))],
+  東京都国立市: [sewer("下水道台帳", geocloud("https://kunitachi.geocloud.jp/webgis/", "mp=9"))],
   東京都国分寺市: [sewer("下水道施設平面図", w("kokubunji", 12))],
   東京都三鷹市: [sewer("下水道台帳図", w("mitakacity", 2000))],
   東京都狛江市: [sewer("下水道台帳マップ", w("komaecity", 132))],

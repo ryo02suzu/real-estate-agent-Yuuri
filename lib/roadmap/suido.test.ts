@@ -17,6 +17,10 @@ describe("上下水道の台帳の地図", () => {
     ]);
     expect(suidoFor({ pref: "神奈川県", name: "川崎市" }, 35.5308, 139.7029)[0].url).toBe("https://kawasaki.geocloud.jp/webgis/?mp=36&z=18&ll=35.530800%2C139.702900");
     expect(suidoFor({ pref: "神奈川県", name: "相模原市" }, 35.5715, 139.373)[0].name).toBe("相模原市の下水道施設台帳平面図");
+    expect(suidoFor({ pref: "千葉県", name: "我孫子市" }, 35.8695, 140.0103)[0].url).toBe("https://abiko.geocloud.jp/mp/30?z=18&ll=35.869500,140.010300");
+    expect(suidoFor({ pref: "埼玉県", name: "深谷市" }, 36.1873, 139.2705)[0].url).toBe("https://fukaya.geocloud.jp/webgis/?mp=39&z=18&ll=36.187300%2C139.270500");
+    expect(suidoFor({ pref: "埼玉県", name: "白岡市" }, 36.0245, 139.6698).map((l) => l.name)).toEqual(["白岡市の公共下水道台帳", "白岡市の上水道台帳"]);
+    expect(suidoFor({ pref: "東京都", name: "国立市" }, 35.6902, 139.446)[0].url).toBe("https://kunitachi.geocloud.jp/webgis/?mp=9&z=18&ll=35.690200%2C139.446000");
   });
 
   it("台帳の地図が見つかっていない市区町村は空", () => {
