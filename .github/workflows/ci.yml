@@ -21,4 +21,6 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
-      - run: npm run build
+      # ビルドは next/font/google が Google Fonts から書体のファイル（約140）を落とし、1つでも落とせないと失敗する。
+      # 通信が一時的に失敗したときのために、1回だけやり直す
+      - run: npm run build || (echo "ビルドをやり直します（書体のダウンロードの失敗など）" && npm run build)
