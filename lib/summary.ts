@@ -13,6 +13,7 @@ import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel, type Estimated }
 import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
 import { isekiFor, isekiLine } from "./roadmap/iseki";
+import { suidoFor } from "./roadmap/suido";
 import { MORIDO_CREDIT, moridoLine, type Morido } from "./roadmap/morido";
 import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
 import { ZONING_CREDIT } from "./roadmap/zoning-data";
@@ -73,6 +74,12 @@ export function buildSummary(
   // 埋蔵文化財の確認先（都県・市の遺跡地図と教育委員会）。都市計画が読めなくても出す
   const iseki = isekiFor(m, result.lat, result.lng);
   lines.push(`【埋蔵文化財】${isekiLine(iseki)}${iseki.map ? `\n  ${iseki.map.url}` : ""}`);
+  // 上下水道の台帳の地図（公開している市町村だけ）
+  const ledgers = suidoFor(m, result.lat, result.lng);
+  if (ledgers.length) {
+    lines.push("【上下水道の台帳（市区町村の地図・参考）】");
+    for (const l of ledgers) lines.push(`・${l.name}\n  ${l.url}`);
+  }
   if (hazard) {
     lines.push("【災害リスク（国のデータ・参考）】");
     for (const r of hazardRows(hazard.report, hazard.elevation)) lines.push(`・${r.label}：${r.value}`);

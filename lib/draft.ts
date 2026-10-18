@@ -13,6 +13,7 @@ import type { NearbyRoad } from "./roadmap/road-read";
 import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
 import { lineLabel, STATION_CREDIT, type StationWalk } from "./roadmap/walk";
 import { isekiFor } from "./roadmap/iseki";
+import { suidoFor } from "./roadmap/suido";
 import { MORIDO_CREDIT, moridoCaution, moridoDetail, moridoValue, type Morido } from "./roadmap/morido";
 import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
 import { ZONING_CREDIT } from "./roadmap/zoning-data";
@@ -78,17 +79,21 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     }
     if (zoning.st?.asOf) law.push({ label: "データの時点", value: `${zoning.st.city}：${zoning.st.asOf}` });
   } else law.push({ label: "用途地域など", value: CHECK, note: "都市計画のデータを読み込めませんでした。市の都市計画図で確認", check: true });
-  // その他の法令：盛土規制法の区域（国のデータ。重要事項説明の根拠には使えないので、指定した都県・市の資料で確かめる）
+  sections.push({ title: "都市計画法・建築基準法に基づく制限（参考）", rows: law });
+
+  // それ以外の法令に基づく制限（重説の欄の分け方のとおり）
+  const other: DraftRow[] = [];
+  // 盛土規制法の区域（国のデータ。重要事項説明の根拠には使えないので、指定した都県・市の資料で確かめる）
   const md = zoning?.morido;
   if (md) {
-    law.push({ label: "宅地造成及び特定盛土等規制法", value: `${moridoValue(md)}（国のデータ・参考）`, note: `${moridoDetail(md)}。${moridoCaution(md.authority)}`, check: true });
-    if (md.link) law.push({ label: "盛土規制法の確認先", value: md.link.label, note: md.link.url });
-  } else law.push({ label: "宅地造成及び特定盛土等規制法", value: CHECK, note: "区域を指定した都県・市（盛土規制法の担当課）で確認", check: true });
+    other.push({ label: "宅地造成及び特定盛土等規制法", value: `${moridoValue(md)}（国のデータ・参考）`, note: `${moridoDetail(md)}。${moridoCaution(md.authority)}`, check: true });
+    if (md.link) other.push({ label: "盛土規制法の確認先", value: md.link.label, note: md.link.url });
+  } else other.push({ label: "宅地造成及び特定盛土等規制法", value: CHECK, note: "区域を指定した都県・市（盛土規制法の担当課）で確認", check: true });
   // 文化財保護法：周知の埋蔵文化財包蔵地（遺跡）に入るかは教育委員会で確かめる。遺跡地図は概要を示すもので、証明にはならない
   const ik = isekiFor(m, result.lat, result.lng);
-  law.push({ label: "文化財保護法（埋蔵文化財包蔵地）", value: CHECK, note: `包蔵地（遺跡）に入るかは${ik.office}で確認${ik.note ? `。${ik.note}` : ""}`, check: true });
-  if (ik.map) law.push({ label: "遺跡地図", value: `${ik.map.name}${ik.map.at ? "（物件の場所で開く）" : ""}`, note: ik.map.url });
-  sections.push({ title: "法令に基づく制限の概要（参考）", rows: law });
+  other.push({ label: "文化財保護法（埋蔵文化財包蔵地）", value: CHECK, note: `包蔵地（遺跡）に入るかは${ik.office}で確認${ik.note ? `。${ik.note}` : ""}`, check: true });
+  if (ik.map) other.push({ label: "遺跡地図", value: `${ik.map.name}${ik.map.at ? "（物件の場所で開く）" : ""}`, note: ik.map.url });
+  sections.push({ title: "その他の法令に基づく制限（参考）", rows: other });
 
   // 敷地と道路との関係
   const road: DraftRow[] = [];
@@ -108,6 +113,18 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     road.push({ label: "窓口", value: `${dept}${c.phone ? ` ${c.phone}` : ""}`, note: c.noPhoneInquiry ? "道路種別は電話では答えてもらえない（窓口で確認）" : undefined });
   }
   sections.push({ title: "敷地と道路との関係（参考）", rows: road });
+
+  // 飲用水・ガスの供給施設と排水施設：台帳の地図は下調べ。前面道路の本管・口径・引込みの有無は水道・下水道の担当で確かめる
+  const supply: DraftRow[] = [];
+  const ledgers = suidoFor(m, result.lat, result.lng);
+  const water = ledgers.find((l) => l.kind === "上水道");
+  const sewer = ledgers.find((l) => l.kind === "下水道");
+  supply.push({ label: "飲用水（上水道）", value: CHECK, note: "前面道路の配水管・口径・引込み管の有無は、水道事業者（市区町村の水道局など）で確認", check: true });
+  if (water) supply.push({ label: "水道の台帳", value: water.name, note: water.url });
+  supply.push({ label: "排水（下水道）", value: CHECK, note: "前面道路の下水道管（汚水・雨水）・公共ますの有無、浄化槽の要否は、下水道の管理者（市区町村など）で確認", check: true });
+  if (sewer) supply.push({ label: "下水道の台帳", value: sewer.name, note: sewer.url });
+  supply.push({ label: "ガス", value: CHECK, note: "都市ガスかプロパンガスか、前面道路のガス管の有無はガス会社で確認", check: true });
+  sections.push({ title: "飲用水・ガス・排水施設（参考）", rows: supply });
 
   // 災害：重要事項説明で所在地を示す市区町村のハザードマップ（水防法）と、国のデータで読んだ地点の値（参考）
   const maps: DraftRow[] = [];
