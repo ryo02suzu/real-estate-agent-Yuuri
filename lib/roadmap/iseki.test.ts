@@ -40,6 +40,7 @@ describe("埋蔵文化財の確認先", () => {
   });
 
   it("神奈川・栃木は見つかった市の地図だけ。無い市は教育委員会", () => {
+    expect(at("神奈川県", "相模原市", 35.5715, 139.373).map?.url).toBe("https://sagamihara.geocloud.jp/webgis/?mp=13&z=15&ll=35.571500%2C139.373000");
     expect(at("神奈川県", "横浜市", 35.5146, 139.6218).map?.url).toBe(
       "https://wwwm.city.yokohama.lg.jp/yokohama/Map?mid=9&mpx=139.621800&mpy=35.514600&mps=2500&gprj=2",
     );

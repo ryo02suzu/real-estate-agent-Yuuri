@@ -65,6 +65,8 @@ const CITY_MAPS: Record<string, IsekiMap> = {
     tip: AGREE,
   },
   神奈川県横浜市: { name: "文化財ハマSite（横浜市行政地図情報提供システム）", build: wagmap("yokohama", 9, { host: "https://wwwm.city.yokohama.lg.jp", scale: 2500 }) },
+  // 相模原市の地図は z15 まで（約1/16,000）
+  神奈川県相模原市: { name: "さがみはら地図情報（埋蔵文化財包蔵地）", build: geocloud("https://sagamihara.geocloud.jp/webgis/", "mp=13", 15) },
   神奈川県鎌倉市: { name: "かまくらわが街マップ（遺跡地図）", build: wagmap("kamakura-hazard", 246, { scale: 2500 }) },
   神奈川県秦野市: { name: "はだのWEBマップ（埋蔵文化財包蔵地）", build: wagmap("hadano", 8, { scale: 2500 }) },
   神奈川県三浦市: { name: "みうらわが街ガイド（文化財情報）", build: wagmap("miura", 3, { scale: 2500 }), tip: AGREE },

@@ -15,7 +15,7 @@ const water = (label: string, build: Build): SuidoMap => ({ kind: "上水道", l
 const w = (slug: string, mid: number) => wagmap(slug, mid, { scale: 1000 });
 const s = (slug: string, theme: string) => sonicweb(slug, theme, 1000);
 
-// 地図サービスの一覧（wagmap の Portal・sonicweb の map.js）から探し、市役所の地点で開いて台帳の管が出ることを確かめた地図（2026年10月）
+// 地図サービスの一覧（wagmap の Portal・sonicweb の map.js・geocloud の地図の一覧）から探し、市役所の地点で開いて台帳の管が出ることを確かめた地図（2026年10月）
 const MAPS: Record<string, SuidoMap[]> = {
   埼玉県上尾市: [sewer("下水道台帳図", w("ageocity", 12))],
   埼玉県朝霞市: [sewer("下水道台帳図", w("asaka", 15)), water("水道管網図", w("asaka", 14))],
@@ -43,6 +43,8 @@ const MAPS: Record<string, SuidoMap[]> = {
   東京都小平市: [sewer("公共下水道台帳施設平面図", s("kodaira", "th_26"))],
   東京都多摩市: [sewer("下水道台帳（汚水）", s("tama", "th_21"))],
   東京都町田市: [sewer("下水道台帳図", geocloud("https://machida.kukanjoho.jp/webgis/", "mp=45"))],
+  神奈川県川崎市: [sewer("公共下水道台帳施設平面図", geocloud("https://kawasaki.geocloud.jp/webgis/", "mp=36"))],
+  神奈川県相模原市: [sewer("下水道施設台帳平面図", geocloud("https://sagamihara.geocloud.jp/webgis/", "mp=5"))],
   神奈川県厚木市: [sewer("下水道情報", w("atsugi", 5))],
   神奈川県秦野市: [sewer("公共下水道台帳（汚水）参考図", w("hadano", 14))],
   神奈川県鎌倉市: [sewer("公共下水道情報", w("kamakura-hazard", 242))],
