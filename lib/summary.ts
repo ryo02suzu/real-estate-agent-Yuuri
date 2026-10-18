@@ -12,6 +12,7 @@ import { KOZU_CREDIT } from "./roadmap/kozu-data";
 import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel, type Estimated } from "./roadmap/parcel";
 import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
+import { isekiFor, isekiLine } from "./roadmap/iseki";
 import { MORIDO_CREDIT, moridoLine, type Morido } from "./roadmap/morido";
 import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
 import { ZONING_CREDIT } from "./roadmap/zoning-data";
@@ -69,6 +70,9 @@ export function buildSummary(
     if (zoning.st?.asOf) lines.push(`  （${zoning.st.city}のデータは${zoning.st.asOf}時点）`);
     if (zoning.morido) lines.push(`・盛土規制法：${moridoLine(zoning.morido)}`);
   }
+  // 埋蔵文化財の確認先（都県・市の遺跡地図と教育委員会）。都市計画が読めなくても出す
+  const iseki = isekiFor(m, result.lat, result.lng);
+  lines.push(`【埋蔵文化財】${isekiLine(iseki)}${iseki.map ? `\n  ${iseki.map.url}` : ""}`);
   if (hazard) {
     lines.push("【災害リスク（国のデータ・参考）】");
     for (const r of hazardRows(hazard.report, hazard.elevation)) lines.push(`・${r.label}：${r.value}`);
@@ -105,6 +109,7 @@ export function buildSummary(
   if (p?.estimated || parcels?.estimated) lines.push(`※${KOZU_CREDIT}。`);
   if (zoning) lines.push(`※都市計画の${ZONING_CREDIT}。`);
   if (zoning?.morido) lines.push(`※盛土規制法の区域の${MORIDO_CREDIT}。概略の区域で、重要事項説明には${zoning.morido.authority}の資料で確認を。`);
+  lines.push(`※遺跡地図は包蔵地の概要を示すもの。包蔵地（遺跡）に入るかは${iseki.office}で確認を。`);
   if (hazard) lines.push(`※災害リスクの${HAZARD_CREDIT}。`);
   if (hit) lines.push(`※建物の${BUILDING_CREDIT}。`);
   if (prices.length) lines.push(`※地価の${LAND_PRICE_CREDIT}。物件そのものの価格ではありません。`);

@@ -12,6 +12,7 @@ import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
 import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
 import { lineLabel, STATION_CREDIT, type StationWalk } from "./roadmap/walk";
+import { isekiFor } from "./roadmap/iseki";
 import { MORIDO_CREDIT, moridoCaution, moridoDetail, moridoValue, type Morido } from "./roadmap/morido";
 import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
 import { ZONING_CREDIT } from "./roadmap/zoning-data";
@@ -83,6 +84,10 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     law.push({ label: "宅地造成及び特定盛土等規制法", value: `${moridoValue(md)}（国のデータ・参考）`, note: `${moridoDetail(md)}。${moridoCaution(md.authority)}`, check: true });
     if (md.link) law.push({ label: "盛土規制法の確認先", value: md.link.label, note: md.link.url });
   } else law.push({ label: "宅地造成及び特定盛土等規制法", value: CHECK, note: "区域を指定した都県・市（盛土規制法の担当課）で確認", check: true });
+  // 文化財保護法：周知の埋蔵文化財包蔵地（遺跡）に入るかは教育委員会で確かめる。遺跡地図は概要を示すもので、証明にはならない
+  const ik = isekiFor(m, result.lat, result.lng);
+  law.push({ label: "文化財保護法（埋蔵文化財包蔵地）", value: CHECK, note: `包蔵地（遺跡）に入るかは${ik.office}で確認${ik.note ? `。${ik.note}` : ""}`, check: true });
+  if (ik.map) law.push({ label: "遺跡地図", value: `${ik.map.name}${ik.map.at ? "（物件の場所で開く）" : ""}`, note: ik.map.url });
   sections.push({ title: "法令に基づく制限の概要（参考）", rows: law });
 
   // 敷地と道路との関係

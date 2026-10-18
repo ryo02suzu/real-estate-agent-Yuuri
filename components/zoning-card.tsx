@@ -2,10 +2,12 @@
 
 // 物件の地点の都市計画（用途地域・建ぺい率・容積率・防火・高度地区など）。国土交通省の都市計画決定GISデータを
 // アプリと同じサイトに置いたタイルから読む（lib/roadmap/zoning.ts）。道路種別の結果を先に出し、こちらは後から読み込む。
-// 盛土規制法の規制区域（国土数値情報。lib/roadmap/morido.ts）も同じ一覧に添える
+// 盛土規制法の規制区域（国土数値情報。lib/roadmap/morido.ts）と、埋蔵文化財の確認先（遺跡地図。lib/roadmap/iseki.ts）も
+// 同じ一覧に添える
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
 import type { Municipality } from "@/lib/roadmap";
+import { isekiFor, isekiNote, type Iseki } from "@/lib/roadmap/iseki";
 import { MORIDO_DATA, MORIDO_SOURCE, moridoAt, moridoDetail, moridoNote, moridoNotice, moridoValue, type Morido } from "@/lib/roadmap/morido";
 import { pmtilesMoridoSource } from "@/lib/roadmap/morido-tiles";
 import { statusFor, zoningAt, zoningChips, zoningRows, type Zoning, type ZoningStatus } from "@/lib/roadmap/zoning";
@@ -14,8 +16,11 @@ import { pmtilesZoningSource } from "@/lib/roadmap/zoning-tiles";
 import { AlertIcon, ChevronRightIcon, InfoIcon, ZoningIcon } from "./icons";
 import { Sheet } from "./sheet";
 
-/** morido：盛土規制法の区域（読めなければ無し） */
-export type ZoningState = { status: "loading" } | { status: "error" } | { status: "ok"; zoning: Zoning; st?: ZoningStatus; morido?: Morido };
+/** morido：盛土規制法の区域（読めなければ無し）、iseki：埋蔵文化財の確認先 */
+export type ZoningState =
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "ok"; zoning: Zoning; st?: ZoningStatus; morido?: Morido; iseki?: Iseki };
 
 /** 地点の都市計画を読む（市区町村のデータの有無と時点も） */
 export function useZoning(lat: number, lng: number, municipality: Municipality): ZoningState {
@@ -33,7 +38,8 @@ export function useZoning(lat: number, lng: number, municipality: Municipality):
       .then(([zoning, mod, morido]) => {
         if (!alive) return;
         const st = statusFor(codes.split(","), mod.default as Record<string, ZoningStatus>);
-        setState({ key, value: zoning ? { status: "ok", zoning, st, morido: morido ?? undefined } : { status: "error" } });
+        const iseki = isekiFor(municipality, lat, lng);
+        setState({ key, value: zoning ? { status: "ok", zoning, st, morido: morido ?? undefined, iseki } : { status: "error" } });
       })
       .catch(() => alive && setState({ key, value: { status: "error" } }));
     return () => {
@@ -80,7 +86,7 @@ export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: 
       </button>
       {state.status === "ok" && !onOpen && (
         <Sheet title="都市計画（参考）" open={open} onClose={() => setOpen(false)}>
-          <ZoningDetail zoning={state.zoning} st={state.st} city={city} morido={state.morido} />
+          <ZoningDetail zoning={state.zoning} st={state.st} city={city} morido={state.morido} iseki={state.iseki} />
         </Sheet>
       )}
     </>
@@ -97,18 +103,18 @@ export function ZoningCard({ state, city }: { state: ZoningState; city: string }
       </h3>
       {state.status === "loading" && <p className="text-[12px] text-muted">都市計画を確認しています…</p>}
       {state.status === "error" && <p className="text-[12px] text-muted">都市計画のデータを読み込めませんでした。時間をおいて調べ直してください。</p>}
-      {state.status === "ok" && <ZoningDetail zoning={state.zoning} st={state.st} city={city} morido={state.morido} />}
+      {state.status === "ok" && <ZoningDetail zoning={state.zoning} st={state.st} city={city} morido={state.morido} iseki={state.iseki} />}
     </section>
   );
 }
 
 // 一覧の行の形。シートで画面に入りきらなければ詰める（dense・denser は components/sheet.tsx の useDense）
-const ROW = "flex gap-3 py-1.5 dense:py-1 denser:py-[3px]";
+const ROW = "flex gap-3 py-1.5 dense:py-1 denser:py-[3px] densest:py-[2px]";
 const LABEL = "w-[8.6em] shrink-0 text-[11.5px] leading-[1.6] text-muted denser:text-[11px]";
-const VALUE = "text-[13px] font-semibold leading-[1.5] denser:text-[12.5px] denser:leading-[1.4]";
-const SUB = "mt-0.5 block text-[10.5px] leading-[1.55] text-muted dense:mt-0 dense:leading-[1.45] denser:text-[10px]";
+const VALUE = "text-[13px] font-semibold leading-[1.5] denser:text-[12.5px] denser:leading-[1.4] densest:leading-[1.3]";
+const SUB = "mt-0.5 block text-[10.5px] leading-[1.55] text-muted dense:mt-0 dense:leading-[1.45] denser:text-[10px] densest:leading-[1.35]";
 
-function ZoningDetail({ zoning, st, city, morido }: { zoning: Zoning; st?: ZoningStatus; city: string; morido?: Morido }) {
+function ZoningDetail({ zoning, st, city, morido, iseki }: { zoning: Zoning; st?: ZoningStatus; city: string; morido?: Morido; iseki?: Iseki }) {
   const rows = zoningRows(zoning, st);
   return (
     <div>
@@ -127,8 +133,9 @@ function ZoningDetail({ zoning, st, city, morido }: { zoning: Zoning; st?: Zonin
           </div>
         ))}
         {morido && <MoridoRow morido={morido} />}
+        {iseki && <IsekiRow iseki={iseki} />}
       </dl>
-      <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted dense:mt-1.5 dense:leading-[1.5] denser:text-[10px]">
+      <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted dense:mt-1.5 dense:leading-[1.5] denser:text-[10px] densest:mt-1 densest:leading-[1.4]">
         <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
         <span>
           {st ? `${st.city}のデータは${st.asOf ? `${st.asOf}時点` : "時点の記載なし"}。` : `${city}は国のデータに載っていません。`}
@@ -177,6 +184,27 @@ function MoridoRow({ morido }: { morido: Morido }) {
           <br />
           {moridoNote(morido.authority)}
         </span>
+      </dd>
+    </div>
+  );
+}
+
+/** 埋蔵文化財の行。包蔵地（遺跡）に入るかは教育委員会で確かめるもので、ここでは都県・市の遺跡地図と窓口を出す */
+function IsekiRow({ iseki }: { iseki: Iseki }) {
+  const m = iseki.map;
+  return (
+    <div className={ROW}>
+      <dt className={LABEL}>埋蔵文化財</dt>
+      <dd className="min-w-0 flex-1">
+        <span className={`block ${VALUE} text-ink`}>
+          {m ? "遺跡地図で確認" : `${iseki.city}の教育委員会で確認`}
+          {m && (
+            <a href={m.url} target="_blank" rel="noreferrer" title={m.name} className="ml-2 whitespace-nowrap text-[11px] text-brand underline">
+              {m.at ? "地図で見る" : "遺跡地図"}
+            </a>
+          )}
+        </span>
+        {(m || iseki.note) && <span className={SUB}>{isekiNote(iseki)}</span>}
       </dd>
     </div>
   );

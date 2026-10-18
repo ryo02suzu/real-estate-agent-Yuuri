@@ -206,6 +206,25 @@ describe("buildSummary の盛土規制法", () => {
     const outside = buildSummary(result, { zoning: { zoning, morido: { authority: "水戸市" } } });
     expect(outside).toContain("・盛土規制法：区域外（2025年7月18日時点の国のデータ・参考）");
   });
+
+  it("埋蔵文化財の確認先（市の遺跡地図を物件の場所で開く URL と教育委員会）", () => {
+    const m = findMunicipality("14109")!;
+    const result = {
+      status: "ok" as const,
+      lat: 35.5146,
+      lng: 139.6218,
+      matchedAddress: "神奈川県横浜市港北区大豆戸町",
+      town: "大豆戸町",
+      approximate: false,
+      municipality: m,
+      links: buildLinks(m, 35.5146, 139.6218),
+    };
+    const text = buildSummary(result);
+    expect(text).toContain(
+      "【埋蔵文化財】文化財ハマSite（横浜市行政地図情報提供システム）で確認（物件の場所で開く）\n  https://wwwm.city.yokohama.lg.jp/yokohama/Map?mid=9&mpx=139.621800&mpy=35.514600&mps=2500&gprj=2",
+    );
+    expect(text).toContain("※遺跡地図は包蔵地の概要を示すもの。包蔵地（遺跡）に入るかは横浜市の教育委員会（文化財の担当）で確認を。");
+  });
 });
 
 describe("buildSummary の最寄り駅", () => {

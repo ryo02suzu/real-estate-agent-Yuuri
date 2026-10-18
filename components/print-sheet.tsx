@@ -16,6 +16,7 @@ import { STATION_CREDIT, stationLine } from "@/lib/roadmap/walk";
 import { KOZU_CREDIT } from "@/lib/roadmap/kozu-data";
 import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel } from "@/lib/roadmap/parcel";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
+import { isekiFor, isekiLine } from "@/lib/roadmap/iseki";
 import { MORIDO_CREDIT, moridoLine } from "@/lib/roadmap/morido";
 import { zoningRows } from "@/lib/roadmap/zoning";
 import { ZONING_CREDIT } from "@/lib/roadmap/zoning-data";
@@ -275,6 +276,10 @@ function Memo({
                     <dd className="min-w-0 flex-1 font-semibold">{moridoLine(zoning.morido)}</dd>
                   </div>
                 )}
+                <div className="flex gap-2 py-0.5">
+                  <dt className="w-[7.5em] shrink-0 text-[10.5px] text-[#7a6a55]">埋蔵文化財</dt>
+                  <dd className="min-w-0 flex-1 font-semibold">{isekiLine(isekiFor(m, result.lat, result.lng))}</dd>
+                </div>
               </dl>
               <p className="mt-1 text-[9px] leading-[1.5] text-[#7a6a55]">
                 {zoning.st?.asOf && `${zoning.st.city}のデータは${zoning.st.asOf}時点。`}

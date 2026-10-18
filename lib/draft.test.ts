@@ -105,6 +105,9 @@ describe("重説・物件概要の下書き", () => {
     expect(text).toContain("所在（地番）：要確認（登記・公図で確認）");
     expect(text).toContain("用途地域など：要確認");
     expect(text).toContain("宅地造成及び特定盛土等規制法：要確認（区域を指定した都県・市（盛土規制法の担当課）で確認）");
+    // 埋蔵文化財は都市計画が読めなくても、確かめる窓口と遺跡地図を出す（千代田区は都の地図。地点では開けない）
+    expect(text).toContain("文化財保護法（埋蔵文化財包蔵地）：要確認（包蔵地（遺跡）に入るかは千代田区の教育委員会（文化財の担当）で確認）");
+    expect(text).toContain("遺跡地図：東京都遺跡地図（https://tokyo-iseki.metro.tokyo.lg.jp/）");
     expect(text).toContain("道路の種別・幅員：要確認（市の道路種別の地図・窓口で確認）");
     expect(text).toContain("ハザードマップ：要確認");
     expect(text).not.toContain("■出典");
