@@ -111,6 +111,10 @@ describe("buildSummary", () => {
     expect(text).toContain("【災害リスク（国のデータ・参考）】\n・洪水（想定最大規模）：浸水 3〜5m\n・土砂災害警戒区域等：区域外\n・地面の高さ（標高）：約-1.0m");
     expect(text).toContain("・江戸川区の洪水・高潮のハザードマップ\n  https://example.jp/hm.html");
     expect(text).toContain("・江戸川区の内水のハザードマップ\n  https://example.jp/naisui.html");
+    // 大規模盛土造成地・液状化の発生傾向は国の重ねるハザードマップを物件の場所で開く
+    expect(text).toContain("・大規模盛土造成地（国の重ねるハザードマップ）\n  https://disaportal.gsi.go.jp/maps/?ll=35.683800,139.864100&z=16&");
+    expect(text).toContain("・液状化の発生傾向（国の重ねるハザードマップ）\n  https://disaportal.gsi.go.jp/maps/?ll=35.683800,139.864100&z=15&");
+    expect(text).toContain("（大規模盛土造成地は安全性の確認が必要な盛土で、直ちに危険というものではありません。");
     expect(text).toContain("※災害リスクの出典：「ハザードマップポータルサイト」");
     expect(text).toContain("重要事項説明には使えません");
   });

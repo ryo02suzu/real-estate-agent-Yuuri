@@ -51,11 +51,14 @@ function DraftBody({ sections }: { sections: DraftSection[] }) {
   return (
     <div className="text-ink">
       <p className="text-[11px] leading-[1.6] text-muted dense:leading-[1.5] denser:text-[10.5px] densest:leading-[1.4]">
-        重説・販売図面の欄の順に並べた参考の下書きです（法令上の判断はしません）。<b className="font-semibold text-[#8a4f3a]">要確認（{checks}）</b>は役所・法務局・現地で確かめてください。
+        {/* いちばん詰めるときは1行に縮める（同じ注意はコピーした文の最後にも入る） */}
+        <span className="densest:hidden">重説・販売図面の欄の順に並べた参考の下書きです（法令上の判断はしません）。</span>
+        <b className="font-semibold text-[#8a4f3a]">要確認（{checks}）</b>は役所・法務局・現地で<span className="densest:hidden">確かめてください。</span>
+        <span className="hidden densest:inline">確認。法令の判断はしません</span>
       </p>
       <button
         onClick={() => all.copy(draftText(sections))}
-        className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-light to-brand py-2.5 text-[14px] font-bold text-white shadow-soft dense:py-2 densest:mt-1.5 densest:py-1.5"
+        className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-light to-brand py-2.5 text-[14px] font-bold text-white shadow-soft dense:py-2 densest:mt-1.5 densest:py-1 densest:text-[13px]"
       >
         <CopyIcon className="h-4 w-4" />
         {all.done ? "コピーしました" : "全部コピー"}

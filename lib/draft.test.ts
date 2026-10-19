@@ -105,6 +105,8 @@ describe("重説・物件概要の下書き", () => {
     expect(text).toContain("北の道路（約4m）：法第42条第1項第1号道路・幅員 6.0m【要確認】");
     expect(text).toContain("■ハザードマップ（重要事項説明で所在地を示す市区町村の地図）\n洪水・内水：千代田区のハザードマップ（https://example.jp/hm.html）");
     expect(text).toContain("■災害リスク（国のデータ・参考）\n洪水（想定最大規模）：浸水 0.5〜3m");
+    expect(text).toMatch(/\n大規模盛土造成地：国の重ねるハザードマップで確認（https:\/\/disaportal\.gsi\.go\.jp\/maps\/\?ll=[\d.]+,[\d.]+&z=16&base=pale&ls=daikiboumoritsuzouseichi_multi%2C0\.8&disp=1&vs=c1j0l0u0t0h0z0）\n/);
+    expect(text).toContain("\n液状化の発生傾向：国の重ねるハザードマップで確認（https://disaportal.gsi.go.jp/maps/?ll=");
     expect(text).toContain("用途地域・建ぺい率・容積率：第一種住居地域／建ぺい率60%／容積率400%");
     expect(text).toContain("■出典");
     expect(text.endsWith(DRAFT_NOTE)).toBe(true);
@@ -174,7 +176,7 @@ describe("重説・物件概要の下書き", () => {
       }),
     );
     expect(text).toContain("所在（地番）：横浜市港北区大豆戸町 589-1（推定・確度低）（公図から推定した位置（確度が低く、5m前後ずれることあり））【要確認】");
-    expect(text).toContain("国土地理院の基盤地図情報（道路縁）に合わせて MICHILU が推定の位置に置いたもの");
+    expect(text).toContain("国土地理院の基盤地図情報（道路縁）に合わせて MICHILU が推定の位置に置いたもので、数mずれることがあります。どちらも法務局の証明ではありません");
     expect(text).toContain("■出典\n筆の出典：「登記所備付地図データ」（法務省）");
   });
 });

@@ -5,6 +5,7 @@ import {
   classify,
   demValue,
   elevationAt,
+  groundMaps,
   groupHazardMaps,
   HAZARD_ZOOM,
   HAZARDS,
@@ -262,5 +263,18 @@ describe("浸水継続時間のデータが無い地点", () => {
     const f = fakeFetcher({ "01_flood_l2_shinsuishin_data": tile(() => rgba("#ffd8c0")) });
     const r = await hazardAt(35.6838, 139.8641, f);
     expect(hazardRows(r).find((x) => x.kind === "keizoku")?.value).toBe("データなし");
+  });
+});
+
+describe("大規模盛土造成地・液状化の発生傾向（国の地図で開く）", () => {
+  it("重ねるハザードマップを物件の場所で、そのレイヤだけ重ねて開く", () => {
+    const [zousei, ekijo] = groundMaps(35.525, 139.555);
+    expect(zousei).toEqual({
+      kind: "zousei",
+      label: "大規模盛土造成地",
+      url: "https://disaportal.gsi.go.jp/maps/?ll=35.525000,139.555000&z=16&base=pale&ls=daikiboumoritsuzouseichi_multi%2C0.8&disp=1&vs=c1j0l0u0t0h0z0",
+    });
+    expect(ekijo.label).toBe("液状化の発生傾向");
+    expect(ekijo.url).toContain("&z=15&base=pale&ls=ekijouka_zenkoku%2C0.8&");
   });
 });

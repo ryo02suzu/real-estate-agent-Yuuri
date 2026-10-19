@@ -3,12 +3,11 @@
 import type { LookupResult } from "./roadmap";
 import { buildingSummary, type BuildingResult } from "./roadmap/building";
 import { BUILDING_CREDIT } from "./roadmap/building-data";
-import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, hazardRows, wagamachiUrl, type Elevation, type HazardMaps, type HazardReport } from "./roadmap/hazard";
-import { KOZU_CREDIT } from "./roadmap/kozu-data";
+import { groundMaps, groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, hazardRows, wagamachiUrl, type Elevation, type HazardMaps, type HazardReport } from "./roadmap/hazard";
+import { parcelCreditLine } from "./roadmap/kozu-data";
 import { distanceText, kindText, priceText, type LandPriceHit } from "./roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
 import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel, type Estimated } from "./roadmap/parcel";
-import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
 import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
 import { lineLabel, STATION_CREDIT, type StationWalk } from "./roadmap/walk";
@@ -196,7 +195,15 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     if (!groups.length) maps.push({ label: "ハザードマップ", value: `${m.name}（わがまちハザードマップ）`, note: wagamachiUrl(hazard.muniCd) });
   } else maps.push({ label: "ハザードマップ", value: CHECK, note: "市区町村のハザードマップで確認", check: true });
   sections.push({ title: "ハザードマップ（重要事項説明で所在地を示す市区町村の地図）", rows: maps });
-  if (hazard) sections.push({ title: "災害リスク（国のデータ・参考）", rows: hazardRows(hazard.report, hazard.elevation).map((r) => ({ label: r.label, value: r.value, check: r.warn })) });
+  // 大規模盛土造成地・液状化の発生傾向は読み取らず、国の重ねるハザードマップを物件の場所で開く URL を添える
+  if (hazard)
+    sections.push({
+      title: "災害リスク（国のデータ・参考）",
+      rows: [
+        ...hazardRows(hazard.report, hazard.elevation).map((r) => ({ label: r.label, value: r.value, check: r.warn })),
+        ...groundMaps(result.lat, result.lng).map((g) => ({ label: g.label, value: "国の重ねるハザードマップで確認", note: g.url })),
+      ],
+    });
 
   // 販売図面（物件概要）
   const outline: DraftRow[] = [];
@@ -222,8 +229,8 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   // 出典（それぞれの出典の文のまま。見出しは付けない。国土数値情報のデータは1つの文にまとめる）
   const credits: DraftRow[] = [];
   const credit = (value: string) => credits.push({ label: "", value });
-  if (p || parcels) credit(`筆の${PARCEL_CREDIT}`);
-  if (p?.estimated || parcels?.estimated) credit(KOZU_CREDIT);
+  // 筆の出典（登記所備付地図データ）と、公図から推定した筆の注意は1つの文に
+  if (p || parcels) credit(parcelCreditLine(!!(p?.estimated || parcels?.estimated)));
   if (zoning) credit(`都市計画の${ZONING_CREDIT}`);
   if (hazard) credit(`災害リスクの${HAZARD_CREDIT}`);
   if (hit) credit(`建物の${BUILDING_CREDIT}`);

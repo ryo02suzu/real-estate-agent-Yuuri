@@ -2,7 +2,7 @@
 import type { LookupResult } from "./roadmap";
 import { buildingSummary, type BuildingResult } from "./roadmap/building";
 import { BUILDING_CREDIT } from "./roadmap/building-data";
-import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, hazardRows, wagamachiUrl, type Elevation, type HazardMaps, type HazardReport } from "./roadmap/hazard";
+import { GROUND_NOTE, groundMaps, groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, hazardRows, wagamachiUrl, type Elevation, type HazardMaps, type HazardReport } from "./roadmap/hazard";
 import { asOfText, changeText, distanceText, kindText, priceText, type LandPriceHit } from "./roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
 import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
@@ -98,6 +98,9 @@ export function buildSummary(
     const groups = groupHazardMaps(hazard.maps);
     for (const g of groups) lines.push(`・${m.name}の${g.kinds.map((k) => HAZARD_MAP_LABELS[k]).join("・")}のハザードマップ\n  ${g.url}`);
     if (!groups.length) lines.push(`・${m.name}のハザードマップ（わがまちハザードマップ）\n  ${wagamachiUrl(hazard.muniCd)}`);
+    // 大規模盛土造成地・液状化の発生傾向は、国の重ねるハザードマップを物件の場所で開く
+    for (const g of groundMaps(result.lat, result.lng)) lines.push(`・${g.label}（国の重ねるハザードマップ）\n  ${g.url}`);
+    lines.push(`  （${GROUND_NOTE}）`);
   }
   const hit = building?.hit;
   if (hit) lines.push(`【建物（PLATEAU・参考）】${buildingSummary(hit.building)}${hit.building.height ? `・高さ約${hit.building.height.toFixed(1)}m` : ""}`);
