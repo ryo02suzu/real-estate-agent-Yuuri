@@ -285,10 +285,10 @@ function Memo({
                     <dd className="min-w-0 flex-1 font-semibold text-[#8a4f3a]">{houreiLine(zoning.hourei)}</dd>
                   </div>
                 )}
-                {/* 自然公園・農業振興地域も、区域に入っているときだけ */}
-                {!!(zoning.tochi?.park || zoning.tochi?.agri) && (
+                {/* 自然公園・農業振興地域・森林も、区域に入っているときだけ */}
+                {!!(zoning.tochi?.park || zoning.tochi?.agri || zoning.tochi?.forest) && (
                   <div className="flex gap-2 py-0.5">
-                    <dt className="w-[7.5em] shrink-0 text-[10.5px] text-[#7a6a55]">自然公園・農振</dt>
+                    <dt className="w-[7.5em] shrink-0 text-[10.5px] text-[#7a6a55]">自然公園・農振・森林</dt>
                     <dd className="min-w-0 flex-1 font-semibold text-[#8a4f3a]">
                       {tochiLine(zoning.tochi)}（{zoning.tochi.year}年度の国のデータ・参考）
                     </dd>
@@ -432,7 +432,7 @@ function Memo({
           {zoning.status === "ok" &&
             !!zoning.hourei?.hits.length &&
             `砂防指定地などの区域の${HOUREI_CREDIT}（概略の区域で、重要事項説明の根拠には使えません）。${[...new Set(zoning.hourei.hits.map((h) => houreiNote(h.kind, h.pref)).filter(Boolean))].join("")}`}
-          {zoning.status === "ok" && !!(zoning.tochi?.park || zoning.tochi?.agri) && `自然公園・農業振興地域の${TOCHI_CREDIT}（縮尺約1/5万の概略の区域）。`}
+          {zoning.status === "ok" && !!(zoning.tochi?.park || zoning.tochi?.agri || zoning.tochi?.forest) && `自然公園・農業振興地域・森林の${TOCHI_CREDIT}（縮尺約1/5万の概略の区域）。`}
           {hazard.status === "ok" && `災害リスクの${HAZARD_CREDIT}。`}
           {bHit && `建物の${BUILDING_CREDIT}。`}
           {prices.length > 0 && `地価の${LAND_PRICE_CREDIT}（標準地・基準地の価格で、物件の価格ではありません）。`}

@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-国土数値情報の土地利用基本計画の区域のうち、重説の「その他の法令」に関わる自然公園地域（A10）と農業地域（A12）の関東1都6県分を、
-1つのベクトルタイル（PMTiles・z14 だけ）にする。アプリ（lib/roadmap/tochi.ts）は物件の地点のタイルだけを読み、地点を含む区域を出す。
+国土数値情報の土地利用基本計画の区域のうち、重説の「その他の法令」に関わる自然公園地域（A10）・農業地域（A12）・森林地域（A13）の
+関東1都6県分を、1つのベクトルタイル（PMTiles・z13 だけ）にする。アプリ（lib/roadmap/tochi.ts）は物件の地点のタイルだけを読み、地点を含む区域を出す。
 
   自然公園地域（A10。自然公園法）：自然公園地域・特別地域・特別保護地区
   農業地域（A12。農業振興地域の整備に関する法律）：農業地域（農業振興地域）・農用地区域
+  森林地域（A13。森林法）：国有林・地域森林計画対象民有林・保安林（森林地域そのものは、国有林と民有林を合わせた区域なので入れない）
 
 どちらも都県の土地利用基本計画図（縮尺約5万分の1）から作った概略の区域で、最新は2015年度版。アプリは参考として出し、
-都県・市町村の資料で確かめる旨を添える。形は変えずに（間引かずに）タイルにする。
+都県・市町村の資料で確かめる旨を添える。形は変えずに（間引かずに）タイルにする。z13 でも座標の刻みは約1.2m で、
+縮尺5万分の1の図の精度よりずっと細かい（z14 より森林の多い県でタイルの数が減り、全体が小さくなる）。
 
   python3 scripts/tochi/build.py --check     # 国土数値情報に新しい年度のデータが出たか（changed=true/false）
   python3 scripts/tochi/build.py --install   # 最新の年度で作り、public/data/ に置いて tochi-source.json を書き換える
@@ -33,12 +35,14 @@ import zipfile
 PREFS = ("08", "09", "10", "11", "12", "13", "14")
 BASE = "https://nlftp.mlit.go.jp/ksj/gml/data/{code}/{code}-{yy}/{code}-{yy}_{pref}_GML.zip"
 UA = {"User-Agent": "michilu-tochi (+https://github.com/ryo02suzu/real-estate-agent-Yuuri)"}
-ATTRIBUTION = '<a href="https://nlftp.mlit.go.jp/ksj/">「国土数値情報（自然公園地域データ・農業地域データ）」（国土交通省）</a>を加工して作成'
+ATTRIBUTION = '<a href="https://nlftp.mlit.go.jp/ksj/">「国土数値情報（自然公園地域データ・農業地域データ・森林地域データ）」（国土交通省）</a>を加工して作成'
+ZOOM = 13
 
 # データ → レイヤ番号（LAYER_NO）ごとの種類（t）。first は探し始める年度
 DATASETS = {
     "A10": {"first": 2015, "layers": {11: 1, 12: 2, 13: 3}},
     "A12": {"first": 2015, "layers": {5: 4, 6: 5}},
+    "A13": {"first": 2015, "layers": {8: 6, 9: 7, 10: 8}},
 }
 
 
@@ -137,9 +141,9 @@ def build(years: dict[str, dict[str, int]], out: str, work: str) -> dict:
     tippecanoe = shutil.which("tippecanoe") or "tippecanoe"
     subprocess.run(
         [
-            tippecanoe, "-q", "--force", "-o", out, "-l", "tc", "-Z14", "-z14", "--full-detail=12",
+            tippecanoe, "-q", "--force", "-o", out, "-l", "tc", f"-Z{ZOOM}", f"-z{ZOOM}", "--full-detail=12",
             "--no-feature-limit", "--no-tile-size-limit", "--no-line-simplification", "--no-tiny-polygon-reduction",
-            "-n", "MICHILU land use plan areas (natural parks, agricultural areas)", "-A", ATTRIBUTION, seq,
+            "-n", "MICHILU land use plan areas (natural parks, agricultural areas, forests)", "-A", ATTRIBUTION, seq,
         ],
         check=True,
     )

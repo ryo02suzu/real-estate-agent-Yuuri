@@ -90,7 +90,7 @@ function DraftBody({ sections }: { sections: DraftSection[] }) {
             ))}
           </div>
         ) : (
-          <dl className="mt-1.5 grid grid-cols-[7.2em_1fr] gap-x-2 gap-y-1 text-[11.5px] leading-[1.5] dense:mt-1 dense:gap-y-0.5 denser:text-[11px] denser:leading-[1.45] densest:gap-y-0 densest:leading-[1.35]">
+          <dl className="mt-1.5 grid grid-cols-[7.2em_1fr] gap-x-2 gap-y-1 text-[11.5px] leading-[1.5] dense:mt-1 dense:gap-y-0.5 denser:text-[11px] denser:leading-[1.45] densest:gap-y-0 densest:leading-[1.3]">
             {s.rows.map((r, i) => (
               <Fragment key={i}>
                 <dt className="text-muted">{r.label}</dt>

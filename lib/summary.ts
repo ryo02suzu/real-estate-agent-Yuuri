@@ -79,7 +79,7 @@ export function buildSummary(
     }
     if (zoning.tochi) {
       const check = tochiCheck(zoning.tochi, m.name);
-      lines.push(`・自然公園・農業振興地域：${tochiLine(zoning.tochi)}（${zoning.tochi.year}年度の国のデータ・参考）`);
+      lines.push(`・自然公園・農業振興地域・森林：${tochiLine(zoning.tochi)}（${zoning.tochi.year}年度の国のデータ・参考）`);
       if (check) lines.push(`  （${check}）`);
     }
   }
@@ -131,7 +131,7 @@ export function buildSummary(
   if (p?.estimated || parcels?.estimated) lines.push(`※${KOZU_CREDIT}。`);
   if (zoning) lines.push(`※都市計画の${ZONING_CREDIT}。`);
   if (zoning?.morido) lines.push(`※盛土規制法の区域の${MORIDO_CREDIT}。概略の区域で、重要事項説明には${zoning.morido.authority}の資料で確認を。`);
-  if (zoning?.tochi) lines.push(`※自然公園・農業振興地域の${TOCHI_CREDIT}。縮尺約1/5万の概略の区域。`);
+  if (zoning?.tochi) lines.push(`※自然公園・農業振興地域・森林の${TOCHI_CREDIT}。縮尺約1/5万の概略の区域。`);
   const hr = zoning?.hourei;
   if (hr) {
     lines.push(`※砂防指定地などの区域の${HOUREI_CREDIT}。概略の区域で、重要事項説明には指定した都県・市の資料で確認を。`);

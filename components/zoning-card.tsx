@@ -67,11 +67,16 @@ export function useZoning(lat: number, lng: number, municipality: Municipality):
 }
 
 /** 注意の色にする印 */
-const WARN_CHIP = new RegExp(`計画道路|境目|調整|自然公園|農用地|${Object.values(HOUREI_SHORT).join("|")}`);
+const WARN_CHIP = new RegExp(`計画道路|境目|調整|自然公園|農用地|保安林|${Object.values(HOUREI_SHORT).join("|")}`);
 
-/** 自然公園の特別地域・特別保護地区と、農用地区域の印（普通地域・農用地区域の外の農業振興地域は印にしない） */
+/**
+ * 自然公園の特別地域・特別保護地区と、農用地区域・保安林の印（普通地域・農用地区域の外の農業振興地域・保安林でない森林は、
+ * 印にせず、その他の法令のタブの印だけにする）
+ */
 function tochiChips(t?: Tochi): string[] {
-  return [t?.park && t.park !== "普通地域" && "自然公園", t?.agri === "農用地区域" && "農用地区域"].filter((c): c is string => !!c);
+  return [t?.park && t.park !== "普通地域" && "自然公園", t?.agri === "農用地区域" && "農用地区域", t?.forest === "保安林" && "保安林"].filter(
+    (c): c is string => !!c,
+  );
 }
 
 /**
@@ -143,7 +148,7 @@ const TABS = ["都市計画", "その他の法令", "上下水道"];
 /** 都市計画と、その他の法令の下調べ。tabs：スマホのシート（タブで分ける） */
 function ZoningDetail({ state, city, tabs }: { state: Extract<ZoningState, { status: "ok" }>; city: string; tabs?: boolean }) {
   const [tab, setTab] = useState(0);
-  const warn = !!state.hourei?.hits.length || tochiChips(state.tochi).length > 0;
+  const warn = !!state.hourei?.hits.length || tochiChips(state.tochi).length > 0 || !!state.tochi?.forest;
   if (!tabs)
     return (
       <div>
@@ -222,7 +227,7 @@ function ZoningPart({ state: { zoning, st }, city }: { state: Extract<ZoningStat
   );
 }
 
-/** その他の法令の下調べ：盛土規制法・砂防指定地や急傾斜地などの区域・自然公園と農業振興地域・埋蔵文化財と、その出典・特記事項 */
+/** その他の法令の下調べ：盛土規制法・砂防指定地や急傾斜地などの区域・自然公園と農業振興地域と森林・埋蔵文化財と、その出典・特記事項 */
 function OtherPart({ state: { morido, hourei, tochi, iseki }, city }: { state: Extract<ZoningState, { status: "ok" }>; city: string }) {
   const notes = hourei && houreiNotesLine(hourei.pref);
   return (
@@ -248,7 +253,7 @@ function OtherPart({ state: { morido, hourei, tochi, iseki }, city }: { state: E
               {[
                 morido && `宅地造成等工事規制区域・特定盛土等規制区域データ（${MORIDO_DATA.asOf}時点）`,
                 hourei && "砂防指定地・地すべり防止区域・急傾斜地崩壊危険区域・災害危険区域データ",
-                tochi && `自然公園地域・農業地域データ（${TOCHI_YEAR}年度）`,
+                tochi && `自然公園地域・農業地域・森林地域データ（${TOCHI_YEAR}年度）`,
               ]
                 .filter(Boolean)
                 .join("、")}
@@ -304,9 +309,9 @@ function HoureiRow({ hourei }: { hourei: Hourei }) {
             </span>
             <span className={SUB}>
               {groups.map((g) => (
-                <span key={g.kind} className="block">
+                <Clamp key={g.kind}>
                   {HOUREI_SHORT[g.kind]}：{g.text}
-                </span>
+                </Clamp>
               ))}
               {houreiCautionAll(hourei)}
             </span>
@@ -325,12 +330,22 @@ function HoureiRow({ hourei }: { hourei: Hourei }) {
   );
 }
 
-/** 自然公園（自然公園法）と農業振興地域（農振法）の行（国のデータ・参考）。2015年度の土地利用基本計画図の概略の区域 */
+/** 区域の名前と告示の一覧。シートでいちばん詰めるときは2行までにして、押すと全部を出す（共有の文面・下書きには全部入る） */
+function Clamp({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span onClick={() => setOpen((o) => !o)} className={`block ${open ? "" : "densest:line-clamp-2"}`}>
+      {children}
+    </span>
+  );
+}
+
+/** 自然公園（自然公園法）・農業振興地域（農振法）・森林（森林法）の行（国のデータ・参考）。2015年度の土地利用基本計画図の概略の区域 */
 function TochiRow({ tochi, city }: { tochi: Tochi; city: string }) {
   const check = tochiCheck(tochi, city);
   return (
     <div className={ROW}>
-      <dt className={LABEL}>自然公園・農振</dt>
+      <dt className={LABEL}>自然公園・農振・森林</dt>
       <dd className="min-w-0 flex-1">
         {check ? (
           <>
@@ -345,7 +360,7 @@ function TochiRow({ tochi, city }: { tochi: Tochi; city: string }) {
         ) : (
           <>
             <span className={`block ${VALUE} text-ink`}>区域外（国のデータ）</span>
-            <span className={SUB}>自然公園・農業振興地域（{tochi.year}年度の国のデータ）</span>
+            <span className={SUB}>自然公園・農業振興地域・森林地域（{tochi.year}年度の国のデータ）</span>
           </>
         )}
       </dd>

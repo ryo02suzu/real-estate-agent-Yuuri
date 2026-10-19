@@ -16,7 +16,7 @@ import { CHIBANZU_NOTE, chibanzuFor } from "./roadmap/chibanzu";
 import { HOUREI_CREDIT, HOUREI_LAWS, houreiAsOf, houreiCaution, houreiGroups, houreiNotesLine, houreiOffice, houreiOfficeAll, PREF_NAMES, type Hourei, type HoureiKind } from "./roadmap/hourei";
 import { isekiFor } from "./roadmap/iseki";
 import { suidoFor } from "./roadmap/suido";
-import { TOCHI_CREDIT, tochiAgriText, tochiCheck, tochiParkText, type Tochi } from "./roadmap/tochi";
+import { TOCHI_CREDIT, tochiAgriText, tochiCheck, tochiForestText, tochiParkText, type Tochi } from "./roadmap/tochi";
 import { MORIDO_CREDIT, moridoCaution, moridoDetail, moridoValue, type Morido } from "./roadmap/morido";
 import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
 import { ZONING_CREDIT } from "./roadmap/zoning-data";
@@ -121,18 +121,35 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
       check: true,
     });
   }
-  // 自然公園法・農業振興地域の整備に関する法律（国のデータは2015年度・縮尺約1/5万の概略。どちらも区域外なら1つの欄）
+  // 自然公園法・農業振興地域の整備に関する法律・森林法（国のデータは2015年度・縮尺約1/5万の概略。区域外の法令が2つ以上なら1つの欄）
   const tc = zoning?.tochi;
-  const PARK = "自然公園法";
-  const AGRI = "農業振興地域の整備に関する法律";
-  if (!tc) other.push({ label: `${PARK}・${AGRI}`, value: CHECK, note: "自然公園は都県、農業振興地域・農用地区域は市町村の農業委員会で確認", check: true });
-  else if (!tc.park && !tc.agri) other.push({ label: `${PARK}・${AGRI}`, value: "区域外（国のデータ・参考）", note: `${tc.year}年度の国のデータ（縮尺約1/5万の概略）では自然公園・農業振興地域の外`, check: true });
+  if (!tc)
+    other.push({
+      label: "自然公園法・農業振興地域の整備に関する法律・森林法",
+      value: CHECK,
+      note: "自然公園・保安林は都県、農用地区域は市町村の農業委員会、地域森林計画の森林は市町村の林務の担当で確認",
+      check: true,
+    });
   else {
-    const check = tochiCheck(tc, m.name);
-    // 注は2つの欄で1回（2015年度・縮尺約1/5万の概略と、確かめる先）
-    const note = `${tc.year}年度・縮尺約1/5万の国のデータ。${check}`;
-    other.push({ label: PARK, value: `${tochiParkText(tc)}（国のデータ・参考）`, note: tc.park ? note : undefined, check: true });
-    other.push({ label: AGRI, value: `${tochiAgriText(tc)}（国のデータ・参考）`, note: tc.agri && !tc.park ? note : undefined, check: true });
+    const laws = [
+      { law: "自然公園法", area: "自然公園", inside: !!tc.park, text: tochiParkText(tc) },
+      { law: "農業振興地域の整備に関する法律", area: "農業振興地域", inside: !!tc.agri, text: tochiAgriText(tc) },
+      { law: "森林法", area: "森林地域", inside: !!tc.forest, text: tochiForestText(tc) },
+    ];
+    // 注は区域に入っている欄で1回（2015年度・縮尺約1/5万の概略と、確かめる先）
+    const note = `${tc.year}年度・縮尺約1/5万の国のデータ。${tochiCheck(tc, m.name)}`;
+    laws
+      .filter((l) => l.inside)
+      .forEach((l, i) => other.push({ label: l.law, value: `${l.text}（国のデータ・参考）`, note: i === 0 ? note : undefined, check: true }));
+    const out = laws.filter((l) => !l.inside);
+    if (out.length >= 2)
+      other.push({
+        label: out.map((l) => l.law).join("・"),
+        value: "区域外（国のデータ・参考）",
+        note: `${tc.year}年度の国のデータ（縮尺約1/5万の概略）では${out.map((l) => l.area).join("・")}の外`,
+        check: true,
+      });
+    else if (out.length) other.push({ label: out[0].law, value: `${out[0].text}（国のデータ・参考）`, check: true });
   }
   // 文化財保護法：周知の埋蔵文化財包蔵地（遺跡）に入るかは教育委員会で確かめる。遺跡地図は概要を示すもので、証明にはならない
   const ik = isekiFor(m, result.lat, result.lng);
@@ -216,7 +233,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   if (near) ksj.push(["地価", LAND_PRICE_CREDIT]);
   if (schools?.elementary || schools?.junior) ksj.push(["学区", schoolCredit(schools)]);
   if (stations?.length) ksj.push(["駅", STATION_CREDIT]);
-  if (zoning?.tochi) ksj.push(["自然公園・農振", TOCHI_CREDIT]);
+  if (zoning?.tochi) ksj.push(["自然公園・農振・森林", TOCHI_CREDIT]);
   ksjCredits(ksj).forEach(credit);
   // 都県が利用条件で求める特記事項（砂防指定地などの区域のデータ）
   const notes = hr && houreiNotesLine(hr.pref);
