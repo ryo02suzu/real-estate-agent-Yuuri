@@ -84,7 +84,7 @@ function DraftBody({ sections }: { sections: DraftSection[] }) {
         </div>
         {/^出典/.test(s.title) ? (
           // 出典は長いので、表にせず小さな字で並べる
-          <div className="mt-1 space-y-0.5 text-[10px] leading-[1.45] text-muted dense:space-y-0 denser:text-[9.5px] densest:leading-[1.35]">
+          <div className="mt-1 space-y-0.5 text-[10px] leading-[1.45] text-muted dense:space-y-0 denser:text-[9.5px] densest:mt-0.5 densest:leading-[1.28]">
             {s.rows.map((r) => (
               <p key={r.value}>{r.value}</p>
             ))}
@@ -104,7 +104,7 @@ function DraftBody({ sections }: { sections: DraftSection[] }) {
                         開く
                       </a>
                     ) : (
-                      <span className="block text-[10px] leading-[1.45] text-muted denser:text-[9.5px] densest:leading-[1.3]">{r.note}</span>
+                      <Note text={r.note} />
                     ))}
                 </dd>
               </Fragment>
@@ -115,5 +115,18 @@ function DraftBody({ sections }: { sections: DraftSection[] }) {
       {/* 同じ注意はコピーした文の最後にも入る。背の低い画面と、詰めるときは出さない */}
       <p className="mt-2 text-[10px] leading-[1.5] text-muted dense:hidden [@media(max-height:720px)]:hidden">{DRAFT_NOTE}</p>
     </div>
+  );
+}
+
+/** 欄の注。いちばん詰めるときは2行までにして、押すと全部を出す（コピーした文には全部入る） */
+function Note({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span
+      onClick={() => setOpen((o) => !o)}
+      className={`block text-[10px] leading-[1.45] text-muted denser:text-[9.5px] densest:leading-[1.3] ${open ? "" : "densest:line-clamp-2"}`}
+    >
+      {text}
+    </span>
   );
 }

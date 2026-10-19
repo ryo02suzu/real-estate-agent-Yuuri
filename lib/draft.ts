@@ -13,9 +13,10 @@ import type { NearbyRoad } from "./roadmap/road-read";
 import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
 import { lineLabel, STATION_CREDIT, type StationWalk } from "./roadmap/walk";
 import { CHIBANZU_NOTE, chibanzuFor } from "./roadmap/chibanzu";
-import { HOUREI_CREDIT, HOUREI_LAWS, houreiAsOf, houreiCaution, houreiGroups, houreiNotesLine, houreiOffice, PREF_NAMES, type Hourei, type HoureiKind } from "./roadmap/hourei";
+import { HOUREI_CREDIT, HOUREI_LAWS, houreiAsOf, houreiCaution, houreiGroups, houreiNotesLine, houreiOffice, houreiOfficeAll, PREF_NAMES, type Hourei, type HoureiKind } from "./roadmap/hourei";
 import { isekiFor } from "./roadmap/iseki";
 import { suidoFor } from "./roadmap/suido";
+import { TOCHI_CREDIT, tochiAgriText, tochiCheck, tochiParkText, type Tochi } from "./roadmap/tochi";
 import { MORIDO_CREDIT, moridoCaution, moridoDetail, moridoValue, type Morido } from "./roadmap/morido";
 import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
 import { ZONING_CREDIT } from "./roadmap/zoning-data";
@@ -25,7 +26,7 @@ export type DraftRow = { label: string; value: string; note?: string; check?: bo
 export type DraftSection = { title: string; rows: DraftRow[] };
 
 export type DraftInput = {
-  zoning?: { zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei };
+  zoning?: { zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi };
   parcels?: { target?: string; neighbors: string[]; reference: boolean; estimated?: Estimated };
   roads?: NearbyRoad[];
   hazard?: { report: HazardReport; elevation: Elevation | null; maps: HazardMaps; muniCd: string };
@@ -107,7 +108,32 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     other.push({ label: "宅地造成及び特定盛土等規制法", value: `${moridoValue(md)}（国のデータ・参考）`, note: `${moridoDetail(md)}。${moridoCaution(md.authority)}`, check: true });
     if (md.link) other.push({ label: "盛土規制法の確認先", value: md.link.label, note: md.link.url });
   } else other.push({ label: "宅地造成及び特定盛土等規制法", value: CHECK, note: "区域を指定した都県・市（盛土規制法の担当課）で確認", check: true });
-  for (const kind of ["急傾斜地崩壊危険区域", "地すべり防止区域", "砂防指定地"] as const) other.push(houreiRow(kind));
+  // 区域外の種類が2つ以上なら1つの欄にまとめる（スマホの1画面に収める。区域内の種類は1つずつ）
+  const kinds = ["急傾斜地崩壊危険区域", "地すべり防止区域", "砂防指定地"] as const;
+  const outside = hr ? kinds.filter((k) => !hr.missing.includes(k) && !hr.hits.some((h) => h.kind === k)) : [];
+  for (const kind of kinds) if (outside.length < 2 || !outside.includes(kind)) other.push(houreiRow(kind));
+  if (hr && outside.length >= 2) {
+    const asOf = [...new Set(outside.map((k) => houreiAsOf(k, hr.pref)))].join("・");
+    other.push({
+      label: `${outside.map((k) => HOUREI_LAWS[k].law).join("・")}（${outside.join("・")}）`,
+      value: "区域外（国のデータ・参考）",
+      note: `${asOf}の国のデータではどれも区域外。概略の区域で、重要事項説明には${houreiOfficeAll([...outside], PREF_NAMES[hr.pref])}で確認`,
+      check: true,
+    });
+  }
+  // 自然公園法・農業振興地域の整備に関する法律（国のデータは2015年度・縮尺約1/5万の概略。どちらも区域外なら1つの欄）
+  const tc = zoning?.tochi;
+  const PARK = "自然公園法";
+  const AGRI = "農業振興地域の整備に関する法律";
+  if (!tc) other.push({ label: `${PARK}・${AGRI}`, value: CHECK, note: "自然公園は都県、農業振興地域・農用地区域は市町村の農業委員会で確認", check: true });
+  else if (!tc.park && !tc.agri) other.push({ label: `${PARK}・${AGRI}`, value: "区域外（国のデータ・参考）", note: `${tc.year}年度の国のデータ（縮尺約1/5万の概略）では自然公園・農業振興地域の外`, check: true });
+  else {
+    const check = tochiCheck(tc, m.name);
+    // 注は2つの欄で1回（2015年度・縮尺約1/5万の概略と、確かめる先）
+    const note = `${tc.year}年度・縮尺約1/5万の国のデータ。${check}`;
+    other.push({ label: PARK, value: `${tochiParkText(tc)}（国のデータ・参考）`, note: tc.park ? note : undefined, check: true });
+    other.push({ label: AGRI, value: `${tochiAgriText(tc)}（国のデータ・参考）`, note: tc.agri && !tc.park ? note : undefined, check: true });
+  }
   // 文化財保護法：周知の埋蔵文化財包蔵地（遺跡）に入るかは教育委員会で確かめる。遺跡地図は概要を示すもので、証明にはならない
   const ik = isekiFor(m, result.lat, result.lng);
   other.push({ label: "文化財保護法（埋蔵文化財包蔵地）", value: CHECK, note: `包蔵地（遺跡）に入るかは${ik.office}で確認${ik.note ? `。${ik.note}` : ""}`, check: true });
@@ -185,11 +211,12 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   if (hazard) credit(`災害リスクの${HAZARD_CREDIT}`);
   if (hit) credit(`建物の${BUILDING_CREDIT}`);
   const ksj: [string, string][] = [];
-  if (md) ksj.push(["盛土規制法の区域", MORIDO_CREDIT]);
-  if (hr) ksj.push(["砂防指定地などの区域", HOUREI_CREDIT]);
+  if (md) ksj.push(["盛土規制法", MORIDO_CREDIT]);
+  if (hr) ksj.push(["砂防指定地など", HOUREI_CREDIT]);
   if (near) ksj.push(["地価", LAND_PRICE_CREDIT]);
   if (schools?.elementary || schools?.junior) ksj.push(["学区", schoolCredit(schools)]);
   if (stations?.length) ksj.push(["駅", STATION_CREDIT]);
+  if (zoning?.tochi) ksj.push(["自然公園・農振", TOCHI_CREDIT]);
   ksjCredits(ksj).forEach(credit);
   // 都県が利用条件で求める特記事項（砂防指定地などの区域のデータ）
   const notes = hr && houreiNotesLine(hr.pref);

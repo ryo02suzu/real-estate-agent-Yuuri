@@ -231,6 +231,24 @@ describe("buildSummary の盛土規制法", () => {
     expect(text.match(/※神奈川県の区域のデータについて：区域の形状は概略であるため/g)).toHaveLength(1);
   });
 
+  it("自然公園・農業振興地域（2015年度の国のデータ）と確かめる先", () => {
+    const m = findMunicipality("14382")!;
+    const result = {
+      status: "ok" as const,
+      lat: 35.2047,
+      lng: 139.0247,
+      matchedAddress: "神奈川県足柄下郡箱根町箱根",
+      town: "箱根",
+      approximate: false,
+      municipality: m,
+      links: buildLinks(m, 35.2047, 139.0247),
+    };
+    const zoning = { youto: [], youtoNear: [], tokei: true, jyuntoshi: false, koudoti: false, others: [] };
+    const text = buildSummary(result, { zoning: { zoning, tochi: { park: "特別地域", agri: "農用地区域", year: 2015 } } });
+    expect(text).toContain("・自然公園・農業振興地域：自然公園の特別地域・農用地区域（2015年度の国のデータ・参考）\n  （自然公園は都県の担当、農用地区域かは箱根町の農業委員会で確認）");
+    expect(text).toContain("※自然公園・農業振興地域の出典：「国土数値情報（自然公園地域データ・農業地域データ）」");
+  });
+
   it("市町村の地番図（物件の場所で開く URL）", () => {
     const m = findMunicipality("11202")!;
     const result = {

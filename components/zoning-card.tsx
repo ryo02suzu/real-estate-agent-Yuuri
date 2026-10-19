@@ -2,18 +2,20 @@
 
 // 物件の地点の都市計画（用途地域・建ぺい率・容積率・防火・高度地区など）。国土交通省の都市計画決定GISデータを
 // アプリと同じサイトに置いたタイルから読む（lib/roadmap/zoning.ts）。道路種別の結果を先に出し、こちらは後から読み込む。
-// 重説の「その他の法令」の下調べ（盛土規制法の区域・砂防指定地や急傾斜地崩壊危険区域などの区域・埋蔵文化財の遺跡地図・
-// 上下水道の台帳の地図。lib/roadmap/morido.ts・hourei.ts・iseki.ts・suido.ts）も添える。スマホのシートは「都市計画」と
-// 「その他の法令」のタブに分け（それぞれ1画面に収める）、PC のカードは続けて出す
+// 重説の「その他の法令」の下調べ（盛土規制法の区域・砂防指定地や急傾斜地崩壊危険区域などの区域・自然公園と農業振興地域・
+// 埋蔵文化財の遺跡地図。lib/roadmap/morido.ts・hourei.ts・tochi.ts・iseki.ts）と、上下水道の台帳の地図（suido.ts）も添える。
+// スマホのシートは「都市計画」「その他の法令」「上下水道」のタブに分け（それぞれ1画面に収める）、PC のカードは続けて出す
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
 import type { Municipality } from "@/lib/roadmap";
 import { HOUREI_SHORT, houreiAt, houreiCautionAll, houreiChips, houreiGroups, houreiNotesLine, PREF_NAMES, type Hourei } from "@/lib/roadmap/hourei";
 import { pmtilesHoureiSource } from "@/lib/roadmap/hourei-tiles";
 import { isekiFor, isekiNote, type Iseki } from "@/lib/roadmap/iseki";
-import { MORIDO_DATA, MORIDO_SOURCE, moridoAt, moridoDetail, moridoNote, moridoNotice, moridoValue, type Morido } from "@/lib/roadmap/morido";
+import { MORIDO_DATA, moridoAt, moridoDetail, moridoNote, moridoNotice, moridoValue, type Morido } from "@/lib/roadmap/morido";
 import { pmtilesMoridoSource } from "@/lib/roadmap/morido-tiles";
 import { suidoFor, type SuidoLink } from "@/lib/roadmap/suido";
+import { TOCHI_YEAR, tochiAt, tochiCheck, tochiLine, type Tochi } from "@/lib/roadmap/tochi";
+import { pmtilesTochiSource } from "@/lib/roadmap/tochi-tiles";
 import { statusFor, zoningAt, zoningChips, zoningRows, type Zoning, type ZoningStatus } from "@/lib/roadmap/zoning";
 import { ZONING_DATA } from "@/lib/roadmap/zoning-data";
 import { pmtilesZoningSource } from "@/lib/roadmap/zoning-tiles";
@@ -21,13 +23,13 @@ import { AlertIcon, ChevronRightIcon, InfoIcon, ZoningIcon } from "./icons";
 import { Sheet } from "./sheet";
 
 /**
- * morido：盛土規制法の区域、hourei：砂防指定地・急傾斜地崩壊危険区域などの区域（どちらも読めなければ無し）、
+ * morido：盛土規制法の区域、hourei：砂防指定地・急傾斜地崩壊危険区域などの区域、tochi：自然公園・農業振興地域（読めなければ無し）、
  * iseki：埋蔵文化財の確認先、suido：上下水道の台帳の地図
  */
 export type ZoningState =
   | { status: "loading" }
   | { status: "error" }
-  | { status: "ok"; zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; iseki?: Iseki; suido?: SuidoLink[] };
+  | { status: "ok"; zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi; iseki?: Iseki; suido?: SuidoLink[] };
 
 /** 地点の都市計画を読む（市区町村のデータの有無と時点も） */
 export function useZoning(lat: number, lng: number, municipality: Municipality): ZoningState {
@@ -42,13 +44,17 @@ export function useZoning(lat: number, lng: number, municipality: Municipality):
       // 盛土規制法・砂防指定地などの区域は読めなくても都市計画は出す
       withRetry(() => moridoAt(lat, lng, codes.split(",")[0], pmtilesMoridoSource)).catch(() => null),
       withRetry(() => houreiAt(lat, lng, codes.split(",")[0], pmtilesHoureiSource)).catch(() => null),
+      withRetry(() => tochiAt(lat, lng, codes.split(",")[0], pmtilesTochiSource)).catch(() => null),
     ])
-      .then(([zoning, mod, morido, hourei]) => {
+      .then(([zoning, mod, morido, hourei, tochi]) => {
         if (!alive) return;
         const st = statusFor(codes.split(","), mod.default as Record<string, ZoningStatus>);
         const iseki = isekiFor(municipality, lat, lng);
         const suido = suidoFor(municipality, lat, lng);
-        setState({ key, value: zoning ? { status: "ok", zoning, st, morido: morido ?? undefined, hourei: hourei ?? undefined, iseki, suido } : { status: "error" } });
+        setState({
+          key,
+          value: zoning ? { status: "ok", zoning, st, morido: morido ?? undefined, hourei: hourei ?? undefined, tochi: tochi ?? undefined, iseki, suido } : { status: "error" },
+        });
       })
       .catch(() => alive && setState({ key, value: { status: "error" } }));
     return () => {
@@ -61,7 +67,12 @@ export function useZoning(lat: number, lng: number, municipality: Municipality):
 }
 
 /** 注意の色にする印 */
-const WARN_CHIP = new RegExp(`計画道路|境目|調整|${Object.values(HOUREI_SHORT).join("|")}`);
+const WARN_CHIP = new RegExp(`計画道路|境目|調整|自然公園|農用地|${Object.values(HOUREI_SHORT).join("|")}`);
+
+/** 自然公園の特別地域・特別保護地区と、農用地区域の印（普通地域・農用地区域の外の農業振興地域は印にしない） */
+function tochiChips(t?: Tochi): string[] {
+  return [t?.park && t.park !== "普通地域" && "自然公園", t?.agri === "農用地区域" && "農用地区域"].filter((c): c is string => !!c);
+}
 
 /**
  * 用途地域などを1行に並べる。スマホは押すと詳しい一覧を下から出す。
@@ -70,7 +81,7 @@ const WARN_CHIP = new RegExp(`計画道路|境目|調整|${Object.values(HOUREI_
 export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: string; onOpen?: () => void }) {
   const [open, setOpen] = useState(false);
   // 砂防指定地・急傾斜地などの区域に入っていれば、用途地域の次に注意の印を出す
-  const chips = state.status === "ok" ? zoningChips(state.zoning).flatMap((c, i) => (i === 0 ? [c, ...houreiChips(state.hourei)] : [c])) : [];
+  const chips = state.status === "ok" ? zoningChips(state.zoning).flatMap((c, i) => (i === 0 ? [c, ...houreiChips(state.hourei), ...tochiChips(state.tochi)] : [c])) : [];
   return (
     <>
       <button
@@ -127,18 +138,22 @@ const LABEL = "w-[8.6em] shrink-0 text-[11.5px] leading-[1.6] text-muted denser:
 const VALUE = "text-[13px] font-semibold leading-[1.5] denser:text-[12.5px] denser:leading-[1.4] densest:leading-[1.3]";
 const SUB = "mt-0.5 block text-[10.5px] leading-[1.55] text-muted dense:mt-0 dense:leading-[1.45] denser:text-[10px] densest:leading-[1.35]";
 const NOTE = "mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted dense:mt-1.5 dense:leading-[1.5] denser:text-[10px] densest:mt-1 densest:leading-[1.4]";
-const TABS = ["都市計画", "その他の法令"];
+const TABS = ["都市計画", "その他の法令", "上下水道"];
 
 /** 都市計画と、その他の法令の下調べ。tabs：スマホのシート（タブで分ける） */
 function ZoningDetail({ state, city, tabs }: { state: Extract<ZoningState, { status: "ok" }>; city: string; tabs?: boolean }) {
   const [tab, setTab] = useState(0);
-  const warn = !!state.hourei?.hits.length;
+  const warn = !!state.hourei?.hits.length || tochiChips(state.tochi).length > 0;
   if (!tabs)
     return (
       <div>
         <ZoningPart state={state} city={city} />
         <h4 className="mb-0.5 mt-3 border-t border-line/70 pt-2.5 text-[12px] font-semibold text-ink">その他の法令（重説の下調べ）</h4>
         <OtherPart state={state} city={city} />
+        <h4 className="mb-0.5 mt-3 border-t border-line/70 pt-2.5 text-[12px] font-semibold text-ink">上下水道</h4>
+        <dl>
+          <SuidoRow links={state.suido ?? []} city={city} />
+        </dl>
       </div>
     );
   return (
@@ -157,7 +172,13 @@ function ZoningDetail({ state, city, tabs }: { state: Extract<ZoningState, { sta
           </button>
         ))}
       </div>
-      {tab === 0 ? <ZoningPart state={state} city={city} /> : <OtherPart state={state} city={city} />}
+      {tab === 0 && <ZoningPart state={state} city={city} />}
+      {tab === 1 && <OtherPart state={state} city={city} />}
+      {tab === 2 && (
+        <dl>
+          <SuidoRow links={state.suido ?? []} city={city} />
+        </dl>
+      )}
     </div>
   );
 }
@@ -201,35 +222,37 @@ function ZoningPart({ state: { zoning, st }, city }: { state: Extract<ZoningStat
   );
 }
 
-/** その他の法令の下調べ：盛土規制法・砂防指定地や急傾斜地などの区域・埋蔵文化財・上下水道と、その出典・特記事項 */
-function OtherPart({ state: { morido, hourei, iseki, suido }, city }: { state: Extract<ZoningState, { status: "ok" }>; city: string }) {
+/** その他の法令の下調べ：盛土規制法・砂防指定地や急傾斜地などの区域・自然公園と農業振興地域・埋蔵文化財と、その出典・特記事項 */
+function OtherPart({ state: { morido, hourei, tochi, iseki }, city }: { state: Extract<ZoningState, { status: "ok" }>; city: string }) {
   const notes = hourei && houreiNotesLine(hourei.pref);
   return (
     <div>
       <dl className="divide-y divide-line/70">
         {morido && <MoridoRow morido={morido} />}
         {hourei && <HoureiRow hourei={hourei} />}
+        {tochi && <TochiRow tochi={tochi} city={city} />}
         {iseki && <IsekiRow iseki={iseki} />}
-        <SuidoRow links={suido ?? []} city={city} />
       </dl>
       <p className={NOTE}>
         <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
         <span>
           国のデータの区域は概略の位置で、法的図書ではありません。重要事項説明には、区域を指定した都県・市の資料で確かめてください。
-          {(morido || hourei) && (
+          {(morido || hourei || tochi) && (
             <span className="mt-1 block dense:mt-0.5">
+              {/* 国土数値情報のデータは1つの文にまとめる（「国土数値情報（○○データ、△△データ）」） */}
               出典：
-              {morido && (
-                <>
-                  <a href={MORIDO_SOURCE.url} target="_blank" rel="noreferrer" className="underline">
-                    {MORIDO_SOURCE.name}
-                  </a>
-                  （{MORIDO_DATA.asOf}時点）
-                </>
-              )}
-              {morido && hourei && "、"}
-              {hourei && "国土数値情報（砂防指定地・地すべり防止区域・急傾斜地崩壊危険区域・災害危険区域データ）"}
-              （国土交通省）を加工して作成
+              <a href="https://nlftp.mlit.go.jp/ksj/" target="_blank" rel="noreferrer" className="underline">
+                国土数値情報
+              </a>
+              （
+              {[
+                morido && `宅地造成等工事規制区域・特定盛土等規制区域データ（${MORIDO_DATA.asOf}時点）`,
+                hourei && "砂防指定地・地すべり防止区域・急傾斜地崩壊危険区域・災害危険区域データ",
+                tochi && `自然公園地域・農業地域データ（${TOCHI_YEAR}年度）`,
+              ]
+                .filter(Boolean)
+                .join("、")}
+              ）（国土交通省）を加工して作成
             </span>
           )}
           {/* 都県が利用条件で求める特記事項（東京都は急傾斜地と地すべりで文が違うので、どちらの文かを添える） */}
@@ -295,6 +318,34 @@ function HoureiRow({ hourei }: { hourei: Hourei }) {
               砂防指定地・地すべり防止区域・急傾斜地崩壊危険区域・災害危険区域
               {hourei.missing.length > 0 && `（${pref}の${hourei.missing.join("・")}は国のデータに無い）`}
             </span>
+          </>
+        )}
+      </dd>
+    </div>
+  );
+}
+
+/** 自然公園（自然公園法）と農業振興地域（農振法）の行（国のデータ・参考）。2015年度の土地利用基本計画図の概略の区域 */
+function TochiRow({ tochi, city }: { tochi: Tochi; city: string }) {
+  const check = tochiCheck(tochi, city);
+  return (
+    <div className={ROW}>
+      <dt className={LABEL}>自然公園・農振</dt>
+      <dd className="min-w-0 flex-1">
+        {check ? (
+          <>
+            <span className={`flex items-start gap-1.5 ${VALUE} text-[#8a4f3a]`}>
+              <AlertIcon className="mt-[3px] h-3.5 w-3.5 shrink-0 denser:mt-[2px]" />
+              <span>{tochiLine(tochi)}（国のデータ）</span>
+            </span>
+            <span className={SUB}>
+              {tochi.year}年度・縮尺約1/5万の概略。{check}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className={`block ${VALUE} text-ink`}>区域外（国のデータ）</span>
+            <span className={SUB}>自然公園・農業振興地域（{tochi.year}年度の国のデータ）</span>
           </>
         )}
       </dd>

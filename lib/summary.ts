@@ -14,6 +14,7 @@ import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
 import { CHIBANZU_NOTE, chibanzuFor } from "./roadmap/chibanzu";
 import { HOUREI_CREDIT, HOUREI_SHORT, houreiGroups, houreiLine, houreiNotesLine, type Hourei } from "./roadmap/hourei";
+import { TOCHI_CREDIT, tochiCheck, tochiLine, type Tochi } from "./roadmap/tochi";
 import { isekiFor, isekiLine } from "./roadmap/iseki";
 import { suidoFor } from "./roadmap/suido";
 import { MORIDO_CREDIT, moridoLine, type Morido } from "./roadmap/morido";
@@ -40,7 +41,7 @@ export function buildSummary(
     schools,
     stations,
   }: {
-    zoning?: { zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei };
+    zoning?: { zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi };
     parcels?: { target?: string; neighbors: string[]; reference: boolean; estimated?: Estimated };
     roads?: NearbyRoad[];
     hazard?: { report: HazardReport; elevation: Elevation | null; maps: HazardMaps; muniCd: string };
@@ -75,6 +76,11 @@ export function buildSummary(
     if (zoning.hourei) {
       lines.push(`・砂防・急傾斜地など：${houreiLine(zoning.hourei)}`);
       for (const g of houreiGroups(zoning.hourei.hits)) lines.push(`  （${HOUREI_SHORT[g.kind]}：${g.text}）`);
+    }
+    if (zoning.tochi) {
+      const check = tochiCheck(zoning.tochi, m.name);
+      lines.push(`・自然公園・農業振興地域：${tochiLine(zoning.tochi)}（${zoning.tochi.year}年度の国のデータ・参考）`);
+      if (check) lines.push(`  （${check}）`);
     }
   }
   // 埋蔵文化財の確認先（都県・市の遺跡地図と教育委員会）。都市計画が読めなくても出す
@@ -125,6 +131,7 @@ export function buildSummary(
   if (p?.estimated || parcels?.estimated) lines.push(`※${KOZU_CREDIT}。`);
   if (zoning) lines.push(`※都市計画の${ZONING_CREDIT}。`);
   if (zoning?.morido) lines.push(`※盛土規制法の区域の${MORIDO_CREDIT}。概略の区域で、重要事項説明には${zoning.morido.authority}の資料で確認を。`);
+  if (zoning?.tochi) lines.push(`※自然公園・農業振興地域の${TOCHI_CREDIT}。縮尺約1/5万の概略の区域。`);
   const hr = zoning?.hourei;
   if (hr) {
     lines.push(`※砂防指定地などの区域の${HOUREI_CREDIT}。概略の区域で、重要事項説明には指定した都県・市の資料で確認を。`);

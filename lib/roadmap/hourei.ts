@@ -180,6 +180,11 @@ export function houreiOffice(kind: HoureiKind, authority: string, office?: strin
   return `${authority}（${houreiRoles(kind, office).join("・")}の担当）`;
 }
 
+/** いくつかの種類をまとめた窓口（「東京都（砂防・農林の担当）」） */
+export function houreiOfficeAll(kinds: HoureiKind[], authority: string): string {
+  return `${authority}（${[...new Set(kinds.flatMap((k) => houreiRoles(k)))].join("・")}の担当）`;
+}
+
 /** 区域の補足（「矢上川（神奈川県告示第320号・1985年3月30日）」） */
 export function houreiDetail(h: HoureiHit): string {
   const extra = houreiNotice(h);
