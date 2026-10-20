@@ -183,7 +183,11 @@ const CITIES: Municipality[] = [
     name: "狭山市",
     codes: ["11215"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "指定道路図（建築基準法上の道路）", build: sonicweb("sayama", "th_3", 1000, "dm%2Cth_5"), verified: true }],
+    maps: [
+      { kind: "road_type", label: "指定道路図（建築基準法上の道路）", build: sonicweb("sayama", "th_3", 1000, "dm%2Cth_5"), verified: true },
+      // 同じテーマの市道の認定路線のレイヤ（凡例は付けない。municipalities.ts の buildLinks）
+      { kind: "public_road", label: "市道認定路線網図", build: sonicweb("sayama", "th_3", 1000, "dm%2Cth_4"), verified: true },
+    ],
     contact: { dept: "都市建設部 建築住宅課", phone: "04-2946-8234", hours: "平日 9:00〜16:30" },
   },
   {

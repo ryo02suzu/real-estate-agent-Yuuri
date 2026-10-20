@@ -268,6 +268,14 @@ describe("Sonicweb の道路台帳・認定路線網図", () => {
       for (const l of buildLinks(m, 35.8, 139.6)) if (l.kind === "public_road") expect(l.legend, `${m.name} ${l.label}`).toBeUndefined();
     }
   });
+
+  it("狭山市は同じテーマの指定道路図と認定路線を開き、凡例は指定道路図だけに付く", () => {
+    const [road, pub] = buildLinks(findMunicipality("11215")!, 35.852, 139.412);
+    expect([road.kind, pub.kind]).toEqual(["road_type", "public_road"]);
+    expect(pub.url).toBe("https://www.sonicweb-asp.jp/sayama/map?theme=th_3&pos=139.412000%2C35.852000&scale=1000&layers=dm%2Cth_4");
+    expect(road.legend?.length).toBeGreaterThan(0);
+    expect(pub.legend).toBeUndefined();
+  });
 });
 
 describe("lookup", () => {
