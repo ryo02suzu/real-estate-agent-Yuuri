@@ -37,6 +37,7 @@ import { SheetPreview } from "./sheet-preview";
 import { parcelLines, ParcelButton, ParcelCard, useParcelInfo, type ParcelInfo } from "./parcel-card";
 import { PrintSheet } from "./print-sheet";
 import { SchoolButton, SchoolCard, useSchools, type SchoolState } from "./school-card";
+import { PoiCard, usePois, type PoiState } from "./poi-card";
 import { StationCard, StationLine, useStations, type StationState } from "./station-card";
 import { useCopy } from "./use-copy";
 import { useZoning, ZoningCard, ZoningLine, type ZoningState } from "./zoning-card";
@@ -176,6 +177,7 @@ function Found({
   const landPrice = useLandPrices(result.lat, result.lng);
   const schools = useSchools(result.lat, result.lng);
   const stations = useStations(result.lat, result.lng);
+  const pois = usePois(result.lat, result.lng);
   const expand = onExpand && (() => onExpand());
   const body = useRef<HTMLDivElement>(null);
   useFit(body);
@@ -202,7 +204,7 @@ function Found({
     />
   );
   // 印刷・PDF 保存用の調査メモ（画面には出ない。iPhone の共有 → プリントでも同じメモになる）
-  const print = <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} />;
+  const print = <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} />;
   // 重説・物件概要の下書き（メニューから開く）
   const [draft, setDraft] = useState(false);
   useEffect(() => {
@@ -223,7 +225,7 @@ function Found({
           actions={
             <>
               <CopyButton text={copyText(result)} />
-              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} />
+              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} />
             </>
           }
         />
@@ -260,7 +262,7 @@ function Found({
           </div>
           {/* 最寄り駅と学区（背の低い画面・入りきらないときは出さず、共有・印刷・重説の下書きで見る） */}
           <div className="mt-1.5 flex gap-1.5 tight:hidden">
-            <StationLine state={stations} />
+            <StationLine state={stations} pois={pois} />
             <SchoolButton state={schools} />
           </div>
           {/* 画面の高さに合わせて地図プレビューが伸び縮みする（スクロールさせない）。低すぎるときは地図を隠し、
@@ -308,7 +310,7 @@ function Found({
         )}
       </div>
       {print}
-      <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations })} open={draft} onClose={() => setDraft(false)} />
+      <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations, pois })} open={draft} onClose={() => setDraft(false)} />
     </div>
   );
 }
@@ -544,6 +546,7 @@ function loaded({
   landPrice,
   schools,
   stations,
+  pois,
 }: {
   zoning: ZoningState;
   parcels: ParcelInfo;
@@ -553,6 +556,7 @@ function loaded({
   landPrice: LandPriceState;
   schools: SchoolState;
   stations?: StationState;
+  pois?: PoiState;
 }): DraftInput {
   return {
     zoning: zoning.status === "ok" ? zoning : undefined,
@@ -563,6 +567,7 @@ function loaded({
     landPrice: landPrice.status === "ok" ? landPrice.hits : undefined,
     schools: schools.status === "ok" ? schools.schools : undefined,
     stations: stations?.status === "ok" ? stations.stations : undefined,
+    pois: pois?.status === "ok" ? pois.pois : undefined,
   };
 }
 
@@ -577,6 +582,7 @@ function ShareButton({
   landPrice,
   schools,
   stations,
+  pois,
   desktop,
 }: {
   result: Extract<LookupResult, { status: "ok" }>;
@@ -588,12 +594,13 @@ function ShareButton({
   landPrice: LandPriceState;
   schools: SchoolState;
   stations: StationState;
+  pois: PoiState;
   /** PC：共有の画面は出さず、メールやチャットに貼れるようコピーする */
   desktop?: boolean;
 }) {
   const { done, copy } = useCopy();
   const onClick = async () => {
-    const text = buildSummary(result, loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations }));
+    const text = buildSummary(result, loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations, pois }));
     if (!desktop && typeof navigator.share === "function") {
       try {
         await navigator.share({ text });
@@ -820,6 +827,7 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
   const landPrice = useLandPrices(result.lat, result.lng);
   const schools = useSchools(result.lat, result.lng);
   const stations = useStations(result.lat, result.lng);
+  const pois = usePois(result.lat, result.lng);
   const [draft, setDraft] = useState(false);
   const offline = m.coverage === "none" || m.coverage === "outside";
   const primary = result.links.filter((l) => !offline && l.kind !== "public_road");
@@ -836,9 +844,9 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
           actions={
             <>
               <CopyButton text={copyText(result)} />
-              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} desktop />
+              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} desktop />
               <PrintMenu result={result} onDraft={() => setDraft(true)} />
-              <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations })} open={draft} onClose={() => setDraft(false)} />
+              <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations, pois })} open={draft} onClose={() => setDraft(false)} />
             </>
           }
         />
@@ -915,12 +923,16 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
         <StationCard state={stations} />
       </div>
 
+      <div id="pc-poi" className="scroll-mt-3">
+        <PoiCard state={pois} />
+      </div>
+
       <div id="pc-school" className="scroll-mt-3">
         <SchoolCard state={schools} />
       </div>
 
       {result.contact && <ContactCard contact={result.contact} city={m.name} address={result.matchedAddress} />}
-      <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} />
+      <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} />
     </div>
   );
 }

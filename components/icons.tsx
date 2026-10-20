@@ -227,3 +227,11 @@ export const TrainIcon = ({ className }: P) => (
     <path d="M5 10h14M9 13h.01M15 13h.01M8 20l2-4M16 20l-2-4" />
   </svg>
 );
+
+/** 周辺施設（買い物袋） */
+export const ShopIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M5 8h14l-1 13H6L5 8z" />
+    <path d="M9 11V6a3 3 0 0 1 6 0v5" />
+  </svg>
+);

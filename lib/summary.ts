@@ -7,7 +7,8 @@ import { asOfText, changeText, distanceText, kindText, priceText, type LandPrice
 import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
 import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
 import { SCHOOL_DATA } from "./roadmap/school-data";
-import { STATION_CREDIT, stationLine, type StationWalk } from "./roadmap/walk";
+import { POI_SOURCE, poiLine, type PoiWalk } from "./roadmap/poi";
+import { ROAD_CREDIT, STATION_CREDIT, stationLine, type StationWalk } from "./roadmap/walk";
 import { KOZU_CREDIT } from "./roadmap/kozu-data";
 import { rosenkaLinks } from "./roadmap/rosenka";
 import { SANKO_NOTE, sankoCredit } from "./roadmap/sanko-data";
@@ -42,6 +43,7 @@ export function buildSummary(
     landPrice,
     schools,
     stations,
+    pois,
   }: {
     zoning?: { zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi };
     parcels?: { target?: string; neighbors: string[]; reference: boolean; estimated?: Estimated; sanko?: string };
@@ -51,6 +53,7 @@ export function buildSummary(
     landPrice?: LandPriceHit[];
     schools?: Schools;
     stations?: StationWalk[];
+    pois?: PoiWalk[];
   } = {},
 ): string {
   const m = result.municipality;
@@ -120,6 +123,10 @@ export function buildSummary(
     lines.push("【最寄り駅（徒歩の目安・道路距離 80m を1分）】");
     for (const s of stations) lines.push(`・${stationLine(s)}`);
   }
+  if (pois?.length) {
+    lines.push("【周辺施設（徒歩の目安・道路距離 80m を1分）】");
+    for (const w of pois) lines.push(`・${poiLine(w)}`);
+  }
   if (schools?.elementary || schools?.junior) {
     lines.push(`【学区（参考・${SCHOOL_DATA.edition}のデータ）】`);
     if (schools.elementary) lines.push(`・小学校：${schoolLine(schools.elementary)}`);
@@ -155,5 +162,7 @@ export function buildSummary(
   if (prices.length) lines.push(`※地価の${LAND_PRICE_CREDIT}。物件そのものの価格ではありません。`);
   if (schools?.elementary || schools?.junior) lines.push(`※学区の${schoolCredit(schools)}。学区は見直されることがあります。指定校は教育委員会で確認を。`);
   if (stations?.length) lines.push(`※駅の${STATION_CREDIT}。駅の出入口までではないので、広告には実際の道路距離で。`);
+  if (pois?.length)
+    lines.push(`※周辺施設は${POI_SOURCE}を加工して作成${stations?.length ? "" : `。${ROAD_CREDIT}`}。施設の位置までの目安なので、広告には実際の道路距離と、施設が今もあるかを確かめて。`);
   return lines.join("\n");
 }

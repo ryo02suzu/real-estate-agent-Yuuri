@@ -1,12 +1,15 @@
 "use client";
 
 // 最寄り駅と徒歩の目安（lib/roadmap/walk.ts）。近い順に3駅まで、駅名・路線・徒歩の分数（道路距離 80m を1分）・道路距離。
-// 駅の出入口ではなく駅（ホーム）までの目安なので、広告に書くときは実際の道路距離で確かめる旨を添える
+// 駅の出入口ではなく駅（ホーム）までの目安なので、広告に書くときは実際の道路距離で確かめる旨を添える。
+// スマホのシートは、周辺施設（components/poi-card.tsx）があればタブで並べる
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
 import { lineLabel, nearestStations, STATION_CREDIT, type StationWalk } from "@/lib/roadmap/walk";
 import { ChevronRightIcon, InfoIcon, TrainIcon } from "./icons";
+import { PoiList, type PoiState } from "./poi-card";
 import { Sheet } from "./sheet";
+import { Tabs } from "./tabs";
 
 export type StationState = { status: "loading" } | { status: "error" } | { status: "ok"; stations: StationWalk[] };
 
@@ -36,12 +39,15 @@ export function walkText(s: StationWalk): string {
 const distText = (m: number) => (m >= 1000 ? `約${(m / 1000).toFixed(1)}km` : `約${Math.round(m / 10) * 10}m`);
 
 /**
- * いちばん近い駅の1行（「新横浜駅 徒歩約11分」）。押すとスマホは一覧が下から出る。PC は onOpen（パネルの中のカードまで動かす）を渡す。
+ * いちばん近い駅の1行（「新横浜駅 徒歩約11分」）。押すとスマホは一覧が下から出る（周辺施設があれば「周辺施設」のタブも）。
+ * PC は onOpen（パネルの中のカードまで動かす）を渡す。
  * スマホは学区と並ぶ狭い行なので、駅名と分数を優先し、「最寄り駅」の見出しと「ほか2駅」は PC だけ出す。駅が無ければ出さない
  */
-export function StationLine({ state, onOpen }: { state: StationState; onOpen?: () => void }) {
+export function StationLine({ state, pois, onOpen }: { state: StationState; pois?: PoiState; onOpen?: () => void }) {
   const [open, setOpen] = useState(false);
   if (state.status === "ok" && state.stations.length === 0) return null;
+  // 周辺施設のデータが無い（施設が1つも無い）ときは、駅だけのシート
+  const withPois = pois && !(pois.status === "ok" && pois.pois.length === 0);
   const top = state.status === "ok" ? state.stations[0] : undefined;
   const more = state.status === "ok" ? state.stations.length - 1 : 0;
   return (
@@ -65,8 +71,12 @@ export function StationLine({ state, onOpen }: { state: StationState; onOpen?: (
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
       {state.status === "ok" && !onOpen && (
-        <Sheet title="最寄り駅（徒歩の目安）" open={open} onClose={() => setOpen(false)}>
-          <StationList stations={state.stations} />
+        <Sheet title={withPois ? "最寄り駅・周辺施設（徒歩の目安）" : "最寄り駅（徒歩の目安）"} open={open} onClose={() => setOpen(false)}>
+          {withPois ? (
+            <Tabs names={["最寄り駅", "周辺施設"]} panels={[<StationList key="s" stations={state.stations} />, <PoiList key="p" state={pois} />]} />
+          ) : (
+            <StationList stations={state.stations} />
+          )}
         </Sheet>
       )}
     </>

@@ -12,6 +12,7 @@ import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
 import { chibanLabel, estimatedNote, kuikiLabel, parcelMark, type Estimated } from "./roadmap/parcel";
 import type { NearbyRoad } from "./roadmap/road-read";
 import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
+import { POI_NOTE, poiCredit, poiWalkText, type PoiWalk } from "./roadmap/poi";
 import { lineLabel, STATION_CREDIT, type StationWalk } from "./roadmap/walk";
 import { CHIBANZU_NOTE, chibanzuFor } from "./roadmap/chibanzu";
 import { HOUREI_CREDIT, HOUREI_LAWS, houreiAsOf, houreiCaution, houreiGroups, houreiNotesLine, houreiOffice, houreiOfficeAll, PREF_NAMES, type Hourei, type HoureiKind } from "./roadmap/hourei";
@@ -35,12 +36,13 @@ export type DraftInput = {
   landPrice?: LandPriceHit[];
   schools?: Schools;
   stations?: StationWalk[];
+  pois?: PoiWalk[];
 };
 
 const CHECK = "要確認";
 
 /** 重要事項説明書（法令上の制限・道路・災害）と販売図面（物件概要）の欄の並びの下書き */
-export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zoning, parcels, roads, hazard, building, landPrice, schools, stations }: DraftInput = {}): DraftSection[] {
+export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zoning, parcels, roads, hazard, building, landPrice, schools, stations, pois }: DraftInput = {}): DraftSection[] {
   const m = result.municipality;
   const p = result.parcel;
   const found = p && !result.picked ? p : undefined;
@@ -241,6 +243,13 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     outline.push({ label: l.kind === "souzoku" ? "相続税路線価" : "固定資産税路線価", value: `全国地価マップで確認（${l.name.match(/（(.+)）/)?.[1] ?? ""}）`, note: l.url });
   if (outline.length) sections.push({ title: "販売図面（物件概要）向け（参考）", rows: outline });
 
+  // 周辺環境（販売図面の生活環境）。種類ごとにいちばん近い施設と徒歩の目安。広告には今もある施設を道路距離で書くので、確認を1行添える
+  if (pois?.length)
+    sections.push({
+      title: "周辺環境（販売図面の生活環境・参考）",
+      rows: [...pois.map((w) => ({ label: w.label, value: `${w.name} ${poiWalkText(w)}` })), { label: "注意", value: POI_NOTE, check: true }],
+    });
+
   // 出典（それぞれの出典の文のまま。見出しは付けない。国土数値情報のデータは1つの文にまとめる）
   const credits: DraftRow[] = [];
   const credit = (value: string) => credits.push({ label: "", value });
@@ -258,6 +267,8 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   if (stations?.length) ksj.push(["駅", STATION_CREDIT]);
   if (zoning?.tochi) ksj.push(["自然公園・農振・森林", TOCHI_CREDIT]);
   ksjCredits(ksj).forEach(credit);
+  // 周辺施設（OpenStreetMap）。道のりの出典は駅の出典にあれば繰り返さない
+  if (pois?.length) credit(poiCredit(!stations?.length));
   // 都県が利用条件で求める特記事項（砂防指定地などの区域のデータ）
   const notes = hr && houreiNotesLine(hr.pref);
   if (notes) credit(notes);

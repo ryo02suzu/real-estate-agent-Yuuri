@@ -12,6 +12,7 @@ import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, HAZARD_TABLE_NOTE, h
 import { changeText, distanceText, kindText, priceText } from "@/lib/roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "@/lib/roadmap/land-price-data";
 import { schoolCredit, schoolLine } from "@/lib/roadmap/school";
+import { POI_SOURCE, poiWalkText } from "@/lib/roadmap/poi";
 import { STATION_CREDIT, stationLine } from "@/lib/roadmap/walk";
 import { KOZU_CREDIT } from "@/lib/roadmap/kozu-data";
 import { chibanLabel, estimatedNote, kuikiLabel, parcelMark } from "@/lib/roadmap/parcel";
@@ -28,6 +29,7 @@ import type { BuildingState } from "./building-card";
 import type { HazardState } from "./hazard-card";
 import type { LandPriceState } from "./land-price-card";
 import type { SchoolState } from "./school-card";
+import type { PoiState } from "./poi-card";
 import type { StationState } from "./station-card";
 import { MapPreview } from "./map-preview";
 import type { RoadsState } from "./nearby-roads";
@@ -55,6 +57,7 @@ export function PrintSheet(props: {
   landPrice: LandPriceState;
   schools: SchoolState;
   stations: StationState;
+  pois: PoiState;
 }) {
   // document.body に出す（画面の作りの外に置き、印刷では画面の作りを丸ごと隠す）。サーバーでは何も出さない
   const client = useSyncExternalStore(
@@ -76,6 +79,7 @@ function Memo({
   landPrice,
   schools,
   stations,
+  pois,
 }: {
   result: Ok;
   zoning: ZoningState;
@@ -86,8 +90,10 @@ function Memo({
   landPrice: LandPriceState;
   schools: SchoolState;
   stations: StationState;
+  pois: PoiState;
 }) {
   const walks = stations.status === "ok" ? stations.stations : [];
+  const facilities = pois.status === "ok" ? pois.pois : [];
   const bHit = building.status === "ok" ? building.result.hit : undefined;
   // 近くの地価：一番近い地価公示と地価調査を1つずつ（1枚に収めるため）
   const hits = landPrice.status === "ok" ? landPrice.hits : [];
@@ -184,6 +190,12 @@ function Memo({
             <>
               <dt className="text-[#7a6a55]">最寄り駅（目安）</dt>
               <dd>{walks.map(stationLine).join("　")}</dd>
+            </>
+          )}
+          {facilities.length > 0 && (
+            <>
+              <dt className="text-[#7a6a55]">周辺施設（目安）</dt>
+              <dd className="text-[10.5px] leading-[1.55]">{facilities.map((w) => `${w.label} ${w.name} ${poiWalkText(w)}`).join("　")}</dd>
             </>
           )}
           <dt className="text-[#7a6a55]">緯度・経度</dt>
@@ -442,6 +454,7 @@ function Memo({
           {prices.length > 0 && `地価の${LAND_PRICE_CREDIT}（標準地・基準地の価格で、物件の価格ではありません）。`}
           {schools.status === "ok" && `学区の${schoolCredit(schools.schools)}（指定校は教育委員会で確認）。`}
           {walks.length > 0 && `駅の${STATION_CREDIT}（徒歩は道路距離 80m を1分。駅の出入口までではない）。`}
+          {facilities.length > 0 && `周辺施設は${POI_SOURCE}を加工して作成（施設の位置までの目安）。`}
           {(p || parcels.status === "ok") && `筆の${PARCEL_CREDIT}。`}
           {(p?.estimated || (parcels.status === "ok" && parcels.parcel.estimated)) && `${KOZU_CREDIT}。`}
           {sanko && `参考図の筆の${sankoCredit(sanko)}。`}

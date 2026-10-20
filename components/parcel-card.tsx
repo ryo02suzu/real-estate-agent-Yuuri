@@ -15,6 +15,7 @@ import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
 import { SANKO_CITIES, sankoSource } from "@/lib/roadmap/sanko-data";
 import { ChevronRightIcon, CopyIcon, ExternalIcon, InfoIcon, ParcelIcon } from "./icons";
 import { Sheet } from "./sheet";
+import { Tabs } from "./tabs";
 import { useCopy } from "./use-copy";
 
 type Ok = Extract<LookupResult, { status: "ok" }>;
@@ -135,28 +136,6 @@ export function ParcelButton({
 }
 
 /** シートのタブ（それぞれ1画面に収める） */
-function Tabs({ names, panels }: { names: string[]; panels: React.ReactNode[] }) {
-  const [tab, setTab] = useState(0);
-  return (
-    <div>
-      <div role="tablist" className="mb-2 flex gap-1 densest:mb-1">
-        {names.map((n, i) => (
-          <button
-            key={n}
-            role="tab"
-            aria-selected={i === tab}
-            onClick={() => setTab(i)}
-            className={`rounded-full border px-2.5 py-1 text-[11.5px] densest:py-0.5 ${i === tab ? "border-brand bg-brand text-white" : "border-line text-ink"}`}
-          >
-            {n}
-          </button>
-        ))}
-      </div>
-      {panels[tab]}
-    </div>
-  );
-}
-
 /** PC：地図の左のパネルのカード */
 export function ParcelCard({ info, chibanzu }: { info: ParcelInfo; chibanzu?: ChibanzuLink }) {
   if (info.status === "none" && !chibanzu) return null;

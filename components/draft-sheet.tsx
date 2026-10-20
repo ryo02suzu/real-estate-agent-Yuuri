@@ -27,6 +27,7 @@ const TAB_NAMES: [RegExp, string][] = [
   [/^ハザードマップ/, "ハザードマップ"],
   [/^災害リスク/, "災害（参考）"],
   [/^販売図面/, "物件概要"],
+  [/^周辺環境/, "周辺環境"],
   [/^出典/, "出典"],
 ];
 const tabName = (s: DraftSection) => TAB_NAMES.find(([re]) => re.test(s.title))?.[1] ?? s.title;
