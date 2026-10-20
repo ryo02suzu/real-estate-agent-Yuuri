@@ -14,6 +14,10 @@ describe("市町村の地番図", () => {
     expect(chibanzuFor({ pref: "神奈川県", name: "相模原市" }, 35.577388, 139.377337)?.url).toBe(
       "https://sagamihara.geocloud.jp/webgis/?mp=101&z=18&ll=35.577388%2C139.377337",
     );
+    expect(chibanzuFor({ pref: "埼玉県", name: "上里町" }, 36.255698, 139.147852)).toEqual({
+      name: "上里町の参考地番図",
+      url: "https://www.sonicweb-asp.jp/kamisato/map?theme=th_2&pos=139.147852%2C36.255698&scale=1000",
+    });
   });
 
   it("地番図が見つかっていない市区町村は無し", () => {

@@ -17,6 +17,7 @@ const MAPS: Record<string, { label: string; build: Build }> = {
   埼玉県加須市: { label: "地番図（参考）", build: w("kazo", 30) },
   埼玉県鴻巣市: { label: "地番参考図", build: s("konosu", "th_15") },
   埼玉県三郷市: { label: "参考地番図", build: s("misato", "th_3") },
+  埼玉県上里町: { label: "参考地番図", build: s("kamisato", "th_2") },
   千葉県印西市: { label: "地番参考図", build: w("inzai", 25) },
   千葉県南房総市: { label: "地番図", build: w("minamiboso", 5) },
   栃木県大田原市: { label: "地番参考図", build: w("ohtawaracity", 22) },

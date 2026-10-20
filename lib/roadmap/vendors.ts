@@ -138,3 +138,9 @@ export const machiInfoMap =
 
 /** 中央区都市計画情報等閲覧システム。map.php?lat=&lon=（表示図の切替は画面上で行う） */
 export const chuoMap: Build = (lat, lng) => `https://chuo-map.jp/map.php?lat=${lat.toFixed(6)}&lon=${lng.toFixed(6)}`;
+
+/** なすしおばらまっぷ（那須塩原市）。#/?center=経度%2F緯度（世界測地系）&zoom=、layers は表示するデータの ID（背景は地理院地図） */
+export const nasushiobaraMap =
+  (layers: string, zoom = 16): Build =>
+  (lat, lng) =>
+    `https://maps.city.nasushiobara.tochigi.jp/#/?center=${lng.toFixed(6)}%2F${lat.toFixed(6)}&zoom=${zoom}&baseMap=gsi&layers=${layers}`;

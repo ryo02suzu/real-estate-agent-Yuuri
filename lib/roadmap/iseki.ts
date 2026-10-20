@@ -4,7 +4,7 @@
 // 埼玉・千葉・茨城・群馬は県の地図が県内全域（埼玉は川越市を除く）を載せている。東京都は都の地図が全域を載せているが
 // 地点で開けないので、地点で開ける区市の地図があればそちらを使う。神奈川・栃木は県の地図が無く、見つかった市町の地図だけ
 import type { Municipality, Prefecture } from "./municipalities";
-import { arcgisExperience, geocloud, geocloudMp, sonicweb, wagmap } from "./vendors";
+import { arcgisExperience, geocloud, geocloudMp, machiInfoMap, machiInfoTokyo, nasushiobaraMap, sonicweb, wagmap } from "./vendors";
 
 type Build = (lat: number, lng: number) => string;
 
@@ -52,7 +52,12 @@ const CITY_MAPS: Record<string, IsekiMap> = {
   東京都世田谷区: { name: "せたがやiMap（埋蔵文化財包蔵地）", build: sonicweb("setagaya", "th_58", 2500), tip: AGREE },
   東京都新宿区: { name: "新宿区みんなのGIS（埋蔵文化財情報）", build: sonicweb("shinjuku2", "th_1150", 2500) },
   東京都墨田区: { name: "すみだまちづくりマップ（埋蔵文化財包蔵地情報）", build: sonicweb("sumida", "th_20", 2500) },
+  // 渋谷区・中野区は文化財の地図の、埋蔵文化財のレイヤ（mtl。渋谷区は点と面の2つ）を出して開く
+  東京都渋谷区: { name: "渋谷区地図情報システム（文化マップ・埋蔵文化財）", build: wagmap("shibuya", 1105, { scale: 2500, extra: "&mtl=143%2C144" }), tip: AGREE },
+  東京都中野区: { name: "なかのデータマップ（観光・文化マップ・埋蔵文化財包蔵地）", build: wagmap("nakanodatamap", 33, { scale: 2500, extra: "&mtl=6000780" }), tip: AGREE },
   東京都杉並区: { name: "すぎナビ（埋蔵文化財包蔵地）", build: geocloudMp("suginami.geocloud.jp", 600) },
+  // 遺跡のレイヤは z15 以上で描かれる
+  東京都板橋区: { name: "どこナビいたばし（板橋区遺跡分布地図）", build: machiInfoMap("itabashi.machi-info.jp", 100028, 17) },
   東京都小平市: { name: "こだいら地図情報システム（文化財・遺跡）", build: sonicweb("kodaira", "th_19", 2500) },
   東京都国分寺市: { name: "わがまちマップ国分寺（史跡・埋蔵文化財包蔵地）", build: wagmap("kokubunji", 9, { scale: 2500 }) },
   東京都狛江市: { name: "狛江市地図情報サービス（埋蔵文化財包蔵地マップ）", build: wagmap("komaecity", 90, { scale: 2500 }), tip: AGREE },
@@ -65,10 +70,24 @@ const CITY_MAPS: Record<string, IsekiMap> = {
     tip: AGREE,
   },
   神奈川県横浜市: { name: "文化財ハマSite（横浜市行政地図情報提供システム）", build: wagmap("yokohama", 9, { host: "https://wwwm.city.yokohama.lg.jp", scale: 2500 }) },
+  // 「その他の土地規制」の地図の、埋蔵文化財の2つのレイヤと地形図だけを出す
+  神奈川県川崎市: {
+    name: "ガイドマップかわさき（その他の土地規制・埋蔵文化財）",
+    build: geocloud("https://kawasaki.geocloud.jp/webgis/", "mp=27&vlf=27-219-060024000000000000", 17),
+    tip: AGREE,
+  },
   // 相模原市の地図は z15 まで（約1/16,000）
   神奈川県相模原市: { name: "さがみはら地図情報（埋蔵文化財包蔵地）", build: geocloud("https://sagamihara.geocloud.jp/webgis/", "mp=13", 15) },
+  // 「教育・健康・福祉」の地図の、文化財の埋蔵文化財包蔵地のレイヤ（mtl・mcl）を出す
+  神奈川県横須賀市: {
+    name: "よこすかわが街ガイド（文化財・埋蔵文化財包蔵地）",
+    build: wagmap("yokosuka", 4, { scale: 2500, extra: "&mtl=79&mcl=2790%2C790%2C0%2C0%3B2790%2C791%2C1%2C1" }),
+    tip: AGREE,
+  },
   神奈川県鎌倉市: { name: "かまくらわが街マップ（遺跡地図）", build: wagmap("kamakura-hazard", 246, { scale: 2500 }) },
   神奈川県秦野市: { name: "はだのWEBマップ（埋蔵文化財包蔵地）", build: wagmap("hadano", 8, { scale: 2500 }) },
+  // machi-info の旧版。座標を日本測地系に換算して渡す（世界測地系のままだと約450mずれる）
+  神奈川県大和市: { name: "大和市公開型地図情報サービス（埋蔵文化財マップ）", build: machiInfoTokyo("yamato_city", "consentpage/gis-buried-cultural.html", 100, 2500), tip: AGREE },
   神奈川県三浦市: { name: "みうらわが街ガイド（文化財情報）", build: wagmap("miura", 3, { scale: 2500 }), tip: AGREE },
   神奈川県南足柄市: { name: "南足柄市地理情報システム（文化財）", build: wagmap("minamiashigara", 13, { scale: 2500 }), tip: AGREE },
   神奈川県箱根町: { name: "はこねMAP（文化財地図）", build: sonicweb("hakone", "th_29", 2500) },
@@ -76,6 +95,7 @@ const CITY_MAPS: Record<string, IsekiMap> = {
   栃木県足利市: { name: "足利市遺跡地図（埋蔵文化財包蔵地情報）", build: sonicweb("ashikaga", "th_30", 2500) },
   栃木県小山市: { name: "おやまわが街ガイドマップ（埋蔵文化財情報）", build: wagmap("oyamacity", 5, { scale: 2500 }) },
   栃木県大田原市: { name: "おおたわらデジタルマップ（文化財情報）", build: wagmap("ohtawaracity", 6, { scale: 2500 }) },
+  栃木県那須塩原市: { name: "なすしおばらまっぷ（文化財・遺跡）", build: nasushiobaraMap("R20NxZw1D"), tip: AGREE },
   栃木県日光市: { name: "日光市わが街ガイド（日光市遺跡等地図）", build: wagmap("nikko", 103, { scale: 2500 }), tip: AGREE },
   栃木県下野市: { name: "しもつけシティーガイド（史跡・遺跡・古墳）", build: sonicweb("shimotsuke", "th_36", 2500) },
 };

@@ -444,7 +444,10 @@ const CITIES: Municipality[] = [
     name: "蓮田市",
     codes: ["11238"],
     coverage: "partial",
-    maps: [{ kind: "road_type", label: "指定道路図（42条1項1〜5号。2項道路は載っていない）", build: sonicweb("hasuda", "th_10"), verified: true }],
+    maps: [
+      { kind: "road_type", label: "指定道路図（42条1項1〜5号。2項道路は載っていない）", build: sonicweb("hasuda", "th_10"), verified: true },
+      { kind: "public_road", label: "認定道路網図（市道）", build: sonicweb("hasuda", "th_27"), verified: true },
+    ],
     contact: { dept: "建築指導課", phone: "048-768-3111（代表）" },
     note: "地図に載るのは42条1項の道路の一部。2項道路や色の無い道は窓口で確認。",
   },
@@ -561,7 +564,14 @@ const PREF_TOWNS: Municipality[] = [
   prefTown("小鹿野町", "11365", "chichibu"),
   prefTown("美里町", "11381", "kumagaya"),
   prefTown("神川町", "11383", "kumagaya"),
-  prefTown("上里町", "11385", "kumagaya"),
+  {
+    ...prefTown("上里町", "11385", "kumagaya"),
+    // 町の地図（Sonicweb kamisato）の町道の路線網。道路台帳図（th_3）もあるが、iPhone SE で結果の画面に入りきらないので載せない
+    maps: [
+      { ...PREF_ROAD_MAP, read: prefRoads("上里町") },
+      { kind: "public_road", label: "認定路線網図（町道）", build: sonicweb("kamisato", "th_1"), verified: true },
+    ],
+  },
   prefTown("寄居町", "11408", "kumagaya"),
   prefTown("伊奈町", "11301", "sugito"),
   prefTown("宮代町", "11442", "sugito"),

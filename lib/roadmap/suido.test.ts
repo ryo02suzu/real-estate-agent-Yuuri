@@ -25,6 +25,22 @@ describe("上下水道の台帳の地図", () => {
     expect(suidoFor({ pref: "群馬県", name: "藤岡市" }, 36.2606, 139.0762)[0].url).toBe("https://www2.wagmap.jp/fujioka/Map?mid=15&mpx=139.076200&mpy=36.260600&mps=1000&gprj=2");
   });
 
+  it("Sonicweb の台帳（上里町の下水道・東庄町の水道・松戸市の汚水・八王子市の下水道）も物件の場所で開く", () => {
+    expect(suidoFor({ pref: "埼玉県", name: "上里町" }, 36.255698, 139.147852)).toEqual([
+      { kind: "下水道", name: "上里町の下水道台帳図", url: "https://www.sonicweb-asp.jp/kamisato/map?theme=th_17&pos=139.147852%2C36.255698&scale=1000" },
+    ]);
+    expect(suidoFor({ pref: "千葉県", name: "東庄町" }, 35.840563, 140.670007)).toEqual([
+      { kind: "上水道", name: "東庄町の水道管網図", url: "https://www.sonicweb-asp.jp/tonosho/map?theme=th_38&pos=140.670007%2C35.840563&scale=1000" },
+    ]);
+    expect(suidoFor({ pref: "千葉県", name: "松戸市" }, 35.791666, 139.906198)).toEqual([
+      { kind: "下水道", name: "松戸市の下水道台帳（汚水）", url: "https://www.sonicweb-asp.jp/matsudo/map?theme=th_osui&pos=139.906198%2C35.791666&scale=1000" },
+    ]);
+    // 八王子市は下水道台帳だけの地図（hachioji-gesui）
+    expect(suidoFor({ pref: "東京都", name: "八王子市" }, 35.670668, 139.318842)[0].url).toBe(
+      "https://www.sonicweb-asp.jp/hachioji-gesui/map?theme=th_1&pos=139.318842%2C35.670668&scale=1000",
+    );
+  });
+
   it("台帳の地図が見つかっていない市区町村は空", () => {
     expect(suidoFor({ pref: "東京都", name: "千代田区" }, 35.6895, 139.7441)).toEqual([]);
   });
