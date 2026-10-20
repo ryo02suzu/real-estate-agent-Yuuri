@@ -14,7 +14,7 @@ import {
   type Building,
   type BuildingSource,
 } from "./building";
-import { buildingTileSource } from "./building-tiles";
+import { buildingTileSource, plausibleYear } from "./building-tiles";
 import SOURCE from "./data/building-source.json";
 import { tileOf } from "./parcel";
 
@@ -177,5 +177,14 @@ describe.runIf(!!FILE)("作った建物のタイル", () => {
     const t = await src.tile(...tileOf(35.7372, 139.7462, BUILDING_ZOOM));
     const withUsage = (t ?? []).filter((b) => b.usage && b.above && b.structure);
     expect(withUsage.length).toBeGreaterThan(100);
+  });
+});
+
+describe("建築年", () => {
+  it("不明を表す 0・1 などは出さない", () => {
+    expect(plausibleYear(1)).toBeUndefined();
+    expect(plausibleYear(0)).toBeUndefined();
+    expect(plausibleYear(undefined)).toBeUndefined();
+    expect(plausibleYear(1978)).toBe(1978);
   });
 });
