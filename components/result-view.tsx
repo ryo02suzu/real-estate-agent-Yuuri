@@ -5,7 +5,7 @@ import { showHazardOnMap, showLandPriceOnMap } from "@/lib/map-style";
 import type { LookupResult, Municipality, ResolvedLink } from "@/lib/roadmap";
 import { chibanzuFor } from "@/lib/roadmap/chibanzu";
 import type { HazardKind } from "@/lib/roadmap/hazard";
-import { chibanLabel, estimatedMark, kuikiLabel } from "@/lib/roadmap/parcel";
+import { chibanLabel, kuikiLabel, parcelMark } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { sheetName } from "@/lib/roadmap/sheets";
 import type { DraftInput } from "@/lib/draft";
@@ -424,6 +424,7 @@ function Place({
             <b className="text-[15px] font-semibold">
               {chibanLabel(found.chibanRaw)}
               {found.estimated && <span className="text-[11px] font-normal text-[#8a4f3a]">（公図から推定{found.estimated === "low" ? "・確度低" : ""}）</span>}
+              {found.sanko && <span className="text-[11px] font-normal text-[#8a4f3a]">{parcelMark(found)}</span>}
             </b>
           ) : (
             "付近"
@@ -471,7 +472,7 @@ function Place({
       ) : picked && parcel ? (
         <p className="mt-1 truncate text-[10.5px] leading-[1.6] text-muted">
           <b className="font-semibold text-ink">
-            この地点の筆：{chibanLabel(parcel.chibanRaw)}（{kuikiLabel(parcel.kuiki)}）{estimatedMark(parcel)}
+            この地点の筆：{chibanLabel(parcel.chibanRaw)}（{kuikiLabel(parcel.kuiki)}）{parcelMark(parcel)}
           </b>
           {desktop && (
             <>
@@ -555,7 +556,7 @@ function loaded({
 }): DraftInput {
   return {
     zoning: zoning.status === "ok" ? zoning : undefined,
-    parcels: parcels.status === "ok" ? { ...parcelLines(parcels), reference: parcels.kind === "address", estimated: parcels.parcel.estimated } : undefined,
+    parcels: parcels.status === "ok" ? { ...parcelLines(parcels), reference: parcels.kind === "address", estimated: parcels.parcel.estimated, sanko: parcels.parcel.sanko } : undefined,
     roads: roads.status === "ok" ? roads.roads : undefined,
     hazard: hazard.status === "ok" ? hazard : undefined,
     building: building.status === "ok" ? building.result : undefined,

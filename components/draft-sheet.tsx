@@ -87,7 +87,7 @@ function DraftBody({ sections }: { sections: DraftSection[] }) {
         </div>
         {/^出典/.test(s.title) ? (
           // 出典は長いので、表にせず小さな字で並べる
-          <div className="mt-1 space-y-0.5 text-[10px] leading-[1.45] text-muted dense:space-y-0 denser:text-[9.5px] densest:mt-0.5 densest:leading-[1.28]">
+          <div className="mt-1 space-y-0.5 text-[10px] leading-[1.45] text-muted dense:space-y-0 denser:text-[9.5px] densest:mt-0.5 densest:text-[9px] densest:leading-[1.28]">
             {s.rows.map((r) => (
               <p key={r.value}>{r.value}</p>
             ))}

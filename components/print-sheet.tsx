@@ -14,8 +14,9 @@ import { LAND_PRICE_CREDIT } from "@/lib/roadmap/land-price-data";
 import { schoolCredit, schoolLine } from "@/lib/roadmap/school";
 import { STATION_CREDIT, stationLine } from "@/lib/roadmap/walk";
 import { KOZU_CREDIT } from "@/lib/roadmap/kozu-data";
-import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel } from "@/lib/roadmap/parcel";
+import { chibanLabel, estimatedNote, kuikiLabel, parcelMark } from "@/lib/roadmap/parcel";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
+import { SANKO_NOTE, sankoCredit } from "@/lib/roadmap/sanko-data";
 import { HOUREI_CREDIT, houreiLine, houreiNote } from "@/lib/roadmap/hourei";
 import { TOCHI_CREDIT, tochiLine } from "@/lib/roadmap/tochi";
 import { isekiFor, isekiLine } from "@/lib/roadmap/iseki";
@@ -96,6 +97,8 @@ function Memo({
   const m = result.municipality;
   const p = result.parcel;
   const found = p && !result.picked ? p : undefined;
+  // 市町村の地番参考図の筆（出典は市町村ごと）
+  const sanko = p?.sanko ?? (parcels.status === "ok" ? parcels.parcel.sanko : undefined);
   const c = result.contact;
   const dept = c ? (/^(東京都|\S{2,3}県)\s/.test(c.dept) ? c.dept : `${m.name} ${c.dept}`) : undefined;
   const lines = parcels.status === "ok" ? parcelLines(parcels) : undefined;
@@ -108,7 +111,7 @@ function Memo({
           <p className="text-[10px] tracking-[0.1em] text-[#7a6a55]">道路種別・都市計画・災害リスクの調査メモ</p>
           <h1 className="text-[17px] font-bold leading-snug">
             {result.matchedAddress}
-            {found ? ` ${chibanLabel(found.chibanRaw)}${estimatedMark(found)}` : <span className="text-[13px] font-normal">{result.picked ? "（地図で選んだ地点）" : " 付近"}</span>}
+            {found ? ` ${chibanLabel(found.chibanRaw)}${parcelMark(found)}` : <span className="text-[13px] font-normal">{result.picked ? "（地図で選んだ地点）" : " 付近"}</span>}
           </h1>
         </div>
         <p className="shrink-0 text-right text-[10px] leading-[1.5] text-[#7a6a55]">
@@ -131,7 +134,7 @@ function Memo({
               <dt className="text-[#7a6a55]">地番で探した筆</dt>
               <dd>
                 {kuikiLabel(found.kuiki)} {chibanLabel(found.chibanRaw)}
-                {estimatedMark(found)}
+                {parcelMark(found)}
               </dd>
             </>
           ) : (
@@ -140,7 +143,7 @@ function Memo({
                 <dt className="text-[#7a6a55]">この地点の筆</dt>
                 <dd>
                   {kuikiLabel(p.kuiki)} {chibanLabel(p.chibanRaw)}
-                  {estimatedMark(p)}
+                  {parcelMark(p)}
                 </dd>
               </>
             )
@@ -316,6 +319,7 @@ function Memo({
               <p className="text-[10px] text-[#7a6a55]">
                 {parcels.kind === "address" ? "住所の地点にある筆（参考。住居表示と地番は別）" : "物件の筆"}
                 {parcels.parcel.estimated && `・公図から推定した位置（${estimatedNote(parcels.parcel.estimated)}）`}
+                {parcels.parcel.sanko && `・地番参考図（${SANKO_NOTE}）`}
               </p>
               <p className="font-semibold">{lines.target ?? `${kuikiLabel(parcels.parcel.kuiki)} ${chibanLabel(parcels.parcel.chibanRaw)}`}</p>
               <p className="mt-1 text-[10px] text-[#7a6a55]">境界が接している筆（{lines.neighbors.length}）</p>
@@ -440,6 +444,7 @@ function Memo({
           {walks.length > 0 && `駅の${STATION_CREDIT}（徒歩は道路距離 80m を1分。駅の出入口までではない）。`}
           {(p || parcels.status === "ok") && `筆の${PARCEL_CREDIT}。`}
           {(p?.estimated || (parcels.status === "ok" && parcels.parcel.estimated)) && `${KOZU_CREDIT}。`}
+          {sanko && `参考図の筆の${sankoCredit(sanko)}。`}
         </p>
       </footer>
     </div>

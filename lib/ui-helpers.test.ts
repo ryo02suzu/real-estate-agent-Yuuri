@@ -339,6 +339,23 @@ describe("buildSummary の地番", () => {
     expect(plain).toContain("【謄本・公図用の地番】");
     expect(plain).not.toContain("基盤地図情報");
   });
+
+  it("市町村の地番参考図の筆は、参考図である旨と市町村ごとの出典を付ける", () => {
+    const m = findMunicipality("12203")!;
+    const result = {
+      status: "ok" as const,
+      lat: 35.7457,
+      lng: 139.9094,
+      matchedAddress: "千葉県市川市国府台一丁目",
+      town: "国府台一丁目",
+      approximate: false,
+      municipality: m,
+      links: buildLinks(m, 35.7457, 139.9094),
+    };
+    const text = buildSummary(result, { parcels: { target: "市川市国府台１丁目 2-1", neighbors: ["2-2"], reference: false, sanko: "12203" } });
+    expect(text).toContain("【謄本・公図用の地番（地番参考図・市町村の課税用の参考図で、登記の地番・筆の形と違うことがあります）】\n・物件：市川市国府台１丁目 2-1");
+    expect(text).toMatch(/※参考図の筆の出典：市川市「地籍図（地番図）」（CC BY 4\.0・.+）を加工して作成。市町村の課税用の参考図で/);
+  });
 });
 
 describe("buildSummary の学区", () => {

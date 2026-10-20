@@ -3,6 +3,7 @@
 // url が空のあいだは推定の筆を出さない。ビルド時の環境変数 NEXT_PUBLIC_KOZU_PMTILES_URL / NEXT_PUBLIC_KOZU_EDITION があれば、そちらを使う
 import SOURCE from "./data/kozu-source.json";
 import { PARCEL_CREDIT, PARCEL_DATA, PARCEL_SOURCE } from "./parcel-data";
+import { SANKO_CITIES } from "./sanko-data";
 
 export const KOZU_DATA = {
   /** 「/data/…」のようにサイト内のパスのときは、開いているサイトのファイルを読む */
@@ -30,10 +31,20 @@ export const KOZU_CREDIT = `公図（任意座標）の筆は、「登記所備�
 
 /**
  * 筆の出典を1つの文にする（「筆の出典：…を加工して作成（版）。公図（任意座標）の筆は…で、数mずれることがあります。どちらも法務局の証明ではありません」）。
- * estimated：公図から推定した筆も出したとき。推定の筆の版は、登記所備付地図データの版と違うときだけ書く
+ * estimated：公図から推定した筆も出したとき。推定の筆の版は、登記所備付地図データの版と違うときだけ書く。
+ * sanko：市町村の地番参考図の筆も出したとき（その市区町村コード。市町村ごとの出典とライセンス）
  */
-export function parcelCreditLine(estimated: boolean): string {
-  if (!estimated) return `筆の${PARCEL_CREDIT}`;
-  const edition = KOZU_DATA.edition && KOZU_DATA.edition !== PARCEL_DATA.edition ? `（${KOZU_DATA.edition}）` : "";
-  return `筆の${PARCEL_SOURCE}。公図（任意座標）の筆は、国土地理院の基盤地図情報（道路縁）に合わせて MICHILU が推定の位置に置いたもの${edition}で、数mずれることがあります。どちらも法務局の証明ではありません`;
+export function parcelCreditLine(estimated: boolean, sanko?: string): string {
+  if (!estimated && !sanko) return `筆の${PARCEL_CREDIT}`;
+  const parts = [`筆の${PARCEL_SOURCE}`];
+  const c = sanko ? SANKO_CITIES[sanko] : undefined;
+  if (sanko)
+    parts.push(
+      `地番参考図の筆は${c ? `${c.credit}（${c.license}・${c.date}）` : "市町村の地番参考図（オープンデータ）"}を加工して作成したもので、課税用の参考図のため登記の地番・筆の形と違うことがあります`,
+    );
+  if (estimated) {
+    const edition = KOZU_DATA.edition && KOZU_DATA.edition !== PARCEL_DATA.edition ? `（${KOZU_DATA.edition}）` : "";
+    parts.push(`公図（任意座標）の筆は、国土地理院の基盤地図情報（道路縁）に合わせて MICHILU が推定の位置に置いたもの${edition}で、数mずれることがあります`);
+  }
+  return `${parts.join("。")}。${parts.length > 2 ? "どれも" : "どちらも"}法務局の証明ではありません`;
 }

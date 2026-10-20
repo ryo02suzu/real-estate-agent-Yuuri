@@ -1,0 +1,166 @@
+# 市町村がオープンデータで公開している地番参考図（固定資産税の地番図）の筆を、地番の筆のタイルと同じ形（z14〜16）の
+# タイル（PMTiles）にして Cloudflare R2 に置く（scripts/sanko/build.py）。公図（任意座標）しか無い所でも、市町村の図で筆を出す。
+#   毎月3日の朝（日本時間 5:23）に、市町村の公開ファイルが新しくなったかを見て（--check）、新しければ作り直す。
+#   作ったら R2 に置き、公開 URL で範囲指定して読めるかを確かめ、lib/roadmap/data/sanko-source.json（置き場所・市町村ごとの出典）を
+#   書き換えて、テストが通れば main に入れる（本番は Vercel が main から自動で作り直す）。
+# 市町村の zip（約0.5GB）と法務省の地図XML（約0.8GB）を読むので、1回1時間ほどかかる。
+#
+# 必要な設定は地番の地図データ（parcel-tiles.yml）と同じ。無ければ何もしないで終わる:
+#   Secrets:   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+#   Variables: R2_PUBLIC_URL（バケットの公開 URL）、R2_BUCKET（省略時 michilu-chiban）
+name: 市町村の地番参考図の筆
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 公開ファイルが新しくなっていなくても作り直す
+        type: boolean
+        default: false
+  schedule:
+    - cron: "23 20 2 * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sanko-tiles
+  cancel-in-progress: false
+
+env:
+  R2_BUCKET: ${{ vars.R2_BUCKET || 'michilu-chiban' }}
+  R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: auto
+  # 新しい AWS CLI が既定で付けるチェックサムを R2 は受け付けないことがある
+  AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+  AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+  TIPPECANOE_VERSION: "2.79.0"
+
+jobs:
+  sanko:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+    steps:
+      - name: R2 の設定があるか
+        id: ready
+        env:
+          ACCOUNT: ${{ secrets.R2_ACCOUNT_ID }}
+        run: |
+          # 同じ日に作り直しても前のファイルを上書きしない（ブラウザが読みかけのタイルと混ざらない）
+          echo "stamp=$(TZ=Asia/Tokyo date +%Y%m%d-%H%M)" >> "$GITHUB_OUTPUT"
+          if [ -n "$ACCOUNT" ] && [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ] && [ -n "$R2_PUBLIC_URL" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::R2 の設定（Secrets: R2_ACCOUNT_ID・R2_ACCESS_KEY_ID・R2_SECRET_ACCESS_KEY、Variables: R2_PUBLIC_URL）が無いので何もしません"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.ready.outputs.ok == 'true'
+      - uses: actions/setup-python@v5
+        if: steps.ready.outputs.ok == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/sanko/requirements.txt
+      - name: 市町村の公開ファイルが新しくなったか
+        id: c
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          pip install -r scripts/sanko/requirements.txt
+          # まだ R2 に置いていない（url が空）ときと、手で動かして force にしたときは作る
+          if [ "${{ inputs.force }}" = "true" ] || [ -z "$(jq -r '.url // ""' lib/roadmap/data/sanko-source.json)" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            python3 scripts/sanko/build.py --check
+          fi
+      - name: 作業用のディスクを空ける
+        if: steps.c.outputs.changed == 'true'
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
+      - uses: actions/cache@v4
+        if: steps.c.outputs.changed == 'true'
+        id: tippecanoe
+        with:
+          path: ~/tippecanoe-bin
+          key: tippecanoe-${{ env.TIPPECANOE_VERSION }}-${{ runner.os }}
+      - name: tippecanoe を作る
+        if: steps.c.outputs.changed == 'true' && steps.tippecanoe.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$TIPPECANOE_VERSION" https://github.com/felt/tippecanoe.git /tmp/tippecanoe
+          make -C /tmp/tippecanoe -j"$(nproc)"
+          mkdir -p ~/tippecanoe-bin && cp /tmp/tippecanoe/tippecanoe /tmp/tippecanoe/tile-join ~/tippecanoe-bin/
+      - name: タイルを作る
+        if: steps.c.outputs.changed == 'true'
+        env:
+          STAMP: ${{ steps.ready.outputs.stamp }}
+        run: |
+          export PATH="$HOME/tippecanoe-bin:$PATH"
+          mkdir -p work
+          python3 scripts/sanko/build.py --jobs 3 --work work/sanko --out "work/sanko-$STAMP.pmtiles" --manifest work/sanko-source.json | tee work/report.tsv
+          ls -la work/*.pmtiles
+          # 前の回より大きく減っていたら（市町村のファイルが読めなかったなど）、置き換えない
+          python3 - <<'PY'
+          import json, sys
+          new = json.load(open("work/sanko-source.json", encoding="utf-8"))
+          old = json.load(open("lib/roadmap/data/sanko-source.json", encoding="utf-8"))
+          count = lambda m: sum(s.get("features", 0) for s in m.get("sources", {}).values())
+          lost = sorted(set(old.get("sources", {})) - set(new["sources"]))
+          print(f"筆: {count(old)} → {count(new)}、市町村: {len(old.get('sources', {}))} → {len(new['sources'])}")
+          if lost:
+              print(f"::warning::作れなかった市町村: {', '.join(lost)}")
+          if count(new) < 0.9 * count(old):
+              sys.exit("::error::筆が前の回の9割より少ないので置き換えません")
+          PY
+      - name: R2 に置く
+        if: steps.c.outputs.changed == 'true'
+        env:
+          STAMP: ${{ steps.ready.outputs.stamp }}
+        run: |
+          aws s3 cp "work/sanko-$STAMP.pmtiles" "s3://$R2_BUCKET/sanko/sanko-$STAMP.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
+            --content-type application/octet-stream --cache-control "public, max-age=86400"
+          aws s3 cp work/sanko-source.json "s3://$R2_BUCKET/sanko/sanko-$STAMP.json" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+      - name: ブラウザから範囲指定で読めるようにする（CORS）
+        if: steps.c.outputs.changed == 'true'
+        run: |
+          cat > cors.json <<'JSON'
+          {"CORSRules":[{"AllowedOrigins":["*"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["Range","If-Match","If-None-Match"],"ExposeHeaders":["Content-Range","Content-Length","ETag","Accept-Ranges"],"MaxAgeSeconds":86400}]}
+          JSON
+          aws s3api put-bucket-cors --bucket "$R2_BUCKET" --cors-configuration file://cors.json --endpoint-url "$R2_ENDPOINT"
+      - name: 公開 URL で読めるか確かめる
+        if: steps.c.outputs.changed == 'true'
+        env:
+          STAMP: ${{ steps.ready.outputs.stamp }}
+        run: |
+          url="${R2_PUBLIC_URL%/}/sanko/sanko-$STAMP.pmtiles"
+          curl -sS -r 0-6 -H "Origin: https://michilu.vercel.app" -D headers.txt -o head.bin "$url"
+          cat headers.txt
+          grep -qi "^HTTP/.* 206" headers.txt || { echo "::error::範囲指定で読めません: $url"; exit 1; }
+          grep -qi "^access-control-allow-origin:" headers.txt || { echo "::error::CORS のヘッダがありません"; exit 1; }
+          [ "$(head -c 7 head.bin)" = "PMTiles" ] || { echo "::error::PMTiles ではありません"; exit 1; }
+          echo "URL=$url" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        if: steps.c.outputs.changed == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - name: アプリの置き場所を書き換え、テストが通れば main に入れる
+        if: steps.c.outputs.changed == 'true'
+        env:
+          STAMP: ${{ steps.ready.outputs.stamp }}
+        run: |
+          jq --arg url "$URL" '{url: $url} + .' work/sanko-source.json > lib/roadmap/data/sanko-source.json
+          head -c 300 lib/roadmap/data/sanko-source.json
+          if git diff --quiet; then echo "変更なし"; exit 0; fi
+          npm ci
+          npm test
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/roadmap/data/sanko-source.json
+          git commit -m "Use the $STAMP municipal parcel reference map data on R2 (automatic)"
+          for i in 1 2 3; do
+            git pull --rebase -X theirs && git push && break
+            sleep 10
+          done

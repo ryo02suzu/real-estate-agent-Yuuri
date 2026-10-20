@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- 外部タイル画像をそのまま並べるため */
 import { useId } from "react";
 import { tileBounds, type Parcel } from "@/lib/roadmap/parcel";
+import { SANKO_CITIES } from "@/lib/roadmap/sanko-data";
 import { TILE, tilesAround, toWorldPixel } from "@/lib/tiles";
 import { ExpandIcon, PinIcon, PinOutlineIcon } from "./icons";
 
@@ -138,14 +139,14 @@ export function MapPreview({
         </a>
       )}
       {parcel && !bare && (
-        // 登記所備付地図データ利用規約の出典と、加工したことの記載
+        // 登記所備付地図データ利用規約の出典と、加工したことの記載（市町村の地番参考図の筆は、その市町村の出典）
         <a
-          href="https://front.geospatial.jp/moj-chizu-xml-readme/"
+          href={(parcel.sanko && SANKO_CITIES[parcel.sanko]?.page) || "https://front.geospatial.jp/moj-chizu-xml-readme/"}
           target="_blank"
           rel="noreferrer"
           className="absolute right-1 top-1 rounded bg-white/80 px-1.5 text-[9px] text-muted"
         >
-          筆：「登記所備付地図データ」（法務省）を加工して作成
+          筆：{parcel.sanko ? (SANKO_CITIES[parcel.sanko]?.credit ?? "市町村の地番参考図") : "「登記所備付地図データ」（法務省）"}を加工して作成
         </a>
       )}
     </div>

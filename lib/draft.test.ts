@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildDraft, draftText, DRAFT_NOTE } from "./draft";
 import { buildLinks, findMunicipality } from "./roadmap";
 import { HAZARDS } from "./roadmap/hazard";
+import { parcelCreditLine } from "./roadmap/kozu-data";
 import type { Zoning, ZoningStatus } from "./roadmap/zoning";
 
 const m = findMunicipality("13101")!;
@@ -178,5 +179,15 @@ describe("重説・物件概要の下書き", () => {
     expect(text).toContain("所在（地番）：横浜市港北区大豆戸町 589-1（推定・確度低）（公図から推定した位置（確度が低く、5m前後ずれることあり））【要確認】");
     expect(text).toContain("国土地理院の基盤地図情報（道路縁）に合わせて MICHILU が推定の位置に置いたもので、数mずれることがあります。どちらも法務局の証明ではありません");
     expect(text).toContain("■出典\n筆の出典：「登記所備付地図データ」（法務省）");
+  });
+});
+
+describe("筆の出典", () => {
+  it("地番参考図・推定の筆があれば、1つの文に市町村の出典と注意を足す", () => {
+    expect(parcelCreditLine(false)).toMatch(/^筆の出典：「登記所備付地図データ」（法務省）.+を加工して作成（.+）。法務局の証明ではありません$/);
+    const s = parcelCreditLine(false, "13229");
+    expect(s).toContain("。地番参考図の筆は西東京市「地番図」（CC BY 4.0・");
+    expect(s).toContain("課税用の参考図のため登記の地番・筆の形と違うことがあります。どちらも法務局の証明ではありません");
+    expect(parcelCreditLine(true, "13229")).toMatch(/数mずれることがあります。どれも法務局の証明ではありません$/);
   });
 });

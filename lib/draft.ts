@@ -5,9 +5,10 @@ import { buildingSummary, type BuildingResult } from "./roadmap/building";
 import { BUILDING_CREDIT } from "./roadmap/building-data";
 import { groundMaps, groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, hazardRows, wagamachiUrl, type Elevation, type HazardMaps, type HazardReport } from "./roadmap/hazard";
 import { parcelCreditLine } from "./roadmap/kozu-data";
+import { SANKO_NOTE } from "./roadmap/sanko-data";
 import { distanceText, kindText, priceText, type LandPriceHit } from "./roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
-import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel, type Estimated } from "./roadmap/parcel";
+import { chibanLabel, estimatedNote, kuikiLabel, parcelMark, type Estimated } from "./roadmap/parcel";
 import type { NearbyRoad } from "./roadmap/road-read";
 import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
 import { lineLabel, STATION_CREDIT, type StationWalk } from "./roadmap/walk";
@@ -26,7 +27,7 @@ export type DraftSection = { title: string; rows: DraftRow[] };
 
 export type DraftInput = {
   zoning?: { zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi };
-  parcels?: { target?: string; neighbors: string[]; reference: boolean; estimated?: Estimated };
+  parcels?: { target?: string; neighbors: string[]; reference: boolean; estimated?: Estimated; sanko?: string };
   roads?: NearbyRoad[];
   hazard?: { report: HazardReport; elevation: Elevation | null; maps: HazardMaps; muniCd: string };
   building?: BuildingResult;
@@ -53,11 +54,21 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
       check: result.approximate,
     },
   ];
-  if (found) place.push({ label: "所在（地番）", value: `${kuikiLabel(found.kuiki)} ${chibanLabel(found.chibanRaw).replace(/^地番 /, "")}${estimatedMark(found)}`, note: found.estimated ? `公図から推定した位置（${estimatedNote(found.estimated)}）` : undefined, check: !!found.estimated });
+  if (found)
+    place.push({
+      label: "所在（地番）",
+      value: `${kuikiLabel(found.kuiki)} ${chibanLabel(found.chibanRaw).replace(/^地番 /, "")}${parcelMark(found)}`,
+      note: found.estimated
+        ? `公図から推定した位置（${estimatedNote(found.estimated)}）`
+        : found.sanko
+          ? `${found.undetermined ? "登記所の地図では筆界未定地。" : ""}${SANKO_NOTE}`
+          : undefined,
+      check: !!(found.estimated || found.sanko),
+    });
   else if (parcels?.target)
     place.push({
       label: "所在（地番）",
-      value: `${parcels.target}${parcels.estimated ? "（推定）" : ""}`,
+      value: `${parcels.target}${parcels.estimated ? "（推定）" : parcels.sanko ? "（地番参考図）" : ""}`,
       note: parcels.reference ? "住所の地点にある筆（参考）。住居表示と地番は別のもの" : undefined,
       check: true,
     });
@@ -230,7 +241,8 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   const credits: DraftRow[] = [];
   const credit = (value: string) => credits.push({ label: "", value });
   // 筆の出典（登記所備付地図データ）と、公図から推定した筆の注意は1つの文に
-  if (p || parcels) credit(parcelCreditLine(!!(p?.estimated || parcels?.estimated)));
+  // 市町村の地番参考図の筆の出典（市町村ごと）も同じ文に
+  if (p || parcels) credit(parcelCreditLine(!!(p?.estimated || parcels?.estimated), p?.sanko ?? parcels?.sanko));
   if (zoning) credit(`都市計画の${ZONING_CREDIT}`);
   if (hazard) credit(`災害リスクの${HAZARD_CREDIT}`);
   if (hit) credit(`建物の${BUILDING_CREDIT}`);

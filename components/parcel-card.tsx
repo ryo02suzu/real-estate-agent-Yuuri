@@ -1,16 +1,18 @@
 "use client";
 
 // 謄本・公図を取るときの地番。物件の筆と、境界が接する隣の筆の地番を並べ、コピーと登記情報提供サービスへの入口を出す。
-// 筆は登記所備付地図データ（lib/roadmap/parcel.ts）。住所で調べたときは、住所の地点にある筆を参考として出す。
+// 筆は登記所備付地図データ（lib/roadmap/parcel.ts）。公図（任意座標）の地域は、市町村の地番参考図（sanko-data.ts）か
+// 推定の位置（kozu-data.ts）の筆。住所で調べたときは、住所の地点にある筆を参考として出す。
 // 市町村が地番図を公開していれば、物件の場所で開く入口も出す（lib/roadmap/chibanzu.ts。筆が無い地点ではそれだけを出す）
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
 import type { LookupResult } from "@/lib/roadmap";
 import type { ChibanzuLink } from "@/lib/roadmap/chibanzu";
 import { KOZU_DATA } from "@/lib/roadmap/kozu-data";
-import { adjacentParcels, chibanLabel, estimatedMark, kuikiLabel, parcelAt, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
+import { adjacentParcels, chibanLabel, kuikiLabel, parcelAt, parcelMark, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
+import { SANKO_CITIES, sankoSource } from "@/lib/roadmap/sanko-data";
 import { ChevronRightIcon, CopyIcon, ExternalIcon, InfoIcon, ParcelIcon } from "./icons";
 import { Sheet } from "./sheet";
 import { useCopy } from "./use-copy";
@@ -97,7 +99,7 @@ export function ParcelButton({
     );
   }
   const chiban =
-    onOpen && info.status === "ok" && info.kind !== "address" && /^\d/.test(info.parcel.chibanRaw) ? `${chibanLabel(info.parcel.chibanRaw)}${estimatedMark(info.parcel)}` : undefined;
+    onOpen && info.status === "ok" && info.kind !== "address" && /^\d/.test(info.parcel.chibanRaw) ? `${chibanLabel(info.parcel.chibanRaw)}${parcelMark(info.parcel)}` : undefined;
   return (
     <>
       <button
@@ -217,6 +219,7 @@ function ParcelDetail({ info, chibanzu }: { info: Extract<ParcelInfo, { status: 
       <p className="text-[11px] text-muted">
         {KIND_LABEL[kind]}
         {parcel.estimated && `・公図から推定した位置${parcel.estimated === "low" ? "（確度低）" : ""}`}
+        {parcel.sanko && `・${SANKO_CITIES[parcel.sanko]?.name ?? "市町村"}の地番参考図`}
       </p>
       <Row kuiki={parcel.kuiki} chiban={parcel.chibanRaw} strong />
       {parcel.estimated && (
@@ -224,6 +227,12 @@ function ParcelDetail({ info, chibanzu }: { info: Extract<ParcelInfo, { status: 
           {parcel.estimated === "low"
             ? "この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置で、合わせ方の確かさが低いため、5m前後ずれて隣の筆の地番になっていることがあります。隣の筆も候補にして、謄本・公図で確かめてください。"
             : "この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、数mずれて隣の筆の地番になることがあります。謄本・公図で確かめてください。"}
+        </p>
+      )}
+      {parcel.sanko && (
+        <p className="mt-0.5 text-[10.5px] leading-[1.55] text-[#8a4f3a] dense:leading-[1.45] denser:text-[10px]">
+          {parcel.undetermined ? "登記所の地図では、この辺りは筆界未定地です。" : "この辺りの登記所の地図は公図（任意座標）です。"}
+          市町村が公開している課税用の地番参考図の筆で、登記の地番・筆の形と違うことがあります。謄本・公図で確かめてください。
         </p>
       )}
       {kind === "address" && (
@@ -260,6 +269,7 @@ function ParcelDetail({ info, chibanzu }: { info: Extract<ParcelInfo, { status: 
         <span>
           筆は「登記所備付地図データ」（法務省）を加工して作成（{parcel.estimated ? KOZU_DATA.edition || PARCEL_DATA.edition : PARCEL_DATA.edition}）。
           {parcel.estimated && "公図の筆は、国土地理院の基盤地図情報（道路縁）に合わせて位置を推定しています。"}
+          {parcel.sanko && `参考図の筆の${sankoSource(parcel.sanko)}。`}
           分筆・合筆などで変わっていることがあります。証明書として使う謄本（登記事項証明書）は、法務局で請求してください。
         </span>
       </p>
