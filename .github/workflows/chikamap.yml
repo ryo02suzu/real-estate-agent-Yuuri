@@ -1,0 +1,47 @@
+# 毎月5日の朝（日本時間 6:47）に、全国地価マップの路線価（相続税・固定資産税）と地価公示の地図に新しい年分・年度が出たかを見て
+# （scripts/chikamap/update.py）、出ていれば lib/roadmap/data/chikamap.json の地図の番号を書き換え、テストが通れば main に入れる。
+# アプリは物件の場所の路線価の地図を、この番号で開く（相続税路線価は毎年7月1日に新しい年分が出る）。外部のストレージや鍵は要らない。
+name: 路線価の地図（全国地価マップ）の番号
+
+on:
+  schedule:
+    - cron: "47 21 4 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# ほかのデータ更新と同時に main へ書き込まないようにする
+concurrency:
+  group: data-updates
+  cancel-in-progress: false
+
+jobs:
+  chikamap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 新しい年分・年度の地図が出たか
+        id: c
+        run: python3 scripts/chikamap/update.py
+      - uses: actions/setup-node@v4
+        if: steps.c.outputs.changed == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - name: テストが通れば main に入れる
+        if: steps.c.outputs.changed == 'true'
+        run: |
+          git diff --quiet && { echo "変更なし"; exit 0; }
+          npm ci
+          npm test
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/roadmap/data/chikamap.json
+          git commit -m "Use the newest 路線価 maps on 全国地価マップ: $(jq -c '[.maps[].mid]' lib/roadmap/data/chikamap.json) (automatic)"
+          git pull --rebase
+          git push

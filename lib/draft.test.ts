@@ -108,6 +108,8 @@ describe("重説・物件概要の下書き", () => {
     expect(text).toContain("■災害リスク（国のデータ・参考）\n洪水（想定最大規模）：浸水 0.5〜3m");
     expect(text).toMatch(/\n大規模盛土造成地：国の重ねるハザードマップで確認（https:\/\/disaportal\.gsi\.go\.jp\/maps\/\?ll=[\d.]+,[\d.]+&z=16&base=pale&ls=daikiboumoritsuzouseichi_multi%2C0\.8&disp=1&vs=c1j0l0u0t0h0z0）\n/);
     expect(text).toContain("\n液状化の発生傾向：国の重ねるハザードマップで確認（https://disaportal.gsi.go.jp/maps/?ll=");
+    // 路線価（全国地価マップを物件の場所で開く）
+    expect(text).toMatch(/\n相続税路線価：全国地価マップで確認（令和\d+年分）（https:\/\/www\.chikamap\.jp\/chikamap\/Map\?mid=3\d\d&mpx=[\d.]+&mpy=[\d.]+&mps=1500&gprj=2）\n固定資産税路線価：全国地価マップで確認（令和\d+年度）（https:\/\/www\.chikamap\.jp\//);
     expect(text).toContain("用途地域・建ぺい率・容積率：第一種住居地域／建ぺい率60%／容積率400%");
     expect(text).toContain("■出典");
     expect(text.endsWith(DRAFT_NOTE)).toBe(true);

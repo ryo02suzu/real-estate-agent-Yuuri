@@ -5,6 +5,7 @@ import { buildingSummary, type BuildingResult } from "./roadmap/building";
 import { BUILDING_CREDIT } from "./roadmap/building-data";
 import { groundMaps, groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, hazardRows, wagamachiUrl, type Elevation, type HazardMaps, type HazardReport } from "./roadmap/hazard";
 import { parcelCreditLine } from "./roadmap/kozu-data";
+import { rosenkaLinks } from "./roadmap/rosenka";
 import { SANKO_NOTE } from "./roadmap/sanko-data";
 import { distanceText, kindText, priceText, type LandPriceHit } from "./roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
@@ -235,6 +236,9 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   if (hit) outline.push({ label: "建物（PLATEAU）", value: `${buildingSummary(hit.building)}${hit.building.height ? `・高さ約${hit.building.height.toFixed(1)}m` : ""}`, note: "登記・建築確認の内容とは異なることがある", check: true });
   const near = (landPrice ?? [])[0];
   if (near) outline.push({ label: "近くの地価", value: `${kindText(near.kind)} ${near.no}（${near.bearing}へ${distanceText(near.distance)}）：${priceText(near.price)}`, note: "標準地・基準地の価格で、物件の価格ではない" });
+  // 路線価（相続税・固定資産税）は全国地価マップを物件の場所で開く URL を添える
+  for (const l of rosenkaLinks(result.lat, result.lng))
+    outline.push({ label: l.kind === "souzoku" ? "相続税路線価" : "固定資産税路線価", value: `全国地価マップで確認（${l.name.match(/（(.+)）/)?.[1] ?? ""}）`, note: l.url });
   if (outline.length) sections.push({ title: "販売図面（物件概要）向け（参考）", rows: outline });
 
   // 出典（それぞれの出典の文のまま。見出しは付けない。国土数値情報のデータは1つの文にまとめる）

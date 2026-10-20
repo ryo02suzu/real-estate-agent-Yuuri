@@ -9,6 +9,7 @@ import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
 import { SCHOOL_DATA } from "./roadmap/school-data";
 import { STATION_CREDIT, stationLine, type StationWalk } from "./roadmap/walk";
 import { KOZU_CREDIT } from "./roadmap/kozu-data";
+import { rosenkaLinks } from "./roadmap/rosenka";
 import { SANKO_NOTE, sankoCredit } from "./roadmap/sanko-data";
 import { chibanLabel, estimatedNote, kuikiLabel, parcelMark, type Estimated } from "./roadmap/parcel";
 import { PARCEL_CREDIT } from "./roadmap/parcel-data";
@@ -112,6 +113,9 @@ export function buildSummary(
     for (const h of prices)
       lines.push(`・${kindText(h.kind)} ${h.no}（${h.usage}・${h.bearing}へ${distanceText(h.distance)}）：${priceText(h.price)}（前年比 ${changeText(h.change)}、${asOfText(h)}）`);
   }
+  // 路線価（相続税・固定資産税）は、全国地価マップを物件の場所で開く
+  lines.push("【路線価（全国地価マップ・参考）】");
+  for (const l of rosenkaLinks(result.lat, result.lng)) lines.push(`・${l.name}\n  ${l.url}`);
   if (stations?.length) {
     lines.push("【最寄り駅（徒歩の目安・道路距離 80m を1分）】");
     for (const s of stations) lines.push(`・${stationLine(s)}`);

@@ -115,6 +115,8 @@ describe("buildSummary", () => {
     expect(text).toContain("・大規模盛土造成地（国の重ねるハザードマップ）\n  https://disaportal.gsi.go.jp/maps/?ll=35.683800,139.864100&z=16&");
     expect(text).toContain("・液状化の発生傾向（国の重ねるハザードマップ）\n  https://disaportal.gsi.go.jp/maps/?ll=35.683800,139.864100&z=15&");
     expect(text).toContain("（大規模盛土造成地は安全性の確認が必要な盛土で、直ちに危険というものではありません。");
+    // 路線価は全国地価マップを物件の場所で開く
+    expect(text).toMatch(/【路線価（全国地価マップ・参考）】\n・相続税路線価等（令和\d+年分）\n  https:\/\/www\.chikamap\.jp\/chikamap\/Map\?mid=3\d\d&mpx=139\.864100&mpy=35\.683800&mps=1500&gprj=2\n・固定資産税路線価等（令和\d+年度）\n  https:\/\/www\.chikamap\.jp\/chikamap\/Map\?mid=2\d\d&/);
     expect(text).toContain("※災害リスクの出典：「ハザードマップポータルサイト」");
     expect(text).toContain("重要事項説明には使えません");
   });

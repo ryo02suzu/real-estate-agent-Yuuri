@@ -1,7 +1,8 @@
 "use client";
 
 // 物件の近くの地価公示（標準地）・都道府県地価調査（基準地）。近い順に、価格（円/m²・坪あたり）・前年比・距離と向き・用途を出し、
-// 押すと所在・地積・前面道路・最寄り駅・用途地域・価格の推移を開く。地点は国土数値情報（lib/roadmap/land-price.ts）
+// 押すと所在・地積・前面道路・最寄り駅・用途地域・価格の推移を開く。地点は国土数値情報（lib/roadmap/land-price.ts）。
+// 路線価（相続税・固定資産税）は、全国地価マップを物件の場所で開くリンクを添える（lib/roadmap/rosenka.ts）
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
 import {
@@ -19,10 +20,14 @@ import {
 } from "@/lib/roadmap/land-price";
 import { LAND_PRICE_DATA } from "@/lib/roadmap/land-price-data";
 import { pmtilesLandPriceSource } from "@/lib/roadmap/land-price-tiles";
-import { ChevronRightIcon, InfoIcon, LandPriceIcon, MapIcon } from "./icons";
+import { ROSENKA_CHECK, ROSENKA_NOTE, rosenkaLinks, type RosenkaLink } from "@/lib/roadmap/rosenka";
+import { ChevronRightIcon, ExternalIcon, InfoIcon, LandPriceIcon, MapIcon } from "./icons";
 import { Sheet } from "./sheet";
 
-export type LandPriceState = { status: "loading" } | { status: "error" } | { status: "ok"; hits: LandPriceHit[] };
+export type LandPriceState =
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "ok"; hits: LandPriceHit[]; /** 物件の場所で開く路線価の地図（全国地価マップ） */ rosenka: RosenkaLink[] };
 
 /** 物件の近くの地点（5つまで・4km 以内）。関東の外や近くに地点が無ければ hits が空 */
 export function useLandPrices(lat: number, lng: number): LandPriceState {
@@ -31,7 +36,7 @@ export function useLandPrices(lat: number, lng: number): LandPriceState {
   useEffect(() => {
     let alive = true;
     withRetry(() => nearestLandPrices(lat, lng, pmtilesLandPriceSource, { count: 5, maxM: 4000 }))
-      .then((hits) => alive && setState({ key, value: { status: "ok", hits } }))
+      .then((hits) => alive && setState({ key, value: { status: "ok", hits, rosenka: rosenkaLinks(lat, lng) } }))
       .catch(() => alive && setState({ key, value: { status: "error" } }));
     return () => {
       alive = false;
@@ -95,6 +100,7 @@ export function LandPriceLine({
         <Sheet title="近くの地価（参考）" open={open} onClose={() => setOpen(false)}>
           <LandPriceDetail
             hits={state.hits}
+            rosenka={state.rosenka}
             onShowMap={
               onShowMap &&
               ((p) => {
@@ -156,7 +162,7 @@ function Item({ hit, onShowMap }: { hit: LandPriceHit; onShowMap?: (point: [numb
 }
 
 /** 地点の一覧（スマホのシート・PC のカード） */
-export function LandPriceDetail({ hits, onShowMap }: { hits: LandPriceHit[]; onShowMap?: (point: [number, number]) => void }) {
+export function LandPriceDetail({ hits, rosenka, onShowMap }: { hits: LandPriceHit[]; rosenka?: RosenkaLink[]; onShowMap?: (point: [number, number]) => void }) {
   return (
     <div>
       <p className="text-[11px] leading-[1.6] text-muted">物件から近い順。標準地（地価公示）・基準地（都道府県地価調査）は、その地域の標準的な土地の価格です。物件そのものの価格ではありません。</p>
@@ -165,6 +171,25 @@ export function LandPriceDetail({ hits, onShowMap }: { hits: LandPriceHit[]; onS
           <Item key={`${h.kind}|${h.no}`} hit={h} onShowMap={onShowMap} />
         ))}
       </ul>
+      {/* 路線価は全国地価マップを物件の場所で開く（相続税・固定資産税の最新の年分・年度） */}
+      {rosenka && rosenka.length > 0 && (
+        <div className="mt-2 rounded-xl bg-[#f7f3ec] px-3 py-2 dense:mt-1.5 dense:py-1.5 densest:py-1">
+          <p className="text-[11.5px] font-semibold text-ink">路線価を地図で見る</p>
+          <ul className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+            {rosenka.map((l) => (
+              <li key={l.kind}>
+                <a href={l.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[12px] leading-[1.5] text-brand underline-offset-2 hover:underline">
+                  <ExternalIcon className="h-3 w-3 shrink-0" />
+                  {l.name.replace(/等（/, "（")}
+                </a>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-0.5 text-[10.5px] leading-[1.5] text-muted denser:text-[10px] densest:leading-[1.4]">
+            {ROSENKA_NOTE}。{ROSENKA_CHECK}。
+          </p>
+        </div>
+      )}
       <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted">
         <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
         <span>
@@ -193,7 +218,7 @@ export function LandPriceCard({ state, onShowMap }: { state: LandPriceState; onS
       </h3>
       {state.status === "loading" && <p className="text-[12px] text-muted">地価公示・地価調査の地点を確認しています…</p>}
       {state.status === "error" && <p className="text-[12px] text-muted">地価のデータを読み込めませんでした。時間をおいて調べ直してください。</p>}
-      {state.status === "ok" && <LandPriceDetail hits={state.hits} onShowMap={onShowMap} />}
+      {state.status === "ok" && <LandPriceDetail hits={state.hits} rosenka={state.rosenka} onShowMap={onShowMap} />}
     </section>
   );
 }
