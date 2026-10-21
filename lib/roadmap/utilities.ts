@@ -1,6 +1,7 @@
 // 上下水道・ガスの照会先（重説の「飲用水・電気・ガスの供給施設及び排水施設」の欄の確認先）。市区町村ごとの水道事業者（末端給水）・
 // 公共下水道の管理者・都市ガスの一般ガス導管事業者と、配管図・下水道台帳・ガス管の埋設状況を確かめる方法を書いた公式のページ
-// （data/utilities.json。事業者・市区町村の公式の資料で調べた。2026年10月）。前面道路の管・口径・引込みの有無は、ここで確かめる
+// （data/utilities.json。事業者・市区町村・都県の公式の資料で調べた。2026年10月、上水道・下水道は1都3県の212市区町村）。
+// 前面道路の管・口径・引込みの有無は、ここで確かめる
 import DATA from "./data/utilities.json";
 import type { Municipality } from "./municipalities";
 
@@ -33,7 +34,8 @@ type Provider = { url: string; top?: boolean; how?: string };
 type Served = [name: string, area?: string];
 type Stored = { checked: string; providers: Record<string, Provider>; cities: Record<string, { water?: Served[]; sewer?: Served[]; gas?: Served[] }> };
 
-const D = DATA as Stored;
+// JSON の配列は string[][] と推論されるので、unknown を通して形を付ける
+const D = DATA as unknown as Stored;
 
 /** データを調べた時点（「2026年10月」） */
 export const UTILITIES_CHECKED = D.checked;
@@ -59,3 +61,9 @@ export const contactName = (c: UtilityContact) => `${c.name}${c.area ? `（${c.a
 
 /** 都市ガスの導管が無い市町村の一言 */
 export const NO_CITY_GAS = "都市ガスの導管事業者の供給区域に無い（プロパンガスか、団地などのガス）";
+
+/** 公共下水道（汚水）の無い市町村の一言（都県の下水道の一覧で「未実施」。2026年10月に1都3県で30市町村） */
+export const NO_SEWER = "公共下水道（汚水）の無い市町村（排水は浄化槽・農業集落排水など。市町村の担当で確認）";
+
+/** 照会先が無いとき（空の一覧）の一言：下水道は公共下水道が無い、ガスは都市ガスの区域に無い */
+export const noContactText = (kind: UtilityKind) => (kind === "下水道" ? NO_SEWER : NO_CITY_GAS);

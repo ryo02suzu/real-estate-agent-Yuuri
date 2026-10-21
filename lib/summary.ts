@@ -20,7 +20,7 @@ import { HOUREI_CREDIT, HOUREI_SHORT, houreiGroups, houreiLine, houreiNotesLine,
 import { TOCHI_CREDIT, tochiCheck, tochiLine, type Tochi } from "./roadmap/tochi";
 import { isekiFor, isekiLine } from "./roadmap/iseki";
 import { suidoFor } from "./roadmap/suido";
-import { contactName, NO_CITY_GAS, UTILITIES_CHECKED, utilitiesFor } from "./roadmap/utilities";
+import { contactName, noContactText, UTILITIES_CHECKED, utilitiesFor } from "./roadmap/utilities";
 import { MORIDO_CREDIT, moridoLine, type Morido } from "./roadmap/morido";
 import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
 import { ZONING_CREDIT } from "./roadmap/zoning-data";
@@ -102,9 +102,9 @@ export function buildSummary(
   const u = utilitiesFor(m);
   if (u) {
     lines.push(`【上下水道・ガスの照会先（${UTILITIES_CHECKED}時点）】`);
-    for (const [what, list] of [["水道", u.water], ["下水道", u.sewer], ["都市ガス", u.gas]] as const) {
+    for (const [what, kind, list] of [["水道", "上水道", u.water], ["下水道", "下水道", u.sewer], ["都市ガス", "ガス", u.gas]] as const) {
       if (!list) continue;
-      if (!list.length) lines.push(`・${what}：${NO_CITY_GAS}`);
+      if (!list.length) lines.push(`・${what}：${noContactText(kind)}`);
       for (const c of list) lines.push(`・${what}：${contactName(c)}${c.how ? `（${c.how}）` : ""}\n  ${c.url}`);
     }
   }

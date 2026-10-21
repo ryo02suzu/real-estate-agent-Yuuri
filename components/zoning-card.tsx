@@ -16,7 +16,7 @@ import { MORIDO_DATA, moridoAt, moridoDetail, moridoNote, moridoNotice, moridoVa
 import { pmtilesMoridoSource } from "@/lib/roadmap/morido-tiles";
 import { suidoFor, type SuidoLink } from "@/lib/roadmap/suido";
 import { TOCHI_YEAR, tochiAt, tochiCheck, tochiLine, type Tochi } from "@/lib/roadmap/tochi";
-import { contactLinkText, contactName, NO_CITY_GAS, utilitiesFor, type UtilityContact, type Utilities } from "@/lib/roadmap/utilities";
+import { contactLinkText, contactName, noContactText, utilitiesFor, type UtilityContact, type UtilityKind, type Utilities } from "@/lib/roadmap/utilities";
 import { pmtilesTochiSource } from "@/lib/roadmap/tochi-tiles";
 import { statusFor, zoningAt, zoningChips, zoningRows, type Zoning, type ZoningStatus } from "@/lib/roadmap/zoning";
 import { ZONING_DATA } from "@/lib/roadmap/zoning-data";
@@ -161,10 +161,7 @@ function ZoningDetail({ state, city, tabs }: { state: Extract<ZoningState, { sta
         <h4 className="mb-0.5 mt-3 border-t border-line/70 pt-2.5 text-[13px] font-semibold text-ink">その他の法令（重説の下調べ）</h4>
         <OtherPart state={state} city={city} />
         <h4 className="mb-0.5 mt-3 border-t border-line/70 pt-2.5 text-[13px] font-semibold text-ink">上下水道・ガス</h4>
-        <dl>
-          <SuidoRow links={state.suido ?? []} city={city} />
-          <UtilityRows u={state.utilities} />
-        </dl>
+        <UtilityPart state={state} city={city} />
       </div>
     );
   return (
@@ -185,12 +182,7 @@ function ZoningDetail({ state, city, tabs }: { state: Extract<ZoningState, { sta
       </div>
       {tab === 0 && <ZoningPart state={state} city={city} />}
       {tab === 1 && <OtherPart state={state} city={city} />}
-      {tab === 2 && (
-        <dl>
-          <SuidoRow links={state.suido ?? []} city={city} />
-          <UtilityRows u={state.utilities} />
-        </dl>
-      )}
+      {tab === 2 && <UtilityPart state={state} city={city} />}
     </div>
   );
 }
@@ -399,21 +391,46 @@ function IsekiRow({ iseki }: { iseki: Iseki }) {
   );
 }
 
-/** 上下水道の行。台帳の地図を公開している市町村は、その地図を物件の場所で開く */
-function SuidoRow({ links, city }: { links: SuidoLink[]; city: string }) {
+/** 上下水道・ガス。照会先（水道・下水道）が分かる市区町村は照会先を出し、分からなければ市区町村の担当を出す。ガスはまだ照会先を
+ * 調べていないので、確かめることだけを出す（タブの名前にガスがあるのに何も無いと、探してしまうため） */
+function UtilityPart({ state, city }: { state: Extract<ZoningState, { status: "ok" }>; city: string }) {
+  const u = state.utilities;
+  const links = state.suido ?? [];
+  return (
+    <>
+      {u && <p className="mb-0.5 text-[12px] leading-[1.6] text-muted densest:leading-[1.45]">前面道路の本管・口径・引込みの有無は、次の照会先で確認</p>}
+      <dl>
+        {(!u || links.length > 0) && <SuidoRow links={links} city={city} short={!!u} />}
+        <UtilityRows u={u} />
+        {!u?.gas && (
+          <div className={ROW}>
+            <dt className={LABEL}>ガス</dt>
+            <dd className="min-w-0 flex-1">
+              <span className={`block ${VALUE} text-ink`}>ガス会社で確認</span>
+              <span className={SUB}>都市ガスかプロパンガスか、前面道路のガス管の有無</span>
+            </dd>
+          </div>
+        )}
+      </dl>
+    </>
+  );
+}
+
+/** 上下水道の行。台帳の地図を公開している市町村は、その地図を物件の場所で開く。short：照会先の行が続くので、地図だけを出す */
+function SuidoRow({ links, city, short }: { links: SuidoLink[]; city: string; short?: boolean }) {
   return (
     <div className={ROW}>
-      <dt className={LABEL}>上下水道</dt>
+      <dt className={LABEL}>{short ? "台帳の地図" : "上下水道"}</dt>
       <dd className="min-w-0 flex-1">
         <span className={`block ${VALUE} text-ink`}>
-          {links.length ? "台帳の地図で確認" : `${city}の上下水道の担当で確認`}
+          {short ? "物件の場所で開く" : links.length ? "台帳の地図で確認" : `${city}の上下水道の担当で確認`}
           {links.map((l) => (
             <a key={l.url} href={l.url} target="_blank" rel="noreferrer" title={l.name} className="ml-2 whitespace-nowrap text-[12.5px] text-brand underline">
               {l.kind === "下水道" ? "下水道" : "水道"}
             </a>
           ))}
         </span>
-        <span className={SUB}>前面道路の本管・口径・引込みの有無は、水道事業者・下水道の担当で確認</span>
+        {!short && <span className={SUB}>前面道路の本管・口径・引込みの有無は、水道事業者・下水道の担当で確認</span>}
       </dd>
     </div>
   );
@@ -422,18 +439,18 @@ function SuidoRow({ links, city }: { links: SuidoLink[]; city: string }) {
 /** 水道・下水道・都市ガスの照会先（事業者と、配管図・台帳・ガス管の埋設状況の確かめ方のページ）。調べていない市区町村は出さない */
 function UtilityRows({ u }: { u?: Utilities }) {
   if (!u) return null;
-  const rows: [string, UtilityContact[] | undefined][] = [
-    ["水道", u.water],
-    ["下水道", u.sewer],
-    ["都市ガス", u.gas],
+  const rows: [string, UtilityKind, UtilityContact[] | undefined][] = [
+    ["水道", "上水道", u.water],
+    ["下水道", "下水道", u.sewer],
+    ["都市ガス", "ガス", u.gas],
   ];
   return rows.map(
-    ([label, list]) =>
+    ([label, kind, list]) =>
       list && (
         <div key={label} className={ROW}>
           <dt className={LABEL}>{label}</dt>
           <dd className="min-w-0 flex-1">
-            {list.length === 0 && <span className={`block ${VALUE} text-ink`}>{NO_CITY_GAS}</span>}
+            {list.length === 0 && <span className={`block ${VALUE} text-ink`}>{noContactText(kind)}</span>}
             {list.map((c) => (
               <span key={c.name} className="block">
                 <span className={`${VALUE} text-ink`}>{contactName(c)}</span>

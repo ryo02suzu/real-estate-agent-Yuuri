@@ -18,7 +18,7 @@ import { CHIBANZU_NOTE, chibanzuFor } from "./roadmap/chibanzu";
 import { HOUREI_CREDIT, HOUREI_LAWS, houreiAsOf, houreiCaution, houreiGroups, houreiNotesLine, houreiOffice, houreiOfficeAll, PREF_NAMES, type Hourei, type HoureiKind } from "./roadmap/hourei";
 import { isekiFor } from "./roadmap/iseki";
 import { suidoFor } from "./roadmap/suido";
-import { contactName, NO_CITY_GAS, utilitiesFor, type UtilityContact } from "./roadmap/utilities";
+import { contactName, NO_CITY_GAS, NO_SEWER, utilitiesFor, type UtilityContact } from "./roadmap/utilities";
 import { TOCHI_CREDIT, tochiAgriText, tochiCheck, tochiForestText, tochiParkText, type Tochi } from "./roadmap/tochi";
 import { MORIDO_CREDIT, moridoCaution, moridoDetail, moridoValue, type Morido } from "./roadmap/morido";
 import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
@@ -206,7 +206,10 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   supply.push({
     label: "排水（下水道）",
     value: CHECK,
-    note: `前面道路の下水道管（汚水・雨水）・公共ますの有無、浄化槽の要否は、${names(u?.sewer, "下水道の管理者（市区町村など）")}で確認`,
+    note:
+      u?.sewer && u.sewer.length === 0
+        ? `${NO_SEWER}。浄化槽の要否・排水の方法は${m.name}の担当で確認`
+        : `前面道路の下水道管（汚水・雨水）・公共ますの有無、浄化槽の要否は、${names(u?.sewer, "下水道の管理者（市区町村など）")}で確認`,
     check: true,
   });
   contactRows("下水道の照会先", u?.sewer);
