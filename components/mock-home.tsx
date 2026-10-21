@@ -2,55 +2,59 @@
 
 // 見た目の見本（ChatGPT で作った画面の絵）をそのまま敷いて、絵の各部分にボタンを重ねたホーム。
 // 絵の中の住所・数字は見本のままで、本物のデータではない。検索窓だけは本物（絵の検索窓の上に重ねる）。
-// 本物の部品ができた所から、絵のその部分を部品に置きかえていく（public/mock/ の絵は 852px 幅の元の絵から、
-// ステータスバーと下のメニューを切り離したもの）
+// 本物の部品ができた所から、絵のその部分を部品に置きかえていく。
+// public/mock/ の絵は、iPhone の枠つきの元の絵（863×1822）から画面の部分だけを切り出し、さらに
+// ステータスバーと下のメニューを切り離したもの。押せる所の座標は元の絵の座標で書き、SX・TOP を引いて使う
 import { useRef, useState } from "react";
 import { CloseIcon, SearchIcon } from "./icons";
 
-/** 元の絵の大きさ（ステータスバーを除いた上の部分と、下のメニューの帯） */
-const W = 852;
-const TOP = 68;
-const MAIN_H = 1756 - TOP;
-const NAV_H = 1824 - 1756;
+/** 元の絵の中の画面の位置と大きさ */
+const SX = 35; // 画面の左端
+const W = 792; // 画面の幅
+const TOP = 112; // 上の絵の上端（ステータスバーの下、ロゴの少し上）
+const NAV_TOP = 1685; // 下のメニューの帯の上端
+const NAV_END = 1768; // 下のメニューの帯の下端（ホームバーの上）
+const MAIN_H = NAV_TOP - TOP;
+const NAV_H = NAV_END - NAV_TOP;
 
 /** 絵の中の押せる所（元の絵の座標。x1,y1,x2,y2） */
 type Spot = { label: string; box: [number, number, number, number]; action: string };
 
 const MAIN_SPOTS: Spot[] = [
-  { label: "検索履歴", box: [548, 78, 628, 148], action: "history" },
-  { label: "保存", box: [650, 78, 728, 148], action: "favorites" },
-  { label: "メニュー", box: [745, 78, 825, 148], action: "menu" },
-  { label: "この場所の道路種別の地図を開く", box: [20, 254, 832, 494], action: "nudge" },
-  { label: "お気に入り", box: [570, 532, 724, 594], action: "favorites" },
-  { label: "共有", box: [733, 532, 828, 594], action: "nudge" },
-  { label: "基本情報", box: [30, 618, 156, 678], action: "nudge" },
-  { label: "周辺環境", box: [160, 618, 288, 678], action: "nudge" },
-  { label: "相場・取引", box: [292, 618, 432, 678], action: "nudge" },
-  { label: "法令・規制", box: [437, 618, 579, 678], action: "nudge" },
-  { label: "ハザード", box: [583, 618, 706, 678], action: "nudge" },
-  { label: "取引事例", box: [710, 618, 830, 678], action: "nudge" },
-  { label: "地図で選ぶ", box: [30, 688, 422, 1128], action: "map" },
-  { label: "土地の参考価格", box: [30, 1138, 422, 1264], action: "nudge" },
-  { label: "周辺の取引相場", box: [30, 1270, 422, 1372], action: "nudge" },
-  { label: "もっと見る", box: [705, 1385, 830, 1425], action: "nudge" },
-  { label: "周辺の取引事例", box: [30, 1593, 420, 1684], action: "nudge" },
-  { label: "法令・規制の詳細", box: [434, 1593, 830, 1684], action: "help" },
-  { label: "この情報を共有", box: [30, 1690, 420, 1750], action: "nudge" },
-  { label: "レポートを作成", box: [434, 1690, 830, 1750], action: "nudge" },
+  { label: "検索履歴", box: [558, 114, 640, 186], action: "history" },
+  { label: "保存", box: [646, 114, 726, 186], action: "favorites" },
+  { label: "メニュー", box: [730, 114, 810, 186], action: "menu" },
+  { label: "この場所の道路種別の地図を開く", box: [54, 282, 808, 483], action: "nudge" },
+  { label: "お気に入り", box: [558, 524, 700, 582], action: "favorites" },
+  { label: "共有", box: [704, 524, 808, 582], action: "nudge" },
+  { label: "基本情報", box: [54, 605, 186, 663], action: "nudge" },
+  { label: "周辺環境", box: [190, 605, 308, 663], action: "nudge" },
+  { label: "相場・取引", box: [312, 605, 438, 663], action: "nudge" },
+  { label: "法令・規制", box: [442, 605, 568, 663], action: "nudge" },
+  { label: "ハザード", box: [572, 605, 690, 663], action: "nudge" },
+  { label: "取引事例", box: [694, 605, 808, 663], action: "nudge" },
+  { label: "地図で選ぶ", box: [56, 682, 414, 1088], action: "map" },
+  { label: "土地の参考価格", box: [56, 1097, 414, 1223], action: "nudge" },
+  { label: "周辺の取引相場", box: [56, 1233, 414, 1333], action: "nudge" },
+  { label: "もっと見る", box: [686, 1348, 808, 1384], action: "nudge" },
+  { label: "周辺の取引事例", box: [56, 1547, 426, 1627], action: "nudge" },
+  { label: "法令・規制の詳細", box: [436, 1547, 808, 1627], action: "help" },
+  { label: "この情報を共有", box: [56, 1633, 426, 1687], action: "nudge" },
+  { label: "レポートを作成", box: [436, 1633, 808, 1687], action: "nudge" },
 ];
 
 const NAV_SPOTS: Spot[] = [
-  { label: "ホーム", box: [30, 1756, 180, 1824], action: "home" },
-  { label: "検索履歴", box: [240, 1756, 400, 1824], action: "history" },
-  { label: "お気に入り", box: [450, 1756, 610, 1824], action: "favorites" },
-  { label: "マイページ", box: [670, 1756, 830, 1824], action: "account" },
+  { label: "ホーム", box: [60, NAV_TOP, 210, NAV_END], action: "home" },
+  { label: "検索履歴", box: [260, NAV_TOP, 410, NAV_END], action: "history" },
+  { label: "お気に入り", box: [450, NAV_TOP, 600, NAV_END], action: "favorites" },
+  { label: "マイページ", box: [650, NAV_TOP, 800, NAV_END], action: "account" },
 ];
 
 /** 絵の検索窓の枠（この上に本物の検索窓を重ねる） */
-const SEARCH_BOX: [number, number, number, number] = [30, 165, 822, 238];
+const SEARCH_BOX: [number, number, number, number] = [58, 193, 806, 265];
 
 const pct = ([x1, y1, x2, y2]: [number, number, number, number], top: number, h: number) => ({
-  left: `${(x1 / W) * 100}%`,
+  left: `${((x1 - SX) / W) * 100}%`,
   top: `${((y1 - top) / h) * 100}%`,
   width: `${((x2 - x1) / W) * 100}%`,
   height: `${((y2 - y1) / h) * 100}%`,
@@ -85,7 +89,7 @@ export function MockHome({ input, setInput, onSearch, loading, error, onAction }
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#e5edf6]">
+    <div className="flex min-h-0 flex-1 flex-col bg-[#f4f8fd]">
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pt-[env(safe-area-inset-top)]">
         <div className="relative mx-auto w-full max-w-[600px]">
           {/* 絵（上の部分） */}
@@ -109,10 +113,8 @@ export function MockHome({ input, setInput, onSearch, loading, error, onAction }
             <label htmlFor="address" className="sr-only">
               住所
             </label>
-            <div className="flex h-full items-center gap-2 rounded-full bg-white pl-3 pr-2 shadow-[0_6px_18px_rgba(15,47,95,0.12)] ring-1 ring-white focus-within:ring-navy/30">
-              <button type="submit" disabled={loading} aria-label="検索" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-navy active:bg-mist">
-                {loading ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-navy/30 border-t-navy" /> : <SearchIcon className="h-6 w-6" />}
-              </button>
+            <div className="flex h-full items-center gap-1.5 rounded-full bg-white py-[3px] pl-3 pr-[3px] shadow-[0_6px_18px_rgba(15,47,95,0.12)] ring-1 ring-white focus-within:ring-navy/30">
+              <SearchIcon className="h-5 w-5 shrink-0 text-navy" />
               <input
                 ref={inputRef}
                 id="address"
@@ -121,13 +123,21 @@ export function MockHome({ input, setInput, onSearch, loading, error, onAction }
                 placeholder="住所・地番を入力"
                 autoComplete="off"
                 enterKeyHint="search"
-                className="min-w-0 flex-1 bg-transparent text-[17px] text-navy-deep outline-none placeholder:text-steel/60"
+                className="min-w-0 flex-1 bg-transparent text-[16px] text-navy-deep outline-none placeholder:text-steel/60"
               />
               {input && (
-                <button type="button" onClick={() => setInput("")} aria-label="入力を消す" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-mist text-steel">
-                  <CloseIcon className="h-3.5 w-3.5" />
+                <button type="button" onClick={() => setInput("")} aria-label="入力を消す" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-mist text-steel">
+                  <CloseIcon className="h-3 w-3" />
                 </button>
               )}
+              <button
+                type="submit"
+                disabled={loading}
+                aria-label="検索"
+                className="bg-navy-gradient flex aspect-square h-full shrink-0 items-center justify-center rounded-full text-white transition active:scale-95 disabled:opacity-60"
+              >
+                {loading ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <SearchIcon className="h-[18px] w-[18px]" />}
+              </button>
             </div>
             {(hint || error) && (
               <p role={error ? "alert" : undefined} className={`absolute left-2 right-2 top-full mt-2 rounded-xl px-3 py-2 text-[12.5px] shadow-[0_6px_18px_rgba(15,47,95,0.16)] ${error ? "bg-[#fdecec] text-[#b4533c]" : "bg-navy text-white"}`}>
@@ -144,7 +154,7 @@ export function MockHome({ input, setInput, onSearch, loading, error, onAction }
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/mock/home-nav.jpg" alt="" width={W} height={NAV_H} className="block h-auto w-full select-none" draggable={false} />
           {NAV_SPOTS.map((s) => (
-            <button key={s.label} onClick={() => act(s.action)} aria-label={s.label} className="absolute active:bg-navy/10" style={pct(s.box, 1756, NAV_H)} />
+            <button key={s.label} onClick={() => act(s.action)} aria-label={s.label} className="absolute active:bg-navy/10" style={pct(s.box, NAV_TOP, NAV_H)} />
           ))}
         </div>
       </div>
