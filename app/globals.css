@@ -10,21 +10,13 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-latin: var(--font-jost), sans-serif;
-}
-
-/*
- * 色。utility は変数を参照する（inline にしない）ので、スマホの新しい見た目（.theme-navy）の中では
- * 下の .theme-navy で差し替えた色になる。PC はこの色のまま（金色）
- */
-@theme {
   --color-ink: #242e37; /* 本文・ロゴ文字の墨色 */
   --color-muted: #6c6f74;
   --color-brand: #8a6632; /* ボタン地（白文字でコントラスト確保） */
   --color-brand-light: #c49a5c; /* ピン・線のゴールド */
   --color-mint: #f6f0e5; /* 淡いクリーム（旧ミント。クラス名はそのまま） */
   --color-line: #ebe4d8;
-  /* 新しい見た目（紺）の色 */
+  /* 新しい見た目（紺）。スマホのホームから順に、こちらの色に移す */
   --color-navy: #0f2f5f; /* いちばん大事なボタン・選んだタブ */
   --color-navy-deep: #0a2248; /* 見出しの文字 */
   --color-navy-soft: #3a5a8a; /* 補助の青 */
@@ -32,22 +24,7 @@
   --color-mist: #e8eef5; /* 薄い塗り（チップ・丸いボタンの地） */
   --color-steel: #5f6f86; /* 薄い文字 */
   --color-hairline: #dde5ee; /* 枠線 */
-}
-
-/* スマホの新しい見た目：今までの部品（シート・カード）の色を、金色から紺に差し替える */
-.theme-navy {
-  --color-ink: #1b2a44;
-  --color-muted: #5f6f86;
-  --color-brand: #0f2f5f;
-  --color-brand-light: #3a5a8a;
-  --color-mint: #e8eef5;
-  --color-line: #dde5ee;
-}
-.theme-navy .bg-gold {
-  background: linear-gradient(135deg, #1b4280 0%, #0f2f5f 55%, #0a2248 100%);
-}
-.theme-navy .shadow-soft {
-  box-shadow: 0 6px 24px rgba(15, 47, 95, 0.08);
+  --font-latin: var(--font-jost), sans-serif;
 }
 
 /*

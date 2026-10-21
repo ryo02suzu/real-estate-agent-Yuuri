@@ -215,7 +215,7 @@ const KIND_LABEL: Record<ParcelKind, string> = {
   address: "住所の地点にある筆（参考）",
 };
 
-export function ParcelDetail({ info, chibanzu }: { info: Extract<ParcelInfo, { status: "ok" }>; chibanzu?: ChibanzuLink }) {
+function ParcelDetail({ info, chibanzu }: { info: Extract<ParcelInfo, { status: "ok" }>; chibanzu?: ChibanzuLink }) {
   const { parcel, kind, neighbors } = info;
   const numbered = neighbors.filter((n) => /^\d/.test(n.chiban));
   const roads = [...new Set(neighbors.filter((n) => !/^\d/.test(n.chiban)).map((n) => chibanLabel(n.chiban)))];
