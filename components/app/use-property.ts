@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import type { LookupResult } from "@/lib/roadmap";
 import { withRetry } from "@/lib/retry";
+import { dealCity, dealsInTown, DEALS_DATA, loadDeals, type DealRecord } from "@/lib/roadmap/deals";
 import { browserJsonFetcher, evacSitesNear, type EvacSite } from "@/lib/roadmap/evac";
 import { nearbyPois, nearestOf, POI_DATA, POI_EXTRA, POI_ORDER, type Poi, type PoiWalk } from "@/lib/roadmap/poi";
 import { pmtilesPoiSource } from "@/lib/roadmap/poi-tiles";
@@ -98,6 +99,45 @@ export function useEvacuation(lat: number, lng: number): EvacState {
   return state?.key === key ? state.value : { status: "loading" };
 }
 
+export type DealsState =
+  | { status: "none" }
+  | { status: "loading" }
+  | { status: "error" }
+  | {
+      status: "ok";
+      /** 市区町村の名前（「東京都渋谷区」） */
+      city: string;
+      /** 物件と同じ町の事例（新しい順） */
+      town: DealRecord[];
+      /** 市区町村全体の事例（新しい順） */
+      all: DealRecord[];
+    };
+
+/** 実際の取引事例（不動産情報ライブラリ）。データがまだ無い（API キーの登録待ち）・データの無い市区町村は none */
+export function useDeals(result: Ok): DealsState {
+  const code = DEALS_DATA.url ? dealCity(result.municipality.codes, result.matchedAddress) : undefined;
+  const key = `${code ?? ""}|${result.town}`;
+  const [state, setState] = useState<{ key: string; value: DealsState }>();
+  useEffect(() => {
+    if (!code) return;
+    let alive = true;
+    withRetry(() => loadDeals(code))
+      .then((file) => {
+        if (!alive) return;
+        if (!file) return setState({ key, value: { status: "none" } });
+        setState({ key, value: { status: "ok", city: DEALS_DATA.cities[code] ?? "", town: dealsInTown(file.records, result.town), all: file.records } });
+      })
+      .catch(() => alive && setState({ key, value: { status: "error" } }));
+    return () => {
+      alive = false;
+    };
+    // key に市区町村と町が入っている
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  if (!code) return { status: "none" };
+  return state?.key === key ? state.value : { status: "loading" };
+}
+
 /** 1つの物件で読むデータすべて */
 export function useProperty(result: Ok) {
   const { lat, lng, municipality: m } = result;
@@ -112,10 +152,11 @@ export function useProperty(result: Ok) {
   const stations = useStations(lat, lng);
   const around = useAround(lat, lng);
   const evac = useEvacuation(lat, lng);
+  const deals = useDeals(result);
   // 共有の文面・下書き・調査メモには、今までどおり生活環境の種類だけ（飲食店は入れない）
   const pois: PoiState = around.status === "ok" ? { status: "ok", pois: around.nearest.filter((p) => POI_ORDER.includes(p.kind)) } : around;
   const landPrice5 = landPrice.status === "ok" ? { ...landPrice, hits: landPrice.hits.slice(0, 5) } : landPrice;
-  return { zoning, parcels, roads, hazard, building, landPrice, landPrice5, schools, stations, around, pois, evac };
+  return { zoning, parcels, roads, hazard, building, landPrice, landPrice5, schools, stations, around, pois, evac, deals };
 }
 
 export type PropertyData = ReturnType<typeof useProperty>;

@@ -1,0 +1,117 @@
+# 実際の取引事例（国土交通省「不動産情報ライブラリ」の取引価格・成約価格）を、関東1都6県の市区町村ごとの JSON にして
+# Cloudflare R2 に置く（scripts/deals/build.py）。置き終えたら lib/roadmap/data/deals-source.json（置き場所・時点・市区町村）を
+# 書き換え、テストが通れば、このブランチに入れる。アプリの「取引事例」「相場・取引」のタブに、同じ町の事例が出るようになる。
+# データは四半期ごとに増えるので、毎月作り直す。
+#
+# 必要な設定（無ければ何もしないで終わる）:
+#   Secrets:   REINFOLIB_API_KEY（不動産情報ライブラリの API 利用申請で届くキー）
+#              R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY（地番の地図データと同じ）
+#   Variables: R2_PUBLIC_URL（バケットの公開 URL）、R2_BUCKET（省略時 michilu-chiban）
+name: 取引事例のデータ（不動産情報ライブラリ）
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 20 5 * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deals
+  cancel-in-progress: false
+
+env:
+  R2_BUCKET: ${{ vars.R2_BUCKET || 'michilu-chiban' }}
+  R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: auto
+  AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+  AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+
+jobs:
+  deals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      REINFOLIB_API_KEY: ${{ secrets.REINFOLIB_API_KEY }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+    steps:
+      - name: 設定があるか
+        id: c
+        run: |
+          echo "stamp=$(TZ=Asia/Tokyo date +%Y%m%d)" >> "$GITHUB_OUTPUT"
+          if [ -z "$REINFOLIB_API_KEY" ]; then
+            echo "::warning::REINFOLIB_API_KEY（不動産情報ライブラリの API キー）が Secrets に無いので何もしません"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          elif [ -z "$R2_ACCOUNT_ID" ] || [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$R2_PUBLIC_URL" ]; then
+            echo "::warning::R2 の設定（Secrets: R2_ACCOUNT_ID・R2_ACCESS_KEY_ID・R2_SECRET_ACCESS_KEY、Variables: R2_PUBLIC_URL）が無いので何もしません"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.c.outputs.ready == 'true'
+      - uses: actions/setup-python@v5
+        if: steps.c.outputs.ready == 'true'
+        with:
+          python-version: "3.12"
+      - name: 変換のテスト
+        if: steps.c.outputs.ready == 'true'
+        run: python3 scripts/deals/build.py --self-test
+      - name: API で関東1都6県の直近8四半期の事例を読む
+        if: steps.c.outputs.ready == 'true'
+        run: python3 scripts/deals/build.py --out work/deals --quarters 8
+      - name: R2 に置く
+        if: steps.c.outputs.ready == 'true'
+        env:
+          STAMP: ${{ steps.c.outputs.stamp }}
+          R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+        run: |
+          aws s3 cp work/deals "s3://$R2_BUCKET/deals/$STAMP/" --recursive --exclude "meta.json" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
+            --content-type "application/json; charset=utf-8" --cache-control "public, max-age=86400"
+          # ブラウザから読めるようにする（地番・建物のタイルと同じ設定）
+          cat > cors.json <<'JSON'
+          {"CORSRules":[{"AllowedOrigins":["*"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["Range","If-Match","If-None-Match"],"ExposeHeaders":["Content-Range","Content-Length","ETag","Accept-Ranges"],"MaxAgeSeconds":86400}]}
+          JSON
+          aws s3api put-bucket-cors --bucket "$R2_BUCKET" --cors-configuration file://cors.json --endpoint-url "$R2_ENDPOINT"
+      - name: 公開 URL で読めるか確かめる
+        if: steps.c.outputs.ready == 'true'
+        env:
+          STAMP: ${{ steps.c.outputs.stamp }}
+        run: |
+          base="${R2_PUBLIC_URL%/}/deals/$STAMP"
+          first=$(ls work/deals | grep -v meta.json | head -1)
+          curl -sS -H "Origin: https://michilu.vercel.app" -D headers.txt -o first.json "$base/$first"
+          cat headers.txt
+          grep -qi "^HTTP/.* 200" headers.txt || { echo "::error::読めません: $base/$first"; exit 1; }
+          grep -qi "^access-control-allow-origin:" headers.txt || { echo "::error::CORS のヘッダがありません"; exit 1; }
+          python3 -c "import json; d=json.load(open('first.json')); assert d['records'], 'records が空'"
+          echo "BASE=$base" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        if: steps.c.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - name: アプリの置き場所を書き換え、テストが通ればこのブランチに入れる
+        if: steps.c.outputs.ready == 'true'
+        run: |
+          python3 - <<'PY'
+          import json, os
+          meta = json.load(open("work/deals/meta.json", encoding="utf-8"))
+          src = {"url": os.environ["BASE"], "asOf": meta["stamp"], "periods": meta["periods"], "cities": meta["cities"]}
+          with open("lib/roadmap/data/deals-source.json", "w", encoding="utf-8") as f:
+              json.dump(src, f, ensure_ascii=False, indent=1)
+              f.write("\n")
+          print(json.dumps({k: v for k, v in src.items() if k != "cities"}, ensure_ascii=False), len(src["cities"]), "市区町村")
+          PY
+          if git diff --quiet; then echo "変更なし"; exit 0; fi
+          npm ci
+          npm test
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/roadmap/data/deals-source.json
+          git commit -m "Use the ${{ steps.c.outputs.stamp }} transaction cases from REINFOLIB on R2 (automatic)"
+          git pull --rebase
+          git push

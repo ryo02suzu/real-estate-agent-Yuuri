@@ -7,6 +7,7 @@ import { ChevronRight, ExternalLink, JapaneseYen, Map as MapIcon, TrendingUp } f
 import { useState } from "react";
 import { parcelAreaM2, TSUBO_M2 } from "@/lib/app/area";
 import { asOfText, changeText, distanceText, kindText, type LandPriceHit } from "@/lib/roadmap/land-price";
+import { DEALS_DATA, DEALS_NOTE, dealSummary } from "@/lib/roadmap/deals";
 import { ROSENKA_CHECK } from "@/lib/roadmap/rosenka";
 import { BarsFill, CoinStack, GrowthChart } from "./icons";
 import type { TabProps } from "./types";
@@ -22,7 +23,7 @@ export function okuText(v: number): string {
   return `${Math.round(v / 1e4).toLocaleString("ja-JP")}万円`;
 }
 
-export function PriceTab({ data, go, expand }: TabProps) {
+export function PriceTab({ result, data, go, expand }: TabProps) {
   const { landPrice, parcels } = data;
   const hits = landPrice.status === "ok" ? landPrice.hits : [];
   const top = hits[0];
@@ -139,25 +140,8 @@ export function PriceTab({ data, go, expand }: TabProps) {
         </section>
       )}
 
-      {/* 取引価格（成約価格） */}
-      <section className="mt-[7px] rounded-[8px] bg-[#eef8f2] px-[9px] pb-[8px] pt-[8px]">
-        <div className="flex items-center gap-[5px]">
-          <GrowthChart size={13} color="#12b076" />
-          <p className="min-w-0 flex-1 font-bold leading-none" style={{ fontSize: 8.2, color: "#1c2740" }}>
-            周辺の取引価格（成約価格）
-          </p>
-          <span className="rounded-full bg-[#fff3c4] px-[6px] py-[3px] font-bold leading-none" style={{ fontSize: 6.4, color: "#5c4a00" }}>
-            準備中
-          </span>
-        </div>
-        <p className="mt-[5px] leading-[1.5]" style={{ fontSize: 6.7, color: SUB }}>
-          国土交通省「不動産情報ライブラリ」の取引価格・成約価格を、この画面と「取引事例」に出す準備をしています（APIの利用申請の登録待ち）。それまでは、不動産情報ライブラリで地域を選んで確認できます。
-        </p>
-        <a href="https://www.reinfolib.mlit.go.jp/realEstatePrices/" target="_blank" rel="noreferrer" className="mt-[6px] inline-flex items-center gap-[4px] rounded-full px-[10px] py-[5.5px] font-bold leading-none text-white" style={{ fontSize: 7, background: NAVY }}>
-          不動産情報ライブラリで見る
-          <ChevronRight size={8} strokeWidth={1.6} absoluteStrokeWidth />
-        </a>
-      </section>
+      {/* 取引価格・成約価格（不動産情報ライブラリ） */}
+      <DealsCard data={data} go={go} town={result.town} />
 
       <button onClick={() => go("deals")} className="mt-[7px] flex w-full items-center rounded-[8px] bg-[#f1f6fc] px-[11px] text-left active:bg-[#e6eefa]" style={{ height: 36 }}>
         <span className="min-w-0 flex-1">
@@ -295,5 +279,71 @@ function History({ hit }: { hit: LandPriceHit }) {
         ))}
       </svg>
     </div>
+  );
+}
+
+/** 周辺の取引価格（同じ町の事例の単価の中央値）。データがまだ無ければ準備中と、不動産情報ライブラリへの入口 */
+function DealsCard({ data, go, town }: { data: TabProps["data"]; go: TabProps["go"]; town: string }) {
+  const d = data.deals;
+  const ok = d.status === "ok" ? d : undefined;
+  const base = ok ? (ok.town.length ? ok.town : ok.all) : [];
+  const sum = dealSummary(base);
+  const where = ok ? (ok.town.length ? town.replace(/[0-9一二三四五六七八九十]+丁目$/, "") : ok.city) : "";
+  return (
+    <section className="mt-[7px] rounded-[8px] bg-[#eef8f2] px-[9px] pb-[8px] pt-[8px]">
+      <div className="flex items-center gap-[5px]">
+        <GrowthChart size={13} color="#12b076" />
+        <p className="min-w-0 flex-1 font-bold leading-none" style={{ fontSize: 8.2, color: "#1c2740" }}>
+          周辺の取引価格（取引・成約）
+        </p>
+        {!ok && (
+          <span className="rounded-full bg-[#fff3c4] px-[6px] py-[3px] font-bold leading-none" style={{ fontSize: 6.4, color: "#5c4a00" }}>
+            {d.status === "loading" ? "確認中" : DEALS_DATA.url ? "データなし" : "準備中"}
+          </span>
+        )}
+      </div>
+      {ok ? (
+        <>
+          <div className="mt-[6px] grid grid-cols-3 gap-[6px]">
+            {[
+              ["事例の件数", `${base.length}件`, `${where}・直近2年`],
+              ["土地の単価", sum.land ? `${yen(sum.land)}円/㎡` : "―", sum.land ? `坪 約${tsubo(sum.land)}円` : "土地の事例なし"],
+              ["マンションの単価", sum.mansion ? `${yen(sum.mansion)}円/㎡` : "―", "専有面積あたり"],
+            ].map(([label, value, note]) => (
+              <div key={label} className="rounded-[6px] bg-white px-[6px] py-[6px]">
+                <p className="leading-none" style={{ fontSize: 6.2, color: "#3f4a5f" }}>
+                  {label}
+                </p>
+                <p className="font-latin mt-[4px] whitespace-nowrap font-bold leading-none" style={{ fontSize: 8.6, color: INK2 }}>
+                  {value}
+                </p>
+                <p className="mt-[3.5px] truncate leading-none" style={{ fontSize: 5.9, color: SUB }}>
+                  {note}
+                </p>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => go("deals")} className="mt-[6px] inline-flex items-center gap-[4px] rounded-full px-[10px] py-[5.5px] font-bold leading-none text-white" style={{ fontSize: 7, background: NAVY }}>
+            取引事例を一覧で見る
+            <ChevronRight size={8} strokeWidth={1.6} absoluteStrokeWidth />
+          </button>
+          <p className="mt-[4px] leading-[1.45]" style={{ fontSize: 5.6, color: "#8a95a6" }}>
+            単価は中央値。国土交通省「不動産情報ライブラリ」（{DEALS_DATA.periods}）。{DEALS_NOTE}。
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="mt-[5px] leading-[1.5]" style={{ fontSize: 6.7, color: SUB }}>
+            {DEALS_DATA.url
+              ? "この市区町村の取引事例は、不動産情報ライブラリのデータにありません。"
+              : "国土交通省「不動産情報ライブラリ」の取引価格・成約価格を、この画面と「取引事例」に出す準備ができています（APIキーの登録待ち）。それまでは、不動産情報ライブラリで地域を選んで確認できます。"}
+          </p>
+          <a href="https://www.reinfolib.mlit.go.jp/realEstatePrices/" target="_blank" rel="noreferrer" className="mt-[6px] inline-flex items-center gap-[4px] rounded-full px-[10px] py-[5.5px] font-bold leading-none text-white" style={{ fontSize: 7, background: NAVY }}>
+            不動産情報ライブラリで見る
+            <ChevronRight size={8} strokeWidth={1.6} absoluteStrokeWidth />
+          </a>
+        </>
+      )}
+    </section>
   );
 }
