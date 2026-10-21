@@ -5,7 +5,7 @@ import { DesktopShell } from "@/components/desktop-shell";
 import { Header } from "@/components/header";
 import { useDesktop } from "@/lib/use-desktop";
 import { HistoryList } from "@/components/history-list";
-import { MockHome } from "@/components/mock-home";
+import { MockApp } from "@/components/mock/mock-app";
 import { AlertIcon, AreaIcon, BookmarkIcon, ChevronRightIcon, ClockIcon, InfoIcon, PinIcon, TrashIcon } from "@/components/icons";
 import { CitiesSheet, HelpSheet, MenuSheet, type SheetName } from "@/components/info-sheets";
 import { FullMap } from "@/components/full-map";
@@ -252,35 +252,8 @@ export default function Home() {
     );
   }
 
-  // 検索する前：見本の絵を敷いたホーム（絵の各部分にボタンを重ねたもの。縦にスクロールする）
-  if (!shown) {
-    return (
-      <>
-        <MockHome
-          input={input}
-          setInput={setInput}
-          onSearch={() => search(input, true)}
-          loading={loading}
-          error={error}
-          onAction={(a) => {
-            if (a === "map") setPicker({});
-            else if (a === "history" || a === "favorites" || a === "account" || a === "menu" || a === "help") open(a);
-          }}
-        />
-        {sheetsEl}
-        {picker && (
-          <LocationPicker
-            start={picker.start}
-            onClose={() => setPicker(null)}
-            onPick={(lat, lng) => {
-              setPicker(null);
-              void searchPoint(lat, lng);
-            }}
-          />
-        )}
-      </>
-    );
-  }
+  // 検索する前：デザインの絵をコードで描いたモック画面（機能なし。タブの切り替えだけ動く）
+  if (!shown) return <MockApp />;
 
   // 結果：スクロールしない1画面の作り。画面の高さに応じて地図プレビューが伸び縮みする（まだ前の見た目）
   return (
