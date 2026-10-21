@@ -1,4 +1,4 @@
-// モック画面だけで使う、線のアイコン集（lucide）に無い形のアイコン
+// スマホの新しい見た目（紺）で使う、線のアイコン集（lucide）に無い形のアイコン
 import type { CSSProperties } from "react";
 
 /** ロゴの「M」（デザインの絵から写した形。正式なマークが届いたら差し替える） */
@@ -407,8 +407,8 @@ export function Runner({ size = 24, color = "#169b4f", style }: IconProps) {
   );
 }
 
-/** 半円のメーター（総合ハザード評価） */
-export function Gauge({ style }: { style?: CSSProperties }) {
+/** 半円のメーター（総合ハザード評価）。needle は針の位置（0=左端・1=右端。無ければ灰色の針を真ん中の少し右に） */
+export function Gauge({ style, needle }: { style?: CSSProperties; needle?: number }) {
   // 中心 (31.5, 31.5)、半径 26.5、線の太さ 7。左から 黄 → 橙 → 灰
   const r = 26.5;
   const cx = 31.5;
@@ -421,10 +421,29 @@ export function Gauge({ style }: { style?: CSSProperties }) {
   };
   return (
     <svg viewBox="0 0 63 36" style={style} aria-hidden>
-      <path d={arc(180, 128)} stroke="#ffd877" strokeWidth="7" fill="none" />
-      <path d={arc(128, 52)} stroke="#f7a90c" strokeWidth="7" fill="none" />
-      <path d={arc(52, 0)} stroke="#c7cedb" strokeWidth="7" fill="none" />
-      <path d="M28.9 29.6 47.7 12.4 33.5 33.2Z" fill="#cfd6e1" />
+      {needle === undefined ? (
+        <>
+          <path d={arc(180, 128)} stroke="#ffd877" strokeWidth="7" fill="none" />
+          <path d={arc(128, 52)} stroke="#f7a90c" strokeWidth="7" fill="none" />
+          <path d={arc(52, 0)} stroke="#c7cedb" strokeWidth="7" fill="none" />
+        </>
+      ) : (
+        // 針があるときは、左から 低い（緑）→ 注意（黄）→ やや高い（橙）→ 高い（赤）
+        <>
+          <path d={arc(180, 135)} stroke="#8fd6a9" strokeWidth="7" fill="none" />
+          <path d={arc(135, 90)} stroke="#ffd877" strokeWidth="7" fill="none" />
+          <path d={arc(90, 45)} stroke="#f7a90c" strokeWidth="7" fill="none" />
+          <path d={arc(45, 0)} stroke="#ef6a5b" strokeWidth="7" fill="none" />
+        </>
+      )}
+      {needle === undefined ? (
+        <path d="M28.9 29.6 47.7 12.4 33.5 33.2Z" fill="#cfd6e1" />
+      ) : (
+        // 針（中心から半径の8割まで。角度は左端 180° → 右端 0°）
+        <g transform={`rotate(${-(180 - 180 * Math.min(1, Math.max(0, needle)))} ${cx} ${cy})`}>
+          <path d={`M${cx} ${cy - 2.6}L${cx + r * 0.82} ${cy}L${cx} ${cy + 2.6}Z`} fill="#1e3a66" />
+        </g>
+      )}
       <circle cx={cx} cy={cy} r="3.4" fill="#1e5bb7" />
     </svg>
   );

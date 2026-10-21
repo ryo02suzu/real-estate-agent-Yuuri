@@ -356,7 +356,7 @@ function useFit(ref: React.RefObject<HTMLDivElement | null>) {
 }
 
 /** 「住所コピー」で写す文字。地番で探した筆は地番まで（地図システムの住所検索に貼る） */
-function copyText(result: Extract<LookupResult, { status: "ok" }>): string {
+export function copyText(result: Extract<LookupResult, { status: "ok" }>): string {
   const p = result.parcel;
   return p && !result.picked && /^\d/.test(p.chibanRaw) ? `${result.matchedAddress}${p.chibanRaw}` : result.matchedAddress;
 }
@@ -544,7 +544,7 @@ function RoadHeading({ municipality: m }: { municipality: Municipality }) {
 }
 
 /** 読み込めた結果だけを、共有の文面・重説の下書きに渡す形にする（読み込み中・失敗は渡さない） */
-function loaded({
+export function loaded({
   zoning,
   parcels,
   roads,
@@ -727,22 +727,8 @@ function SlimPreview({ result, onFix, onExpand }: { result: Extract<LookupResult
   );
 }
 
-function MapButton({
-  link,
-  primary,
-  row,
-  agree,
-  desktop,
-}: {
-  link: ResolvedLink;
-  primary?: boolean;
-  /** 開くと利用規約の画面が出る地図の案内を説明に入れる（スマホの結果で1行減らす） */
-  agree?: boolean;
-  /** スマホの2つ目からの地図：枠の中の1行（説明は出さず、操作の手順だけ下に出す） */
-  row?: boolean;
-  /** PC：色の見方（凡例）をボタンの下にそのまま出す（スマホは「色の見方」を押すとシートで出す） */
-  desktop?: boolean;
-}) {
+/** 地図ボタンの説明（何が開くか）と、開いたあとの操作の手順 */
+export function linkTexts(link: ResolvedLink, agree?: boolean, copyHint = "上の「住所コピー」を押し、地図の住所検索に貼り付けてください。"): { sub: string; tip?: string } {
   const sheet = link.sheet;
   const sub = sheet
     ? sheet.howto
@@ -762,10 +748,28 @@ function MapButton({
     ? sheet.howto
       ? `${sheet.howto}物件は図の${sheet.where}あたりです。`
       : `物件は図の${sheet.where}あたりです${page ? `（PDFの${page}ページ目）` : ""}。`
-    : (link.tip ??
-      (link.pinpoint
-        ? undefined
-        : "上の「住所コピー」を押し、地図の住所検索に貼り付けてください。"));
+    : (link.tip ?? (link.pinpoint ? undefined : copyHint));
+  return { sub, tip };
+}
+
+function MapButton({
+  link,
+  primary,
+  row,
+  agree,
+  desktop,
+}: {
+  link: ResolvedLink;
+  primary?: boolean;
+  /** 開くと利用規約の画面が出る地図の案内を説明に入れる（スマホの結果で1行減らす） */
+  agree?: boolean;
+  /** スマホの2つ目からの地図：枠の中の1行（説明は出さず、操作の手順だけ下に出す） */
+  row?: boolean;
+  /** PC：色の見方（凡例）をボタンの下にそのまま出す（スマホは「色の見方」を押すとシートで出す） */
+  desktop?: boolean;
+}) {
+  const sheet = link.sheet;
+  const { sub, tip } = linkTexts(link, agree);
   return (
     <div>
       <a

@@ -196,7 +196,7 @@ export function HazardCard({ state, city, onShowMap }: { state: HazardState; cit
 /** 「江戸川区の洪水・内水・高潮のハザードマップ」 */
 const mapTitle = (city: string, kinds: (keyof typeof HAZARD_MAP_LABELS)[]) => `${city}の${kinds.map((k) => HAZARD_MAP_LABELS[k]).join("・")}のハザードマップ`;
 
-function HazardDetail({ state, city, onShowMap }: { state: Extract<HazardState, { status: "ok" }>; city: string; onShowMap?: (kind: HazardKind) => void }) {
+export function HazardDetail({ state, city, onShowMap }: { state: Extract<HazardState, { status: "ok" }>; city: string; onShowMap?: (kind: HazardKind) => void }) {
   const rows = hazardRows(state.report, state.elevation);
   const groups = groupHazardMaps(state.maps);
   return (

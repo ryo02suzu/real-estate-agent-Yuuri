@@ -180,8 +180,8 @@ const SUB = "mt-0.5 block text-[11.5px] leading-[1.55] text-muted dense:mt-0 den
 const TABS = ["都市計画", "その他の法令", "上下水道・ガス"];
 
 /** 都市計画と、その他の法令の下調べ。tabs：スマホのシート（タブで分ける） */
-function ZoningDetail({ state, city, tabs }: { state: Extract<ZoningState, { status: "ok" }>; city: string; tabs?: boolean }) {
-  const [tab, setTab] = useState(0);
+export function ZoningDetail({ state, city, tabs, initial = 0 }: { state: Extract<ZoningState, { status: "ok" }>; city: string; tabs?: boolean; /** 最初に開くタブ（0 都市計画・1 その他の法令・2 上下水道・ガス） */ initial?: number }) {
+  const [tab, setTab] = useState(initial);
   const warn = !!state.hourei?.hits.length || tochiChips(state.tochi).length > 0 || !!state.tochi?.forest;
   if (!tabs)
     return (

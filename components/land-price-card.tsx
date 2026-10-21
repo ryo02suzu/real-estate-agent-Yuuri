@@ -34,13 +34,13 @@ export type LandPriceState =
   | { status: "error" }
   | { status: "ok"; hits: LandPriceHit[]; /** 物件の場所で開く路線価の地図（全国地価マップ） */ rosenka: RosenkaLink[] };
 
-/** 物件の近くの地点（5つまで・4km 以内）。関東の外や近くに地点が無ければ hits が空 */
-export function useLandPrices(lat: number, lng: number): LandPriceState {
-  const key = `${lat},${lng}`;
+/** 物件の近くの地点（count まで・4km 以内。ふだんは5つ）。関東の外や近くに地点が無ければ hits が空 */
+export function useLandPrices(lat: number, lng: number, count = 5): LandPriceState {
+  const key = `${lat},${lng},${count}`;
   const [state, setState] = useState<{ key: string; value: LandPriceState }>();
   useEffect(() => {
     let alive = true;
-    withRetry(() => nearestLandPrices(lat, lng, pmtilesLandPriceSource, { count: 5, maxM: 4000 }))
+    withRetry(() => nearestLandPrices(lat, lng, pmtilesLandPriceSource, { count, maxM: 4000 }))
       .then((hits) => alive && setState({ key, value: { status: "ok", hits, rosenka: rosenkaLinks(lat, lng) } }))
       .catch(() => alive && setState({ key, value: { status: "error" } }));
     return () => {

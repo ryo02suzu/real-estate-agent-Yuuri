@@ -2,18 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { DesktopShell } from "@/components/desktop-shell";
-import { Header } from "@/components/header";
 import { useDesktop } from "@/lib/use-desktop";
 import { HistoryList } from "@/components/history-list";
-import { MockApp } from "@/components/mock/mock-app";
-import { AlertIcon, AreaIcon, BookmarkIcon, ChevronRightIcon, ClockIcon, InfoIcon, PinIcon, TrashIcon } from "@/components/icons";
+import { MobileApp } from "@/components/app/mobile-app";
+import { AreaIcon, BookmarkIcon, ChevronRightIcon, ClockIcon, InfoIcon, PinIcon, TrashIcon } from "@/components/icons";
 import { CitiesSheet, HelpSheet, MenuSheet, type SheetName } from "@/components/info-sheets";
-import { FullMap } from "@/components/full-map";
 import { openDraft } from "@/components/draft-sheet";
 import { GuideMapSheet } from "@/components/guide-map";
-import { LocationPicker } from "@/components/location-picker";
-import { ResultView, type MapOpen } from "@/components/result-view";
-import { SearchCard } from "@/components/search-card";
 import { Sheet } from "@/components/sheet";
 import { favoriteKey, loadFavorites, removeFavorite, type FavoriteItem } from "@/lib/favorites";
 import { addHistory, clearHistory, loadHistory, type HistoryItem } from "@/lib/history";
@@ -51,12 +46,8 @@ export default function Home() {
   const [sheet, setSheet] = useState<AnySheet | null>(null);
   // スマホの「案内図」（メニューから開く。PC は結果の印刷の欄から）
   const [guide, setGuide] = useState(false);
-  // スマホの「地図で選ぶ」画面（start: 最初に表示する地点）
-  const [picker, setPicker] = useState<{ start?: { lat: number; lng: number } } | null>(null);
   // 住所で調べた回数。変わると PC の地図が物件の場所へ戻る（同じ住所で調べ直したときも）
   const [focus, setFocus] = useState(0);
-  // スマホの「地図を拡大」（MICHILU の中の動く地図）。roads: 道路種別を重ねて開く
-  const [fullMap, setFullMap] = useState<MapOpen | null>(null);
   const desktop = useDesktop();
 
   /** 住所（q）か、地図で選んだ地点（ll）で調べて結果を出す */
@@ -252,74 +243,27 @@ export default function Home() {
     );
   }
 
-  // 検索する前：デザインの絵をコードで描いたモック画面（機能なし。タブの切り替えだけ動く）
-  if (!shown) return <MockApp />;
-
-  // 結果：スクロールしない1画面の作り。画面の高さに応じて地図プレビューが伸び縮みする（まだ前の見た目）
+  // スマホ：紺の新しい見た目（components/app/mobile-app.tsx）。検索する前のホーム・物件の6つのタブ・検索履歴・お気に入り・マイページ
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-      {/* 右上から流れるゴールドの細い弧（モックの飾り） */}
-      <svg aria-hidden viewBox="0 0 400 400" className="pointer-events-none absolute -right-40 -top-28 h-[360px] w-[360px] text-brand-light/40">
-        <path d="M90 0 C130 150 250 250 400 290" stroke="currentColor" strokeWidth="1.2" fill="none" />
-      </svg>
-
-      <main className="relative mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))] lg:max-w-5xl lg:px-8">
-        <Header onMenu={() => open("menu")} onHome={backHome} compact />
-
-        <div className="mt-3 flex min-h-0 flex-1 flex-col gap-2.5 [&>*]:shrink-0 [&>*:last-child]:shrink">
-          <SearchCard value={input} onChange={setInput} onSearch={() => search(input, true)} loading={loading} compact />
-          {error && <ErrorLine text={error} />}
-          <ResultView
-            query={shown.query}
-            result={shown.result}
-            onPick={(a) => search(a, false)}
-            onFix={() => {
-              const r = shown.result;
-              setPicker({ start: r.status === "ok" || r.status === "unsupported" ? { lat: r.lat, lng: r.lng } : undefined });
-            }}
-            onExpand={(o) => setFullMap(o ?? {})}
-          />
-        </div>
-      </main>
-
-      <footer className="relative px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-1">
-        <p className="mx-auto flex max-w-md items-start gap-2 text-[10.5px] lg:max-w-5xl lg:justify-center leading-[1.7] text-muted">
-          <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
-          {/* 結果をスクロールさせないよう1行に */}
-          <span>地図は参考情報です。最終確認は必ず役所の窓口で。</span>
-        </p>
-      </footer>
-
-      {sheetsEl}
-      {picker && (
-        <LocationPicker
-          start={picker.start}
-          onClose={() => setPicker(null)}
-          onPick={(lat, lng) => {
-            setPicker(null);
-            void searchPoint(lat, lng);
-          }}
-        />
-      )}
-      {fullMap && shown?.result.status === "ok" && (
-        <FullMap
-          result={shown.result}
-          withRoads={fullMap.roads}
-          hazard={fullMap.hazard}
-          landPrice={fullMap.landPrice}
-          onClose={() => setFullMap(null)}
-          onPick={(lat, lng) => void searchPoint(lat, lng)}
-        />
-      )}
-    </div>
-  );
-}
-
-function ErrorLine({ text }: { text: string }) {
-  return (
-    <p role="alert" className="flex gap-2 rounded-2xl bg-[#f8efe9] p-3 text-sm text-[#8a4f3a]">
-      <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
-      {text}
-    </p>
+    <MobileApp
+      shown={shown}
+      input={input}
+      setInput={setInput}
+      loading={loading}
+      error={error}
+      history={history}
+      favorites={favorites}
+      setFavorites={setFavorites}
+      onSearch={() => search(input, true)}
+      onPickAddress={(a) => search(a, false)}
+      onPickPoint={(lat, lng) => void searchPoint(lat, lng)}
+      onPickHistory={(h) => void pickHistory(h)}
+      onClearHistory={() => {
+        clearHistory();
+        setHistory([]);
+      }}
+      onHome={backHome}
+      areaText={AREA_TEXT}
+    />
   );
 }
