@@ -832,8 +832,14 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
   const offline = m.coverage === "none" || m.coverage === "outside";
   const primary = result.links.filter((l) => !offline && l.kind !== "public_road");
   const others = result.links.filter((l) => offline || l.kind === "public_road");
-  // 要点の行から、パネルの下のほうのカード（都市計画・地番）まで動かす
-  const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  // くわしい内容は、パネルの下のタブで1つずつ出す（全部を縦に並べると画面7枚分ほどになるので）。要点の行を押すと、そのタブを開いて動かす
+  const tabs = pcTabs({ parcels, chibanzu, building, landPrice, stations, pois, schools });
+  const [tab, setTab] = useState<PcTab>("zoning");
+  const current = tabs.some((t) => t.key === tab) ? tab : "zoning";
+  const jump = (t: PcTab) => {
+    setTab(t);
+    requestAnimationFrame(() => document.getElementById("pc-tabs")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
   return (
     <div className="flex flex-col gap-3">
       <section className={CARD}>
@@ -854,25 +860,25 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
           <CityLine municipality={m} />
           {/* 要点（スマホと同じ行）。最初の画面で用途地域・建ぺい率・容積率と地番、災害リスクが分かる */}
           <div className="mt-2.5 flex gap-1.5">
-            <ZoningLine state={zoning} city={m.name} onOpen={() => jump("pc-zoning")} />
-            <ParcelButton info={parcels} onOpen={() => jump("pc-parcel")} chibanzu={chibanzu} />
+            <ZoningLine state={zoning} city={m.name} onOpen={() => jump("zoning")} />
+            <ParcelButton info={parcels} onOpen={() => jump("parcel")} chibanzu={chibanzu} />
           </div>
           <div className="mt-1.5 flex">
-            <HazardLine state={hazard} city={m.name} onOpen={() => jump("pc-hazard")} />
+            <HazardLine state={hazard} city={m.name} onOpen={() => jump("hazard")} />
           </div>
           {!(landPrice.status === "ok" && landPrice.hits.length === 0) && (
             <div className="mt-1.5 flex">
-              <LandPriceLine state={landPrice} onOpen={() => jump("pc-land-price")} />
+              <LandPriceLine state={landPrice} onOpen={() => jump("land-price")} />
             </div>
           )}
           {!(stations.status === "ok" && stations.stations.length === 0) && (
             <div className="mt-1.5 flex">
-              <StationLine state={stations} onOpen={() => jump("pc-station")} />
+              <StationLine state={stations} onOpen={() => jump("station")} />
             </div>
           )}
           {(schools.status === "ok" || schools.status === "loading") && (
             <div className="mt-1.5 flex">
-              <SchoolButton state={schools} onOpen={() => jump("pc-school")} />
+              <SchoolButton state={schools} onOpen={() => jump("school")} />
             </div>
           )}
         </div>
@@ -899,36 +905,41 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
         </section>
       )}
 
-      <div id="pc-zoning" className="scroll-mt-3">
-        <ZoningCard state={zoning} city={m.name} />
-      </div>
-
-      <div id="pc-hazard" className="scroll-mt-3">
-        <HazardCard state={hazard} city={m.name} onShowMap={showHazardOnMap} />
-      </div>
-
-      {(parcels.status !== "none" || chibanzu) && (
-        <div id="pc-parcel" className="scroll-mt-3">
-          <ParcelCard info={parcels} chibanzu={chibanzu} />
+      <div>
+        {/* パネルを動かしても、タブは上に残る */}
+        <div id="pc-tabs" role="tablist" className="no-scrollbar sticky top-0 z-10 -mx-1 flex scroll-mt-0 gap-1.5 overflow-x-auto bg-background/95 px-1 pb-2 pt-1 backdrop-blur">
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              role="tab"
+              aria-selected={t.key === current}
+              onClick={() => setTab(t.key)}
+              className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-[13px] ${t.key === current ? "border-brand bg-brand text-white" : "border-line bg-white text-ink hover:bg-mint"}`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
-      )}
-
-      <BuildingCard state={building} />
-
-      <div id="pc-land-price" className="scroll-mt-3">
-        <LandPriceCard state={landPrice} onShowMap={showLandPriceOnMap} />
-      </div>
-
-      <div id="pc-station" className="scroll-mt-3">
-        <StationCard state={stations} />
-      </div>
-
-      <div id="pc-poi" className="scroll-mt-3">
-        <PoiCard state={pois} />
-      </div>
-
-      <div id="pc-school" className="scroll-mt-3">
-        <SchoolCard state={schools} />
+        <div className="flex flex-col gap-3">
+          {current === "zoning" && <ZoningCard state={zoning} city={m.name} />}
+          {current === "hazard" && <HazardCard state={hazard} city={m.name} onShowMap={showHazardOnMap} />}
+          {current === "parcel" && (
+            <>
+              {(parcels.status !== "none" || chibanzu) && <ParcelCard info={parcels} chibanzu={chibanzu} />}
+              <BuildingCard state={building} />
+            </>
+          )}
+          {current === "land-price" && <LandPriceCard state={landPrice} onShowMap={showLandPriceOnMap} />}
+          {current === "station" && (
+            <>
+              <StationCard state={stations} />
+              <div id="pc-poi">
+                <PoiCard state={pois} />
+              </div>
+            </>
+          )}
+          {current === "school" && <SchoolCard state={schools} />}
+        </div>
       </div>
 
       {result.contact && <ContactCard contact={result.contact} city={m.name} address={result.matchedAddress} />}
@@ -1006,4 +1017,35 @@ function PrintMenu({ result, onDraft }: { result: Extract<LookupResult, { status
       <GuideMapSheet result={result} open={guide} onClose={() => setGuide(false)} />
     </span>
   );
+}
+
+type PcTab = "zoning" | "hazard" | "parcel" | "land-price" | "station" | "school";
+
+/** PC のパネルのタブ（データの無いものは出さない） */
+function pcTabs({
+  parcels,
+  chibanzu,
+  building,
+  landPrice,
+  stations,
+  pois,
+  schools,
+}: {
+  parcels: ParcelInfo;
+  chibanzu?: ReturnType<typeof chibanzuFor>;
+  building: BuildingState;
+  landPrice: LandPriceState;
+  stations: StationState;
+  pois: PoiState;
+  schools: SchoolState;
+}): { key: PcTab; label: string }[] {
+  const out: { key: PcTab; label: string }[] = [
+    { key: "zoning", label: "法令の制限" },
+    { key: "hazard", label: "災害リスク" },
+  ];
+  if (parcels.status !== "none" || chibanzu || building.status !== "none") out.push({ key: "parcel", label: building.status !== "none" ? "地番・建物" : "地番" });
+  if (!(landPrice.status === "ok" && landPrice.hits.length === 0)) out.push({ key: "land-price", label: "地価" });
+  if (!(stations.status === "ok" && stations.stations.length === 0) || !(pois.status === "ok" && pois.pois.length === 0)) out.push({ key: "station", label: "駅・周辺" });
+  if (schools.status !== "none") out.push({ key: "school", label: "学区" });
+  return out;
 }

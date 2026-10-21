@@ -9,7 +9,8 @@ import { schoolShort, schoolsAt, schoolWayText, withSchoolWalks, type SchoolHit,
 import { ROAD_CREDIT } from "@/lib/roadmap/walk";
 import { SCHOOL_DATA } from "@/lib/roadmap/school-data";
 import { pmtilesSchoolSource } from "@/lib/roadmap/school-tiles";
-import { ChevronRightIcon, InfoIcon, SchoolIcon } from "./icons";
+import { ChevronRightIcon, SchoolIcon } from "./icons";
+import { Notes } from "./notes";
 import { Sheet } from "./sheet";
 
 /** none：データの無い市区町村（国のデータに入っていないか、利用条件で入れていない） */
@@ -42,17 +43,17 @@ export function useSchools(lat: number, lng: number): SchoolState {
 
 function Row({ label, s }: { label: string; s?: SchoolHit }) {
   return (
-    <div className="flex gap-3 py-1.5">
-      <dt className="w-[5.5em] shrink-0 text-[11.5px] leading-[1.6] text-muted">{label}</dt>
-      <dd className="min-w-0 flex-1 text-[13px] leading-[1.5] text-ink">
+    <div className="flex gap-3 py-2">
+      <dt className="w-[5em] shrink-0 text-[12.5px] leading-[1.7] text-muted">{label}</dt>
+      <dd className="min-w-0 flex-1 text-[14.5px] leading-[1.55] text-ink">
         {s ? (
           <>
             <b className="font-semibold">{s.name}</b>
-            {schoolWayText(s) && <span className="ml-1.5 text-[11.5px] text-muted">{schoolWayText(s)}</span>}
-            <span className="block text-[11px] leading-[1.5] text-muted">{[s.owner, s.address].filter(Boolean).join("・")}</span>
+            {schoolWayText(s) && <span className="ml-1.5 text-[12.5px] text-muted">{schoolWayText(s)}</span>}
+            <span className="block text-[12px] leading-[1.55] text-muted">{[s.owner, s.address].filter(Boolean).join("・")}</span>
           </>
         ) : (
-          <span className="text-[12px] text-muted">この地点を含む区域がデータにありません</span>
+          <span className="text-[13px] text-muted">この地点を含む区域がデータにありません</span>
         )}
       </dd>
     </div>
@@ -68,20 +69,22 @@ export function SchoolDetail({ schools }: { schools: Schools }) {
         <Row label="小学校区" s={schools.elementary} />
         <Row label="中学校区" s={schools.junior} />
       </dl>
-      {note && <p className="mt-1 text-[11.5px] leading-[1.6] text-[#8a4f3a]">{note}</p>}
-      <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted">
-        <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
-        <span>
+      {note && <p className="mt-1 text-[12.5px] leading-[1.6] text-[#8a4f3a]">{note}</p>}
+      <Notes
+        lead="学区は見直されることがあります。指定校は教育委員会で確かめてください。"
+        source={
+          <a href="https://nlftp.mlit.go.jp/ksj/" target="_blank" rel="noreferrer" className="underline">
+            国土数値情報（国土交通省）
+          </a>
+        }
+      >
+        <p>
           {SCHOOL_DATA.edition}の市区町村の資料をもとにした通学区域です。学区は見直されることがあり、学校選択制の市区町村もあります。指定校は市区町村の教育委員会で確かめてください。徒歩は国土地理院の地図の道路をたどった、学校の位置（敷地の中の点）までの目安です（道路距離 80m を1分）。道をたどれないときは直線距離です。
-          <span className="mt-1 block">
-            出典：
-            <a href="https://nlftp.mlit.go.jp/ksj/" target="_blank" rel="noreferrer" className="underline">
-              「国土数値情報（小学校区データ・中学校区データ・学校データ）」（国土交通省）
-            </a>
-            を加工して作成{(schools.elementary?.walk || schools.junior?.walk) && `。${ROAD_CREDIT}`}
-          </span>
-        </span>
-      </p>
+        </p>
+        <p>
+          出典：「国土数値情報（小学校区データ・中学校区データ・学校データ）」（国土交通省）を加工して作成{(schools.elementary?.walk || schools.junior?.walk) && `。${ROAD_CREDIT}`}
+        </p>
+      </Notes>
     </div>
   );
 }
@@ -99,7 +102,7 @@ export function SchoolButton({ state, onOpen }: { state: SchoolState; onOpen?: (
       <button
         onClick={() => (onOpen ? onOpen() : setOpen(true))}
         disabled={state.status !== "ok"}
-        className={`flex items-center gap-1 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-left text-[11px] leading-[1.5] text-ink disabled:text-muted lg:hover:border-brand-light/60 ${onOpen ? "min-w-0 flex-1" : "shrink-0"}`}
+        className={`flex items-center gap-1 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-left text-[12px] leading-[1.5] lg:py-1.5 lg:text-[13px] text-ink disabled:text-muted lg:hover:border-brand-light/60 ${onOpen ? "min-w-0 flex-1" : "shrink-0"}`}
       >
         <SchoolIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
         {onOpen ? (
@@ -128,7 +131,7 @@ export function SchoolCard({ state }: { state: SchoolState }) {
   if (state.status === "none") return null;
   return (
     <section className="shadow-soft rounded-2xl border border-white bg-white p-4">
-      <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+      <h3 className="mb-2 flex items-center gap-1.5 text-[14.5px] font-semibold text-ink">
         <SchoolIcon className="h-4 w-4 text-brand-light" />
         学区（参考）
       </h3>

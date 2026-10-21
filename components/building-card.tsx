@@ -9,7 +9,8 @@ import type { LookupResult } from "@/lib/roadmap";
 import { buildingAt, buildingRows, buildingSummary, type BuildingHit, type BuildingResult } from "@/lib/roadmap/building";
 import { BUILDING_DATA, buildingsCover } from "@/lib/roadmap/building-data";
 import { pmtilesBuildingSource } from "@/lib/roadmap/building-tiles";
-import { BuildingIcon, InfoIcon } from "./icons";
+import { BuildingIcon } from "./icons";
+import { Notes } from "./notes";
 import type { ParcelInfo } from "./parcel-card";
 
 type Ok = Extract<LookupResult, { status: "ok" }>;
@@ -46,8 +47,8 @@ function Rows({ hit }: { hit: BuildingHit }) {
     <dl className="divide-y divide-line/70">
       {buildingRows(hit.building).map((r) => (
         <div key={r.label} className="flex gap-3 py-1.5">
-          <dt className="w-[7.5em] shrink-0 text-[11.5px] leading-[1.6] text-muted">{r.label}</dt>
-          <dd className="min-w-0 flex-1 text-[13px] font-semibold leading-[1.5] text-ink">{r.value}</dd>
+          <dt className="w-[6.5em] shrink-0 text-[12.5px] leading-[1.65] text-muted">{r.label}</dt>
+          <dd className="min-w-0 flex-1 text-[14.5px] font-semibold leading-[1.5] text-ink">{r.value}</dd>
         </div>
       ))}
     </dl>
@@ -63,34 +64,34 @@ export function BuildingDetail({ state }: { state: Exclude<BuildingState, { stat
     <div>
       {hit ? (
         <>
-          <p className="text-[11px] text-muted">{hit.onParcel ? "物件の筆の上の建物（推定）" : "地点の建物（推定）"}</p>
+          <p className="text-[12px] text-muted">{hit.onParcel ? "物件の筆の上の建物（推定）" : "地点の建物（推定）"}</p>
           <Rows hit={hit} />
           {hit.building.usage === undefined && hit.building.above === undefined && (
-            <p className="mt-1 text-[11px] text-muted">この市区町村のデータには、用途・階数が入っていません。</p>
+            <p className="mt-1 text-[12px] text-muted">この市区町村のデータには、用途・階数が入っていません。</p>
           )}
         </>
       ) : (
-        <p className="text-[12px] text-ink">この地点に建物はありません（データの時点で空き地・駐車場・道路など）。</p>
+        <p className="text-[13.5px] text-ink">この地点に建物はありません（データの時点で空き地・駐車場・道路など）。</p>
       )}
       {others.length > 0 && (
-        <p className="mt-1.5 text-[11.5px] leading-[1.6] text-ink">
+        <p className="mt-1.5 text-[12.5px] leading-[1.6] text-ink">
           同じ筆の上にほかに{others.length}棟：{others.slice(0, 3).map((o) => buildingSummary(o.building)).join("／")}
           {others.length > 3 && " ほか"}
         </p>
       )}
-      <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted">
-        <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
-        <span>
+      <Notes
+        lead="地点から推定した建物です。登記・建築確認の内容とは異なることがあります。"
+        source={
+          <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noreferrer" className="underline">
+            PLATEAU（国土交通省）
+          </a>
+        }
+      >
+        <p>
           国土交通省 PLATEAU の3D都市モデルの建物の属性です（都市計画基礎調査などをもとにしたもの）。建物の形は使っていないので、地点の建物は推定です。登記・建築確認の内容とは異なることがあります。構造は防火上の区分（耐火造・準耐火造・防火造・木造など）です。
-          <span className="mt-1 block">
-            出典：
-            <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noreferrer" className="underline">
-              「3D都市モデル（Project PLATEAU）」（国土交通省）
-            </a>
-            を加工して作成{BUILDING_DATA.edition && `（${BUILDING_DATA.edition}）`}
-          </span>
-        </span>
-      </p>
+        </p>
+        <p>出典：「3D都市モデル（Project PLATEAU）」（国土交通省）を加工して作成{BUILDING_DATA.edition && `（${BUILDING_DATA.edition}）`}</p>
+      </Notes>
     </div>
   );
 }
@@ -100,7 +101,7 @@ export function BuildingCard({ state }: { state: BuildingState }) {
   if (state.status === "none") return null;
   return (
     <section className="shadow-soft rounded-2xl border border-white bg-white p-4">
-      <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+      <h3 className="mb-2 flex items-center gap-1.5 text-[14.5px] font-semibold text-ink">
         <BuildingIcon className="h-4 w-4 text-brand-light" />
         建物（参考）
       </h3>

@@ -1,5 +1,3665 @@
 {
- "checked": "",
- "providers": {},
- "cities": {}
+ "checked": "2026年10月",
+ "providers": {
+  "あきる野市": {
+   "url": "https://www.city.akiruno.tokyo.jp/0000013578.html",
+   "how": "生活排水対策課窓口で閲覧、HPで台帳PDF公開"
+  },
+  "かずさ水道広域連合企業団": {
+   "url": "http://www.kazusa-kouiki.jp/",
+   "top": true
+  },
+  "さいたま市水道局": {
+   "url": "https://www.city.saitama.lg.jp/001/006/002/045/001/p125906.html",
+   "how": "水道管管理図を電子閲覧（ID申請制）"
+  },
+  "さいたま市（下水道）": {
+   "url": "https://www.city.saitama.lg.jp/001/006/003/006/001/p008271.html",
+   "how": "下水道台帳の閲覧（窓口）"
+  },
+  "ときがわ町水道課": {
+   "url": "https://www.town.tokigawa.lg.jp/menu/42",
+   "top": true
+  },
+  "ふじみ野市上下水道課": {
+   "url": "https://www.city.fujimino.saitama.jp/kurashinojoho/jogesuido/index.html",
+   "top": true
+  },
+  "ふじみ野市（下水道）": {
+   "url": "https://www.city.fujimino.saitama.jp/kurashinojoho/jogesuido/index.html",
+   "top": true
+  },
+  "三宅村（簡易水道）": {
+   "url": "https://www.vill.miyake.tokyo.jp/kakuka/kigyouka/",
+   "top": true
+  },
+  "三浦市": {
+   "url": "https://www.city.miura.kanagawa.jp/soshiki/gesuidoka/gyousya/2432.html",
+   "how": "HPで下水道台帳図（R2.3作製）公開"
+  },
+  "三浦市上下水道部": {
+   "url": "https://www.city.miura.kanagawa.jp/soshiki/kyusuika/miurashisuidou/wagayanosidou/10520.html",
+   "how": "埋設管調査は給水課窓口"
+  },
+  "三芳町上下水道課": {
+   "url": "https://www.town.saitama-miyoshi.lg.jp/life/suidou/",
+   "top": true
+  },
+  "三芳町（下水道）": {
+   "url": "https://www.town.saitama-miyoshi.lg.jp/life/suidou/",
+   "top": true
+  },
+  "三郷市水道部": {
+   "url": "https://www.city.misato.lg.jp/soshiki/suido/index.html",
+   "top": true
+  },
+  "三郷市（下水道）": {
+   "url": "https://www.city.misato.lg.jp/",
+   "top": true
+  },
+  "三鷹市": {
+   "url": "https://www.city.mitaka.lg.jp/c_service/020/020425.html",
+   "how": "本庁舎5階水再生課の端末で閲覧（無料）、わがまちマップでも閲覧可"
+  },
+  "上尾市上下水道部": {
+   "url": "https://www.city.ageo.lg.jp/soshiki/11.html",
+   "how": "給・配水施設管理図は水道施設課（組織ページの業務一覧）"
+  },
+  "上尾市（下水道）": {
+   "url": "https://www.city.ageo.lg.jp/soshiki/11.html",
+   "how": "公共下水道台帳の閲覧は業務課（組織ページ）"
+  },
+  "上里町上下水道課": {
+   "url": "https://www.town.kamisato.saitama.jp/1080.htm",
+   "top": true
+  },
+  "上里町（下水道）": {
+   "url": "https://www.town.kamisato.saitama.jp/1080.htm",
+   "top": true
+  },
+  "中井町": {
+   "url": "https://www.town.nakai.kanagawa.jp/shigoto_sangyo/kaihatsu_machizukuri/3791.html",
+   "how": "町の地理情報ポータル（GIS）で下水道台帳を公開"
+  },
+  "中井町上下水道課": {
+   "url": "https://www.town.nakai.kanagawa.jp/shigoto_sangyo/kaihatsu_machizukuri/3791.html",
+   "how": "町の地理情報ポータル（GIS）で水道台帳を公開（利用規約に同意）"
+  },
+  "久喜市上下水道部": {
+   "url": "https://www.city.kuki.lg.jp/kurashi/jogesuido/josuido/1002181/1003387.html",
+   "how": "水道管の調査方法"
+  },
+  "久喜市（下水道）": {
+   "url": "https://www.city.kuki.lg.jp/faq/kurashi/faq_water/1007230/1002630.html",
+   "how": "公共下水道・農集排の埋設管位置確認（FAQ）"
+  },
+  "二宮町": {
+   "url": "https://www.town.ninomiya.kanagawa.jp/0000002071.html",
+   "how": "役場1階下水道課窓口で台帳提供（無料）"
+  },
+  "伊勢原市": {
+   "url": "https://www.city.isehara.kanagawa.jp/docs/2024042600026/",
+   "how": "いせはらWebMapsで閲覧・印刷、下水道経営課窓口でも閲覧"
+  },
+  "伊奈町上下水道課": {
+   "url": "https://www.town.saitama-ina.lg.jp/category/15-10-1-0-0.html",
+   "top": true
+  },
+  "伊奈町（下水道）": {
+   "url": "https://www.town.saitama-ina.lg.jp/0000009240.html",
+   "how": "公共下水道台帳図の公開"
+  },
+  "佐倉市上下水道部": {
+   "url": "https://www.city.sakura.lg.jp/soshiki/jogesuidobu/81/4468.html",
+   "how": "上下水道埋設管調査は上下水道総合案内センター窓口で閲覧"
+  },
+  "佐倉市（下水道）": {
+   "url": "https://www.city.sakura.lg.jp/soshiki/jogesuidobu/81/4468.html",
+   "how": "上下水道総合案内センター窓口で埋設管調査"
+  },
+  "入間市上下水道部": {
+   "url": "https://www.city.iruma.saitama.jp/kurashi/jogesuido/index.html",
+   "top": true
+  },
+  "入間市（下水道）": {
+   "url": "https://www.city.iruma.saitama.jp/kurashi/jogesuido/index.html",
+   "top": true
+  },
+  "八丈町（企業課）": {
+   "url": "https://www.town.hachijo.tokyo.jp/kurashi/suido/",
+   "top": true
+  },
+  "八匝水道企業団": {
+   "url": "http://www.hasso-suidou.jp/customer/contact_us/page001.html",
+   "how": "配水管・給水管の埋設状況は企業団窓口（窓口案内）"
+  },
+  "八千代市上下水道局": {
+   "url": "https://www.city.yachiyo.lg.jp/site/jougesui/",
+   "top": true
+  },
+  "八千代市（下水道）": {
+   "url": "https://www.city.yachiyo.lg.jp/site/jougesui/",
+   "top": true
+  },
+  "八潮市水道部": {
+   "url": "https://www.city.yashio.lg.jp/kurashi/jogesuido/suido/index.html",
+   "top": true
+  },
+  "八潮市（下水道）": {
+   "url": "https://www.city.yashio.lg.jp/kurashi/jogesuido/gesuido/gesuidounituite/gesui-heimenzu.html",
+   "how": "公共下水道平面図（PDF）"
+  },
+  "八王子市": {
+   "url": "https://www.city.hachioji.tokyo.jp/kurashi/life/002/002/001/p030588.html",
+   "how": "インターネット下水道台帳あり"
+  },
+  "八街市上下水道課": {
+   "url": "https://www.city.yachimata.lg.jp/soshiki/26/63872.html",
+   "how": "水道管の埋設状況の調査"
+  },
+  "八街市（下水道）": {
+   "url": "https://www.city.yachimata.lg.jp/soshiki/26/53582.html",
+   "how": "公共下水道台帳図をWeb公開・窓口閲覧"
+  },
+  "利島村（簡易水道）": {
+   "url": "https://www.toshimamura.org/life/living/water.html",
+   "top": true
+  },
+  "加須市上下水道部": {
+   "url": "https://www.city.kazo.lg.jp/soshiki/suidou/faq/30776.html",
+   "how": "水道管の位置は水道課窓口で確認（かぞまっぷに配管図あり）"
+  },
+  "加須市（下水道）": {
+   "url": "https://www.city.kazo.lg.jp/soshiki/dx/dx/42990.html",
+   "how": "かぞまっぷで下水道台帳図を閲覧"
+  },
+  "北本市（下水道）": {
+   "url": "https://www.city.kitamoto.lg.jp/",
+   "top": true
+  },
+  "千葉市水道局": {
+   "url": "https://www.city.chiba.jp/suido/jigyo/kanmozu.html",
+   "how": "管網図PDF公開・詳細は水道事業事務所窓口"
+  },
+  "千葉市（下水道）": {
+   "url": "https://www.city.chiba.jp/kensetsu/gesuidoshisetsu/iji/daityou_manual.html",
+   "how": "下水道施設平面図をWeb・下水道維持課窓口で閲覧"
+  },
+  "千葉県企業局": {
+   "url": "https://www.pref.chiba.lg.jp/suidou/kyuusui/etsuran.html",
+   "how": "管路情報閲覧システム（Web）または受持ち水道事務所窓口で確認"
+  },
+  "南足柄市": {
+   "url": "https://www.city.minamiashigara.kanagawa.jp/kurashi/mizu/onegai/p08299.html",
+   "how": "上下水道課窓口で閲覧"
+  },
+  "南足柄市上下水道課": {
+   "url": "https://www.city.minamiashigara.kanagawa.jp/kurashi/mizu/onegai/p09040.html",
+   "how": "上水道台帳は上下水道課窓口の専用端末でセルフ閲覧・交付"
+  },
+  "印西市（下水道）": {
+   "url": "https://www.city.inzai.lg.jp/",
+   "top": true
+  },
+  "印西市（水道）": {
+   "url": "https://www.city.inzai.lg.jp/category/1-3-4-0-0.html",
+   "top": true
+  },
+  "厚木市": {
+   "url": "https://www.city.atsugi.kanagawa.jp/soshiki/johoseisakuka/9/8771.html",
+   "how": "台帳閲覧の専用案内なし"
+  },
+  "吉川市都市建設部（水道）": {
+   "url": "https://www.city.yoshikawa.saitama.jp/index.cfm/23,0,123,html",
+   "top": true
+  },
+  "吉川市（下水道）": {
+   "url": "https://www.city.yoshikawa.saitama.jp/index.cfm/23,96461,123,1250,html",
+   "how": "公共下水道台帳図の公開"
+  },
+  "吉見町水生活課": {
+   "url": "https://www.town.yoshimi.saitama.jp/kurashi_tetsuzuki/jogesuido/3574.html",
+   "top": true
+  },
+  "吉見町（下水道）": {
+   "url": "https://www.town.yoshimi.saitama.jp/kurashi_tetsuzuki/jogesuido/3574.html",
+   "top": true
+  },
+  "君津富津広域下水道組合": {
+   "url": "https://kimitsufuttsu-gesui.jp/business/ledger/",
+   "how": "君津市役所5階の組合管理課窓口で閲覧申請"
+  },
+  "和光市上下水道部": {
+   "url": "https://www.city.wako.lg.jp/kurashi/suido/index.html",
+   "top": true
+  },
+  "和光市（下水道）": {
+   "url": "https://www.city.wako.lg.jp/kurashi/suido/1006016/index.html",
+   "top": true
+  },
+  "四街道市上下水道部": {
+   "url": "https://www.city.yotsukaido.chiba.jp/kurashi/sumai/suido/suidouoshirase2/ykomu_chosa.html",
+   "how": "水道課窓口で管網図を交付"
+  },
+  "四街道市（下水道）": {
+   "url": "https://www.city.yotsukaido.chiba.jp/",
+   "top": true
+  },
+  "国分寺市": {
+   "url": "https://www.city.kokubunji.tokyo.jp/kurashi/seikatsu/jougesuido/1002327.html",
+   "how": "下水道課窓口で閲覧、わがまちマップ国分寺でも公開"
+  },
+  "国立市": {
+   "url": "https://www.city.kunitachi.tokyo.jp/soshiki/Dept06/Div04/Sec04/0538/12205.html",
+   "how": "公開型GIS「くにたちガイド」で閲覧・印刷可、下水道課窓口でも閲覧"
+  },
+  "坂戸、鶴ヶ島下水道組合": {
+   "url": "https://www.city.sakado.lg.jp/",
+   "top": true
+  },
+  "坂戸、鶴ヶ島水道企業団": {
+   "url": "http://www.sakatsuru-suido.or.jp/",
+   "top": true
+  },
+  "多古町（水道）": {
+   "url": "https://www.town.tako.chiba.jp/unit/environment/",
+   "top": true
+  },
+  "多摩市": {
+   "url": "https://www.city.tama.lg.jp/kurashi/suido/gesuidou/1014303/1014304.html",
+   "how": "インターネット閲覧可（R6.3〜）、下水道課（第2庁舎1階）窓口でも閲覧"
+  },
+  "大井町": {
+   "url": "https://www.town.oi.kanagawa.jp/soshiki/9/daichou.html",
+   "how": "公共下水道台帳図・排水設備台帳は生活環境課窓口で閲覧・写し交付"
+  },
+  "大井町生活環境課": {
+   "url": "https://www.town.oi.kanagawa.jp/soshiki/9/daityouzu.html",
+   "how": "上水道台帳図・給水装置工事関係書類は生活環境課窓口で閲覧・写し交付"
+  },
+  "大和市": {
+   "url": "https://www.city.yamato.lg.jp/gyosei/soshik/17/kannrihaisuisetubi/25614.html",
+   "how": "HPで台帳図PDF公開、本庁舎4階下水道経営課の端末でも閲覧"
+  },
+  "大島町（水道環境課）": {
+   "url": "https://www.town.oshima.tokyo.jp/soshiki/suidou/",
+   "top": true
+  },
+  "大磯町": {
+   "url": "https://www.town.oiso.kanagawa.jp/soshiki/toshikensetsubu/gesuido/tanto/1492411654142.html",
+   "how": "HPで台帳図PDF公開、おおいそオンラインマップでも閲覧"
+  },
+  "大網白里市（下水道）": {
+   "url": "https://www.city.oamishirasato.lg.jp/0000014295.html",
+   "how": "下水道管網図を公開"
+  },
+  "夷隅郡市広域市町村圏事務組合": {
+   "url": "https://www.isumi-kouiki.com/suido/",
+   "top": true
+  },
+  "奥多摩町": {
+   "url": "https://www.town.okutama.tokyo.jp/1/kankyoka/seikatsu_kankyo/3/914.html",
+   "top": true
+  },
+  "安房郡市広域市町村圏事務組合": {
+   "url": "https://awakouikisuido.jp/%e4%ba%8b%e6%a5%ad%e8%80%85%e6%a7%98%e3%81%b8/%e7%ae%a1%e8%b7%af%e5%9b%b3%e3%81%ae%e9%96%b2%e8%a6%a7%e3%83%bb%e4%ba%a4%e4%bb%98%e3%81%ab%e3%81%a4%e3%81%84%e3%81%a6/",
+   "how": "管路図の閲覧・交付"
+  },
+  "宮下簡易水道組合": {
+   "url": "https://www.town.yugawara.kanagawa.jp/soshiki/28/1841.html",
+   "top": true
+  },
+  "宮代町まちづくり建設課": {
+   "url": "https://www.town.miyashiro.lg.jp/soshiki/11-5-0-0-0_1.html",
+   "top": true
+  },
+  "宮代町（下水道）": {
+   "url": "https://www.town.miyashiro.lg.jp/soshiki/11-5-0-0-0_1.html",
+   "top": true
+  },
+  "寄居町上下水道課": {
+   "url": "https://www.town.yorii.saitama.jp/soshiki/18/",
+   "top": true
+  },
+  "寄居町（下水道）": {
+   "url": "https://www.town.yorii.saitama.jp/soshiki/18/",
+   "top": true
+  },
+  "富士見市建設部（水道）": {
+   "url": "https://www.city.fujimi.saitama.jp/kurashi_tetsuzuki/_suidou/jyousui/suidou02daichouweb.html",
+   "how": "水道台帳をWeb閲覧"
+  },
+  "富士見市（下水道）": {
+   "url": "https://www.city.fujimi.saitama.jp/kurashi_tetsuzuki/_suidou/gesui/gesuidaichouetsuran.html",
+   "how": "公共下水道台帳をWeb閲覧"
+  },
+  "富里市上下水道課": {
+   "url": "http://www.city.tomisato.lg.jp/soshiki/4-4-0-0-0_5.html",
+   "top": true
+  },
+  "富里市（下水道）": {
+   "url": "https://www.city.tomisato.lg.jp/",
+   "top": true
+  },
+  "寒川町": {
+   "url": "https://www.town.samukawa.kanagawa.jp/soshiki/toshikensetsu/gesui/kanri/info/gesuidoriyo_info/18014.html",
+   "how": "ネット公開、下水道課窓口のタブレットでも閲覧（無料、写しA3 300円）"
+  },
+  "小川町上下水道課": {
+   "url": "https://www.town.ogawa.saitama.jp/gyosei/kurashi_tetsuzuki/jogesuido/2/3610.html",
+   "how": "埋設管の調査及び給水台帳の閲覧"
+  },
+  "小川町（下水道）": {
+   "url": "https://www.town.ogawa.saitama.jp/gyosei/kurashi_tetsuzuki/jogesuido/2/3610.html",
+   "how": "埋設管の調査及び閲覧（上下水道課）"
+  },
+  "小平市": {
+   "url": "https://www.city.kodaira.tokyo.jp/kurashi/074/074149.html",
+   "how": "こだいら地図情報システムで閲覧・印刷可、市役所4階でも閲覧"
+  },
+  "小田原市": {
+   "url": "https://www.city.odawara.kanagawa.jp/field/c-planning/sewer/sewer/ledger.html",
+   "how": "公共下水道台帳（汚水）参考図は上下水道局1階で閲覧、Navi-Oでも閲覧・印刷"
+  },
+  "小田原市上下水道局": {
+   "url": "https://www.city.odawara.kanagawa.jp/field/c-planning/water/user/procedure/eturankouhu.html",
+   "how": "給水装置台帳は給排水業務課窓口で閲覧・交付（無料、本人確認・委任状）"
+  },
+  "小笠原村（簡易水道）": {
+   "url": "https://www.vill.ogasawara.tokyo.jp/kensetsu_suidou/",
+   "top": true
+  },
+  "小金井市": {
+   "url": "https://www.city.koganei.lg.jp/kurashi/478/gesuidaicho.html",
+   "how": "HPで台帳PDF公開、第二庁舎4階下水道課の端末でも閲覧"
+  },
+  "山北町": {
+   "url": "https://www.town.yamakita.kanagawa.jp/category/1-4-3-0-0.html",
+   "top": true
+  },
+  "山北町上下水道課": {
+   "url": "https://www.town.yamakita.kanagawa.jp/category/1-4-3-0-0.html",
+   "top": true
+  },
+  "山武市（水道）": {
+   "url": "https://www.city.sammu.lg.jp/page/page001863.html",
+   "top": true
+  },
+  "山武郡市広域水道企業団": {
+   "url": "https://water-sansui-ki.jp/contact/",
+   "how": "水道管の埋設状況の確認は給水検査班（窓口案内）"
+  },
+  "嵐山町上下水道課": {
+   "url": "http://www.town.ranzan.saitama.jp/category/1-4-1-0-0.html",
+   "top": true
+  },
+  "嵐山町（下水道）": {
+   "url": "http://www.town.ranzan.saitama.jp/category/1-4-1-0-0.html",
+   "top": true
+  },
+  "川口市上下水道局": {
+   "url": "https://www.water-kawaguchi.jp/jigyousha/1001573/1001576.html",
+   "how": "埋設管図・給水台帳を上水道維持課窓口で閲覧"
+  },
+  "川口市（下水道）": {
+   "url": "https://www.water-kawaguchi.jp/jigyousha/1001594/1001595.html",
+   "how": "下水道維持課窓口で閲覧（Web非公開）"
+  },
+  "川島町上下水道課": {
+   "url": "https://www.town.kawajima.saitama.jp/1322.htm",
+   "top": true
+  },
+  "川島町（下水道）": {
+   "url": "https://www.town.kawajima.saitama.jp/1322.htm",
+   "top": true
+  },
+  "川崎市": {
+   "url": "https://www.city.kawasaki.jp/800/page/0000083538.html",
+   "how": "公共下水道台帳施設平面図は「ガイドマップかわさき」で閲覧、各下水道（管理）事務所・管路保全課でも閲覧（写し1枚50円）"
+  },
+  "川崎市上下水道局": {
+   "url": "https://www.city.kawasaki.jp/800/category/226-13-4-0-0-0-0-0-0-0.html",
+   "how": "給水装置情報は電子申請又は窓口で提供（完成図は所有者・使用者又は同意書）"
+  },
+  "川越市上下水道局": {
+   "url": "https://www.city.kawagoe.saitama.jp/kurashi/jogesuidobu/1002827/1002846/1002850.html",
+   "how": "給水装置図面の複写申請（委任状要）"
+  },
+  "川越市（下水道）": {
+   "url": "https://www.city.kawagoe.saitama.jp/kurashi/jogesuidobu/1002779/1002780/1020452.html",
+   "how": "下水道台帳をHPで確認可"
+  },
+  "市原市（下水道）": {
+   "url": "https://www.city.ichihara.chiba.jp/",
+   "top": true
+  },
+  "市原市（水道）": {
+   "url": "https://www.city.ichihara.chiba.jp/2ndCategory?categoryId=10509000",
+   "top": true
+  },
+  "市川市（下水道）": {
+   "url": "https://www.city.ichikawa.lg.jp/page/3105.html",
+   "how": "下水道台帳の閲覧（Web GIS・窓口）"
+  },
+  "平塚市": {
+   "url": "https://www.city.hiratsuka.kanagawa.jp/keikaku/page81_00008.html",
+   "how": "「ひらつかわくわくマップ」の下水道カテゴリで下水道台帳を閲覧可"
+  },
+  "幸手市水道部": {
+   "url": "https://www.city.satte.lg.jp/soshiki/suidoukanri/index.html",
+   "top": true
+  },
+  "幸手市（下水道）": {
+   "url": "https://www.city.satte.lg.jp/",
+   "top": true
+  },
+  "府中市": {
+   "url": "https://www.city.fuchu.tokyo.jp/kurashi/sekatu/jogesuido/gesuidodaicho.html",
+   "how": "下水道課窓口で閲覧（無料）、HPで丁目別PDF公開"
+  },
+  "座間市": {
+   "url": "https://www.city.zama.kanagawa.jp/shisei/machi/douro/1012849/1011723.html",
+   "how": "道路情報管理システムの窓口閲覧端末（タッチパネル）で一般下水道管網図を閲覧（ネット非公開）"
+  },
+  "座間市上下水道局": {
+   "url": "https://www.city.zama.kanagawa.jp/kurashi/suidou/josuidou/jigyousha/1007430.html",
+   "how": "上下水道局3階水道施設課の専用端末で道路上埋設管を閲覧（無料、印刷300円）"
+  },
+  "御蔵島村（簡易水道）": {
+   "url": "http://mikurasima.jp/",
+   "top": true
+  },
+  "志木市上下水道部": {
+   "url": "https://www.city.shiki.lg.jp/soshiki/37/7101.html",
+   "how": "上下水道施設平面図をWeb閲覧"
+  },
+  "志木市（下水道）": {
+   "url": "https://www.city.shiki.lg.jp/soshiki/37/7101.html",
+   "how": "上下水道施設平面図をWeb閲覧"
+  },
+  "愛川町": {
+   "url": "https://www.town.aikawa.kanagawa.jp/soshiki/kensetsu/gesuido/index.html",
+   "top": true
+  },
+  "愛川町水道事業所": {
+   "url": "https://www.town.aikawa.kanagawa.jp/soshiki/suido/gyomu/info/1422277675354.html",
+   "top": true
+  },
+  "成田市水道部": {
+   "url": "https://www.city.narita.chiba.jp/kurashi/index0679.html",
+   "how": "上水道配水管網図（地区別PDF）"
+  },
+  "成田市（下水道）": {
+   "url": "https://www.city.narita.chiba.jp/",
+   "top": true
+  },
+  "我孫子市水道局": {
+   "url": "https://www.city.abiko.chiba.jp/kurashi/suidou/index.html",
+   "top": true
+  },
+  "我孫子市（下水道）": {
+   "url": "https://www.city.abiko.chiba.jp/kurashi/suidou/gesuidou/gesuidou_info/akkk.html",
+   "how": "下水道台帳を「あびまっぷ」で閲覧"
+  },
+  "戸田市水安全部": {
+   "url": "https://www.city.toda.saitama.jp/soshiki/273/doro-kasen-daichou.html",
+   "how": "道路台帳閲覧システム（道路管理課端末）で市水道等の地下埋設物を閲覧"
+  },
+  "戸田市（下水道）": {
+   "url": "https://www.city.toda.saitama.jp/soshiki/273/doro-kasen-daichou.html",
+   "how": "道路台帳閲覧システム（地下埋設物に下水）"
+  },
+  "所沢市上下水道局": {
+   "url": "https://www.city.tokorozawa.saitama.jp/kurashi/jogesuido/komarigoto/kyusuihaisuietsuran.html",
+   "how": "給水台帳の閲覧・交付（埋設管調査ページもあり）"
+  },
+  "所沢市（下水道）": {
+   "url": "https://www.city.tokorozawa.saitama.jp/kurashi/jogesuido/jigyosya/maisetsukan.html",
+   "how": "埋設管調査（下水道台帳）"
+  },
+  "新島村": {
+   "url": "https://www.niijima.com/kurashi/seikatsu/suidou/",
+   "top": true
+  },
+  "新島村（簡易水道）": {
+   "url": "https://www.niijima.com/kurashi/seikatsu/suidou/",
+   "top": true
+  },
+  "新座市インフラ整備部（水道）": {
+   "url": "https://www.city.niiza.lg.jp/soshiki/37/",
+   "top": true
+  },
+  "新座市（下水道）": {
+   "url": "https://www.city.niiza.lg.jp/soshiki/39/gesuidou-daichoueturan.html",
+   "how": "下水道台帳の閲覧"
+  },
+  "日の出町": {
+   "url": "https://www.town.hinode.tokyo.jp/category/1-3-3-0-0-0-0-0-0-0.html",
+   "top": true
+  },
+  "日野市": {
+   "url": "https://www.city.hino.lg.jp/kurashi/sumai/suido/gesui/1028495.html",
+   "how": "下水道台帳閲覧システムでネット公開（R7.3〜）"
+  },
+  "日高市上・下水道部": {
+   "url": "https://www.city.hidaka.lg.jp/life_procedure/17/index.html",
+   "top": true
+  },
+  "日高市（下水道）": {
+   "url": "https://www.city.hidaka.lg.jp/life_procedure/17/index.html",
+   "top": true
+  },
+  "旭市（下水道）": {
+   "url": "https://www.city.asahi.lg.jp/",
+   "top": true
+  },
+  "旭市（水道）": {
+   "url": "https://www.city.asahi.lg.jp/soshiki/21",
+   "top": true
+  },
+  "春日部市上下水道部": {
+   "url": "https://www.city.kasukabe.lg.jp/kurashi/jogesuido/suido/index.html",
+   "top": true
+  },
+  "春日部市（下水道）": {
+   "url": "https://www.city.kasukabe.lg.jp/kurashi/jogesuido/suido/index.html",
+   "top": true
+  },
+  "昭島市": {
+   "url": "https://www.city.akishima.lg.jp/kurashi/sumai/1001689/1001704/1001705.html",
+   "how": "HPで台帳PDF公開（R4.4〜）、市役所5階下水道課窓口でも閲覧"
+  },
+  "昭島市水道部": {
+   "url": "https://www.city.akishima.lg.jp/kurashi/water/1008280/1002875.html",
+   "how": "給水装置図は水道部工務課給水係窓口で閲覧・写し交付（1件200円、所有者又は委任状、電話照会不可）"
+  },
+  "朝霞市上下水道部": {
+   "url": "https://www.city.asaka.lg.jp/soshiki/34/kyuusuisouti.html",
+   "how": "給水装置・管路情報の閲覧（管網図はWeb公開）"
+  },
+  "朝霞市（下水道）": {
+   "url": "https://www.city.asaka.lg.jp/soshiki/29/gesuidoudaityou.html",
+   "how": "公共下水道台帳をHPで閲覧"
+  },
+  "木更津市（下水道）": {
+   "url": "https://www.city.kisarazu.lg.jp/soshiki/toshiseibi/shitasuidosuishinshitsu/5/2040.html",
+   "how": "下水道管網図を「きさNAVI」で閲覧"
+  },
+  "本庄市上下水道部": {
+   "url": "https://www.city.honjo.lg.jp/kurashi_tetsuzuki/jogesuido/josuido/15317.html",
+   "how": "水道台帳図を「ほんじょうマップ」で閲覧"
+  },
+  "本庄市（下水道）": {
+   "url": "https://www.city.honjo.lg.jp/soshiki/jougesuidou/index.html",
+   "top": true
+  },
+  "杉戸町上下水道課": {
+   "url": "https://www.town.sugito.lg.jp/page/1936.html",
+   "how": "水道管管理図等の情報提供"
+  },
+  "杉戸町（下水道）": {
+   "url": "https://www.town.sugito.lg.jp/soshiki/21/index.html",
+   "top": true
+  },
+  "東久留米市": {
+   "url": "https://www.city.higashikurume.lg.jp/kurashi/kankyo/gesui/1022230.html",
+   "how": "市役所5階窓口で閲覧、HPで台帳PDF公開"
+  },
+  "東京都下水道局": {
+   "url": "https://www.gesui.metro.tokyo.lg.jp/contractor/daicyo",
+   "how": "23区の下水道台帳はHP（SEMIS）で公開、都庁第二本庁舎27階の台帳閲覧室でも閲覧可（無料、電話・FAX不可）"
+  },
+  "東京都水道局": {
+   "url": "https://www.waterworks.metro.tokyo.lg.jp/jigyosha/zumen",
+   "how": "給水装置図面は所管の給水管工事事務所／サービスステーション窓口で閲覧・抄本交付（電話・FAX不可、閲覧300円・抄本400円）"
+  },
+  "東大和市": {
+   "url": "https://www.city.higashiyamato.lg.jp/kurashi/suido/1002033/1010747.html",
+   "how": "HPで台帳PDF公開（R7.4〜）"
+  },
+  "東庄町（水道）": {
+   "url": "https://www.town.tohnosho.chiba.jp/soshiki/machizukurika/suido_kakari/gyomu/jogesuido/josuido/index.html",
+   "top": true
+  },
+  "東村山市": {
+   "url": "https://www.city.higashimurayama.tokyo.jp/faq/kurashi/sumai/suido/gesui_maisetu.html",
+   "how": "下水道課（本庁舎4階）で台帳閲覧"
+  },
+  "東松山市建設部（水道）": {
+   "url": "https://www.city.higashimatsuyama.lg.jp/site/higashimatsuyama-suidouzigyou/",
+   "top": true
+  },
+  "東松山市（下水道）": {
+   "url": "https://www.city.higashimatsuyama.lg.jp/",
+   "top": true
+  },
+  "東秩父村（簡易水道）": {
+   "url": "https://www.vill.higashichichibu.saitama.jp/",
+   "top": true
+  },
+  "東金市（下水道）": {
+   "url": "https://www.city.togane.lg.jp/",
+   "top": true
+  },
+  "松伏町（下水道）": {
+   "url": "https://www.town.matsubushi.lg.jp/",
+   "top": true
+  },
+  "松戸市水道部": {
+   "url": "http://www.city.matsudo.chiba.jp/suidou/index.html",
+   "top": true
+  },
+  "松戸市（下水道）": {
+   "url": "https://www.city.matsudo.chiba.jp/kurashi/jyougesuidou/gesuidou/daityoumikata.html",
+   "how": "下水道台帳をWeb（やさシティマップ）・窓口で確認"
+  },
+  "松田町": {
+   "url": "https://town.matsuda.kanagawa.jp/soshiki/11/",
+   "top": true
+  },
+  "松田町環境上下水道課": {
+   "url": "https://town.matsuda.kanagawa.jp/soshiki/11/",
+   "top": true
+  },
+  "柏市上下水道局": {
+   "url": "https://www.city.kashiwa.lg.jp/kyuhaisui/jigyosha/jousui/kyusui/maisetsukan.html",
+   "how": "水道管管網図・給水装置図面の閲覧及び交付"
+  },
+  "柏市（下水道）": {
+   "url": "https://www.city.kashiwa.lg.jp/gesuikomu/living_environment/gesui/daicho.html",
+   "how": "下水道台帳（管網図）をHP公開"
+  },
+  "栄町（下水道）": {
+   "url": "https://www.town.sakae.chiba.jp/",
+   "top": true
+  },
+  "桶川北本水道企業団": {
+   "url": "https://water-okekita.jp/customers/procedure/inspect/",
+   "how": "水道管の調査（給水台帳の閲覧・交付）"
+  },
+  "桶川市（下水道）": {
+   "url": "https://www.city.okegawa.lg.jp/",
+   "top": true
+  },
+  "横浜市": {
+   "url": "https://www.city.yokohama.lg.jp/faq/kukyoku/gesui/kanro-hozen/20211015085255270.html",
+   "how": "公共下水道台帳図は行政地図情報提供システム「だいちゃんマップ」で閲覧、市庁舎2階よこはま建築情報センター・各区土木事務所でも閲覧"
+  },
+  "横浜市水道局": {
+   "url": "https://www.city.yokohama.lg.jp/business/bunyabetsu/suido/mizumore/kanro.html",
+   "how": "給水工事受付センター窓口で閲覧・写し交付（完成図1件300円、所有者等又は委任）"
+  },
+  "横瀬町（下水道）": {
+   "url": "https://www.town.yokoze.saitama.jp/",
+   "top": true
+  },
+  "横須賀市": {
+   "url": "https://www.city.yokosuka.kanagawa.jp/6920/tetuduki/maisetu_eturan/eturan.html",
+   "how": "下水道管は「よこすかわが街ガイド」で閲覧、市役所8階上下水道埋設管閲覧コーナーでも可"
+  },
+  "横須賀市上下水道局": {
+   "url": "https://www.city.yokosuka.kanagawa.jp/6920/tetuduki/maisetu_eturan/eturan.html",
+   "how": "公設水道管・下水道管は「よこすかわが街ガイド」で閲覧、市役所8階閲覧コーナーでも可（交付A3 150円）"
+  },
+  "檜原村": {
+   "url": "https://www.vill.hinohara.tokyo.jp/category/1-5-2-0-0-0-0-0-0-0.html",
+   "top": true
+  },
+  "檜原村（簡易水道）": {
+   "url": "https://www.vill.hinohara.tokyo.jp/category/1-5-2-0-0-0-0-0-0-0.html",
+   "top": true
+  },
+  "武蔵村山市": {
+   "url": "https://www.city.musashimurayama.lg.jp/kurashi/koutsu/water/1014790/index.html",
+   "how": "HPで台帳PDF公開、窓口は道路下水道課"
+  },
+  "武蔵野市": {
+   "url": "https://www.city.musashino.lg.jp/kurashi_tetsuzuki/jogesuido/gesuido/1024081.html",
+   "how": "市庁舎西棟2階下水道課の端末で閲覧、HPでも台帳図公開"
+  },
+  "武蔵野市水道部": {
+   "url": "https://www.city.musashino.lg.jp/kurashi_tetsuzuki/jogesuido/suido/1045825.html",
+   "how": "水道管理図は水道部3階工務課窓口で閲覧（無料、複写10円、HP・電話不可）"
+  },
+  "毛呂山・越生・鳩山公共下水道組合": {
+   "url": "https://www.town.moroyama.saitama.jp/",
+   "top": true
+  },
+  "毛呂山町水道課": {
+   "url": "https://www.town.moroyama.saitama.jp/soshikikarasagasu/suidoka/josuido/6/2320.html",
+   "how": "水道管の埋設状況（図面交付）"
+  },
+  "流山市上下水道局": {
+   "url": "https://www.city.nagareyama.chiba.jp/life/1001972/1002026/1002044.html",
+   "how": "配給水管台帳図・給水装置工事申請書写しを上下水道センターで閲覧・交付"
+  },
+  "流山市（下水道）": {
+   "url": "https://www.city.nagareyama.chiba.jp/life/1001972/1002026/1002044.html",
+   "how": "下水道台帳平面図を上下水道センターで閲覧・交付"
+  },
+  "浦安市（下水道）": {
+   "url": "https://www.city.urayasu.lg.jp/todokede/machi/gesuido/1018026.html",
+   "how": "下水道台帳（Web地図・窓口）"
+  },
+  "海老名市": {
+   "url": "https://www.city.ebina.kanagawa.jp/guide/sumai/gesui/1016347.html",
+   "how": "i-Map「下水道施設マップ」で閲覧、下水道課窓口で台帳閲覧（無料、写し300円）"
+  },
+  "深谷市環境水道部": {
+   "url": "http://www.city.fukaya.saitama.jp/kurashi/kurashi/jogesuido/jyosuido/index.html",
+   "top": true
+  },
+  "深谷市（下水道）": {
+   "url": "https://www.city.fukaya.saitama.jp/",
+   "top": true
+  },
+  "清川村": {
+   "url": "https://www.town.kiyokawa.kanagawa.jp/soshiki/machizukuri/442.html",
+   "top": true
+  },
+  "清川村（簡易水道）": {
+   "url": "https://www.town.kiyokawa.kanagawa.jp/soshiki/machizukuri/443.html",
+   "top": true
+  },
+  "清瀬市": {
+   "url": "https://www.city.kiyose.lg.jp/kurashi/suidougesuidou/gesuidou/1015243/1011845.html",
+   "how": "HPで台帳PDF公開、下水道課窓口でも閲覧"
+  },
+  "湯河原町": {
+   "url": "https://www.town.yugawara.kanagawa.jp/soshiki/28/",
+   "top": true
+  },
+  "湯河原町（水道）": {
+   "url": "https://www.town.yugawara.kanagawa.jp/soshiki/28/",
+   "top": true
+  },
+  "滑川町上下水道課": {
+   "url": "https://www.town.namegawa.saitama.jp/kurashi_tetsuzuki/jogesuido/3304.html",
+   "top": true
+  },
+  "滑川町（下水道）": {
+   "url": "https://www.town.namegawa.saitama.jp/kurashi_tetsuzuki/jogesuido/3304.html",
+   "top": true
+  },
+  "熊谷市上下水道部": {
+   "url": "https://www.city.kumagaya.lg.jp/kurashi/jyougesuidou/suidou/index.html",
+   "top": true
+  },
+  "熊谷市（下水道）": {
+   "url": "https://www.city.kumagaya.lg.jp/about/soshiki/jogesuido/gesuidou/index.html",
+   "top": true
+  },
+  "狛江市": {
+   "url": "https://www.city.komae.tokyo.jp/index.cfm/41,94802,313,2003,html",
+   "how": "HPで台帳平面図公開、下水道課窓口でも閲覧・複写"
+  },
+  "狭山市上下水道部": {
+   "url": "https://www.city.sayama.saitama.jp/kurashi/dourokotsuu/jogesuido/jigyoushanokata/suidoukyuusuikannzu.html",
+   "how": "配給水管図を「さやまちマップ」で公開"
+  },
+  "狭山市（下水道）": {
+   "url": "https://www.city.sayama.saitama.jp/kurashi/dourokotsuu/jogesuido/jigyoushanokata/gesuidoudaityouzu.html",
+   "how": "下水道台帳図をWeb公開"
+  },
+  "瑞穂町": {
+   "url": "https://www.town.mizuho.tokyo.jp/kankyo/002/003/index.html",
+   "top": true
+  },
+  "町田市": {
+   "url": "https://www.city.machida.tokyo.jp/kurashi/suido/grsui/daichou_system.html",
+   "how": "下水道管理課窓口の端末で閲覧（無料）、地図情報まちだでも公開"
+  },
+  "白井市（下水道）": {
+   "url": "https://www.city.shiroi.chiba.jp/soshiki/kankyo/k03/sui003/sui009/sui013/index.html",
+   "top": true
+  },
+  "白井市（水道）": {
+   "url": "https://www.city.shiroi.chiba.jp/kurashi/suido/index.html",
+   "top": true
+  },
+  "白岡市上下水道部": {
+   "url": "https://www.city.shiraoka.lg.jp/soshiki/jogesuidobu/index.html",
+   "top": true
+  },
+  "白岡市（下水道）": {
+   "url": "https://www.city.shiraoka.lg.jp/soshiki/jogesuidobu/index.html",
+   "top": true
+  },
+  "皆野・長瀞下水道組合": {
+   "url": "https://www.town.minano.saitama.jp/life/suidou/",
+   "top": true
+  },
+  "相模原市": {
+   "url": "https://www.city.sagamihara.kanagawa.jp/shisei/1026823/gesuido/1004571/1004572.html",
+   "how": "下水道施設台帳平面図はさがみはら地図情報（Web）・各土木事務所等のSRIMS端末で閲覧（旧市域）"
+  },
+  "相模原市（市営簡易水道）": {
+   "url": "https://www.city.sagamihara.kanagawa.jp/shisei/1026823/1004616/1026848/1020969/index.html",
+   "top": true
+  },
+  "真鶴町": {
+   "url": "https://www.town.manazuru.kanagawa.jp/soshiki/toshikiban/jogesuidokanri/",
+   "top": true
+  },
+  "真鶴町（水道）": {
+   "url": "https://www.town.manazuru.kanagawa.jp/soshiki/toshikiban/jogesuidokanri/",
+   "top": true
+  },
+  "神奈川県企業庁": {
+   "url": "https://www.pref.kanagawa.jp/docs/yn3/notice/p312503.html",
+   "how": "管路情報図閲覧システム（Web、月〜土8:30〜20:00）で配水管を確認可"
+  },
+  "神崎町（水道）": {
+   "url": "https://www.town.kozaki.chiba.jp/kurashi/living_bosai/suido/",
+   "top": true
+  },
+  "神川町上下水道課": {
+   "url": "http://www.town.kamikawa.saitama.jp/kurashi_tetsuduki/suidou/jousuidou/index.html",
+   "top": true
+  },
+  "神川町（下水道）": {
+   "url": "http://www.town.kamikawa.saitama.jp/kurashi_tetsuduki/suidou/jousuidou/index.html",
+   "top": true
+  },
+  "神津島村（簡易水道）": {
+   "url": "https://www.vill.kouzushima.tokyo.jp/busyo/kankyoeisei/",
+   "top": true
+  },
+  "福生市": {
+   "url": "https://www.city.fussa.tokyo.jp/life/city/1017110/1017113.html",
+   "how": "道路下水道課の端末で閲覧、HPで台帳図PDF公開"
+  },
+  "秦野市": {
+   "url": "https://www.city.hadano.kanagawa.jp/soshiki/1/1005/4230.html",
+   "how": "はだのWEBマップで公共下水道台帳（汚水）参考図を公開"
+  },
+  "秦野市上下水道局": {
+   "url": "https://www.city.hadano.kanagawa.jp/soshiki/1/1005/4230.html",
+   "how": "はだのWEBマップで水道管網図（PCのみ）・公共下水道台帳参考図を公開"
+  },
+  "秩父市（下水道）": {
+   "url": "https://www.city.chichibu.lg.jp/",
+   "top": true
+  },
+  "秩父広域市町村圏組合水道局": {
+   "url": "https://www.c-kouiki.jp/wd/suidokan-map/",
+   "how": "水道管埋設図面・給水台帳の交付"
+  },
+  "稲城市": {
+   "url": "https://www.city.inagi.tokyo.jp/kankyo/jogesuido/1005196/1005197.html",
+   "how": "HPで埋設状況PDF公開（R7.4〜、窓口印刷は原則終了）"
+  },
+  "立川市": {
+   "url": "https://www.city.tachikawa.lg.jp/kurashi/suido/1002266/1020511.html",
+   "how": "HPで台帳PDF公開、市役所2階下水道管理課窓口でも閲覧"
+  },
+  "箱根町": {
+   "url": "https://www.town.hakone.kanagawa.jp/www/contents/1100000002108/index.html",
+   "top": true
+  },
+  "箱根町上下水道温泉課": {
+   "url": "https://www.town.hakone.kanagawa.jp/index.cfm/11,0,70,250,html",
+   "top": true
+  },
+  "綾瀬市": {
+   "url": "https://www.city.ayase.kanagawa.jp/soshiki/gesuidoka/gesuidodaicho/617.html",
+   "how": "市役所4階下水道課の端末で閲覧、ネット公開あり"
+  },
+  "美里町上下水道課": {
+   "url": "https://www.town.saitama-misato.lg.jp/category/1-11-1-0-0-0-0-0-0-0.html",
+   "top": true
+  },
+  "美里町（下水道）": {
+   "url": "https://www.town.saitama-misato.lg.jp/category/1-11-1-0-0-0-0-0-0-0.html",
+   "top": true
+  },
+  "羽村市": {
+   "url": "https://www.city.hamura.tokyo.jp/0000019372.html",
+   "how": "上下水道設備課（水道事務所内）で下水道台帳・排水設備図を閲覧（無料、電話照会不可）"
+  },
+  "羽村市上下水道部": {
+   "url": "https://www.city.hamura.tokyo.jp/0000019372.html",
+   "how": "水道台帳・給水装置図は上下水道設備課（水道事務所内）で閲覧（無料、給水装置図は所有者又は委任状）"
+  },
+  "羽生市まちづくり部（水道）": {
+   "url": "https://www.city.hanyu.lg.jp/docs/2014121100035/",
+   "top": true
+  },
+  "羽生市（下水道）": {
+   "url": "https://www.city.hanyu.lg.jp/docs/2024050100044/",
+   "how": "公共下水道台帳図をWeb閲覧"
+  },
+  "習志野市企業局": {
+   "url": "https://www.city.narashino.lg.jp/kigyoukyoku/index.html",
+   "top": true
+  },
+  "習志野市企業局（下水道）": {
+   "url": "https://www.city.narashino.lg.jp/kigyoukyoku/about/gesuido/gesuidoudaityou.html",
+   "how": "下水道台帳の閲覧・謄写は企業局下水道課窓口"
+  },
+  "船橋市（下水道）": {
+   "url": "https://www.city.funabashi.lg.jp/faq/machi/gesui/004/p010894.html",
+   "how": "窓口端末・Web地図で下水道台帳を閲覧"
+  },
+  "芝山町（下水道）": {
+   "url": "https://www.town.shibayama.lg.jp/",
+   "top": true
+  },
+  "芝山町（水道）": {
+   "url": "https://www.town.shibayama.lg.jp/category/22-3-1-0-0-0-0-0-0-0.html",
+   "top": true
+  },
+  "茂原市（下水道）": {
+   "url": "https://www.city.mobara.chiba.jp/0000000838.html",
+   "how": "下水道台帳の閲覧"
+  },
+  "茅ヶ崎市": {
+   "url": "https://www.city.chigasaki.kanagawa.jp/faq/1000006/1000184/1000209.html",
+   "how": "本庁舎3階の都市づくりGIS端末で確認・印刷（1枚100円）"
+  },
+  "草加市上下水道部": {
+   "url": "https://www.city.soka.saitama.jp/li/020/120/index.html",
+   "top": true
+  },
+  "草加市（下水道）": {
+   "url": "https://www.city.soka.saitama.jp/li/020/120/index.html",
+   "top": true
+  },
+  "葉山町": {
+   "url": "https://www.town.hayama.lg.jp/soshiki/soumu/oshirase/16361.html",
+   "how": "公開型GIS「はやまMap」に下水道台帳マップあり"
+  },
+  "蓮田市上下水道部": {
+   "url": "https://www.city.hasuda.saitama.jp/machi/suido/index.html",
+   "top": true
+  },
+  "蓮田市（下水道）": {
+   "url": "https://www.city.hasuda.saitama.jp/machi/suido/index.html",
+   "top": true
+  },
+  "蕨市水道部": {
+   "url": "https://www.city.warabi.saitama.jp/kurashi/suido/suido/index.html",
+   "top": true
+  },
+  "蕨市（下水道）": {
+   "url": "https://www.city.warabi.saitama.jp/kurashi/suido/gesuido/gaiyo/1001461.html",
+   "how": "公共下水道台帳図をWeb公開"
+  },
+  "藤沢市": {
+   "url": "https://www.city.fujisawa.kanagawa.jp/gesui-ka/daityou.html",
+   "how": "「ふじさわキュンマップ」で閲覧、最新は下水道管路課窓口（分庁舎5階）"
+  },
+  "行田市都市整備部（水道）": {
+   "url": "https://www.city.gyoda.lg.jp/soshiki/toshiseibibu/suido/gyomu/jogesuido/josuido/kurashisuido/1457.html",
+   "how": "水道埋設管の調査方法"
+  },
+  "行田市（下水道）": {
+   "url": "https://www.city.gyoda.lg.jp/kurashi/jogesuido/gesuido/5867.html",
+   "how": "公共下水道埋設管情報の公開"
+  },
+  "袖ケ浦市（下水道）": {
+   "url": "https://www.city.sodegaura.lg.jp/soshiki/gesui/gesuidodaityo.html",
+   "how": "下水道台帳について"
+  },
+  "西東京市": {
+   "url": "https://www.city.nishitokyo.lg.jp/kurasi/zyogesuido/daicho.html",
+   "how": "下水道課（東分庁舎1階）で閲覧、HPで台帳PDF公開"
+  },
+  "調布市": {
+   "url": "https://www.city.chofu.lg.jp/070040/p042028.html",
+   "how": "市庁舎8階下水道課の端末で閲覧、HPで台帳PDF公開"
+  },
+  "越生町水道課": {
+   "url": "https://www.town.ogose.saitama.jp/kamei/suido/index.html",
+   "top": true
+  },
+  "越谷・松伏水道企業団": {
+   "url": "https://www.koshi-matsu.koshigaya.saitama.jp",
+   "top": true
+  },
+  "越谷市（下水道）": {
+   "url": "https://www.city.koshigaya.saitama.jp/kurashi_shisei/kurashi/suido/gesuido/index.html",
+   "top": true
+  },
+  "逗子市": {
+   "url": "https://www.city.zushi.kanagawa.jp/kurashi/suido/1001970/1009593/index.html",
+   "how": "HPで台帳PDF公開、市役所2階下水道課でも閲覧"
+  },
+  "酒々井町上下水道課": {
+   "url": "https://www.town.shisui.chiba.jp/category/bunya/machizukuri/suido/",
+   "top": true
+  },
+  "酒々井町（下水道）": {
+   "url": "https://www.town.shisui.chiba.jp/",
+   "top": true
+  },
+  "野田市水道部": {
+   "url": "http://www.city.noda.chiba.jp/suido/index.html",
+   "top": true
+  },
+  "野田市（下水道）": {
+   "url": "https://www.city.noda.chiba.jp/",
+   "top": true
+  },
+  "銚子市水道部": {
+   "url": "http://www.city.choshi.chiba.jp/suidou/",
+   "top": true
+  },
+  "銚子市（下水道）": {
+   "url": "https://www.city.choshi.chiba.jp/",
+   "top": true
+  },
+  "鎌ケ谷市（下水道）": {
+   "url": "https://www.city.kamagaya.chiba.jp/kurashi-tetsuzuki/gesuidou/gesuidodaityo.html",
+   "how": "下水道台帳の閲覧（Web・窓口）"
+  },
+  "鎌倉市": {
+   "url": "https://www.city.kamakura.kanagawa.jp/gesuidaicho/daicho-top.html",
+   "how": "HPで台帳PDF・かまくらわが街マップ公開、本庁舎4階でも閲覧"
+  },
+  "長生村（下水道）": {
+   "url": "https://www.vill.chosei.chiba.jp/",
+   "top": true
+  },
+  "長生郡市広域市町村圏組合": {
+   "url": "http://www.chouseisuidou.jp/",
+   "top": true
+  },
+  "長門川水道企業団": {
+   "url": "http://www.nagatogawa.jp/",
+   "top": true
+  },
+  "開成町": {
+   "url": "https://www.town.kaisei.kanagawa.jp/mg/25",
+   "top": true
+  },
+  "開成町（水道）": {
+   "url": "https://www.town.kaisei.kanagawa.jp/menu/31",
+   "top": true
+  },
+  "青ヶ島村（簡易水道）": {
+   "url": "https://www.vill.aogashima.tokyo.jp/top.html",
+   "top": true
+  },
+  "青梅市": {
+   "url": "https://www.city.ome.tokyo.jp/soshiki/25/50793.html",
+   "how": "おうめ地図情報システムで下水道台帳を公開"
+  },
+  "飯能市上下水道部": {
+   "url": "https://www.city.hanno.lg.jp/kurashi_seikatsukankyo/josuido/suidonikansurutetsuzuki/13943.html",
+   "how": "水道管の埋設状況の確認"
+  },
+  "飯能市（下水道）": {
+   "url": "https://www.city.hanno.lg.jp/soshikikarasagasu/jogesuidobu/gesuidoka/index.html",
+   "top": true
+  },
+  "館山市（下水道）": {
+   "url": "https://www.city.tateyama.chiba.jp/gesui/page100052.html",
+   "how": "下水道台帳の閲覧・写しの発行"
+  },
+  "香取市（下水道）": {
+   "url": "https://www.city.katori.lg.jp/",
+   "top": true
+  },
+  "香取市（水道）": {
+   "url": "http://www.city.katori.lg.jp/government/section/kensetsusuido/index.html",
+   "top": true
+  },
+  "鳩山町上下水道課": {
+   "url": "https://www.town.hatoyama.saitama.jp/kurashi/gomi_seikatsukankyo/suido/",
+   "top": true
+  },
+  "鴻巣市上下水道部": {
+   "url": "https://www.city.kounosu.saitama.jp/soshiki/11.html",
+   "top": true
+  },
+  "鴻巣市（下水道）": {
+   "url": "https://www.city.kounosu.saitama.jp/page/23963.html",
+   "how": "下水道台帳を「こうのとりっぷ」・窓口で閲覧"
+  }
+ },
+ "cities": {
+  "埼玉県さいたま市": {
+   "water": [
+    [
+     "さいたま市水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "さいたま市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県川口市": {
+   "water": [
+    [
+     "川口市上下水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "川口市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県川越市": {
+   "water": [
+    [
+     "川越市上下水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "川越市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県所沢市": {
+   "water": [
+    [
+     "所沢市上下水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "所沢市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県越谷市": {
+   "water": [
+    [
+     "越谷・松伏水道企業団"
+    ]
+   ],
+   "sewer": [
+    [
+     "越谷市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県草加市": {
+   "water": [
+    [
+     "草加市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "草加市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県春日部市": {
+   "water": [
+    [
+     "春日部市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "春日部市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県上尾市": {
+   "water": [
+    [
+     "上尾市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "上尾市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県熊谷市": {
+   "water": [
+    [
+     "熊谷市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "熊谷市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県新座市": {
+   "water": [
+    [
+     "新座市インフラ整備部（水道）"
+    ]
+   ],
+   "sewer": [
+    [
+     "新座市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県久喜市": {
+   "water": [
+    [
+     "久喜市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "久喜市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県狭山市": {
+   "water": [
+    [
+     "狭山市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "狭山市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県入間市": {
+   "water": [
+    [
+     "入間市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "入間市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県朝霞市": {
+   "water": [
+    [
+     "朝霞市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "朝霞市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県三郷市": {
+   "water": [
+    [
+     "三郷市水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "三郷市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県戸田市": {
+   "water": [
+    [
+     "戸田市水安全部"
+    ]
+   ],
+   "sewer": [
+    [
+     "戸田市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県深谷市": {
+   "water": [
+    [
+     "深谷市環境水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "深谷市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県鴻巣市": {
+   "water": [
+    [
+     "鴻巣市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "鴻巣市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県ふじみ野市": {
+   "water": [
+    [
+     "ふじみ野市上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "ふじみ野市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県富士見市": {
+   "water": [
+    [
+     "富士見市建設部（水道）"
+    ]
+   ],
+   "sewer": [
+    [
+     "富士見市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県加須市": {
+   "water": [
+    [
+     "加須市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "加須市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県坂戸市": {
+   "water": [
+    [
+     "坂戸、鶴ヶ島水道企業団"
+    ]
+   ],
+   "sewer": [
+    [
+     "坂戸、鶴ヶ島下水道組合"
+    ]
+   ]
+  },
+  "埼玉県行田市": {
+   "water": [
+    [
+     "行田市都市整備部（水道）"
+    ]
+   ],
+   "sewer": [
+    [
+     "行田市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県秩父市": {
+   "water": [
+    [
+     "秩父広域市町村圏組合水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "秩父市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県飯能市": {
+   "water": [
+    [
+     "飯能市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "飯能市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県本庄市": {
+   "water": [
+    [
+     "本庄市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "本庄市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県東松山市": {
+   "water": [
+    [
+     "東松山市建設部（水道）"
+    ]
+   ],
+   "sewer": [
+    [
+     "東松山市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県羽生市": {
+   "water": [
+    [
+     "羽生市まちづくり部（水道）"
+    ]
+   ],
+   "sewer": [
+    [
+     "羽生市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県蕨市": {
+   "water": [
+    [
+     "蕨市水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "蕨市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県志木市": {
+   "water": [
+    [
+     "志木市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "志木市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県和光市": {
+   "water": [
+    [
+     "和光市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "和光市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県桶川市": {
+   "water": [
+    [
+     "桶川北本水道企業団"
+    ]
+   ],
+   "sewer": [
+    [
+     "桶川市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県北本市": {
+   "water": [
+    [
+     "桶川北本水道企業団"
+    ]
+   ],
+   "sewer": [
+    [
+     "北本市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県八潮市": {
+   "water": [
+    [
+     "八潮市水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "八潮市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県蓮田市": {
+   "water": [
+    [
+     "蓮田市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "蓮田市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県幸手市": {
+   "water": [
+    [
+     "幸手市水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "幸手市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県鶴ヶ島市": {
+   "water": [
+    [
+     "坂戸、鶴ヶ島水道企業団"
+    ]
+   ],
+   "sewer": [
+    [
+     "坂戸、鶴ヶ島下水道組合"
+    ]
+   ]
+  },
+  "埼玉県日高市": {
+   "water": [
+    [
+     "日高市上・下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "日高市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県吉川市": {
+   "water": [
+    [
+     "吉川市都市建設部（水道）"
+    ]
+   ],
+   "sewer": [
+    [
+     "吉川市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県白岡市": {
+   "water": [
+    [
+     "白岡市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "白岡市（下水道）"
+    ]
+   ]
+  },
+  "埼玉県杉戸町": {
+   "water": [
+    [
+     "杉戸町上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "杉戸町（下水道）"
+    ]
+   ]
+  },
+  "埼玉県松伏町": {
+   "water": [
+    [
+     "越谷・松伏水道企業団"
+    ]
+   ],
+   "sewer": [
+    [
+     "松伏町（下水道）"
+    ]
+   ]
+  },
+  "埼玉県三芳町": {
+   "water": [
+    [
+     "三芳町上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "三芳町（下水道）"
+    ]
+   ]
+  },
+  "埼玉県毛呂山町": {
+   "water": [
+    [
+     "毛呂山町水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "毛呂山・越生・鳩山公共下水道組合"
+    ]
+   ]
+  },
+  "埼玉県越生町": {
+   "water": [
+    [
+     "越生町水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "毛呂山・越生・鳩山公共下水道組合"
+    ]
+   ]
+  },
+  "埼玉県滑川町": {
+   "water": [
+    [
+     "滑川町上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "滑川町（下水道）"
+    ]
+   ]
+  },
+  "埼玉県嵐山町": {
+   "water": [
+    [
+     "嵐山町上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "嵐山町（下水道）"
+    ]
+   ]
+  },
+  "埼玉県小川町": {
+   "water": [
+    [
+     "小川町上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "小川町（下水道）"
+    ]
+   ]
+  },
+  "埼玉県川島町": {
+   "water": [
+    [
+     "川島町上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "川島町（下水道）"
+    ]
+   ]
+  },
+  "埼玉県吉見町": {
+   "water": [
+    [
+     "吉見町水生活課"
+    ]
+   ],
+   "sewer": [
+    [
+     "吉見町（下水道）"
+    ]
+   ]
+  },
+  "埼玉県鳩山町": {
+   "water": [
+    [
+     "鳩山町上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "毛呂山・越生・鳩山公共下水道組合"
+    ]
+   ]
+  },
+  "埼玉県ときがわ町": {
+   "water": [
+    [
+     "ときがわ町水道課"
+    ]
+   ],
+   "sewer": []
+  },
+  "埼玉県横瀬町": {
+   "water": [
+    [
+     "秩父広域市町村圏組合水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "横瀬町（下水道）"
+    ]
+   ]
+  },
+  "埼玉県皆野町": {
+   "water": [
+    [
+     "秩父広域市町村圏組合水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "皆野・長瀞下水道組合"
+    ]
+   ]
+  },
+  "埼玉県長瀞町": {
+   "water": [
+    [
+     "秩父広域市町村圏組合水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "皆野・長瀞下水道組合"
+    ]
+   ]
+  },
+  "埼玉県小鹿野町": {
+   "water": [
+    [
+     "秩父広域市町村圏組合水道局"
+    ]
+   ],
+   "sewer": []
+  },
+  "埼玉県美里町": {
+   "water": [
+    [
+     "美里町上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "美里町（下水道）"
+    ]
+   ]
+  },
+  "埼玉県神川町": {
+   "water": [
+    [
+     "神川町上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "神川町（下水道）"
+    ]
+   ]
+  },
+  "埼玉県上里町": {
+   "water": [
+    [
+     "上里町上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "上里町（下水道）"
+    ]
+   ]
+  },
+  "埼玉県寄居町": {
+   "water": [
+    [
+     "寄居町上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "寄居町（下水道）"
+    ]
+   ]
+  },
+  "埼玉県伊奈町": {
+   "water": [
+    [
+     "伊奈町上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "伊奈町（下水道）"
+    ]
+   ]
+  },
+  "埼玉県宮代町": {
+   "water": [
+    [
+     "宮代町まちづくり建設課"
+    ]
+   ],
+   "sewer": [
+    [
+     "宮代町（下水道）"
+    ]
+   ]
+  },
+  "埼玉県東秩父村": {
+   "water": [
+    [
+     "東秩父村（簡易水道）"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県千葉市": {
+   "water": [
+    [
+     "千葉県企業局",
+     "中央・稲毛・花見川・美浜区全域、若葉区・緑区の一部"
+    ],
+    [
+     "千葉市水道局",
+     "緑区土気・あすみが丘等、若葉区の一部"
+    ],
+    [
+     "四街道市上下水道部",
+     "若葉区御成台"
+    ]
+   ],
+   "sewer": [
+    [
+     "千葉市（下水道）"
+    ]
+   ]
+  },
+  "千葉県市川市": {
+   "water": [
+    [
+     "千葉県企業局"
+    ]
+   ],
+   "sewer": [
+    [
+     "市川市（下水道）"
+    ]
+   ]
+  },
+  "千葉県船橋市": {
+   "water": [
+    [
+     "千葉県企業局",
+     "市内の大部分"
+    ],
+    [
+     "習志野市企業局",
+     "習志野5丁目・三山、田喜野井2丁目・習志野4丁目の一部"
+    ]
+   ],
+   "sewer": [
+    [
+     "船橋市（下水道）"
+    ]
+   ]
+  },
+  "千葉県松戸市": {
+   "water": [
+    [
+     "千葉県企業局",
+     "市内の大部分"
+    ],
+    [
+     "松戸市水道部",
+     "小金・常盤平・新松戸1丁目・平賀等の一部地区"
+    ]
+   ],
+   "sewer": [
+    [
+     "松戸市（下水道）"
+    ]
+   ]
+  },
+  "千葉県柏市": {
+   "water": [
+    [
+     "柏市上下水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "柏市（下水道）"
+    ]
+   ]
+  },
+  "千葉県市原市": {
+   "water": [
+    [
+     "千葉県企業局",
+     "五井・姉崎・八幡・国分寺台等の北部・臨海部"
+    ],
+    [
+     "市原市（水道）",
+     "南部地区"
+    ],
+    [
+     "長生郡市広域市町村圏組合",
+     "滝口・犬成の一部"
+    ]
+   ],
+   "sewer": [
+    [
+     "市原市（下水道）"
+    ]
+   ]
+  },
+  "千葉県佐倉市": {
+   "water": [
+    [
+     "佐倉市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "佐倉市（下水道）"
+    ]
+   ]
+  },
+  "千葉県八千代市": {
+   "water": [
+    [
+     "八千代市上下水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "八千代市（下水道）"
+    ]
+   ]
+  },
+  "千葉県我孫子市": {
+   "water": [
+    [
+     "我孫子市水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "我孫子市（下水道）"
+    ]
+   ]
+  },
+  "千葉県浦安市": {
+   "water": [
+    [
+     "千葉県企業局"
+    ]
+   ],
+   "sewer": [
+    [
+     "浦安市（下水道）"
+    ]
+   ]
+  },
+  "千葉県習志野市": {
+   "water": [
+    [
+     "千葉県企業局",
+     "谷津・秋津・香澄・袖ケ浦・鷺沼・津田沼2,4〜7丁目・奏の杜等"
+    ],
+    [
+     "習志野市企業局",
+     "実籾・大久保・東習志野・藤崎・花咲・泉町・屋敷・新栄・本大久保・鷺沼台・津田沼1丁目等"
+    ]
+   ],
+   "sewer": [
+    [
+     "習志野市企業局（下水道）"
+    ]
+   ]
+  },
+  "千葉県木更津市": {
+   "water": [
+    [
+     "かずさ水道広域連合企業団"
+    ]
+   ],
+   "sewer": [
+    [
+     "木更津市（下水道）"
+    ]
+   ]
+  },
+  "千葉県流山市": {
+   "water": [
+    [
+     "流山市上下水道局"
+    ],
+    [
+     "松戸市水道部",
+     "前ケ崎の一部"
+    ]
+   ],
+   "sewer": [
+    [
+     "流山市（下水道）"
+    ]
+   ]
+  },
+  "千葉県成田市": {
+   "water": [
+    [
+     "成田市水道部",
+     "市内の大部分"
+    ],
+    [
+     "千葉県企業局",
+     "成田ニュータウン（赤坂・吾妻・加良部・玉造・中台・橋賀台）・成田空港"
+    ],
+    [
+     "神崎町（水道）",
+     "小浮・野馬込"
+    ]
+   ],
+   "sewer": [
+    [
+     "成田市（下水道）"
+    ]
+   ]
+  },
+  "千葉県鎌ケ谷市": {
+   "water": [
+    [
+     "千葉県企業局"
+    ]
+   ],
+   "sewer": [
+    [
+     "鎌ケ谷市（下水道）"
+    ]
+   ]
+  },
+  "千葉県野田市": {
+   "water": [
+    [
+     "野田市水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "野田市（下水道）"
+    ]
+   ]
+  },
+  "千葉県君津市": {
+   "water": [
+    [
+     "かずさ水道広域連合企業団"
+    ]
+   ],
+   "sewer": [
+    [
+     "君津富津広域下水道組合"
+    ]
+   ]
+  },
+  "千葉県茂原市": {
+   "water": [
+    [
+     "長生郡市広域市町村圏組合"
+    ]
+   ],
+   "sewer": [
+    [
+     "茂原市（下水道）"
+    ]
+   ]
+  },
+  "千葉県四街道市": {
+   "water": [
+    [
+     "四街道市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "四街道市（下水道）"
+    ]
+   ]
+  },
+  "千葉県白井市": {
+   "water": [
+    [
+     "千葉県企業局",
+     "千葉ニュータウン地区"
+    ],
+    [
+     "白井市（水道）",
+     "白井・名内・今井・平塚・冨士・西白井等"
+    ]
+   ],
+   "sewer": [
+    [
+     "白井市（下水道）"
+    ]
+   ]
+  },
+  "千葉県印西市": {
+   "water": [
+    [
+     "千葉県企業局",
+     "千葉ニュータウン地区"
+    ],
+    [
+     "印西市（水道）",
+     "木下・小林・大森・平岡等"
+    ],
+    [
+     "長門川水道企業団",
+     "旧本埜村地区（安食卜杭・中田切・下井・笠神等）"
+    ]
+   ],
+   "sewer": [
+    [
+     "印西市（下水道）"
+    ]
+   ]
+  },
+  "千葉県八街市": {
+   "water": [
+    [
+     "八街市上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "八街市（下水道）"
+    ]
+   ]
+  },
+  "千葉県酒々井町": {
+   "water": [
+    [
+     "酒々井町上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "酒々井町（下水道）"
+    ]
+   ]
+  },
+  "千葉県栄町": {
+   "water": [
+    [
+     "長門川水道企業団"
+    ]
+   ],
+   "sewer": [
+    [
+     "栄町（下水道）"
+    ]
+   ]
+  },
+  "千葉県富里市": {
+   "water": [
+    [
+     "富里市上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "富里市（下水道）"
+    ]
+   ]
+  },
+  "千葉県多古町": {
+   "water": [
+    [
+     "多古町（水道）"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県芝山町": {
+   "water": [
+    [
+     "芝山町（水道）"
+    ]
+   ],
+   "sewer": [
+    [
+     "芝山町（下水道）"
+    ]
+   ]
+  },
+  "千葉県香取市": {
+   "water": [
+    [
+     "香取市（水道）"
+    ],
+    [
+     "神崎町（水道）",
+     "堀之内の一部"
+    ]
+   ],
+   "sewer": [
+    [
+     "香取市（下水道）"
+    ]
+   ]
+  },
+  "千葉県東庄町": {
+   "water": [
+    [
+     "東庄町（水道）"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県銚子市": {
+   "water": [
+    [
+     "銚子市水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "銚子市（下水道）"
+    ]
+   ]
+  },
+  "千葉県匝瑳市": {
+   "water": [
+    [
+     "八匝水道企業団"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県旭市": {
+   "water": [
+    [
+     "旭市（水道）"
+    ]
+   ],
+   "sewer": [
+    [
+     "旭市（下水道）"
+    ]
+   ]
+  },
+  "千葉県東金市": {
+   "water": [
+    [
+     "山武郡市広域水道企業団"
+    ]
+   ],
+   "sewer": [
+    [
+     "東金市（下水道）"
+    ]
+   ]
+  },
+  "千葉県山武市": {
+   "water": [
+    [
+     "山武郡市広域水道企業団",
+     "成東・松尾・蓮沼地区等"
+    ],
+    [
+     "山武市（水道）",
+     "旧山武町の一部（植草・埴谷・美杉野・横田等）"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県大網白里市": {
+   "water": [
+    [
+     "山武郡市広域水道企業団"
+    ]
+   ],
+   "sewer": [
+    [
+     "大網白里市（下水道）"
+    ]
+   ]
+  },
+  "千葉県九十九里町": {
+   "water": [
+    [
+     "山武郡市広域水道企業団"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県横芝光町": {
+   "water": [
+    [
+     "山武郡市広域水道企業団",
+     "旧横芝町地区"
+    ],
+    [
+     "八匝水道企業団",
+     "旧光町地区"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県一宮町": {
+   "water": [
+    [
+     "長生郡市広域市町村圏組合"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県白子町": {
+   "water": [
+    [
+     "長生郡市広域市町村圏組合"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県長南町": {
+   "water": [
+    [
+     "長生郡市広域市町村圏組合"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県長生村": {
+   "water": [
+    [
+     "長生郡市広域市町村圏組合"
+    ]
+   ],
+   "sewer": [
+    [
+     "長生村（下水道）"
+    ]
+   ]
+  },
+  "千葉県勝浦市": {
+   "water": [
+    [
+     "夷隅郡市広域市町村圏事務組合"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県いすみ市": {
+   "water": [
+    [
+     "夷隅郡市広域市町村圏事務組合"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県御宿町": {
+   "water": [
+    [
+     "夷隅郡市広域市町村圏事務組合"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県館山市": {
+   "water": [
+    [
+     "安房郡市広域市町村圏事務組合"
+    ]
+   ],
+   "sewer": [
+    [
+     "館山市（下水道）"
+    ]
+   ]
+  },
+  "千葉県鴨川市": {
+   "water": [
+    [
+     "安房郡市広域市町村圏事務組合"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県袖ケ浦市": {
+   "water": [
+    [
+     "かずさ水道広域連合企業団"
+    ]
+   ],
+   "sewer": [
+    [
+     "袖ケ浦市（下水道）"
+    ]
+   ]
+  },
+  "千葉県富津市": {
+   "water": [
+    [
+     "かずさ水道広域連合企業団"
+    ]
+   ],
+   "sewer": [
+    [
+     "君津富津広域下水道組合"
+    ]
+   ]
+  },
+  "千葉県南房総市": {
+   "water": [
+    [
+     "安房郡市広域市町村圏事務組合"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県鋸南町": {
+   "water": [
+    [
+     "安房郡市広域市町村圏事務組合"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県神崎町": {
+   "water": [
+    [
+     "神崎町（水道）"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県睦沢町": {
+   "water": [
+    [
+     "長生郡市広域市町村圏組合"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県長柄町": {
+   "water": [
+    [
+     "長生郡市広域市町村圏組合"
+    ]
+   ],
+   "sewer": []
+  },
+  "千葉県大多喜町": {
+   "water": [
+    [
+     "夷隅郡市広域市町村圏事務組合"
+    ]
+   ],
+   "sewer": []
+  },
+  "東京都千代田区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都中央区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都港区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都新宿区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都文京区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都台東区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都墨田区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都江東区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都品川区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都目黒区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都大田区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都世田谷区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都渋谷区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都中野区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都杉並区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都豊島区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都北区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都荒川区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都板橋区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都練馬区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都足立区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都葛飾区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都江戸川区": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東京都下水道局"
+    ]
+   ]
+  },
+  "東京都八王子市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "八王子市"
+    ]
+   ]
+  },
+  "東京都立川市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "立川市"
+    ]
+   ]
+  },
+  "東京都三鷹市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "三鷹市"
+    ]
+   ]
+  },
+  "東京都府中市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "府中市"
+    ]
+   ]
+  },
+  "東京都調布市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "調布市"
+    ]
+   ]
+  },
+  "東京都町田市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "町田市"
+    ]
+   ]
+  },
+  "東京都小平市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "小平市"
+    ]
+   ]
+  },
+  "東京都日野市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "日野市"
+    ]
+   ]
+  },
+  "東京都国分寺市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "国分寺市"
+    ]
+   ]
+  },
+  "東京都西東京市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "西東京市"
+    ]
+   ]
+  },
+  "東京都国立市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "国立市"
+    ]
+   ]
+  },
+  "東京都狛江市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "狛江市"
+    ]
+   ]
+  },
+  "東京都東大和市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東大和市"
+    ]
+   ]
+  },
+  "東京都武蔵村山市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "武蔵村山市"
+    ]
+   ]
+  },
+  "東京都多摩市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "多摩市"
+    ]
+   ]
+  },
+  "東京都稲城市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "稲城市"
+    ]
+   ]
+  },
+  "東京都小金井市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "小金井市"
+    ]
+   ]
+  },
+  "東京都東村山市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東村山市"
+    ]
+   ]
+  },
+  "東京都清瀬市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "清瀬市"
+    ]
+   ]
+  },
+  "東京都東久留米市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "東久留米市"
+    ]
+   ]
+  },
+  "東京都青梅市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "青梅市"
+    ]
+   ]
+  },
+  "東京都福生市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "福生市"
+    ]
+   ]
+  },
+  "東京都あきる野市": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "あきる野市"
+    ]
+   ]
+  },
+  "東京都瑞穂町": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "瑞穂町",
+     "処理区域外は浄化槽等"
+    ]
+   ]
+  },
+  "東京都日の出町": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "日の出町"
+    ]
+   ]
+  },
+  "東京都奥多摩町": {
+   "water": [
+    [
+     "東京都水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "奥多摩町",
+     "小河内・奥多摩の2処理区。区域外は町設置型合併浄化槽"
+    ]
+   ]
+  },
+  "東京都武蔵野市": {
+   "water": [
+    [
+     "武蔵野市水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "武蔵野市"
+    ]
+   ]
+  },
+  "東京都昭島市": {
+   "water": [
+    [
+     "昭島市水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "昭島市"
+    ]
+   ]
+  },
+  "東京都羽村市": {
+   "water": [
+    [
+     "羽村市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "羽村市"
+    ]
+   ]
+  },
+  "東京都檜原村": {
+   "water": [
+    [
+     "檜原村（簡易水道）"
+    ]
+   ],
+   "sewer": [
+    [
+     "檜原村",
+     "供用開始区域のみ"
+    ]
+   ]
+  },
+  "東京都大島町": {
+   "water": [
+    [
+     "大島町（水道環境課）"
+    ]
+   ],
+   "sewer": []
+  },
+  "東京都利島村": {
+   "water": [
+    [
+     "利島村（簡易水道）"
+    ]
+   ],
+   "sewer": []
+  },
+  "東京都新島村": {
+   "water": [
+    [
+     "新島村（簡易水道）"
+    ]
+   ],
+   "sewer": [
+    [
+     "新島村",
+     "特定環境保全公共下水道（新島本村処理区。式根島はR4時点で整備中）。若郷地区は漁業集落排水、その他は浄化槽"
+    ]
+   ]
+  },
+  "東京都神津島村": {
+   "water": [
+    [
+     "神津島村（簡易水道）"
+    ]
+   ],
+   "sewer": []
+  },
+  "東京都三宅村": {
+   "water": [
+    [
+     "三宅村（簡易水道）"
+    ]
+   ],
+   "sewer": []
+  },
+  "東京都御蔵島村": {
+   "water": [
+    [
+     "御蔵島村（簡易水道）"
+    ]
+   ],
+   "sewer": []
+  },
+  "東京都八丈町": {
+   "water": [
+    [
+     "八丈町（企業課）"
+    ]
+   ],
+   "sewer": []
+  },
+  "東京都青ヶ島村": {
+   "water": [
+    [
+     "青ヶ島村（簡易水道）"
+    ]
+   ],
+   "sewer": []
+  },
+  "東京都小笠原村": {
+   "water": [
+    [
+     "小笠原村（簡易水道）"
+    ]
+   ],
+   "sewer": []
+  },
+  "神奈川県横浜市": {
+   "water": [
+    [
+     "横浜市水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "横浜市"
+    ]
+   ]
+  },
+  "神奈川県川崎市": {
+   "water": [
+    [
+     "川崎市上下水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "川崎市"
+    ]
+   ]
+  },
+  "神奈川県横須賀市": {
+   "water": [
+    [
+     "横須賀市上下水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "横須賀市"
+    ]
+   ]
+  },
+  "神奈川県相模原市": {
+   "water": [
+    [
+     "神奈川県企業庁",
+     "市の大部分（緑区の一部を除く）"
+    ],
+    [
+     "相模原市（市営簡易水道）",
+     "緑区の青根地区全域、牧野・名倉地区の一部。他に組合水道の地域あり"
+    ]
+   ],
+   "sewer": [
+    [
+     "相模原市"
+    ]
+   ]
+  },
+  "神奈川県平塚市": {
+   "water": [
+    [
+     "神奈川県企業庁",
+     "土屋のうち字遠藤原を除く全域"
+    ],
+    [
+     "中井町上下水道課",
+     "土屋字遠藤原"
+    ]
+   ],
+   "sewer": [
+    [
+     "平塚市"
+    ]
+   ]
+  },
+  "神奈川県鎌倉市": {
+   "water": [
+    [
+     "神奈川県企業庁"
+    ]
+   ],
+   "sewer": [
+    [
+     "鎌倉市"
+    ]
+   ]
+  },
+  "神奈川県藤沢市": {
+   "water": [
+    [
+     "神奈川県企業庁"
+    ]
+   ],
+   "sewer": [
+    [
+     "藤沢市"
+    ]
+   ]
+  },
+  "神奈川県茅ヶ崎市": {
+   "water": [
+    [
+     "神奈川県企業庁"
+    ]
+   ],
+   "sewer": [
+    [
+     "茅ヶ崎市"
+    ]
+   ]
+  },
+  "神奈川県逗子市": {
+   "water": [
+    [
+     "神奈川県企業庁"
+    ]
+   ],
+   "sewer": [
+    [
+     "逗子市"
+    ]
+   ]
+  },
+  "神奈川県厚木市": {
+   "water": [
+    [
+     "神奈川県企業庁"
+    ]
+   ],
+   "sewer": [
+    [
+     "厚木市"
+    ]
+   ]
+  },
+  "神奈川県大和市": {
+   "water": [
+    [
+     "神奈川県企業庁"
+    ]
+   ],
+   "sewer": [
+    [
+     "大和市"
+    ]
+   ]
+  },
+  "神奈川県伊勢原市": {
+   "water": [
+    [
+     "神奈川県企業庁"
+    ]
+   ],
+   "sewer": [
+    [
+     "伊勢原市"
+    ]
+   ]
+  },
+  "神奈川県海老名市": {
+   "water": [
+    [
+     "神奈川県企業庁"
+    ]
+   ],
+   "sewer": [
+    [
+     "海老名市"
+    ]
+   ]
+  },
+  "神奈川県綾瀬市": {
+   "water": [
+    [
+     "神奈川県企業庁"
+    ]
+   ],
+   "sewer": [
+    [
+     "綾瀬市"
+    ]
+   ]
+  },
+  "神奈川県寒川町": {
+   "water": [
+    [
+     "神奈川県企業庁"
+    ]
+   ],
+   "sewer": [
+    [
+     "寒川町"
+    ]
+   ]
+  },
+  "神奈川県大磯町": {
+   "water": [
+    [
+     "神奈川県企業庁"
+    ]
+   ],
+   "sewer": [
+    [
+     "大磯町"
+    ]
+   ]
+  },
+  "神奈川県二宮町": {
+   "water": [
+    [
+     "神奈川県企業庁"
+    ]
+   ],
+   "sewer": [
+    [
+     "二宮町"
+    ]
+   ]
+  },
+  "神奈川県葉山町": {
+   "water": [
+    [
+     "神奈川県企業庁",
+     "一部地域を除く全域（湘南国際村付近は県鎌倉営業所の所管外）"
+    ]
+   ],
+   "sewer": [
+    [
+     "葉山町"
+    ]
+   ]
+  },
+  "神奈川県小田原市": {
+   "water": [
+    [
+     "小田原市上下水道局",
+     "県営区域以外"
+    ],
+    [
+     "神奈川県企業庁",
+     "小船・中村原・沼代・上町・小竹・山西・前川（一部除く）・羽根尾・東ヶ丘・川匂・国府津四丁目／五丁目の一部"
+    ]
+   ],
+   "sewer": [
+    [
+     "小田原市"
+    ]
+   ]
+  },
+  "神奈川県秦野市": {
+   "water": [
+    [
+     "秦野市上下水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "秦野市"
+    ]
+   ]
+  },
+  "神奈川県三浦市": {
+   "water": [
+    [
+     "三浦市上下水道部"
+    ]
+   ],
+   "sewer": [
+    [
+     "三浦市",
+     "台帳図の整備区域外は未整備"
+    ]
+   ]
+  },
+  "神奈川県座間市": {
+   "water": [
+    [
+     "座間市上下水道局"
+    ]
+   ],
+   "sewer": [
+    [
+     "座間市"
+    ]
+   ]
+  },
+  "神奈川県南足柄市": {
+   "water": [
+    [
+     "南足柄市上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "南足柄市"
+    ]
+   ]
+  },
+  "神奈川県中井町": {
+   "water": [
+    [
+     "中井町上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "中井町"
+    ]
+   ]
+  },
+  "神奈川県大井町": {
+   "water": [
+    [
+     "大井町生活環境課"
+    ]
+   ],
+   "sewer": [
+    [
+     "大井町"
+    ]
+   ]
+  },
+  "神奈川県松田町": {
+   "water": [
+    [
+     "松田町環境上下水道課",
+     "町営上水道と寄簡易水道（いずれも町）"
+    ],
+    [
+     "秦野市上下水道局",
+     "湯の沢地区（給水協定）"
+    ]
+   ],
+   "sewer": [
+    [
+     "松田町",
+     "寄地区は生活排水処理計画（浄化槽等）の対象"
+    ]
+   ]
+  },
+  "神奈川県山北町": {
+   "water": [
+    [
+     "山北町上下水道課"
+    ]
+   ],
+   "sewer": [
+    [
+     "山北町",
+     "町設置型浄化槽の区域あり"
+    ]
+   ]
+  },
+  "神奈川県開成町": {
+   "water": [
+    [
+     "開成町（水道）"
+    ]
+   ],
+   "sewer": [
+    [
+     "開成町"
+    ]
+   ]
+  },
+  "神奈川県箱根町": {
+   "water": [
+    [
+     "箱根町上下水道温泉課",
+     "南側：湯本・湯本茶屋・須雲川・畑宿・塔之澤・大平台・宮ノ下・底倉・小涌谷・木賀の一部・二ノ平・芦之湯・箱根・元箱根の一部"
+    ],
+    [
+     "神奈川県企業庁",
+     "北側：仙石原・宮城野・強羅・木賀の一部・元箱根の一部（窓口は箱根水道パートナーズ）"
+    ]
+   ],
+   "sewer": [
+    [
+     "箱根町"
+    ]
+   ]
+  },
+  "神奈川県真鶴町": {
+   "water": [
+    [
+     "真鶴町（水道）"
+    ]
+   ],
+   "sewer": [
+    [
+     "真鶴町"
+    ]
+   ]
+  },
+  "神奈川県湯河原町": {
+   "water": [
+    [
+     "湯河原町（水道）",
+     "宮下簡易水道組合区域以外"
+    ],
+    [
+     "宮下簡易水道組合",
+     "宮下番地の一部、土肥4・5丁目、土肥1・6丁目の一部"
+    ]
+   ],
+   "sewer": [
+    [
+     "湯河原町"
+    ]
+   ]
+  },
+  "神奈川県愛川町": {
+   "water": [
+    [
+     "愛川町水道事業所",
+     "町営区域（住民の約3/4）"
+    ],
+    [
+     "神奈川県企業庁",
+     "春日台、中津の一部、棚沢の一部（中津・棚沢は混在）"
+    ]
+   ],
+   "sewer": [
+    [
+     "愛川町"
+    ]
+   ]
+  },
+  "神奈川県清川村": {
+   "water": [
+    [
+     "清川村（簡易水道）",
+     "丹沢札掛地区を除く村全域"
+    ]
+   ],
+   "sewer": [
+    [
+     "清川村"
+    ]
+   ]
+  }
+ }
 }

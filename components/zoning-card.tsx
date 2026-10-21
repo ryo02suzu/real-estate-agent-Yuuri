@@ -16,12 +16,13 @@ import { MORIDO_DATA, moridoAt, moridoDetail, moridoNote, moridoNotice, moridoVa
 import { pmtilesMoridoSource } from "@/lib/roadmap/morido-tiles";
 import { suidoFor, type SuidoLink } from "@/lib/roadmap/suido";
 import { TOCHI_YEAR, tochiAt, tochiCheck, tochiLine, type Tochi } from "@/lib/roadmap/tochi";
-import { contactLinkText, contactName, NO_CITY_GAS, utilitiesFor, type UtilityContact, type Utilities } from "@/lib/roadmap/utilities";
+import { contactLinkText, contactName, noContactText, utilitiesFor, type UtilityContact, type UtilityKind, type Utilities } from "@/lib/roadmap/utilities";
 import { pmtilesTochiSource } from "@/lib/roadmap/tochi-tiles";
 import { statusFor, zoningAt, zoningChips, zoningRows, type Zoning, type ZoningStatus } from "@/lib/roadmap/zoning";
 import { ZONING_DATA } from "@/lib/roadmap/zoning-data";
 import { pmtilesZoningSource } from "@/lib/roadmap/zoning-tiles";
-import { AlertIcon, ChevronRightIcon, InfoIcon, ZoningIcon } from "./icons";
+import { AlertIcon, ChevronRightIcon, ZoningIcon } from "./icons";
+import { Notes } from "./notes";
 import { Sheet } from "./sheet";
 
 /**
@@ -97,7 +98,7 @@ export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: 
       <button
         onClick={() => (onOpen ? onOpen() : setOpen(true))}
         disabled={state.status !== "ok"}
-        className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-left text-[11px] leading-[1.5] text-ink lg:hover:border-brand-light/60"
+        className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-left text-[12px] leading-[1.5] lg:py-1.5 lg:text-[13px] text-ink lg:hover:border-brand-light/60"
       >
         <ZoningIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
         <span className={`shrink-0 text-muted ${state.status === "ok" && !onOpen ? "short:hidden" : ""}`}>都市計画</span>
@@ -131,7 +132,7 @@ export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: 
 export function ZoningCard({ state, city }: { state: ZoningState; city: string }) {
   return (
     <section className="shadow-soft rounded-2xl border border-white bg-white p-4">
-      <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+      <h3 className="mb-2 flex items-center gap-1.5 text-[14.5px] font-semibold text-ink">
         <ZoningIcon className="h-4 w-4 text-brand-light" />
         法令に基づく制限（参考）
       </h3>
@@ -143,11 +144,10 @@ export function ZoningCard({ state, city }: { state: ZoningState; city: string }
 }
 
 // 一覧の行の形。シートで画面に入りきらなければ詰める（dense・denser・densest は components/sheet.tsx の useDense）
-const ROW = "flex gap-3 py-1.5 dense:py-1 denser:py-[3px] densest:py-[2px]";
-const LABEL = "w-[8.6em] shrink-0 text-[11.5px] leading-[1.6] text-muted denser:text-[11px]";
-const VALUE = "text-[13px] font-semibold leading-[1.5] denser:text-[12.5px] denser:leading-[1.4] densest:leading-[1.3]";
-const SUB = "mt-0.5 block text-[10.5px] leading-[1.55] text-muted dense:mt-0 dense:leading-[1.45] denser:text-[10px] densest:leading-[1.35]";
-const NOTE = "mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted dense:mt-1.5 dense:leading-[1.5] denser:text-[10px] densest:mt-1 densest:leading-[1.4]";
+const ROW = "flex gap-3 py-2 dense:py-1.5 denser:py-1 densest:py-[3px]";
+const LABEL = "w-[7.8em] shrink-0 text-[12.5px] leading-[1.65] text-muted denser:text-[12px]";
+const VALUE = "text-[14.5px] font-semibold leading-[1.5] denser:text-[13.5px] denser:leading-[1.4] densest:leading-[1.3]";
+const SUB = "mt-0.5 block text-[11.5px] leading-[1.55] text-muted dense:mt-0 dense:leading-[1.45] denser:text-[11px] densest:leading-[1.35]";
 const TABS = ["都市計画", "その他の法令", "上下水道・ガス"];
 
 /** 都市計画と、その他の法令の下調べ。tabs：スマホのシート（タブで分ける） */
@@ -158,25 +158,22 @@ function ZoningDetail({ state, city, tabs }: { state: Extract<ZoningState, { sta
     return (
       <div>
         <ZoningPart state={state} city={city} />
-        <h4 className="mb-0.5 mt-3 border-t border-line/70 pt-2.5 text-[12px] font-semibold text-ink">その他の法令（重説の下調べ）</h4>
+        <h4 className="mb-0.5 mt-3 border-t border-line/70 pt-2.5 text-[13px] font-semibold text-ink">その他の法令（重説の下調べ）</h4>
         <OtherPart state={state} city={city} />
-        <h4 className="mb-0.5 mt-3 border-t border-line/70 pt-2.5 text-[12px] font-semibold text-ink">上下水道・ガス</h4>
-        <dl>
-          <SuidoRow links={state.suido ?? []} city={city} />
-          <UtilityRows u={state.utilities} />
-        </dl>
+        <h4 className="mb-0.5 mt-3 border-t border-line/70 pt-2.5 text-[13px] font-semibold text-ink">上下水道・ガス</h4>
+        <UtilityPart state={state} city={city} />
       </div>
     );
   return (
     <div>
-      <div role="tablist" className="mb-1.5 flex gap-1 densest:mb-1">
+      <div role="tablist" className="mb-2 flex gap-1.5 dense:mb-1.5 densest:mb-1">
         {TABS.map((t, i) => (
           <button
             key={t}
             role="tab"
             aria-selected={i === tab}
             onClick={() => setTab(i)}
-            className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11.5px] densest:py-0.5 ${i === tab ? "border-brand bg-brand text-white" : "border-line text-ink"}`}
+            className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-[12.5px] dense:py-1 densest:py-0.5 ${i === tab ? "border-brand bg-brand text-white" : "border-line text-ink"}`}
           >
             {t}
             {i === 1 && warn && <AlertIcon className={`h-3 w-3 ${i === tab ? "text-white" : "text-[#8a4f3a]"}`} aria-label="区域内" />}
@@ -185,12 +182,7 @@ function ZoningDetail({ state, city, tabs }: { state: Extract<ZoningState, { sta
       </div>
       {tab === 0 && <ZoningPart state={state} city={city} />}
       {tab === 1 && <OtherPart state={state} city={city} />}
-      {tab === 2 && (
-        <dl>
-          <SuidoRow links={state.suido ?? []} city={city} />
-          <UtilityRows u={state.utilities} />
-        </dl>
-      )}
+      {tab === 2 && <UtilityPart state={state} city={city} />}
     </div>
   );
 }
@@ -215,21 +207,22 @@ function ZoningPart({ state: { zoning, st }, city }: { state: Extract<ZoningStat
           </div>
         ))}
       </dl>
-      <p className={NOTE}>
-        <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
-        <span>
-          {st ? `${st.city}のデータは${st.asOf ? `${st.asOf}時点` : "時点の記載なし"}。` : `${city}は国のデータに載っていません。`}
-          {st?.note && `${st.note.replace(/。?$/, "。")}`}
-          地図上の区域は概ねの位置で、実際の範囲や最新の決定と異なることがあります。重要事項説明などの最終確認は、{city}の都市計画の窓口・都市計画図で行ってください。
-          <span className="mt-1 block dense:mt-0.5">
-            出典：
-            <a href="https://www.mlit.go.jp/toshi/tosiko/toshi_tosiko_tk_000087.html" target="_blank" rel="noreferrer" className="underline">
-              都市計画決定GISデータ（国土交通省）
-            </a>
-            を加工して作成（{ZONING_DATA.edition}）
-          </span>
-        </span>
-      </p>
+      <Notes
+        lead={
+          st
+            ? `${st.city}のデータ（${st.asOf ? `${st.asOf}時点` : "時点の記載なし"}）。区域は概ねの位置です。最終確認は${city}の都市計画図で。`
+            : `${city}は国のデータに載っていません。${city}の都市計画の窓口で確かめてください。`
+        }
+        source={
+          <a href="https://www.mlit.go.jp/toshi/tosiko/toshi_tosiko_tk_000087.html" target="_blank" rel="noreferrer" className="underline">
+            都市計画決定GISデータ（国土交通省）
+          </a>
+        }
+      >
+        {st?.note && <p>{st.note.replace(/。?$/, "。")}</p>}
+        <p>地図上の区域は概ねの位置で、実際の範囲や最新の決定と異なることがあります。重要事項説明などの最終確認は、{city}の都市計画の窓口・都市計画図で行ってください。</p>
+        <p>出典：都市計画決定GISデータ（国土交通省）を加工して作成（{ZONING_DATA.edition}）</p>
+      </Notes>
     </div>
   );
 }
@@ -245,32 +238,34 @@ function OtherPart({ state: { morido, hourei, tochi, iseki }, city }: { state: E
         {tochi && <TochiRow tochi={tochi} city={city} />}
         {iseki && <IsekiRow iseki={iseki} />}
       </dl>
-      <p className={NOTE}>
-        <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
-        <span>
-          国のデータの区域は概略の位置で、法的図書ではありません。重要事項説明には、区域を指定した都県・市の資料で確かめてください。
-          {(morido || hourei || tochi) && (
-            <span className="mt-1 block dense:mt-0.5">
-              {/* 国土数値情報のデータは1つの文にまとめる（「国土数値情報（○○データ、△△データ）」） */}
-              出典：
-              <a href="https://nlftp.mlit.go.jp/ksj/" target="_blank" rel="noreferrer" className="underline">
-                国土数値情報
-              </a>
-              （
-              {[
-                morido && `宅地造成等工事規制区域・特定盛土等規制区域データ（${MORIDO_DATA.asOf}時点）`,
-                hourei && "砂防指定地・地すべり防止区域・急傾斜地崩壊危険区域・災害危険区域データ",
-                tochi && `自然公園地域・農業地域・森林地域データ（${TOCHI_YEAR}年度）`,
-              ]
-                .filter(Boolean)
-                .join("、")}
-              ）（国土交通省）を加工して作成
-            </span>
-          )}
-          {/* 都県が利用条件で求める特記事項（東京都は急傾斜地と地すべりで文が違うので、どちらの文かを添える） */}
-          {notes && <span className="mt-0.5 block">{notes}</span>}
-        </span>
-      </p>
+      <Notes
+        lead="国のデータの概略の区域です。重要事項説明は、区域を指定した都県・市の資料で確かめてください。"
+        source={
+          (morido || hourei || tochi) && (
+            <a href="https://nlftp.mlit.go.jp/ksj/" target="_blank" rel="noreferrer" className="underline">
+              国土数値情報（国土交通省）
+            </a>
+          )
+        }
+      >
+        <p>国のデータの区域は概略の位置で、法的図書ではありません。重要事項説明には、区域を指定した都県・市の資料で確かめてください。</p>
+        {(morido || hourei || tochi) && (
+          <p>
+            {/* 国土数値情報のデータは1つの文にまとめる（「国土数値情報（○○データ、△△データ）」） */}
+            出典：国土数値情報（
+            {[
+              morido && `宅地造成等工事規制区域・特定盛土等規制区域データ（${MORIDO_DATA.asOf}時点）`,
+              hourei && "砂防指定地・地すべり防止区域・急傾斜地崩壊危険区域・災害危険区域データ",
+              tochi && `自然公園地域・農業地域・森林地域データ（${TOCHI_YEAR}年度）`,
+            ]
+              .filter(Boolean)
+              .join("、")}
+            ）（国土交通省）を加工して作成
+          </p>
+        )}
+        {/* 都県が利用条件で求める特記事項（東京都は急傾斜地と地すべりで文が違うので、どちらの文かを添える） */}
+        {notes && <p>{notes}</p>}
+      </Notes>
     </div>
   );
 }
@@ -285,7 +280,7 @@ function MoridoRow({ morido }: { morido: Morido }) {
         <span className={`block ${VALUE} text-ink`}>
           {moridoValue(morido)}
           {morido.link && (
-            <a href={morido.link.url} target="_blank" rel="noreferrer" className="ml-2 whitespace-nowrap text-[11px] text-brand underline">
+            <a href={morido.link.url} target="_blank" rel="noreferrer" className="ml-2 whitespace-nowrap text-[12.5px] text-brand underline">
               {/^https:\/\/www2\.wagmap/.test(morido.link.url) ? "地図で見る" : "区域の資料"}
             </a>
           )}
@@ -385,7 +380,7 @@ function IsekiRow({ iseki }: { iseki: Iseki }) {
         <span className={`block ${VALUE} text-ink`}>
           {m ? "遺跡地図で確認" : `${iseki.city}の教育委員会で確認`}
           {m && (
-            <a href={m.url} target="_blank" rel="noreferrer" title={m.name} className="ml-2 whitespace-nowrap text-[11px] text-brand underline">
+            <a href={m.url} target="_blank" rel="noreferrer" title={m.name} className="ml-2 whitespace-nowrap text-[12.5px] text-brand underline">
               {m.at ? "地図で見る" : "開く"}
             </a>
           )}
@@ -396,21 +391,46 @@ function IsekiRow({ iseki }: { iseki: Iseki }) {
   );
 }
 
-/** 上下水道の行。台帳の地図を公開している市町村は、その地図を物件の場所で開く */
-function SuidoRow({ links, city }: { links: SuidoLink[]; city: string }) {
+/** 上下水道・ガス。照会先（水道・下水道）が分かる市区町村は照会先を出し、分からなければ市区町村の担当を出す。ガスはまだ照会先を
+ * 調べていないので、確かめることだけを出す（タブの名前にガスがあるのに何も無いと、探してしまうため） */
+function UtilityPart({ state, city }: { state: Extract<ZoningState, { status: "ok" }>; city: string }) {
+  const u = state.utilities;
+  const links = state.suido ?? [];
+  return (
+    <>
+      {u && <p className="mb-0.5 text-[12px] leading-[1.6] text-muted densest:leading-[1.45]">前面道路の本管・口径・引込みの有無は、次の照会先で確認</p>}
+      <dl>
+        {(!u || links.length > 0) && <SuidoRow links={links} city={city} short={!!u} />}
+        <UtilityRows u={u} />
+        {!u?.gas && (
+          <div className={ROW}>
+            <dt className={LABEL}>ガス</dt>
+            <dd className="min-w-0 flex-1">
+              <span className={`block ${VALUE} text-ink`}>ガス会社で確認</span>
+              <span className={SUB}>都市ガスかプロパンガスか、前面道路のガス管の有無</span>
+            </dd>
+          </div>
+        )}
+      </dl>
+    </>
+  );
+}
+
+/** 上下水道の行。台帳の地図を公開している市町村は、その地図を物件の場所で開く。short：照会先の行が続くので、地図だけを出す */
+function SuidoRow({ links, city, short }: { links: SuidoLink[]; city: string; short?: boolean }) {
   return (
     <div className={ROW}>
-      <dt className={LABEL}>上下水道</dt>
+      <dt className={LABEL}>{short ? "台帳の地図" : "上下水道"}</dt>
       <dd className="min-w-0 flex-1">
         <span className={`block ${VALUE} text-ink`}>
-          {links.length ? "台帳の地図で確認" : `${city}の上下水道の担当で確認`}
+          {short ? "物件の場所で開く" : links.length ? "台帳の地図で確認" : `${city}の上下水道の担当で確認`}
           {links.map((l) => (
-            <a key={l.url} href={l.url} target="_blank" rel="noreferrer" title={l.name} className="ml-2 whitespace-nowrap text-[11px] text-brand underline">
+            <a key={l.url} href={l.url} target="_blank" rel="noreferrer" title={l.name} className="ml-2 whitespace-nowrap text-[12.5px] text-brand underline">
               {l.kind === "下水道" ? "下水道" : "水道"}
             </a>
           ))}
         </span>
-        <span className={SUB}>前面道路の本管・口径・引込みの有無は、水道事業者・下水道の担当で確認</span>
+        {!short && <span className={SUB}>前面道路の本管・口径・引込みの有無は、水道事業者・下水道の担当で確認</span>}
       </dd>
     </div>
   );
@@ -419,22 +439,22 @@ function SuidoRow({ links, city }: { links: SuidoLink[]; city: string }) {
 /** 水道・下水道・都市ガスの照会先（事業者と、配管図・台帳・ガス管の埋設状況の確かめ方のページ）。調べていない市区町村は出さない */
 function UtilityRows({ u }: { u?: Utilities }) {
   if (!u) return null;
-  const rows: [string, UtilityContact[] | undefined][] = [
-    ["水道", u.water],
-    ["下水道", u.sewer],
-    ["都市ガス", u.gas],
+  const rows: [string, UtilityKind, UtilityContact[] | undefined][] = [
+    ["水道", "上水道", u.water],
+    ["下水道", "下水道", u.sewer],
+    ["都市ガス", "ガス", u.gas],
   ];
   return rows.map(
-    ([label, list]) =>
+    ([label, kind, list]) =>
       list && (
         <div key={label} className={ROW}>
           <dt className={LABEL}>{label}</dt>
           <dd className="min-w-0 flex-1">
-            {list.length === 0 && <span className={`block ${VALUE} text-ink`}>{NO_CITY_GAS}</span>}
+            {list.length === 0 && <span className={`block ${VALUE} text-ink`}>{noContactText(kind)}</span>}
             {list.map((c) => (
               <span key={c.name} className="block">
                 <span className={`${VALUE} text-ink`}>{contactName(c)}</span>
-                <a href={c.url} target="_blank" rel="noreferrer" className="ml-2 whitespace-nowrap text-[11px] text-brand underline">
+                <a href={c.url} target="_blank" rel="noreferrer" className="ml-2 whitespace-nowrap text-[12.5px] text-brand underline">
                   {contactLinkText(c)}
                 </a>
                 {c.how && <span className={SUB}>{c.how}</span>}

@@ -5,6 +5,11 @@
 #   書き換えて、テストが通れば main に入れる（本番は Vercel が main から自動で作り直す）。
 # 市町村の zip（約0.5GB）と法務省の地図XML（約0.8GB）を読むので、1回1時間ほどかかる。
 #
+# 埼玉県・千葉県のオープンデータサイトは、GitHub Actions からだとどのページも 403 で読めない（2026年10月）。そこのファイル
+# （12市町）は R2 の写し（sanko/src/）から読む。写しは、別の所（手元など）で build.py --fetch-only で取ったファイルを
+# ブランチの sanko-src/ に置き、Run workflow の import_ref にそのブランチを入れて足す（作れたら R2 に置く。ブランチは消してよい）。
+# 新しいファイルが出たかも GitHub Actions からは分からないので、同じ所で確かめる。
+#
 # 必要な設定は地番の地図データ（parcel-tiles.yml）と同じ。無ければ何もしないで終わる:
 #   Secrets:   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
 #   Variables: R2_PUBLIC_URL（バケットの公開 URL）、R2_BUCKET（省略時 michilu-chiban）
@@ -17,6 +22,10 @@ on:
         description: 公開ファイルが新しくなっていなくても作り直す
         type: boolean
         default: false
+      import_ref:
+        description: 埼玉県・千葉県のサイトのファイルを置いたブランチ（sanko-src/ に zip と import.json。build.py --fetch-only で作る）
+        type: string
+        default: ""
   schedule:
     - cron: "23 20 2 * *"
 
@@ -69,10 +78,12 @@ jobs:
       - name: 市町村の公開ファイルが新しくなったか
         id: c
         if: steps.ready.outputs.ok == 'true'
+        env:
+          IMPORT_REF: ${{ inputs.import_ref }}
         run: |
           pip install -r scripts/sanko/requirements.txt
-          # まだ R2 に置いていない（url が空）ときと、手で動かして force にしたときは作る
-          if [ "${{ inputs.force }}" = "true" ] || [ -z "$(jq -r '.url // ""' lib/roadmap/data/sanko-source.json)" ]; then
+          # まだ R2 に置いていない（url が空）ときと、手で動かして force か import_ref を入れたときは作る
+          if [ "${{ inputs.force }}" = "true" ] || [ -n "$IMPORT_REF" ] || [ -z "$(jq -r '.url // ""' lib/roadmap/data/sanko-source.json)" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             python3 scripts/sanko/build.py --check
@@ -92,6 +103,22 @@ jobs:
           git clone --depth 1 --branch "$TIPPECANOE_VERSION" https://github.com/felt/tippecanoe.git /tmp/tippecanoe
           make -C /tmp/tippecanoe -j"$(nproc)"
           mkdir -p ~/tippecanoe-bin && cp /tmp/tippecanoe/tippecanoe /tmp/tippecanoe/tile-join ~/tippecanoe-bin/
+      - name: 埼玉県・千葉県のサイトのファイルの写しを R2 から読む
+        if: steps.c.outputs.changed == 'true'
+        run: |
+          mkdir -p work/sanko/src
+          aws s3 sync "s3://$R2_BUCKET/sanko/src/" work/sanko/src/ --endpoint-url "$R2_ENDPOINT" --only-show-errors
+          ls -la work/sanko/src
+      - name: ブランチに置いたファイルを足す
+        if: steps.c.outputs.changed == 'true' && inputs.import_ref != ''
+        env:
+          IMPORT_REF: ${{ inputs.import_ref }}
+        run: |
+          git fetch --depth 1 origin "$IMPORT_REF"
+          mkdir -p work/import
+          git archive FETCH_HEAD sanko-src | tar -x -C work/import
+          cp work/import/sanko-src/*.zip work/import/sanko-src/import.json work/sanko/src/
+          ls -la work/sanko/src
       - name: タイルを作る
         if: steps.c.outputs.changed == 'true'
         env:
@@ -99,7 +126,8 @@ jobs:
         run: |
           export PATH="$HOME/tippecanoe-bin:$PATH"
           mkdir -p work
-          python3 scripts/sanko/build.py --jobs 3 --work work/sanko --out "work/sanko-$STAMP.pmtiles" --manifest work/sanko-source.json | tee work/report.tsv
+          python3 scripts/sanko/build.py --jobs 3 --work work/sanko --out "work/sanko-$STAMP.pmtiles" --manifest work/sanko-source.json \
+            --mirror-list work/sanko/mirror.txt | tee work/report.tsv
           ls -la work/*.pmtiles
           # 前の回より大きく減っていたら（市町村のファイルが読めなかったなど）、置き換えない
           python3 - <<'PY'
@@ -114,6 +142,22 @@ jobs:
           if count(new) < 0.9 * count(old):
               sys.exit("::error::筆が前の回の9割より少ないので置き換えません")
           PY
+      - name: 埼玉県・千葉県のサイトのファイルの写しを R2 に置く
+        if: steps.c.outputs.changed == 'true'
+        run: |
+          # 使ったファイルで R2 に無いものを置き、同じ市町村の前のファイルを消す（次の回もこの写しから作る）
+          have=$(aws s3 ls "s3://$R2_BUCKET/sanko/src/" --endpoint-url "$R2_ENDPOINT" | awk '{print $4}' || true)
+          while read -r f; do
+            [ -n "$f" ] || continue
+            if ! grep -qxF "$f" <<<"$have"; then
+              aws s3 cp "work/sanko/src/$f" "s3://$R2_BUCKET/sanko/src/$f" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+              echo "置いた: $f"
+            fi
+            for old in $(grep -E "^${f%%-*}-" <<<"$have" | grep -vxF "$f" || true); do
+              aws s3 rm "s3://$R2_BUCKET/sanko/src/$old" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+              echo "消した: $old"
+            done
+          done < work/sanko/mirror.txt
       - name: R2 に置く
         if: steps.c.outputs.changed == 'true'
         env:

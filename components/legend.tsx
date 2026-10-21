@@ -3,7 +3,7 @@
 // 道路種別の地図の「色の見方」（凡例を文字にしたもの）。地図ごとに色の付け方が違うので、地図を開く前・開いたあとに見比べられるようにする
 import { useState } from "react";
 import type { LegendEntry } from "@/lib/roadmap/legends";
-import { InfoIcon } from "./icons";
+import { ChevronRightIcon, InfoIcon } from "./icons";
 import { Sheet } from "./sheet";
 
 /** 線の色の見本（地図の道路の線のように横長） */
@@ -53,10 +53,10 @@ export function LegendButton({ legend, title }: { legend: LegendEntry[]; title: 
         色の見方
       </button>
       <Sheet title="地図の色の見方" open={open} onClose={() => setOpen(false)}>
-        <p className="mb-1 text-[12px] font-semibold text-muted">{title}</p>
+        <p className="mb-1 text-[13px] font-semibold text-muted">{title}</p>
         <LegendList legend={legend} />
-        <p className="mt-3 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted">
-          <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+        <p className="mt-3 flex gap-1.5 text-[12px] leading-[1.6] text-muted">
+          <InfoIcon className="mt-[3px] h-3.5 w-3.5 shrink-0" />
           {NOTE}
         </p>
       </Sheet>
@@ -64,13 +64,18 @@ export function LegendButton({ legend, title }: { legend: LegendEntry[]; title: 
   );
 }
 
-/** PC：地図ボタンの下に出す凡例 */
+/** PC：地図ボタンの下の凡例。押すと開く（いつも出しておくと、パネルの半分ほどを占めるので） */
 export function LegendBlock({ legend }: { legend: LegendEntry[] }) {
   return (
-    <div className="mt-1.5 rounded-xl border border-line/80 px-3 py-2">
-      <p className="mb-1 text-[11px] font-semibold text-muted">地図の色の見方</p>
-      <LegendList legend={legend} compact />
-      <p className="mt-1.5 text-[10px] leading-[1.6] text-muted">{NOTE}</p>
-    </div>
+    <details className="group mt-1.5 rounded-xl border border-line/80 px-3 py-2">
+      <summary className="flex cursor-pointer list-none items-center gap-1 text-[12.5px] font-semibold text-brand [&::-webkit-details-marker]:hidden">
+        地図の色の見方（{legend.length}色）
+        <ChevronRightIcon className="h-3.5 w-3.5 rotate-90 transition-transform group-open:-rotate-90" />
+      </summary>
+      <div className="mt-1.5">
+        <LegendList legend={legend} compact />
+        <p className="mt-1.5 text-[11px] leading-[1.6] text-muted">{NOTE}</p>
+      </div>
+    </details>
   );
 }

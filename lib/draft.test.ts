@@ -161,9 +161,11 @@ describe("重説・物件概要の下書き", () => {
     // 埋蔵文化財は都市計画が読めなくても、確かめる窓口と遺跡地図を出す（千代田区は都の地図。地点では開けない）
     expect(text).toContain("文化財保護法（埋蔵文化財包蔵地）：要確認（包蔵地（遺跡）に入るかは千代田区の教育委員会（文化財の担当）で確認）");
     expect(text).toContain("遺跡地図：東京都遺跡地図（https://tokyo-iseki.metro.tokyo.lg.jp/）");
-    // 上下水道・ガスは、台帳の地図が無くても確かめる先を出す
+    // 上下水道・ガスは、台帳の地図が無くても確かめる先を出す（千代田区は照会先を調べてあるので、水道局・下水道局の名前とページ）
     expect(text).toContain("■飲用水・ガス・排水施設（参考）");
-    expect(text).toContain("飲用水（上水道）：要確認（前面道路の配水管・口径・引込み管の有無は、水道事業者（市区町村の水道局など）で確認）");
+    expect(text).toContain("飲用水（上水道）：要確認（前面道路の配水管・口径・引込み管の有無は、東京都水道局で確認）");
+    expect(text).toContain("水道の照会先：東京都水道局（https://www.waterworks.metro.tokyo.lg.jp/");
+    expect(text).toContain("下水道の照会先：東京都下水道局（https://www.gesui.metro.tokyo.lg.jp/");
     expect(text).toContain("ガス：要確認（都市ガスかプロパンガスか、前面道路のガス管の有無はガス会社で確認）");
     expect(text).not.toContain("下水道の台帳：");
     expect(text).toContain("道路の種別・幅員：要確認（市の道路種別の地図・窓口で確認）");
