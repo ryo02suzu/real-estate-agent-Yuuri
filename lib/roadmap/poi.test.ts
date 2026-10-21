@@ -5,7 +5,7 @@ import { buildDraft, draftText } from "../draft";
 import { buildSummary } from "../summary";
 import { buildLinks, findMunicipality } from "./index";
 import type { LngLat } from "./parcel";
-import { nearbyPois, nearestPois, poiCredit, poiLine, poiWalkText, POI_KINDS, POI_ORDER, POI_ZOOM, type Poi, type PoiSource, type PoiWalk } from "./poi";
+import { nearbyPois, nearestPois, poiCredit, poiLine, poiWalkText, POI_EXTRA, POI_KINDS, POI_ORDER, POI_ZOOM, type Poi, type PoiSource, type PoiWalk } from "./poi";
 import SRC from "./data/poi-source.json";
 import { decodePoiTile, poiTileSource } from "./poi-tiles";
 import { ROAD_CREDIT } from "./walk";
@@ -137,9 +137,10 @@ describe("周辺施設", () => {
     expect(poiLine(w(452))).toBe("スーパー：〇〇ストア 徒歩約6分（約450m）");
   });
 
-  it("種類の番号はタイルを作るスクリプトと同じ（12種類・順番にすべて入る）", () => {
-    expect(Object.keys(POI_KINDS).map(Number).sort((a, b) => a - b)).toEqual([...POI_ORDER].sort((a, b) => a - b));
+  it("種類の番号はタイルを作るスクリプトと同じ（生活環境の12種類と飲食店・順番にすべて入る）", () => {
+    expect(Object.keys(POI_KINDS).map(Number).sort((a, b) => a - b)).toEqual([...POI_ORDER, ...POI_EXTRA].sort((a, b) => a - b));
     expect(POI_ORDER).toHaveLength(12);
+    expect(POI_EXTRA).toEqual([13]);
   });
 });
 
@@ -244,6 +245,9 @@ describe.skipIf(!SRC.url)("アプリに入っている周辺施設のタイル",
 
   it("どの種類も入っていて、名前の付け違い（動物病院・整骨院・政策金融公庫）は入っていない", async () => {
     for (const k of POI_ORDER) expect(SRC.counts[String(k) as keyof typeof SRC.counts], POI_KINDS[k]).toBeGreaterThan(500);
+    // 飲食店は、タイルを作り直したデータから入る（作り直す前のデータには無い）
+    const counts = SRC.counts as Record<string, number>;
+    for (const k of POI_EXTRA) if (counts[String(k)] !== undefined) expect(counts[String(k)], POI_KINDS[k]).toBeGreaterThan(500);
     const around = await nearbyPois(35.6618, 139.6981, src(), 1200);
     expect(around.filter((p) => (p.kind === 4 || p.kind === 5) && /動物|整骨|接骨/.test(p.name))).toEqual([]);
     expect(around.filter((p) => p.kind === 8 && /公庫/.test(p.name))).toEqual([]);

@@ -25,10 +25,13 @@ export const POI_KINDS: Record<number, string> = {
   10: "役所",
   11: "図書館",
   12: "商業施設",
+  13: "飲食店",
 };
 
 /** 画面・下書き・共有に出す順（販売図面の生活環境によく書く順） */
 export const POI_ORDER = [1, 2, 3, 12, 4, 5, 9, 6, 7, 8, 11, 10];
+/** 生活環境の一覧には出さない種類（スマホの周辺環境の「飲食店」と、まわりの飲食店の多さの目安に使う） */
+export const POI_EXTRA = [13];
 
 export type Poi = { kind: number; name: string; at: LngLat };
 

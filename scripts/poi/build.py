@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 OpenStreetMap（© OpenStreetMap contributors、ODbL）の関東の施設のうち、販売図面の「生活環境」に書くもの（スーパー・コンビニ・
-ドラッグストア・病院・診療所・公園・郵便局・銀行・幼稚園と保育園・役所・図書館・商業施設）を、点のベクトルタイル（PMTiles・z14 だけ）にする。
+ドラッグストア・病院・診療所・公園・郵便局・銀行・幼稚園と保育園・役所・図書館・商業施設）と飲食店を、点のベクトルタイル（PMTiles・z14 だけ）にする。
 アプリ（lib/roadmap/poi.ts）は物件のまわりのタイルだけを読み、種類ごとに近い施設を選んで、国土地理院の道路中心線で徒歩の目安を出す。
 
   python3 scripts/poi/build.py --pbf kanto-latest.osm.pbf --install   # public/data/poi-<日付>.pmtiles を置き、poi-source.json を書き換える
@@ -40,6 +40,8 @@ KINDS = {
     10: ("役所", [("amenity", "townhall")]),
     11: ("図書館", [("amenity", "library")]),
     12: ("商業施設", [("shop", "mall"), ("shop", "department_store")]),
+    # 飲食店（周辺環境の「飲食店」と、まわりの飲食店の多さの目安に使う。販売図面の生活環境の一覧には出さない）
+    13: ("飲食店", [("amenity", "restaurant"), ("amenity", "cafe"), ("amenity", "fast_food"), ("amenity", "food_court")]),
 }
 TAG_KIND = {kv: k for k, (_, kvs) in KINDS.items() for kv in kvs}
 # 薬局（amenity=pharmacy）のうちドラッグストアのチェーン（日本の OpenStreetMap ではドラッグストアの多くが pharmacy。調剤だけの薬局は入れない）
