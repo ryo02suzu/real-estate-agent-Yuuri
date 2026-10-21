@@ -51,20 +51,13 @@ export function CoverageBadge({ coverage }: { coverage: Coverage }) {
   );
 }
 
-/** 結果画面の「ネットで全種別が分かります」の丸いラベル。shortWhenLow なら、背の低い画面では短い言い方（「全種別あり」） */
-export function CoveragePill({ coverage, shortWhenLow }: { coverage: Coverage; shortWhenLow?: boolean }) {
+/** 結果画面の「ネットで全種別が分かります」の丸いラベル */
+export function CoveragePill({ coverage }: { coverage: Coverage }) {
   const c = COVERAGE[coverage];
   return (
     <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${c.badge}`}>
       <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] text-white ${c.dot}`}>{coverage === "full" ? "✓" : coverage === "partial" ? "−" : "!"}</span>
-      {shortWhenLow ? (
-        <>
-          <span className="short:hidden">{c.pill}</span>
-          <span className="hidden whitespace-nowrap short:inline">{c.short}</span>
-        </>
-      ) : (
-        c.pill
-      )}
+      {c.pill}
     </span>
   );
 }

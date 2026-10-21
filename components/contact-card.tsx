@@ -15,7 +15,7 @@ export function ContactCard({ contact, city, address }: { contact: Contact; city
   // 県の出先機関（「千葉県 ○○土木事務所」など）は市町村名を付けない
   const dept = /^(東京都|\S{2,3}県)\s/.test(contact.dept) ? contact.dept : `${city} ${contact.dept}`;
   return (
-    <section className="shadow-soft rounded-2xl border border-white bg-white px-4 py-3">
+    <section className="shadow-soft rounded-2xl border border-white bg-white px-4 py-3 tight:py-2">
       <h3 className="flex items-center gap-2 border-b border-line/70 pb-2 text-[13px] font-semibold text-ink">
         <PhoneIcon className="h-4 w-4 text-brand-light" />
         お問い合わせ先
@@ -48,7 +48,7 @@ export function ContactCard({ contact, city, address }: { contact: Contact; city
       </dl>
 
       {(phones.length > 0 || contact.email) && (
-        <div className="mt-2.5 space-y-2">
+        <div className="mt-2.5 space-y-2 tight:mt-1.5">
           {phones.map((p, i) => {
             // 1件目を金色の大きなボタンに。押すとそのまま発信画面になる。
             // 道路種別を電話で答えない役所は、電話で聞けると誤解しないよう控えめな色と文言にする

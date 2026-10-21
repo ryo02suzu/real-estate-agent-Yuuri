@@ -22,6 +22,7 @@ import { statusFor, zoningAt, zoningChips, zoningRows, type Zoning, type ZoningS
 import { ZONING_DATA } from "@/lib/roadmap/zoning-data";
 import { pmtilesZoningSource } from "@/lib/roadmap/zoning-tiles";
 import { AlertIcon, ChevronRightIcon, ZoningIcon } from "./icons";
+import { Fact } from "./fact";
 import { Notes } from "./notes";
 import { Sheet } from "./sheet";
 
@@ -89,12 +90,39 @@ function tochiChips(t?: Tochi): string[] {
  * 用途地域などを1行に並べる。スマホは押すと詳しい一覧を下から出す。
  * PC は onOpen（パネルの中の都市計画のカードまで動かす）を渡す
  */
-export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: string; onOpen?: () => void }) {
+export function ZoningLine({ state, city, onOpen, tile }: { state: ZoningState; city: string; onOpen?: () => void; tile?: boolean }) {
   const [open, setOpen] = useState(false);
   // 砂防指定地・急傾斜地などの区域に入っていれば、用途地域の次に注意の印を出す
   const chips = state.status === "ok" ? zoningChips(state.zoning).flatMap((c, i) => (i === 0 ? [c, ...houreiChips(state.hourei), ...tochiChips(state.tochi)] : [c])) : [];
   return (
     <>
+      {tile ? (
+        // スマホの要点のマス：用途地域と建ぺい率・容積率を太字で、ほかは小さな印で
+        <Fact
+          icon={<ZoningIcon className="h-3.5 w-3.5" />}
+          label="都市計画"
+          onClick={() => setOpen(true)}
+          disabled={state.status !== "ok"}
+          value={
+            state.status === "loading"
+              ? "確認中…"
+              : state.status === "error"
+                ? "読み込めませんでした"
+                : chips.map((c, i) => (
+                    <span
+                      key={c}
+                      className={
+                        i === 0
+                          ? "shrink-0 whitespace-nowrap"
+                          : `shrink-0 whitespace-nowrap rounded px-1 text-[11px] font-normal leading-[18px] ${WARN_CHIP.test(c) ? "bg-[#f8ece6] text-[#8a4f3a]" : "bg-[#f3f1ed] text-ink"}`
+                      }
+                    >
+                      {c}
+                    </span>
+                  ))
+          }
+        />
+      ) : (
       <button
         onClick={() => (onOpen ? onOpen() : setOpen(true))}
         disabled={state.status !== "ok"}
@@ -119,6 +147,7 @@ export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: 
         )}
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
+      )}
       {state.status === "ok" && !onOpen && (
         <Sheet title="法令に基づく制限（参考）" open={open} onClose={() => setOpen(false)}>
           <ZoningDetail state={state} city={city} tabs />

@@ -26,6 +26,7 @@ import {
   type HazardReport,
 } from "@/lib/roadmap/hazard";
 import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
+import { Fact } from "./fact";
 import { AlertIcon, ChevronRightIcon, ExternalIcon, HazardIcon, MapIcon } from "./icons";
 import { Notes } from "./notes";
 import { Sheet } from "./sheet";
@@ -97,6 +98,7 @@ export function HazardLine({
   onOpen,
   onShowMap,
   compact,
+  tile,
 }: {
   state: HazardState;
   city: string;
@@ -104,11 +106,33 @@ export function HazardLine({
   onShowMap?: (kind: HazardKind) => void;
   /** 狭い所（背の低いスマホで、市の行の右）：見出しは出さず（読み上げだけ）、印に幅を回す */
   compact?: boolean;
+  /** スマホの要点のマス（components/fact.tsx） */
+  tile?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const chips = state.status === "ok" ? hazardChips(state.report) : [];
   return (
     <>
+      {tile ? (
+        <Fact
+          icon={<HazardIcon className="h-3.5 w-3.5" />}
+          label="災害リスク"
+          onClick={() => setOpen(true)}
+          disabled={state.status !== "ok"}
+          value={
+            state.status === "loading"
+              ? "確認中…"
+              : state.status === "error"
+                ? "読み込めませんでした"
+                : chips.map((c) => (
+                    <span key={c.text} className={`flex shrink-0 items-center gap-1 whitespace-nowrap ${c.warn ? "text-[#8a4f3a]" : ""}`}>
+                      {c.color && <span className="h-2.5 w-2.5 shrink-0 rounded-[3px] border border-black/10" style={{ background: c.color }} />}
+                      {c.short ?? c.text}
+                    </span>
+                  ))
+          }
+        />
+      ) : (
       <button
         onClick={() => (onOpen ? onOpen() : setOpen(true))}
         disabled={state.status !== "ok"}
@@ -134,6 +158,7 @@ export function HazardLine({
         )}
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
+      )}
       {state.status === "ok" && !onOpen && (
         <Sheet title="災害リスク（参考）" open={open} onClose={() => setOpen(false)}>
           <HazardDetail

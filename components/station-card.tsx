@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
 import { lineLabel, nearestStations, STATION_CREDIT, type StationWalk } from "@/lib/roadmap/walk";
+import { Fact } from "./fact";
 import { ChevronRightIcon, TrainIcon } from "./icons";
 import { Notes } from "./notes";
 import { PoiList, type PoiState } from "./poi-card";
@@ -44,7 +45,7 @@ const distText = (m: number) => (m >= 1000 ? `約${(m / 1000).toFixed(1)}km` : `
  * PC は onOpen（パネルの中のカードまで動かす）を渡す。
  * スマホは学区と並ぶ狭い行なので、駅名と分数を優先し、「最寄り駅」の見出しと「ほか2駅」は PC だけ出す。駅が無ければ出さない
  */
-export function StationLine({ state, pois, onOpen }: { state: StationState; pois?: PoiState; onOpen?: () => void }) {
+export function StationLine({ state, pois, onOpen, tile }: { state: StationState; pois?: PoiState; onOpen?: () => void; tile?: boolean }) {
   const [open, setOpen] = useState(false);
   if (state.status === "ok" && state.stations.length === 0) return null;
   // 周辺施設のデータが無い（施設が1つも無い）ときは、駅だけのシート
@@ -53,6 +54,35 @@ export function StationLine({ state, pois, onOpen }: { state: StationState; pois
   const more = state.status === "ok" ? state.stations.length - 1 : 0;
   return (
     <>
+      {tile ? (
+        // 見出しが「最寄り駅」なので「駅」は付けない。駅名が長ければ駅名を省き、徒歩の分数は残す（1段のときは「徒歩」も省く）
+        <Fact
+          icon={<TrainIcon className="h-3.5 w-3.5" />}
+          label={withPois ? "最寄り駅・周辺施設" : "最寄り駅"}
+          onClick={() => setOpen(true)}
+          disabled={state.status !== "ok"}
+          value={
+            top ? (
+              <span className="flex min-w-0 flex-1 items-center gap-1 whitespace-nowrap">
+                <span className="min-w-0 truncate">{top.name}</span>
+                <span className="shrink-0">
+                  {top.routed ? (
+                    <>
+                      <span className="short:hidden">徒歩</span>約{top.minutes}分
+                    </>
+                  ) : (
+                    walkText(top)
+                  )}
+                </span>
+              </span>
+            ) : state.status === "error" ? (
+              "出せませんでした"
+            ) : (
+              "確認中…"
+            )
+          }
+        />
+      ) : (
       <button
         onClick={() => (onOpen ? onOpen() : setOpen(true))}
         disabled={state.status !== "ok"}
@@ -71,6 +101,7 @@ export function StationLine({ state, pois, onOpen }: { state: StationState; pois
         )}
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
+      )}
       {state.status === "ok" && !onOpen && (
         <Sheet title={withPois ? "最寄り駅・周辺施設（徒歩の目安）" : "最寄り駅（徒歩の目安）"} open={open} onClose={() => setOpen(false)}>
           {withPois ? (

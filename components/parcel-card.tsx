@@ -13,6 +13,7 @@ import { adjacentParcels, chibanLabel, kuikiLabel, parcelAt, parcelMark, type Ne
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
 import { SANKO_CITIES, sankoSource } from "@/lib/roadmap/sanko-data";
+import { Fact } from "./fact";
 import { ChevronRightIcon, CopyIcon, ExternalIcon, ParcelIcon } from "./icons";
 import { Notes } from "./notes";
 import { Sheet } from "./sheet";
@@ -72,6 +73,7 @@ export function ParcelButton({
   extra,
   withBuilding,
   chibanzu,
+  tile,
 }: {
   info: ParcelInfo;
   onOpen?: () => void;
@@ -81,11 +83,14 @@ export function ParcelButton({
   withBuilding?: boolean;
   /** 市町村の地番図（物件の場所で開く） */
   chibanzu?: ChibanzuLink;
+  /** スマホの要点のマス（components/fact.tsx） */
+  tile?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   if (info.status === "none") {
     // 登記所の地図データに筆が無い地点：市町村の地番図があれば、それを直接開く
     if (!chibanzu) return null;
+    if (tile) return <Fact icon={<ParcelIcon className="h-3.5 w-3.5" />} label="地番" href={chibanzu.url} value="市町村の地番図" />;
     return (
       <a
         href={chibanzu.url}
@@ -104,6 +109,16 @@ export function ParcelButton({
     onOpen && info.status === "ok" && info.kind !== "address" && /^\d/.test(info.parcel.chibanRaw) ? `${chibanLabel(info.parcel.chibanRaw)}${parcelMark(info.parcel)}` : undefined;
   return (
     <>
+      {tile ? (
+        // スマホの要点のマス：地点の筆の地番（住所で探した地点は参考）。道路などで地番が無ければ、隣の筆の数
+        <Fact
+          icon={<ParcelIcon className="h-3.5 w-3.5" />}
+          label={withBuilding ? "地番・建物" : "地番"}
+          onClick={() => setOpen(true)}
+          disabled={info.status !== "ok"}
+          value={info.status !== "ok" ? "確認中…" : <TileChiban info={info} />}
+        />
+      ) : (
       <button
         onClick={() => (onOpen ? onOpen() : setOpen(true))}
         disabled={info.status !== "ok"}
@@ -123,6 +138,7 @@ export function ParcelButton({
         )}
         {info.status === "ok" && <ChevronRightIcon className="h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
+      )}
       {info.status === "ok" && !onOpen && (
         <Sheet title={withBuilding ? "地番・建物" : "謄本・公図を取るときの地番"} open={open} onClose={() => setOpen(false)}>
           {withBuilding ? (
@@ -136,7 +152,18 @@ export function ParcelButton({
   );
 }
 
-/** シートのタブ（それぞれ1画面に収める） */
+/** 要点のマスの値：「3556-1（参考）」、地番の無い道路などは「隣地 12筆」 */
+function TileChiban({ info }: { info: Extract<ParcelInfo, { status: "ok" }> }) {
+  const p = info.parcel;
+  if (!/^\d/.test(p.chibanRaw)) return <>隣地 {info.neighbors.filter((n) => /^\d/.test(n.chiban)).length}筆</>;
+  return (
+    <>
+      <span className="shrink-0 whitespace-nowrap">{chibanLabel(p.chibanRaw)}</span>
+      <span className="shrink-0 whitespace-nowrap text-[11px] font-normal text-muted">{info.kind === "address" ? "（参考）" : parcelMark(p)}</span>
+    </>
+  );
+}
+
 /** PC：地図の左のパネルのカード */
 export function ParcelCard({ info, chibanzu }: { info: ParcelInfo; chibanzu?: ChibanzuLink }) {
   if (info.status === "none" && !chibanzu) return null;

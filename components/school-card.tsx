@@ -9,6 +9,7 @@ import { schoolShort, schoolsAt, schoolWayText, withSchoolWalks, type SchoolHit,
 import { ROAD_CREDIT } from "@/lib/roadmap/walk";
 import { SCHOOL_DATA } from "@/lib/roadmap/school-data";
 import { pmtilesSchoolSource } from "@/lib/roadmap/school-tiles";
+import { Fact } from "./fact";
 import { ChevronRightIcon, SchoolIcon } from "./icons";
 import { Notes } from "./notes";
 import { Sheet } from "./sheet";
@@ -93,12 +94,23 @@ export function SchoolDetail({ schools }: { schools: Schools }) {
  * スマホ：都市計画の行の右の小さなボタン（「学区」）。押すと小学校区・中学校区が下から出る。
  * PC は onOpen（パネルの中の学区のカードまで動かす）を渡し、学校の名前も出す。データの無い所では出さない
  */
-export function SchoolButton({ state, onOpen }: { state: SchoolState; onOpen?: () => void }) {
+export function SchoolButton({ state, onOpen, tile, className }: { state: SchoolState; onOpen?: () => void; tile?: boolean; className?: string }) {
   const [open, setOpen] = useState(false);
   if (state.status === "none" || state.status === "error") return null;
   const s = state.status === "ok" ? state.schools : undefined;
+  const names = s && [s.elementary && schoolShort(s.elementary.name), s.junior && schoolShort(s.junior.name)].filter(Boolean).join("・");
   return (
     <>
+      {tile ? (
+        <Fact
+          icon={<SchoolIcon className="h-3.5 w-3.5" />}
+          label="学区"
+          onClick={() => setOpen(true)}
+          disabled={!s}
+          className={className}
+          value={<span className="min-w-0 flex-1 truncate">{s ? names || "学区" : "確認中…"}</span>}
+        />
+      ) : (
       <button
         onClick={() => (onOpen ? onOpen() : setOpen(true))}
         disabled={state.status !== "ok"}
@@ -117,6 +129,7 @@ export function SchoolButton({ state, onOpen }: { state: SchoolState; onOpen?: (
         )}
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
+      )}
       {s && !onOpen && (
         <Sheet title="学区（参考）" open={open} onClose={() => setOpen(false)}>
           <SchoolDetail schools={s} />
