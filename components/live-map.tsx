@@ -69,9 +69,9 @@ const LOCALE = {
   "ScaleControl.Kilometers": "km",
 };
 
-// 物件のピン（components/icons.tsx の PinIcon と同じ形）
+// 物件のピン（components/icons.tsx の PinIcon と同じ形）。色は brand（PC は金色、スマホの紺の見た目では紺）
 const PIN_SVG =
-  '<svg viewBox="0 0 24 24" width="44" height="44" aria-hidden="true"><path fill="#8a6632" stroke="#fff" stroke-width="1.2" d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z"/></svg>';
+  '<svg viewBox="0 0 24 24" width="44" height="44" aria-hidden="true"><path fill="currentColor" stroke="#fff" stroke-width="1.2" d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z"/></svg>';
 
 type Point = { lat: number; lng: number };
 type Padding = { top: number; bottom: number; left: number; right: number };
@@ -310,10 +310,14 @@ export default function LiveMap({
   useEffect(() => {
     if (!container.current) return;
     let map: MapLibreMap;
+    // 見つけた筆・図の範囲の色は、画面の brand の色（PC は金色、スマホの紺の見た目では紺）
+    const css = getComputedStyle(container.current);
+    const fill = css.getPropertyValue("--color-brand-light").trim();
+    const line = css.getPropertyValue("--color-brand").trim();
     try {
       map = new MapLibreMap({
         container: container.current,
-        style: gsiStyle(),
+        style: gsiStyle("pale", fill && line ? { fill, line } : undefined),
         ...(point ? { center: [point.lng, point.lat] as [number, number], zoom: 17 } : { bounds: KANTO_BOUNDS, fitBoundsOptions: { padding: pad } }),
         minZoom: 5,
         maxZoom: 19.5,
@@ -537,7 +541,7 @@ export default function LiveMap({
     if (!pinRef.current) {
       const el = document.createElement("div");
       el.innerHTML = PIN_SVG;
-      el.className = "cursor-grab drop-shadow-md active:cursor-grabbing";
+      el.className = "cursor-grab text-brand drop-shadow-md active:cursor-grabbing";
       el.title = "ドラッグして物件の場所を直せます";
       const pin = new Marker({ element: el, anchor: "bottom", draggable: true }).setLngLat([lng, lat]).addTo(map);
       pin.on("dragend", () => {
@@ -568,7 +572,7 @@ export default function LiveMap({
     labelRef.current = null;
     if (sheet) {
       const el = document.createElement("div");
-      el.className = "rounded-md bg-[#8a6632] px-2 py-0.5 text-[11px] font-semibold text-white shadow";
+      el.className = "rounded-md bg-brand px-2 py-0.5 text-[11px] font-semibold text-white shadow";
       el.textContent = sheet.whole ? "市全体の図" : `図 ${sheet.label}`;
       labelRef.current = new Marker({ element: el, anchor: "bottom-left" }).setLngLat([sheet.bounds[1], sheet.bounds[0]]).addTo(map);
     }

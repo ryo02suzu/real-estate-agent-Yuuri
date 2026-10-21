@@ -86,6 +86,11 @@ export function MobileApp(props: MobileAppProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   // 開発中の再マウントで <html> の style が消えたときのため、拡大率をもう一度入れる
   useLayoutEffect(() => applyAppZoom(), []);
+  // 自分で document.body に出す部品（重説の下書き・案内図）も紺の色にする（PC はこの画面を使わないので金色のまま）
+  useEffect(() => {
+    document.body.classList.add("theme-navy");
+    return () => document.body.classList.remove("theme-navy");
+  }, []);
 
   // 新しく調べたら、ホーム（物件の画面）のいちばん上へ
   const resultKey = shown ? `${shown.query}|${shown.result.status}|${"lat" in shown.result ? `${shown.result.lat},${shown.result.lng}` : ""}` : "";
@@ -116,7 +121,8 @@ export function MobileApp(props: MobileAppProps) {
   };
   const typeChiban = () => {
     setInput("地番 ");
-    requestAnimationFrame(() => inputRef.current?.focus());
+    // 押した操作の中で入力欄に入れる（iPhone はそうしないとキーボードが出ない）
+    inputRef.current?.focus();
   };
   const openMap = () => {
     const r = shown?.result;
@@ -185,15 +191,22 @@ export function MobileApp(props: MobileAppProps) {
               { label: "現在地で調べる", onClick: pickHere },
               { label: "地番で調べる", onClick: typeChiban },
             ]}
-            onHome={props.onHome}
+            onHome={() => {
+              setPage("home");
+              props.onHome();
+            }}
             onHistory={() => go("history")}
             onFavorites={() => go("favorites")}
             onMenu={() => setSheet("menu")}
             inputRef={inputRef}
           />
-          {ok && page === "home" ? (
-            <PropertyView key={`${ok.lat},${ok.lng},${ok.matchedAddress}`} result={ok} loading={loading} error={error} favorite={isFav(itemOf(shown!.query, ok))} onFavorite={() => setFavorites(toggleFavorite(itemOf(shown!.query, ok)))} onPick={props.onPickAddress} onPickPoint={onPickPoint} onFix={openMap} scroller={scroller} />
-          ) : (
+          {/* 物件の画面は、検索履歴などのページを見ているあいだも残す（戻ったときに読み直さない・タブもそのまま） */}
+          {ok && (
+            <div hidden={page !== "home"}>
+              <PropertyView key={`${ok.lat},${ok.lng},${ok.matchedAddress}`} result={ok} loading={loading} error={error} favorite={isFav(itemOf(shown!.query, ok))} onFavorite={() => setFavorites(toggleFavorite(itemOf(shown!.query, ok)))} onPick={props.onPickAddress} onPickPoint={onPickPoint} onFix={openMap} scroller={scroller} />
+            </div>
+          )}
+          {(!ok || page !== "home") && (
             <SheetFrame>
               <Banner loading={loading} error={error} notice={notice} onDismiss={() => setNotice(null)} />
               {body}

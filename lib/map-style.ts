@@ -242,7 +242,11 @@ export function parcelHitFilter(id: string, p?: { kuiki: string; chibanRaw: stri
   return id.startsWith("kozu") ? withKozuFilter(f)! : f;
 }
 
-export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
+/** 見つけた筆・図の範囲の色（PC は金色。スマホの紺の見た目では紺を渡す） */
+export type Accent = { fill: string; line: string };
+const GOLD: Accent = { fill: "#c49a5c", line: "#8a6632" };
+
+export function gsiStyle(basemap: Basemap = "pale", accent: Accent = GOLD): StyleSpecification {
   const keys = Object.keys(BASEMAPS) as Basemap[];
   const buildings = hasBuildings();
   return {
@@ -327,15 +331,15 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         layout: { visibility: "none" },
         paint: { "line-color": DOURO_COLOR, "line-width": 2.5, "line-opacity": 0.8, "line-dasharray": [2, 1.5] },
       },
-      { id: "sheet-fill", type: "fill", source: "sheet", filter: ["==", ["get", "kind"], "frame"], paint: { "fill-color": "#c49a5c", "fill-opacity": 0.06 } },
+      { id: "sheet-fill", type: "fill", source: "sheet", filter: ["==", ["get", "kind"], "frame"], paint: { "fill-color": accent.fill, "fill-opacity": 0.06 } },
       {
         id: "sheet-grid",
         type: "line",
         source: "sheet",
         filter: ["==", ["get", "kind"], "grid"],
-        paint: { "line-color": "#8a6632", "line-width": 1, "line-opacity": 0.6, "line-dasharray": [3, 3] },
+        paint: { "line-color": accent.line, "line-width": 1, "line-opacity": 0.6, "line-dasharray": [3, 3] },
       },
-      { id: "sheet-line", type: "line", source: "sheet", filter: ["==", ["get", "kind"], "frame"], paint: { "line-color": "#8a6632", "line-width": 2.5 } },
+      { id: "sheet-line", type: "line", source: "sheet", filter: ["==", ["get", "kind"], "frame"], paint: { "line-color": accent.line, "line-width": 2.5 } },
       // 筆界（「筆・地番」で表示）。fude-fill は透明で、クリックした筆を拾うためのもの
       {
         id: "fude-fill",
@@ -512,7 +516,7 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         minzoom: 14,
         filter: parcelFilter(),
         layout: { visibility: "none" },
-        paint: { "fill-color": "#c49a5c", "fill-opacity": 0.28 },
+        paint: { "fill-color": accent.fill, "fill-opacity": 0.28 },
       },
       {
         id: "fude-hit-line",
@@ -522,7 +526,7 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         minzoom: 14,
         filter: parcelFilter(),
         layout: { visibility: "none" },
-        paint: { "line-color": "#8a6632", "line-width": 3 },
+        paint: { "line-color": accent.line, "line-width": 3 },
       },
       ...(sankoOn
         ? ([
@@ -534,7 +538,7 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
               minzoom: 14,
               filter: parcelFilter(),
               layout: { visibility: "none" },
-              paint: { "fill-color": "#c49a5c", "fill-opacity": 0.28 },
+              paint: { "fill-color": accent.fill, "fill-opacity": 0.28 },
             },
             {
               id: "sanko-hit-line",
@@ -544,7 +548,7 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
               minzoom: 14,
               filter: parcelFilter(),
               layout: { visibility: "none" },
-              paint: { "line-color": "#8a6632", "line-width": 3 },
+              paint: { "line-color": accent.line, "line-width": 3 },
             },
           ] satisfies LayerSpecification[])
         : []),
@@ -558,7 +562,7 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
               minzoom: 14,
               filter: parcelFilter(),
               layout: { visibility: "none" },
-              paint: { "fill-color": "#c49a5c", "fill-opacity": 0.28 },
+              paint: { "fill-color": accent.fill, "fill-opacity": 0.28 },
             },
             {
               id: "kozu-hit-line",
@@ -568,7 +572,7 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
               minzoom: 14,
               filter: parcelFilter(),
               layout: { visibility: "none" },
-              paint: { "line-color": "#8a6632", "line-width": 3, "line-dasharray": [2, 1] },
+              paint: { "line-color": accent.line, "line-width": 3, "line-dasharray": [2, 1] },
             },
           ] satisfies LayerSpecification[])
         : []),
