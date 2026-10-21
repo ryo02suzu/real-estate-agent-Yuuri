@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DesktopShell } from "@/components/desktop-shell";
-import { Header } from "@/components/header";
 import { useDesktop } from "@/lib/use-desktop";
 import { HistoryList } from "@/components/history-list";
-import { MockHome } from "@/components/mock-home";
+import { MobileHome } from "@/components/mobile-home";
+import { MobileResult } from "@/components/mobile-result";
+import { BottomNav, MobileFrame, MobileHeader, MobileSearch } from "@/components/mobile-shell";
 import { AlertIcon, AreaIcon, BookmarkIcon, ChevronRightIcon, ClockIcon, InfoIcon, PinIcon, TrashIcon } from "@/components/icons";
 import { CitiesSheet, HelpSheet, MenuSheet, type SheetName } from "@/components/info-sheets";
 import { FullMap } from "@/components/full-map";
@@ -13,9 +14,8 @@ import { openDraft } from "@/components/draft-sheet";
 import { GuideMapSheet } from "@/components/guide-map";
 import { LocationPicker } from "@/components/location-picker";
 import { ResultView, type MapOpen } from "@/components/result-view";
-import { SearchCard } from "@/components/search-card";
 import { Sheet } from "@/components/sheet";
-import { favoriteKey, loadFavorites, removeFavorite, type FavoriteItem } from "@/lib/favorites";
+import { favoriteKey, loadFavorites, removeFavorite, toggleFavorite, type FavoriteItem } from "@/lib/favorites";
 import { addHistory, clearHistory, loadHistory, type HistoryItem } from "@/lib/history";
 import { lookup, lookupPoint, MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
 
@@ -49,6 +49,8 @@ export default function Home() {
   // お気に入り（保存した物件。端末の中だけ）
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [sheet, setSheet] = useState<AnySheet | null>(null);
+  // スマホの検索窓（「住所を入れて調べる」で入力欄へ）
+  const inputRef = useRef<HTMLInputElement>(null);
   // スマホの「案内図」（メニューから開く。PC は結果の印刷の欄から）
   const [guide, setGuide] = useState(false);
   // スマホの「地図で選ぶ」画面（start: 最初に表示する地点）
@@ -252,70 +254,69 @@ export default function Home() {
     );
   }
 
-  // 検索する前：見本の絵を敷いたホーム（絵の各部分にボタンを重ねたもの。縦にスクロールする）
-  if (!shown) {
-    return (
-      <>
-        <MockHome
-          input={input}
-          setInput={setInput}
-          onSearch={() => search(input, true)}
-          loading={loading}
-          error={error}
-          onAction={(a) => {
-            if (a === "map") setPicker({});
-            else if (a === "history" || a === "favorites" || a === "account" || a === "menu" || a === "help") open(a);
-          }}
-        />
-        {sheetsEl}
-        {picker && (
-          <LocationPicker
-            start={picker.start}
-            onClose={() => setPicker(null)}
-            onPick={(lat, lng) => {
-              setPicker(null);
-              void searchPoint(lat, lng);
-            }}
+  // スマホ：新しい見た目（紺）。上にロゴと検索窓、いちばん下にメニュー。検索する前はホーム、したあとは結果（縦にスクロールする）
+  const fav = shown && (shown.result.status === "ok" || shown.result.status === "unsupported") ? favoriteOf(shown) : undefined;
+  return (
+    <div className="theme-navy flex min-h-0 flex-1 flex-col">
+      <MobileFrame
+        header={<MobileHeader onHome={shown ? backHome : undefined} onHistory={() => open("history")} onFavorites={() => open("favorites")} onMenu={() => open("menu")} />}
+        search={
+          <>
+            <MobileSearch inputRef={inputRef} input={input} setInput={setInput} onSearch={() => search(input, true)} loading={loading} onMap={shown ? undefined : () => setPicker({})} />
+            {error && <ErrorLine text={error} />}
+          </>
+        }
+        nav={
+          <BottomNav
+            active={shown ? undefined : "home"}
+            onHome={shown ? backHome : () => inputRef.current?.focus()}
+            onHistory={() => open("history")}
+            onFavorites={() => open("favorites")}
+            onAccount={() => open("account")}
+          />
+        }
+      >
+        {shown ? (
+          shown.result.status === "ok" ? (
+            <MobileResult
+              key={shown.query}
+              result={shown.result}
+              onPick={(a) => search(a, false)}
+              onFix={() => {
+                const r = shown.result;
+                setPicker({ start: r.status === "ok" || r.status === "unsupported" ? { lat: r.lat, lng: r.lng } : undefined });
+              }}
+              onExpand={(o) => setFullMap(o ?? {})}
+              favorite={!!fav && favorites.some((f) => favoriteKey(f) === favoriteKey(fav))}
+              onToggleFavorite={() => fav && setFavorites(toggleFavorite(fav))}
+            />
+          ) : (
+            // 見つからない・候補から選ぶ・未対応の市町村（前からの画面）
+            <div className="px-4 pt-3">
+              <ResultView
+                query={shown.query}
+                result={shown.result}
+                onPick={(a) => search(a, false)}
+                onFix={() => {
+                  const r = shown.result;
+                  setPicker({ start: r.status === "unsupported" ? { lat: r.lat, lng: r.lng } : undefined });
+                }}
+                onExpand={(o) => setFullMap(o ?? {})}
+              />
+            </div>
+          )
+        ) : (
+          <MobileHome
+            history={history}
+            onPickHistory={pickHistory}
+            onShowHistory={() => open("history")}
+            onHelp={() => open("help")}
+            onCities={() => open("cities")}
+            onStart={() => inputRef.current?.focus()}
+            areaText={AREA_TEXT}
           />
         )}
-      </>
-    );
-  }
-
-  // 結果：スクロールしない1画面の作り。画面の高さに応じて地図プレビューが伸び縮みする（まだ前の見た目）
-  return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-      {/* 右上から流れるゴールドの細い弧（モックの飾り） */}
-      <svg aria-hidden viewBox="0 0 400 400" className="pointer-events-none absolute -right-40 -top-28 h-[360px] w-[360px] text-brand-light/40">
-        <path d="M90 0 C130 150 250 250 400 290" stroke="currentColor" strokeWidth="1.2" fill="none" />
-      </svg>
-
-      <main className="relative mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pb-2 pt-[max(12px,env(safe-area-inset-top))] lg:max-w-5xl lg:px-8">
-        <Header onMenu={() => open("menu")} onHome={backHome} compact />
-
-        <div className="mt-3 flex min-h-0 flex-1 flex-col gap-2.5 [&>*]:shrink-0 [&>*:last-child]:shrink">
-          <SearchCard value={input} onChange={setInput} onSearch={() => search(input, true)} loading={loading} compact />
-          {error && <ErrorLine text={error} />}
-          <ResultView
-            query={shown.query}
-            result={shown.result}
-            onPick={(a) => search(a, false)}
-            onFix={() => {
-              const r = shown.result;
-              setPicker({ start: r.status === "ok" || r.status === "unsupported" ? { lat: r.lat, lng: r.lng } : undefined });
-            }}
-            onExpand={(o) => setFullMap(o ?? {})}
-          />
-        </div>
-      </main>
-
-      <footer className="relative px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-1">
-        <p className="mx-auto flex max-w-md items-start gap-2 text-[10.5px] lg:max-w-5xl lg:justify-center leading-[1.7] text-muted">
-          <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
-          {/* 結果をスクロールさせないよう1行に */}
-          <span>地図は参考情報です。最終確認は必ず役所の窓口で。</span>
-        </p>
-      </footer>
+      </MobileFrame>
 
       {sheetsEl}
       {picker && (
@@ -340,6 +341,19 @@ export default function Home() {
       )}
     </div>
   );
+}
+
+/** お気に入りに入れる形（検索した文字か、地図で選んだ地点。調べ直すときにそのまま使う） */
+function favoriteOf(shown: Shown): FavoriteItem {
+  const r = shown.result;
+  const ok = r.status === "ok" ? r : undefined;
+  return {
+    address: shown.query,
+    city: ok?.municipality.name,
+    coverage: ok?.municipality.coverage,
+    at: Date.now(),
+    ...(ok?.picked ? { ll: [ok.lat, ok.lng] as [number, number] } : {}),
+  };
 }
 
 function ErrorLine({ text }: { text: string }) {

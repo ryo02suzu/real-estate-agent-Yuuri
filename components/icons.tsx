@@ -263,3 +263,42 @@ export const ArrowRightIcon = ({ className }: P) => (
     <path d="M5 12h14M13 6l6 6-6 6" />
   </svg>
 );
+
+/** お気に入り（星） */
+export const StarIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z" />
+  </svg>
+);
+
+/** 相場・取引（棒グラフ） */
+export const BarsIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M5 20v-7M11 20V5M17 20v-9M3 20h18" />
+  </svg>
+);
+
+/** ハザード（三角の注意） */
+export const TriangleAlertIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M12 3.5 2.8 19.5h18.4zM12 9.5v4.5M12 17h.01" />
+  </svg>
+);
+
+/** 取引事例（データ） */
+export const DatabaseIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <ellipse cx="12" cy="6" rx="8" ry="3" />
+    <path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
+  </svg>
+);
+
+/** 共有（つながった点） */
+export const ShareNodesIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <circle cx="18" cy="5" r="2.5" />
+    <circle cx="6" cy="12" r="2.5" />
+    <circle cx="18" cy="19" r="2.5" />
+    <path d="m8.2 10.8 7.6-4.6M8.2 13.2l7.6 4.6" />
+  </svg>
+);

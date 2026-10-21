@@ -356,7 +356,7 @@ function useFit(ref: React.RefObject<HTMLDivElement | null>) {
 }
 
 /** 「住所コピー」で写す文字。地番で探した筆は地番まで（地図システムの住所検索に貼る） */
-function copyText(result: Extract<LookupResult, { status: "ok" }>): string {
+export function copyText(result: Extract<LookupResult, { status: "ok" }>): string {
   const p = result.parcel;
   return p && !result.picked && /^\d/.test(p.chibanRaw) ? `${result.matchedAddress}${p.chibanRaw}` : result.matchedAddress;
 }
@@ -544,7 +544,7 @@ function RoadHeading({ municipality: m }: { municipality: Municipality }) {
 }
 
 /** 読み込めた結果だけを、共有の文面・重説の下書きに渡す形にする（読み込み中・失敗は渡さない） */
-function loaded({
+export function loaded({
   zoning,
   parcels,
   roads,
