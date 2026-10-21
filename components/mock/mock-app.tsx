@@ -4,7 +4,7 @@
 // 幅393ptの絵を、画面の幅に合わせて拡大・縮小して出す（どの機種でも絵と同じ見た目）。
 // 写真と地図は NO IMAGE（写真はあとで届く）。押して動くのはタブの切り替えだけ。
 // 5枚の絵は上の部分の大きさが少しずつ違うので、タブごとにその絵の配置（layouts.ts）で描く
-import { useState, useSyncExternalStore } from "react";
+import { useLayoutEffect, useState } from "react";
 import {
   Bookmark,
   Building2,
@@ -28,6 +28,7 @@ import {
 import { ART_W, at, T } from "./kit";
 import { BarsOutline, ClockBack, HouseFill, MockLogoMark } from "./icons";
 import { LAYOUTS, type Layout } from "./layouts";
+import { applyMockZoom } from "./zoom";
 import { BasicTab } from "./tab-basic";
 import { AroundTab } from "./tab-around";
 import { LawTab } from "./tab-law";
@@ -41,20 +42,8 @@ export const NAVY = "#133664";
 const STATUS_BAR = 24;
 const ADDRESS = "東京都渋谷区神南１丁目１９-１１";
 
-// 画面の幅 ÷ 絵の幅 で全体を拡大・縮小する（タブレットでは大きくなりすぎないよう上限）
-const subscribe = (cb: () => void) => {
-  window.addEventListener("resize", cb);
-  return () => window.removeEventListener("resize", cb);
-};
-const getZoom = () => {
-  const w = Math.min(
-    window.innerWidth,
-    document.documentElement.clientWidth || window.innerWidth,
-    window.visualViewport?.width ?? window.innerWidth,
-  );
-  return Math.min(w / ART_W, 1.3);
-};
-const useZoom = () => useSyncExternalStore(subscribe, getZoom, () => 1);
+// 画面の幅 ÷ 絵の幅 で全体を拡大・縮小する。値は app/layout.tsx の <head> のスクリプトが CSS 変数に入れる（zoom.ts）
+const ZOOM = "var(--mock-zoom, 1)";
 
 /** 絵ごとに違う小さなアイコン（取引事例のタブ・最近の検索・下のメニューの検索履歴） */
 const ICON_VARIANT: Record<
@@ -74,7 +63,8 @@ const ICON_VARIANT: Record<
 
 export function MockApp() {
   const [tab, setTab] = useState<Exclude<MockTab, "price">>("basic");
-  const zoom = useZoom();
+  // 開発中の再マウントで <html> の style が消えたときのため、もう一度入れる（本番では同じ値を入れ直すだけ）
+  useLayoutEffect(() => applyMockZoom(), []);
   const L = LAYOUTS[tab];
   const cardBottom = L.buttons.y + L.buttons.h + 1.9;
   const h = cardBottom + 2;
@@ -87,7 +77,7 @@ export function MockApp() {
         {/* 絵のいちばん上（時刻・電池のステータスバー）の分は、本物のステータスバーが出るので切り落とす */}
         <div
           className="relative mx-auto select-none overflow-hidden"
-          style={{ width: ART_W, height: h - STATUS_BAR, zoom }}
+          style={{ width: ART_W, height: h - STATUS_BAR, zoom: ZOOM }}
         >
           <div
             className="absolute left-0"
@@ -119,7 +109,7 @@ export function MockApp() {
           </div>
         </div>
       </div>
-      <BottomNav L={L} zoom={zoom} history={ICON_VARIANT[tab].history} />
+      <BottomNav L={L} history={ICON_VARIANT[tab].history} />
     </div>
   );
 }
@@ -582,20 +572,12 @@ const NAV_ICON: Record<string, (on: boolean) => React.ReactNode> = {
 /** 絵の中で濃い紺になっている項目（周辺環境の絵では「周辺環境」も濃い） */
 const NAV_DARK = ["ホーム", "周辺環境"];
 
-function BottomNav({
-  L,
-  zoom,
-  history,
-}: {
-  L: Layout;
-  zoom: number;
-  history: "clock" | "search";
-}) {
+function BottomNav({ L, history }: { L: Layout; history: "clock" | "search" }) {
   return (
     <nav className="shrink-0 overflow-hidden bg-white pb-[max(0px,calc(env(safe-area-inset-bottom)-12px))] shadow-[0_-1px_6px_rgba(16,40,80,0.06)]">
       <div
         className="relative mx-auto"
-        style={{ width: ART_W, height: 51, zoom }}
+        style={{ width: ART_W, height: 51, zoom: ZOOM }}
       >
         {L.nav.labels.map((label, i) => {
           const dark = NAV_DARK.includes(label);
