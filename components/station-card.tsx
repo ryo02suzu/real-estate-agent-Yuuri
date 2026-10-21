@@ -6,7 +6,8 @@
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
 import { lineLabel, nearestStations, STATION_CREDIT, type StationWalk } from "@/lib/roadmap/walk";
-import { ChevronRightIcon, InfoIcon, TrainIcon } from "./icons";
+import { ChevronRightIcon, TrainIcon } from "./icons";
+import { Notes } from "./notes";
 import { PoiList, type PoiState } from "./poi-card";
 import { Sheet } from "./sheet";
 import { Tabs } from "./tabs";
@@ -55,7 +56,7 @@ export function StationLine({ state, pois, onOpen }: { state: StationState; pois
       <button
         onClick={() => (onOpen ? onOpen() : setOpen(true))}
         disabled={state.status !== "ok"}
-        className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-left text-[11px] leading-[1.5] text-ink lg:hover:border-brand-light/60"
+        className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-left text-[12px] leading-[1.5] lg:py-1.5 lg:text-[13px] text-ink lg:hover:border-brand-light/60"
       >
         <TrainIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
         <span className={onOpen ? "shrink-0 text-muted" : "sr-only"}>最寄り駅</span>
@@ -89,24 +90,23 @@ export function StationList({ stations }: { stations: StationWalk[] }) {
     <div>
       <ul className="divide-y divide-line">
         {stations.map((s) => (
-          <li key={s.name} className="py-2">
+          <li key={s.name} className="py-2.5 dense:py-2 densest:py-1.5">
             <p className="flex flex-wrap items-baseline gap-x-2 text-ink">
-              <b className="text-[15px] font-semibold">{s.name}駅</b>
-              <span className="text-[14px] font-semibold text-brand">{walkText(s)}</span>
-              {s.routed && <span className="text-[11.5px] text-muted">道路距離{distText(s.meters)}（直線{distText(s.straight)}）</span>}
+              <b className="text-[16px] font-semibold">{s.name}駅</b>
+              <span className="text-[15px] font-semibold text-brand">{walkText(s)}</span>
+              {s.routed && <span className="text-[12px] text-muted">道路距離{distText(s.meters)}（直線{distText(s.straight)}）</span>}
             </p>
-            <p className="text-[11.5px] leading-[1.6] text-muted">{s.lines.map(lineLabel).join("・")}</p>
+            <p className="text-[12.5px] leading-[1.6] text-muted">{s.lines.map(lineLabel).join("・")}</p>
           </li>
         ))}
       </ul>
-      <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted">
-        <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        <span>
+      <Notes lead="道路距離 80m を1分とした目安です。広告には実際の道路距離で。" source="国土数値情報（鉄道データ）（国土交通省）・地理院地図Vector">
+        <p>
           国土地理院の地図の道路をたどった、物件の地点から駅（ホームの位置）までの目安です（道路距離 80m を1分）。駅の出入口までの道のりや信号・歩道橋は含まないので、広告に書くときは実際の道路距離で確かめてください。
           {stations.some((s) => !s.routed) && "「直線」は、歩いて行ける範囲（2km）に駅が無い・道がつながらないときの直線距離です。"}
-        </span>
-      </p>
-      <p className="mt-1 text-[10px] leading-[1.5] text-muted">{STATION_CREDIT}</p>
+        </p>
+        <p>{STATION_CREDIT}</p>
+      </Notes>
     </div>
   );
 }
@@ -116,7 +116,7 @@ export function StationCard({ state }: { state: StationState }) {
   if (state.status === "ok" && state.stations.length === 0) return null;
   return (
     <section className="rounded-2xl border border-line bg-white px-4 py-3 shadow-soft">
-      <h3 className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+      <h3 className="flex items-center gap-1.5 text-[14.5px] font-bold text-ink">
         <TrainIcon className="h-4 w-4 text-brand-light" />
         最寄り駅（徒歩の目安）
       </h3>

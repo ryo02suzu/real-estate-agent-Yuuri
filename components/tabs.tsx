@@ -7,14 +7,14 @@ export function Tabs({ names, panels }: { names: string[]; panels: React.ReactNo
   const [tab, setTab] = useState(0);
   return (
     <div>
-      <div role="tablist" className="mb-2 flex gap-1 densest:mb-1">
+      <div role="tablist" className="mb-2 flex gap-1.5 densest:mb-1">
         {names.map((n, i) => (
           <button
             key={n}
             role="tab"
             aria-selected={i === tab}
             onClick={() => setTab(i)}
-            className={`rounded-full border px-2.5 py-1 text-[11.5px] densest:py-0.5 ${i === tab ? "border-brand bg-brand text-white" : "border-line text-ink"}`}
+            className={`rounded-full border px-3 py-1.5 text-[12.5px] dense:py-1 densest:py-0.5 ${i === tab ? "border-brand bg-brand text-white" : "border-line text-ink"}`}
           >
             {n}
           </button>

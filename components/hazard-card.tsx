@@ -26,7 +26,8 @@ import {
   type HazardReport,
 } from "@/lib/roadmap/hazard";
 import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
-import { AlertIcon, ChevronRightIcon, ExternalIcon, HazardIcon, InfoIcon, MapIcon } from "./icons";
+import { AlertIcon, ChevronRightIcon, ExternalIcon, HazardIcon, MapIcon } from "./icons";
+import { Notes } from "./notes";
 import { Sheet } from "./sheet";
 
 export type HazardState =
@@ -111,7 +112,7 @@ export function HazardLine({
       <button
         onClick={() => (onOpen ? onOpen() : setOpen(true))}
         disabled={state.status !== "ok"}
-        className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-left text-[11px] leading-[1.5] text-ink lg:hover:border-brand-light/60"
+        className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-left text-[12px] leading-[1.5] lg:py-1.5 lg:text-[13px] text-ink lg:hover:border-brand-light/60"
       >
         <HazardIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
         <span className={compact ? "sr-only" : "shrink-0 text-muted"}>災害リスク</span>
@@ -156,7 +157,7 @@ export function HazardLine({
 export function HazardCard({ state, city, onShowMap }: { state: HazardState; city: string; onShowMap?: (kind: HazardKind) => void }) {
   return (
     <section className="shadow-soft rounded-2xl border border-white bg-white p-4">
-      <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+      <h3 className="mb-2 flex items-center gap-1.5 text-[14.5px] font-semibold text-ink">
         <HazardIcon className="h-4 w-4 text-brand-light" />
         災害リスク（参考）
       </h3>
@@ -178,24 +179,24 @@ function HazardDetail({ state, city, onShowMap }: { state: Extract<HazardState, 
       <dl className="divide-y divide-line/70">
         {rows.map((r) => (
           // シートで画面に入りきらなければ、行の間 → 文字 → 行の高さの順に詰める（components/sheet.tsx の useDense）
-          <div key={r.kind} className="flex items-start gap-3 py-1.5 dense:py-1 denser:py-[3px] densest:py-[2px]">
-            <dt className="w-[6.5em] shrink-0 text-[11.5px] leading-[1.6] text-muted denser:text-[11px] densest:leading-[1.4]">{r.name}</dt>
+          <div key={r.kind} className="flex items-start gap-3 py-2 dense:py-1.5 denser:py-1 densest:py-[3px]">
+            <dt className="w-[6.6em] shrink-0 text-[12.5px] leading-[1.6] text-muted denser:text-[12px] densest:leading-[1.4]">{r.name}</dt>
             <dd className="min-w-0 flex-1">
               <span
-                className={`flex items-start gap-1.5 text-[13px] font-semibold leading-[1.5] denser:text-[12.5px] densest:leading-[1.35] ${r.warn ? "text-[#8a4f3a]" : "text-ink"}`}
+                className={`flex items-start gap-1.5 text-[14.5px] font-semibold leading-[1.5] denser:text-[13.5px] densest:leading-[1.35] ${r.warn ? "text-[#8a4f3a]" : "text-ink"}`}
               >
-                {r.color && <span className="mt-[5px] h-2.5 w-2.5 shrink-0 rounded-sm border border-black/10 densest:mt-[4px]" style={{ background: r.color }} />}
-                {r.warn && !r.color && <AlertIcon className="mt-[3px] h-3.5 w-3.5 shrink-0 densest:mt-[2px]" />}
+                {r.color && <span className="mt-[6px] h-2.5 w-2.5 shrink-0 rounded-sm border border-black/10 densest:mt-[5px]" style={{ background: r.color }} />}
+                {r.warn && !r.color && <AlertIcon className="mt-[3px] h-4 w-4 shrink-0 densest:mt-[2px]" />}
                 <span>{r.value}</span>
               </span>
-              {r.sub && <span className="mt-0.5 block text-[10.5px] leading-[1.55] text-muted dense:mt-0 denser:text-[10px] densest:leading-[1.35]">{r.sub}</span>}
+              {r.sub && <span className="mt-0.5 block text-[11.5px] leading-[1.55] text-muted dense:mt-0 denser:text-[11px] densest:leading-[1.35]">{r.sub}</span>}
             </dd>
             {onShowMap && r.kind !== "elevation" && (
               <button
                 onClick={() => onShowMap(r.kind as HazardKind)}
                 aria-label={`${r.name}を地図に重ねる`}
                 title="地図に重ねる"
-                className="mt-0.5 flex shrink-0 items-center gap-0.5 rounded-full border border-line px-1.5 py-0.5 text-[10.5px] text-brand lg:hover:bg-mint densest:mt-0 densest:py-0"
+                className="flex shrink-0 items-center gap-1 rounded-full border border-line px-2 py-1 text-[11.5px] text-brand lg:hover:bg-mint densest:py-0.5"
               >
                 <MapIcon className="h-3 w-3" />
                 地図
@@ -207,7 +208,7 @@ function HazardDetail({ state, city, onShowMap }: { state: Extract<HazardState, 
 
       {/* 重要事項説明（水害）は市区町村のハザードマップで。国の一覧の登録先へ */}
       <div className="mt-2.5 rounded-xl bg-[#f7f3ec] px-3 py-2 dense:mt-2 dense:py-1.5 densest:mt-1.5 densest:py-1">
-        <p className="text-[11.5px] font-semibold text-ink">重要事項説明は{city}のハザードマップで</p>
+        <p className="text-[12.5px] font-semibold text-ink">重要事項説明は{city}のハザードマップで</p>
         {/* 種類ごとのページは「洪水・内水」のように並べる（見出しに市の名前があるので、リンクは種類だけ） */}
         <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 dense:mt-0.5">
           {groups.map((g) => (
@@ -217,7 +218,7 @@ function HazardDetail({ state, city, onShowMap }: { state: Extract<HazardState, 
                 target="_blank"
                 rel="noreferrer"
                 aria-label={mapTitle(city, g.kinds)}
-                className="flex items-center gap-1 text-[12px] leading-[1.5] text-brand underline-offset-2 hover:underline"
+                className="flex items-center gap-1 text-[13px] leading-[1.6] text-brand underline-offset-2 hover:underline"
               >
                 <ExternalIcon className="h-3 w-3 shrink-0" />
                 {g.kinds.map((k) => HAZARD_MAP_LABELS[k]).join("・")}
@@ -230,7 +231,7 @@ function HazardDetail({ state, city, onShowMap }: { state: Extract<HazardState, 
               target="_blank"
               rel="noreferrer"
               aria-label={`わがまちハザードマップ（国の一覧で${city}を開く）`}
-              className="flex items-center gap-1 text-[12px] leading-[1.5] text-brand underline-offset-2 hover:underline"
+              className="flex items-center gap-1 text-[13px] leading-[1.6] text-brand underline-offset-2 hover:underline"
             >
               <ExternalIcon className="h-3 w-3 shrink-0" />
               わがまちハザードマップ（国の一覧）
@@ -239,8 +240,8 @@ function HazardDetail({ state, city, onShowMap }: { state: Extract<HazardState, 
         </ul>
         {groups.length === 0 && <p className="mt-1 text-[10.5px] text-muted">国の一覧に{city}のページの登録がありません。{city}の防災の窓口で確認してください。</p>}
         {/* 地盤（大規模盛土造成地・液状化）は読み取らず、国の重ねるハザードマップを物件の場所で開く */}
-        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 border-t border-line/70 pt-1.5 text-[12px] leading-[1.5] dense:mt-1 dense:pt-1">
-          <span className="text-[11px] text-muted" title={GROUND_NOTE}>
+        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 border-t border-line/70 pt-1.5 text-[13px] leading-[1.6] dense:mt-1 dense:pt-1">
+          <span className="text-[12px] text-muted" title={GROUND_NOTE}>
             地盤（国の地図）
           </span>
           {state.ground.map((g) => (
@@ -252,19 +253,24 @@ function HazardDetail({ state, city, onShowMap }: { state: Extract<HazardState, 
         </p>
       </div>
 
-      <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted dense:mt-1.5 dense:leading-[1.5] denser:text-[10px] densest:mt-1 densest:leading-[1.4]">
-        <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
-        <span>
-          {HAZARD_TABLE_NOTE}。国の「重ねるハザードマップ」のデータを、物件の地点の色から読み取ったものです。市区町村が作るハザードマップではないため、重要事項説明には使えません。国のデータに無い川・区域や、市区町村独自の想定は含みません。土砂災害警戒区域等のデータは、重要事項説明や土砂災害防止法の手続きの根拠に使えません（都道府県の公表図で確認）。{GROUND_NOTE}。
-          <span className="mt-1 block dense:mt-0.5">
-            出典：
+      <Notes
+        lead="国のデータを地点の色から読んだ参考値です。重要事項説明には使えません。"
+        source={
+          <>
             <a href="https://disaportal.gsi.go.jp/" target="_blank" rel="noreferrer" className="underline">
               ハザードマップポータルサイト
             </a>
-            （国土交通省・国土地理院）を加工して作成。洪水・浸水継続時間・家屋倒壊等：国土交通省 各地方整備局等・都道府県／内水：市町村／高潮・津波：都道府県／土砂災害：「国土数値情報（土砂災害警戒区域）」をもとに国土地理院が加工。標高：地理院タイル。
-          </span>
-        </span>
-      </p>
+            （国土交通省・国土地理院）
+          </>
+        }
+      >
+        <p>
+          {HAZARD_TABLE_NOTE}。国の「重ねるハザードマップ」のデータを、物件の地点の色から読み取ったものです。市区町村が作るハザードマップではないため、重要事項説明には使えません。国のデータに無い川・区域や、市区町村独自の想定は含みません。土砂災害警戒区域等のデータは、重要事項説明や土砂災害防止法の手続きの根拠に使えません（都道府県の公表図で確認）。{GROUND_NOTE}。
+        </p>
+        <p>
+          出典：ハザードマップポータルサイト（国土交通省・国土地理院）を加工して作成。洪水・浸水継続時間・家屋倒壊等：国土交通省 各地方整備局等・都道府県／内水：市町村／高潮・津波：都道府県／土砂災害：「国土数値情報（土砂災害警戒区域）」をもとに国土地理院が加工。標高：地理院タイル。
+        </p>
+      </Notes>
     </div>
   );
 }

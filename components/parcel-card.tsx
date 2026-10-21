@@ -13,7 +13,8 @@ import { adjacentParcels, chibanLabel, kuikiLabel, parcelAt, parcelMark, type Ne
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
 import { SANKO_CITIES, sankoSource } from "@/lib/roadmap/sanko-data";
-import { ChevronRightIcon, CopyIcon, ExternalIcon, InfoIcon, ParcelIcon } from "./icons";
+import { ChevronRightIcon, CopyIcon, ExternalIcon, ParcelIcon } from "./icons";
+import { Notes } from "./notes";
 import { Sheet } from "./sheet";
 import { Tabs } from "./tabs";
 import { useCopy } from "./use-copy";
@@ -91,7 +92,7 @@ export function ParcelButton({
         target="_blank"
         rel="noreferrer"
         title={chibanzu.name}
-        className="flex shrink-0 items-center gap-1 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-[11px] leading-[1.5] text-ink lg:hover:border-brand-light/60"
+        className="flex shrink-0 items-center gap-1 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-[12px] leading-[1.5] text-ink lg:py-1.5 lg:text-[13px] lg:hover:border-brand-light/60"
       >
         <ParcelIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
         地番図
@@ -141,7 +142,7 @@ export function ParcelCard({ info, chibanzu }: { info: ParcelInfo; chibanzu?: Ch
   if (info.status === "none" && !chibanzu) return null;
   return (
     <section className="shadow-soft rounded-2xl border border-white bg-white p-4">
-      <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+      <h3 className="mb-2 flex items-center gap-1.5 text-[14.5px] font-semibold text-ink">
         <ParcelIcon className="h-4 w-4 text-brand-light" />
         謄本・公図を取るときの地番
       </h3>
@@ -165,8 +166,9 @@ function LinkButton({ href, title, sub }: { href: string; title: string; sub: st
     <a href={href} target="_blank" rel="noreferrer" className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-ink active:scale-[0.99] denser:py-1.5">
       <ExternalIcon className="h-4 w-4 shrink-0 text-brand-light" />
       <span className="min-w-0 flex-1">
-        <span className="block text-[12.5px] font-semibold leading-[1.4]">{title}</span>
-        <span className="mt-0.5 block text-[10px] leading-[1.45] text-muted">{sub}</span>
+        <span className="block text-[13.5px] font-semibold leading-[1.4]">{title}</span>
+        {/* 一番詰めても入りきらない画面（隣の筆が20を超える道路など）では、説明を省いて名前だけにする */}
+        <span className="mt-0.5 block text-[11px] leading-[1.45] text-muted densest:hidden">{sub}</span>
       </span>
       <ChevronRightIcon className="h-3.5 w-3.5 shrink-0 opacity-80" />
     </a>
@@ -195,32 +197,32 @@ function ParcelDetail({ info, chibanzu }: { info: Extract<ParcelInfo, { status: 
   const town = kuikiLabel(parcel.kuiki);
   return (
     <div>
-      <p className="text-[11px] text-muted">
+      <p className="text-[12px] text-muted">
         {KIND_LABEL[kind]}
         {parcel.estimated && `・公図から推定した位置${parcel.estimated === "low" ? "（確度低）" : ""}`}
         {parcel.sanko && `・${SANKO_CITIES[parcel.sanko]?.name ?? "市町村"}の地番参考図`}
       </p>
       <Row kuiki={parcel.kuiki} chiban={parcel.chibanRaw} strong />
       {parcel.estimated && (
-        <p className="mt-0.5 text-[10.5px] leading-[1.55] text-[#8a4f3a] dense:leading-[1.45] denser:text-[10px]">
+        <p className="mt-0.5 text-[12px] leading-[1.55] text-[#8a4f3a] dense:leading-[1.45] denser:text-[11.5px]">
           {parcel.estimated === "low"
             ? "この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置で、合わせ方の確かさが低いため、5m前後ずれて隣の筆の地番になっていることがあります。隣の筆も候補にして、謄本・公図で確かめてください。"
             : "この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、数mずれて隣の筆の地番になることがあります。謄本・公図で確かめてください。"}
         </p>
       )}
       {parcel.sanko && (
-        <p className="mt-0.5 text-[10.5px] leading-[1.55] text-[#8a4f3a] dense:leading-[1.45] denser:text-[10px]">
+        <p className="mt-0.5 text-[12px] leading-[1.55] text-[#8a4f3a] dense:leading-[1.45] denser:text-[11.5px]">
           {parcel.undetermined ? "登記所の地図では、この辺りは筆界未定地です。" : "この辺りの登記所の地図は公図（任意座標）です。"}
           市町村が公開している課税用の地番参考図の筆で、登記の地番・筆の形と違うことがあります。謄本・公図で確かめてください。
         </p>
       )}
       {kind === "address" && (
-        <p className="mt-0.5 text-[10.5px] leading-[1.55] text-[#8a4f3a] dense:leading-[1.45] denser:text-[10px]">
+        <p className="mt-0.5 text-[12px] leading-[1.55] text-[#8a4f3a] dense:leading-[1.45] denser:text-[11.5px]">
           住居表示の住所と地番は別のものです。物件の土地かどうかは、公図や登記で確かめてください。
         </p>
       )}
 
-      <p className="mt-3 text-[11px] text-muted dense:mt-2">
+      <p className="mt-3 text-[12px] text-muted dense:mt-2">
         境界が接している筆（{numbered.length}）{numbered.length > 0 && "。押すとその筆をコピー"}
       </p>
       {/* 隣の筆は多いと20を超えるので、1行に並べる（1画面に収める） */}
@@ -231,9 +233,9 @@ function ParcelDetail({ info, chibanzu }: { info: Extract<ParcelInfo, { status: 
           ))}
         </div>
       ) : (
-        <p className="py-1 text-[12px] text-muted">地図データの中には見つかりませんでした</p>
+        <p className="py-1 text-[13px] text-muted">地図データの中には見つかりませんでした</p>
       )}
-      {roads.length > 0 && <p className="mt-1 text-[11px] text-muted">ほかに{roads.join("・")}に接しています。</p>}
+      {roads.length > 0 && <p className="mt-1 text-[12px] text-muted">ほかに{roads.join("・")}に接しています。</p>}
 
       <div className="mt-3 flex flex-col gap-2 dense:mt-2 denser:gap-1.5">
         <CopyAll text={lines.join("\n")} count={lines.length} />
@@ -243,15 +245,17 @@ function ParcelDetail({ info, chibanzu }: { info: Extract<ParcelInfo, { status: 
           {chibanzu && <ChibanzuButton link={chibanzu} />}
         </div>
       </div>
-      <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted dense:leading-[1.5] denser:text-[10px] densest:mt-1.5 densest:leading-[1.4]">
-        <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
-        <span>
+      <Notes
+        lead="地番と筆の形は、謄本・公図で確かめてください。"
+        source={parcel.sanko ? `登記所備付地図データ（法務省）・${SANKO_CITIES[parcel.sanko]?.credit ?? "市町村の地番参考図"}` : "登記所備付地図データ（法務省）"}
+      >
+        <p>
           筆は「登記所備付地図データ」（法務省）を加工して作成（{parcel.estimated ? KOZU_DATA.edition || PARCEL_DATA.edition : PARCEL_DATA.edition}）。
           {parcel.estimated && "公図の筆は、国土地理院の基盤地図情報（道路縁）に合わせて位置を推定しています。"}
           {parcel.sanko && `参考図の筆の${sankoSource(parcel.sanko)}。`}
-          分筆・合筆などで変わっていることがあります。証明書として使う謄本（登記事項証明書）は、法務局で請求してください。
-        </span>
-      </p>
+        </p>
+        <p>分筆・合筆などで変わっていることがあります。証明書として使う謄本（登記事項証明書）は、法務局で請求してください。</p>
+      </Notes>
     </div>
   );
 }
@@ -261,13 +265,13 @@ function Row({ kuiki, chiban, strong, hideTown }: { kuiki: string; chiban: strin
   const { done, copy } = useCopy();
   return (
     <div className="flex items-center gap-2 py-1">
-      <span className={`min-w-0 flex-1 ${strong ? "text-[14px] font-semibold text-ink" : "text-[12.5px] text-ink"}`}>
+      <span className={`min-w-0 flex-1 ${strong ? "text-[16px] font-semibold text-ink" : "text-[13.5px] text-ink"}`}>
         {!hideTown && <span className={strong ? "" : "text-muted"}>{kuikiLabel(kuiki)} </span>}
         {chibanLabel(chiban)}
       </span>
       {/* 地番の無い道路・水路は請求できないのでコピーを出さない */}
       {/^\d/.test(chiban) && (
-        <button onClick={() => copy(`${kuikiLabel(kuiki)} ${chiban}`)} className="flex shrink-0 items-center gap-1 rounded-full border border-line px-2 py-0.5 text-[11px] text-brand">
+        <button onClick={() => copy(`${kuikiLabel(kuiki)} ${chiban}`)} className="flex shrink-0 items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[12px] text-brand">
           <CopyIcon className="h-3 w-3" />
           {done ? "コピー済" : "コピー"}
         </button>
@@ -282,7 +286,7 @@ function NeighborChip({ kuiki, chiban, hideTown }: { kuiki: string; chiban: stri
   return (
     <button
       onClick={() => copy(`${kuikiLabel(kuiki)} ${chiban}`)}
-      className={`rounded-full border px-2 py-0.5 text-[12px] leading-[1.5] dense:py-0 denser:px-1.5 denser:text-[11.5px] ${done ? "border-brand bg-mint text-brand" : "border-line text-ink"}`}
+      className={`rounded-full border px-2.5 py-1 text-[13px] leading-[1.5] dense:py-0.5 denser:px-2 denser:text-[12.5px] ${done ? "border-brand bg-mint text-brand" : "border-line text-ink"}`}
     >
       {!hideTown && <span className="text-muted">{kuikiLabel(kuiki)} </span>}
       {done ? "コピー済" : chiban}

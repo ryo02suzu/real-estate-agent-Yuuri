@@ -21,8 +21,12 @@ import {
 import { LAND_PRICE_DATA } from "@/lib/roadmap/land-price-data";
 import { pmtilesLandPriceSource } from "@/lib/roadmap/land-price-tiles";
 import { ROSENKA_CHECK, ROSENKA_NOTE, rosenkaLinks, type RosenkaLink } from "@/lib/roadmap/rosenka";
-import { ChevronRightIcon, ExternalIcon, InfoIcon, LandPriceIcon, MapIcon } from "./icons";
+import { ChevronRightIcon, ExternalIcon, LandPriceIcon, MapIcon } from "./icons";
+import { Notes } from "./notes";
 import { Sheet } from "./sheet";
+
+/** シート・カードに最初に出す地点の数（残りは「ほかの地点」で開く） */
+const SHOWN = 3;
 
 export type LandPriceState =
   | { status: "loading" }
@@ -76,7 +80,7 @@ export function LandPriceLine({
       <button
         onClick={() => (onOpen ? onOpen() : setOpen(true))}
         disabled={state.status !== "ok"}
-        className={`flex items-center gap-1.5 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-left text-[11px] leading-[1.5] text-ink lg:hover:border-brand-light/60 ${compact ? "shrink-0 gap-1" : "min-w-0 flex-1"}`}
+        className={`flex items-center gap-1.5 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-left text-[12px] leading-[1.5] lg:py-1.5 lg:text-[13px] text-ink lg:hover:border-brand-light/60 ${compact ? "shrink-0 gap-1" : "min-w-0 flex-1"}`}
       >
         <LandPriceIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
         <span className={compact ? "sr-only" : "shrink-0 text-muted"}>近くの地価</span>
@@ -119,27 +123,27 @@ export function LandPriceLine({
 function Item({ hit, onShowMap }: { hit: LandPriceHit; onShowMap?: (point: [number, number]) => void }) {
   const rows = landPriceRows(hit);
   return (
-    <li className="py-2">
+    <li className="py-2.5 dense:py-2 densest:py-1.5">
       <div className="flex items-start gap-2">
-        <span className="mt-[5px] h-2.5 w-2.5 shrink-0 rounded-full border border-black/10" style={{ background: LAND_USAGE_COLORS[hit.usage] }} />
+        <span className="mt-[6px] h-2.5 w-2.5 shrink-0 rounded-full border border-black/10" style={{ background: LAND_USAGE_COLORS[hit.usage] }} />
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] leading-[1.5] text-muted">
+          <p className="text-[12px] leading-[1.5] text-muted">
             {landPriceTitle(hit)}・{hit.bearing}へ{distanceText(hit.distance)}
           </p>
           <p className="flex flex-wrap items-baseline gap-x-2 text-ink">
-            <b className="text-[16px] font-semibold">{priceText(hit.price)}</b>
-            <span className="text-[11.5px] text-muted">{tsuboText(hit.price)}</span>
-            <span className={`rounded px-1 text-[11px] ${changeClass(hit.change)}`}>前年比 {changeText(hit.change)}</span>
+            <b className="text-[18px] font-semibold densest:text-[16px]">{priceText(hit.price)}</b>
+            <span className="text-[12.5px] text-muted">{tsuboText(hit.price)}</span>
+            <span className={`rounded px-1 text-[12px] ${changeClass(hit.change)}`}>前年比 {changeText(hit.change)}</span>
           </p>
-          <p className="text-[10.5px] text-muted">{asOfText(hit)}</p>
+          <p className="text-[11.5px] text-muted">{asOfText(hit)}</p>
           {rows.length > 0 && (
-            <details className="mt-1 text-[11.5px]">
+            <details className="mt-1 text-[12.5px]">
               <summary className="cursor-pointer text-brand">所在・前面道路・駅・用途地域など</summary>
               <dl className="mt-1 divide-y divide-line/70">
                 {rows.map((r) => (
                   <div key={r.label} className="flex gap-3 py-1">
-                    <dt className="w-[6.5em] shrink-0 text-[11px] leading-[1.6] text-muted">{r.label}</dt>
-                    <dd className="min-w-0 flex-1 text-[12px] leading-[1.5] text-ink">{r.value}</dd>
+                    <dt className="w-[6.5em] shrink-0 text-[12px] leading-[1.6] text-muted">{r.label}</dt>
+                    <dd className="min-w-0 flex-1 text-[13px] leading-[1.55] text-ink">{r.value}</dd>
                   </div>
                 ))}
               </dl>
@@ -149,7 +153,7 @@ function Item({ hit, onShowMap }: { hit: LandPriceHit; onShowMap?: (point: [numb
         {onShowMap && (
           <button
             onClick={() => onShowMap(hit.point)}
-            className="flex shrink-0 items-center gap-1 rounded-full border border-line px-2 py-0.5 text-[11px] text-brand hover:bg-mint"
+            className="flex shrink-0 items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[12px] text-brand hover:bg-mint"
             aria-label={`${kindText(hit.kind)} ${hit.no} を地図で見る`}
           >
             <MapIcon className="h-3.5 w-3.5" />
@@ -161,48 +165,57 @@ function Item({ hit, onShowMap }: { hit: LandPriceHit; onShowMap?: (point: [numb
   );
 }
 
-/** 地点の一覧（スマホのシート・PC のカード） */
+/** 地点の一覧（スマホのシート・PC のカード）。近い3地点を出し、残りは「ほかの地点」で開く */
 export function LandPriceDetail({ hits, rosenka, onShowMap }: { hits: LandPriceHit[]; rosenka?: RosenkaLink[]; onShowMap?: (point: [number, number]) => void }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? hits : hits.slice(0, SHOWN);
   return (
     <div>
-      <p className="text-[11px] leading-[1.6] text-muted">物件から近い順。標準地（地価公示）・基準地（都道府県地価調査）は、その地域の標準的な土地の価格です。物件そのものの価格ではありません。</p>
       <ul className="divide-y divide-line/70">
-        {hits.map((h) => (
+        {shown.map((h) => (
           <Item key={`${h.kind}|${h.no}`} hit={h} onShowMap={onShowMap} />
         ))}
       </ul>
+      {hits.length > SHOWN && (
+        <button onClick={() => setAll((v) => !v)} aria-expanded={all} className="mt-0.5 flex items-center gap-1 py-1 text-[12.5px] text-brand">
+          {all ? "近い3地点だけにする" : `ほかの地点（${hits.length - SHOWN}）も見る`}
+          <ChevronRightIcon className={`h-3.5 w-3.5 ${all ? "-rotate-90" : "rotate-90"}`} />
+        </button>
+      )}
       {/* 路線価は全国地価マップを物件の場所で開く（相続税・固定資産税の最新の年分・年度） */}
       {rosenka && rosenka.length > 0 && (
         <div className="mt-2 rounded-xl bg-[#f7f3ec] px-3 py-2 dense:mt-1.5 dense:py-1.5 densest:py-1">
-          <p className="text-[11.5px] font-semibold text-ink">路線価を地図で見る</p>
+          <p className="text-[12.5px] font-semibold text-ink">路線価を地図で見る</p>
           <ul className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
             {rosenka.map((l) => (
               <li key={l.kind}>
-                <a href={l.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[12px] leading-[1.5] text-brand underline-offset-2 hover:underline">
+                <a href={l.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[13px] leading-[1.6] text-brand underline-offset-2 hover:underline">
                   <ExternalIcon className="h-3 w-3 shrink-0" />
                   {l.name.replace(/等（/, "（")}
                 </a>
               </li>
             ))}
           </ul>
-          <p className="mt-0.5 text-[10.5px] leading-[1.5] text-muted denser:text-[10px] densest:leading-[1.4]">
-            {ROSENKA_NOTE}。{ROSENKA_CHECK}。
-          </p>
         </div>
       )}
-      <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted">
-        <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
-        <span>
-          国土交通省の地価公示（毎年1月1日時点）と、都県の地価調査（毎年7月1日時点）です。前年比は同じ地点の前年の価格との比べです。
-          <span className="mt-1 block">
-            出典：
-            <a href="https://nlftp.mlit.go.jp/ksj/" target="_blank" rel="noreferrer" className="underline">
-              「国土数値情報（地価公示データ・都道府県地価調査データ）」（国土交通省）
-            </a>
-            を加工して作成（{LAND_PRICE_DATA.edition}）
-          </span>
-        </span>
-      </p>
+      <Notes
+        lead="その地域の標準的な土地の価格で、物件そのものの価格ではありません。"
+        source={
+          <a href="https://nlftp.mlit.go.jp/ksj/" target="_blank" rel="noreferrer" className="underline">
+            国土数値情報（国土交通省）
+          </a>
+        }
+      >
+        <p>
+          物件から近い順。標準地（地価公示・毎年1月1日時点）・基準地（都道府県地価調査・毎年7月1日時点）は、その地域の標準的な土地の価格です。前年比は、同じ地点の前年の価格との比べです。
+        </p>
+        {rosenka && rosenka.length > 0 && (
+          <p>
+            路線価：{ROSENKA_NOTE}。{ROSENKA_CHECK}。
+          </p>
+        )}
+        <p>出典：「国土数値情報（地価公示データ・都道府県地価調査データ）」（国土交通省）を加工して作成（{LAND_PRICE_DATA.edition}）</p>
+      </Notes>
     </div>
   );
 }
@@ -212,7 +225,7 @@ export function LandPriceCard({ state, onShowMap }: { state: LandPriceState; onS
   if (state.status === "ok" && state.hits.length === 0) return null;
   return (
     <section className="shadow-soft rounded-2xl border border-white bg-white p-4">
-      <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+      <h3 className="mb-2 flex items-center gap-1.5 text-[14.5px] font-semibold text-ink">
         <LandPriceIcon className="h-4 w-4 text-brand-light" />
         近くの地価（参考）
       </h3>

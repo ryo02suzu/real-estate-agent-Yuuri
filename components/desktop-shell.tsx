@@ -15,9 +15,20 @@ import { SearchCard } from "./search-card";
 import { Wordmark } from "./header";
 
 const MARK = { src: "/logo-mark.webp", w: 204, h: 202 };
-/** 左のパネルの幅（地図の中心は、この分だけ右にずらす） */
-const PANEL = 440;
+/** 左のパネルの幅（地図の中心は、この分だけ右にずらす）。広い画面ほど広げ、地図の幅も残す（1024px で 440・1440px で 520） */
+const panelWidth = (w: number) => Math.round(Math.min(540, Math.max(440, 440 + (w - 1024) * 0.2)));
 const GAP = 20;
+
+/** 画面の幅に合わせたパネルの幅 */
+function usePanelWidth(): number {
+  const [w, setW] = useState(() => (typeof window === "undefined" ? 1024 : window.innerWidth));
+  useEffect(() => {
+    const on = () => setW(window.innerWidth);
+    addEventListener("resize", on);
+    return () => removeEventListener("resize", on);
+  }, []);
+  return panelWidth(w);
+}
 
 type Shown = { query: string; result: LookupResult };
 
@@ -59,6 +70,7 @@ export function DesktopShell({
 }) {
   // 動く地図が使えない端末では、地図で選び直す案内を出さない
   const [live] = useState(() => typeof document !== "undefined" && webglAvailable());
+  const PANEL = usePanelWidth();
   // 「/」で住所の入力欄へ（続けて次の物件を調べやすく）。入力中やシートの中では何もしない
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
