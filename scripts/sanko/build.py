@@ -7,6 +7,12 @@
   python3 scripts/sanko/build.py --jobs 3 --work work/sanko --out work/sanko.pmtiles --manifest lib/roadmap/data/sanko-source.json
   python3 scripts/sanko/build.py --only 13215 12227 --out work/test.pmtiles --work work/sanko   # 一部の市町村だけで試す
   python3 scripts/sanko/build.py --check      # 市町村の公開ファイルが新しくなったか（changed=true/false。--source と比べる）
+  python3 scripts/sanko/build.py --fetch-only --work work/import   # 埼玉県・千葉県のサイトのファイルだけ取る（下の「R2 の写し」）
+
+R2 の写し：埼玉県・千葉県のオープンデータサイトは、GitHub Actions（Microsoft のサーバー）からだと、どのページも 403 で読めない
+（2026年10月）。そこで、そのファイルは別の所（手元など）で --fetch-only で取り、ブランチの sanko-src/ に zip と import.json を置いて、
+ワークフロー（.github/workflows/sanko-tiles.yml）の import_ref で R2 の写し（sanko/src/）に足す。ワークフローは毎回その写しを
+<work>/src に置いてから作る。公開サイトに届かない市町村は、import.json か前に作ったときの情報（--source）にあるファイルを使う。
 
 17 市町村で約 198 万筆・タイル約 180MB（2026年10月）。ダウンロードは市町村の zip 約 0.5GB と法務省の地図XML 約 0.8GB（--work に残し、
 次に作るときも使う）。ダウンロード済みなら --jobs 3 で約 15 分。入間市は筆界の線しか無いので、線から面を作って地番の文字の中点で地番を付ける。
@@ -222,7 +228,8 @@ def get(url: str, timeout: int = 180, tries: int = 4) -> bytes:
             with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=timeout) as r:
                 return r.read()
         except urllib.error.HTTPError as e:
-            if e.code == 404 or i == tries - 1:
+            # 403（埼玉県・千葉県のサイトは GitHub Actions から読めない）と 404 は、読み直しても同じ
+            if e.code in (403, 404) or i == tries - 1:
                 raise
         except Exception:
             if i == tries - 1:
@@ -317,10 +324,18 @@ def ckan_resources(api: str, dataset: str) -> tuple[dict, list[dict]]:
     return info, out
 
 
-def resolve(src: dict) -> dict:
-    """いま公開されているファイル（合うリソースのうち一番新しいもの）"""
+def resolve(src: dict, known: dict | None = None) -> dict:
+    """いま公開されているファイル（合うリソースのうち一番新しいもの）。公開サイトに届かないときは、known（前に取ったファイル。
+    known_files）にその市町村があれば、それを使う（埼玉県・千葉県のサイトは GitHub Actions から 403。ファイルは R2 の写しを使う）"""
     f = src["fetch"]
-    info, res = dataeye_resources(f["base"], f["dataset"]) if f["kind"] == "dataeye" else ckan_resources(f["api"], f["dataset"])
+    try:
+        info, res = dataeye_resources(f["base"], f["dataset"]) if f["kind"] == "dataeye" else ckan_resources(f["api"], f["dataset"])
+    except Exception as e:
+        k = (known or {}).get(src["code"])
+        if not k:
+            raise
+        log(f"::warning::{src['code']} {src['name']}: 公開サイトに届かないので（{type(e).__name__}: {e}）、前に取ったファイル {k['file']}（{k['modified']}）を使います")
+        return k
     pat = re.compile(f["resource"])
     cand = [r for r in res if pat.search(r["name"]) or pat.search(urllib.parse.unquote(r["file"]))]
     if not cand:
@@ -328,6 +343,45 @@ def resolve(src: dict) -> dict:
     best = max(cand, key=lambda r: (r["modified"], r["id"]))
     page = f"{f['base']}/datasets/{f['dataset']}" if f["kind"] == "dataeye" else f"{f['api'].replace('/api/3/action', '')}/dataset/{f['dataset']}"
     return {**best, "title": info.get("title", ""), "org": info.get("org", ""), "page": page}
+
+
+def known_files(source_path: str | None, work: str) -> dict:
+    """前に取ったファイルの情報（resolve と同じ形。市区町村コード → 情報）。前に作ったときの情報（--source）と、別の所で取って
+    足したファイルの <work>/src/import.json（--fetch-only で書く。こちらが優先）から"""
+    known = {}
+    if source_path and os.path.exists(source_path):
+        for code, e in json.load(open(source_path, encoding="utf-8")).get("sources", {}).items():
+            m = re.search(r"/resource_download/(\d+)$", e.get("url", ""))
+            rid = e.get("id") or (m.group(1) if m else "")
+            if rid:
+                known[code] = {
+                    "id": rid, "name": "", "file": e["file"], "modified": e["modified"], "size": e["size"],
+                    "license": e.get("portal_license", ""), "terms": e.get("terms", ""), "url": e["url"], "page": e["page"],
+                }
+    imp = os.path.join(work, "src", "import.json")
+    if os.path.exists(imp):
+        known.update(json.load(open(imp, encoding="utf-8")))
+    return known
+
+
+def fetch_only(srcs: list[dict], work: str) -> None:
+    """市町村のファイルを <work>/src に取り、resolve の情報を <work>/src/import.json に書く。GitHub Actions から読めないサイトの
+    ファイルを別の所（手元など）で取り、ブランチの sanko-src/ に置いて、ワークフローの import_ref で R2 の写しに足すときに使う"""
+    d = os.path.join(work, "src")
+    os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, "import.json")
+    metas = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else {}
+    for s in srcs:
+        meta = resolve(s)
+        dl = os.path.join(d, f"{s['code']}-{meta['id']}.zip")
+        if not zipfile.is_zipfile(dl):
+            download(meta["url"], dl)
+        metas[s["code"]] = meta
+        log(f"{s['code']} {s['name']}: {os.path.basename(dl)}（{meta['file']} {meta['modified']}・{os.path.getsize(dl)} バイト）")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(metas, f, ensure_ascii=False, indent=1)
+        f.write("\n")
+    log(f"{path}: {len(metas)} 市町村")
 
 
 def extract(zip_path: str, out: str) -> None:
@@ -612,10 +666,10 @@ def merge(geoms: list):
 # ---- 対応づけ ----
 
 
-def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: bool, drop_unmapped: bool, fo) -> dict:
+def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: bool, drop_unmapped: bool, known: dict, fo) -> dict:
     code = src["code"]
     t0 = time.time()
-    meta = resolve(src)
+    meta = resolve(src, known)
     dl = os.path.join(work, "src", f"{code}-{meta['id']}.zip")
     os.makedirs(os.path.dirname(dl), exist_ok=True)
     if not zipfile.is_zipfile(dl):
@@ -782,6 +836,7 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         "terms": src.get("terms") or meta.get("terms") or "",
         "portal_license": meta.get("license", ""),
         "page": meta["page"],
+        "id": meta["id"],
         "url": meta["url"],
         "file": meta["file"],
         "modified": meta["modified"],
@@ -818,10 +873,12 @@ def check(source_path: str) -> bool:
     current = json.load(open(source_path, encoding="utf-8")).get("sources", {}) if os.path.exists(source_path) else {}
     changed = False
     latest: dict[str, str] = {}  # 市町村名 → いま使っているファイルの更新日
+    blocked = False
     for src in SOURCES:
         try:
             meta = resolve(src)
         except Exception as e:
+            blocked |= isinstance(e, urllib.error.HTTPError) and e.code == 403
             log(f"{src['code']} {src['name']}: 読めません: {e}")
             continue
         latest[src["name"]] = meta["modified"]
@@ -860,6 +917,11 @@ def check(source_path: str) -> bool:
             else:
                 what = "入れていない市町村（ライセンスを確かめて SOURCES に足す）"
             log(f"  {what}: {org} {info.get('title')} {newest} {base}/datasets/{ds}")
+    if blocked:
+        log(
+            "::notice::読めない（403）サイトがありました。埼玉県・千葉県のオープンデータサイトは GitHub Actions から読めないので、"
+            "新しいファイルが出たかは別の所で確かめ、build.py --fetch-only で取ってワークフローの import_ref で足します"
+        )
     if os.environ.get("GITHUB_OUTPUT"):
         with open(os.environ["GITHUB_OUTPUT"], "a") as f:
             f.write(f"changed={'true' if changed else 'false'}\n")
@@ -868,14 +930,27 @@ def check(source_path: str) -> bool:
 
 
 def run_one(src: dict, part: str, *opts) -> dict:
-    with open(part, "w", encoding="utf-8") as fo:
-        return build_one(src, *opts, fo)
+    try:
+        with open(part, "w", encoding="utf-8") as fo:
+            return build_one(src, *opts, fo)
+    except Exception as e:
+        # urllib の HTTPError などはプロセスの間で受け渡せない（pickle できない）ので、ここでログに出して文字だけ返す
+        log(traceback.format_exc())
+        raise RuntimeError(f"{type(e).__name__}: {e}") from None
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="公開ファイルが新しくなったかだけ調べる（GITHUB_OUTPUT があれば changed= を書く）")
-    ap.add_argument("--source", default="lib/roadmap/data/sanko-source.json", help="--check で比べる、前に作ったときの情報（--manifest で書いたもの）")
+    ap.add_argument(
+        "--source", default="lib/roadmap/data/sanko-source.json",
+        help="前に作ったときの情報（--manifest で書いたもの）。--check で比べ、公開サイトに届かない市町村はここにあるファイルを使う",
+    )
+    ap.add_argument(
+        "--fetch-only", action="store_true",
+        help="市町村のファイルを --work に取り、情報を <work>/src/import.json に書くだけ（--only が無ければ、GitHub Actions から読めない埼玉県・千葉県のサイトのもの）",
+    )
+    ap.add_argument("--mirror-list", help="使った埼玉県・千葉県のサイトのファイル（<work>/src の zip の名前）を書き出す（ワークフローが R2 に写しを置く）")
     ap.add_argument("--out", help="出力する .pmtiles")
     ap.add_argument("--geojsonl", help="タイルにする前の GeoJSON の行（省略時は作業用のディレクトリに作って消す）")
     ap.add_argument("--manifest", help="市町村ごとの出典・ファイル・筆の数・対応の割合の JSON（省略時は --out の .json）")
@@ -895,6 +970,11 @@ def main() -> None:
     if a.check:
         check(a.source)
         return
+    if a.fetch_only:
+        if not a.work:
+            sys.exit("--work を指定してください")
+        fetch_only([s for s in SOURCES if (s["code"] in a.only if a.only else s["fetch"]["kind"] == "dataeye")], a.work)
+        return
     if not a.out:
         sys.exit("--out を指定してください")
     work = a.work or tempfile.mkdtemp(prefix="sanko-")
@@ -904,7 +984,7 @@ def main() -> None:
     # 市町村ごとに別のプロセスで作り（--jobs）、GeoJSON の行を SOURCES の順につなぐ
     parts_dir = os.path.join(work, "parts")
     os.makedirs(parts_dir, exist_ok=True)
-    opts = (work, a.moj_year, not a.no_align, a.keep_public, a.drop_unmapped)
+    opts = (work, a.moj_year, not a.no_align, a.keep_public, a.drop_unmapped, known_files(a.source, work))
     done: dict[str, dict] = {}
     with cf.ProcessPoolExecutor(max_workers=max(1, a.jobs)) as ex:
         futs = {ex.submit(run_one, s, os.path.join(parts_dir, f"{s['code']}.geojsonl"), *opts): s for s in srcs}
@@ -912,10 +992,13 @@ def main() -> None:
             s = futs[fut]
             try:
                 done[s["code"]] = fut.result()
-            except Exception as e:  # 1つの市町村が読めなくても、ほかは作る
-                log(f"::warning::{s['code']} {s['name']}: {type(e).__name__}: {e}")
-                log("".join(traceback.format_exception(e)))
+            except Exception as e:  # 1つの市町村が読めなくても、ほかは作る（くわしいことは run_one がログに出している）
+                log(f"::warning::{s['code']} {s['name']}: {e}")
     results = {s["code"]: done[s["code"]] for s in srcs if s["code"] in done}
+    if a.mirror_list:
+        portal = {s["code"] for s in SOURCES if s["fetch"]["kind"] == "dataeye"}
+        with open(a.mirror_list, "w", encoding="utf-8") as f:
+            f.writelines(f"{c}-{r['id']}.zip\n" for c, r in results.items() if c in portal)
     with open(seq, "w", encoding="utf-8") as fo:
         for c in results:
             with open(os.path.join(parts_dir, f"{c}.geojsonl"), encoding="utf-8") as fi:
