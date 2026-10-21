@@ -4,7 +4,7 @@ import "./globals.css";
 
 // 本文は Noto Sans JP を同梱し、どの端末でも同じ見た目にする。ロゴ文字（MICHILU）は Jost
 const notoSansJP = Noto_Sans_JP({ weight: ["400", "500", "600", "700"], subsets: ["latin"], display: "swap", variable: "--font-noto-sans-jp" });
-const jost = Jost({ weight: ["300", "400"], subsets: ["latin"], display: "swap", variable: "--font-jost" });
+const jost = Jost({ weight: ["300", "400", "500"], subsets: ["latin"], display: "swap", variable: "--font-jost" });
 
 export const metadata: Metadata = {
   title: "MICHILU（ミチル）",
