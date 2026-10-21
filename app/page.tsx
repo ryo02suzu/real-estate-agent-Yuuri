@@ -5,7 +5,7 @@ import { DesktopShell } from "@/components/desktop-shell";
 import { Header } from "@/components/header";
 import { useDesktop } from "@/lib/use-desktop";
 import { HistoryList } from "@/components/history-list";
-import { HomeMobile } from "@/components/home-mobile";
+import { MockHome } from "@/components/mock-home";
 import { AlertIcon, AreaIcon, BookmarkIcon, ChevronRightIcon, ClockIcon, InfoIcon, PinIcon, TrashIcon } from "@/components/icons";
 import { CitiesSheet, HelpSheet, MenuSheet, type SheetName } from "@/components/info-sheets";
 import { FullMap } from "@/components/full-map";
@@ -252,26 +252,20 @@ export default function Home() {
     );
   }
 
-  // 検索する前：新しい見た目のホーム（縦にスクロールする）
+  // 検索する前：見本の絵を敷いたホーム（絵の各部分にボタンを重ねたもの。縦にスクロールする）
   if (!shown) {
     return (
       <>
-        <HomeMobile
+        <MockHome
           input={input}
           setInput={setInput}
           onSearch={() => search(input, true)}
           loading={loading}
           error={error}
-          history={history}
-          onPickHistory={pickHistory}
-          onShowHistory={() => open("history")}
-          onMap={() => setPicker({})}
-          onMenu={() => open("menu")}
-          onFavorites={() => open("favorites")}
-          onAccount={() => open("account")}
-          onHelp={() => open("help")}
-          onCities={() => open("cities")}
-          areaText={AREA_TEXT}
+          onAction={(a) => {
+            if (a === "map") setPicker({});
+            else if (a === "history" || a === "favorites" || a === "account" || a === "menu" || a === "help") open(a);
+          }}
         />
         {sheetsEl}
         {picker && (
