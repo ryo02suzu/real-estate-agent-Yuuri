@@ -130,7 +130,7 @@ describe("周辺施設", () => {
   });
 
   it("徒歩の文字（80m を1分・切り上げ。10m 単位、1km からは 0.1km 単位）", () => {
-    const w = (meters: number, routed = true): PoiWalk => ({ kind: 1, label: "スーパー", name: "〇〇ストア", meters, minutes: Math.max(1, Math.ceil(meters / 80)), straight: meters, routed });
+    const w = (meters: number, routed = true): PoiWalk => ({ kind: 1, label: "スーパー", name: "〇〇ストア", meters, minutes: Math.max(1, Math.ceil(meters / 80)), straight: meters, routed, at: [139.6, 35.5] });
     expect(poiWalkText(w(452))).toBe("徒歩約6分（約450m）");
     expect(poiWalkText(w(3))).toBe("徒歩約1分（約10m）");
     expect(poiWalkText(w(1234))).toBe("徒歩約16分（約1.2km）");
@@ -180,8 +180,8 @@ describe("周辺施設を下書き・共有に書く", () => {
     links: buildLinks(m, 35.5, 139.6),
   };
   const pois: PoiWalk[] = [
-    { kind: 1, label: "スーパー", name: "〇〇ストア 菊名店", meters: 452, minutes: 6, straight: 380, routed: true },
-    { kind: 6, label: "公園", name: "大豆戸公園", meters: 900, minutes: 12, straight: 900, routed: false },
+    { kind: 1, label: "スーパー", name: "〇〇ストア 菊名店", meters: 452, minutes: 6, straight: 380, routed: true, at: [139.6, 35.5] },
+    { kind: 6, label: "公園", name: "大豆戸公園", meters: 900, minutes: 12, straight: 900, routed: false, at: [139.6, 35.5] },
   ];
 
   it("下書きに「周辺環境」の欄を足し、確かめる旨を1行（要確認）と OpenStreetMap の出典を付ける", () => {

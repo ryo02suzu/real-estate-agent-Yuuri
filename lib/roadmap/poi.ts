@@ -51,6 +51,8 @@ export type PoiWalk = {
   straight: number;
   /** 道路の道のりで求めたか（false は直線距離の目安） */
   routed: boolean;
+  /** 施設の位置（地図の印） */
+  at: LngLat;
 };
 
 /** 探す範囲（直線距離）。これより遠い施設は出さない（徒歩15分くらい） */
@@ -92,9 +94,14 @@ export async function nearbyPois(lat: number, lng: number, source: PoiSource, ma
  * 種類ごとに直線で近い3つまでの道のりを測り、いちばん近いものを選ぶ。道がつながらない・遠回りすぎるものは直線距離の目安
  */
 export async function nearestPois(lat: number, lng: number, source: PoiSource, walk = walkTo): Promise<PoiWalk[]> {
-  const pois = await nearbyPois(lat, lng, source);
+  return nearestOf(lat, lng, await nearbyPois(lat, lng, source), POI_ORDER, walk);
+}
+
+/** 読んだ施設（nearbyPois）から、kinds の種類ごとの最寄りと徒歩の目安（kinds の順） */
+export async function nearestOf(lat: number, lng: number, pois: (Poi & { straight: number })[], kinds: number[], walk = walkTo): Promise<PoiWalk[]> {
   const byKind = new Map<number, (Poi & { straight: number })[]>();
   for (const p of pois) {
+    if (!kinds.includes(p.kind)) continue;
     const list = byKind.get(p.kind) ?? [];
     // 同じ名前の施設（チェーン店の別の点・同じ施設の点と面）は近い方だけ
     if (list.length < CANDIDATES && !list.some((q) => q.name === p.name)) list.push(p);
@@ -108,14 +115,14 @@ export async function nearestPois(lat: number, lng: number, source: PoiSource, w
     candidates.map((c, id) => ({ id, points: [c.at] })),
   ).catch(() => new Map<number, number>());
   const out: PoiWalk[] = [];
-  for (const kind of POI_ORDER) {
+  for (const kind of kinds) {
     const list = byKind.get(kind);
     if (!list?.length) continue;
     const walks = list.map((c) => {
       const d = dist.get(candidates.indexOf(c));
       const routed = routedOk(d, c.straight);
       const meters = routed ? d : c.straight;
-      return { kind, label: POI_KINDS[kind], name: c.name, meters, minutes: walkMinutes(meters), straight: c.straight, routed };
+      return { kind, label: POI_KINDS[kind], name: c.name, meters, minutes: walkMinutes(meters), straight: c.straight, routed, at: c.at };
     });
     walks.sort((a, b) => Number(b.routed) - Number(a.routed) || a.meters - b.meters);
     out.push(walks[0]);

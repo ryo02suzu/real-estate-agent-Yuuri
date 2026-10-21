@@ -13,9 +13,12 @@ function memoryStorage() {
 describe("history", () => {
   beforeEach(() => vi.stubGlobal("localStorage", memoryStorage()));
 
-  it("新しい順に最大5件", () => {
-    for (let i = 1; i <= 7; i++) addHistory({ address: `住所${i}`, at: i });
-    expect(loadHistory().map((h) => h.address)).toEqual(["住所7", "住所6", "住所5", "住所4", "住所3"]);
+  it("新しい順に最大30件", () => {
+    for (let i = 1; i <= 32; i++) addHistory({ address: `住所${i}`, at: i });
+    const got = loadHistory().map((h) => h.address);
+    expect(got).toHaveLength(30);
+    expect(got.slice(0, 3)).toEqual(["住所32", "住所31", "住所30"]);
+    expect(got.at(-1)).toBe("住所3");
   });
 
   it("同じ住所は先頭に移動して重複しない", () => {

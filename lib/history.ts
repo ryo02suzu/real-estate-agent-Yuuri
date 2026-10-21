@@ -15,7 +15,8 @@ export type HistoryItem = {
 export const historyKey = (h: HistoryItem) => (h.ll ? h.ll.join(",") : h.address);
 
 const KEY = "michilu:history";
-const MAX = 5;
+/** 検索履歴の画面に出す数（ホームの「最近の検索」はこの先頭の3件） */
+const MAX = 30;
 
 export function loadHistory(): HistoryItem[] {
   try {

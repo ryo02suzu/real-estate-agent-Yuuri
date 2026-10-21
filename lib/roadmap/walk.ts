@@ -20,6 +20,8 @@ export type StationWalk = {
   straight: number;
   /** 道路の道のりで求めたか（false は直線距離の目安） */
   routed: boolean;
+  /** 駅の位置（いちばん近い出入口・ホームの点。地図の印） */
+  at?: LngLat;
 };
 
 export const STATION_DATA = { url: SOURCE.url, year: SOURCE.year };
@@ -345,6 +347,12 @@ export async function walkTo(lat: number, lng: number, targets: { id: number; po
   return lines.length ? walkDistances(lines, [lng, lat], targets) : new Map();
 }
 
+/** 駅の点のうち、物件にいちばん近い点 */
+function nearestPoint(points: LngLat[], lat: number, lng: number): LngLat | undefined {
+  const k = Math.cos((lat * Math.PI) / 180);
+  return [...points].sort((a, b) => Math.hypot((a[0] - lng) * k, a[1] - lat) - Math.hypot((b[0] - lng) * k, b[1] - lat))[0];
+}
+
 /**
  * 物件の近くの駅と徒歩の目安（近い順に3つまで）。道路のタイルが読めない・道がつながらない駅は直線距離の目安（routed: false）。
  * 2km 以内に駅が無ければ、いちばん近い駅（20km まで）の直線距離だけ。それも無ければ空
@@ -354,14 +362,15 @@ export async function nearestStations(lat: number, lng: number): Promise<Station
   const near = nearbyStations(lat, lng, stations);
   if (!near.length) return [];
   // 歩いて行ける範囲に駅が無い（いちばん近い駅でも遠い）ときは、直線距離だけ
-  if (near[0].straight > MAX_STRAIGHT) return [{ name: near[0].station.n, lines: near[0].station.l, meters: near[0].straight, minutes: walkMinutes(near[0].straight), straight: near[0].straight, routed: false }];
+  if (near[0].straight > MAX_STRAIGHT)
+    return [{ name: near[0].station.n, lines: near[0].station.l, meters: near[0].straight, minutes: walkMinutes(near[0].straight), straight: near[0].straight, routed: false, at: nearestPoint(near[0].station.p, lat, lng) }];
   const dist = await walkTo(lat, lng, near.map((n, id) => ({ id, points: n.station.p })));
   return near
     .map((n, id) => {
       const d = dist.get(id);
       const routed = routedOk(d, n.straight);
       const meters = routed ? d : n.straight;
-      return { name: n.station.n, lines: n.station.l, meters, minutes: walkMinutes(meters), straight: n.straight, routed };
+      return { name: n.station.n, lines: n.station.l, meters, minutes: walkMinutes(meters), straight: n.straight, routed, at: nearestPoint(n.station.p, lat, lng) };
     })
     .sort((a, b) => Number(b.routed) - Number(a.routed) || a.meters - b.meters)
     .slice(0, 3);
