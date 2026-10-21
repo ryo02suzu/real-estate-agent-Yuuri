@@ -18,6 +18,7 @@ import { CHIBANZU_NOTE, chibanzuFor } from "./roadmap/chibanzu";
 import { HOUREI_CREDIT, HOUREI_LAWS, houreiAsOf, houreiCaution, houreiGroups, houreiNotesLine, houreiOffice, houreiOfficeAll, PREF_NAMES, type Hourei, type HoureiKind } from "./roadmap/hourei";
 import { isekiFor } from "./roadmap/iseki";
 import { suidoFor } from "./roadmap/suido";
+import { contactName, NO_CITY_GAS, utilitiesFor, type UtilityContact } from "./roadmap/utilities";
 import { TOCHI_CREDIT, tochiAgriText, tochiCheck, tochiForestText, tochiParkText, type Tochi } from "./roadmap/tochi";
 import { MORIDO_CREDIT, moridoCaution, moridoDetail, moridoValue, type Morido } from "./roadmap/morido";
 import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
@@ -194,11 +195,29 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   const ledgers = suidoFor(m, result.lat, result.lng);
   const water = ledgers.find((l) => l.kind === "上水道");
   const sewer = ledgers.find((l) => l.kind === "下水道");
-  supply.push({ label: "飲用水（上水道）", value: CHECK, note: "前面道路の配水管・口径・引込み管の有無は、水道事業者（市区町村の水道局など）で確認", check: true });
+  // 照会先（水道事業者・下水道の管理者・都市ガスの導管事業者）が分かる市区町村は、名前と確かめ方のページを添える
+  const u = utilitiesFor(m);
+  const names = (list: UtilityContact[] | undefined, other: string) => (list?.length ? list.map(contactName).join("・") : other);
+  const contactRows = (label: string, list: UtilityContact[] | undefined) =>
+    (list ?? []).forEach((c) => supply.push({ label, value: contactName(c), note: c.url }));
+  supply.push({ label: "飲用水（上水道）", value: CHECK, note: `前面道路の配水管・口径・引込み管の有無は、${names(u?.water, "水道事業者（市区町村の水道局など）")}で確認`, check: true });
+  contactRows("水道の照会先", u?.water);
   if (water) supply.push({ label: "水道の台帳", value: water.name, note: water.url });
-  supply.push({ label: "排水（下水道）", value: CHECK, note: "前面道路の下水道管（汚水・雨水）・公共ますの有無、浄化槽の要否は、下水道の管理者（市区町村など）で確認", check: true });
+  supply.push({
+    label: "排水（下水道）",
+    value: CHECK,
+    note: `前面道路の下水道管（汚水・雨水）・公共ますの有無、浄化槽の要否は、${names(u?.sewer, "下水道の管理者（市区町村など）")}で確認`,
+    check: true,
+  });
+  contactRows("下水道の照会先", u?.sewer);
   if (sewer) supply.push({ label: "下水道の台帳", value: sewer.name, note: sewer.url });
-  supply.push({ label: "ガス", value: CHECK, note: "都市ガスかプロパンガスか、前面道路のガス管の有無はガス会社で確認", check: true });
+  const gasNote = !u?.gas
+    ? "都市ガスかプロパンガスか、前面道路のガス管の有無はガス会社で確認"
+    : u.gas.length
+      ? `都市ガスかプロパンガスか、前面道路のガス管の有無は${names(u.gas, "")}（都市ガス）かプロパンガスの販売店で確認`
+      : `${NO_CITY_GAS}。ガスの種類と設備は売主・ガスの販売店で確認`;
+  supply.push({ label: "ガス", value: CHECK, note: gasNote, check: true });
+  contactRows("ガスの照会先", u?.gas);
   sections.push({ title: "飲用水・ガス・排水施設（参考）", rows: supply });
 
   // 災害：重要事項説明で所在地を示す市区町村のハザードマップ（水防法）と、国のデータで読んだ地点の値（参考）

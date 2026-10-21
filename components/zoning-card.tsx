@@ -3,8 +3,9 @@
 // 物件の地点の都市計画（用途地域・建ぺい率・容積率・防火・高度地区など）。国土交通省の都市計画決定GISデータを
 // アプリと同じサイトに置いたタイルから読む（lib/roadmap/zoning.ts）。道路種別の結果を先に出し、こちらは後から読み込む。
 // 重説の「その他の法令」の下調べ（盛土規制法の区域・砂防指定地や急傾斜地崩壊危険区域などの区域・自然公園と農業振興地域・
-// 埋蔵文化財の遺跡地図。lib/roadmap/morido.ts・hourei.ts・tochi.ts・iseki.ts）と、上下水道の台帳の地図（suido.ts）も添える。
-// スマホのシートは「都市計画」「その他の法令」「上下水道」のタブに分け（それぞれ1画面に収める）、PC のカードは続けて出す
+// 埋蔵文化財の遺跡地図。lib/roadmap/morido.ts・hourei.ts・tochi.ts・iseki.ts）と、上下水道の台帳の地図（suido.ts）・
+// 水道・下水道・都市ガスの照会先（utilities.ts）も添える。
+// スマホのシートは「都市計画」「その他の法令」「上下水道・ガス」のタブに分け（それぞれ1画面に収める）、PC のカードは続けて出す
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
 import type { Municipality } from "@/lib/roadmap";
@@ -15,6 +16,7 @@ import { MORIDO_DATA, moridoAt, moridoDetail, moridoNote, moridoNotice, moridoVa
 import { pmtilesMoridoSource } from "@/lib/roadmap/morido-tiles";
 import { suidoFor, type SuidoLink } from "@/lib/roadmap/suido";
 import { TOCHI_YEAR, tochiAt, tochiCheck, tochiLine, type Tochi } from "@/lib/roadmap/tochi";
+import { contactLinkText, contactName, NO_CITY_GAS, utilitiesFor, type UtilityContact, type Utilities } from "@/lib/roadmap/utilities";
 import { pmtilesTochiSource } from "@/lib/roadmap/tochi-tiles";
 import { statusFor, zoningAt, zoningChips, zoningRows, type Zoning, type ZoningStatus } from "@/lib/roadmap/zoning";
 import { ZONING_DATA } from "@/lib/roadmap/zoning-data";
@@ -24,12 +26,12 @@ import { Sheet } from "./sheet";
 
 /**
  * morido：盛土規制法の区域、hourei：砂防指定地・急傾斜地崩壊危険区域などの区域、tochi：自然公園・農業振興地域（読めなければ無し）、
- * iseki：埋蔵文化財の確認先、suido：上下水道の台帳の地図
+ * iseki：埋蔵文化財の確認先、suido：上下水道の台帳の地図、utilities：水道・下水道・都市ガスの照会先
  */
 export type ZoningState =
   | { status: "loading" }
   | { status: "error" }
-  | { status: "ok"; zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi; iseki?: Iseki; suido?: SuidoLink[] };
+  | { status: "ok"; zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi; iseki?: Iseki; suido?: SuidoLink[]; utilities?: Utilities };
 
 /** 地点の都市計画を読む（市区町村のデータの有無と時点も） */
 export function useZoning(lat: number, lng: number, municipality: Municipality): ZoningState {
@@ -51,9 +53,12 @@ export function useZoning(lat: number, lng: number, municipality: Municipality):
         const st = statusFor(codes.split(","), mod.default as Record<string, ZoningStatus>);
         const iseki = isekiFor(municipality, lat, lng);
         const suido = suidoFor(municipality, lat, lng);
+        const utilities = utilitiesFor(municipality);
         setState({
           key,
-          value: zoning ? { status: "ok", zoning, st, morido: morido ?? undefined, hourei: hourei ?? undefined, tochi: tochi ?? undefined, iseki, suido } : { status: "error" },
+          value: zoning
+            ? { status: "ok", zoning, st, morido: morido ?? undefined, hourei: hourei ?? undefined, tochi: tochi ?? undefined, iseki, suido, utilities }
+            : { status: "error" },
         });
       })
       .catch(() => alive && setState({ key, value: { status: "error" } }));
@@ -143,7 +148,7 @@ const LABEL = "w-[8.6em] shrink-0 text-[11.5px] leading-[1.6] text-muted denser:
 const VALUE = "text-[13px] font-semibold leading-[1.5] denser:text-[12.5px] denser:leading-[1.4] densest:leading-[1.3]";
 const SUB = "mt-0.5 block text-[10.5px] leading-[1.55] text-muted dense:mt-0 dense:leading-[1.45] denser:text-[10px] densest:leading-[1.35]";
 const NOTE = "mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted dense:mt-1.5 dense:leading-[1.5] denser:text-[10px] densest:mt-1 densest:leading-[1.4]";
-const TABS = ["都市計画", "その他の法令", "上下水道"];
+const TABS = ["都市計画", "その他の法令", "上下水道・ガス"];
 
 /** 都市計画と、その他の法令の下調べ。tabs：スマホのシート（タブで分ける） */
 function ZoningDetail({ state, city, tabs }: { state: Extract<ZoningState, { status: "ok" }>; city: string; tabs?: boolean }) {
@@ -155,9 +160,10 @@ function ZoningDetail({ state, city, tabs }: { state: Extract<ZoningState, { sta
         <ZoningPart state={state} city={city} />
         <h4 className="mb-0.5 mt-3 border-t border-line/70 pt-2.5 text-[12px] font-semibold text-ink">その他の法令（重説の下調べ）</h4>
         <OtherPart state={state} city={city} />
-        <h4 className="mb-0.5 mt-3 border-t border-line/70 pt-2.5 text-[12px] font-semibold text-ink">上下水道</h4>
+        <h4 className="mb-0.5 mt-3 border-t border-line/70 pt-2.5 text-[12px] font-semibold text-ink">上下水道・ガス</h4>
         <dl>
           <SuidoRow links={state.suido ?? []} city={city} />
+          <UtilityRows u={state.utilities} />
         </dl>
       </div>
     );
@@ -182,6 +188,7 @@ function ZoningDetail({ state, city, tabs }: { state: Extract<ZoningState, { sta
       {tab === 2 && (
         <dl>
           <SuidoRow links={state.suido ?? []} city={city} />
+          <UtilityRows u={state.utilities} />
         </dl>
       )}
     </div>
@@ -406,5 +413,35 @@ function SuidoRow({ links, city }: { links: SuidoLink[]; city: string }) {
         <span className={SUB}>前面道路の本管・口径・引込みの有無は、水道事業者・下水道の担当で確認</span>
       </dd>
     </div>
+  );
+}
+
+/** 水道・下水道・都市ガスの照会先（事業者と、配管図・台帳・ガス管の埋設状況の確かめ方のページ）。調べていない市区町村は出さない */
+function UtilityRows({ u }: { u?: Utilities }) {
+  if (!u) return null;
+  const rows: [string, UtilityContact[] | undefined][] = [
+    ["水道", u.water],
+    ["下水道", u.sewer],
+    ["都市ガス", u.gas],
+  ];
+  return rows.map(
+    ([label, list]) =>
+      list && (
+        <div key={label} className={ROW}>
+          <dt className={LABEL}>{label}</dt>
+          <dd className="min-w-0 flex-1">
+            {list.length === 0 && <span className={`block ${VALUE} text-ink`}>{NO_CITY_GAS}</span>}
+            {list.map((c) => (
+              <span key={c.name} className="block">
+                <span className={`${VALUE} text-ink`}>{contactName(c)}</span>
+                <a href={c.url} target="_blank" rel="noreferrer" className="ml-2 whitespace-nowrap text-[11px] text-brand underline">
+                  {contactLinkText(c)}
+                </a>
+                {c.how && <span className={SUB}>{c.how}</span>}
+              </span>
+            ))}
+          </dd>
+        </div>
+      ),
   );
 }
