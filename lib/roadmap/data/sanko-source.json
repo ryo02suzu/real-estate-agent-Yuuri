@@ -1,0 +1,648 @@
+{
+ "url": "",
+ "built": "2026-10-19",
+ "file": "sanko.pmtiles",
+ "bytes": 178238646,
+ "layer": "sanko",
+ "attribution": "出典：市川市「地籍図（地番図）」、越谷市「地番図データ」、川越市「地番図データ」、前橋市「地籍図(地番現況図)」、久喜市「地番現況図（地番図データ）」、深谷市「地番参考図」、秩父市「地番参考図」、小鹿野町「地番参考図データ」、横瀬町「地番参考図データ」、小川町「地番参考図データ」、上里町「地番参考図（地番図データ）」、入間市「地番図情報」、我孫子市「地番参考図」、浦安市「浦安市地図データ（筆－形状）」、西東京市「地番図」、国立市「地番図」、東村山市「地形図（筆界）」（いずれも市町村のオープンデータ。PDL1.0／CC BY 4.0）を MICHILU が加工して作成。課税用の参考図で、登記の地番・筆の形と違うことがある",
+ "sources": {
+  "12203": {
+   "name": "市川市",
+   "credit": "市川市「地籍図（地番図）」",
+   "license": "CC BY 4.0",
+   "terms": "https://www.city.ichikawa.lg.jp/uploaded/attachment/11819.pdf（市川市オープンデータ利用規約。CC BY 4.0）",
+   "portal_license": "CC BY 4.0（クリエイティブ・コモンズ表示4.0国際）",
+   "page": "https://opendata.pref.chiba.lg.jp/datasets/3321",
+   "url": "https://opendata.pref.chiba.lg.jp/resource_download/54018",
+   "file": "45180.zip",
+   "modified": "2026-04-01",
+   "size": 17353350,
+   "date": "2026-04-01（更新日）",
+   "moj_year": "2026",
+   "parcels_raw": 245240,
+   "parcels_numbered": 240161,
+   "public_overlap_dropped": 8203,
+   "kept": 231958,
+   "features": 231674,
+   "mapped": 1.0,
+   "exists": 0.9937,
+   "kuiki_distinct": 236,
+   "kuiki_in_moj": 1.0,
+   "methods": {
+    "name": 205726,
+    "spatial": 30451,
+    "chiban": 3984
+   },
+   "pairs": 7427,
+   "shift_m": [
+    0.16,
+    0.28
+   ],
+   "residual_m": [
+    0.84,
+    0.83
+   ],
+   "seconds": 177
+  },
+  "11222": {
+   "name": "越谷市",
+   "credit": "越谷市「地番図データ」",
+   "license": "公共データ利用規約第1.0版（PDL1.0）",
+   "terms": "https://www.digital.go.jp/resources/open_data/public_data_license_v1.0",
+   "portal_license": "公共データ利用規約第1.0版（PDL1.0）",
+   "page": "https://opendata.pref.saitama.lg.jp/datasets/3520",
+   "url": "https://opendata.pref.saitama.lg.jp/resource_download/9080",
+   "file": "112224_open_data_list.zip",
+   "modified": "2026-09-29",
+   "size": 40876186,
+   "date": "2026-01-01",
+   "moj_year": "2026",
+   "parcels_raw": 272955,
+   "parcels_numbered": 267903,
+   "public_overlap_dropped": 15703,
+   "kept": 252200,
+   "features": 251713,
+   "mapped": 1.0,
+   "exists": 0.9955,
+   "kuiki_distinct": 193,
+   "kuiki_in_moj": 1.0,
+   "methods": {
+    "name": 237605,
+    "spatial": 30283,
+    "chiban": 15
+   },
+   "pairs": 14894,
+   "shift_m": [
+    0.44,
+    -0.0
+   ],
+   "residual_m": [
+    0.47,
+    0.44
+   ],
+   "seconds": 165
+  },
+  "11201": {
+   "name": "川越市",
+   "credit": "川越市「地番図データ」",
+   "license": "公共データ利用規約第1.0版（PDL1.0）",
+   "terms": "https://www.digital.go.jp/resources/open_data/public_data_license_v1.0",
+   "portal_license": "公共データ利用規約第1.0版（PDL1.0）",
+   "page": "https://opendata.pref.saitama.lg.jp/datasets/3472",
+   "url": "https://opendata.pref.saitama.lg.jp/resource_download/8971",
+   "file": "112011_chibanzu.zip",
+   "modified": "2026-08-08",
+   "size": 51903383,
+   "date": "2026-01-01",
+   "moj_year": "2026",
+   "parcels_raw": 348837,
+   "parcels_numbered": 337994,
+   "public_overlap_dropped": 104027,
+   "kept": 233967,
+   "features": 232221,
+   "mapped": 1.0,
+   "exists": 0.9724,
+   "kuiki_distinct": 235,
+   "kuiki_in_moj": 1.0,
+   "methods": {
+    "spatial": 152508,
+    "name": 185215,
+    "name-only": 267,
+    "chiban": 4
+   },
+   "pairs": 101429,
+   "shift_m": [
+    0.0,
+    0.0
+   ],
+   "residual_m": [
+    0.17,
+    0.17
+   ],
+   "seconds": 214
+  },
+  "10201": {
+   "name": "前橋市",
+   "credit": "前橋市「地籍図(地番現況図)」",
+   "license": "CC BY 4.0",
+   "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja",
+   "portal_license": "Creative Commons Attribution 4.0 International",
+   "page": "https://data.bodik.jp/dataset/102016_tisekizu",
+   "url": "https://data.bodik.jp/dataset/d7ecd30d-0c6c-4e83-b18f-bf9fc85343eb/resource/6117303b-5c27-4f19-b4f2-9bb43f64b6a6/download/r8tisekizu.zip",
+   "file": "r8tisekizu.zip",
+   "modified": "2026-05-08",
+   "size": 152203975,
+   "date": "2026-01-01",
+   "moj_year": "2026",
+   "parcels_raw": 452497,
+   "parcels_numbered": 432673,
+   "public_overlap_dropped": 234325,
+   "kept": 198348,
+   "features": 197655,
+   "mapped": 1.0,
+   "exists": 0.9861,
+   "kuiki_distinct": 263,
+   "kuiki_in_moj": 1.0,
+   "methods": {
+    "spatial": 351221,
+    "chiban": 81452
+   },
+   "pairs": 228976,
+   "shift_m": [
+    0.0,
+    0.0
+   ],
+   "residual_m": [
+    0.15,
+    0.15
+   ],
+   "seconds": 296
+  },
+  "11232": {
+   "name": "久喜市",
+   "credit": "久喜市「地番現況図（地番図データ）」",
+   "license": "CC BY（版の記載なし）",
+   "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja（ポータルの表示は「クリエイティブ・コモンズ表示」で版の記載なし）",
+   "portal_license": "クリエイティブ・コモンズ表示",
+   "page": "https://opendata.pref.saitama.lg.jp/datasets/3493",
+   "url": "https://opendata.pref.saitama.lg.jp/resource_download/9001",
+   "file": "地番図データ.zip",
+   "modified": "2026-09-10",
+   "size": 47150265,
+   "date": "2026-01-01",
+   "moj_year": "2026",
+   "parcels_raw": 239401,
+   "parcels_numbered": 233052,
+   "public_overlap_dropped": 25016,
+   "kept": 208036,
+   "features": 206405,
+   "mapped": 1.0,
+   "exists": 0.9868,
+   "kuiki_distinct": 143,
+   "kuiki_in_moj": 1.0,
+   "methods": {
+    "name": 101402,
+    "chiban": 46517,
+    "spatial": 85133
+   },
+   "pairs": 22848,
+   "shift_m": [
+    0.0,
+    0.0
+   ],
+   "residual_m": [
+    0.53,
+    0.53
+   ],
+   "seconds": 162
+  },
+  "11218": {
+   "name": "深谷市",
+   "credit": "深谷市「地番参考図」",
+   "license": "公共データ利用規約第1.0版（PDL1.0）",
+   "terms": "https://www.digital.go.jp/resources/open_data/public_data_license_v1.0",
+   "portal_license": "公共データ利用規約第1.0版（PDL1.0）",
+   "page": "https://opendata.pref.saitama.lg.jp/datasets/1923",
+   "url": "https://opendata.pref.saitama.lg.jp/resource_download/7492",
+   "file": "R07_地番参考図.zip",
+   "modified": "2025-10-31",
+   "size": 22159648,
+   "date": "令和7年度版（2025-10-31 公開）",
+   "moj_year": "2026",
+   "parcels_raw": 235503,
+   "parcels_numbered": 227050,
+   "public_overlap_dropped": 62611,
+   "kept": 164439,
+   "features": 163287,
+   "mapped": 0.9999,
+   "exists": 0.985,
+   "kuiki_distinct": 127,
+   "kuiki_in_moj": 0.9921,
+   "methods": {
+    "name": 118453,
+    "spatial": 108583,
+    "none": 14
+   },
+   "pairs": 57906,
+   "shift_m": [
+    0.43,
+    -0.06
+   ],
+   "residual_m": [
+    0.56,
+    0.43
+   ],
+   "seconds": 168
+  },
+  "11207": {
+   "name": "秩父市",
+   "credit": "秩父市「地番参考図」",
+   "license": "公共データ利用規約第1.0版（PDL1.0）",
+   "terms": "https://www.digital.go.jp/resources/open_data/public_data_license_v1.0",
+   "portal_license": "公共データ利用規約第1.0版（PDL1.0）",
+   "page": "https://opendata.pref.saitama.lg.jp/datasets/3529",
+   "url": "https://opendata.pref.saitama.lg.jp/resource_download/9089",
+   "file": "土地筆界_R08_1_1.zip",
+   "modified": "2026-09-29",
+   "size": 40978297,
+   "date": "2026-01-01",
+   "moj_year": "2026",
+   "parcels_raw": 231150,
+   "parcels_numbered": 219033,
+   "public_overlap_dropped": 9377,
+   "kept": 209656,
+   "features": 207513,
+   "mapped": 1.0,
+   "exists": 0.9855,
+   "kuiki_distinct": 65,
+   "kuiki_in_moj": 1.0,
+   "methods": {
+    "chiban": 163648,
+    "spatial": 55385
+   },
+   "pairs": 9242,
+   "shift_m": [
+    0.29,
+    -0.05
+   ],
+   "residual_m": [
+    0.3,
+    0.08
+   ],
+   "seconds": 182
+  },
+  "11365": {
+   "name": "小鹿野町",
+   "credit": "小鹿野町「地番参考図データ」",
+   "license": "公共データ利用規約第1.0版（PDL1.0）",
+   "terms": "https://www.digital.go.jp/resources/open_data/public_data_license_v1.0",
+   "portal_license": "公共データ利用規約第1.0版（PDL1.0）",
+   "page": "https://opendata.pref.saitama.lg.jp/datasets/3374",
+   "url": "https://opendata.pref.saitama.lg.jp/resource_download/8794",
+   "file": "小鹿野町地番参考図.zip",
+   "modified": "2026-06-11",
+   "size": 19720358,
+   "date": "2026-01-01",
+   "moj_year": "2026",
+   "parcels_raw": 85361,
+   "parcels_numbered": 79862,
+   "public_overlap_dropped": 8520,
+   "kept": 71342,
+   "features": 70444,
+   "mapped": 1.0,
+   "exists": 0.9717,
+   "kuiki_distinct": 12,
+   "kuiki_in_moj": 1.0,
+   "methods": {
+    "spatial": 19679,
+    "chiban": 60183
+   },
+   "pairs": 8440,
+   "shift_m": [
+    0.0,
+    0.0
+   ],
+   "residual_m": [
+    0.01,
+    0.01
+   ],
+   "seconds": 75
+  },
+  "11361": {
+   "name": "横瀬町",
+   "credit": "横瀬町「地番参考図データ」",
+   "license": "公共データ利用規約第1.0版（PDL1.0）",
+   "terms": "https://www.digital.go.jp/resources/open_data/public_data_license_v1.0",
+   "portal_license": "公共データ利用規約第1.0版（PDL1.0）",
+   "page": "https://opendata.pref.saitama.lg.jp/datasets/3442",
+   "url": "https://opendata.pref.saitama.lg.jp/resource_download/8915",
+   "file": "横瀬町基礎図形データ(令和8年1月1日時点).zip",
+   "modified": "2026-07-09",
+   "size": 7561497,
+   "date": "2026-01-01",
+   "moj_year": "2026",
+   "parcels_raw": 36027,
+   "parcels_numbered": 34684,
+   "public_overlap_dropped": 1167,
+   "kept": 33517,
+   "features": 33441,
+   "mapped": 1.0,
+   "exists": 0.9947,
+   "kuiki_distinct": 2,
+   "kuiki_in_moj": 1.0,
+   "methods": {
+    "spatial": 27936,
+    "chiban": 6748
+   },
+   "pairs": 1146,
+   "shift_m": [
+    0.0,
+    0.0
+   ],
+   "residual_m": [
+    0.0,
+    0.0
+   ],
+   "seconds": 36
+  },
+  "11343": {
+   "name": "小川町",
+   "credit": "小川町「地番参考図データ」",
+   "license": "公共データ利用規約第1.0版（PDL1.0）",
+   "terms": "https://www.digital.go.jp/resources/open_data/public_data_license_v1.0 ＋ 小川町の条件（データセットのページ）",
+   "portal_license": "公共データ利用規約第1.0版（PDL1.0）",
+   "page": "https://opendata.pref.saitama.lg.jp/datasets/3460",
+   "url": "https://opendata.pref.saitama.lg.jp/resource_download/8970",
+   "file": "小川町基礎図形データ(令和8年1月1日時点).zip",
+   "modified": "2026-08-07",
+   "size": 15440054,
+   "date": "2026-01-01",
+   "moj_year": "2026",
+   "parcels_raw": 73973,
+   "parcels_numbered": 65797,
+   "public_overlap_dropped": 36856,
+   "kept": 28941,
+   "features": 28748,
+   "mapped": 1.0,
+   "exists": 0.9802,
+   "kuiki_distinct": 36,
+   "kuiki_in_moj": 1.0,
+   "methods": {
+    "spatial": 46999,
+    "name": 18798
+   },
+   "pairs": 36826,
+   "shift_m": [
+    0.0,
+    0.0
+   ],
+   "residual_m": [
+    0.02,
+    0.02
+   ],
+   "seconds": 62
+  },
+  "11385": {
+   "name": "上里町",
+   "credit": "上里町「地番参考図（地番図データ）」",
+   "license": "公共データ利用規約第1.0版（PDL1.0）",
+   "terms": "https://www.digital.go.jp/resources/open_data/public_data_license_v1.0",
+   "portal_license": "公共データ利用規約第1.0版（PDL1.0）",
+   "page": "https://opendata.pref.saitama.lg.jp/datasets/3588",
+   "url": "https://opendata.pref.saitama.lg.jp/resource_download/9184",
+   "file": "113859_R8_tibanzu_shapedate.zip",
+   "modified": "2026-10-05",
+   "size": 7638451,
+   "date": "2026-01-01",
+   "moj_year": "2026",
+   "parcels_raw": 50000,
+   "parcels_numbered": 48350,
+   "public_overlap_dropped": 36236,
+   "kept": 12114,
+   "features": 11906,
+   "mapped": 1.0,
+   "exists": 0.9577,
+   "kuiki_distinct": 17,
+   "kuiki_in_moj": 1.0,
+   "methods": {
+    "spatial": 40508,
+    "chiban": 7840,
+    "none": 2
+   },
+   "pairs": 35796,
+   "shift_m": [
+    0.0,
+    0.0
+   ],
+   "residual_m": [
+    0.12,
+    0.12
+   ],
+   "seconds": 33
+  },
+  "11225": {
+   "name": "入間市",
+   "credit": "入間市「地番図情報」",
+   "license": "公共データ利用規約第1.0版（PDL1.0）",
+   "terms": "https://www.digital.go.jp/resources/open_data/public_data_license_v1.0",
+   "portal_license": "公共データ利用規約第1.0版（PDL1.0）",
+   "page": "https://opendata.pref.saitama.lg.jp/datasets/3366",
+   "url": "https://opendata.pref.saitama.lg.jp/resource_download/8785",
+   "file": "tibannzu.zip",
+   "modified": "2026-06-08",
+   "size": 19216356,
+   "date": "2026-06-05（公開日）",
+   "moj_year": "2026",
+   "parcels_raw": 107842,
+   "parcels_numbered": 105747,
+   "public_overlap_dropped": 79714,
+   "kept": 26033,
+   "features": 25996,
+   "mapped": 1.0,
+   "exists": 0.9443,
+   "kuiki_distinct": 82,
+   "kuiki_in_moj": 1.0,
+   "methods": {
+    "spatial": 93590,
+    "name": 11812,
+    "chiban": 345
+   },
+   "pairs": 75820,
+   "shift_m": [
+    0.29,
+    -0.05
+   ],
+   "residual_m": [
+    0.34,
+    0.2
+   ],
+   "seconds": 95
+  },
+  "12222": {
+   "name": "我孫子市",
+   "credit": "我孫子市「地番参考図」",
+   "license": "CC BY 4.0",
+   "terms": "https://www.city.abiko.chiba.jp/shisei/opendata/opendata.files/122220_opendata_terms_of_use.pdf.pdf（我孫子市オープンデータ利用規約。CC BY 4.0）",
+   "portal_license": "クリエイティブ・コモンズ 表示",
+   "page": "https://www.geospatial.jp/ckan/dataset/chibansannkouzu",
+   "url": "https://www.geospatial.jp/ckan/dataset/4eec6683-625f-43de-bda9-3bfbbdd4f10e/resource/b960bfcc-edd3-4d62-a487-db47bd75bec2/download/r7chibanzu.zip",
+   "file": "r7chibanzu.zip",
+   "modified": "2026-04-22",
+   "size": 17847866,
+   "date": "令和7年度版（2026-04-22 公開）",
+   "moj_year": "2026",
+   "parcels_raw": 94440,
+   "parcels_numbered": 94024,
+   "public_overlap_dropped": 3355,
+   "kept": 90669,
+   "features": 90497,
+   "mapped": 1.0,
+   "exists": 0.989,
+   "kuiki_distinct": 126,
+   "kuiki_in_moj": 1.0,
+   "methods": {
+    "name": 79857,
+    "spatial": 14167
+   },
+   "pairs": 3313,
+   "shift_m": [
+    -0.47,
+    0.07
+   ],
+   "residual_m": [
+    0.5,
+    0.11
+   ],
+   "seconds": 50
+  },
+  "12227": {
+   "name": "浦安市",
+   "credit": "浦安市「浦安市地図データ（筆－形状）」",
+   "license": "CC BY 4.0",
+   "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja",
+   "portal_license": "CC BY 4.0（クリエイティブ・コモンズ表示4.0国際）",
+   "page": "https://opendata.pref.chiba.lg.jp/datasets/3824",
+   "url": "https://opendata.pref.chiba.lg.jp/resource_download/56512",
+   "file": "_.zip",
+   "modified": "2026-05-13",
+   "size": 24123040,
+   "date": "2026-04-01",
+   "moj_year": "2026",
+   "parcels_raw": 33935,
+   "parcels_numbered": 33595,
+   "public_overlap_dropped": 9408,
+   "kept": 24187,
+   "features": 24185,
+   "mapped": 1.0,
+   "exists": 0.9936,
+   "kuiki_distinct": 55,
+   "kuiki_in_moj": 0.9818,
+   "methods": {
+    "spatial": 14587,
+    "name": 19007,
+    "none": 1
+   },
+   "pairs": 9259,
+   "shift_m": [
+    0.0,
+    0.0
+   ],
+   "residual_m": [
+    0.0,
+    0.0
+   ],
+   "seconds": 31
+  },
+  "13229": {
+   "name": "西東京市",
+   "credit": "西東京市「地番図」",
+   "license": "CC BY 4.0",
+   "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja ＋ 東京都オープンデータ利用規約 https://portal.data.metro.tokyo.lg.jp/terms/",
+   "portal_license": "クリエイティブ・コモンズ 表示（CC BY）",
+   "page": "https://catalog.data.metro.tokyo.lg.jp/dataset/t132292d3000000015",
+   "url": "https://www.opendata.metro.tokyo.lg.jp/nishitokyo/132292_Chiban_Shape.zip",
+   "file": "132292_Chiban_Shape.zip",
+   "modified": "2025-07-13",
+   "size": 263192576,
+   "date": "2025-01-01",
+   "moj_year": "2026",
+   "parcels_raw": 91755,
+   "parcels_numbered": 90383,
+   "public_overlap_dropped": 164,
+   "kept": 90219,
+   "features": 90197,
+   "mapped": 1.0,
+   "exists": 0.9964,
+   "kuiki_distinct": 114,
+   "kuiki_in_moj": 1.0,
+   "methods": {
+    "spatial": 4898,
+    "name": 85485
+   },
+   "pairs": 120,
+   "shift_m": [
+    0.35,
+    -0.18
+   ],
+   "residual_m": [
+    1.02,
+    0.9
+   ],
+   "seconds": 49
+  },
+  "13215": {
+   "name": "国立市",
+   "credit": "国立市「地番図」",
+   "license": "CC BY 4.0",
+   "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja ＋ 東京都オープンデータ利用規約 https://portal.data.metro.tokyo.lg.jp/terms/",
+   "portal_license": "クリエイティブ・コモンズ 表示（CC BY）",
+   "page": "https://catalog.data.metro.tokyo.lg.jp/dataset/t132152d0000000012",
+   "url": "https://www.opendata.metro.tokyo.lg.jp/kunitachi/132152_Chiban_Shape.zip",
+   "file": "132152_Chiban_Shape.zip",
+   "modified": "2026-08-14",
+   "size": 7076488,
+   "date": "2026-01-01",
+   "moj_year": "2026",
+   "parcels_raw": 36431,
+   "parcels_numbered": 34184,
+   "public_overlap_dropped": 342,
+   "kept": 33842,
+   "features": 33833,
+   "mapped": 1.0,
+   "exists": 0.9963,
+   "kuiki_distinct": 32,
+   "kuiki_in_moj": 1.0,
+   "methods": {
+    "name": 31205,
+    "spatial": 2979
+   },
+   "pairs": 339,
+   "shift_m": [
+    0.0,
+    0.0
+   ],
+   "residual_m": [
+    0.25,
+    0.25
+   ],
+   "seconds": 20
+  },
+  "13213": {
+   "name": "東村山市",
+   "credit": "東村山市「地形図（筆界）」",
+   "license": "CC BY 4.0",
+   "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja ＋ 東京都オープンデータ利用規約 https://portal.data.metro.tokyo.lg.jp/terms/",
+   "portal_license": "クリエイティブ・コモンズ 表示（CC BY）",
+   "page": "https://catalog.data.metro.tokyo.lg.jp/dataset/t132136d0000000005",
+   "url": "https://www.opendata.metro.tokyo.lg.jp/higashimurayama/Tochi_poly.zip",
+   "file": "Tochi_poly.zip",
+   "modified": "2024-10-17",
+   "size": 7556096,
+   "date": "2024-01（ファイルの日付）",
+   "moj_year": "2026",
+   "parcels_raw": 81101,
+   "parcels_numbered": 79926,
+   "public_overlap_dropped": 125,
+   "kept": 79801,
+   "features": 79734,
+   "mapped": 1.0,
+   "exists": 0.9951,
+   "kuiki_distinct": 53,
+   "kuiki_in_moj": 1.0,
+   "methods": {
+    "chiban": 78470,
+    "spatial": 1456
+   },
+   "pairs": 69,
+   "shift_m": [
+    -0.42,
+    -0.0
+   ],
+   "residual_m": [
+    0.48,
+    0.24
+   ],
+   "seconds": 41
+  }
+ }
+}

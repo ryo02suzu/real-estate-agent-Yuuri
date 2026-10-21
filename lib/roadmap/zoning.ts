@@ -214,17 +214,24 @@ export function zoningRows(z: Zoning, st: ZoningStatus | undefined): ZoningRow[]
     rows.push({
       label: "高度地区",
       value: z.koudoti ? "指定あり" : none("koudoti"),
-      sub: z.koudoti ? "種類と高さの制限はデータに無いため、市の都市計画図で確認してください" : undefined,
+      sub: z.koudoti ? "種類・高さの制限は市の都市計画図で確認" : undefined,
     });
     const plans = z.others.filter((o) => o.layer === "chikukei");
     rows.push({ label: "地区計画", value: plans.length ? plans.map((o) => o.name ?? "区域内").join("／") : none("chikukei"), warn: plans.length > 0 });
   }
-  for (const o of z.others.filter((o) => o.layer !== "chikukei")) rows.push({ label: o.label, value: o.name ?? "区域内" });
+  // 同じ種類（立地適正化計画の居住誘導区域と都市機能誘導区域など）は1行にまとめる
+  const others = new Map<string, string[]>();
+  for (const o of z.others.filter((o) => o.layer !== "chikukei")) {
+    const names = others.get(o.label) ?? [];
+    if (!names.includes(o.name ?? "区域内")) names.push(o.name ?? "区域内");
+    others.set(o.label, names);
+  }
+  for (const [label, names] of others) rows.push({ label, value: names.join("・") });
   if (z.road !== undefined) {
     rows.push({
       label: "都市計画道路",
       value: `中心線まで約${Math.max(1, Math.round(z.road))}m`,
-      sub: "整備済みの道路も含みます。計画線にかかるか・事業の予定は、市の窓口で確認してください",
+      sub: "整備済みも含む。計画線・事業予定は市で確認",
       warn: true,
     });
   }
@@ -234,7 +241,7 @@ export function zoningRows(z: Zoning, st: ZoningStatus | undefined): ZoningRow[]
     rows.push({
       label: "用途地域の境目",
       value: `約${Math.max(1, Math.round(near.distance))}m先は${near.name}${r}`,
-      sub: "敷地が2つの用途地域にまたがるときは、市の窓口で確認してください",
+      sub: "敷地がまたがるときは市の窓口で確認",
       warn: true,
       color: YOUTO_COLORS[near.code],
     });

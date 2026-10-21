@@ -52,6 +52,7 @@ const CITIES: Municipality[] = [
     maps: [
       { kind: "road_type", label: "指定道路（やさシティマップ）", build: sonicweb("matsudo", "th_33"), verified: true },
       { kind: "public_road", label: "認定路線網図（市道）", build: sonicweb("matsudo", "th_8"), verified: true },
+      { kind: "public_road", label: "道路台帳現況平面図（市道）", build: sonicweb("matsudo", "th_60"), verified: true },
     ],
     contact: { dept: "建築指導課（新館8階）", phone: "047-366-7368", note: "道路種別の電話での問い合わせは不可。窓口で確認", noPhoneInquiry: true },
   },
@@ -60,7 +61,10 @@ const CITIES: Municipality[] = [
     name: "柏市",
     codes: ["12217"],
     coverage: "none",
-    maps: [{ kind: "public_road", label: "市道認定路線網図", build: sonicweb("kashiwa", "th_15"), verified: true }],
+    maps: [
+      { kind: "public_road", label: "市道認定路線網図", build: sonicweb("kashiwa", "th_15"), verified: true },
+      { kind: "public_road", label: "道路台帳図（市道）", build: sonicweb("kashiwa", "th_16"), verified: true },
+    ],
     contact: { dept: "建築指導課（分庁舎2 1階）", phone: "04-7167-1145", note: "道路種別は窓口のみ（電話・FAX・メール不可）", noPhoneInquiry: true },
   },
   {
@@ -312,7 +316,15 @@ const PREF_AREAS: Municipality[] = [
   prefArea("多古町", "12347", "narita"),
   prefArea("芝山町", "12409", "narita"),
   prefArea("香取市", "12236", "katori"),
-  prefArea("東庄町", "12349", "katori", true),
+  {
+    ...prefArea("東庄町", "12349", "katori", true),
+    // 町の地図（Sonicweb tonosho）の町道の路線網と道路台帳
+    maps: [
+      PREF_ROAD_MAP,
+      { kind: "public_road", label: "認定路線網図（町道）", build: sonicweb("tonosho", "th_34"), verified: true },
+      { kind: "public_road", label: "道路台帳図（町道）", build: sonicweb("tonosho", "th_35"), verified: true },
+    ],
+  },
   prefArea("銚子市", "12202", "kaiso"),
   prefArea("匝瑳市", "12235", "kaiso", true),
   prefArea("旭市", "12215", "kaiso", true),

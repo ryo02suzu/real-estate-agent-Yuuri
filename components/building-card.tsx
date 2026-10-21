@@ -108,17 +108,3 @@ export function BuildingCard({ state }: { state: BuildingState }) {
     </section>
   );
 }
-
-/** スマホ：地番の一覧（シート）の下に添える */
-export function BuildingSection({ state }: { state: BuildingState }) {
-  if (state.status === "none") return null;
-  return (
-    <section className="mt-4 border-t border-line/70 pt-3">
-      <h3 className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
-        <BuildingIcon className="h-4 w-4 text-brand-light" />
-        建物（参考）
-      </h3>
-      <BuildingDetail state={state} />
-    </section>
-  );
-}

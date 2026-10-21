@@ -111,6 +111,12 @@ describe("buildSummary", () => {
     expect(text).toContain("【災害リスク（国のデータ・参考）】\n・洪水（想定最大規模）：浸水 3〜5m\n・土砂災害警戒区域等：区域外\n・地面の高さ（標高）：約-1.0m");
     expect(text).toContain("・江戸川区の洪水・高潮のハザードマップ\n  https://example.jp/hm.html");
     expect(text).toContain("・江戸川区の内水のハザードマップ\n  https://example.jp/naisui.html");
+    // 大規模盛土造成地・液状化の発生傾向は国の重ねるハザードマップを物件の場所で開く
+    expect(text).toContain("・大規模盛土造成地（国の重ねるハザードマップ）\n  https://disaportal.gsi.go.jp/maps/?ll=35.683800,139.864100&z=16&");
+    expect(text).toContain("・液状化の発生傾向（国の重ねるハザードマップ）\n  https://disaportal.gsi.go.jp/maps/?ll=35.683800,139.864100&z=15&");
+    expect(text).toContain("（大規模盛土造成地は安全性の確認が必要な盛土で、直ちに危険というものではありません。");
+    // 路線価は全国地価マップを物件の場所で開く
+    expect(text).toMatch(/【路線価（全国地価マップ・参考）】\n・相続税路線価等（令和\d+年分）\n  https:\/\/www\.chikamap\.jp\/chikamap\/Map\?mid=3\d\d&mpx=139\.864100&mpy=35\.683800&mps=1500&gprj=2\n・固定資産税路線価等（令和\d+年度）\n  https:\/\/www\.chikamap\.jp\/chikamap\/Map\?mid=2\d\d&/);
     expect(text).toContain("※災害リスクの出典：「ハザードマップポータルサイト」");
     expect(text).toContain("重要事項説明には使えません");
   });
@@ -183,6 +189,109 @@ describe("buildSummary", () => {
   });
 });
 
+describe("buildSummary の盛土規制法", () => {
+  it("区域（国のデータ・参考）と、確かめる先の都県・市", () => {
+    const m = findMunicipality("14109")!;
+    const result = {
+      status: "ok" as const,
+      lat: 35.5146,
+      lng: 139.6218,
+      matchedAddress: "神奈川県横浜市港北区大豆戸町",
+      town: "大豆戸町",
+      approximate: false,
+      municipality: m,
+      links: buildLinks(m, 35.5146, 139.6218),
+    };
+    const zoning = { youto: [], youtoNear: [], tokei: true, jyuntoshi: false, koudoti: false, others: [] };
+    const text = buildSummary(result, {
+      zoning: { zoning, morido: { area: { kind: "宅地造成等工事規制区域", city: "14109", level: "B", notice: "横浜市告示第113号", since: "2025-04-01" }, authority: "横浜市" } },
+    });
+    expect(text).toContain("・盛土規制法：宅地造成等工事規制区域（横浜市が指定・参考）");
+    expect(text).toContain("※盛土規制法の区域の出典：「国土数値情報（宅地造成等工事規制区域・特定盛土等規制区域データ）」");
+    expect(text).toContain("重要事項説明には横浜市の資料で確認を");
+    const outside = buildSummary(result, { zoning: { zoning, morido: { authority: "水戸市" } } });
+    expect(outside).toContain("・盛土規制法：区域外（2025年7月18日時点の国のデータ・参考）");
+  });
+
+  it("砂防指定地・急傾斜地などの区域と、神奈川県が求める特記事項", () => {
+    const m = findMunicipality("14109")!;
+    const result = {
+      status: "ok" as const,
+      lat: 35.5146,
+      lng: 139.6218,
+      matchedAddress: "神奈川県横浜市港北区大豆戸町",
+      town: "大豆戸町",
+      approximate: false,
+      municipality: m,
+      links: buildLinks(m, 35.5146, 139.6218),
+    };
+    const zoning = { youto: [], youtoNear: [], tokei: true, jyuntoshi: false, koudoti: false, others: [] };
+    const hit = { kind: "急傾斜地崩壊危険区域" as const, name: "大豆戸町", notice: "第220号", since: "1994-03-25", pref: "14" };
+    const saigai = { ...hit, kind: "災害危険区域" as const, notice: "第220号(急傾斜)", rule: "神奈川県建築基準条例" };
+    const text = buildSummary(result, { zoning: { zoning, hourei: { pref: "14", hits: [hit, saigai], missing: [] } } });
+    expect(text).toContain(
+      "・砂防・急傾斜地など：急傾斜地崩壊危険区域・災害危険区域（国のデータ・参考）\n  （急傾斜地：大豆戸町（第220号・1994年3月25日））\n  （災害危険区域：急傾斜地崩壊危険区域と同じ区域（神奈川県建築基準条例））",
+    );
+    expect(text).toContain("※砂防指定地などの区域の出典：「国土数値情報（砂防指定地データ・地すべり防止区域データ・急傾斜地崩壊危険区域データ・災害危険区域データ）」");
+    // 地すべり・急傾斜地の神奈川県の特記事項は同じ文なので1つ
+    expect(text.match(/※神奈川県の区域のデータについて：区域の形状は概略であるため/g)).toHaveLength(1);
+  });
+
+  it("自然公園・農業振興地域・森林（2015年度の国のデータ）と確かめる先", () => {
+    const m = findMunicipality("14382")!;
+    const result = {
+      status: "ok" as const,
+      lat: 35.2047,
+      lng: 139.0247,
+      matchedAddress: "神奈川県足柄下郡箱根町箱根",
+      town: "箱根",
+      approximate: false,
+      municipality: m,
+      links: buildLinks(m, 35.2047, 139.0247),
+    };
+    const zoning = { youto: [], youtoNear: [], tokei: true, jyuntoshi: false, koudoti: false, others: [] };
+    const text = buildSummary(result, { zoning: { zoning, tochi: { park: "特別地域", agri: "農用地区域", forest: "保安林", year: 2015 } } });
+    expect(text).toContain("・自然公園・農業振興地域・森林：自然公園の特別地域・農用地区域・保安林（2015年度の国のデータ・参考）\n  （自然公園・保安林は都県の担当、農用地区域かは箱根町の農業委員会で確認）");
+    expect(text).toContain("※自然公園・農業振興地域・森林の出典：「国土数値情報（自然公園地域データ・農業地域データ・森林地域データ）」");
+  });
+
+  it("市町村の地番図（物件の場所で開く URL）", () => {
+    const m = findMunicipality("11202")!;
+    const result = {
+      status: "ok" as const,
+      lat: 36.153221,
+      lng: 139.392611,
+      matchedAddress: "埼玉県熊谷市宮町二丁目",
+      town: "宮町二丁目",
+      approximate: false,
+      municipality: m,
+      links: buildLinks(m, 36.153221, 139.392611),
+    };
+    expect(buildSummary(result, {})).toContain(
+      "【地番の参考図】熊谷市の地番情報：https://www2.wagmap.jp/kumagaya/Map?mid=260&mpx=139.392611&mpy=36.153221&mps=1000&gprj=2\n  （市町村が公開している地番の参考図。",
+    );
+  });
+
+  it("埋蔵文化財の確認先（市の遺跡地図を物件の場所で開く URL と教育委員会）", () => {
+    const m = findMunicipality("14109")!;
+    const result = {
+      status: "ok" as const,
+      lat: 35.5146,
+      lng: 139.6218,
+      matchedAddress: "神奈川県横浜市港北区大豆戸町",
+      town: "大豆戸町",
+      approximate: false,
+      municipality: m,
+      links: buildLinks(m, 35.5146, 139.6218),
+    };
+    const text = buildSummary(result);
+    expect(text).toContain(
+      "【埋蔵文化財】文化財ハマSite（横浜市行政地図情報提供システム）で確認（物件の場所で開く）\n  https://wwwm.city.yokohama.lg.jp/yokohama/Map?mid=9&mpx=139.621800&mpy=35.514600&mps=2500&gprj=2",
+    );
+    expect(text).toContain("※遺跡地図は包蔵地の概要を示すもの。包蔵地（遺跡）に入るかは横浜市の教育委員会（文化財の担当）で確認を。");
+  });
+});
+
 describe("buildSummary の最寄り駅", () => {
   it("徒歩の目安（道路距離 80m を1分）と、直線の目安・出典を添える", () => {
     const m = findMunicipality("14109")!;
@@ -231,6 +340,23 @@ describe("buildSummary の地番", () => {
     const plain = buildSummary(result, parcels());
     expect(plain).toContain("【謄本・公図用の地番】");
     expect(plain).not.toContain("基盤地図情報");
+  });
+
+  it("市町村の地番参考図の筆は、参考図である旨と市町村ごとの出典を付ける", () => {
+    const m = findMunicipality("12203")!;
+    const result = {
+      status: "ok" as const,
+      lat: 35.7457,
+      lng: 139.9094,
+      matchedAddress: "千葉県市川市国府台一丁目",
+      town: "国府台一丁目",
+      approximate: false,
+      municipality: m,
+      links: buildLinks(m, 35.7457, 139.9094),
+    };
+    const text = buildSummary(result, { parcels: { target: "市川市国府台１丁目 2-1", neighbors: ["2-2"], reference: false, sanko: "12203" } });
+    expect(text).toContain("【謄本・公図用の地番（地番参考図・市町村の課税用の参考図で、登記の地番・筆の形と違うことがあります）】\n・物件：市川市国府台１丁目 2-1");
+    expect(text).toMatch(/※参考図の筆の出典：市川市「地籍図（地番図）」（CC BY 4\.0・.+）を加工して作成。市町村の課税用の参考図で/);
   });
 });
 

@@ -12,10 +12,16 @@ import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, HAZARD_TABLE_NOTE, h
 import { changeText, distanceText, kindText, priceText } from "@/lib/roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "@/lib/roadmap/land-price-data";
 import { schoolCredit, schoolLine } from "@/lib/roadmap/school";
+import { POI_SOURCE, poiWalkText } from "@/lib/roadmap/poi";
 import { STATION_CREDIT, stationLine } from "@/lib/roadmap/walk";
 import { KOZU_CREDIT } from "@/lib/roadmap/kozu-data";
-import { chibanLabel, estimatedMark, estimatedNote, kuikiLabel } from "@/lib/roadmap/parcel";
+import { chibanLabel, estimatedNote, kuikiLabel, parcelMark } from "@/lib/roadmap/parcel";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
+import { SANKO_NOTE, sankoCredit } from "@/lib/roadmap/sanko-data";
+import { HOUREI_CREDIT, houreiLine, houreiNote } from "@/lib/roadmap/hourei";
+import { TOCHI_CREDIT, tochiLine } from "@/lib/roadmap/tochi";
+import { isekiFor, isekiLine } from "@/lib/roadmap/iseki";
+import { MORIDO_CREDIT, moridoLine } from "@/lib/roadmap/morido";
 import { zoningRows } from "@/lib/roadmap/zoning";
 import { ZONING_CREDIT } from "@/lib/roadmap/zoning-data";
 import { COVERAGE } from "./coverage";
@@ -23,6 +29,7 @@ import type { BuildingState } from "./building-card";
 import type { HazardState } from "./hazard-card";
 import type { LandPriceState } from "./land-price-card";
 import type { SchoolState } from "./school-card";
+import type { PoiState } from "./poi-card";
 import type { StationState } from "./station-card";
 import { MapPreview } from "./map-preview";
 import type { RoadsState } from "./nearby-roads";
@@ -50,6 +57,7 @@ export function PrintSheet(props: {
   landPrice: LandPriceState;
   schools: SchoolState;
   stations: StationState;
+  pois: PoiState;
 }) {
   // document.body に出す（画面の作りの外に置き、印刷では画面の作りを丸ごと隠す）。サーバーでは何も出さない
   const client = useSyncExternalStore(
@@ -71,6 +79,7 @@ function Memo({
   landPrice,
   schools,
   stations,
+  pois,
 }: {
   result: Ok;
   zoning: ZoningState;
@@ -81,8 +90,10 @@ function Memo({
   landPrice: LandPriceState;
   schools: SchoolState;
   stations: StationState;
+  pois: PoiState;
 }) {
   const walks = stations.status === "ok" ? stations.stations : [];
+  const facilities = pois.status === "ok" ? pois.pois : [];
   const bHit = building.status === "ok" ? building.result.hit : undefined;
   // 近くの地価：一番近い地価公示と地価調査を1つずつ（1枚に収めるため）
   const hits = landPrice.status === "ok" ? landPrice.hits : [];
@@ -92,6 +103,8 @@ function Memo({
   const m = result.municipality;
   const p = result.parcel;
   const found = p && !result.picked ? p : undefined;
+  // 市町村の地番参考図の筆（出典は市町村ごと）
+  const sanko = p?.sanko ?? (parcels.status === "ok" ? parcels.parcel.sanko : undefined);
   const c = result.contact;
   const dept = c ? (/^(東京都|\S{2,3}県)\s/.test(c.dept) ? c.dept : `${m.name} ${c.dept}`) : undefined;
   const lines = parcels.status === "ok" ? parcelLines(parcels) : undefined;
@@ -104,7 +117,7 @@ function Memo({
           <p className="text-[10px] tracking-[0.1em] text-[#7a6a55]">道路種別・都市計画・災害リスクの調査メモ</p>
           <h1 className="text-[17px] font-bold leading-snug">
             {result.matchedAddress}
-            {found ? ` ${chibanLabel(found.chibanRaw)}${estimatedMark(found)}` : <span className="text-[13px] font-normal">{result.picked ? "（地図で選んだ地点）" : " 付近"}</span>}
+            {found ? ` ${chibanLabel(found.chibanRaw)}${parcelMark(found)}` : <span className="text-[13px] font-normal">{result.picked ? "（地図で選んだ地点）" : " 付近"}</span>}
           </h1>
         </div>
         <p className="shrink-0 text-right text-[10px] leading-[1.5] text-[#7a6a55]">
@@ -127,7 +140,7 @@ function Memo({
               <dt className="text-[#7a6a55]">地番で探した筆</dt>
               <dd>
                 {kuikiLabel(found.kuiki)} {chibanLabel(found.chibanRaw)}
-                {estimatedMark(found)}
+                {parcelMark(found)}
               </dd>
             </>
           ) : (
@@ -136,7 +149,7 @@ function Memo({
                 <dt className="text-[#7a6a55]">この地点の筆</dt>
                 <dd>
                   {kuikiLabel(p.kuiki)} {chibanLabel(p.chibanRaw)}
-                  {estimatedMark(p)}
+                  {parcelMark(p)}
                 </dd>
               </>
             )
@@ -177,6 +190,12 @@ function Memo({
             <>
               <dt className="text-[#7a6a55]">最寄り駅（目安）</dt>
               <dd>{walks.map(stationLine).join("　")}</dd>
+            </>
+          )}
+          {facilities.length > 0 && (
+            <>
+              <dt className="text-[#7a6a55]">周辺施設（目安）</dt>
+              <dd className="text-[10.5px] leading-[1.55]">{facilities.map((w) => `${w.label} ${w.name} ${poiWalkText(w)}`).join("　")}</dd>
             </>
           )}
           <dt className="text-[#7a6a55]">緯度・経度</dt>
@@ -268,6 +287,32 @@ function Memo({
                     <dd className={`min-w-0 flex-1 font-semibold ${r.warn ? "text-[#8a4f3a]" : ""}`}>{r.value}</dd>
                   </div>
                 ))}
+                {zoning.morido && (
+                  <div className="flex gap-2 py-0.5">
+                    <dt className="w-[7.5em] shrink-0 text-[10.5px] text-[#7a6a55]">盛土規制法</dt>
+                    <dd className="min-w-0 flex-1 font-semibold">{moridoLine(zoning.morido)}</dd>
+                  </div>
+                )}
+                {/* 砂防指定地・急傾斜地などは、区域に入っているときだけ（1枚に収めるため） */}
+                {!!zoning.hourei?.hits.length && (
+                  <div className="flex gap-2 py-0.5">
+                    <dt className="w-[7.5em] shrink-0 text-[10.5px] text-[#7a6a55]">法令の区域</dt>
+                    <dd className="min-w-0 flex-1 font-semibold text-[#8a4f3a]">{houreiLine(zoning.hourei)}</dd>
+                  </div>
+                )}
+                {/* 自然公園・農業振興地域・森林も、区域に入っているときだけ */}
+                {!!(zoning.tochi?.park || zoning.tochi?.agri || zoning.tochi?.forest) && (
+                  <div className="flex gap-2 py-0.5">
+                    <dt className="w-[7.5em] shrink-0 text-[10.5px] text-[#7a6a55]">自然公園・農振・森林</dt>
+                    <dd className="min-w-0 flex-1 font-semibold text-[#8a4f3a]">
+                      {tochiLine(zoning.tochi)}（{zoning.tochi.year}年度の国のデータ・参考）
+                    </dd>
+                  </div>
+                )}
+                <div className="flex gap-2 py-0.5">
+                  <dt className="w-[7.5em] shrink-0 text-[10.5px] text-[#7a6a55]">埋蔵文化財</dt>
+                  <dd className="min-w-0 flex-1 font-semibold">{isekiLine(isekiFor(m, result.lat, result.lng))}</dd>
+                </div>
               </dl>
               <p className="mt-1 text-[9px] leading-[1.5] text-[#7a6a55]">
                 {zoning.st?.asOf && `${zoning.st.city}のデータは${zoning.st.asOf}時点。`}
@@ -286,6 +331,7 @@ function Memo({
               <p className="text-[10px] text-[#7a6a55]">
                 {parcels.kind === "address" ? "住所の地点にある筆（参考。住居表示と地番は別）" : "物件の筆"}
                 {parcels.parcel.estimated && `・公図から推定した位置（${estimatedNote(parcels.parcel.estimated)}）`}
+                {parcels.parcel.sanko && `・地番参考図（${SANKO_NOTE}）`}
               </p>
               <p className="font-semibold">{lines.target ?? `${kuikiLabel(parcels.parcel.kuiki)} ${chibanLabel(parcels.parcel.chibanRaw)}`}</p>
               <p className="mt-1 text-[10px] text-[#7a6a55]">境界が接している筆（{lines.neighbors.length}）</p>
@@ -398,13 +444,20 @@ function Memo({
         </p>
         <p>
           地図：地理院タイル（国土地理院）。{zoning.status === "ok" && `都市計画の${ZONING_CREDIT}。`}
+          {zoning.status === "ok" && zoning.morido && `盛土規制法の区域の${MORIDO_CREDIT}（概略の区域で、重要事項説明の根拠には使えません）。`}
+          {zoning.status === "ok" &&
+            !!zoning.hourei?.hits.length &&
+            `砂防指定地などの区域の${HOUREI_CREDIT}（概略の区域で、重要事項説明の根拠には使えません）。${[...new Set(zoning.hourei.hits.map((h) => houreiNote(h.kind, h.pref)).filter(Boolean))].join("")}`}
+          {zoning.status === "ok" && !!(zoning.tochi?.park || zoning.tochi?.agri || zoning.tochi?.forest) && `自然公園・農業振興地域・森林の${TOCHI_CREDIT}（縮尺約1/5万の概略の区域）。`}
           {hazard.status === "ok" && `災害リスクの${HAZARD_CREDIT}。`}
           {bHit && `建物の${BUILDING_CREDIT}。`}
           {prices.length > 0 && `地価の${LAND_PRICE_CREDIT}（標準地・基準地の価格で、物件の価格ではありません）。`}
           {schools.status === "ok" && `学区の${schoolCredit(schools.schools)}（指定校は教育委員会で確認）。`}
           {walks.length > 0 && `駅の${STATION_CREDIT}（徒歩は道路距離 80m を1分。駅の出入口までではない）。`}
+          {facilities.length > 0 && `周辺施設は${POI_SOURCE}を加工して作成（施設の位置までの目安）。`}
           {(p || parcels.status === "ok") && `筆の${PARCEL_CREDIT}。`}
           {(p?.estimated || (parcels.status === "ok" && parcels.parcel.estimated)) && `${KOZU_CREDIT}。`}
+          {sanko && `参考図の筆の${sankoCredit(sanko)}。`}
         </p>
       </footer>
     </div>

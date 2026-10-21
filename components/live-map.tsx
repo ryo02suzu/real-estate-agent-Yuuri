@@ -20,6 +20,7 @@ import {
   hazardLayerId,
   KANTO_BOUNDS,
   KOZU_COLORS,
+  SANKO_COLOR,
   LAND_PRICE_EVENT,
   LAND_PRICE_LAYERS,
   LAND_PRICE_MIN_ZOOM,
@@ -32,13 +33,14 @@ import {
   ZONING_LAYERS,
   ZONING_MIN_ZOOM,
   gsiStyle,
-  parcelFilter,
+  parcelHitFilter,
   sheetFeatures,
   type Basemap,
 } from "@/lib/map-style";
 import { buildingAt, buildingSummary, USAGE_GROUPS } from "@/lib/roadmap/building";
 import { BUILDING_DATA, hasBuildings } from "@/lib/roadmap/building-data";
 import { hasKozu } from "@/lib/roadmap/kozu-data";
+import { hasSanko } from "@/lib/roadmap/sanko-data";
 import { pmtilesBuildingSource } from "@/lib/roadmap/building-tiles";
 import { HAZARD_KINDS, HAZARD_LAYERS, hazardAt, hazardPointLabel, HAZARDS, type HazardKind } from "@/lib/roadmap/hazard";
 import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
@@ -91,7 +93,12 @@ const OVERLAYS = {
     /** 押したとき、これより引いていれば zoomTo まで寄る */
     zoomBelow: PARCEL_MIN_ZOOM + 1,
     zoomTo: PARCEL_MIN_ZOOM + 1.5,
-    none: ["この辺りはデータがありません", hasKozu() ? "公図（任意座標）の地域は、推定の位置に置けた所だけ点線で出ます" : "公図（任意座標）の地域は載っていません"],
+    none: [
+      "この辺りはデータがありません",
+      hasSanko() || hasKozu()
+        ? `公図（任意座標）の地域は、${[hasSanko() && "市町村の地番参考図がある所", hasKozu() && "推定の位置に置けた所"].filter(Boolean).join("と、")}だけ出ます`
+        : "公図（任意座標）の地域は載っていません",
+    ],
   },
   zoning: {
     label: "用途地域",
@@ -346,7 +353,8 @@ export default function LiveMap({
       if (!onRef.current.parcels || map.getZoom() < PARCEL_MIN_ZOOM) return undefined;
       const f = map.queryRenderedFeatures([pt.x, pt.y], { layers: PARCEL_PICK_LAYERS })[0];
       const p = f?.properties as { 地番?: string; 地番区域?: string } | undefined;
-      const est = f?.layer.id === "kozu-fill" ? (Number(f.properties?.q) === 2 ? "・公図から推定・確度低" : "・公図から推定") : "";
+      const est =
+        f?.layer.id === "kozu-fill" ? (Number(f.properties?.q) === 2 ? "・公図から推定・確度低" : "・公図から推定") : f?.layer.id === "sanko-fill" ? "・地番参考図" : "";
       return p?.地番 ? `${chibanLabel(String(p.地番))}（${kuikiLabel(String(p.地番区域 ?? ""))}${est}）` : undefined;
     };
     /** 画面上の点の用途地域「第１種低層住居専用地域 50/100」（用途地域を表示しているときだけ） */
@@ -573,7 +581,7 @@ export default function LiveMap({
     const map = mapRef.current;
     if (!map || !loaded) return;
     for (const id of PARCEL_HIT_LAYERS) {
-      map.setFilter(id, parcelFilter(parcel));
+      map.setFilter(id, parcelHitFilter(id, parcel));
       map.setLayoutProperty(id, "visibility", parcel ? "visible" : "none");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -781,17 +789,28 @@ export default function LiveMap({
         foot={`${HAZARD_FOOT[hazard] ?? ""}国の重ねるハザードマップ（参考）。色の無い所は区域外かデータ無し。重要事項説明は市区町村のハザードマップで`}
       />
     ),
-    on.parcels && hasKozu() && (
+    on.parcels && (hasKozu() || hasSanko()) && (
       <MapLegend
         key="parcels"
         title="筆界"
         items={[
           { label: "登記所備付地図", short: "登記所の地図", color: "#b0472a", kind: "line" as const },
-          { label: "公図から推定した位置", short: "公図（推定）", color: KOZU_COLORS.high, kind: "dash" as const },
-          { label: "推定（確度低）", short: "推定・確度低", color: KOZU_COLORS.low, kind: "dash" as const },
+          ...(hasSanko() ? [{ label: "市町村の地番参考図", short: "地番参考図", color: SANKO_COLOR, kind: "line" as const }] : []),
+          ...(hasKozu()
+            ? [
+                { label: "公図から推定した位置", short: "公図（推定）", color: KOZU_COLORS.high, kind: "dash" as const },
+                { label: "推定（確度低）", short: "推定・確度低", color: KOZU_COLORS.low, kind: "dash" as const },
+              ]
+            : []),
         ]}
         compact={compact}
-        foot="点線は、公図（任意座標）の形を道路の縁に合わせて置いた推定の位置です。数m（薄い点線は5m前後）ずれることがあります。謄本・公図で確かめてください"
+        foot={[
+          hasSanko() && "緑の線は、市町村が公開している課税用の地番参考図の筆で、登記の地番・筆の形と違うことがあります。",
+          hasKozu() && "点線は、公図（任意座標）の形を道路の縁に合わせて置いた推定の位置です。数m（薄い点線は5m前後）ずれることがあります。",
+          "謄本・公図で確かめてください",
+        ]
+          .filter(Boolean)
+          .join("")}
       />
     ),
     on.zoning && legend.zoning && <MapLegend key="zoning" title="用途地域の色" items={legend.zoning} compact={compact} />,

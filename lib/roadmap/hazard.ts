@@ -547,6 +547,25 @@ export function groupHazardMaps(maps: HazardMaps): { kinds: HazardMapKind[]; url
   return groups;
 }
 
+/**
+ * 国の重ねるハザードマップで、物件の場所に大規模盛土造成地・液状化の発生傾向図を重ねて開く。
+ * どちらも公共データの一覧に無い（第三者の権利がある）データなので、読み取らずに国の地図で見てもらう
+ */
+export type GroundMap = { kind: "zousei" | "ekijo"; label: string; url: string };
+
+export function groundMaps(lat: number, lng: number): GroundMap[] {
+  const at = (z: number, layer: string) =>
+    `https://disaportal.gsi.go.jp/maps/?ll=${lat.toFixed(6)},${lng.toFixed(6)}&z=${z}&base=pale&ls=${layer}%2C0.8&disp=1&vs=c1j0l0u0t0h0z0`;
+  return [
+    { kind: "zousei", label: "大規模盛土造成地", url: at(16, "daikiboumoritsuzouseichi_multi") },
+    { kind: "ekijo", label: "液状化の発生傾向", url: at(15, "ekijouka_zenkoku") },
+  ];
+}
+
+/** 地盤の地図の注記（国の地図の凡例のとおり） */
+export const GROUND_NOTE =
+  "大規模盛土造成地は安全性の確認が必要な盛土で、直ちに危険というものではありません。液状化の発生傾向は地形から見た目安です";
+
 /** わがまちハザードマップ（国の一覧）で、その市区町村を開く */
 export const wagamachiUrl = (muniCd: string) => `https://disaportal.gsi.go.jp/hazardmap/index.html?citycode=${cityCode(muniCd)}`;
 

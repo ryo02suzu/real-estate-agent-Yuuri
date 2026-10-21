@@ -1,0 +1,76 @@
+# 3か月ごと（1・4・7・10月の9日の朝、日本時間 6:41）に、国土数値情報の自然公園地域・農業地域・森林地域（土地利用基本計画）に
+# 新しい年度のデータが出たかを見て（都県ごと。今は2015年度が最新）、出ていれば関東1都6県の区域のタイルを作り直し、アプリ（public/data/）に入れる。
+# テストが通れば main に直接入れる（本番は Vercel が main から自動で作り直す）。外部のストレージや鍵は要らない。
+name: 自然公園・農業振興地域・森林の地図データ（最新版）
+
+on:
+  schedule:
+    - cron: "41 21 8 1,4,7,10 *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 新しいデータが無くても作り直す
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+# ほかのデータ更新と同時に main へ書き込まないようにする
+concurrency:
+  group: data-updates
+  cancel-in-progress: false
+
+env:
+  TIPPECANOE_VERSION: "2.79.0"
+
+jobs:
+  tochi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 新しいデータが出たか
+        id: c
+        run: |
+          pip install pyshp==2.3.1
+          python3 scripts/tochi/build.py --check
+          if [ "${{ inputs.force }}" = "true" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/cache@v4
+        if: steps.c.outputs.changed == 'true'
+        id: tippecanoe
+        with:
+          path: ~/tippecanoe-bin
+          key: tippecanoe-${{ env.TIPPECANOE_VERSION }}-${{ runner.os }}
+      - name: tippecanoe を作る
+        if: steps.c.outputs.changed == 'true' && steps.tippecanoe.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$TIPPECANOE_VERSION" https://github.com/felt/tippecanoe.git /tmp/tippecanoe
+          make -C /tmp/tippecanoe -j"$(nproc)"
+          mkdir -p ~/tippecanoe-bin && cp /tmp/tippecanoe/tippecanoe /tmp/tippecanoe/tile-join ~/tippecanoe-bin/
+      - name: タイルを作ってアプリに入れる
+        if: steps.c.outputs.changed == 'true'
+        run: |
+          export PATH="$HOME/tippecanoe-bin:$PATH"
+          python3 scripts/tochi/build.py --install --work "$RUNNER_TEMP/tochi"
+          ls -la public/data
+      - uses: actions/setup-node@v4
+        if: steps.c.outputs.changed == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - name: テストが通れば main に入れる
+        if: steps.c.outputs.changed == 'true'
+        run: |
+          if git diff --quiet && [ -z "$(git status --porcelain public/data)" ]; then echo "変更なし"; exit 0; fi
+          npm ci
+          npm test
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A public/data lib/roadmap/data/tochi-source.json
+          git commit -m "Update the natural park, agricultural and forest area data: $(jq -c .years lib/roadmap/data/tochi-source.json) (automatic)"
+          git pull --rebase
+          git push

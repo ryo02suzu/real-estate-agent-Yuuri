@@ -9,7 +9,7 @@
 #
 # 時間切れ・失敗したジョブがあっても、置けた分でまとめて main に入れ、ジョブごとの結果（parts）は消さずに残す。
 # まとめのログの「結果の無いジョブ」を Run workflow の chunks に、parts に置き場（kozu/run-…）を入れて動かすと、
-# そのジョブだけやり直して前の結果に足し、まとめ直す。
+# そのジョブだけやり直して前の結果に足し、まとめ直す。merge_only なら置き直さずにまとめ直すだけ。
 #
 # 必要な設定は地番の地図データ（parcel-tiles.yml）と同じ。無ければ何もしないで終わる:
 #   Secrets:   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
@@ -31,6 +31,10 @@ on:
       parts:
         description: 前の回のジョブごとの結果の置き場（例 kozu/run-38289741426）。やり直した分を足してまとめる。空ならこの回の置き場
         required: false
+      merge_only:
+        description: 置き直さず、parts の結果をまとめ直すだけ（まとめ方を直したときなど）
+        type: boolean
+        default: false
   schedule:
     - cron: "0 18 10 5 *"
 
@@ -117,6 +121,7 @@ jobs:
 
   build:
     needs: [check, plan]
+    if: ${{ !inputs.merge_only }}
     runs-on: ubuntu-latest
     # ジョブの時間の上限（6時間）より前に、置けた分で終える（kozu.py --minutes）
     timeout-minutes: 355
@@ -217,6 +222,7 @@ jobs:
           mkdir -p ~/tippecanoe-bin && cp /tmp/tippecanoe/tippecanoe /tmp/tippecanoe/tile-join ~/tippecanoe-bin/
       - run: echo "$HOME/tippecanoe-bin" >> "$GITHUB_PATH"
       - name: ジョブの結果をまとめる（ジョブをまたいで重なった切れ端を外す）
+        id: resolve
         run: |
           mkdir -p work/parts
           aws s3 cp "s3://$R2_BUCKET/$PARTS/" work/parts/ --recursive --endpoint-url "$R2_ENDPOINT" --only-show-errors
@@ -234,6 +240,8 @@ jobs:
           miss = [i for c in json.loads(os.environ["ALL_CHUNKS"]) for i in c.split(",") if set(done.get(label(i), {"cut": True})) <= {"cut", "error"}]
           if miss:
               print(f"::warning::結果の無いジョブ {len(miss)}（時間切れ・失敗）。Run workflow の chunks に「{';'.join(miss)}」、parts に「{os.environ['PARTS']}」を入れるとやり直せます")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"missing={len(miss)}\n")
           PY
           python3 scripts/kozu-tiles/kozu.py --resolve work/parts --out work/kozu.geojsonl --stats work/kozu-stats.json
           rm -rf work/parts
@@ -281,8 +289,12 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add lib/roadmap/data/kozu-source.json
           git commit -m "Use the $STAMP estimated kozu parcel data on R2 (automatic)"
-          git pull --rebase
-          git push
-      - name: ジョブごとの結果を消す（時間切れ・失敗したジョブがあれば、やり直して足せるよう残す）
-        if: needs.build.result == 'success'
+          # 長い実行のあいだに別の実行（merge_only など）が kozu-source.json を書き換えていても、この実行で作った版にする
+          # （まとめは R2 にある全部のジョブの結果から作るので、こちらが新しい）。rebase の -X theirs は、載せ直す側（この実行）を取る
+          for i in 1 2 3; do
+            git pull --rebase -X theirs && git push && break
+            sleep 10
+          done
+      - name: ジョブごとの結果を消す（結果の無いジョブがあれば、やり直して足せるよう残す）
+        if: needs.build.result == 'success' && steps.resolve.outputs.missing == '0'
         run: aws s3 rm "s3://$R2_BUCKET/$PARTS/" --recursive --endpoint-url "$R2_ENDPOINT" --only-show-errors

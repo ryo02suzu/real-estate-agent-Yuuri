@@ -9,6 +9,7 @@ import { KOZU_DATA, hasKozu, kozuUrl } from "./roadmap/kozu-data";
 import { LAND_PRICE_ZOOM, LAND_USAGE_COLORS } from "./roadmap/land-price";
 import { LAND_PRICE_DATA, landPriceUrl } from "./roadmap/land-price-data";
 import { PARCEL_DATA } from "./roadmap/parcel-data";
+import { hasSanko, SANKO_ATTRIBUTION, SANKO_CITY_NAMES, SANKO_DATA, sankoUrl } from "./roadmap/sanko-data";
 import type { SheetHit } from "./roadmap/sheets";
 import { YOUTO_COLORS, ZONING_ZOOM } from "./roadmap/zoning";
 import { ZONING_DATA, zoningUrl } from "./roadmap/zoning-data";
@@ -36,14 +37,49 @@ const KOZU_ATTRIBUTION = `公図の推定位置：<a href="https://front.geospat
 
 /** 公図から推定した位置の筆の線の色（確かさが高い・低い） */
 export const KOZU_COLORS = { high: "#7a4fb0", low: "#b9a2d8" };
-/** 筆のレイヤ（「筆・地番」で表示を切り替える）。推定の筆のデータがあれば点線の筆も */
-export const PARCEL_LAYERS = hasKozu()
-  ? ["fude-fill", "fude-line", "fude-label", "kozu-fill", "kozu-line", "kozu-label"]
-  : ["fude-fill", "fude-line", "fude-label"];
+/** 市町村の地番参考図の筆の線の色 */
+export const SANKO_COLOR = "#2f7a6e";
+// 市町村の地番参考図の筆（データの置き場所が決まるまでは無し）。法務省の地図データの筆と重ならない
+const sankoOn = hasSanko();
+// 市町村の地番参考図の出典（市町村ごとのライセンス：公共データ利用規約第1.0版か CC BY 4.0）
+const SANKO_MAP_ATTRIBUTION = SANKO_ATTRIBUTION;
+/** 筆のレイヤ（「筆・地番」で表示を切り替える）。参考図・推定の筆のデータがあれば、その筆も */
+export const PARCEL_LAYERS = [
+  "fude-fill",
+  "fude-line",
+  "fude-label",
+  ...(sankoOn ? ["sanko-fill", "sanko-line", "sanko-label"] : []),
+  ...(hasKozu() ? ["kozu-fill", "kozu-line", "kozu-label"] : []),
+];
 /** 地点の筆を拾うレイヤ */
-export const PARCEL_PICK_LAYERS = hasKozu() ? ["fude-fill", "kozu-fill"] : ["fude-fill"];
+export const PARCEL_PICK_LAYERS = ["fude-fill", ...(sankoOn ? ["sanko-fill"] : []), ...(hasKozu() ? ["kozu-fill"] : [])];
 /** 地番で見つけた筆・地図で選んだ地点の筆を強調するレイヤ */
-export const PARCEL_HIT_LAYERS = hasKozu() ? ["fude-hit", "fude-hit-line", "kozu-hit", "kozu-hit-line"] : ["fude-hit", "fude-hit-line"];
+export const PARCEL_HIT_LAYERS = [
+  "fude-hit",
+  "fude-hit-line",
+  ...(sankoOn ? ["sanko-hit", "sanko-hit-line"] : []),
+  ...(hasKozu() ? ["kozu-hit", "kozu-hit-line"] : []),
+];
+
+/**
+ * 推定の位置の筆のうち、参考図のある市町村の筆は描かない（市町村の図の筆を使う）。地番区域の先頭が市町村名
+ * （町村は「比企郡小川町_…」のように郡の名前が前に付く。lib/roadmap/sanko-data.ts の sankoCovers と同じ判定）
+ */
+const KUIKI: ExpressionSpecification = ["to-string", ["get", "地番区域"]];
+const KOZU_FILTER: FilterSpecification | undefined = sankoOn
+  ? ([
+      "!",
+      [
+        "any",
+        ...[...SANKO_CITY_NAMES].flatMap((n): ExpressionSpecification[] => [
+          ["==", ["index-of", `${n}_`, KUIKI], 0],
+          [">", ["index-of", `郡${n}_`, KUIKI], 0],
+        ]),
+      ] as ExpressionSpecification,
+    ] as FilterSpecification)
+  : undefined;
+const withKozuFilter = (f?: FilterSpecification): FilterSpecification | undefined =>
+  KOZU_FILTER ? (f ? (["all", KOZU_FILTER, f] as unknown as FilterSpecification) : KOZU_FILTER) : f;
 
 /** 筆を地図に描く最小のズーム（タイルは z14〜16。z16 より細かいときは z16 を拡大して描く） */
 export const PARCEL_MIN_ZOOM = 15;
@@ -200,6 +236,12 @@ export function parcelFilter(p?: { kuiki: string; chibanRaw: string }): FilterSp
     : ["==", ["get", "地番"], "\u0000"];
 }
 
+/** 強調するレイヤ（id）ごとの絞り込み（推定の位置の筆は、参考図のある市町村の筆を除く） */
+export function parcelHitFilter(id: string, p?: { kuiki: string; chibanRaw: string }): FilterSpecification {
+  const f = parcelFilter(p);
+  return id.startsWith("kozu") ? withKozuFilter(f)! : f;
+}
+
 export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
   const keys = Object.keys(BASEMAPS) as Basemap[];
   const buildings = hasBuildings();
@@ -233,6 +275,8 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
       ...(buildings ? { buildings: { type: "vector" as const, url: `pmtiles://${buildingUrl()}`, attribution: BUILDING_ATTRIBUTION } } : {}),
       // 公図の推定位置の筆（データの置き場所が決まるまでは無し）
       ...(hasKozu() ? { kozu: { type: "vector" as const, url: `pmtiles://${kozuUrl()}`, attribution: KOZU_ATTRIBUTION } } : {}),
+      // 市町村の地番参考図の筆（データの置き場所が決まるまでは無し）
+      ...(sankoOn ? { sanko: { type: "vector" as const, url: `pmtiles://${sankoUrl()}`, attribution: SANKO_MAP_ATTRIBUTION } } : {}),
       // 地価公示・地価調査（アプリと同じサイトに置いた PMTiles）
       landprice: { type: "vector", url: `pmtiles://${landPriceUrl()}`, attribution: LAND_PRICE_ATTRIBUTION },
     },
@@ -322,7 +366,40 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         layout: chibanLabelLayout,
         paint: { "text-color": "#8a3a22", "text-halo-color": "#ffffff", "text-halo-width": 1.3 },
       },
-      // 公図から推定した位置の筆（点線。数mずれることがある）
+      // 市町村の地番参考図の筆（実線。課税用の参考図で、登記の筆と違うことがある）
+      ...(sankoOn
+        ? ([
+            {
+              id: "sanko-fill",
+              type: "fill",
+              source: "sanko",
+              "source-layer": SANKO_DATA.layer,
+              minzoom: PARCEL_MIN_ZOOM,
+              layout: { visibility: "none" },
+              paint: { "fill-color": "#000000", "fill-opacity": 0 },
+            },
+            {
+              id: "sanko-line",
+              type: "line",
+              source: "sanko",
+              "source-layer": SANKO_DATA.layer,
+              minzoom: PARCEL_MIN_ZOOM,
+              layout: { visibility: "none" },
+              paint: { "line-color": SANKO_COLOR, "line-width": ["interpolate", ["linear"], ["zoom"], 15, 0.4, 18, 1.2], "line-opacity": 0.75 },
+            },
+            {
+              id: "sanko-label",
+              type: "symbol",
+              source: "sanko",
+              "source-layer": SANKO_DATA.layer,
+              minzoom: PARCEL_LABEL_ZOOM,
+              filter: CHIBAN_LABEL_FILTER,
+              layout: chibanLabelLayout,
+              paint: { "text-color": "#1f5c53", "text-halo-color": "#ffffff", "text-halo-width": 1.3 },
+            },
+          ] satisfies LayerSpecification[])
+        : []),
+      // 公図から推定した位置の筆（点線。数mずれることがある）。参考図のある市町村の筆は描かない
       ...(hasKozu()
         ? ([
             {
@@ -331,6 +408,7 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
               source: "kozu",
               "source-layer": KOZU_DATA.layer,
               minzoom: PARCEL_MIN_ZOOM,
+              ...(KOZU_FILTER ? { filter: KOZU_FILTER } : {}),
               layout: { visibility: "none" },
               paint: { "fill-color": "#000000", "fill-opacity": 0 },
             },
@@ -340,6 +418,7 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
               source: "kozu",
               "source-layer": KOZU_DATA.layer,
               minzoom: PARCEL_MIN_ZOOM,
+              ...(KOZU_FILTER ? { filter: KOZU_FILTER } : {}),
               layout: { visibility: "none" },
               paint: {
                 // 位置合わせの確かさ（q）が低いものは薄く
@@ -355,7 +434,7 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
               source: "kozu",
               "source-layer": KOZU_DATA.layer,
               minzoom: PARCEL_LABEL_ZOOM,
-              filter: CHIBAN_LABEL_FILTER,
+              filter: withKozuFilter(CHIBAN_LABEL_FILTER),
               layout: chibanLabelLayout,
               paint: { "text-color": ["match", ["get", "q"], 2, "#8f78b8", "#5b3690"], "text-halo-color": "#ffffff", "text-halo-width": 1.3 },
             },
@@ -445,6 +524,30 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         layout: { visibility: "none" },
         paint: { "line-color": "#8a6632", "line-width": 3 },
       },
+      ...(sankoOn
+        ? ([
+            {
+              id: "sanko-hit",
+              type: "fill",
+              source: "sanko",
+              "source-layer": SANKO_DATA.layer,
+              minzoom: 14,
+              filter: parcelFilter(),
+              layout: { visibility: "none" },
+              paint: { "fill-color": "#c49a5c", "fill-opacity": 0.28 },
+            },
+            {
+              id: "sanko-hit-line",
+              type: "line",
+              source: "sanko",
+              "source-layer": SANKO_DATA.layer,
+              minzoom: 14,
+              filter: parcelFilter(),
+              layout: { visibility: "none" },
+              paint: { "line-color": "#8a6632", "line-width": 3 },
+            },
+          ] satisfies LayerSpecification[])
+        : []),
       ...(hasKozu()
         ? ([
             {

@@ -1,16 +1,21 @@
 "use client";
 
 // 謄本・公図を取るときの地番。物件の筆と、境界が接する隣の筆の地番を並べ、コピーと登記情報提供サービスへの入口を出す。
-// 筆は登記所備付地図データ（lib/roadmap/parcel.ts）。住所で調べたときは、住所の地点にある筆を参考として出す
+// 筆は登記所備付地図データ（lib/roadmap/parcel.ts）。公図（任意座標）の地域は、市町村の地番参考図（sanko-data.ts）か
+// 推定の位置（kozu-data.ts）の筆。住所で調べたときは、住所の地点にある筆を参考として出す。
+// 市町村が地番図を公開していれば、物件の場所で開く入口も出す（lib/roadmap/chibanzu.ts。筆が無い地点ではそれだけを出す）
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
 import type { LookupResult } from "@/lib/roadmap";
+import type { ChibanzuLink } from "@/lib/roadmap/chibanzu";
 import { KOZU_DATA } from "@/lib/roadmap/kozu-data";
-import { adjacentParcels, chibanLabel, estimatedMark, kuikiLabel, parcelAt, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
+import { adjacentParcels, chibanLabel, kuikiLabel, parcelAt, parcelMark, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
+import { SANKO_CITIES, sankoSource } from "@/lib/roadmap/sanko-data";
 import { ChevronRightIcon, CopyIcon, ExternalIcon, InfoIcon, ParcelIcon } from "./icons";
 import { Sheet } from "./sheet";
+import { Tabs } from "./tabs";
 import { useCopy } from "./use-copy";
 
 type Ok = Extract<LookupResult, { status: "ok" }>;
@@ -65,18 +70,37 @@ export function ParcelButton({
   onOpen,
   extra,
   withBuilding,
+  chibanzu,
 }: {
   info: ParcelInfo;
   onOpen?: () => void;
-  /** スマホの一覧の下に添えるもの（地点の建物） */
+  /** スマホのシートの「建物」のタブに出すもの（地点の建物） */
   extra?: React.ReactNode;
   /** 一覧に建物も入っている（ボタンを「地番・建物」にする） */
   withBuilding?: boolean;
+  /** 市町村の地番図（物件の場所で開く） */
+  chibanzu?: ChibanzuLink;
 }) {
   const [open, setOpen] = useState(false);
-  if (info.status === "none") return null;
+  if (info.status === "none") {
+    // 登記所の地図データに筆が無い地点：市町村の地番図があれば、それを直接開く
+    if (!chibanzu) return null;
+    return (
+      <a
+        href={chibanzu.url}
+        target="_blank"
+        rel="noreferrer"
+        title={chibanzu.name}
+        className="flex shrink-0 items-center gap-1 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-[11px] leading-[1.5] text-ink lg:hover:border-brand-light/60"
+      >
+        <ParcelIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
+        地番図
+        <ExternalIcon className="h-3 w-3 shrink-0 text-muted" />
+      </a>
+    );
+  }
   const chiban =
-    onOpen && info.status === "ok" && info.kind !== "address" && /^\d/.test(info.parcel.chibanRaw) ? `${chibanLabel(info.parcel.chibanRaw)}${estimatedMark(info.parcel)}` : undefined;
+    onOpen && info.status === "ok" && info.kind !== "address" && /^\d/.test(info.parcel.chibanRaw) ? `${chibanLabel(info.parcel.chibanRaw)}${parcelMark(info.parcel)}` : undefined;
   return (
     <>
       <button
@@ -99,27 +123,61 @@ export function ParcelButton({
         {info.status === "ok" && <ChevronRightIcon className="h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
       {info.status === "ok" && !onOpen && (
-        <Sheet title="謄本・公図を取るときの地番" open={open} onClose={() => setOpen(false)}>
-          <ParcelDetail info={info} />
-          {extra}
+        <Sheet title={withBuilding ? "地番・建物" : "謄本・公図を取るときの地番"} open={open} onClose={() => setOpen(false)}>
+          {withBuilding ? (
+            <Tabs names={["謄本・公図用の地番", "建物"]} panels={[<ParcelDetail key="p" info={info} chibanzu={chibanzu} />, extra]} />
+          ) : (
+            <ParcelDetail info={info} chibanzu={chibanzu} />
+          )}
         </Sheet>
       )}
     </>
   );
 }
 
+/** シートのタブ（それぞれ1画面に収める） */
 /** PC：地図の左のパネルのカード */
-export function ParcelCard({ info }: { info: ParcelInfo }) {
-  if (info.status === "none") return null;
+export function ParcelCard({ info, chibanzu }: { info: ParcelInfo; chibanzu?: ChibanzuLink }) {
+  if (info.status === "none" && !chibanzu) return null;
   return (
     <section className="shadow-soft rounded-2xl border border-white bg-white p-4">
       <h3 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
         <ParcelIcon className="h-4 w-4 text-brand-light" />
         謄本・公図を取るときの地番
       </h3>
-      {info.status === "loading" ? <p className="text-[12px] text-muted">筆を確認しています…</p> : <ParcelDetail info={info} />}
+      {info.status === "loading" ? (
+        <p className="text-[12px] text-muted">筆を確認しています…</p>
+      ) : info.status === "none" ? (
+        <>
+          <p className="mb-2 text-[12px] leading-[1.6] text-muted">この地点の筆は、登記所の地図データにありません。</p>
+          <ChibanzuButton link={chibanzu!} />
+        </>
+      ) : (
+        <ParcelDetail info={info} chibanzu={chibanzu} />
+      )}
     </section>
   );
+}
+
+/** 外のサイトを開くボタン（登記情報提供サービス・市町村の地番図） */
+function LinkButton({ href, title, sub }: { href: string; title: string; sub: string }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-ink active:scale-[0.99] denser:py-1.5">
+      <ExternalIcon className="h-4 w-4 shrink-0 text-brand-light" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-[12.5px] font-semibold leading-[1.4]">{title}</span>
+        <span className="mt-0.5 block text-[10px] leading-[1.45] text-muted">{sub}</span>
+      </span>
+      <ChevronRightIcon className="h-3.5 w-3.5 shrink-0 opacity-80" />
+    </a>
+  );
+}
+
+const TOUKI = { href: "https://www1.touki.or.jp/", title: "登記情報提供サービス", sub: "謄本と同じ内容と公図（有料・要登録）" };
+
+/** 市町村の地番図を物件の場所で開くボタン */
+function ChibanzuButton({ link }: { link: ChibanzuLink }) {
+  return <LinkButton href={link.url} title={link.name} sub="物件の場所で開く（登記と違うことがある）" />;
 }
 
 const KIND_LABEL: Record<ParcelKind, string> = {
@@ -128,7 +186,7 @@ const KIND_LABEL: Record<ParcelKind, string> = {
   address: "住所の地点にある筆（参考）",
 };
 
-function ParcelDetail({ info }: { info: Extract<ParcelInfo, { status: "ok" }> }) {
+function ParcelDetail({ info, chibanzu }: { info: Extract<ParcelInfo, { status: "ok" }>; chibanzu?: ChibanzuLink }) {
   const { parcel, kind, neighbors } = info;
   const numbered = neighbors.filter((n) => /^\d/.test(n.chiban));
   const roads = [...new Set(neighbors.filter((n) => !/^\d/.test(n.chiban)).map((n) => chibanLabel(n.chiban)))];
@@ -140,56 +198,57 @@ function ParcelDetail({ info }: { info: Extract<ParcelInfo, { status: "ok" }> })
       <p className="text-[11px] text-muted">
         {KIND_LABEL[kind]}
         {parcel.estimated && `・公図から推定した位置${parcel.estimated === "low" ? "（確度低）" : ""}`}
+        {parcel.sanko && `・${SANKO_CITIES[parcel.sanko]?.name ?? "市町村"}の地番参考図`}
       </p>
       <Row kuiki={parcel.kuiki} chiban={parcel.chibanRaw} strong />
       {parcel.estimated && (
-        <p className="mt-0.5 text-[10.5px] leading-[1.55] text-[#8a4f3a]">
+        <p className="mt-0.5 text-[10.5px] leading-[1.55] text-[#8a4f3a] dense:leading-[1.45] denser:text-[10px]">
           {parcel.estimated === "low"
             ? "この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置で、合わせ方の確かさが低いため、5m前後ずれて隣の筆の地番になっていることがあります。隣の筆も候補にして、謄本・公図で確かめてください。"
             : "この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、数mずれて隣の筆の地番になることがあります。謄本・公図で確かめてください。"}
         </p>
       )}
+      {parcel.sanko && (
+        <p className="mt-0.5 text-[10.5px] leading-[1.55] text-[#8a4f3a] dense:leading-[1.45] denser:text-[10px]">
+          {parcel.undetermined ? "登記所の地図では、この辺りは筆界未定地です。" : "この辺りの登記所の地図は公図（任意座標）です。"}
+          市町村が公開している課税用の地番参考図の筆で、登記の地番・筆の形と違うことがあります。謄本・公図で確かめてください。
+        </p>
+      )}
       {kind === "address" && (
-        <p className="mt-0.5 text-[10.5px] leading-[1.55] text-[#8a4f3a]">
+        <p className="mt-0.5 text-[10.5px] leading-[1.55] text-[#8a4f3a] dense:leading-[1.45] denser:text-[10px]">
           住居表示の住所と地番は別のものです。物件の土地かどうかは、公図や登記で確かめてください。
         </p>
       )}
 
-      <p className="mt-3 text-[11px] text-muted">境界が接している筆（{numbered.length}）</p>
+      <p className="mt-3 text-[11px] text-muted dense:mt-2">
+        境界が接している筆（{numbered.length}）{numbered.length > 0 && "。押すとその筆をコピー"}
+      </p>
+      {/* 隣の筆は多いと20を超えるので、1行に並べる（1画面に収める） */}
       {numbered.length > 0 ? (
-        <ul className="divide-y divide-line/70">
+        <div className="mt-1 flex flex-wrap gap-1">
           {numbered.map((n) => (
-            <li key={`${n.kuiki}|${n.chiban}`}>
-              <Row kuiki={n.kuiki} chiban={n.chiban} hideTown={kuikiLabel(n.kuiki) === town} />
-            </li>
+            <NeighborChip key={`${n.kuiki}|${n.chiban}`} kuiki={n.kuiki} chiban={n.chiban} hideTown={kuikiLabel(n.kuiki) === town} />
           ))}
-        </ul>
+        </div>
       ) : (
         <p className="py-1 text-[12px] text-muted">地図データの中には見つかりませんでした</p>
       )}
       {roads.length > 0 && <p className="mt-1 text-[11px] text-muted">ほかに{roads.join("・")}に接しています。</p>}
 
-      <div className="mt-3 flex flex-col gap-2">
+      <div className="mt-3 flex flex-col gap-2 dense:mt-2 denser:gap-1.5">
         <CopyAll text={lines.join("\n")} count={lines.length} />
-        <a
-          href="https://www1.touki.or.jp/"
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-3 rounded-xl border border-line bg-white px-4 py-2.5 text-ink active:scale-[0.99]"
-        >
-          <ExternalIcon className="h-5 w-5 shrink-0 text-brand-light" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-[13px] font-semibold">登記情報提供サービス</span>
-            <span className="mt-0.5 block text-[10.5px] text-muted">登記の内容（謄本と同じ内容）と公図をネットで見られます（有料・利用登録が要ります）</span>
-          </span>
-          <ChevronRightIcon className="h-4 w-4 shrink-0 opacity-80" />
-        </a>
+        {/* 地番図があれば、登記情報提供サービスと横に並べる */}
+        <div className="flex gap-2 denser:gap-1.5">
+          <LinkButton {...TOUKI} />
+          {chibanzu && <ChibanzuButton link={chibanzu} />}
+        </div>
       </div>
-      <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted">
+      <p className="mt-2 flex gap-1.5 text-[10.5px] leading-[1.6] text-muted dense:leading-[1.5] denser:text-[10px] densest:mt-1.5 densest:leading-[1.4]">
         <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
         <span>
           筆は「登記所備付地図データ」（法務省）を加工して作成（{parcel.estimated ? KOZU_DATA.edition || PARCEL_DATA.edition : PARCEL_DATA.edition}）。
           {parcel.estimated && "公図の筆は、国土地理院の基盤地図情報（道路縁）に合わせて位置を推定しています。"}
+          {parcel.sanko && `参考図の筆の${sankoSource(parcel.sanko)}。`}
           分筆・合筆などで変わっていることがあります。証明書として使う謄本（登記事項証明書）は、法務局で請求してください。
         </span>
       </p>
@@ -217,10 +276,24 @@ function Row({ kuiki, chiban, strong, hideTown }: { kuiki: string; chiban: strin
   );
 }
 
+/** 隣の筆（「226-2」。町が違えば町の名前も）。押すと「所在 地番」をコピー */
+function NeighborChip({ kuiki, chiban, hideTown }: { kuiki: string; chiban: string; hideTown?: boolean }) {
+  const { done, copy } = useCopy();
+  return (
+    <button
+      onClick={() => copy(`${kuikiLabel(kuiki)} ${chiban}`)}
+      className={`rounded-full border px-2 py-0.5 text-[12px] leading-[1.5] dense:py-0 denser:px-1.5 denser:text-[11.5px] ${done ? "border-brand bg-mint text-brand" : "border-line text-ink"}`}
+    >
+      {!hideTown && <span className="text-muted">{kuikiLabel(kuiki)} </span>}
+      {done ? "コピー済" : chiban}
+    </button>
+  );
+}
+
 function CopyAll({ text, count }: { text: string; count: number }) {
   const { done, copy } = useCopy();
   return (
-    <button onClick={() => copy(text)} className="bg-gold flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold text-white">
+    <button onClick={() => copy(text)} className="bg-gold flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold text-white dense:py-2">
       <CopyIcon className="h-4 w-4" />
       {done ? "コピーしました" : `所在と地番をまとめてコピー（${count}筆）`}
     </button>

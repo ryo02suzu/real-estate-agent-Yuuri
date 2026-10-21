@@ -1,7 +1,7 @@
 // 神奈川県 全33市町村（2026-09 調査）。出典は docs/kanagawa-research.md。
 // 道路種別は特定行政庁の12市が各市、それ以外の9市町村＋12町村は県の土木事務所が扱う（県「各土木事務所一覧」）。
 import type { Contact, MapLink, Municipality } from "../municipalities";
-import { alandis, geocloud, machiInfo, wagmap, yokohamaMappy } from "../vendors";
+import { alandis, geocloud, machiInfo, sonicweb, wagmap, yokohamaMappy } from "../vendors";
 
 const pref = "神奈川県" as const;
 
@@ -199,7 +199,11 @@ const PREF_AREAS: Municipality[] = [
   prefArea("松田町", "14363", "kensei"),
   prefArea("山北町", "14364", "kensei"),
   prefArea("開成町", "14366", "kensei"),
-  prefArea("箱根町", "14382", "kensei"),
+  {
+    ...prefArea("箱根町", "14382", "kensei"),
+    // はこねMAP（Sonicweb hakone）の町道網図（1/1000 で開くと、地図が 1/1875 に合わせる）
+    maps: [PREF_ROAD_MAP, { kind: "public_road", label: "町道網図（はこねMAP）", build: sonicweb("hakone", "th_18"), verified: true }],
+  },
   prefArea("真鶴町", "14383", "kensei"),
   prefArea("湯河原町", "14384", "kensei"),
 ];

@@ -1,6 +1,6 @@
 // 東京都 全62区市町村（2026-09 調査）。出典は docs/tokyo-research.md。
 // 23区: 各区が特定行政庁。多摩: 特定行政庁の11市は各市、それ以外の15市2町・檜原村・奥多摩町は都の多摩建築指導事務所。島しょは都（各支庁の土木課が窓口）。
-import type { Contact, Municipality } from "../municipalities";
+import type { Contact, MapLink, Municipality } from "../municipalities";
 import type { RoadRead } from "../road-read";
 import type { SheetIndex } from "../sheets";
 import MINATO_SHEETS from "./sheets/minato.json";
@@ -111,7 +111,10 @@ const WARDS: Municipality[] = [
     name: "新宿区",
     codes: ["13104"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "建築基準法の道路種別情報（新宿区みんなのGIS）", build: sonicweb("shinjuku2", "th_1209"), verified: true }],
+    maps: [
+      { kind: "road_type", label: "建築基準法の道路種別情報（新宿区みんなのGIS）", build: sonicweb("shinjuku2", "th_1209"), verified: true },
+      { kind: "public_road", label: "道路台帳平面図（区道）", build: sonicweb("shinjuku2", "douro"), verified: true },
+    ],
     contact: { dept: "都市計画部 建築調整課 細街路拡幅整備担当（本庁舎8階）", phone: "03-5273-3733", note: COUNTER_ONLY, noPhoneInquiry: true },
   },
   {
@@ -154,7 +157,10 @@ const WARDS: Municipality[] = [
     name: "墨田区",
     codes: ["13107"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "指定道路図（建築基準法上の道路種別）", build: sonicweb("sumida", "th_8"), verified: true }],
+    maps: [
+      { kind: "road_type", label: "指定道路図（建築基準法上の道路種別）", build: sonicweb("sumida", "th_8"), verified: true },
+      { kind: "public_road", label: "道路台帳現況図（区道の幅員）", build: sonicweb("sumida", "th_9"), verified: true },
+    ],
     contact: { dept: "都市計画部 建築指導課（区役所9階）", phone: "03-5608-6267", note: "後退方法や中心線などの詳細は電話・メール・FAXでは答えてもらえない。窓口で確認" },
   },
   {
@@ -178,7 +184,10 @@ const WARDS: Municipality[] = [
     name: "目黒区",
     codes: ["13110"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "目黒区指定道路図（めぐろ地図情報サービス）", build: sonicweb("meguro", "th_3"), verified: true }],
+    maps: [
+      { kind: "road_type", label: "目黒区指定道路図（めぐろ地図情報サービス）", build: sonicweb("meguro", "th_3"), verified: true },
+      { kind: "public_road", label: "道路台帳現況平面図（区道）", build: sonicweb("meguro", "th_2"), verified: true },
+    ],
     contact: { dept: "都市整備部 建築課 調査係（総合庁舎6階）", phone: "03-5722-9638", note: COUNTER_ONLY, noPhoneInquiry: true },
   },
   {
@@ -194,7 +203,10 @@ const WARDS: Municipality[] = [
     name: "世田谷区",
     codes: ["13112"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "指定道路図（せたがやiMap）", build: sonicweb("setagaya", "shiteidouro"), verified: true, tip: "最初の利用規約の画面で、いちばん下の「同意する」を押してください。" }],
+    maps: [
+      { kind: "road_type", label: "指定道路図（せたがやiMap）", build: sonicweb("setagaya", "shiteidouro"), verified: true, tip: "最初の利用規約の画面で、いちばん下の「同意する」を押してください。" },
+      { kind: "public_road", label: "道路現況平面図（区道）", build: sonicweb("setagaya", "th_71"), verified: true },
+    ],
     contact: { dept: "防災街づくり担当部 建築安全課（二子玉川分庁舎2階）", phone: "03-6432-7188", note: COUNTER_ONLY, noPhoneInquiry: true },
   },
   {
@@ -283,7 +295,10 @@ const WARDS: Municipality[] = [
     name: "練馬区",
     codes: ["13120"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "建築基準法による道路等（ねりまっぷ・参考公開）", build: sonicweb("nerimap", "th_216"), verified: true }],
+    maps: [
+      { kind: "road_type", label: "建築基準法による道路等（ねりまっぷ・参考公開）", build: sonicweb("nerimap", "th_216"), verified: true },
+      { kind: "public_road", label: "区道等の現況（参考公開）", build: sonicweb("nerimap", "th_217"), verified: true },
+    ],
     contact: { dept: "建築・開発担当部 建築審査課 道路調査係（本庁舎15階）", phone: "03-5984-1984" },
     note: "参考公開。最終確認は建築審査課 道路調査係の窓口で。",
   },
@@ -292,7 +307,12 @@ const WARDS: Municipality[] = [
     name: "足立区",
     codes: ["13121"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "建築基準法道路（指定道路）（あだち地図情報）", build: sonicweb("adachi2", "th_2"), verified: true }],
+    maps: [
+      { kind: "road_type", label: "建築基準法道路（指定道路）（あだち地図情報）", build: sonicweb("adachi2", "th_2"), verified: true },
+      // 細街路の路線を、拡幅・築造すべき幅員（4m〜7m以上）ごとに色分けした図（緑の線は幅員4m以上ある路線）
+      { kind: "road_type", label: "細街路路線図（拡幅すべき幅員）", build: sonicweb("adachi2", "th_3"), verified: true },
+      { kind: "public_road", label: "道路台帳現況平面図（区道）", build: sonicweb("adachi2", "th_4"), verified: true },
+    ],
     contact: { dept: "建築室 道路照会担当", phone: "03-3880-5463" },
   },
   {
@@ -300,7 +320,11 @@ const WARDS: Municipality[] = [
     name: "葛飾区",
     codes: ["13122"],
     coverage: "full",
-    maps: [{ kind: "road_type", label: "建築基準法道路種別（かつしかWEBマップ）", build: sonicweb("katsushika", "th_25"), verified: true }],
+    maps: [
+      { kind: "road_type", label: "建築基準法道路種別（かつしかWEBマップ）", build: sonicweb("katsushika", "th_25"), verified: true },
+      // 道路の面を、特別区道・区有通路・認定外道路・国道・都道・私道などに塗り分けた図
+      { kind: "public_road", label: "道路情報（区道・私道などの区分）", build: sonicweb("katsushika", "th_37"), verified: true },
+    ],
     contact: { dept: "都市整備部 住環境整備課 開発指導係", phone: "03-5654-8349" },
   },
   {
@@ -385,6 +409,7 @@ const TAMA_CITIES: Municipality[] = [
     maps: [
       { kind: "road_type", label: "道路種別図（こだいら地図情報システム）", build: sonicweb("kodaira", "th_24"), verified: true },
       { kind: "public_road", label: "認定路線網図（市道）", build: sonicweb("kodaira", "th_16"), verified: true },
+      { kind: "public_road", label: "道路台帳平面図（市道）", build: sonicweb("kodaira", "th_17"), verified: true },
     ],
     contact: { dept: "都市開発部 建築指導課 管理担当", phone: "042-346-9851" },
   },
@@ -443,13 +468,15 @@ const TAMA_OFFICE: Record<string, Contact> = {
   third: { dept: "東京都 多摩建築指導事務所 建築指導第三課（青梅合同庁舎3階）", phone: "0428-23-3423", note: "道路の扱いは電話・FAXでは答えてもらえない。窓口で確認", noPhoneInquiry: true },
 };
 
+// 東京都の地図は 1/1000 だと表示されない（縮尺一覧に無い）ため 1/2500 で開く
+const TAMA_ROAD_MAP: MapLink = { kind: "road_type", label: "建築基準法 多摩地域道路種別情報（東京都）", build: wagmap("tokyo_tokeizu", 2, { scale: 2500 }), verified: true };
+
 const tamaArea = (name: string, code: string, office: keyof typeof TAMA_OFFICE): Municipality => ({
   pref,
   name,
   codes: [code],
   coverage: "full",
-  // 東京都の地図は 1/1000 だと表示されない（縮尺一覧に無い）ため 1/2500 で開く
-  maps: [{ kind: "road_type", label: "建築基準法 多摩地域道路種別情報（東京都）", build: wagmap("tokyo_tokeizu", 2, { scale: 2500 }), verified: true }],
+  maps: [TAMA_ROAD_MAP],
   contact: TAMA_OFFICE[office],
 });
 
@@ -459,11 +486,13 @@ const TAMA_AREAS: Municipality[] = [
   tamaArea("狛江市", "13219", "first"),
   tamaArea("東大和市", "13220", "first"),
   tamaArea("武蔵村山市", "13223", "first"),
-  tamaArea("多摩市", "13224", "first"),
+  // 市の地図の市道の路線網図も開く。道路台帳図（th_2）もあるが、都の窓口の欄が長く iPhone SE で結果の画面に入りきらないので載せない
+  { ...tamaArea("多摩市", "13224", "first"), maps: [TAMA_ROAD_MAP, { kind: "public_road", label: "認定路線網図（市道）", build: sonicweb("tama", "th_19"), verified: true }] },
   tamaArea("稲城市", "13225", "first"),
   tamaArea("小金井市", "13210", "second"),
   tamaArea("東村山市", "13213", "second"),
-  tamaArea("清瀬市", "13221", "second"),
+  // 市の地図の「道路情報」（市道の路線網図に1級・2級・その他の路線番号と舗装の種別）。道路台帳図（th_30）は多摩市と同じ理由で載せない
+  { ...tamaArea("清瀬市", "13221", "second"), maps: [TAMA_ROAD_MAP, { kind: "public_road", label: "道路情報（市道の路線網図）", build: sonicweb("kiyose", "th_60"), verified: true }] },
   tamaArea("東久留米市", "13222", "second"),
   tamaArea("青梅市", "13205", "third"),
   tamaArea("福生市", "13218", "third"),

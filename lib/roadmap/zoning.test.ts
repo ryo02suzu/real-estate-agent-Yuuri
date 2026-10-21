@@ -94,6 +94,15 @@ describe("地点の都市計画", () => {
     expect(zoningFrom([area("tokei", BIG), line([[X - 0.01, Y + 60 * M], [X + 0.01, Y + 60 * M]])], P).road).toBeUndefined();
   });
 
+  it("同じ種類の区域（立地適正化計画の居住誘導区域と都市機能誘導区域）は1行にまとめる", () => {
+    const z = zoningFrom(
+      [area("tokei", BIG), area("ritteki", BIG, { name: "居住誘導区域" }), area("ritteki", square(-50, -50, 50, 50), { name: "都市機能誘導区域" })],
+      P,
+    );
+    const rows = zoningRows(z, STATUS_ALL).filter((r) => r.label === "立地適正化計画");
+    expect(rows).toEqual([{ label: "立地適正化計画", value: "居住誘導区域・都市機能誘導区域" }]);
+  });
+
   it("穴のある区域（穴の中は区域外）", () => {
     const withHole: Polygon = [square(-100, -100, 100, 100)[0], square(-10, -10, 10, 10)[0]];
     expect(zoningFrom([area("bouka", withHole, { name: "防火地域" })], P).bouka).toBeUndefined();

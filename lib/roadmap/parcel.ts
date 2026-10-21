@@ -2,6 +2,7 @@
 // 法務省の登記所備付地図データをベクトルタイル（PMTiles、レイヤ fude、z16 で全件）にしたものを、
 // 国土地理院で調べた町・大字の代表点のまわりから近い順に読み、地番区域と地番が一致する筆を探す。
 // タイルの読み込みは ParcelSource に任せる（実物は parcel-tiles.ts、テストでは作り物を渡す）。
+import { SANKO_MARK } from "./sanko-data";
 
 /** 筆を探すタイルのズーム（このズームのタイルに全ての筆が入っている） */
 export const PARCEL_ZOOM = 16;
@@ -26,6 +27,8 @@ export type ParcelFeature = {
   polygons: () => Polygon[];
   /** 公図（任意座標）を道路縁に合わせて置いた、推定の位置の筆とその確かさ */
   estimated?: Estimated;
+  /** 市町村の地番参考図の筆（その市区町村コード。lib/roadmap/sanko-data.ts） */
+  sanko?: string;
 };
 
 export type ParcelSource = {
@@ -47,6 +50,10 @@ export type Parcel = {
   point: { lat: number; lng: number };
   /** 公図から推定した位置の筆（数mずれることがある）とその確かさ */
   estimated?: Estimated;
+  /** 市町村の地番参考図の筆（その市区町村コード） */
+  sanko?: string;
+  /** 登記所の地図では筆界未定地の所の、地番参考図の筆 */
+  undetermined?: boolean;
 };
 
 export type ParcelSearch =
@@ -168,6 +175,8 @@ export async function searchParcel(
   const hits = new Map<string, ParcelPiece[]>();
   const raw = new Map<string, string>();
   const estimated = new Map<string, Estimated>();
+  const sanko = new Map<string, string>();
+  const rank = new Map<string, number>();
   const similar = new Set<string>();
   let focus: [number, number] = [sx, sy];
   let closest = Number.POSITIVE_INFINITY;
@@ -184,9 +193,20 @@ export async function searchParcel(
         townSeen = true;
         const c = normalizeChiban(f.chiban);
         if (c === want) {
+          // 同じ筆が別のデータにもあれば（法務省の地図データ → 地番参考図 → 推定の位置の順に使う）、形を混ぜない
+          const r = sourceRank(f);
+          const had = rank.get(f.kuiki);
+          if (had !== undefined && had < r) continue;
+          if (had !== undefined && had > r) {
+            hits.delete(f.kuiki);
+            estimated.delete(f.kuiki);
+            sanko.delete(f.kuiki);
+          }
+          rank.set(f.kuiki, r);
           hits.set(f.kuiki, [...(hits.get(f.kuiki) ?? []), { polygons: f.polygons(), tile: [x, y] }]);
           raw.set(f.kuiki, f.chiban);
           if (f.estimated) estimated.set(f.kuiki, f.estimated);
+          if (f.sanko) sanko.set(f.kuiki, f.sanko);
           continue;
         }
         const b = baseNumber(c);
@@ -236,24 +256,49 @@ export async function searchParcel(
   }
   return {
     status: "found",
-    parcel: { kuiki, chiban: want, chibanRaw: raw.get(kuiki)!, pieces, point: interiorPoint(pieces), ...(estimated.has(kuiki) ? { estimated: estimated.get(kuiki) } : {}) },
+    parcel: {
+      kuiki,
+      chiban: want,
+      chibanRaw: raw.get(kuiki)!,
+      pieces,
+      point: interiorPoint(pieces),
+      ...(estimated.has(kuiki) ? { estimated: estimated.get(kuiki) } : {}),
+      ...(sanko.has(kuiki) ? { sanko: sanko.get(kuiki) } : {}),
+    },
     others: ranked.length - 1,
   };
 }
+
+/** 筆のデータの順（小さいほど先に使う）：法務省の地図データ、市町村の地番参考図、公図から推定した位置 */
+const sourceRank = (f: ParcelFeature) => (f.sanko ? 1 : f.estimated ? 2 : 0);
 
 /** 地点を含む筆（地図で選んだ地点の地番を出す）。地図データの無い地域や、筆の無い所なら null */
 export async function parcelAt(lat: number, lng: number, source: ParcelSource): Promise<Parcel | null> {
   const [x, y] = tileOf(lat, lng);
   const p: LngLat = [lng, lat];
-  for (const f of (await source.tile(x, y)) ?? []) {
-    const polygons = f.polygons();
-    if (!polygons.some(([outer, ...holes]) => inRing(p, outer) && !holes.some((h) => inRing(p, h)))) continue;
-    const pieces: ParcelPiece[] = [{ polygons, tile: [x, y] }];
-    for (const [nx, ny] of neighborsToComplete(pieces))
-      for (const g of (await source.tile(nx, ny)) ?? []) if (g.kuiki === f.kuiki && g.chiban === f.chiban) pieces.push({ polygons: g.polygons(), tile: [nx, ny] });
-    return { kuiki: f.kuiki, chiban: normalizeChiban(f.chiban), chibanRaw: f.chiban, pieces, point: { lat, lng }, ...(f.estimated ? { estimated: f.estimated } : {}) };
-  }
-  return null;
+  const hits = ((await source.tile(x, y)) ?? [])
+    .map((f) => ({ f, polygons: f.polygons() }))
+    .filter(({ polygons }) => polygons.some(([outer, ...holes]) => inRing(p, outer) && !holes.some((h) => inRing(p, h))));
+  if (!hits.length) return null;
+  // 登記所の地図が筆界未定地の所に、市町村の地番参考図の地番の付いた筆があれば、そちらを出す（筆界未定地だったことも添える）
+  let hit = hits[0];
+  const undetermined = /^筆界未定/.test(hit.f.chiban) && !hit.f.sanko && !hit.f.estimated;
+  const ref = undetermined ? hits.find(({ f }) => f.sanko && /^\d/.test(f.chiban)) : undefined;
+  if (ref) hit = ref;
+  const { f, polygons } = hit;
+  const pieces: ParcelPiece[] = [{ polygons, tile: [x, y] }];
+  for (const [nx, ny] of neighborsToComplete(pieces))
+    for (const g of (await source.tile(nx, ny)) ?? []) if (g.kuiki === f.kuiki && g.chiban === f.chiban) pieces.push({ polygons: g.polygons(), tile: [nx, ny] });
+  return {
+    kuiki: f.kuiki,
+    chiban: normalizeChiban(f.chiban),
+    chibanRaw: f.chiban,
+    pieces,
+    point: { lat, lng },
+    ...(f.estimated ? { estimated: f.estimated } : {}),
+    ...(f.sanko ? { sanko: f.sanko } : {}),
+    ...(ref ? { undetermined: true } : {}),
+  };
 }
 
 /** 画面での地番の呼び方。道路・水路など地番の無い所は「道路（地番なし）」など */
@@ -261,12 +306,18 @@ export function chibanLabel(chiban: string): string {
   if (/^道/.test(chiban)) return "道路（地番なし）";
   if (/^水/.test(chiban)) return "水路（地番なし）";
   if (/^筆界未定/.test(chiban)) return "筆界未定地";
+  if (/^無地番/.test(chiban)) return "無地番の土地";
   return `地番 ${chiban}`;
 }
 
 /** 公図から推定した位置の筆に添える印 */
 export function estimatedMark(p: { estimated?: Estimated }): string {
   return p.estimated === "low" ? "（推定・確度低）" : p.estimated ? "（推定）" : "";
+}
+
+/** 筆に添える印（公図から推定した位置の筆、市町村の地番参考図の筆。法務省の地図データの筆には付けない） */
+export function parcelMark(p: { estimated?: Estimated; sanko?: string }): string {
+  return p.sanko ? SANKO_MARK : estimatedMark(p);
 }
 
 /** 公図から推定した位置の筆の、ずれの目安（見出しや注記に添える） */

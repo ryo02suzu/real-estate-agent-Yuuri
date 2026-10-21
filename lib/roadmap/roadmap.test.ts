@@ -213,6 +213,71 @@ describe("buildLinks", () => {
   });
 });
 
+describe("Sonicweb の道路台帳・認定路線網図", () => {
+  /** Sonicweb の地図の「slug テーマ」（ほかの地図は undefined） */
+  const theme = (url: string) => url.match(/sonicweb-asp\.jp\/([\w-]+)\/map\?theme=(\w+)/)?.slice(1).join(" ");
+
+  it("足立区は指定道路図・細街路路線図（拡幅すべき幅員）と、区道の道路台帳現況平面図を開く", () => {
+    const links = buildLinks(findMunicipality("13121")!, 35.779002, 139.801733);
+    expect(links.map((l) => [l.kind, theme(l.url)])).toEqual([
+      ["road_type", "adachi2 th_2"],
+      ["road_type", "adachi2 th_3"],
+      ["public_road", "adachi2 th_4"],
+    ]);
+    expect(links[2].url).toBe("https://www.sonicweb-asp.jp/adachi2/map?theme=th_4&pos=139.801733%2C35.779002&scale=1000");
+    expect(links.every((l) => l.pinpoint && l.verified)).toBe(true);
+  });
+
+  it("県・都の道路種別の地図を開く町・市は、その地図の後に町・市の道路の地図を足す", () => {
+    const after = (code: string) => {
+      const [first, ...rest] = buildLinks(findMunicipality(code)!, 35.8, 139.5);
+      return { first, rest: rest.map((l) => `${l.label} ${theme(l.url)}`) };
+    };
+    const kamisato = after("11385");
+    expect(kamisato.first.label).toBe("埼玉県指定道路図（試行）");
+    expect(kamisato.first.read).toBeDefined(); // 県の地図の道路種別は読めたまま
+    expect(kamisato.rest).toEqual(["認定路線網図（町道） kamisato th_1"]);
+    const tonosho = after("12349");
+    expect(tonosho.first.url).toBe("https://ds.icba-info.jp/siteidouro/chiba/pref/");
+    expect(tonosho.rest).toEqual(["認定路線網図（町道） tonosho th_34", "道路台帳図（町道） tonosho th_35"]);
+    expect(after("14382").rest).toEqual(["町道網図（はこねMAP） hakone th_18"]); // 箱根町
+    expect(after("13224").first.label).toBe("建築基準法 多摩地域道路種別情報（東京都）"); // 多摩市
+    expect(after("13224").rest).toEqual(["認定路線網図（市道） tama th_19"]);
+    expect(after("13221").rest).toEqual(["道路情報（市道の路線網図） kiyose th_60"]); // 清瀬市
+    // 同じ都の地図の、ほかの市は変わらない
+    expect(buildLinks(findMunicipality("13225")!, 35.638, 139.504)).toHaveLength(1); // 稲城市
+  });
+
+  it("道路台帳図と認定路線網図は、同じ地図の別のテーマを両方出す（柏市・小平市・松戸市・鹿沼市）", () => {
+    const publicRoads = (code: string) => buildLinks(findMunicipality(code)!, 35.8, 139.9).filter((l) => l.kind === "public_road").map((l) => theme(l.url));
+    expect(publicRoads("12217")).toEqual(["kashiwa th_15", "kashiwa th_16"]);
+    expect(publicRoads("13211")).toEqual(["kodaira th_16", "kodaira th_17"]);
+    expect(publicRoads("12207")).toEqual(["matsudo th_8", "matsudo th_60"]);
+    expect(publicRoads("09205")).toEqual(["kanuma th_1", "kanuma th_2"]);
+  });
+
+  it("同じ地図（URL）を二重に載せない", () => {
+    for (const m of MUNICIPALITIES) {
+      const urls = buildLinks(m, 35.8, 139.6).map((l) => l.url);
+      expect(new Set(urls).size, m.name).toBe(urls.length);
+    }
+  });
+
+  it("公道（市道）の地図に、道路種別の凡例が付かない（同じテーマの道路種別の地図があると、凡例のキーが重なる）", () => {
+    for (const m of MUNICIPALITIES) {
+      for (const l of buildLinks(m, 35.8, 139.6)) if (l.kind === "public_road") expect(l.legend, `${m.name} ${l.label}`).toBeUndefined();
+    }
+  });
+
+  it("狭山市は同じテーマの指定道路図と認定路線を開き、凡例は指定道路図だけに付く", () => {
+    const [road, pub] = buildLinks(findMunicipality("11215")!, 35.852, 139.412);
+    expect([road.kind, pub.kind]).toEqual(["road_type", "public_road"]);
+    expect(pub.url).toBe("https://www.sonicweb-asp.jp/sayama/map?theme=th_3&pos=139.412000%2C35.852000&scale=1000&layers=dm%2Cth_4");
+    expect(road.legend?.length).toBeGreaterThan(0);
+    expect(pub.legend).toBeUndefined();
+  });
+});
+
 describe("lookup", () => {
   afterEach(() => vi.unstubAllGlobals());
 

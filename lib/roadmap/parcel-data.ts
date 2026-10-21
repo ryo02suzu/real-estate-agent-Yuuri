@@ -12,5 +12,8 @@ export const PARCEL_DATA = {
   layer: "fude",
 };
 
-/** 利用規約どおりの出典と、加工したことの記載（共有の文面に添える） */
-export const PARCEL_CREDIT = `出典：「登記所備付地図データ」（法務省）（https://front.geospatial.jp/moj-chizu-xml-readme/）を加工して作成（${PARCEL_DATA.edition}）。法務局の証明ではありません`;
+/** 利用規約どおりの出典と、加工したことの記載 */
+export const PARCEL_SOURCE = `出典：「登記所備付地図データ」（法務省）（https://front.geospatial.jp/moj-chizu-xml-readme/）を加工して作成（${PARCEL_DATA.edition}）`;
+
+/** 出典と、法務局の証明ではないこと（共有の文面に添える） */
+export const PARCEL_CREDIT = `${PARCEL_SOURCE}。法務局の証明ではありません`;

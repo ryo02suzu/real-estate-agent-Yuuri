@@ -860,12 +860,18 @@ def read_lines(path: str):
                 yield json.loads(line)
 
 
+def valid_wkt(text: str):
+    """WKT の形。間引き・丸めで自己交差した形（4万に百数十ほど）は直す（重なりを測ると GEOS が止まるので）"""
+    g = shapely.from_wkt(text)
+    return g if g.is_valid else g.buffer(0)
+
+
 def resolve(src: str, out: str, stats_out: str | None) -> None:
     """ジョブごとの結果（src の kozu-*.geojsonl・frags-*.jsonl・stats-*.json。.gz でもよい）をまとめる。
     ジョブ（図面の組・市区町村）をまたいで大きく重なった切れ端は、確かなほうだけ残し、タイルにする筆（地番区域・地番・q）を書き出す"""
     frags = [d for p in sorted(glob.glob(os.path.join(src, "frags-*.jsonl*"))) for d in read_lines(p)]
     frags.sort(key=lambda d: conflict_order(d["q"], d["sc"], d["n"]))
-    dropped = drop_overlaps([(d["f"], shapely.from_wkt(d["g"])) for d in frags])
+    dropped = drop_overlaps([(d["f"], valid_wkt(d["g"])) for d in frags])
     log(f"切れ端 {len(frags)}・ジョブをまたいで重なり外した {len(dropped)}")
     per_code: dict[str, dict] = {}
     n = 0

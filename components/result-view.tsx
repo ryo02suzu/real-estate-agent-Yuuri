@@ -3,13 +3,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { showHazardOnMap, showLandPriceOnMap } from "@/lib/map-style";
 import type { LookupResult, Municipality, ResolvedLink } from "@/lib/roadmap";
+import { chibanzuFor } from "@/lib/roadmap/chibanzu";
 import type { HazardKind } from "@/lib/roadmap/hazard";
-import { chibanLabel, estimatedMark, kuikiLabel } from "@/lib/roadmap/parcel";
+import { chibanLabel, kuikiLabel, parcelMark } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { sheetName } from "@/lib/roadmap/sheets";
 import type { DraftInput } from "@/lib/draft";
 import { buildSummary } from "@/lib/summary";
-import { BuildingCard, BuildingSection, useBuilding, type BuildingState } from "./building-card";
+import { BuildingCard, BuildingDetail, useBuilding, type BuildingState } from "./building-card";
 import { ContactCard } from "./contact-card";
 import { COVERAGE, CoveragePill } from "./coverage";
 import { DRAFT_EVENT, DraftSheet } from "./draft-sheet";
@@ -36,6 +37,7 @@ import { SheetPreview } from "./sheet-preview";
 import { parcelLines, ParcelButton, ParcelCard, useParcelInfo, type ParcelInfo } from "./parcel-card";
 import { PrintSheet } from "./print-sheet";
 import { SchoolButton, SchoolCard, useSchools, type SchoolState } from "./school-card";
+import { PoiCard, usePois, type PoiState } from "./poi-card";
 import { StationCard, StationLine, useStations, type StationState } from "./station-card";
 import { useCopy } from "./use-copy";
 import { useZoning, ZoningCard, ZoningLine, type ZoningState } from "./zoning-card";
@@ -175,6 +177,7 @@ function Found({
   const landPrice = useLandPrices(result.lat, result.lng);
   const schools = useSchools(result.lat, result.lng);
   const stations = useStations(result.lat, result.lng);
+  const pois = usePois(result.lat, result.lng);
   const expand = onExpand && (() => onExpand());
   const body = useRef<HTMLDivElement>(null);
   useFit(body);
@@ -201,7 +204,7 @@ function Found({
     />
   );
   // 印刷・PDF 保存用の調査メモ（画面には出ない。iPhone の共有 → プリントでも同じメモになる）
-  const print = <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} />;
+  const print = <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} />;
   // 重説・物件概要の下書き（メニューから開く）
   const [draft, setDraft] = useState(false);
   useEffect(() => {
@@ -222,7 +225,7 @@ function Found({
           actions={
             <>
               <CopyButton text={copyText(result)} />
-              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} />
+              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} />
             </>
           }
         />
@@ -234,7 +237,12 @@ function Found({
           />
           <div className="mt-2 flex gap-1.5 short:mt-1">
             <ZoningLine state={zoning} city={m.name} />
-            <ParcelButton info={parcels} extra={<BuildingSection state={building} />} withBuilding={building.status !== "none"} />
+            <ParcelButton
+              info={parcels}
+              extra={building.status !== "none" && <BuildingDetail state={building} />}
+              withBuilding={building.status !== "none"}
+              chibanzu={chibanzuFor(m, result.lat, result.lng)}
+            />
             {/* 背の低い画面では「場所を直す」をこの行に置く（地図プレビューが入らなくなっても使える） */}
             {onFix && (
               <button
@@ -254,7 +262,7 @@ function Found({
           </div>
           {/* 最寄り駅と学区（背の低い画面・入りきらないときは出さず、共有・印刷・重説の下書きで見る） */}
           <div className="mt-1.5 flex gap-1.5 tight:hidden">
-            <StationLine state={stations} />
+            <StationLine state={stations} pois={pois} />
             <SchoolButton state={schools} />
           </div>
           {/* 画面の高さに合わせて地図プレビューが伸び縮みする（スクロールさせない）。低すぎるときは地図を隠し、
@@ -302,7 +310,7 @@ function Found({
         )}
       </div>
       {print}
-      <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations })} open={draft} onClose={() => setDraft(false)} />
+      <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations, pois })} open={draft} onClose={() => setDraft(false)} />
     </div>
   );
 }
@@ -418,6 +426,7 @@ function Place({
             <b className="text-[15px] font-semibold">
               {chibanLabel(found.chibanRaw)}
               {found.estimated && <span className="text-[11px] font-normal text-[#8a4f3a]">（公図から推定{found.estimated === "low" ? "・確度低" : ""}）</span>}
+              {found.sanko && <span className="text-[11px] font-normal text-[#8a4f3a]">{parcelMark(found)}</span>}
             </b>
           ) : (
             "付近"
@@ -465,7 +474,7 @@ function Place({
       ) : picked && parcel ? (
         <p className="mt-1 truncate text-[10.5px] leading-[1.6] text-muted">
           <b className="font-semibold text-ink">
-            この地点の筆：{chibanLabel(parcel.chibanRaw)}（{kuikiLabel(parcel.kuiki)}）{estimatedMark(parcel)}
+            この地点の筆：{chibanLabel(parcel.chibanRaw)}（{kuikiLabel(parcel.kuiki)}）{parcelMark(parcel)}
           </b>
           {desktop && (
             <>
@@ -537,6 +546,7 @@ function loaded({
   landPrice,
   schools,
   stations,
+  pois,
 }: {
   zoning: ZoningState;
   parcels: ParcelInfo;
@@ -546,16 +556,18 @@ function loaded({
   landPrice: LandPriceState;
   schools: SchoolState;
   stations?: StationState;
+  pois?: PoiState;
 }): DraftInput {
   return {
     zoning: zoning.status === "ok" ? zoning : undefined,
-    parcels: parcels.status === "ok" ? { ...parcelLines(parcels), reference: parcels.kind === "address", estimated: parcels.parcel.estimated } : undefined,
+    parcels: parcels.status === "ok" ? { ...parcelLines(parcels), reference: parcels.kind === "address", estimated: parcels.parcel.estimated, sanko: parcels.parcel.sanko } : undefined,
     roads: roads.status === "ok" ? roads.roads : undefined,
     hazard: hazard.status === "ok" ? hazard : undefined,
     building: building.status === "ok" ? building.result : undefined,
     landPrice: landPrice.status === "ok" ? landPrice.hits : undefined,
     schools: schools.status === "ok" ? schools.schools : undefined,
     stations: stations?.status === "ok" ? stations.stations : undefined,
+    pois: pois?.status === "ok" ? pois.pois : undefined,
   };
 }
 
@@ -570,6 +582,7 @@ function ShareButton({
   landPrice,
   schools,
   stations,
+  pois,
   desktop,
 }: {
   result: Extract<LookupResult, { status: "ok" }>;
@@ -581,12 +594,13 @@ function ShareButton({
   landPrice: LandPriceState;
   schools: SchoolState;
   stations: StationState;
+  pois: PoiState;
   /** PC：共有の画面は出さず、メールやチャットに貼れるようコピーする */
   desktop?: boolean;
 }) {
   const { done, copy } = useCopy();
   const onClick = async () => {
-    const text = buildSummary(result, loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations }));
+    const text = buildSummary(result, loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations, pois }));
     if (!desktop && typeof navigator.share === "function") {
       try {
         await navigator.share({ text });
@@ -807,11 +821,13 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
   const zoning = useZoning(result.lat, result.lng, m);
   const parcels = useParcelInfo(result);
   const roads = useNearbyRoads(result.links, result.lat, result.lng);
+  const chibanzu = chibanzuFor(m, result.lat, result.lng);
   const hazard = useHazard(result.lat, result.lng, m);
   const building = useBuilding(result, parcels);
   const landPrice = useLandPrices(result.lat, result.lng);
   const schools = useSchools(result.lat, result.lng);
   const stations = useStations(result.lat, result.lng);
+  const pois = usePois(result.lat, result.lng);
   const [draft, setDraft] = useState(false);
   const offline = m.coverage === "none" || m.coverage === "outside";
   const primary = result.links.filter((l) => !offline && l.kind !== "public_road");
@@ -828,9 +844,9 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
           actions={
             <>
               <CopyButton text={copyText(result)} />
-              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} desktop />
+              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} desktop />
               <PrintMenu result={result} onDraft={() => setDraft(true)} />
-              <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations })} open={draft} onClose={() => setDraft(false)} />
+              <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations, pois })} open={draft} onClose={() => setDraft(false)} />
             </>
           }
         />
@@ -839,7 +855,7 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
           {/* 要点（スマホと同じ行）。最初の画面で用途地域・建ぺい率・容積率と地番、災害リスクが分かる */}
           <div className="mt-2.5 flex gap-1.5">
             <ZoningLine state={zoning} city={m.name} onOpen={() => jump("pc-zoning")} />
-            <ParcelButton info={parcels} onOpen={() => jump("pc-parcel")} />
+            <ParcelButton info={parcels} onOpen={() => jump("pc-parcel")} chibanzu={chibanzu} />
           </div>
           <div className="mt-1.5 flex">
             <HazardLine state={hazard} city={m.name} onOpen={() => jump("pc-hazard")} />
@@ -891,9 +907,9 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
         <HazardCard state={hazard} city={m.name} onShowMap={showHazardOnMap} />
       </div>
 
-      {parcels.status !== "none" && (
+      {(parcels.status !== "none" || chibanzu) && (
         <div id="pc-parcel" className="scroll-mt-3">
-          <ParcelCard info={parcels} />
+          <ParcelCard info={parcels} chibanzu={chibanzu} />
         </div>
       )}
 
@@ -907,12 +923,16 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
         <StationCard state={stations} />
       </div>
 
+      <div id="pc-poi" className="scroll-mt-3">
+        <PoiCard state={pois} />
+      </div>
+
       <div id="pc-school" className="scroll-mt-3">
         <SchoolCard state={schools} />
       </div>
 
       {result.contact && <ContactCard contact={result.contact} city={m.name} address={result.matchedAddress} />}
-      <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} />
+      <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} />
     </div>
   );
 }

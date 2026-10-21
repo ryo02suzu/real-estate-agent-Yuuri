@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import KOZU_SOURCE from "./data/kozu-source.json";
 import { lookup } from "./index";
-import { mergeParcelSources } from "./parcel-tiles";
+import { mergeParcelSources, withoutCities } from "./parcel-tiles";
+import { sankoCovers } from "./sanko-data";
 import {
   chibanLabel,
   cityMatches,
   estimatedMark,
+  parcelMark,
   estimatedNote,
   kuikiLabel,
   adjacentParcels,
@@ -212,6 +214,72 @@ describe("地点の筆", () => {
     expect(await mergeParcelSources(pub, { tile: async () => Promise.reject(new Error("x")) }).tile(SX, SY)).toHaveLength(1);
   });
 
+  it("市町村の地番参考図の筆を合わせ、法務省の地図データ → 参考図 → 推定の位置の順に使う", async () => {
+    const [w, s, e, n] = tileBounds(SX, SY);
+    const at = (fx: number, fy: number) => ({ lat: s + (n - s) * fy, lng: w + (e - w) * fx });
+    const pub = fakeSource({ [`${SX},${SY}`]: [{ kuiki: "市川市_国府台_１丁目__", chiban: "1-1", polygon: box(SX, SY, 0.1, 0.1, 0.3, 0.3) }] });
+    const sanko: ParcelSource = {
+      tile: async (x, y) =>
+        x === SX && y === SY
+          ? [
+              // 法務省の地図データにもある筆（参考図の方は使わない）
+              { kuiki: "市川市_国府台_１丁目__", chiban: "1-1", polygons: () => [box(SX, SY, 0.15, 0.15, 0.3, 0.3)], sanko: "12203" },
+              { kuiki: "市川市_国府台_１丁目__", chiban: "2-1", polygons: () => [box(SX, SY, 0.6, 0.6, 0.3, 0.3)], sanko: "12203" },
+            ]
+          : null,
+    };
+    const kozu: ParcelSource = {
+      tile: async (x, y) =>
+        x === SX && y === SY
+          ? [
+              // 参考図のある市町村の推定の筆は使わない
+              { kuiki: "市川市_国府台_１丁目__", chiban: "2-1", polygons: () => [box(SX, SY, 0.6, 0.1, 0.3, 0.3)], estimated: "high" },
+              { kuiki: "松戸市_根本___", chiban: "5", polygons: () => [box(SX, SY, 0.1, 0.6, 0.3, 0.3)], estimated: "high" },
+            ]
+          : null,
+    };
+    const src = mergeParcelSources(pub, sanko, withoutCities(kozu, (c) => c === "市川市"));
+    const tile = await src.tile(SX, SY);
+    expect(tile?.map((f) => `${f.chiban}${parcelMark(f)}`)).toEqual(["1-1", "2-1（地番参考図）", "5（推定）"]);
+    expect((await parcelAt(at(0.2, 0.2).lat, at(0.2, 0.2).lng, src))?.sanko).toBeUndefined();
+    const b = await parcelAt(at(0.7, 0.7).lat, at(0.7, 0.7).lng, src);
+    expect(b).toMatchObject({ chibanRaw: "2-1", sanko: "12203" });
+    expect(b?.estimated).toBeUndefined();
+    // 推定の位置（0.7, 0.2）には筆を出さない
+    expect(await parcelAt(at(0.7, 0.2).lat, at(0.7, 0.2).lng, src)).toBeNull();
+    const r = await searchParcel({ city: "市川市", town: "国府台1丁目", chiban: "2-1" }, START, src);
+    expect(r.status === "found" && r.parcel.sanko).toBe("12203");
+    // 同じ筆が別のタイルで推定の位置からも見つかっても、参考図の形だけを使う
+    const mixed: ParcelSource = {
+      tile: async (x, y) =>
+        x === SX && y === SY
+          ? [{ kuiki: "市川市_国府台_１丁目__", chiban: "3", polygons: () => [box(SX, SY, 0.6, 0.6, 0.3, 0.3)], sanko: "12203" }]
+          : x === SX + 1 && y === SY
+            ? [{ kuiki: "市川市_国府台_１丁目__", chiban: "3", polygons: () => [box(SX + 1, SY, 0.1, 0.1, 0.3, 0.3)], estimated: "low" }]
+            : null,
+    };
+    const r2 = await searchParcel({ city: "市川市", town: "国府台1丁目", chiban: "3" }, START, mixed);
+    expect(r2.status === "found" && r2.parcel.pieces.map((p) => p.tile)).toEqual([[SX, SY]]);
+    expect(r2.status === "found" && r2.parcel).toMatchObject({ sanko: "12203" });
+  });
+
+  it("登記所の地図が筆界未定地の所は、地番参考図の地番の付いた筆を出す", async () => {
+    const [w, s, e, n] = tileBounds(SX, SY);
+    const at = (fx: number, fy: number) => ({ lat: s + (n - s) * fy, lng: w + (e - w) * fx });
+    const pub = fakeSource({ [`${SX},${SY}`]: [{ kuiki: "前橋市_小相木町___", chiban: "筆界未定地(704+645-2)", polygon: box(SX, SY, 0.1, 0.1, 0.6, 0.6) }] });
+    const sanko: ParcelSource = {
+      tile: async (x, y) =>
+        x === SX && y === SY ? [{ kuiki: "前橋市_小相木町___", chiban: "704", polygons: () => [box(SX, SY, 0.2, 0.2, 0.2, 0.2)], sanko: "10201" }] : null,
+    };
+    const src = mergeParcelSources(pub, sanko);
+    expect(await parcelAt(at(0.3, 0.3).lat, at(0.3, 0.3).lng, src)).toMatchObject({ chibanRaw: "704", sanko: "10201", undetermined: true });
+    // 参考図の筆の無い所は、筆界未定地のまま
+    const away = await parcelAt(at(0.6, 0.6).lat, at(0.6, 0.6).lng, src);
+    expect(away?.chibanRaw).toBe("筆界未定地(704+645-2)");
+    expect(away?.undetermined).toBeUndefined();
+    expect(chibanLabel("無地番-1")).toBe("無地番の土地");
+  });
+
   it("地番の呼び方", () => {
     expect(chibanLabel("391-3")).toBe("地番 391-3");
     expect(chibanLabel("道-5")).toBe("道路（地番なし）");
@@ -311,5 +379,16 @@ describe("公図から推定した筆のデータの置き場所（data/kozu-sou
       // 1都3県の公図の地域の多く（置けた筆のある市区町村）
       expect(KOZU_SOURCE.codes.length).toBeGreaterThan(50);
     }
+  });
+});
+
+describe("地番参考図のある市町村", () => {
+  it("地番区域の市区町村の部分で判定する（町村は郡の名前が前に付く）", () => {
+    expect(sankoCovers("市川市")).toBe(true);
+    expect(sankoCovers("比企郡小川町")).toBe(true);
+    expect(sankoCovers("児玉郡上里町")).toBe(true);
+    expect(sankoCovers("小川町")).toBe(true);
+    expect(sankoCovers("松戸市")).toBe(false);
+    expect(sankoCovers("横浜市港北区")).toBe(false);
   });
 });

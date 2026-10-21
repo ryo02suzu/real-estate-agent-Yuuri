@@ -6,6 +6,9 @@ import { BUILDING_ZOOM, type Building, type BuildingSource } from "./building";
 import { BUILDING_DATA, buildingUrl } from "./building-data";
 import type { LngLat } from "./parcel";
 
+/** 建築年としてありそうな年（1800年〜来年）。それ以外（0・1 など、不明を表す値）は無し */
+export const plausibleYear = (y?: number) => (y && y >= 1800 && y <= new Date().getFullYear() + 1 ? y : undefined);
+
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
 
@@ -30,7 +33,8 @@ function decode(data: ArrayBuffer, x: number, y: number): Building[] {
       structure: str(p.k),
       area: num(p.a),
       floorArea: num(p.t),
-      year: num(p.y),
+      // 建築年は西暦。都市計画基礎調査の「不明」などが 0〜1 桁で入っていることがあるので、それらしい年だけ使う
+      year: plausibleYear(num(p.y)),
       survey: num(p.sv),
     });
   }

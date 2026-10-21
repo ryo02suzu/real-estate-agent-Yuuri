@@ -10,8 +10,9 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { LookupResult } from "@/lib/roadmap";
 import { KOZU_CREDIT } from "@/lib/roadmap/kozu-data";
-import { chibanLabel, estimatedMark, kuikiLabel, tileBounds, type Parcel } from "@/lib/roadmap/parcel";
+import { chibanLabel, kuikiLabel, parcelMark, tileBounds, type Parcel } from "@/lib/roadmap/parcel";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
+import { sankoCredit } from "@/lib/roadmap/sanko-data";
 import { TILE, tilesAround, toWorldPixel } from "@/lib/tiles";
 import { PrintIcon } from "./icons";
 import { Sheet } from "./sheet";
@@ -103,12 +104,12 @@ function GuideMapPage({ result }: { result: Ok }) {
           <p className="text-[18px] font-bold leading-tight tracking-[0.3em]">案内図</p>
           <p className="mt-1 text-[14px] font-bold leading-snug">
             {result.matchedAddress}
-            {found ? ` ${chibanLabel(found.chibanRaw)}${estimatedMark(found)}` : <span className="text-[12px] font-normal"> 付近</span>}
+            {found ? ` ${chibanLabel(found.chibanRaw)}${parcelMark(found)}` : <span className="text-[12px] font-normal"> 付近</span>}
           </p>
           {p && result.picked && (
             <p className="text-[11px]">
               地図で選んだ地点の筆：{kuikiLabel(p.kuiki)} {chibanLabel(p.chibanRaw)}
-              {estimatedMark(p)}
+              {parcelMark(p)}
             </p>
           )}
         </div>
@@ -138,6 +139,7 @@ function GuideMapPage({ result }: { result: Ok }) {
         <p className="text-[#7a6a55]">
           出典：地理院タイル（国土地理院）を加工して作成。{p && `筆の${PARCEL_CREDIT}。`}
           {p?.estimated && `${KOZU_CREDIT}。`}
+          {p?.sanko && `参考図の筆の${sankoCredit(p.sanko)}。`}
         </p>
       </footer>
     </div>
