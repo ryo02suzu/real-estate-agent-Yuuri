@@ -13,6 +13,10 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 20 5 * *"
+  # 本番（main）に入るまでは、作業用ブランチでこの処理か作り方を変えたときにも動かす（GitHub は main に無い処理を手で起動できないため）
+  push:
+    branches: [claude/system-feedback-eggn72]
+    paths: [".github/workflows/deals.yml", "scripts/deals/**"]
 
 permissions:
   contents: write
