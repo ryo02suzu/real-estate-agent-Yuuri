@@ -232,7 +232,8 @@ export function MobileApp(props: MobileAppProps) {
           )}
           {(!ok || page !== "home") && (
             <SheetFrame>
-              <Banner loading={loading} error={error ?? (offline ? OFFLINE : null)} notice={notice} onDismiss={() => setNotice(null)} />
+              {/* 通信できないあいだは「調べています」より先に、通信できないことを出す */}
+              <Banner loading={loading && !offline} error={error ?? (offline ? OFFLINE : null)} notice={notice} onDismiss={() => setNotice(null)} />
               {body}
             </SheetFrame>
           )}
@@ -392,7 +393,7 @@ function PropertyView({
     <>
       <SheetFrame>
         <PropertyHeader title={title} sub={copyText(result)} onCopy={() => addr.copy(copyText(result))} copied={addr.done} favorite={favorite} onFavorite={onFavorite} onShare={share} />
-        <Banner loading={loading} error={error ?? (offline ? OFFLINE : null)} />
+        <Banner loading={loading && !offline} error={error ?? (offline ? OFFLINE : null)} />
         <PlaceNote query={query} result={result} data={data} onPick={onPick} onFix={onFix} />
         <div className="mt-[10.5px]">
           <TabBar tab={tab} onTab={changeTab} refEl={tabBar} />
