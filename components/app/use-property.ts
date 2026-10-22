@@ -22,6 +22,8 @@ import type { PoiState } from "../poi-card";
 import { useSchools } from "../school-card";
 import { useStations } from "../station-card";
 import { useZoning } from "../zoning-card";
+import { useLiquefaction, useRireki, useZousei } from "./use-national";
+import { useTriage } from "./use-triage";
 
 export type Ok = Extract<LookupResult, { status: "ok" }>;
 
@@ -156,10 +158,16 @@ export function useProperty(result: Ok) {
   const around = useAround(lat, lng);
   const evac = useEvacuation(lat, lng);
   const deals = useDeals(result);
+  // 国の地点データ（液状化の発生傾向・大規模盛土造成地・災害履歴）。ハザードの画面と、要注意点に使う
+  const liq = useLiquefaction(lat, lng);
+  const zousei = useZousei(lat, lng);
+  const rireki = useRireki(lat, lng);
   // 共有の文面・下書き・調査メモには、今までどおり生活環境の種類だけ（飲食店は入れない）
   const pois: PoiState = around.status === "ok" ? { status: "ok", pois: around.nearest.filter((p) => POI_ORDER.includes(p.kind)) } : around;
   const landPrice5 = landPrice.status === "ok" ? { ...landPrice, hits: landPrice.hits.slice(0, 5) } : landPrice;
-  return { zoning, parcels, roads, hazard, building, landPrice, landPrice5, schools, stations, around, pois, evac, deals };
+  // この物件で問題になりそうな所と、次にやること（読み込みの状態が変わるたびに出し直す）
+  const triage = useTriage(result, { zoning, parcels, roads, hazard, building, liq, zousei, rireki });
+  return { zoning, parcels, roads, hazard, building, landPrice, landPrice5, schools, stations, around, pois, evac, deals, liq, zousei, rireki, triage };
 }
 
 export type PropertyData = ReturnType<typeof useProperty>;

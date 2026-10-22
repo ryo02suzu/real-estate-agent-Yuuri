@@ -35,6 +35,10 @@ import { MapPreview } from "./map-preview";
 import { NearbyRoadsBlock, NearbyRoadsLine, useNearbyRoads, type RoadsState } from "./nearby-roads";
 import { SheetPreview } from "./sheet-preview";
 import { addressOffLot, parcelLines, ParcelButton, ParcelCard, registryNeighbors, useParcelInfo, type ParcelInfo } from "./parcel-card";
+import { TriageSheet, useChecklist } from "./triage-sheet";
+import { useLiquefaction, useRireki, useZousei } from "./app/use-national";
+import { useTriage } from "./app/use-triage";
+import type { Triage } from "@/lib/app/triage";
 import { PrintSheet } from "./print-sheet";
 import { SchoolButton, SchoolCard, useSchools, type SchoolState } from "./school-card";
 import { PoiCard, usePois, type PoiState } from "./poi-card";
@@ -621,6 +625,8 @@ function ShareButton({
   schools,
   stations,
   pois,
+  triage,
+  checked,
   desktop,
 }: {
   result: Extract<LookupResult, { status: "ok" }>;
@@ -633,12 +639,15 @@ function ShareButton({
   schools: SchoolState;
   stations: StationState;
   pois: PoiState;
+  /** 要注意点と次にやること（文の先頭に入れる） */
+  triage?: Triage;
+  checked?: ReadonlySet<string>;
   /** PC：共有の画面は出さず、メールやチャットに貼れるようコピーする */
   desktop?: boolean;
 }) {
   const { done, copy } = useCopy();
   const onClick = async () => {
-    const text = buildSummary(result, loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations, pois }));
+    const text = buildSummary(result, { ...loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations, pois }), triage, done: checked });
     if (!desktop && typeof navigator.share === "function") {
       try {
         await navigator.share({ text });
@@ -878,6 +887,13 @@ function DesktopFound({ query, result, onPick }: { query: string; result: Extrac
   const schools = useSchools(result.lat, result.lng);
   const stations = useStations(result.lat, result.lng);
   const pois = usePois(result.lat, result.lng);
+  const liq = useLiquefaction(result.lat, result.lng);
+  const zousei = useZousei(result.lat, result.lng);
+  const rireki = useRireki(result.lat, result.lng);
+  // この物件で問題になりそうな所と、次にやること（共有の文・調査メモ・印刷のメニューから）
+  const triage = useTriage(result, { zoning, parcels, roads, hazard, building, liq, zousei, rireki });
+  const checklist = useChecklist(result);
+  const [triageOpen, setTriageOpen] = useState(false);
   const [draft, setDraft] = useState(false);
   const offline = m.coverage === "none" || m.coverage === "outside";
   const primary = result.links.filter((l) => !offline && l.kind !== "public_road");
@@ -902,8 +918,9 @@ function DesktopFound({ query, result, onPick }: { query: string; result: Extrac
           actions={
             <>
               <CopyButton text={copyText(result)} />
-              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} desktop />
-              <PrintMenu result={result} onDraft={() => setDraft(true)} />
+              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} triage={triage} checked={checklist.done} desktop />
+              <PrintMenu result={result} onDraft={() => setDraft(true)} onTriage={() => setTriageOpen(true)} />
+              <TriageSheet result={result} triage={triage} open={triageOpen} onClose={() => setTriageOpen(false)} />
               <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations, pois })} open={draft} onClose={() => setDraft(false)} />
             </>
           }
@@ -995,7 +1012,7 @@ function DesktopFound({ query, result, onPick }: { query: string; result: Extrac
       </div>
 
       {result.contact && <ContactCard contact={result.contact} city={m.name} address={result.matchedAddress} />}
-      <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} />
+      <PrintSheet result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} triage={triage} />
     </div>
   );
 }
@@ -1004,7 +1021,7 @@ function DesktopFound({ query, result, onPick }: { query: string; result: Extrac
  * PC：調査メモ（components/print-sheet.tsx）・案内図（components/guide-map.tsx）の印刷・PDF 保存と、重説・物件概要の下書き（onDraft）。
  * 見出しの行が窮屈なのでアイコンだけで、押すと選ぶ
  */
-function PrintMenu({ result, onDraft }: { result: Extract<LookupResult, { status: "ok" }>; onDraft: () => void }) {
+function PrintMenu({ result, onDraft, onTriage }: { result: Extract<LookupResult, { status: "ok" }>; onDraft: () => void; onTriage: () => void }) {
   const [menu, setMenu] = useState(false);
   const [guide, setGuide] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
@@ -1027,13 +1044,23 @@ function PrintMenu({ result, onDraft }: { result: Extract<LookupResult, { status
         onClick={() => setMenu((v) => !v)}
         aria-label="印刷"
         aria-expanded={menu}
-        title="調査メモ・案内図の印刷・PDF保存、重説・物件概要の下書き"
+        title="要注意点と次にやること、調査メモ・案内図の印刷・PDF保存、重説・物件概要の下書き"
         className="flex items-center rounded-full border border-line px-2 py-1 text-brand lg:hover:bg-mint"
       >
         <PrintIcon className="h-3.5 w-3.5" />
       </button>
       {menu && (
         <span className="absolute right-0 top-full z-40 mt-1 flex w-max flex-col rounded-xl border border-line bg-white p-1 text-[12.5px] text-ink shadow-soft">
+          <button
+            className={item}
+            onClick={() => {
+              setMenu(false);
+              onTriage();
+            }}
+          >
+            <AlertIcon className="h-3.5 w-3.5 text-brand" />
+            要注意点と次にやること…
+          </button>
           <button
             className={item}
             onClick={() => {

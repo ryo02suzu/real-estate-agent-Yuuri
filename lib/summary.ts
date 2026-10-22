@@ -24,6 +24,7 @@ import { contactName, noContactText, UTILITIES_CHECKED, utilitiesFor } from "./r
 import { MORIDO_CREDIT, moridoLine, type Morido } from "./roadmap/morido";
 import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
 import { ZONING_CREDIT } from "./roadmap/zoning-data";
+import { triageLines, type Triage } from "./app/triage";
 
 const COVERAGE_SHORT = { full: "ネットで全種別が分かる", partial: "ネットで分かるのは一部", none: "ネット非公開（窓口で確認）", outside: "都市計画区域外（窓口で確認）" } as const;
 
@@ -31,7 +32,7 @@ const COVERAGE_SHORT = { full: "ネットで全種別が分かる", partial: "�
  * zoning：地点の都市計画、parcels：謄本・公図用の「所在 地番」の行（物件の筆と隣の筆。reference は住所の地点の筆で参考）、
  * roads：市の地図データで読んだ、物件のまわりの道路の種別、hazard：国のハザードマップのデータで読んだ地点の災害リスクと、
  * 市区町村のハザードマップのページ、landPrice：近くの地価公示・地価調査の地点（近い順）、schools：地点の小学校区・中学校区。
- * 読み込めていれば添える
+ * 読み込めていれば添える。triage：要注意点と次にやること（先頭に出す。done は済んだやること）
  */
 export function buildSummary(
   result: Extract<LookupResult, { status: "ok" }>,
@@ -45,6 +46,8 @@ export function buildSummary(
     schools,
     stations,
     pois,
+    triage,
+    done,
   }: {
     zoning?: { zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi };
     parcels?: { target?: string; neighbors: string[]; reference: boolean; offLot?: boolean; estimated?: Estimated; sanko?: string };
@@ -55,13 +58,18 @@ export function buildSummary(
     schools?: Schools;
     stations?: StationWalk[];
     pois?: PoiWalk[];
+    triage?: Triage;
+    done?: ReadonlySet<string>;
   } = {},
 ): string {
   const m = result.municipality;
   const p = result.parcel;
-  const lines = [`【道路種別の確認先】${result.matchedAddress}${p && !result.picked ? ` ${chibanLabel(p.chibanRaw)}${parcelMark(p)}` : " 付近"}`];
+  const lines = [`【MICHILU の調査結果】${result.matchedAddress}${p && !result.picked ? ` ${chibanLabel(p.chibanRaw)}${parcelMark(p)}` : " 付近"}`];
   // 地図で選んだ地点・地番で探した筆は、その地点を地理院地図で開けるようにする
   if (result.picked || p) lines.push(`${result.picked ? "地図で選んだ地点" : "筆の位置"}：https://maps.gsi.go.jp/#18/${result.lat.toFixed(6)}/${result.lng.toFixed(6)}/`);
+  // 問題になりそうな所と次にやることを、結果の前に
+  if (triage) lines.push(...triageLines(triage, done));
+  lines.push("【道路種別の確認先】");
   if (p && result.picked) lines.push(`この地点の筆：${chibanLabel(p.chibanRaw)}（${kuikiLabel(p.kuiki)}）${parcelMark(p)}`);
   lines.push(`${m.pref}${m.name}：${COVERAGE_SHORT[m.coverage]}`);
   for (const l of result.links) lines.push(`・${l.label}${l.pinpoint ? "" : "（地図内で住所検索）"}\n  ${l.url}`);

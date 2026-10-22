@@ -33,6 +33,8 @@ import type { PoiState } from "./poi-card";
 import type { StationState } from "./station-card";
 import { MapPreview } from "./map-preview";
 import type { RoadsState } from "./nearby-roads";
+import type { Triage } from "@/lib/app/triage";
+import { checklistKey, loadDone } from "@/lib/checklist";
 import { addressOffLot, parcelLines, type ParcelInfo } from "./parcel-card";
 import type { ZoningState } from "./zoning-card";
 
@@ -58,6 +60,8 @@ export function PrintSheet(props: {
   schools: SchoolState;
   stations: StationState;
   pois: PoiState;
+  /** 要注意点と次にやること（見出しのすぐ下に出す） */
+  triage?: Triage;
 }) {
   // document.body に出す（画面の作りの外に置き、印刷では画面の作りを丸ごと隠す）。サーバーでは何も出さない
   const client = useSyncExternalStore(
@@ -80,6 +84,7 @@ function Memo({
   schools,
   stations,
   pois,
+  triage,
 }: {
   result: Ok;
   zoning: ZoningState;
@@ -91,6 +96,7 @@ function Memo({
   schools: SchoolState;
   stations: StationState;
   pois: PoiState;
+  triage?: Triage;
 }) {
   const walks = stations.status === "ok" ? stations.stations : [];
   const facilities = pois.status === "ok" ? pois.pois : [];
@@ -126,6 +132,8 @@ function Memo({
           MICHILU（michilu.vercel.app）
         </p>
       </header>
+
+      {triage && <TriageBlock triage={triage} done={loadDone(checklistKey(result.lat, result.lng))} />}
 
       {/* 物件：場所の表と地図 */}
       <section className="mt-2.5 flex gap-4">
@@ -461,6 +469,45 @@ function Memo({
         </p>
       </footer>
     </div>
+  );
+}
+
+/** 要注意点（▲ 要注意・・要確認）と、次にやること（窓口ごと。済んだものは ☑） */
+function TriageBlock({ triage, done }: { triage: Triage; done: Set<string> }) {
+  return (
+    <section className="mt-2.5 flex gap-4 break-inside-avoid">
+      <div className="min-w-0 flex-1">
+        <h2 className="mb-1 border-l-[3px] border-[#9a7442] pl-1.5 text-[12.5px] font-bold">
+          問題になりそうな所 <span className="text-[10px] font-normal text-[#7a6a55]">{triage.headline}</span>
+        </h2>
+        {triage.issues.length ? (
+          <ul className="space-y-0.5 text-[10.5px] leading-[1.5]">
+            {triage.issues.map((i) => (
+              <li key={i.id}>
+                <span className={i.level === "warn" ? "font-bold text-[#a3321a]" : "font-bold"}>{i.level === "warn" ? "▲" : "・"}{i.title}</span>
+                {i.confirm && <span className="text-[#7a6a55]">（{i.confirm}）</span>}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-[10.5px] text-[#7a6a55]">{triage.pending.length ? `${triage.pending.join("・")}を確認中に印刷しました` : "データで見つかった注意はありません"}</p>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <h2 className="mb-1 border-l-[3px] border-[#9a7442] pl-1.5 text-[12.5px] font-bold">次にやること</h2>
+        <ul className="space-y-0.5 text-[10.5px] leading-[1.5]">
+          {triage.actions.map((a) => (
+            <li key={a.id}>
+              {done.has(a.id) ? "☑" : "□"} <b>{a.title}</b>
+              <span className="text-[#7a6a55]">
+                ：{a.where}
+                {a.phone ? ` ${a.phone}` : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
   );
 }
 

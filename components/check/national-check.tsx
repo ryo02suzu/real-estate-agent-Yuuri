@@ -17,6 +17,8 @@ import { RIREKI_CAUTIONS, RIREKI_CREDIT, rirekiLine } from "@/lib/roadmap/rireki
 import { lineLabel } from "@/lib/roadmap/walk";
 import { ZOUSEI_CAUTIONS, ZOUSEI_CREDIT, zouseiText } from "@/lib/roadmap/zousei";
 import { useAppraisal, useFacilities, useLiquefaction, usePopulation, useRidership, useRireki, useZousei, type Loaded } from "@/components/app/use-national";
+import { useProperty } from "@/components/app/use-property";
+import { TriageBody } from "@/components/triage-sheet";
 
 type Ok = Extract<LookupResult, { status: "ok" }>;
 
@@ -93,6 +95,8 @@ function Report({ result }: { result: Ok }) {
       <p className="text-[13px]">
         <b>{result.matchedAddress}</b>（{lat.toFixed(6)}, {lng.toFixed(6)}）
       </p>
+
+      <Triage result={result} />
 
       <Section title="液状化の発生傾向" data="liq" state={liq} cautions={LIQ_CAUTIONS} credit={LIQ_CREDIT}>
         {(l) => (l ? <p className="text-[16px] font-bold">{liquefactionText(l)}</p> : <p>この地点のデータはありません（海・河川・関東の外など）</p>)}
@@ -295,6 +299,19 @@ function Appraisal({ a }: { a: AppraisalPoint }) {
         </div>
       ))}
     </>
+  );
+}
+
+/** 要注意点と次にやること（lib/app/triage.ts）。物件の全データを読んでから出す */
+function Triage({ result }: { result: Ok }) {
+  const data = useProperty(result);
+  return (
+    <section className="rounded border border-slate-200 p-3">
+      <h2 className="font-bold">要注意点と次にやること（方向1の中身）</h2>
+      <div className="mt-1">
+        <TriageBody result={result} triage={data.triage} />
+      </div>
+    </section>
   );
 }
 

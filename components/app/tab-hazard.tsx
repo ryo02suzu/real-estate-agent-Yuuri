@@ -12,7 +12,6 @@ import { LIQ_CREDIT } from "@/lib/roadmap/liquefaction";
 import { REINFOLIB_NOTE } from "@/lib/roadmap/reinfolib";
 import { Gauge, Landslide, Liquefaction, Quake, RainCloud, Runner, WavesFill } from "./icons";
 import { MiniMap, PropertyMap } from "./property-map";
-import { useLiquefaction } from "./use-national";
 import { metersText } from "./shared";
 import type { TabProps } from "./types";
 import { NAVY, SUB, TONE } from "./ui";
@@ -50,8 +49,7 @@ const LIQ_CHIP: Record<number, [string, Tone]> = {
 const EVAC_NEAR_M = 1000;
 
 export function HazardTab({ result, data, open, expand }: TabProps) {
-  const { hazard, evac } = data;
-  const liq = useLiquefaction(result.lat, result.lng);
+  const { hazard, evac, liq } = data;
   const liqHit = liq.status === "ok" ? liq.value : null;
   const [shown, setShown] = useState<Kind>("flood");
   const ok = hazard.status === "ok" ? hazard : undefined;

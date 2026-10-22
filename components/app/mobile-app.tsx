@@ -28,6 +28,7 @@ import { LocationPicker } from "../location-picker";
 import { addressOffLot, registryNeighbors } from "../parcel-card";
 import { PrintSheet } from "../print-sheet";
 import { copyText, loaded } from "../result-view";
+import { TriageSheet, useChecklist } from "../triage-sheet";
 import { Sheet } from "../sheet";
 import { useCopy } from "../use-copy";
 import { MapAppsSheet, ReportSheet } from "./app-sheets";
@@ -349,6 +350,7 @@ function PropertyView({
   const [detail, setDetail] = useState<{ kind: SheetKind; arg?: number } | null>(null);
   const [mapApps, setMapApps] = useState(false);
   const [report, setReport] = useState(false);
+  const [triage, setTriage] = useState(false);
   const [draft, setDraft] = useState(false);
   const [guide, setGuide] = useState(false);
   const [full, setFull] = useState<MapOpen | null>(null);
@@ -356,7 +358,9 @@ function PropertyView({
   const addr = useCopy();
   const shareCopy = useCopy();
   const reportCopy = useCopy();
-  const input = loaded({ ...data, landPrice: data.landPrice5 });
+  const checklist = useChecklist(result);
+  // 共有の文の先頭に、要注意点と次にやること（済んだ印も）を入れる
+  const input = { ...loaded({ ...data, landPrice: data.landPrice5 }), triage: data.triage, done: checklist.done };
 
   const changeTab = (t: TabKey) => {
     setTab(t);
@@ -413,6 +417,11 @@ function PropertyView({
         <ReportSheet
           open={report}
           onClose={() => setReport(false)}
+          onTriage={() => {
+            setReport(false);
+            setTriage(true);
+          }}
+          triageSub={data.triage.headline}
           onMemo={() => {
             setReport(false);
             // 押した操作の中で印刷を呼ぶ（iPhone はプリントの画面から PDF にもできる）
@@ -431,9 +440,10 @@ function PropertyView({
         />
         {full && <FullMap result={result} withRoads={full.roads} hazard={full.hazard} landPrice={full.landPrice} onClose={() => setFull(null)} onPick={(lat, lng) => onPickPoint(lat, lng)} />}
       </Portal>
+      <TriageSheet result={result} triage={data.triage} open={triage} onClose={() => setTriage(false)} />
       <DraftSheet result={result} input={input} open={draft} onClose={() => setDraft(false)} />
       <GuideMapSheet result={result} open={guide} onClose={() => setGuide(false)} />
-      <PrintSheet result={result} zoning={data.zoning} parcels={data.parcels} roads={data.roads} hazard={data.hazard} building={data.building} landPrice={data.landPrice5} schools={data.schools} stations={data.stations} pois={data.pois} />
+      <PrintSheet result={result} zoning={data.zoning} parcels={data.parcels} roads={data.roads} hazard={data.hazard} building={data.building} landPrice={data.landPrice5} schools={data.schools} stations={data.stations} pois={data.pois} triage={data.triage} />
     </>
   );
 }

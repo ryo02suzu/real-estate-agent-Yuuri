@@ -1,7 +1,7 @@
 "use client";
 
 // 「地図アプリで開く」と「レポートを作成」の選択（下から出る）。地図アプリには物件の座標だけを渡す（押したときだけ。自前のサーバーは通さない）
-import { ChevronRight, ClipboardCopy, Compass, Crosshair, ExternalLink, FileText, Map as MapIcon, Navigation, Printer, Route, ScrollText } from "lucide-react";
+import { ChevronRight, ClipboardCopy, Compass, Crosshair, ExternalLink, FileText, ListChecks, Map as MapIcon, Navigation, Printer, Route, ScrollText } from "lucide-react";
 import type { ReactNode } from "react";
 import { Sheet } from "../sheet";
 import type { Ok } from "./use-property";
@@ -73,12 +73,34 @@ export function MapAppsSheet({ result, open, onClose, onMichilu, onFix }: { resu
   );
 }
 
-export function ReportSheet({ open, onClose, onMemo, onDraft, onGuide, onCopy, copied }: { open: boolean; onClose: () => void; onMemo: () => void; onDraft: () => void; onGuide: () => void; onCopy: () => void; copied: boolean }) {
+export function ReportSheet({
+  open,
+  onClose,
+  onTriage,
+  triageSub,
+  onMemo,
+  onDraft,
+  onGuide,
+  onCopy,
+  copied,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** 要注意点と次にやること（triageSub は「要注意 2件・要確認 5件」） */
+  onTriage: () => void;
+  triageSub: string;
+  onMemo: () => void;
+  onDraft: () => void;
+  onGuide: () => void;
+  onCopy: () => void;
+  copied: boolean;
+}) {
   if (!open) return null;
   return (
     <div className="theme-navy">
       <Sheet title="レポートを作成" open onClose={onClose}>
         <ul className="divide-y divide-line">
+          <Item icon={<ListChecks className="h-[18px] w-[18px]" />} title="要注意点と次にやること" sub={`${triageSub}。窓口ごとの確認事項をチェックしながら進められます`} onClick={onTriage} />
           <Item icon={<Printer className="h-[18px] w-[18px]" />} title="調査メモを印刷・PDF保存" sub="道路・法令・ハザード・地価・周辺環境をA4にまとめる（iPhoneはプリントの画面からPDFにできます）" onClick={onMemo} />
           <Item icon={<ScrollText className="h-[18px] w-[18px]" />} title="重説・物件概要の下書き" sub="重要事項説明書・販売図面の欄の順に、コピーして使える下書き" onClick={onDraft} />
           <Item icon={<FileText className="h-[18px] w-[18px]" />} title="案内図を印刷・PDF保存" sub="物件の場所の地図（A4）" onClick={onGuide} />
