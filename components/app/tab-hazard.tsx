@@ -187,6 +187,11 @@ export function HazardTab({ result, data, open, expand }: TabProps) {
       {evac.status === "loading" && <p className="mt-[6px]" style={{ fontSize: 6.6, color: "#8a95a6" }}>確認中…</p>}
       {evac.status === "error" && <p className="mt-[6px]" style={{ fontSize: 6.6, color: "#8a95a6" }}>避難場所のデータを読み込めませんでした。</p>}
       {evac.status === "ok" && evac.sites.length === 0 && <p className="mt-[6px]" style={{ fontSize: 6.6, color: "#8a95a6" }}>3km以内に、データにある指定緊急避難場所がありません。市区町村の防災のページで確認してください。</p>}
+      {otherMuni && (
+        <p className="mt-[5px] leading-[1.5]" style={{ fontSize: 6.6, color: "#8a4f3a" }}>
+          近くの場所は、どれも{muni}の外の指定です（国のデータに{muni}の指定が載っていないことがあります）。{muni}の指定は{muni}の防災マップで確認してください。
+        </p>
+      )}
       {evac.status === "ok" &&
         evac.sites.slice(0, 2).map((s) => (
           <div key={`${s.name}|${s.at.join()}`} className="mt-[5px] flex items-center gap-[6.7px]">
