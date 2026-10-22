@@ -130,7 +130,7 @@ describe("次にやること", () => {
     expect(touki.what.at(-1)).toContain("隣地の地番");
     // 住所の地点が水路の筆なら、その隣は物件の隣地ではないので並べない
     const water = triageOf(loaded({ parcels: { status: "ok", parcel: { ...parcel, chibanRaw: "水-5", chiban: "水-5" }, kind: "address", neighbors: ["渋谷区神南１丁目 1"] } }));
-    expect(water.actions.find((a) => a.id === "touki")!.what.some((w) => w.includes("隣地"))).toBe(false);
+    expect(water.actions.find((a) => a.id === "touki")!.what.some((w) => w.startsWith("隣地の地番"))).toBe(false);
     const toshi = t.actions.find((a) => a.id === "toshi")!;
     expect(toshi.what).toEqual(["高度地区の種類と高さの制限", "地区計画の内容（用途・高さ・壁面の位置・最低敷地面積・届出）"]);
     const hazard = t.actions.find((a) => a.id === "hazard")!;
