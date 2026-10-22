@@ -400,7 +400,8 @@ function buildActions(input: TriageInput, issues: Issue[]): Action[] {
       numbered ? `登記事項証明書（土地）：${p?.kind === "address" ? `住所の地点の筆 ${numbered}（参考。物件の筆かを確認）` : numbered}。所有者・地目・地積・抵当権` : "登記事項証明書（土地・建物）：所有者・地目・地積・抵当権（地番は売主・公図で確認）",
       "公図：筆の形・接道・隣地との位置関係。公図と地図のずれ",
       "地積測量図（あれば）：境界・面積の根拠",
-      ...(p && p.neighbors.length ? [`隣地の地番（境界の確認・承諾の相手）：${neighborList(p.neighbors, 10)}`] : []),
+      // 隣地は、物件の筆が分かっているときだけ（道路・水路の筆や、隣地のとても多い筆の隣は物件の隣地ではない）
+      ...(numbered && p && p.neighbors.length && !(p.kind === "address" && p.neighbors.length >= 30) ? [`隣地の地番（境界の確認・承諾の相手${p.kind === "address" ? "。住所の地点の筆の隣なので参考" : ""}）：${neighborList(p.neighbors, 10)}`] : []),
     ];
     const chibanzu = chibanzuFor(m, result.lat, result.lng);
     out.push({
