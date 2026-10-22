@@ -5,7 +5,7 @@ import { showHazardOnMap, showLandPriceOnMap } from "@/lib/map-style";
 import type { LookupResult, Municipality, ResolvedLink } from "@/lib/roadmap";
 import { chibanzuFor } from "@/lib/roadmap/chibanzu";
 import type { HazardKind } from "@/lib/roadmap/hazard";
-import { chibanLabel, kuikiLabel, parcelMark } from "@/lib/roadmap/parcel";
+import { chibanLabel, chibanQueryOf, kuikiLabel, parcelMark, registryChiban } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { sheetName } from "@/lib/roadmap/sheets";
 import type { DraftInput } from "@/lib/draft";
@@ -34,7 +34,7 @@ import { LegendBlock, LegendButton } from "./legend";
 import { MapPreview } from "./map-preview";
 import { NearbyRoadsBlock, NearbyRoadsLine, useNearbyRoads, type RoadsState } from "./nearby-roads";
 import { SheetPreview } from "./sheet-preview";
-import { parcelLines, ParcelButton, ParcelCard, useParcelInfo, type ParcelInfo } from "./parcel-card";
+import { addressOffLot, parcelLines, ParcelButton, ParcelCard, registryNeighbors, useParcelInfo, type ParcelInfo } from "./parcel-card";
 import { PrintSheet } from "./print-sheet";
 import { SchoolButton, SchoolCard, useSchools, type SchoolState } from "./school-card";
 import { PoiCard, usePois, type PoiState } from "./poi-card";
@@ -68,7 +68,7 @@ export function ResultView({
   if (result.status === "not_found") return <NotFound query={query} />;
   if (result.status === "choose") return <Choose query={query} result={result} onPick={onPick} />;
   if (result.status === "unsupported") return <Unsupported result={result} onFix={onFix} />;
-  return desktop ? <DesktopFound result={result} onPick={onPick} /> : <Found result={result} onFix={onFix} onExpand={onExpand} onPick={onPick} />;
+  return desktop ? <DesktopFound query={query} result={result} onPick={onPick} /> : <Found result={result} onFix={onFix} onExpand={onExpand} onPick={onPick} />;
 }
 
 function NotFound({ query }: { query: string }) {
@@ -358,7 +358,7 @@ function useFit(ref: React.RefObject<HTMLDivElement | null>) {
 /** 「住所コピー」で写す文字。地番で探した筆は地番まで（地図システムの住所検索に貼る） */
 export function copyText(result: Extract<LookupResult, { status: "ok" }>): string {
   const p = result.parcel;
-  return p && !result.picked && /^\d/.test(p.chibanRaw) ? `${result.matchedAddress}${p.chibanRaw}` : result.matchedAddress;
+  return p && !result.picked && /^\d/.test(p.chibanRaw) ? `${result.matchedAddress}${registryChiban(p.chibanRaw)}` : result.matchedAddress;
 }
 
 /** 見出し（「検索地点」など）と住所の2行 */
@@ -396,13 +396,19 @@ function ParcelCredit() {
  * 地図で選んだ地点は住所が町名までなので「地図で選んだ地点」、地番で探した筆は「地番で探した筆」と地番を出す
  */
 function Place({
+  query,
   result,
+  parcels,
   fixable,
   onPick,
   actions,
   desktop,
 }: {
+  /** 調べた文字（道路・水路の上の地点を、地番で探し直すとき） */
+  query?: string;
   result: Extract<LookupResult, { status: "ok" }>;
+  /** 地点の筆（住所の地点が道路・水路の上か） */
+  parcels?: ParcelInfo;
   /** PC のパネル（出典を本文に書く。スマホは地図プレビューの上に書く） */
   desktop?: boolean;
   /** 地図の「場所を直す」で選び直せる（その案内を添える） */
@@ -415,6 +421,12 @@ function Place({
   const found = parcel && !picked ? parcel : undefined;
   const warn = "mt-1 flex gap-1 text-[10.5px] leading-[1.6] text-[#8a4f3a]";
   const town = approximate ? "町の中心を表示しています。" : "";
+  // 住所で調べた地点が、道路・水路の筆か隣地のとても多い筆（地番の付いた公道など）の上。番地が地番の地域なら
+  // （住居表示の「号」まで合った地点でなければ）地番で探し直せるようにする
+  const off = !picked && !parcel && !approximate && parcels ? addressOffLot(parcels) : undefined;
+  const chibanArea = !/号$/.test(address);
+  const onRoad = !!off && (off === "large" || chibanArea);
+  const asChiban = query && chibanArea ? chibanQueryOf(query, /丁目/.test(result.town)) : undefined;
   return (
     <div className="px-4 pb-3 pt-3 short:pb-2">
       <PlaceHeader
@@ -470,6 +482,22 @@ function Place({
           <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
           {fixable ? "番地が見つからず、町の中心を表示しています。地図の「場所を直す」で物件の位置を選べます。" : "番地が見つからず、町の中心を表示しています。"}
         </p>
+      ) : onRoad ? (
+        <div className={warn}>
+          <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+          <span>
+            {off === "large" && parcels?.status === "ok"
+              ? `住所の地点の筆（地番 ${registryChiban(parcels.parcel.chibanRaw)}）は隣地が${registryNeighbors(parcels).length}筆あり、道路など物件の外の土地の可能性があります。${chibanArea ? "番地が地番の地域なら、地番で探すと土地（筆）が出ます。" : "地図のピンを建物の位置へ動かすと、物件の土地の地番が出ます。"}`
+              : `住所の地点が${off}の上です。番地が地番の地域なら、地番で探すと土地（筆）が出ます。`}
+            {asChiban && (
+              <span className="mt-0.5 flex">
+                <button onClick={() => onPick(asChiban)} className="rounded-full bg-mint px-2 py-px font-semibold text-brand">
+                  「{asChiban}」で探す
+                </button>
+              </span>
+            )}
+          </span>
+        </div>
       ) : picked && parcel ? (
         <p className="mt-1 truncate text-[10.5px] leading-[1.6] text-muted">
           <b className="font-semibold text-ink">
@@ -567,7 +595,10 @@ export function loaded({
 }): DraftInput {
   return {
     zoning: zoning.status === "ok" ? zoning : undefined,
-    parcels: parcels.status === "ok" ? { ...parcelLines(parcels), reference: parcels.kind === "address", estimated: parcels.parcel.estimated, sanko: parcels.parcel.sanko } : undefined,
+    parcels:
+      parcels.status === "ok"
+        ? { ...parcelLines(parcels), reference: parcels.kind === "address", offLot: addressOffLot(parcels) === "large", estimated: parcels.parcel.estimated, sanko: parcels.parcel.sanko }
+        : undefined,
     roads: roads.status === "ok" ? roads.roads : undefined,
     hazard: hazard.status === "ok" ? hazard : undefined,
     building: building.status === "ok" ? building.result : undefined,
@@ -835,7 +866,7 @@ function MapButton({
  * PC の結果（地図の左のパネルの中身）。検索地点・市・地図ボタン・問い合わせ先。
  * 物件の場所と図の範囲は、右の動く地図に出る（components/desktop-shell.tsx）
  */
-function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { status: "ok" }>; onPick: (address: string) => void }) {
+function DesktopFound({ query, result, onPick }: { query: string; result: Extract<LookupResult, { status: "ok" }>; onPick: (address: string) => void }) {
   const m = result.municipality;
   const zoning = useZoning(result.lat, result.lng, m);
   const parcels = useParcelInfo(result);
@@ -863,7 +894,9 @@ function DesktopFound({ result, onPick }: { result: Extract<LookupResult, { stat
     <div className="flex flex-col gap-3">
       <section className={CARD}>
         <Place
+          query={query}
           result={result}
+          parcels={parcels}
           onPick={onPick}
           desktop
           actions={

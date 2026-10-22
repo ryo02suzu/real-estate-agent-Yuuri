@@ -186,6 +186,15 @@ describe("重説・物件概要の下書き", () => {
   });
 });
 
+describe("住所の地点の筆", () => {
+  it("隣地がとても多い筆（地番の付いた公道など）は、物件の外の土地の可能性を添え、隣地は20筆まで", () => {
+    const neighbors = Array.from({ length: 25 }, (_, i) => `渋谷区神南１丁目 ${i + 30}-1`);
+    const text = draftText(buildDraft(base, { parcels: { target: "渋谷区神南１丁目 51-3", neighbors, reference: true, offLot: true } }));
+    expect(text).toContain("所在（地番）：渋谷区神南１丁目 51-3（住所の地点にある筆（参考）。隣地がとても多く、道路など物件の外の土地の可能性があるので、公図で確認）【要確認】");
+    expect(text).toContain("、ほか5筆（公図で確認）");
+  });
+});
+
 describe("筆の出典", () => {
   it("地番参考図・推定の筆があれば、1つの文に市町村の出典と注意を足す", () => {
     expect(parcelCreditLine(false)).toMatch(/^筆の出典：「登記所備付地図データ」（法務省）.+を加工して作成（.+）。法務局の証明ではありません$/);

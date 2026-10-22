@@ -10,7 +10,7 @@ import { livingScores, SCORE_METHOD } from "@/lib/app/scores";
 import { chibanzuFor } from "@/lib/roadmap/chibanzu";
 import { EVAC_CREDIT, EVAC_KINDS } from "@/lib/roadmap/evac";
 import { asOfText, changeText, distanceText, kindText, landPriceRows, priceText, tsuboText } from "@/lib/roadmap/land-price";
-import { POI_CREDIT, POI_KINDS, POI_ORDER } from "@/lib/roadmap/poi";
+import { POI_CREDIT, POI_KINDS, POI_ORDER, POI_SOURCES } from "@/lib/roadmap/poi";
 import { ROAD_RADIUS_M } from "@/lib/roadmap/road-read";
 import { BuildingDetail } from "../building-card";
 import { ContactCard } from "../contact-card";
@@ -179,7 +179,7 @@ function PoiSheet({ data, first }: { data: PropertyData; first?: number }) {
           );
         })}
       </div>
-      <Notes lead="施設の位置までの目安です。今もあるかと実際の道のりを確かめてください。" source="© OpenStreetMap contributors（ODbL）">
+      <Notes lead="施設の位置までの目安です。今もあるかと実際の道のりを確かめてください。" source={POI_SOURCES}>
         <p>最寄りの施設は道路をたどった徒歩の目安（道路距離80mを1分）、ほかは直線距離です。</p>
         <p>{POI_CREDIT}</p>
       </Notes>
@@ -214,7 +214,7 @@ function ScoreSheet({ data }: { data: PropertyData }) {
           </div>
         ))}
       </dl>
-      <Notes lead="点の付け方" source="駅：国土数値情報・施設：© OpenStreetMap contributors（ODbL）・学区：国土数値情報">
+      <Notes lead="点の付け方" source={`駅：国土数値情報・施設：${POI_SOURCES}・学区：国土数値情報`}>
         <p>{SCORE_METHOD}</p>
       </Notes>
     </div>

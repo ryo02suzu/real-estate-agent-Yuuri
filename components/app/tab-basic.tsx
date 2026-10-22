@@ -26,6 +26,7 @@ import { usageShort } from "@/lib/roadmap/building";
 import { schoolShort } from "@/lib/roadmap/school";
 import { chibanLabel, parcelMark } from "@/lib/roadmap/parcel";
 import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
+import { addressOffLot } from "../parcel-card";
 import { CoinStack, GrowthChart } from "./icons";
 import { MiniMap, PropertyMap } from "./property-map";
 import { InfoRow, KIND_STYLE, metersText, Pending, walkLabel, wayMeters } from "./shared";
@@ -42,8 +43,13 @@ export function BasicTab({ result, data, go, open, expand, mapApps }: TabProps) 
   const parcel = parcels.status === "ok" ? parcels.parcel : undefined;
   const z = zoning.status === "ok" ? zoning.zoning : undefined;
   const y = z?.youto[0];
-  const zPending = zoning.status === "loading" ? <Pending /> : <Pending>データなし</Pending>;
-  const area = parcel && /^\d/.test(parcel.chibanRaw) ? parcelAreaM2(parcel) : undefined;
+  // 読み込めなかったときは「データなし」と言わない（無いのか読めなかったのかを分ける）
+  const zPending = zoning.status === "loading" ? <Pending /> : zoning.status === "error" ? <Pending>読み込めず</Pending> : <Pending>データなし</Pending>;
+  // 番地まで見つからず町の中心を出しているときは、地点の筆・建物は物件と関係ないので出さない
+  const townCenter = parcels.status === "none" && parcels.approximate;
+  // 住所の地点の筆が、隣地のとても多い筆（地番の付いた公道など）なら、その面積は物件の土地のものではないので出さない
+  const offLot = addressOffLot(parcels) === "large";
+  const area = parcel && /^\d/.test(parcel.chibanRaw) && !offLot ? parcelAreaM2(parcel) : undefined;
   const st = stations.status === "ok" ? stations.stations[0] : undefined;
   const school = schools.status === "ok" ? schools.schools.elementary : undefined;
   const hit = building.status === "ok" ? building.result.hit : undefined;
@@ -85,8 +91,16 @@ export function BasicTab({ result, data, go, open, expand, mapApps }: TabProps) 
                 <>
                   {chibanLabel(parcel.chibanRaw).replace(/^地番 /, "")}
                   {parcelMark(parcel) && <span className="text-[#8a4f3a]">{parcelMark(parcel)}</span>}
-                  {parcels.status === "ok" && parcels.kind === "address" && <span className="block text-[5.9px] text-[#6b7486]">住所の地点の筆（参考）</span>}
+                  {offLot ? (
+                    <span className="block text-[5.9px] text-[#8a4f3a]">住所の地点の筆（道路などの可能性）</span>
+                  ) : (
+                    parcels.status === "ok" && parcels.kind === "address" && <span className="block text-[5.9px] text-[#6b7486]">住所の地点の筆（参考）</span>
+                  )}
                 </>
+              ) : parcels.status === "error" ? (
+                <Pending>読み込めず</Pending>
+              ) : townCenter ? (
+                <Pending>場所を直すと出ます</Pending>
               ) : (
                 <Pending>地図データなし</Pending>
               )}
@@ -108,12 +122,18 @@ export function BasicTab({ result, data, go, open, expand, mapApps }: TabProps) 
                   <Num>{areaText(area)}</Num>
                   {parcels.status === "ok" && parcels.kind === "address" && <span className="block text-[5.9px] text-[#6b7486]">住所の地点の筆（参考）・公簿は登記で確認</span>}
                 </>
+              ) : parcels.status === "error" ? (
+                <Pending>読み込めず</Pending>
+              ) : townCenter || offLot ? (
+                <Pending>場所を直すと出ます</Pending>
               ) : (
                 <Pending>登記で確認</Pending>
               )}
             </InfoRow>
             <InfoRow icon={<Building2 {...ICON} />} label="現況（建物）" onClick={building.status !== "none" ? () => open("building") : undefined}>
-              {building.status === "loading" ? (
+              {townCenter ? (
+                <Pending>場所を直すと出ます</Pending>
+              ) : building.status === "loading" ? (
                 <Pending />
               ) : building.status === "none" ? (
                 <Pending>データなし</Pending>
@@ -129,10 +149,10 @@ export function BasicTab({ result, data, go, open, expand, mapApps }: TabProps) 
               )}
             </InfoRow>
             <InfoRow icon={<TrainFront {...ICON} />} label="最寄り駅" onClick={() => open("stations")}>
-              {stations.status === "loading" ? <Pending /> : st ? `${st.name}駅 ${st.routed ? `徒歩${st.minutes}分` : metersText(st.straight)}` : <Pending>近くに駅なし</Pending>}
+              {stations.status === "loading" ? <Pending /> : st ? `${st.name}駅 ${st.routed ? `徒歩${st.minutes}分` : metersText(st.straight)}` : stations.status === "error" ? <Pending>読み込めず</Pending> : <Pending>近くに駅なし</Pending>}
             </InfoRow>
             <InfoRow icon={<School {...ICON} />} label="小学校区" onClick={schools.status === "ok" ? () => open("schools") : undefined}>
-              {schools.status === "loading" ? <Pending /> : school ? schoolShort(school.name) : <Pending>データなし</Pending>}
+              {schools.status === "loading" ? <Pending /> : school ? schoolShort(school.name) : schools.status === "error" ? <Pending>読み込めず</Pending> : <Pending>データなし</Pending>}
             </InfoRow>
             <InfoRow icon={<Landmark {...ICON} />} label="都市計画">
               {z ? (z.senbiki ?? (z.tokei ? "都市計画区域" : z.jyuntoshi ? "準都市計画区域" : "都市計画区域外")) : zPending}
@@ -299,6 +319,8 @@ function Facilities({ data }: { data: TabProps["data"] }) {
     if (p) list.push({ key: `p${k}`, name: p.name, meters: wayMeters(p), walk: walkLabel(p), kind: k, at: p.at });
   }
   const loading = stations.status === "loading" || around.status === "loading";
+  // 読み込めなかった枠は「データなし」と言わない
+  const failed = around.status === "error" || stations.status === "error";
   return (
     <div className="mt-[7.5px] grid grid-cols-5 gap-[6.6px]">
       {list.slice(0, 5).map((f) => {
@@ -324,7 +346,7 @@ function Facilities({ data }: { data: TabProps["data"] }) {
       {list.length < 5 &&
         Array.from({ length: 5 - list.length }, (_, i) => (
           <div key={`empty${i}`} className="flex items-center justify-center rounded-[7px] bg-[#f7f9fd] text-center leading-[1.4]" style={{ height: 70, fontSize: 6, color: "#8a95a6" }}>
-            {loading ? "確認中…" : "データなし"}
+            {loading ? "確認中…" : failed ? "読み込めず" : "データなし"}
           </div>
         ))}
     </div>

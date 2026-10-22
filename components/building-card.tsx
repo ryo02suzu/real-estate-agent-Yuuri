@@ -19,7 +19,8 @@ export type BuildingState = { status: "none" } | { status: "loading" } | { statu
 
 /** 地点の建物を読む。筆（地番）が分かるのを待ち、筆の中にある建物を先に選ぶ。PLATEAU の無い市区町村は none */
 export function useBuilding(result: Ok, parcels: ParcelInfo): BuildingState {
-  const covered = buildingsCover(result.municipality.codes);
+  // 番地まで見つからず町の中心を出しているときは、そこにある建物は物件と関係ないので読まない
+  const covered = buildingsCover(result.municipality.codes) && !(result.approximate && !result.picked && !result.parcel);
   const parcel = parcels.status === "ok" ? parcels.parcel : undefined;
   const ready = parcels.status !== "loading";
   const key = `${result.lat},${result.lng},${parcel ? `${parcel.kuiki}|${parcel.chibanRaw}` : ""}`;

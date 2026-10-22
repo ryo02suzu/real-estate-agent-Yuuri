@@ -9,7 +9,7 @@ import { withRetry } from "@/lib/retry";
 import type { LookupResult } from "@/lib/roadmap";
 import type { ChibanzuLink } from "@/lib/roadmap/chibanzu";
 import { KOZU_DATA } from "@/lib/roadmap/kozu-data";
-import { adjacentParcels, chibanLabel, kuikiLabel, parcelAt, parcelMark, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
+import { adjacentParcels, chibanLabel, hasPieceMark, kuikiLabel, parcelAt, parcelMark, registryChiban, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
 import { SANKO_CITIES, sankoSource } from "@/lib/roadmap/sanko-data";
@@ -27,15 +27,21 @@ export type ParcelKind = "chiban" | "picked" | "address";
 
 export type ParcelInfo =
   | { status: "loading" }
-  | { status: "none" }
+  /** 筆が無い。approximate は番地まで見つからず町の中心の地点なので、筆を探さなかった */
+  | { status: "none"; approximate?: boolean }
+  /** 地図データを読めなかった（通信の失敗など） */
+  | { status: "error" }
   | { status: "ok"; parcel: Parcel; kind: ParcelKind; neighbors: Neighbor[] };
 
 /** 物件の筆と隣の筆を読む（筆が分かっていればそれを、無ければ地点の筆を探す） */
 export function useParcelInfo(result: Ok): ParcelInfo {
   const { lat, lng, parcel, picked } = result;
+  // 番地まで見つからず町の中心を出しているときは、そこにある筆は物件と関係ないので探さない
+  const townCenter = !parcel && !picked && !!result.approximate;
   const key = `${lat},${lng},${parcel ? `${parcel.kuiki}|${parcel.chibanRaw}` : ""}`;
   const [state, setState] = useState<{ key: string; value: ParcelInfo }>();
   useEffect(() => {
+    if (townCenter) return;
     let alive = true;
     withRetry(async () => {
       const p = parcel ?? (await parcelAt(lat, lng, pmtilesParcelSource));
@@ -44,23 +50,55 @@ export function useParcelInfo(result: Ok): ParcelInfo {
       const neighbors = await adjacentParcels(p, pmtilesParcelSource);
       return { status: "ok", parcel: p, kind, neighbors } as const;
     })
-      .catch(() => ({ status: "none" }) as const)
+      .catch(() => ({ status: "error" }) as const)
       .then((value) => alive && setState({ key, value }));
     return () => {
       alive = false;
     };
     // key に地点と筆が入っている
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, townCenter]);
+  if (townCenter) return { status: "none", approximate: true };
   return state?.key === key ? state.value : { status: "loading" };
 }
 
-/** 謄本・公図の請求に貼れる「所在 地番」（物件の筆と隣の筆。地番の無い道路・水路は除く） */
+/**
+ * 隣の筆（地番のあるもの）を、登記の地番でまとめる。物件と同じ地番（地図データで分かれた区画「51-3W1」など）と、
+ * 同じ地番の区画の重なりは1つにする
+ */
+export function registryNeighbors(info: Extract<ParcelInfo, { status: "ok" }>): Neighbor[] {
+  const self = `${info.parcel.kuiki}|${registryChiban(info.parcel.chibanRaw)}`;
+  const seen = new Set([self]);
+  const out: Neighbor[] = [];
+  for (const n of info.neighbors) {
+    if (!/^\d/.test(n.chiban)) continue;
+    const key = `${n.kuiki}|${registryChiban(n.chiban)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ ...n, chiban: registryChiban(n.chiban) });
+  }
+  return out;
+}
+
+/** 隣地がこれより多い筆は、道路など細長い土地か大きな土地とみなす（ふつうの宅地の隣地は多くても20筆ほど） */
+export const ROADLIKE_NEIGHBORS = 30;
+
+/**
+ * 住所の地点の筆が、物件の土地ではなさそうか（住所の点は建物の入口や道路の側に置かれていることがある）：
+ * 道路・水路（地番なし）か、隣地がとても多い筆（地番の付いた公道など）
+ */
+export function addressOffLot(info: ParcelInfo): "道路" | "水路" | "large" | undefined {
+  if (info.status !== "ok" || info.kind !== "address") return undefined;
+  if (/^道/.test(info.parcel.chibanRaw)) return "道路";
+  if (/^水/.test(info.parcel.chibanRaw)) return "水路";
+  return registryNeighbors(info).length >= ROADLIKE_NEIGHBORS ? "large" : undefined;
+}
+
+/** 謄本・公図の請求に貼れる「所在 地番」（物件の筆と隣の筆。地番の無い道路・水路は除く。地番は登記の地番） */
 export function parcelLines(info: Extract<ParcelInfo, { status: "ok" }>): { target?: string; neighbors: string[] } {
-  const line = (r: { kuiki: string; chiban: string }) => `${kuikiLabel(r.kuiki)} ${r.chiban}`;
-  const numbered = (r: { chiban: string }) => /^\d/.test(r.chiban);
+  const line = (r: { kuiki: string; chiban: string }) => `${kuikiLabel(r.kuiki)} ${registryChiban(r.chiban)}`;
   const target = { kuiki: info.parcel.kuiki, chiban: info.parcel.chibanRaw };
-  return { target: numbered(target) ? line(target) : undefined, neighbors: info.neighbors.filter(numbered).map(line) };
+  return { target: /^\d/.test(target.chiban) ? line(target) : undefined, neighbors: registryNeighbors(info).map(line) };
 }
 
 /**
@@ -87,7 +125,7 @@ export function ParcelButton({
   tile?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  if (info.status === "none") {
+  if (info.status === "none" || info.status === "error") {
     // 登記所の地図データに筆が無い地点：市町村の地番図があれば、それを直接開く
     if (!chibanzu) return null;
     if (tile) return <Fact icon={<ParcelIcon className="h-3.5 w-3.5" />} label="地番" href={chibanzu.url} value="市町村の地番図" />;
@@ -155,7 +193,7 @@ export function ParcelButton({
 /** 要点のマスの値：「3556-1（参考）」、地番の無い道路などは「隣地 12筆」 */
 function TileChiban({ info }: { info: Extract<ParcelInfo, { status: "ok" }> }) {
   const p = info.parcel;
-  if (!/^\d/.test(p.chibanRaw)) return <>隣地 {info.neighbors.filter((n) => /^\d/.test(n.chiban)).length}筆</>;
+  if (!/^\d/.test(p.chibanRaw)) return <>隣地 {registryNeighbors(info).length}筆</>;
   return (
     <>
       <span className="shrink-0 whitespace-nowrap">{chibanLabel(p.chibanRaw)}</span>
@@ -166,7 +204,7 @@ function TileChiban({ info }: { info: Extract<ParcelInfo, { status: "ok" }> }) {
 
 /** PC：地図の左のパネルのカード */
 export function ParcelCard({ info, chibanzu }: { info: ParcelInfo; chibanzu?: ChibanzuLink }) {
-  if (info.status === "none" && !chibanzu) return null;
+  if (info.status === "none" && !info.approximate && !chibanzu) return null;
   return (
     <section className="shadow-soft rounded-2xl border border-white bg-white p-4">
       <h3 className="mb-2 flex items-center gap-1.5 text-[14.5px] font-semibold text-ink">
@@ -175,10 +213,14 @@ export function ParcelCard({ info, chibanzu }: { info: ParcelInfo; chibanzu?: Ch
       </h3>
       {info.status === "loading" ? (
         <p className="text-[12px] text-muted">筆を確認しています…</p>
+      ) : info.status === "error" ? (
+        <p className="text-[12px] leading-[1.6] text-muted">地番の地図データを読み込めませんでした。時間をおいて調べ直してください。</p>
       ) : info.status === "none" ? (
         <>
-          <p className="mb-2 text-[12px] leading-[1.6] text-muted">この地点の筆は、登記所の地図データにありません。</p>
-          <ChibanzuButton link={chibanzu!} />
+          <p className="mb-2 text-[12px] leading-[1.6] text-muted">
+            {info.approximate ? "番地まで見つからず町の中心を表示しているため、筆は出しません。地図で物件の場所を選ぶと出ます。" : "この地点の筆は、登記所の地図データにありません。"}
+          </p>
+          {chibanzu && <ChibanzuButton link={chibanzu} />}
         </>
       ) : (
         <ParcelDetail info={info} chibanzu={chibanzu} />
@@ -217,7 +259,7 @@ const KIND_LABEL: Record<ParcelKind, string> = {
 
 export function ParcelDetail({ info, chibanzu }: { info: Extract<ParcelInfo, { status: "ok" }>; chibanzu?: ChibanzuLink }) {
   const { parcel, kind, neighbors } = info;
-  const numbered = neighbors.filter((n) => /^\d/.test(n.chiban));
+  const numbered = registryNeighbors(info);
   const roads = [...new Set(neighbors.filter((n) => !/^\d/.test(n.chiban)).map((n) => chibanLabel(n.chiban)))];
   const { target, neighbors: near } = parcelLines(info);
   const lines = [...(target ? [target] : []), ...near];
@@ -230,6 +272,19 @@ export function ParcelDetail({ info, chibanzu }: { info: Extract<ParcelInfo, { s
         {parcel.sanko && `・${SANKO_CITIES[parcel.sanko]?.name ?? "市町村"}の地番参考図`}
       </p>
       <Row kuiki={parcel.kuiki} chiban={parcel.chibanRaw} strong />
+      {addressOffLot(info) === "large" && (
+        <p className="mt-0.5 text-[12px] leading-[1.55] text-[#8a4f3a] dense:leading-[1.45] denser:text-[11.5px]">
+          隣地が{numbered.length}筆あり、道路など細長い土地か大きな土地の可能性があります。物件の土地かどうかは、公図で確かめてください。
+        </p>
+      )}
+      {hasPieceMark(parcel.chibanRaw) && (
+        <p className="mt-0.5 text-[12px] leading-[1.55] text-[#8a4f3a] dense:leading-[1.45] denser:text-[11.5px]">
+          {parcel.chibanRaws
+            ? `地図データでは、この筆が${parcel.chibanRaws.length}つの区画（「${parcel.chibanRaws.join("」「")}」）に分かれています。区画を合わせて1筆として出しています。`
+            : `地図データの地番は「${parcel.chibanRaw}」です。`}
+          登記の地番には「{parcel.chibanRaw.slice(registryChiban(parcel.chibanRaw).length)}」のような印は付かないので、「{registryChiban(parcel.chibanRaw)}」で確かめてください。
+        </p>
+      )}
       {parcel.estimated && (
         <p className="mt-0.5 text-[12px] leading-[1.55] text-[#8a4f3a] dense:leading-[1.45] denser:text-[11.5px]">
           {parcel.estimated === "low"
@@ -298,7 +353,7 @@ function Row({ kuiki, chiban, strong, hideTown }: { kuiki: string; chiban: strin
       </span>
       {/* 地番の無い道路・水路は請求できないのでコピーを出さない */}
       {/^\d/.test(chiban) && (
-        <button onClick={() => copy(`${kuikiLabel(kuiki)} ${chiban}`)} className="flex shrink-0 items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[12px] text-brand">
+        <button onClick={() => copy(`${kuikiLabel(kuiki)} ${registryChiban(chiban)}`)} className="flex shrink-0 items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[12px] text-brand">
           <CopyIcon className="h-3 w-3" />
           {done ? "コピー済" : "コピー"}
         </button>

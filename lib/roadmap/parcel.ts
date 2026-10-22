@@ -45,6 +45,8 @@ export type Parcel = {
   chiban: string;
   /** データのままの地番（地図の絞り込みに使う） */
   chibanRaw: string;
+  /** 地番の後ろに印のある筆（二重地番など）で、同じ筆として合わせた区画の、データのままの地番（「51-3W1」「51-3W2」） */
+  chibanRaws?: string[];
   pieces: ParcelPiece[];
   /** 筆の中の代表点（物件の場所として使う） */
   point: { lat: number; lng: number };
@@ -79,6 +81,19 @@ export function splitChiban(input: string): { body: string; chiban: string; expl
   // 前にも番号が続く（「1-2-3」「1丁目2番3」）のは住居表示
   if (!body || new RegExp(`(\\d|${DASH}|番)$`).test(body)) return null;
   return { body, chiban: m[3] ? `${m[2]}-${m[3]}` : m[2], explicit };
+}
+
+/**
+ * 住所として調べた文字を、地番で探す文字にする（住所の地点が道路・水路の上だったときの探し直し）。番地が地番の地域では
+ * 「古ヶ崎4-3556-1」は「四丁目3556番1」なので、町に丁目があって（chome）丁目と書いていなければ、町の名前のすぐ後ろの番号を
+ * 丁目にする。作れなければ undefined
+ */
+export function chibanQueryOf(query: string, chome: boolean): string | undefined {
+  const q = query.normalize("NFKC").replace(/\s+/g, " ").trim();
+  if (!q || /地番/.test(q)) return undefined;
+  const m = chome && !/丁目/.test(q) ? q.match(new RegExp(`^(.*[^\\d${DASH.slice(1, -1)}])(\\d+)${DASH}(\\d+(?:${DASH}\\d+)?)$`)) : null;
+  const out = m ? `地番 ${m[1]}${m[2]}丁目${m[3]}` : `地番 ${q}`;
+  return splitChiban(out) ? out : undefined;
 }
 
 /** 地番をそろえる（「391番3」「391の3」「３９１－３」→「391-3」） */
@@ -174,6 +189,8 @@ export async function searchParcel(
   const seen = new Set<string>();
   const hits = new Map<string, ParcelPiece[]>();
   const raw = new Map<string, string>();
+  // 地番区域ごとの、合わせた区画のデータのままの地番（二重地番の「51-3W1」「51-3W2」など）
+  const raws = new Map<string, Set<string>>();
   const estimated = new Map<string, Estimated>();
   const sanko = new Map<string, string>();
   const rank = new Map<string, number>();
@@ -191,7 +208,8 @@ export async function searchParcel(
       for (const f of got[i] ?? []) {
         if (kuikiParts(f.kuiki).town !== town) continue;
         townSeen = true;
-        const c = normalizeChiban(f.chiban);
+        // 地図データの「51-3W2」（同じ地番の土地の分かれた区画）も「51-3」として探す
+        const c = registryChiban(normalizeChiban(f.chiban));
         if (c === want) {
           // 同じ筆が別のデータにもあれば（法務省の地図データ → 地番参考図 → 推定の位置の順に使う）、形を混ぜない
           const r = sourceRank(f);
@@ -199,12 +217,14 @@ export async function searchParcel(
           if (had !== undefined && had < r) continue;
           if (had !== undefined && had > r) {
             hits.delete(f.kuiki);
+            raws.delete(f.kuiki);
             estimated.delete(f.kuiki);
             sanko.delete(f.kuiki);
           }
           rank.set(f.kuiki, r);
           hits.set(f.kuiki, [...(hits.get(f.kuiki) ?? []), { polygons: f.polygons(), tile: [x, y] }]);
           raw.set(f.kuiki, f.chiban);
+          raws.set(f.kuiki, (raws.get(f.kuiki) ?? new Set<string>()).add(f.chiban));
           if (f.estimated) estimated.set(f.kuiki, f.estimated);
           if (f.sanko) sanko.set(f.kuiki, f.sanko);
           continue;
@@ -246,9 +266,10 @@ export async function searchParcel(
       tileDist(pa, sx, sy) - tileDist(pb, sx, sy),
   );
   const [kuiki, pieces] = ranked[0];
-  // 筆がタイルの端にかかっていれば、隣のタイルの続きも集める
+  // 筆がタイルの端にかかっていれば、隣のタイルの続きも集める。地番の後ろに印のある筆（二重地番など）は、まわりのタイルの同じ筆の区画も
   for (let round = 0; round < 3; round++) {
-    const more = neighborsToComplete(pieces).filter(([x, y]) => !seen.has(`${x},${y}`));
+    const marked = [...raws.get(kuiki)!].some(hasPieceMark);
+    const more = [...neighborsToComplete(pieces), ...(marked ? aroundTiles(pieces) : [])].filter(([x, y]) => !seen.has(`${x},${y}`));
     if (!more.length) break;
     const before = hits.get(kuiki)!.length;
     await visit(more);
@@ -260,6 +281,7 @@ export async function searchParcel(
       kuiki,
       chiban: want,
       chibanRaw: raw.get(kuiki)!,
+      ...(raws.get(kuiki)!.size > 1 ? { chibanRaws: [...raws.get(kuiki)!].sort(byPieceMark) } : {}),
       pieces,
       point: interiorPoint(pieces),
       ...(estimated.has(kuiki) ? { estimated: estimated.get(kuiki) } : {}),
@@ -289,10 +311,12 @@ export async function parcelAt(lat: number, lng: number, source: ParcelSource): 
   const pieces: ParcelPiece[] = [{ polygons, tile: [x, y] }];
   for (const [nx, ny] of neighborsToComplete(pieces))
     for (const g of (await source.tile(nx, ny)) ?? []) if (g.kuiki === f.kuiki && g.chiban === f.chiban) pieces.push({ polygons: g.polygons(), tile: [nx, ny] });
+  const raws = hasPieceMark(f.chiban) ? await addSiblings(f, pieces, source) : [];
   return {
     kuiki: f.kuiki,
     chiban: normalizeChiban(f.chiban),
     chibanRaw: f.chiban,
+    ...(raws.length > 1 ? { chibanRaws: raws } : {}),
     pieces,
     point: { lat, lng },
     ...(f.estimated ? { estimated: f.estimated } : {}),
@@ -301,13 +325,83 @@ export async function parcelAt(lat: number, lng: number, source: ParcelSource): 
   };
 }
 
+/**
+ * 地番の後ろに印のある筆（W・V・X）に、同じ筆の区画を足す（筆のまわりのタイルの中）。二重地番（W）は、つながっている区画だけ
+ * （離れた所の同じ地番は別の土地のことがある）。めがね地番（V）・分属管理地番（X）は同じ地番の区画すべて。合わせた区画の地図データの地番を返す
+ */
+async function addSiblings(f: ParcelFeature, pieces: ParcelPiece[], source: ParcelSource): Promise<string[]> {
+  const same = (g: ParcelFeature) => g.kuiki === f.kuiki && registryChiban(g.chiban) === registryChiban(f.chiban) && sourceRank(g) === sourceRank(f);
+  const read = new Set<string>();
+  const cand = new Map<string, ParcelPiece[]>();
+  const gather = async (tiles: [number, number][]) => {
+    for (const [x, y] of tiles) {
+      if (read.has(`${x},${y}`)) continue;
+      read.add(`${x},${y}`);
+      for (const g of (await source.tile(x, y)) ?? []) if (g.chiban !== f.chiban && same(g)) cand.set(g.chiban, [...(cand.get(g.chiban) ?? []), { polygons: g.polygons(), tile: [x, y] }]);
+    }
+  };
+  await gather(aroundTiles(pieces));
+  const lat0 = pieces[0].polygons[0]?.[0]?.[0]?.[1] ?? 35;
+  const rings = (ps: ParcelPiece[]) => ps.flatMap((p) => p.polygons.flat());
+  const linked = /W\d+$/.test(f.chiban);
+  const raws = [f.chiban];
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const [raw, ps] of cand) {
+      if (linked && !ringsWithin(rings(ps), rings(pieces), 0.5, lat0)) continue;
+      pieces.push(...ps);
+      raws.push(raw);
+      cand.delete(raw);
+      grew = true;
+      // 足した区画が、まだ読んでいないタイルへ続いていれば読む
+      await gather(neighborsToComplete(ps));
+      const more = cand.get(raw);
+      if (more) {
+        pieces.push(...more);
+        cand.delete(raw);
+      }
+    }
+  }
+  return raws.sort(byPieceMark);
+}
+
+/** 同じ地番の区画の並び（「51-3W1」「51-3W2」…「51-3W10」） */
+const byPieceMark = (a: string, b: string) => a.localeCompare(b, "ja", { numeric: true });
+
 /** 画面での地番の呼び方。道路・水路など地番の無い所は「道路（地番なし）」など */
 export function chibanLabel(chiban: string): string {
   if (/^道/.test(chiban)) return "道路（地番なし）";
   if (/^水/.test(chiban)) return "水路（地番なし）";
   if (/^筆界未定/.test(chiban)) return "筆界未定地";
   if (/^無地番/.test(chiban)) return "無地番の土地";
-  return `地番 ${chiban}`;
+  return `地番 ${registryChiban(chiban)}`;
+}
+
+/**
+ * 地図XML（法務省）で地番の後ろに付く印。二重地番「51-3W1」（同じ地番が地図に2つ以上ある。合筆や図面の分け方で1つの土地が
+ * 分かれて描かれたものが多い）・めがね地番「100V1」（離れた土地を1筆として扱う）・分属管理地番「100X(1/2)」（1つの土地が
+ * 図郭で分かれている）
+ */
+const PIECE_MARK = /(?:W\d+|V\d+|X\(\d+\/\d+\))$/;
+
+/**
+ * 登記の地番。地図データの地番の後ろの印（W・V・X）は登記の地番には付かないので外す
+ * （謄本の請求・画面・コピーはこちら。地図の上で筆を選ぶときは元の地番のまま）
+ */
+export function registryChiban(chiban: string): string {
+  return chiban.replace(PIECE_MARK, "");
+}
+
+/** 地図データの地番に、登記の地番には無い印（W・V・X）が付いているか */
+export const hasPieceMark = (chiban: string) => PIECE_MARK.test(chiban);
+
+/** 下書き・コピー・印刷に並べる隣地の数（道路や大きな筆は、まわりの何十筆にも接する） */
+export const NEIGHBOR_LIST_MAX = 20;
+
+/** 隣地の地番を「、」でつなぐ。多いときは先頭の max 筆と「ほかN筆」 */
+export function neighborList(neighbors: string[], max = NEIGHBOR_LIST_MAX): string {
+  if (neighbors.length <= max) return neighbors.join("、");
+  return `${neighbors.slice(0, max).join("、")}、ほか${neighbors.length - max}筆（公図で確認）`;
 }
 
 /** 公図から推定した位置の筆に添える印 */
@@ -339,6 +433,13 @@ function compareChiban(a: string, b: string): number {
 }
 
 const tileDist = (pieces: ParcelPiece[], sx: number, sy: number) => Math.min(...pieces.map(({ tile: [x, y] }) => (x - sx) ** 2 + (y - sy) ** 2));
+
+/** 筆のあるタイルと、そのまわり8枚 */
+function aroundTiles(pieces: ParcelPiece[]): [number, number][] {
+  const out = new Map<string, [number, number]>();
+  for (const { tile: [x, y] } of pieces) for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) out.set(`${x + dx},${y + dy}`, [x + dx, y + dy]);
+  return [...out.values()];
+}
 
 /** 筆の形がタイルの外（のりしろ）にはみ出している方向の、隣のタイル */
 function neighborsToComplete(pieces: ParcelPiece[]): [number, number][] {
@@ -409,7 +510,8 @@ export async function adjacentParcels(target: Parcel, source: ParcelSource, tole
   const pad = [toleranceM / (111_320 * Math.cos((lat0 * Math.PI) / 180)), toleranceM / 110_950];
   const tb = bboxOf(rings);
   const near = (b: [number, number, number, number]) => b[0] <= tb[2] + pad[0] && b[2] >= tb[0] - pad[0] && b[1] <= tb[3] + pad[1] && b[3] >= tb[1] - pad[1];
-  const seen = new Set([`${target.kuiki}|${target.chibanRaw}`]);
+  // 物件の筆（二重地番などで分かれた区画も）は隣地に入れない
+  const seen = new Set((target.chibanRaws ?? [target.chibanRaw]).map((c) => `${target.kuiki}|${c}`));
   const out: Neighbor[] = [];
   const tiles = new Map(target.pieces.map((p) => [p.tile.join(","), p.tile]));
   for (const [x, y] of tiles.values()) {

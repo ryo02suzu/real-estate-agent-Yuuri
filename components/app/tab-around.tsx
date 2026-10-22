@@ -5,6 +5,7 @@
 import { Baby, Car, ChevronRight, Cross, FileText, MapPin, ShieldCheck, ShoppingCart, SquareArrowOutUpRight, Store, Utensils, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { livingScores, totalComment, totalScore, type ScoreKey } from "@/lib/app/scores";
+import { HOSPITAL_SOURCE } from "@/lib/roadmap/facilities";
 import type { PoiWalk } from "@/lib/roadmap/poi";
 import { lineLabel } from "@/lib/roadmap/walk";
 import { schoolShort } from "@/lib/roadmap/school";
@@ -267,7 +268,7 @@ export function AroundTab({ result, data, open, expand, mapApps }: TabProps) {
         </div>
       </div>
       <p className="mt-[4px] leading-[1.5]" style={{ fontSize: 5.6, color: "#8a95a6" }}>
-        施設：© OpenStreetMap contributors（ODbL）・駅：国土数値情報・学区：国土数値情報。徒歩は道路距離80mを1分とした目安です。
+        施設：© OpenStreetMap contributors（ODbL）・{HOSPITAL_SOURCE ? "病院・" : ""}駅・学区：国土数値情報。徒歩は道路距離80mを1分とした目安です。
       </p>
     </div>
   );

@@ -48,8 +48,10 @@ const COVER_LONG: Record<string, string> = {
 };
 
 function Row({ Icon, icon, label, value, sub, onClick, line = true }: { Icon?: LucideIcon; icon?: ReactNode; label: string; value: ReactNode; sub?: ReactNode; onClick?: () => void; line?: boolean }) {
+  // 押しても何も開かない行はボタンにしない（読み上げで「ボタン」と言わない）
+  const Tag = onClick ? "button" : "div";
   return (
-    <button onClick={onClick} disabled={!onClick} className={`flex w-full items-start py-[5.2px] text-left ${line ? "border-b-[0.6px] border-[#eef2f6]" : ""} ${onClick ? "active:bg-[#f7f9fd]" : ""}`}>
+    <Tag onClick={onClick} className={`flex w-full items-start py-[5.2px] text-left ${line ? "border-b-[0.6px] border-[#eef2f6]" : ""} ${onClick ? "active:bg-[#f7f9fd]" : ""}`}>
       <span className="flex w-[25.9px] shrink-0 justify-start pt-[1px]">{icon ?? (Icon && <Icon size={12} strokeWidth={1.3} absoluteStrokeWidth color={ICON} />)}</span>
       <span className="w-[52.7px] shrink-0 pt-[1.5px] leading-[1.3]" style={{ fontSize: 6.9, color: LABEL }}>
         {label}
@@ -65,7 +67,7 @@ function Row({ Icon, icon, label, value, sub, onClick, line = true }: { Icon?: L
         )}
       </span>
       {onClick && <ChevronRight size={7.5} strokeWidth={1.15} absoluteStrokeWidth color="#1d2b48" className="mt-[2px] shrink-0" />}
-    </button>
+    </Tag>
   );
 }
 

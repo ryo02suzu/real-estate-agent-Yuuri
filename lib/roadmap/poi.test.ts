@@ -5,7 +5,8 @@ import { buildDraft, draftText } from "../draft";
 import { buildSummary } from "../summary";
 import { buildLinks, findMunicipality } from "./index";
 import type { LngLat } from "./parcel";
-import { nearbyPois, nearestPois, poiCredit, poiLine, poiWalkText, POI_EXTRA, POI_KINDS, POI_ORDER, POI_ZOOM, type Poi, type PoiSource, type PoiWalk } from "./poi";
+import { HOSPITAL_SOURCE } from "./facilities";
+import { nearbyPois, nearestPois, poiCredit, poiLine, poiWalkText, POI_EXTRA, POI_KINDS, POI_ORDER, POI_SOURCES, POI_ZOOM, type Poi, type PoiSource, type PoiWalk } from "./poi";
 import SRC from "./data/poi-source.json";
 import { decodePoiTile, poiTileSource } from "./poi-tiles";
 import { ROAD_CREDIT } from "./walk";
@@ -195,7 +196,9 @@ describe("周辺施設を下書き・共有に書く", () => {
     expect(env.rows.filter((r) => r.check)).toHaveLength(1);
     const credits = draft.find((s) => s.title === "出典")!.rows.map((r) => r.value);
     expect(credits).toContain(poiCredit(true));
-    expect(poiCredit(true)).toBe(`周辺施設：© OpenStreetMap contributors（ODbL）を加工して作成。${ROAD_CREDIT}`);
+    expect(poiCredit(true)).toBe(`周辺施設：${POI_SOURCES}を加工して作成。${ROAD_CREDIT}`);
+    // 病院を国のデータにしていれば、その出典も
+    expect(POI_SOURCES).toBe(HOSPITAL_SOURCE ? `© OpenStreetMap contributors（ODbL）・病院は${HOSPITAL_SOURCE}` : "© OpenStreetMap contributors（ODbL）");
     expect(draftText(draft)).toContain("■周辺環境（販売図面の生活環境・参考）\nスーパー：〇〇ストア 菊名店 徒歩約6分（約450m）");
   });
 
@@ -211,7 +214,7 @@ describe("周辺施設を下書き・共有に書く", () => {
   it("共有の文に施設の一覧と出典・注意を入れる。施設が無ければ何も足さない", () => {
     const text = buildSummary(result, { pois });
     expect(text).toContain("【周辺施設（徒歩の目安・道路距離 80m を1分）】\n・スーパー：〇〇ストア 菊名店 徒歩約6分（約450m）\n・公園：大豆戸公園 直線約900m");
-    expect(text).toContain(`※周辺施設は© OpenStreetMap contributors（ODbL）を加工して作成。${ROAD_CREDIT}。`);
+    expect(text).toContain(`※周辺施設は${POI_SOURCES}を加工して作成。${ROAD_CREDIT}。`);
     expect(buildSummary(result, { pois: [] })).not.toContain("周辺施設");
     expect(buildDraft(result, { pois: [] }).some((s) => s.title.startsWith("周辺環境"))).toBe(false);
   });

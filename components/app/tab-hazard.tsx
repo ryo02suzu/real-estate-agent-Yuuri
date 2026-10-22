@@ -8,8 +8,11 @@ import { useState, type ReactNode } from "react";
 import { hazardCards, hazardTotal, type HazardCardInfo, type Tone } from "@/lib/app/hazard-level";
 import { EVAC_KINDS } from "@/lib/roadmap/evac";
 import { groupHazardMaps, HAZARD_MAP_LABELS, HAZARDS, hazardTileUrl, wagamachiUrl } from "@/lib/roadmap/hazard";
+import { LIQ_CREDIT } from "@/lib/roadmap/liquefaction";
+import { REINFOLIB_NOTE } from "@/lib/roadmap/reinfolib";
 import { Gauge, Landslide, Liquefaction, Quake, RainCloud, Runner, WavesFill } from "./icons";
 import { MiniMap, PropertyMap } from "./property-map";
+import { useLiquefaction } from "./use-national";
 import { metersText } from "./shared";
 import type { TabProps } from "./types";
 import { NAVY, SUB, TONE } from "./ui";
@@ -33,8 +36,23 @@ const ICONS: Record<Kind | "ekijo" | "quake" | "evac", ReactNode> = {
 
 const LEVEL_COLOR: Record<string, string> = { out: "#1e9e55", caution: "#c99700", mid: "#f7a20c", high: "#e0452f" };
 
+/** 液状化の発生傾向の区分 → 印の短い言い方と色 */
+const LIQ_CHIP: Record<number, [string, Tone]> = {
+  1: ["非常にしやすい", "high"],
+  2: ["しやすい", "high"],
+  3: ["ややしやすい", "mid"],
+  4: ["ややしにくい", "out"],
+  5: ["しにくい", "out"],
+  6: ["評価対象外", "none"],
+};
+
+/** 避難場所を「近く」と言える道のり（m） */
+const EVAC_NEAR_M = 1000;
+
 export function HazardTab({ result, data, open, expand }: TabProps) {
   const { hazard, evac } = data;
+  const liq = useLiquefaction(result.lat, result.lng);
+  const liqHit = liq.status === "ok" ? liq.value : null;
   const [shown, setShown] = useState<Kind>("flood");
   const ok = hazard.status === "ok" ? hazard : undefined;
   const cards: HazardCardInfo[] = ok
@@ -48,6 +66,10 @@ export function HazardTab({ result, data, open, expand }: TabProps) {
       }));
   const total = ok ? hazardTotal(ok.report) : null;
   const site = evac.status === "ok" ? evac.sites[0] : undefined;
+  const siteM = site ? (site.walk?.meters ?? site.straight) : undefined;
+  // 近い場所がどれも別の市区町村なら、物件の市区町村が指定する場所は、その市区町村の資料で確かめる
+  const muni = result.municipality.name;
+  const otherMuni = evac.status === "ok" && evac.sites.length > 0 && !evac.sites.some((s) => s.address?.includes(muni));
   const ekijo = ok?.ground.find((g) => g.kind === "ekijo");
   const mapH = 4 * CARD_H + 3 * GAP;
   const layers = HAZARDS[shown].layers;
@@ -102,18 +124,22 @@ export function HazardTab({ result, data, open, expand }: TabProps) {
           <HazCard
             icon={ICONS.ekijo}
             title="液状化"
-            chip="地図で確認"
-            tone="map"
-            lines={["国の地図（液状化の発生傾向）を物件の場所で開きます。"]}
+            chip={liqHit ? LIQ_CHIP[liqHit.level]?.[0] ?? liqHit.label : "地図で確認"}
+            tone={liqHit ? LIQ_CHIP[liqHit.level]?.[1] ?? "none" : "map"}
+            lines={liqHit ? [`${liqHit.landform}。地形から見た目安で、揺れの強さは見ていません。`] : ["国の地図（液状化の発生傾向）を物件の場所で開きます。"]}
             href={ekijo?.url ?? `https://disaportal.gsi.go.jp/maps/?ll=${result.lat.toFixed(6)},${result.lng.toFixed(6)}&z=15&base=pale&ls=ekijouka_zenkoku%2C0.8&disp=1&vs=c1j0l0u0t0h0z0`}
           />
           <HazCard icon={ICONS.quake} title="地震" chip="地図で確認" tone="map" lines={["J-SHIS（防災科研）で揺れやすさと30年以内の確率を確認できます。"]} href="https://www.j-shis.bosai.go.jp/map/" />
           <HazCard
             icon={ICONS.evac}
             title="避難場所"
-            chip={evac.status === "loading" ? "確認中" : site ? "近くにあり" : "3km以内になし"}
-            tone={site ? "near" : "none"}
-            lines={site ? [`${site.name}まで${site.walk ? `徒歩約${site.walk.minutes}分（${metersText(site.walk.meters)}）` : `直線${metersText(site.straight)}`}。`] : [evac.status === "error" ? "読み込めませんでした" : "市区町村の防災のページで確認してください。"]}
+            chip={evac.status === "loading" ? "確認中" : evac.status === "error" ? "読み込めず" : site ? (site.walk ? `徒歩${site.walk.minutes}分` : `直線${metersText(site.straight)}`) : "3km以内になし"}
+            tone={siteM !== undefined && siteM <= EVAC_NEAR_M ? "near" : "none"}
+            lines={
+              site
+                ? [`${site.name}まで${site.walk ? `徒歩約${site.walk.minutes}分（${metersText(site.walk.meters)}）` : `直線${metersText(site.straight)}`}。`, otherMuni ? `${muni}の指定は${muni}の防災マップで確認。` : ""]
+                : [evac.status === "error" ? "読み込めませんでした" : "市区町村の防災のページで確認してください。"]
+            }
             onClick={() => open("evac")}
           />
         </div>
@@ -202,6 +228,7 @@ export function HazardTab({ result, data, open, expand }: TabProps) {
       {ok && <CityMaps city={result.municipality.name} maps={ok.maps} muniCd={ok.muniCd} elevation={ok.elevation?.value} />}
       <p className="mt-[4px] leading-[1.5]" style={{ fontSize: 5.6, color: "#8a95a6" }}>
         出典：ハザードマップポータルサイト（国土交通省・国土地理院）・指定緊急避難場所データ（国土地理院）を加工して作成。国のデータを地点の色から読んだ参考値で、重要事項説明には使えません。
+        {liqHit && `液状化の${LIQ_CREDIT}。${REINFOLIB_NOTE}。`}
       </p>
     </div>
   );

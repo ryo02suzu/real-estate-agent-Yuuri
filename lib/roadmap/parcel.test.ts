@@ -11,6 +11,9 @@ import {
   estimatedNote,
   kuikiLabel,
   adjacentParcels,
+  neighborList,
+  registryChiban,
+  chibanQueryOf,
   parcelAt,
   kuikiParts,
   normalizeChiban,
@@ -286,6 +289,32 @@ describe("地点の筆", () => {
     expect(chibanLabel("水-154")).toBe("水路（地番なし）");
     expect(kuikiLabel("川口市_青木_２丁目__")).toBe("川口市青木２丁目");
   });
+
+  it("地図データの「51-3W2」（二重地番）・「100V1」（めがね地番）・「1000X(1/2)」（分属管理地番）は、登記の地番で出す", () => {
+    expect(registryChiban("51-3W2")).toBe("51-3");
+    expect(registryChiban("28-1")).toBe("28-1");
+    expect(chibanLabel("28-1W5")).toBe("地番 28-1");
+    expect(registryChiban("100V1")).toBe("100");
+    expect(registryChiban("1000X(1/2)")).toBe("1000");
+    expect(chibanLabel("123X(3/4)")).toBe("地番 123");
+  });
+
+  it("住所の地点が道路の上だったときの、地番で探し直す文字（町に丁目があれば、すぐ後ろの番号を丁目に）", () => {
+    expect(chibanQueryOf("千葉県松戸市古ヶ崎4-3556-1", true)).toBe("地番 千葉県松戸市古ヶ崎4丁目3556-1");
+    expect(chibanQueryOf("千葉県松戸市古ヶ崎4-3556", true)).toBe("地番 千葉県松戸市古ヶ崎4丁目3556");
+    expect(chibanQueryOf("千葉県松戸市古ヶ崎四丁目3556-1", true)).toBe("地番 千葉県松戸市古ヶ崎四丁目3556-1");
+    expect(chibanQueryOf("埼玉県熊谷市下奈良391-3", false)).toBe("地番 埼玉県熊谷市下奈良391-3");
+    // 丁目の無い町の「1-2-3」は地番にできない。もう地番で探したものはそのまま
+    expect(chibanQueryOf("埼玉県熊谷市下奈良1-391-3", false)).toBeUndefined();
+    expect(chibanQueryOf("地番 熊谷市下奈良391-3", false)).toBeUndefined();
+  });
+
+  it("隣地が多いとき（道路の筆など）は、先頭の20筆と「ほかN筆」", () => {
+    const many = Array.from({ length: 23 }, (_, i) => `青木 ${i + 1}`);
+    expect(neighborList(many.slice(0, 3))).toBe("青木 1、青木 2、青木 3");
+    expect(neighborList(many.slice(0, 20)).split("、")).toHaveLength(20);
+    expect(neighborList(many)).toBe(`${many.slice(0, 20).join("、")}、ほか3筆（公図で確認）`);
+  });
 });
 
 describe("lookup で地番を探す", () => {
@@ -345,6 +374,41 @@ describe("lookup で地番を探す", () => {
     const r = await lookup("埼玉県熊谷市下奈良391番地", { parcels: fakeSource({ [`${SX},${SY}`]: [{ kuiki: "熊谷市_下奈良___", chiban: "391-1" }] }) });
     expect(r.status === "ok" && r.approximate).toBe(true);
     expect(r.status === "ok" && r.parcelMiss).toEqual({ chiban: "391", reason: "not_found", similar: ["391-1"] });
+  });
+});
+
+describe("二重地番（W）などで分かれた区画", () => {
+  const K = "渋谷区_神南_１丁目__";
+  // 51-3 の区画：W1 と W2 は接し、W4 は隣のタイルで W2 に接する。W3 は離れている（別の土地のことがある）
+  const src = () =>
+    fakeSource({
+      [`${SX},${SY}`]: [
+        { kuiki: K, chiban: "51-3W1", polygon: box(SX, SY, 0.4, 0.4, 0.1, 0.1) },
+        { kuiki: K, chiban: "51-3W2", polygon: box(SX, SY, 0.5, 0.4, 0.5, 0.1) },
+        { kuiki: K, chiban: "51-3W3", polygon: box(SX, SY, 0.1, 0.8, 0.1, 0.1) },
+        { kuiki: K, chiban: "52", polygon: box(SX, SY, 0.3, 0.4, 0.1, 0.1) },
+      ],
+      [`${SX + 1},${SY}`]: [
+        { kuiki: K, chiban: "51-3W4", polygon: box(SX + 1, SY, 0, 0.4, 0.2, 0.1) },
+        { kuiki: K, chiban: "60", polygon: box(SX + 1, SY, 0.2, 0.4, 0.1, 0.1) },
+      ],
+    });
+  const [w, s, e, n] = tileBounds(SX, SY);
+
+  it("地点の筆は、つながっている区画を合わせて1筆にする（面積・隣地・地図の強調に使う）", async () => {
+    const source = src();
+    const target = await parcelAt(s + (n - s) * 0.45, w + (e - w) * 0.45, source);
+    expect(target?.chibanRaw).toBe("51-3W1");
+    expect(target?.chibanRaws).toEqual(["51-3W1", "51-3W2", "51-3W4"]);
+    expect(target?.pieces).toHaveLength(3);
+    // 隣地は、合わせた区画のどれかに接する筆（自分の区画は入れない）
+    const got = await adjacentParcels(target!, source);
+    expect(got.map((g) => g.chiban)).toEqual(["52", "60"]);
+  });
+
+  it("地番で探したときも、同じ地番の区画をまとめる", async () => {
+    const r = await searchParcel({ city: "渋谷区", town: "神南一丁目", chiban: "51-3" }, START, src());
+    expect(r.status === "found" && r.parcel.chibanRaws).toEqual(["51-3W1", "51-3W2", "51-3W3", "51-3W4"]);
   });
 });
 

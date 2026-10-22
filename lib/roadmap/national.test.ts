@@ -2,7 +2,7 @@
 // 置き場所（data/reinfolib-source.json）はテスト用に差し替え、ファイル・タイルの中身はテストの中で作る（通信しない）
 import { describe, expect, it, vi } from "vitest";
 import { appraisalFor, methodRows, type AppraisalFile } from "./appraisal";
-import { facilityCounts, nearestFacilities, nearbyFacilities, notForPublic, type Facility } from "./facilities";
+import { facilityCounts, nearestFacilities, nearbyFacilities, notForPublic, withNationalHospitals, type Facility } from "./facilities";
 import { liquefactionAt, liquefactionText } from "./liquefaction";
 import { meshBounds, meshCenter } from "./mesh";
 import type { LngLat, Polygon } from "./parcel";
@@ -238,6 +238,18 @@ describe("医療機関と幼稚園", () => {
       emergency: "総合病院 11分",
       kindergarten: "幼稚園 7分",
     });
+  });
+
+  it("周辺施設（OpenStreetMap）の病院を国のデータの病院にし、名前に「病院」のある診療所の印も外す。国のデータが無ければそのまま", async () => {
+    const near = await nearbyFacilities(...TOKYO, allTiles(list));
+    const osm = [
+      { kind: 4, name: "遠くの病院", at: east(here, 1100), straight: 1100 },
+      { kind: 5, name: "リハビリテーション病院", at: east(here, 400), straight: 400 },
+      { kind: 5, name: "駅前クリニック", at: east(here, 150), straight: 150 },
+      { kind: 1, name: "スーパー", at: east(here, 200), straight: 200 },
+    ];
+    expect(withNationalHospitals(osm, near).map((p) => `${p.kind}:${p.name}`)).toEqual(["5:駅前クリニック", "1:スーパー", "4:総合病院"]);
+    expect(withNationalHospitals(osm, null)).toBe(osm);
   });
 });
 

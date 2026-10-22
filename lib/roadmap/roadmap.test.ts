@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import GSI_CODES from "./data/gsi-muni-codes.json";
-import { MUNICIPALITIES, buildLinks, findMunicipality, lookup, lookupPoint, muniName, resolveContact } from "./index";
+import { GeocoderUnavailable, MUNICIPALITIES, buildLinks, findMunicipality, lookup, lookupPoint, muniName, resolveContact } from "./index";
 
 // 熊谷市役所（宮町二丁目47）の国土地理院の座標
 const KUMAGAYA_CITY_HALL = { lat: 36.147129, lng: 139.38858 };
@@ -291,8 +291,20 @@ describe("lookup", () => {
     );
 
   it("住所が見つからなければ not_found", async () => {
-    stubFetch([], {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        // 住所検索は動いている（県・市なら見つかる）
+        json: async () => (decodeURIComponent(url).includes("東京都千代田区") ? [{ geometry: { coordinates: [139.75, 35.69] }, properties: { title: "東京都千代田区" } }] : []),
+      })),
+    );
     expect(await lookup("存在しない住所")).toEqual({ status: "not_found" });
+  });
+
+  it("住所検索がどの住所にも0件を返すとき（障害など）は、見つからないとは言わない", async () => {
+    stubFetch([], {});
+    await expect(lookup("東京都渋谷区神南1-19-11")).rejects.toBeInstanceOf(GeocoderUnavailable);
   });
 
   it("未対応の市町村なら unsupported", async () => {

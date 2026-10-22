@@ -229,15 +229,18 @@ export function showHazardOnMap(kind: HazardKind) {
   window.dispatchEvent(new CustomEvent<HazardKind>(HAZARD_EVENT, { detail: kind }));
 }
 
+/** 見つけた筆（地番区域と、データのままの地番。二重地番などで区画が分かれていれば、その全部） */
+type HitParcel = { kuiki: string; chibanRaw: string; chibanRaws?: string[] };
+
 /** 地番区域と地番で、ひとつの筆だけに絞る（見つけた筆を強調する）。何も無ければどれにも当たらない条件 */
-export function parcelFilter(p?: { kuiki: string; chibanRaw: string }): FilterSpecification {
+export function parcelFilter(p?: HitParcel): FilterSpecification {
   return p
-    ? ["all", ["==", ["get", "地番区域"], p.kuiki], ["==", ["get", "地番"], p.chibanRaw]]
+    ? ["all", ["==", ["get", "地番区域"], p.kuiki], ["in", ["get", "地番"], ["literal", p.chibanRaws ?? [p.chibanRaw]]]]
     : ["==", ["get", "地番"], "\u0000"];
 }
 
 /** 強調するレイヤ（id）ごとの絞り込み（推定の位置の筆は、参考図のある市町村の筆を除く） */
-export function parcelHitFilter(id: string, p?: { kuiki: string; chibanRaw: string }): FilterSpecification {
+export function parcelHitFilter(id: string, p?: HitParcel): FilterSpecification {
   const f = parcelFilter(p);
   return id.startsWith("kozu") ? withKozuFilter(f)! : f;
 }

@@ -12,7 +12,7 @@ import { GuideMapSheet } from "@/components/guide-map";
 import { Sheet } from "@/components/sheet";
 import { favoriteKey, loadFavorites, removeFavorite, type FavoriteItem } from "@/lib/favorites";
 import { addHistory, clearHistory, loadHistory, type HistoryItem } from "@/lib/history";
-import { lookup, lookupPoint, MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
+import { GeocoderUnavailable, lookup, lookupPoint, MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
 
 type Shown = { query: string; result: LookupResult };
 /** 地図で選んだ地点の URL（?ll=緯度,経度）。小数5桁（約1m） */
@@ -76,8 +76,12 @@ export default function Home() {
       // depth: ホームから何画面進んだか（ロゴで一度にホームへ戻るのに使う）
       if (push) window.history.pushState({ ...window.history.state, depth: historyDepth() + 1 }, "", url);
       window.scrollTo(0, 0);
-    } catch {
-      setError("通信に失敗しました。電波の良い場所でもう一度お試しください。");
+    } catch (e) {
+      setError(
+        e instanceof GeocoderUnavailable
+          ? "住所検索（国土地理院）が今つながりにくくなっています。少し時間をおいてもう一度お試しください。地図で場所を選んで調べることはできます。"
+          : "通信に失敗しました。電波の良い場所でもう一度お試しください。",
+      );
     } finally {
       setLoading(false);
     }

@@ -4,7 +4,8 @@
 // 保育所（福祉施設データ）は、神奈川県・横浜市が保育関係の商用利用・公開を認めていないので入れていない（保育園は OpenStreetMap のまま）
 import type { VectorTileFeature } from "@mapbox/vector-tile";
 import type { LngLat } from "./parcel";
-import { NATIONAL_DATA, NATIONAL_ZOOM, sitePmtiles, tilesAround, type TileSource } from "./reinfolib";
+import type { Poi } from "./poi";
+import { hasNational, NATIONAL_DATA, NATIONAL_ZOOM, sitePmtiles, tilesAround, type TileSource } from "./reinfolib";
 import { routedOk, walkMinutes, walkTo } from "./walk";
 
 /** 施設の種類（タイルの k） */
@@ -94,6 +95,27 @@ export async function nearbyFacilities(lat: number, lng: number, source: TileSou
   return out.sort((a, b) => a.straight - b.straight);
 }
 
+/** 物件のまわりの国のデータの施設。データが無い・読めないときは null（周辺施設は OpenStreetMap のままにする） */
+export function facilitiesNear(lat: number, lng: number, source: TileSource<Facility> = facilitySource): Promise<(Facility & { straight: number })[] | null> {
+  return hasNational("fac") ? nearbyFacilities(lat, lng, source).catch(() => null) : Promise.resolve(null);
+}
+
+/** 周辺施設（lib/roadmap/poi.ts の POI_KINDS）の病院・診療所の番号 */
+const POI_HOSPITAL = 4;
+const POI_CLINIC = 5;
+
+/**
+ * 周辺施設（OpenStreetMap）の病院を、国のデータの病院に置きかえる（近い順）。病院は医療法で病床20以上の医療機関で、国のデータは
+ * 漏れが少ない。OpenStreetMap には近くの病院が載っていないことがあり、病院が診療所の印で載っていることもある
+ * （診療所は名前に「病院」を付けられないので、名前に「病院」のある診療所の印は外す）。国のデータが無ければ（null）そのまま
+ */
+export function withNationalHospitals(pois: (Poi & { straight: number })[], facilities: (Facility & { straight: number })[] | null): (Poi & { straight: number })[] {
+  if (!facilities) return pois;
+  const hospitals = facilities.filter((f) => f.kind === 1 && !offHours(f.name)).map((f) => ({ kind: POI_HOSPITAL, name: f.name, at: f.at, straight: f.straight }));
+  const rest = pois.filter((p) => p.kind !== POI_HOSPITAL && !(p.kind === POI_CLINIC && /病院/.test(p.name)));
+  return [...rest, ...hospitals].sort((a, b) => a.straight - b.straight);
+}
+
 /** 探すもの：施設の種類と、診療科目（「小児科」のある医療機関など） */
 export type FacilityQuery = { key: string; label: string; kinds: number[]; department?: string };
 
@@ -155,6 +177,9 @@ export function facilityCounts(facilities: Facility[]): Record<number, number> {
 }
 
 const years = NATIONAL_DATA.fac as { medicalYear?: number; kinderYear?: number } | undefined;
+
+/** 周辺施設の病院を国のデータにしたときの出典（データが無ければ undefined） */
+export const HOSPITAL_SOURCE = hasNational("fac") ? `国土数値情報（医療機関データ・${years?.medicalYear ?? 2020}年度）` : undefined;
 
 export const FACILITY_CAUTION = `国のデータ（医療機関は${years?.medicalYear ?? 2020}年度、幼稚園は${years?.kinderYear ?? 2023}年度）なので、今も開いているか・診療科目は施設に確かめてください`;
 

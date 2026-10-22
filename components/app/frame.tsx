@@ -203,7 +203,7 @@ const NAV: { key: NavKey; label: string; cx: number; icon: (on: boolean) => Reac
 /** いちばん下のメニュー（ホーム・検索履歴・お気に入り・マイページ） */
 export function BottomNav({ active, onSelect }: { active: NavKey; onSelect: (key: NavKey) => void }) {
   return (
-    <nav aria-label="メニュー" className="shrink-0 overflow-hidden bg-white pb-[max(0px,calc(env(safe-area-inset-bottom)-12px))] shadow-[0_-1px_6px_rgba(16,40,80,0.06)]">
+    <nav aria-label="画面の切り替え" className="shrink-0 overflow-hidden bg-white pb-[max(0px,calc(env(safe-area-inset-bottom)-12px))] shadow-[0_-1px_6px_rgba(16,40,80,0.06)]">
       <div className="relative mx-auto" style={{ width: ART_W, height: 51, zoom: ZOOM }}>
         {NAV.map((n) => {
           const on = n.key === active;

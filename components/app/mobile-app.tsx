@@ -11,18 +11,21 @@ import type { HistoryItem } from "@/lib/history";
 import { MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
 import { BUILDING_DATA } from "@/lib/roadmap/building-data";
 import { LAND_PRICE_DATA } from "@/lib/roadmap/land-price-data";
-import { chibanLabel, kuikiLabel, parcelMark } from "@/lib/roadmap/parcel";
+import { chibanLabel, chibanQueryOf, kuikiLabel, parcelMark, registryChiban } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
+import { HOSPITAL_SOURCE } from "@/lib/roadmap/facilities";
 import { POI_DATA } from "@/lib/roadmap/poi";
 import { SCHOOL_DATA } from "@/lib/roadmap/school-data";
 import { STATION_DATA } from "@/lib/roadmap/walk";
 import { ZONING_DATA } from "@/lib/roadmap/zoning-data";
+import { DEALS_DATA, DEALS_NOTE } from "@/lib/roadmap/deals";
 import { buildSummary } from "@/lib/summary";
 import { DraftSheet } from "../draft-sheet";
 import { FullMap } from "../full-map";
 import { GuideMapSheet } from "../guide-map";
 import { CitiesSheet, HelpSheet, MenuSheet } from "../info-sheets";
 import { LocationPicker } from "../location-picker";
+import { addressOffLot, registryNeighbors } from "../parcel-card";
 import { PrintSheet } from "../print-sheet";
 import { copyText, loaded } from "../result-view";
 import { Sheet } from "../sheet";
@@ -39,7 +42,7 @@ import { HazardTab } from "./tab-hazard";
 import { LawTab } from "./tab-law";
 import { PriceTab } from "./tab-price";
 import type { MapOpen, SheetKind, TabProps } from "./types";
-import { useProperty, type Ok } from "./use-property";
+import { useProperty, type Ok, type PropertyData } from "./use-property";
 import { applyAppZoom } from "./zoom";
 
 type Shown = { query: string; result: LookupResult };
@@ -82,6 +85,7 @@ export function MobileApp(props: MobileAppProps) {
   const [picker, setPicker] = useState<{ start?: { lat: number; lng: number } } | null>(null);
   const [locating, setLocating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const offline = useOffline();
   const scroller = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // 開発中の再マウントで <html> の style が消えたときのため、拡大率をもう一度入れる
@@ -181,6 +185,13 @@ export function MobileApp(props: MobileAppProps) {
             setInput={setInput}
             onSearch={() => {
               setPage("home");
+              // 空のまま押したら、何を入れるかを出して入力欄に戻す
+              if (!input.trim()) {
+                setNotice("住所か地番を入れてください（例：渋谷区神南1-19-11、地番 松戸市古ヶ崎四丁目3556-1）。");
+                inputRef.current?.focus();
+                return;
+              }
+              setNotice(null);
               onSearch();
             }}
             loading={loading}
@@ -203,12 +214,25 @@ export function MobileApp(props: MobileAppProps) {
           {/* 物件の画面は、検索履歴などのページを見ているあいだも残す（戻ったときに読み直さない・タブもそのまま） */}
           {ok && (
             <div hidden={page !== "home"}>
-              <PropertyView key={`${ok.lat},${ok.lng},${ok.matchedAddress}`} result={ok} loading={loading} error={error} favorite={isFav(itemOf(shown!.query, ok))} onFavorite={() => setFavorites(toggleFavorite(itemOf(shown!.query, ok)))} onPick={props.onPickAddress} onPickPoint={onPickPoint} onFix={openMap} scroller={scroller} />
+              <PropertyView
+                key={`${ok.lat},${ok.lng},${ok.matchedAddress}`}
+                query={shown!.query}
+                result={ok}
+                loading={loading}
+                error={error}
+                offline={offline}
+                favorite={isFav(itemOf(shown!.query, ok))}
+                onFavorite={() => setFavorites(toggleFavorite(itemOf(shown!.query, ok)))}
+                onPick={props.onPickAddress}
+                onPickPoint={onPickPoint}
+                onFix={openMap}
+                scroller={scroller}
+              />
             </div>
           )}
           {(!ok || page !== "home") && (
             <SheetFrame>
-              <Banner loading={loading} error={error} notice={notice} onDismiss={() => setNotice(null)} />
+              <Banner loading={loading} error={error ?? (offline ? OFFLINE : null)} notice={notice} onDismiss={() => setNotice(null)} />
               {body}
             </SheetFrame>
           )}
@@ -250,6 +274,25 @@ export function MobileApp(props: MobileAppProps) {
   );
 }
 
+/** 通信できないときの一言 */
+const OFFLINE = "通信できません（オフライン）。電波の良い場所で調べ直してください。読めなかった項目は「読み込めず」と出ます。";
+
+/** 端末が通信できないか（ブラウザの online / offline） */
+function useOffline(): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      addEventListener("online", cb);
+      addEventListener("offline", cb);
+      return () => {
+        removeEventListener("online", cb);
+        removeEventListener("offline", cb);
+      };
+    },
+    () => !navigator.onLine,
+    () => false,
+  );
+}
+
 /** お気に入りに保存する形（検索履歴と同じ。地図で選んだ地点は座標で調べ直す） */
 function itemOf(query: string, r: Ok): HistoryItem {
   return { address: r.picked ? r.matchedAddress : query, city: r.municipality.name, coverage: r.municipality.coverage, at: Date.now(), ...(r.picked ? { ll: [r.lat, r.lng] as [number, number] } : {}) };
@@ -276,9 +319,11 @@ function Banner({ loading, error, notice, onDismiss }: { loading: boolean; error
 
 /** 物件の画面（6つのタブ）。データはここで読む */
 function PropertyView({
+  query,
   result,
   loading,
   error,
+  offline,
   favorite,
   onFavorite,
   onPick,
@@ -286,9 +331,11 @@ function PropertyView({
   onFix,
   scroller,
 }: {
+  query: string;
   result: Ok;
   loading: boolean;
   error: string | null;
+  offline: boolean;
   favorite: boolean;
   onFavorite: () => void;
   onPick: (address: string) => void;
@@ -345,8 +392,8 @@ function PropertyView({
     <>
       <SheetFrame>
         <PropertyHeader title={title} sub={copyText(result)} onCopy={() => addr.copy(copyText(result))} copied={addr.done} favorite={favorite} onFavorite={onFavorite} onShare={share} />
-        <Banner loading={loading} error={error} />
-        <PlaceNote result={result} onPick={onPick} onFix={onFix} />
+        <Banner loading={loading} error={error ?? (offline ? OFFLINE : null)} />
+        <PlaceNote query={query} result={result} data={data} onPick={onPick} onFix={onFix} />
         <div className="mt-[10.5px]">
           <TabBar tab={tab} onTab={changeTab} refEl={tabBar} />
         </div>
@@ -391,10 +438,16 @@ function PropertyView({
 }
 
 /** 物件の場所の確かさ（番地まで一致しない・地番が見つからない・地図で選んだ地点）と、場所を直す */
-function PlaceNote({ result, onPick, onFix }: { result: Ok; onPick: (address: string) => void; onFix: () => void }) {
+function PlaceNote({ query, result, data, onPick, onFix }: { query: string; result: Ok; data: PropertyData; onPick: (address: string) => void; onFix: () => void }) {
   const { approximate, picked, parcel, parcelMiss, parcelOthers } = result;
   let text: ReactNode = null;
   let warn = false;
+  // 住所で調べた地点が、道路・水路の筆か隣地のとても多い筆（地番の付いた公道など）の上。番地が地番の地域なら
+  // （住居表示の「号」まで合った地点でなければ）地番で探し直せるようにする
+  const off = !picked && !parcel && !approximate ? addressOffLot(data.parcels) : undefined;
+  const chibanArea = !/号$/.test(result.matchedAddress);
+  const onRoad = !!off && (off === "large" || chibanArea);
+  const asChiban = chibanArea ? chibanQueryOf(query, /丁目/.test(result.town)) : undefined;
   if (parcelMiss) {
     warn = true;
     text = (
@@ -419,7 +472,23 @@ function PlaceNote({ result, onPick, onFix }: { result: Ok; onPick: (address: st
     );
   } else if (approximate) {
     warn = true;
-    text = "番地が見つからず、町の中心を表示しています。";
+    text = "番地が見つからず、町の中心を表示しています。地番・建物は、場所を直すと出ます。";
+  } else if (onRoad) {
+    warn = true;
+    text = (
+      <>
+        {off === "large" && data.parcels.status === "ok"
+          ? `住所の地点の筆（地番 ${registryChiban(data.parcels.parcel.chibanRaw)}）は隣地が${registryNeighbors(data.parcels).length}筆あり、道路など物件の外の土地の可能性があります。${chibanArea ? "番地が地番の地域なら、地番で探すと土地（筆）が出ます。" : "「場所を直す」で建物の位置を選ぶと、物件の土地の地番・面積が出ます。"}`
+          : `住所の地点が${off}の上です。番地が地番の地域なら、地番で探すと土地（筆）が出ます。`}
+        {asChiban && (
+          <span className="mt-[3px] flex">
+            <button onClick={() => onPick(asChiban)} className="rounded-full bg-white px-[6px] py-[2px] font-bold" style={{ color: "#133664" }}>
+              「{asChiban}」で探す
+            </button>
+          </span>
+        )}
+      </>
+    );
   } else if (parcel && !picked) {
     text = `地番で探した筆です（${kuikiLabel(parcel.kuiki)}）${parcelMark(parcel)}。筆は${PARCEL_DATA.edition}の地図で、分筆などで変わることがあります。${parcelOthers ? `同じ地番の筆がほかに${parcelOthers}件あります。` : ""}`;
   } else if (picked) {
@@ -445,9 +514,10 @@ function SourcesSheet({ open, onClose }: { open: boolean; onClose: () => void })
     ["地番・筆の形", `登記所備付地図データ（法務省）${PARCEL_DATA.edition}・市町村の地番参考図`],
     ["建物", `3D都市モデル PLATEAU（国土交通省）${BUILDING_DATA.edition ?? ""}`],
     ["地価", `地価公示・都道府県地価調査（国土数値情報）${LAND_PRICE_DATA.edition}`],
+    ...(DEALS_DATA.url ? ([["取引事例", `不動産情報ライブラリ（国土交通省）の取引価格・成約価格 ${DEALS_DATA.periods}。${DEALS_NOTE}`]] as [string, string][]) : []),
     ["学区", `小学校区・中学校区（国土数値情報）${SCHOOL_DATA.edition}`],
     ["駅", `鉄道データ（国土数値情報）${STATION_DATA.year}年`],
-    ["周辺施設", `© OpenStreetMap contributors（ODbL）${POI_DATA.date}時点`],
+    ["周辺施設", `© OpenStreetMap contributors（ODbL）${POI_DATA.date}時点${HOSPITAL_SOURCE ? `。病院は${HOSPITAL_SOURCE}` : ""}`],
     ["ハザード", "重ねるハザードマップ（国土交通省・国土地理院）を開くたびに読む"],
     ["避難場所", "指定緊急避難場所データ（国土地理院）を開くたびに読む"],
     ["地図・航空写真・道のり", "地理院タイル・地理院地図Vector（国土地理院）"],

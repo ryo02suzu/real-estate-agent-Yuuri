@@ -12,10 +12,10 @@ import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, HAZARD_TABLE_NOTE, h
 import { changeText, distanceText, kindText, priceText } from "@/lib/roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "@/lib/roadmap/land-price-data";
 import { schoolCredit, schoolLine } from "@/lib/roadmap/school";
-import { POI_SOURCE, poiWalkText } from "@/lib/roadmap/poi";
+import { POI_SOURCES, poiWalkText } from "@/lib/roadmap/poi";
 import { STATION_CREDIT, stationLine } from "@/lib/roadmap/walk";
 import { KOZU_CREDIT } from "@/lib/roadmap/kozu-data";
-import { chibanLabel, estimatedNote, kuikiLabel, parcelMark } from "@/lib/roadmap/parcel";
+import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark } from "@/lib/roadmap/parcel";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
 import { SANKO_NOTE, sankoCredit } from "@/lib/roadmap/sanko-data";
 import { HOUREI_CREDIT, houreiLine, houreiNote } from "@/lib/roadmap/hourei";
@@ -33,7 +33,7 @@ import type { PoiState } from "./poi-card";
 import type { StationState } from "./station-card";
 import { MapPreview } from "./map-preview";
 import type { RoadsState } from "./nearby-roads";
-import { parcelLines, type ParcelInfo } from "./parcel-card";
+import { addressOffLot, parcelLines, type ParcelInfo } from "./parcel-card";
 import type { ZoningState } from "./zoning-card";
 
 type Ok = Extract<LookupResult, { status: "ok" }>;
@@ -329,13 +329,13 @@ function Memo({
           {parcels.status === "ok" && lines ? (
             <>
               <p className="text-[10px] text-[#7a6a55]">
-                {parcels.kind === "address" ? "住所の地点にある筆（参考。住居表示と地番は別）" : "物件の筆"}
+                {addressOffLot(parcels) === "large" ? "住所の地点にある筆（参考。隣地がとても多く、道路など物件の外の土地の可能性）" : parcels.kind === "address" ? "住所の地点にある筆（参考。住居表示と地番は別）" : "物件の筆"}
                 {parcels.parcel.estimated && `・公図から推定した位置（${estimatedNote(parcels.parcel.estimated)}）`}
                 {parcels.parcel.sanko && `・地番参考図（${SANKO_NOTE}）`}
               </p>
               <p className="font-semibold">{lines.target ?? `${kuikiLabel(parcels.parcel.kuiki)} ${chibanLabel(parcels.parcel.chibanRaw)}`}</p>
               <p className="mt-1 text-[10px] text-[#7a6a55]">境界が接している筆（{lines.neighbors.length}）</p>
-              <p className="text-[10.5px]">{lines.neighbors.length ? lines.neighbors.join("、") : "地図データの中には見つかりませんでした"}</p>
+              <p className="text-[10.5px]">{lines.neighbors.length ? neighborList(lines.neighbors) : "地図データの中には見つかりませんでした"}</p>
             </>
           ) : (
             <p className="text-[10.5px] text-[#7a6a55]">
@@ -454,7 +454,7 @@ function Memo({
           {prices.length > 0 && `地価の${LAND_PRICE_CREDIT}（標準地・基準地の価格で、物件の価格ではありません）。`}
           {schools.status === "ok" && `学区の${schoolCredit(schools.schools)}（指定校は教育委員会で確認）。`}
           {walks.length > 0 && `駅の${STATION_CREDIT}（徒歩は道路距離 80m を1分。駅の出入口までではない）。`}
-          {facilities.length > 0 && `周辺施設は${POI_SOURCE}を加工して作成（施設の位置までの目安）。`}
+          {facilities.length > 0 && `周辺施設は${POI_SOURCES}を加工して作成（施設の位置までの目安）。`}
           {(p || parcels.status === "ok") && `筆の${PARCEL_CREDIT}。`}
           {(p?.estimated || (parcels.status === "ok" && parcels.parcel.estimated)) && `${KOZU_CREDIT}。`}
           {sanko && `参考図の筆の${sankoCredit(sanko)}。`}

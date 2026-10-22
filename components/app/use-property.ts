@@ -8,6 +8,7 @@ import type { LookupResult } from "@/lib/roadmap";
 import { withRetry } from "@/lib/retry";
 import { dealCity, dealsInTown, DEALS_DATA, loadDeals, type DealRecord } from "@/lib/roadmap/deals";
 import { browserJsonFetcher, evacSitesNear, type EvacSite } from "@/lib/roadmap/evac";
+import { facilitiesNear, withNationalHospitals } from "@/lib/roadmap/facilities";
 import { nearbyPois, nearestOf, POI_DATA, POI_EXTRA, POI_ORDER, type Poi, type PoiWalk } from "@/lib/roadmap/poi";
 import { pmtilesPoiSource } from "@/lib/roadmap/poi-tiles";
 import { routedOk, walkMinutes, walkTo } from "@/lib/roadmap/walk";
@@ -48,7 +49,9 @@ export function useAround(lat: number, lng: number): AroundState {
     if (!POI_DATA.url) return;
     let alive = true;
     withRetry(async () => {
-      const all = await nearbyPois(lat, lng, pmtilesPoiSource);
+      // 病院は国のデータ（OpenStreetMap には近くの病院が無いことがある）
+      const [pois, facilities] = await Promise.all([nearbyPois(lat, lng, pmtilesPoiSource), facilitiesNear(lat, lng)]);
+      const all = withNationalHospitals(pois, facilities);
       const nearest = await nearestOf(lat, lng, all, [...POI_ORDER, ...POI_EXTRA]);
       const dining = HAS_DINING_DATA ? all.filter((p) => p.kind === 13 && p.straight <= DINING_RADIUS).length : undefined;
       return { status: "ok", nearest, dining, all } as const;

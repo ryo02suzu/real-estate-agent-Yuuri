@@ -9,7 +9,7 @@ import { rosenkaLinks } from "./roadmap/rosenka";
 import { SANKO_NOTE } from "./roadmap/sanko-data";
 import { distanceText, kindText, priceText, type LandPriceHit } from "./roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
-import { chibanLabel, estimatedNote, kuikiLabel, parcelMark, type Estimated } from "./roadmap/parcel";
+import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark, type Estimated } from "./roadmap/parcel";
 import type { NearbyRoad } from "./roadmap/road-read";
 import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
 import { POI_NOTE, poiCredit, poiWalkText, type PoiWalk } from "./roadmap/poi";
@@ -30,7 +30,8 @@ export type DraftSection = { title: string; rows: DraftRow[] };
 
 export type DraftInput = {
   zoning?: { zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi };
-  parcels?: { target?: string; neighbors: string[]; reference: boolean; estimated?: Estimated; sanko?: string };
+  /** offLot：住所の地点の筆が、隣地のとても多い筆（地番の付いた公道など。物件の外の土地の可能性） */
+  parcels?: { target?: string; neighbors: string[]; reference: boolean; offLot?: boolean; estimated?: Estimated; sanko?: string };
   roads?: NearbyRoad[];
   hazard?: { report: HazardReport; elevation: Elevation | null; maps: HazardMaps; muniCd: string };
   building?: BuildingResult;
@@ -73,11 +74,15 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     place.push({
       label: "所在（地番）",
       value: `${parcels.target}${parcels.estimated ? "（推定）" : parcels.sanko ? "（地番参考図）" : ""}`,
-      note: parcels.reference ? "住所の地点にある筆（参考）。住居表示と地番は別のもの" : undefined,
+      note: parcels.offLot
+        ? "住所の地点にある筆（参考）。隣地がとても多く、道路など物件の外の土地の可能性があるので、公図で確認"
+        : parcels.reference
+          ? "住所の地点にある筆（参考）。住居表示と地番は別のもの"
+          : undefined,
       check: true,
     });
   else place.push({ label: "所在（地番）", value: CHECK, note: "登記・公図で確認", check: true });
-  if (parcels?.neighbors.length) place.push({ label: "隣地の地番", value: parcels.neighbors.join("、"), note: "境界が接している筆（地図データから）" });
+  if (parcels?.neighbors.length) place.push({ label: "隣地の地番", value: neighborList(parcels.neighbors), note: "境界が接している筆（地図データから）" });
   const chibanzu = chibanzuFor(m, result.lat, result.lng);
   if (chibanzu) place.push({ label: "地番の参考図", value: `${chibanzu.name}（${chibanzu.url}）`, note: CHIBANZU_NOTE });
   place.push({ label: "緯度・経度", value: `${result.lat.toFixed(6)}, ${result.lng.toFixed(6)}` });

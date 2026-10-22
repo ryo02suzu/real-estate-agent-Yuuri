@@ -3,6 +3,7 @@
 // 施設の入口ではなく施設の位置（面の施設は面の中ほど）までの目安で、OpenStreetMap に載っていない施設もあるので、広告に書くときは
 // 実際の道路距離と、施設が今もあるかを確かめる旨を添える
 import SOURCE from "./data/poi-source.json";
+import { HOSPITAL_SOURCE } from "./facilities";
 import type { LngLat } from "./parcel";
 import { ROAD_CREDIT, routedOk, walkMinutes, walkTo } from "./walk";
 
@@ -151,8 +152,11 @@ export const POI_NOTE = "施設の位置までの道路距離の目安（80m を
 /** OpenStreetMap の出典とライセンス（ODbL は「© OpenStreetMap contributors」とライセンスを示すよう求めている） */
 export const POI_SOURCE = "© OpenStreetMap contributors（ODbL）";
 
+/** 周辺施設の出典。病院を国のデータにしていれば（lib/roadmap/facilities.ts の withNationalHospitals）、それも */
+export const POI_SOURCES = HOSPITAL_SOURCE ? `${POI_SOURCE}・病院は${HOSPITAL_SOURCE}` : POI_SOURCE;
+
 /** 画面の出典（データの時点と道のりの出典も） */
-export const POI_CREDIT = `出典：© OpenStreetMap contributors（ODbL・${SOURCE.date}時点）を加工して作成。${ROAD_CREDIT}`;
+export const POI_CREDIT = `出典：© OpenStreetMap contributors（ODbL・${SOURCE.date}時点）${HOSPITAL_SOURCE ? `・病院は「${HOSPITAL_SOURCE}」（国土交通省）` : ""}を加工して作成。${ROAD_CREDIT}`;
 
 /** 下書き・共有の出典。道のりの出典は、駅の出典に入っていれば（withRoad=false）付けない */
-export const poiCredit = (withRoad: boolean) => `周辺施設：${POI_SOURCE}を加工して作成${withRoad ? `。${ROAD_CREDIT}` : ""}`;
+export const poiCredit = (withRoad: boolean) => `周辺施設：${POI_SOURCES}を加工して作成${withRoad ? `。${ROAD_CREDIT}` : ""}`;

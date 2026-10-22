@@ -1,11 +1,11 @@
 import GSI_CODES from "./data/gsi-muni-codes.json";
-import { geocodeCandidates, isApproximate, needsChoice, reverseGeocode, type GeocodeResult } from "./geocode";
+import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, needsChoice, reverseGeocode, type GeocodeResult } from "./geocode";
 import { buildLinks, findMunicipality, resolveContact, type Contact, type Municipality, type ResolvedLink } from "./municipalities";
 import { parcelAt, searchParcel, splitChiban, townFromAddress, type Parcel, type ParcelSource } from "./parcel";
 import { pmtilesParcelSource } from "./parcel-tiles";
 
 export * from "./municipalities";
-export { geocode, geocodeCandidates, isApproximate, needsChoice, reverseGeocode, type GeocodeResult } from "./geocode";
+export { geocode, geocodeCandidates, GeocoderUnavailable, isApproximate, needsChoice, reverseGeocode, type GeocodeResult } from "./geocode";
 export { toWebMercator } from "./vendors";
 
 export type LookupResult =
@@ -43,7 +43,11 @@ export async function lookup(address: string, { parcels = pmtilesParcelSource }:
   const chiban = splitChiban(address);
   // 「地番」の語は外して調べる（国土地理院が番地まで持っていれば、その位置から筆を探せる）
   const candidates = await geocodeCandidates(chiban?.explicit ? `${chiban.body}${chiban.chiban}` : address);
-  if (candidates.length === 0) return { status: "not_found" };
+  if (candidates.length === 0) {
+    // 住所検索がどの住所にも0件を返しているとき（障害など）は「見つからない」ではない
+    if (!(await geocoderAlive())) throw new GeocoderUnavailable("住所検索が応答していません");
+    return { status: "not_found" };
+  }
   if (needsChoice(address, candidates)) return { status: "choose", candidates: candidates.slice(0, 15) };
   let geo = candidates[0];
   // 「地番」と明示したのに住居表示の街区（「217番」）に当たったら、地番と取り違えないよう町の代表点から探す

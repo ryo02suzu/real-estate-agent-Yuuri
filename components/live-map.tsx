@@ -197,7 +197,7 @@ export type LiveMapProps = {
   /** PDF の分割図の市で、物件が載っている図（範囲の枠を重ねる） */
   sheet?: SheetHit;
   /** 地番で見つけた筆・地図で選んだ地点の筆（強調する） */
-  parcel?: { kuiki: string; chibanRaw: string };
+  parcel?: { kuiki: string; chibanRaw: string; chibanRaws?: string[] };
   mode?: "pin" | "crosshair";
   /** pin: ピンを動かした・クリックした地点で調べる */
   onPick?: (lat: number, lng: number) => void;
@@ -580,7 +580,7 @@ export default function LiveMap({
   }, [sheetKey, loaded]);
 
   // 見つけた筆の強調
-  const parcelKey = parcel ? `${parcel.kuiki}|${parcel.chibanRaw}` : "";
+  const parcelKey = parcel ? `${parcel.kuiki}|${(parcel.chibanRaws ?? [parcel.chibanRaw]).join(",")}` : "";
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !loaded) return;

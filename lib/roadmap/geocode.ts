@@ -8,6 +8,17 @@ export type GeocodeResult = {
   matchedAddress: string;
 };
 
+/**
+ * 国土地理院の住所検索が、県・市の名前にも何も返さない（障害・混雑で、どの住所にも0件を返すことがある）。
+ * 「住所が見つかりません」と言わないために、ふつうの通信の失敗とも分ける
+ */
+export class GeocoderUnavailable extends Error {}
+
+/** 住所検索が動いているか（必ず見つかる「東京都千代田区」で確かめる） */
+export async function geocoderAlive(): Promise<boolean> {
+  return (await geocodeCandidates("東京都千代田区")).length > 0;
+}
+
 export async function geocode(address: string): Promise<GeocodeResult | null> {
   return (await geocodeCandidates(address))[0] ?? null;
 }
