@@ -124,6 +124,10 @@ export function MobileApp(props: MobileAppProps) {
       if (status !== "ok") setReport(false);
     });
   }, [status, resultKey]);
+  // 調べられなかった（通信の失敗など）ときも、頼まれていたレポートは開かない（次に調べた物件で急に開かないように）
+  useEffect(() => {
+    if (error) queueMicrotask(() => setReport(false));
+  }, [error]);
 
   const go = useCallback((p: NavKey) => {
     setPage(p);
