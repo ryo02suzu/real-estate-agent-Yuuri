@@ -86,3 +86,9 @@ export function stamp(t: number): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+
+/** カードに出す短い日付（「4/26」） */
+export function monthDay(t: number): string {
+  const d = new Date(t);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}

@@ -267,7 +267,6 @@ export default function Home() {
         setHistory([]);
       }}
       onHome={backHome}
-      areaText={AREA_TEXT}
     />
   );
 }

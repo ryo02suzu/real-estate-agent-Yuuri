@@ -25,6 +25,7 @@ import type { ReactNode } from "react";
 import { placeParts, stamp } from "@/lib/app/scene";
 import { favoriteKey, type FavoriteItem } from "@/lib/favorites";
 import { historyKey, type HistoryItem } from "@/lib/history";
+import { PhoneImg } from "./frame";
 import { PAGE, SKY } from "./home";
 import { ClockBack } from "./icons";
 import { NAVY } from "./ui";
@@ -257,6 +258,18 @@ const DOCS: { Icon: LucideIcon; title: string; sub: string }[] = [
 export function DocsPage({ history, onPick, banner }: { history: HistoryItem[]; onPick: (h: HistoryItem) => void; banner?: ReactNode }) {
   return (
     <TabScreen title="書類・出力" sub="調べた物件の書類をすぐ作れます（参考の資料）" banner={banner}>
+      {/* 届いた絵の書類のバナー（前はホームの下にあったもの。写真の書類の左の空いた所に文字を置く） */}
+      <div className="relative mt-[14px] overflow-hidden rounded-[16px] shadow-[0_6px_20px_rgba(60,40,20,0.09)]" style={{ height: 86 }}>
+        <PhoneImg src="/home/docs.webp" alt="" loading="lazy" draggable={false} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "0% 50%" }} />
+        <span className="absolute top-1/2 -translate-y-1/2" style={{ left: 16 }}>
+          <span className="block whitespace-nowrap font-bold leading-none" style={{ fontSize: 16, color: "#0f2a5c", fontFeatureSettings: '"palt"' }}>
+            調査結果から書類を作成
+          </span>
+          <span className="mt-[7px] block whitespace-nowrap leading-none" style={{ fontSize: 13, color: "#4b5568", fontFeatureSettings: '"palt"' }}>
+            調査メモ・重説下書き・案内図
+          </span>
+        </span>
+      </div>
       <Group title="最近調べた物件から作る">
         {history.length ? (
           history.slice(0, 5).map((h) => <PlaceRow key={historyKey(h)} item={h} onClick={() => onPick(h)} />)

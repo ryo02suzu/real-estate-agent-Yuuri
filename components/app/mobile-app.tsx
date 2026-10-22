@@ -35,7 +35,7 @@ import { useCopy } from "../use-copy";
 import { MapAppsSheet, ReportSheet } from "./app-sheets";
 import { DetailSheet } from "./detail-sheets";
 import { ART_W, BottomNav, Hero, SheetFrame, ZOOM, type NavKey } from "./frame";
-import { HomeScreen, modeOf, PAGE, type HomeMessage, type SearchMode } from "./home";
+import { HomeScreen, PAGE, type HomeMessage } from "./home";
 import { markNewsSeen, NewsSheet, useUnreadNews } from "./news";
 import { NotOkPage } from "./pages";
 import { AccountPage, DocsPage, FavoritesPage, HistoryPage, TabBanner } from "./tab-pages";
@@ -78,20 +78,17 @@ export type MobileAppProps = {
   onPickHistory: (h: HistoryItem) => void;
   onClearHistory: () => void;
   onHome: () => void;
-  areaText: string;
 };
 
 type AppSheet = "menu" | "help" | "cities" | "sources" | null;
 
 export function MobileApp(props: MobileAppProps) {
-  const { shown, input, setInput, loading, error, history, favorites, setFavorites, onSearch, onPickHistory, onPickPoint, areaText } = props;
+  const { shown, input, setInput, loading, error, history, favorites, setFavorites, onSearch, onPickHistory, onPickPoint } = props;
   const [page, setPage] = useState<NavKey>("home");
   const [sheet, setSheet] = useState<AppSheet>(null);
   const [picker, setPicker] = useState<{ start?: { lat: number; lng: number } } | null>(null);
-  const [locating, setLocating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  // ホームの調べ方（住所・地番・地図）と、調査メニューで選んだ「調べたら開くタブ」・その案内
-  const [mode, setMode] = useState<SearchMode>(() => modeOf(input));
+  // 調査メニューで選んだ「調べたら開くタブ」と、その案内
   const [startTab, setStartTab] = useState<TabKey | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   // 物件の「レポートを作成」（書類・出力）。下のメニューの「書類・出力」からも開く
@@ -137,14 +134,9 @@ export function MobileApp(props: MobileAppProps) {
 
   const pickHere = () => {
     if (!navigator.geolocation) return setNotice("この端末では現在地を使えません。");
-    setLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocating(false);
-        onPickPoint(pos.coords.latitude, pos.coords.longitude);
-      },
+      (pos) => onPickPoint(pos.coords.latitude, pos.coords.longitude),
       () => {
-        setLocating(false);
         setNotice("現在地を取得できませんでした。位置情報の利用を許可してください。");
       },
       { enableHighAccuracy: true, timeout: 15000 },
@@ -163,17 +155,10 @@ export function MobileApp(props: MobileAppProps) {
     setPage("home");
     onPickHistory(h);
   };
-  /** 調べ方の切り替え。地番の欄では入力に「地番 」を付けて調べる（入力欄には出さない） */
-  const changeMode = (m: SearchMode) => {
-    setMode(m);
-    setNotice(null);
-    const text = input.replace(/^\s*地番\s*/, "").trim();
-    if (m === "address") setInput(text);
-    else if (m === "chiban") setInput(text ? `地番 ${text}` : "");
-  };
+  /** ホームの「調査を開始する」。住所も地番も同じ欄（地番かどうかは調べるときに見分ける。lib/roadmap の splitChiban） */
   const submitHome = () => {
     if (!input.replace(/^\s*地番\s*/, "").trim()) {
-      setNotice(mode === "chiban" ? "地番を入れてください。" : "住所を入れてください。地番のときは「地番から検索」を選びます。");
+      setNotice(EMPTY);
       inputRef.current?.focus();
       return;
     }
@@ -230,11 +215,8 @@ export function MobileApp(props: MobileAppProps) {
             <HomeScreen
               input={input}
               setInput={setInput}
-              mode={mode}
-              onMode={changeMode}
               onSubmit={submitHome}
               loading={loading}
-              locating={locating}
               message={homeMessage}
               onDismiss={() => {
                 setNotice(null);
@@ -244,26 +226,21 @@ export function MobileApp(props: MobileAppProps) {
               onPickRecent={pickRecent}
               onHistory={() => go("history")}
               onMap={openMap}
-              onHere={pickHere}
               onMenu={(tab, title) => {
                 setStartTab(tab);
                 setNotice(null);
-                setHint(`調べると「${title}」から開きます。${mode === "map" ? "地図で場所を選んでください。" : "住所か地番を入れてください。"}`);
+                setHint(`調べると「${title}」から開きます。住所か地番を入れるか、地図で選んでください。`);
                 // 押した操作の中で入力欄に入れる（iPhone はそうしないとキーボードが出ない）
-                if (mode === "map") scroller.current?.scrollTo({ top: 0, behavior: "smooth" });
-                else inputRef.current?.focus();
+                inputRef.current?.focus();
               }}
               onMenuAll={() => setSheet("help")}
-              onDocs={() => go("docs")}
               onBell={() => {
                 setNews(true);
                 markNewsSeen();
               }}
               unread={unread}
               onCities={() => setSheet("cities")}
-              onSources={() => setSheet("sources")}
               onLogo={() => scroller.current?.scrollTo({ top: 0, behavior: "smooth" })}
-              areaText={areaText}
               cityCount={MUNICIPALITIES.length}
               inputRef={inputRef}
             />
@@ -275,7 +252,7 @@ export function MobileApp(props: MobileAppProps) {
                 setPage("home");
                 // 空のまま押したら、何を入れるかを出して入力欄に戻す
                 if (!input.trim()) {
-                  setNotice("住所か地番を入れてください（例：渋谷区神南1-19-11、地番 松戸市古ヶ崎四丁目3556-1）。");
+                  setNotice(EMPTY);
                   inputRef.current?.focus();
                   return;
                 }
@@ -372,6 +349,9 @@ export function MobileApp(props: MobileAppProps) {
     </div>
   );
 }
+
+/** 空のまま調べようとしたときの一言 */
+const EMPTY = "住所か地番を入れてください（例：渋谷区神南1-19-11、松戸市古ヶ崎四丁目3556-1）。";
 
 /** 通信できないときの一言 */
 const OFFLINE = "通信できません（オフライン）。電波の良い場所で調べ直してください。読めなかった項目は「読み込めず」と出ます。";

@@ -82,6 +82,17 @@
 }
 
 /*
+ * スマホの新しいホーム（components/app/home.tsx）を1画面に収める詰め方。ホームは幅で拡大・縮小するので、幅に対して背の低い画面
+ * （高さ÷幅が 1.985 より小さい。iPhone SE・8 Plus など）では、写真の見出し・調べるカード・最近の検索・調査メニューを少し詰める。
+ * iPhone の mini・無印・Pro・Pro Max（ホーム画面に追加したアプリ）は詰めずに収まる。ホームの高さを変えたら 1.985 も見直す
+ */
+@custom-variant low {
+  @media (max-width: 520px) and (min-aspect-ratio: 1000/1985) {
+    @slot;
+  }
+}
+
+/*
  * シート（components/sheet.tsx）の中身が画面に入りきらないときの詰め方。Sheet が data-dense を付ける：
  * dense（"1"。行の間を詰める）→ denser（"2"。文字も少し小さくする）→ densest（"3"。見出しのまわりと行の高さも詰める）
  */
@@ -109,10 +120,41 @@ body {
   letter-spacing: 0.01em;
 }
 
-/* スマホの新しいホームの明朝（components/app/fonts.ts）。PC の幅では使わない */
-@media (max-width: 1023px) {
-  .home-serif {
-    font-family: var(--font-serif-jp), serif;
+/*
+ * スマホの新しいホームの動き（components/app/home.tsx）。上から順に浮き上がって現れる（.home-rise。遅れは style の animation-delay）と、
+ * 「調査を開始する」の上を光が流れる（.home-shine）。動きを減らす設定の端末と PC の幅では動かさない
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .home-rise {
+    animation: home-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .home-shine::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, rgba(255, 255, 255, 0) 38%, rgba(255, 255, 255, 0.32) 50%, rgba(255, 255, 255, 0) 62%);
+    transform: translateX(-110%);
+    animation: home-shine 5s ease-in-out 1.4s infinite;
+    pointer-events: none;
+  }
+}
+@keyframes home-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes home-shine {
+  0% {
+    transform: translateX(-110%);
+  }
+  30%,
+  100% {
+    transform: translateX(110%);
   }
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HistoryItem } from "../history";
-import { placeholderScenes, placeParts, placeTitle, SCENES, stamp } from "./scene";
+import { monthDay, placeholderScenes, placeParts, placeTitle, SCENES, stamp } from "./scene";
 
 const item = (address: string, city?: string, ll?: [number, number]): HistoryItem => ({ address, city, at: 0, ...(ll ? { ll } : {}) });
 
@@ -35,6 +35,8 @@ describe("最近の検索のカード", () => {
   it("日時は「2026/04/26 14:32」の形", () => {
     expect(stamp(new Date(2026, 3, 26, 14, 32).getTime())).toBe("2026/04/26 14:32");
     expect(stamp(new Date(2026, 9, 2, 9, 5).getTime())).toBe("2026/10/02 09:05");
+    expect(monthDay(new Date(2026, 3, 26, 14, 32).getTime())).toBe("4/26");
+    expect(monthDay(new Date(2026, 9, 2, 9, 5).getTime())).toBe("10/2");
   });
 
   it("仮の写真は住宅地の4枚から。同じ物件には同じ写真で、並んだ3枚は別の写真にする", () => {
