@@ -1,0 +1,35 @@
+# 国土交通省「不動産情報ライブラリ」の API（液状化・大規模盛土・災害履歴・駅の乗降客数・将来人口・保育園等・医療機関・鑑定評価書）から、
+# 物件の地点で使うデータを作る（scripts/reinfolib/build.py）。
+# いまは各 API の返り方を確かめる（probe）だけ。
+#
+# 必要な設定（無ければ何もしないで終わる）:
+#   Secrets:   REINFOLIB_API_KEY（不動産情報ライブラリの API 利用申請で届くキー）
+name: 国の地点データ（不動産情報ライブラリ）
+
+on:
+  workflow_dispatch:
+  # 本番（main）に入るまでは、作業用ブランチでこの処理か作り方を変えたときにも動かす（GitHub は main に無い処理を手で起動できないため）
+  push:
+    branches: [claude/system-feedback-eggn72]
+    paths: [".github/workflows/reinfolib.yml", "scripts/reinfolib/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reinfolib
+  cancel-in-progress: false
+
+jobs:
+  reinfolib:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      REINFOLIB_API_KEY: ${{ secrets.REINFOLIB_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 各 API の返り方を確かめる
+        run: python3 scripts/reinfolib/build.py --probe
