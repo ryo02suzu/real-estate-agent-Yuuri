@@ -6,7 +6,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useLandPrices } from "@/components/land-price-card";
 import { useStations } from "@/components/station-card";
-import { lookup, type LookupResult } from "@/lib/roadmap";
+import { lookup, lookupPoint, type LookupResult } from "@/lib/roadmap";
 import { APPRAISAL_CAUTION, APPRAISAL_CREDIT, methodRows, yenPerM2, type AppraisalPoint } from "@/lib/roadmap/appraisal";
 import { FACILITY_CAUTION, FACILITY_CREDIT, FACILITY_KINDS, facilityCounts } from "@/lib/roadmap/facilities";
 import { LIQ_CAUTIONS, LIQ_CREDIT, liquefactionText } from "@/lib/roadmap/liquefaction";
@@ -25,18 +25,21 @@ export function NationalCheck() {
   const [result, setResult] = useState<LookupResult | null>(null);
   const [busy, setBusy] = useState(false);
 
+  /** 住所か「緯度,経度」で調べる */
   const run = async (q: string) => {
-    if (!q.trim()) return;
+    const text = q.trim();
+    if (!text) return;
     setBusy(true);
     try {
-      setResult(await lookup(q.trim()));
-      window.history.replaceState(null, "", `?q=${encodeURIComponent(q.trim())}`);
+      const ll = text.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+      setResult(ll ? await lookupPoint(Number(ll[1]), Number(ll[2])) : await lookup(text));
+      window.history.replaceState(null, "", `?q=${encodeURIComponent(text)}`);
     } finally {
       setBusy(false);
     }
   };
 
-  // ?q= の住所で開いたら、そのまま調べる（最初の1回だけ）
+  // ?q= の住所（か緯度,経度）で開いたら、そのまま調べる（最初の1回だけ）
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get("q");
     if (!q) return;
@@ -58,7 +61,7 @@ export function NationalCheck() {
             void run(input);
           }}
         >
-          <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="住所（例：東京都渋谷区神南1-19-11）" className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2 text-[16px]" />
+          <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="住所か緯度,経度（例：東京都渋谷区神南1-19-11）" className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2 text-[16px]" />
           <button className="rounded bg-slate-800 px-4 py-2 text-white disabled:opacity-50" disabled={busy}>
             {busy ? "調べています" : "調べる"}
           </button>
@@ -162,11 +165,15 @@ function Report({ result }: { result: Ok }) {
         }
       </Section>
 
-      <Section title="最寄り駅の乗降客数" data="ridership" state={ridership} cautions={[RIDERSHIP_CAUTION]} credit={RIDERSHIP_CREDIT}>
+      <Section
+        title="最寄り駅の乗降客数"
+        data="ridership"
+        state={stations.status === "ok" ? ridership : { status: stations.status === "error" ? "error" : "loading" }}
+        cautions={[RIDERSHIP_CAUTION]}
+        credit={RIDERSHIP_CREDIT}
+      >
         {(byName) =>
-          stations.status !== "ok" ? (
-            <p>駅を読んでいます</p>
-          ) : (
+          stations.status !== "ok" ? null : (
             <ul className="space-y-2">
               {stations.stations.map((s) => {
                 const r = byName[s.name];
