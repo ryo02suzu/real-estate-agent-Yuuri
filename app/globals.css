@@ -116,6 +116,14 @@ body {
   }
 }
 
+/* スマホの新しい画面（ホーム・タブのページ・下のメニュー）：押したときの灰色の四角と、画像の長押しのメニューを出さない（押した感じは各部品で出す） */
+.app-touch {
+  -webkit-tap-highlight-color: transparent;
+}
+.app-touch img {
+  -webkit-touch-callout: none;
+}
+
 /* 住所や電話番号の数字は桁を揃える */
 .tabular {
   font-variant-numeric: tabular-nums;

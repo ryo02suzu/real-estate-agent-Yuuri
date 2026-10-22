@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HistoryItem } from "../history";
-import { placeholderScenes, placeTitle, SCENES, stamp } from "./scene";
+import { placeholderScenes, placeParts, placeTitle, SCENES, stamp } from "./scene";
 
 const item = (address: string, city?: string, ll?: [number, number]): HistoryItem => ({ address, city, at: 0, ...(ll ? { ll } : {}) });
 
@@ -18,6 +18,13 @@ describe("最近の検索のカード", () => {
     // 番地だけ・市区町村だけでも空にしない
     expect(placeTitle(item("1-19-11")).title).toBe("1-19-11");
     expect(placeTitle(item("東京都渋谷区", "渋谷区")).title).toBe("渋谷区");
+  });
+
+  it("カードの2行：市区町村を小さく上に、町名を大きく。市区町村が分からないときは空", () => {
+    expect(placeParts(item("東京都世田谷区上野毛3丁目1-2", "世田谷区"))).toEqual({ city: "世田谷区", town: "上野毛3丁目", full: "世田谷区 上野毛3丁目1-2", chiban: false });
+    expect(placeParts(item("神南1-19-11", "渋谷区"))).toEqual({ city: "渋谷区", town: "神南", full: "渋谷区 神南1-19-11", chiban: false });
+    expect(placeParts(item("大阪府大阪市北区梅田3-1-1"))).toEqual({ city: "", town: "大阪市北区梅田", full: "大阪市北区梅田3-1-1", chiban: false });
+    expect(placeParts(item("東京都渋谷区", "渋谷区"))).toEqual({ city: "渋谷区", town: "", full: "渋谷区", chiban: false });
   });
 
   it("地番で調べたものは「地番」を外して印を立てる", () => {

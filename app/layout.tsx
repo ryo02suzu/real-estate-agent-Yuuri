@@ -17,7 +17,12 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover", // ノッチ・ホームバーの余白は env(safe-area-inset-*) で取る
-  themeColor: "#fbfaf8",
+  // 時刻・電池の帯の色。スマホは新しいホームの写真の上の空の色（写真の上端をこの色からつなぐ。components/app/home.tsx の SKY）、
+  // PC は今までの地の色
+  themeColor: [
+    { media: "(max-width: 1023px)", color: "#e6eff9" },
+    { media: "(min-width: 1024px)", color: "#fbfaf8" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

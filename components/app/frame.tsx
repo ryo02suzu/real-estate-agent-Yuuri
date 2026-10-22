@@ -228,23 +228,24 @@ export function SheetFrame({ children }: { children: ReactNode }) {
 
 export type NavKey = "home" | "history" | "favorites" | "docs" | "account";
 
-const ON = "#1b3563";
-const OFF = "#5f697c";
+const ON = "#133664";
+const OFF = "#68738a";
 /** 5つを同じ幅で並べる（幅393pt ÷ 5） */
 const NAV_W = ART_W / 5;
+/** iPhone のアプリの下のメニューと同じくらいの大きさ（アイコン約24pt・名前10.5pt） */
 const NAV: { key: NavKey; label: string; icon: (on: boolean) => ReactNode }[] = [
-  { key: "home", label: "ホーム", icon: (on) => <HouseFill size={15.5} color={on ? ON : OFF} /> },
-  { key: "history", label: "履歴", icon: (on) => <ClockBack size={15.5} stroke={on ? 1.8 : 1.45} color={on ? ON : OFF} /> },
-  { key: "favorites", label: "お気に入り", icon: (on) => <Star size={15} strokeWidth={on ? 1.7 : 1.3} absoluteStrokeWidth color={on ? ON : OFF} fill={on ? ON : "none"} /> },
-  { key: "docs", label: "書類・出力", icon: (on) => <FileText size={15} strokeWidth={on ? 1.7 : 1.3} absoluteStrokeWidth color={on ? ON : OFF} /> },
-  { key: "account", label: "その他", icon: (on) => <Ellipsis size={16} strokeWidth={on ? 2.2 : 1.8} absoluteStrokeWidth color={on ? ON : OFF} /> },
+  { key: "home", label: "ホーム", icon: (on) => <HouseFill size={24} color={on ? ON : OFF} /> },
+  { key: "history", label: "履歴", icon: (on) => <ClockBack size={24} stroke={on ? 2 : 1.6} color={on ? ON : OFF} /> },
+  { key: "favorites", label: "お気に入り", icon: (on) => <Star size={23} strokeWidth={on ? 2 : 1.6} absoluteStrokeWidth color={on ? ON : OFF} fill={on ? ON : "none"} /> },
+  { key: "docs", label: "書類・出力", icon: (on) => <FileText size={23} strokeWidth={on ? 2 : 1.6} absoluteStrokeWidth color={on ? ON : OFF} /> },
+  { key: "account", label: "その他", icon: (on) => <Ellipsis size={24} strokeWidth={on ? 2.6 : 2.2} absoluteStrokeWidth color={on ? ON : OFF} /> },
 ];
 
 /** いちばん下のメニュー（ホーム・履歴・お気に入り・書類・出力・その他） */
 export function BottomNav({ active, onSelect }: { active: NavKey; onSelect: (key: NavKey) => void }) {
   return (
-    <nav aria-label="画面の切り替え" className="shrink-0 overflow-hidden bg-white pb-[max(0px,calc(env(safe-area-inset-bottom)-12px))] shadow-[0_-1px_6px_rgba(16,40,80,0.06)]">
-      <div className="relative mx-auto" style={{ width: ART_W, height: 51, zoom: ZOOM }}>
+    <nav aria-label="画面の切り替え" className="app-touch shrink-0 overflow-hidden border-t border-[#e6ebf2] bg-white/95 pb-[max(0px,calc(env(safe-area-inset-bottom)-12px))] backdrop-blur">
+      <div className="relative mx-auto" style={{ width: ART_W, height: 54, zoom: ZOOM }}>
         {NAV.map((n, i) => {
           const on = n.key === active;
           return (
@@ -252,11 +253,11 @@ export function BottomNav({ active, onSelect }: { active: NavKey; onSelect: (key
               key={n.key}
               onClick={() => onSelect(n.key)}
               aria-current={on ? "page" : undefined}
-              className="absolute flex flex-col items-center pt-[7.4px]"
-              style={{ left: i * NAV_W, top: 0, width: NAV_W, height: 51 }}
+              className="absolute flex flex-col items-center justify-center gap-[4px] active:opacity-60"
+              style={{ left: i * NAV_W, top: 0, width: NAV_W, height: 54 }}
             >
               {n.icon(on)}
-              <span className="whitespace-nowrap leading-none" style={{ marginTop: on ? 5.2 : 4.7, fontSize: on ? 7.3 : 7.44, color: on ? ON : "#6a7385", fontWeight: on ? 700 : 400 }}>
+              <span className="whitespace-nowrap leading-none" style={{ fontSize: 10.5, color: on ? ON : OFF, fontWeight: on ? 700 : 500 }}>
                 {n.label}
               </span>
             </button>

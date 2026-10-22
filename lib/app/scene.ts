@@ -57,19 +57,27 @@ function townOf(s: string): string {
 }
 
 /**
- * カードの見出し。デザインの絵と同じく、市区町村と町名（丁目まで）にする（「世田谷区 上野毛3丁目」）。番地まで入れた住所は full。
- * 地番で調べたものは先頭の「地番」を外して chiban を立てる
+ * カードの2行：市区町村（小さく上に）と町名（丁目まで。番地・号・地番・建物名は外す）。番地まで入れた住所は full。
+ * 市区町村が分からない（対応エリアの外など）ときは city が空。地番で調べたものは先頭の「地番」を外して chiban を立てる
  */
-export function placeTitle(h: HistoryItem): { title: string; full: string; chiban: boolean } {
+export function placeParts(h: HistoryItem): { city: string; town: string; full: string; chiban: boolean } {
   const raw = h.address.normalize("NFKC").replace(/\s+/g, " ").trim();
   const chiban = /^地番/.test(raw);
   const rest = raw.replace(/^地番\s*/, "").replace(PREF, "").trim();
-  const city = h.city;
-  if (!city) return { title: townOf(rest), full: rest, chiban };
-  // 市区町村を書かずに調べたもの（「神南1-19-11」）は、前に市区町村を付ける
-  const town = rest.startsWith(city) ? rest.slice(city.length).trim() : rest.includes(city) ? "" : rest;
-  if (!town) return { title: rest.includes(city) && !rest.startsWith(city) ? townOf(rest) : city, full: rest || city, chiban };
-  return { title: `${city} ${townOf(town)}`, full: `${city} ${town}`, chiban };
+  const city = h.city ?? "";
+  if (city && rest.startsWith(city)) {
+    const tail = rest.slice(city.length).trim();
+    return { city, town: tail ? townOf(tail) : "", full: tail ? `${city} ${tail}` : city, chiban };
+  }
+  // 市区町村を書かずに調べたもの（「神南1-19-11」）は、市区町村を前に付ける
+  if (city && !rest.includes(city)) return { city, town: townOf(rest), full: `${city} ${rest}`, chiban };
+  return { city: "", town: townOf(rest), full: rest, chiban };
+}
+
+/** 1行の見出し（「世田谷区 上野毛3丁目」） */
+export function placeTitle(h: HistoryItem): { title: string; full: string; chiban: boolean } {
+  const p = placeParts(h);
+  return { title: [p.city, p.town].filter(Boolean).join(" ") || p.full, full: p.full, chiban: p.chiban };
 }
 
 /** 「2026/04/26 14:32」 */

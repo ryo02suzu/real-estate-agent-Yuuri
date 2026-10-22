@@ -35,9 +35,10 @@ import { useCopy } from "../use-copy";
 import { MapAppsSheet, ReportSheet } from "./app-sheets";
 import { DetailSheet } from "./detail-sheets";
 import { ART_W, BottomNav, Hero, SheetFrame, ZOOM, type NavKey } from "./frame";
-import { HomeScreen, modeOf, type HomeMessage, type SearchMode } from "./home";
+import { HomeScreen, modeOf, PAGE, type HomeMessage, type SearchMode } from "./home";
 import { markNewsSeen, NewsSheet, useUnreadNews } from "./news";
-import { AccountPage, DocsPage, FavoritesPage, HistoryPage, NotOkPage } from "./pages";
+import { NotOkPage } from "./pages";
+import { AccountPage, DocsPage, FavoritesPage, HistoryPage, TabBanner } from "./tab-pages";
 import { BottomActions, PropertyHeader, TabBar, type TabKey } from "./property-head";
 import { AroundTab } from "./tab-around";
 import { BasicTab } from "./tab-basic";
@@ -172,7 +173,7 @@ export function MobileApp(props: MobileAppProps) {
   };
   const submitHome = () => {
     if (!input.replace(/^\s*地番\s*/, "").trim()) {
-      setNotice(mode === "chiban" ? "地番を入れてください（例：松戸市古ヶ崎四丁目3556-1）。" : "住所を入れてください（例：渋谷区神南1-19-11）。地番のときは「地番から検索」を選んでください。");
+      setNotice(mode === "chiban" ? "地番を入れてください。" : "住所を入れてください。地番のときは「地番から検索」を選びます。");
       inputRef.current?.focus();
       return;
     }
@@ -187,13 +188,17 @@ export function MobileApp(props: MobileAppProps) {
   const homeMessage: HomeMessage = failure ? { text: failure, warn: true } : notice ? { text: notice, warn: true } : hint ? { text: hint, warn: false } : null;
   const isFav = (h: HistoryItem) => favorites.some((f) => favoriteKey(f) === favoriteKey(h));
 
+  // 下のメニューのページ（履歴・お気に入り・書類・出力・その他）は、大きな見出しのページにする（物件の画面の上の部分は出さない）
+  const tabPage = page !== "home";
+  const tabBanner = <TabBanner loading={loading && !offline} error={failure} notice={notice} onDismiss={() => setNotice(null)} />;
   let body: ReactNode;
   if (page === "history")
-    body = <HistoryPage history={history} isFavorite={isFav} onToggleFavorite={(h) => setFavorites(toggleFavorite(h))} onPick={pickRecent} onClear={props.onClearHistory} />;
-  else if (page === "favorites") body = <FavoritesPage favorites={favorites} onPick={pickRecent} onRemove={(f) => setFavorites(removeFavorite(f))} />;
+    body = <HistoryPage history={history} isFavorite={isFav} onToggleFavorite={(h) => setFavorites(toggleFavorite(h))} onPick={pickRecent} onClear={props.onClearHistory} banner={tabBanner} />;
+  else if (page === "favorites") body = <FavoritesPage favorites={favorites} onPick={pickRecent} onRemove={(f) => setFavorites(removeFavorite(f))} banner={tabBanner} />;
   else if (page === "docs")
     body = (
       <DocsPage
+        banner={tabBanner}
         history={history}
         onPick={(h) => {
           // 調べ終わったら、その物件の「レポートを作成」を開く
@@ -212,12 +217,13 @@ export function MobileApp(props: MobileAppProps) {
         onSources={() => setSheet("sources")}
         historyCount={history.length}
         favoriteCount={favorites.length}
+        banner={tabBanner}
       />
     );
   else if (shown && shown.result.status !== "ok") body = <NotOkPage query={shown.query} result={shown.result} onPick={props.onPickAddress} onMap={openMap} />;
 
   return (
-    <div className="theme-navy flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-[#f7f9fd]" style={{ fontFeatureSettings: "normal", letterSpacing: 0 }}>
+    <div className="theme-navy flex min-h-0 w-full flex-1 flex-col overflow-hidden" style={{ fontFeatureSettings: "normal", letterSpacing: 0, background: showHome || tabPage ? PAGE : "#f7f9fd" }}>
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain">
         <div className="relative mx-auto" style={{ width: ART_W, zoom: ZOOM }}>
           {showHome ? (
@@ -242,7 +248,7 @@ export function MobileApp(props: MobileAppProps) {
               onMenu={(tab, title) => {
                 setStartTab(tab);
                 setNotice(null);
-                setHint(`調べたら「${title}」の情報から開きます。${mode === "map" ? "地図で場所を選んでください。" : "住所か地番を入れて「調査を開始する」を押してください。"}`);
+                setHint(`調べると「${title}」から開きます。${mode === "map" ? "地図で場所を選んでください。" : "住所か地番を入れてください。"}`);
                 // 押した操作の中で入力欄に入れる（iPhone はそうしないとキーボードが出ない）
                 if (mode === "map") scroller.current?.scrollTo({ top: 0, behavior: "smooth" });
                 else inputRef.current?.focus();
@@ -261,7 +267,7 @@ export function MobileApp(props: MobileAppProps) {
               cityCount={MUNICIPALITIES.length}
               inputRef={inputRef}
             />
-          ) : (
+          ) : tabPage ? null : (
             <Hero
               input={input}
               setInput={setInput}
@@ -316,7 +322,8 @@ export function MobileApp(props: MobileAppProps) {
               />
             </div>
           )}
-          {!showHome && (!ok || page !== "home") && (
+          {tabPage && body}
+          {!showHome && !tabPage && !ok && (
             <SheetFrame>
               {/* 通信できないあいだは「調べています」より先に、通信できないことを出す */}
               <Banner loading={loading && !offline} error={error ?? (offline ? OFFLINE : null)} notice={notice} onDismiss={() => setNotice(null)} />
