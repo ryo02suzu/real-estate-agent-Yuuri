@@ -37,12 +37,22 @@ export type FacilityWalk = Facility & {
   routed: boolean;
 };
 
+/**
+ * 一般の人がかかれない医療機関（会社の社員向けの診療所・医務室、保健所、刑務所・自衛隊の中など）。
+ * 会社（株式会社など）は医療法で社員向けの診療所しか開けないので、会社の名前の付いた医療機関も入れる
+ */
+export const notForPublic = (name: string) => /株式会社|有限会社|\(株\)|（株）|健康管理|医務室|保健所|保健センター|刑務所|拘置所|少年院|自衛隊|駐屯地/.test(name);
+
+/** 休日・夜間だけの診療所（ふだんの最寄りには選ばない） */
+export const offHours = (name: string) => /休日|夜間|応急/.test(name);
+
 export function decodeFacility(f: VectorTileFeature, x: number, y: number): Facility | null {
   const g = f.toGeoJSON(x, y, NATIONAL_ZOOM).geometry;
   const p = f.properties;
   const kind = Number(p.k);
   const name = String(p.n ?? "").trim();
   if (g.type !== "Point" || !FACILITY_KINDS[kind] || !name) return null;
+  if (kind <= 3 && notForPublic(name)) return null;
   const out: Facility = { kind, name, at: g.coordinates as LngLat };
   if (p.a) out.address = String(p.a);
   if (p.d) out.departments = String(p.d).split("・");
@@ -98,7 +108,8 @@ export const FACILITY_QUERIES: FacilityQuery[] = [
   { key: "kindergarten", label: "幼稚園・こども園", kinds: [4, 5] },
 ];
 
-const matches = (f: Facility, q: FacilityQuery) => q.kinds.includes(f.kind) && (!q.department || (f.departments ?? []).includes(q.department)) && (q.key !== "emergency" || f.emergency === true);
+const matches = (f: Facility, q: FacilityQuery) =>
+  q.kinds.includes(f.kind) && !offHours(f.name) && (!q.department || (f.departments ?? []).includes(q.department)) && (q.key !== "emergency" || f.emergency === true);
 
 /** 探し方ごとに直線で近い候補の数（道のりでは順番が入れ替わることがある） */
 const CANDIDATES = 3;

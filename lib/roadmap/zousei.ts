@@ -7,7 +7,7 @@ import { NATIONAL_ZOOM, sitePmtiles, tilesAround, type TileSource } from "./rein
 import { distToRings, inPolygon } from "./zoning";
 
 export type ZouseiArea = {
-  /** 盛土の区分（「谷埋め型」「腹付け型」。区分していないものは「区分なし」） */
+  /** 盛土の区分（「谷埋め型」「腹付け型」。国のデータで区分していないものは「区分なし」） */
   kind: string;
   /** 市区町村コード・名前 */
   city?: string;
@@ -36,7 +36,9 @@ export function decodeZousei(f: VectorTileFeature, x: number, y: number): Zousei
   if (!polygons.length) return null;
   const p = f.properties;
   const s = (v: unknown) => (typeof v === "string" && v ? v : undefined);
-  return { kind: s(p.k) ?? "区分なし", city: s(p.c), cityName: s(p.m), number: s(p.n), polygons };
+  // 国のデータの「区分していない」（と空）は「区分なし」にそろえる
+  const kind = s(p.k);
+  return { kind: kind === "谷埋め型" || kind === "腹付け型" ? kind : "区分なし", city: s(p.c), cityName: s(p.m), number: s(p.n), polygons };
 }
 
 /** アプリが使う造成地のタイル */
@@ -73,7 +75,8 @@ export async function zouseiAt(lat: number, lng: number, source: TileSource<Zous
 export function zouseiText(z: Zousei): string {
   const a = z.areas[0];
   if (!a) return "大規模盛土造成地にはあたりません（国のデータ）";
-  const where = [a.cityName, a.number].filter(Boolean).join(" ");
+  // 盛土番号に市の名前が入っていれば（「横浜市0523」）、市の名前は重ねない
+  const where = a.number && a.cityName && a.number.startsWith(a.cityName) ? a.number : [a.cityName, a.number].filter(Boolean).join(" ");
   const kind = a.kind === "区分なし" ? "" : `${a.kind}の`;
   return a.inside ? `${kind}大規模盛土造成地の中${where ? `（${where}）` : ""}` : `約${Math.max(1, Math.round(a.distance))}m先に${kind}大規模盛土造成地${where ? `（${where}）` : ""}`;
 }

@@ -2,7 +2,7 @@
 // 置き場所（data/reinfolib-source.json）はテスト用に差し替え、ファイル・タイルの中身はテストの中で作る（通信しない）
 import { describe, expect, it, vi } from "vitest";
 import { appraisalFor, methodRows, type AppraisalFile } from "./appraisal";
-import { facilityCounts, nearestFacilities, nearbyFacilities, type Facility } from "./facilities";
+import { facilityCounts, nearestFacilities, nearbyFacilities, notForPublic, type Facility } from "./facilities";
 import { liquefactionAt, liquefactionText } from "./liquefaction";
 import { meshBounds, meshCenter } from "./mesh";
 import type { LngLat, Polygon } from "./parcel";
@@ -91,6 +91,11 @@ describe("大規模盛土造成地", () => {
     expect(z.areas).toHaveLength(1);
     expect(Math.round(z.areas[0].distance)).toBe(30);
     expect(zouseiText(z)).toBe("約30m先に谷埋め型の大規模盛土造成地（横浜市港北区 港北-12）");
+  });
+
+  it("盛土番号に市の名前が入っていれば重ねない", async () => {
+    const z = await zouseiAt(...TOKYO, allTiles([area({ city: "14100", cityName: "横浜市", number: "横浜市0523" })]));
+    expect(zouseiText(z)).toBe("谷埋め型の大規模盛土造成地の中（横浜市0523）");
   });
 
   it("造成地が無ければ「あたらない」", async () => {
@@ -200,6 +205,16 @@ describe("医療機関と幼稚園", () => {
     f({ kind: 4, name: "幼稚園", owner: "私立", at: east(here, 500) }),
     f({ kind: 1, name: "遠い病院", at: east(here, 3000) }),
   ];
+
+  it("一般の人がかかれない医療機関は入れず、休日・夜間だけの診療所は最寄りに選ばない", async () => {
+    expect(notForPublic("日本電気株式会社 本社健康管理センター 新木場健康管理室")).toBe(true);
+    expect(notForPublic("渋谷区保健所中央保健相談所")).toBe(true);
+    expect(notForPublic("医療法人社団 直和会 平成立石病院")).toBe(false);
+    const withHoliday = [f({ name: "立石休日応急診療所", departments: ["内科", "小児科"], at: east(here, 50) }), ...list];
+    const near = await nearbyFacilities(...TOKYO, allTiles(withHoliday));
+    const got = await nearestFacilities(...TOKYO, near, undefined, async (_a, _b, t) => new Map(t.map((x) => [x.id, 1000])));
+    expect(got.find((g) => g.query === "internal")?.name).not.toBe("立石休日応急診療所");
+  });
 
   it("まわり（1.2km）の施設を近い順に", async () => {
     const near = await nearbyFacilities(...TOKYO, allTiles(list));
