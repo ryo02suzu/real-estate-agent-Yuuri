@@ -1,34 +1,6 @@
 // スマホの新しい見た目（紺）で使う、線のアイコン集（lucide）に無い形のアイコン
 import type { CSSProperties } from "react";
 
-/** ロゴの「M」（デザインの絵から写した形。正式なマークが届いたら差し替える） */
-export function MockLogoMark({ style }: { style?: CSSProperties }) {
-  return (
-    <svg viewBox="0 0 36 26" style={style} aria-hidden>
-      <defs>
-        <linearGradient id="mk-mid" x1="0" y1="0" x2="0.4" y2="1">
-          <stop offset="0" stopColor="#8a9db8" stopOpacity="0.95" />
-          <stop offset="1" stopColor="#c9d3df" stopOpacity="0.35" />
-        </linearGradient>
-        <linearGradient id="mk-band" x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0" stopColor="#0e1f3b" />
-          <stop offset="0.45" stopColor="#13284a" />
-          <stop offset="0.55" stopColor="#6a7f9d" />
-          <stop offset="1" stopColor="#8396b0" />
-        </linearGradient>
-        <linearGradient id="mk-right" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#6c819f" />
-          <stop offset="1" stopColor="#dbe2ea" />
-        </linearGradient>
-      </defs>
-      <path d="M15.5 1.3 23.6 12.6 21.4 15.2 15.5 6.6Z" fill="url(#mk-mid)" />
-      <path d="M32.1 7.9 35 .5 35.5 25.8 32 22Z" fill="url(#mk-right)" />
-      <path d="M19.4 18.2 34.9.6 32.1 7.9 21.2 20.3Z" fill="url(#mk-band)" />
-      <path d="M.3 25.7 15.5 1.2 15.5 6.4 5.1 22.9Z" fill="#0f1d36" />
-    </svg>
-  );
-}
-
 /** 塗りつぶしの家（下のメニューで選ばれている「ホーム」） */
 export function HouseFill({ size = 24, color = "currentColor", style }: { size?: number; color?: string; style?: CSSProperties }) {
   return (

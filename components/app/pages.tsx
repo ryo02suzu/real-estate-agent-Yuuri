@@ -1,32 +1,34 @@
 "use client";
 
-// 紺の見た目のページ：検索する前のホーム、検索履歴、お気に入り、マイページ、見つからない・候補から選ぶ・未対応のときの画面。
-// どれも上の写真の部分・白いカード・下のメニューは同じで、カードの中身だけが変わる（デザインの絵と同じ系統）
+// 紺の見た目のページ：検索履歴、お気に入り、書類・出力、その他、見つからない・候補から選ぶ・未対応のときの画面。
+// どれも上の写真の部分・白いカード・下のメニューは同じで、カードの中身だけが変わる（デザインの絵と同じ系統）。
+// 検索する前のホームは components/app/home.tsx
 import {
-  Building2,
   ChevronRight,
   CircleHelp,
+  ClipboardCopy,
   Database,
+  Ellipsis,
   FileText,
   Info,
-  LandPlot,
-  LocateFixed,
+  ListChecks,
   LogIn,
   Map as MapIcon,
   MapPin,
+  Printer,
+  ScrollText,
   Search,
   Share2,
   Star,
   Trash2,
   TriangleAlert,
-  User,
   type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { favoriteKey, type FavoriteItem } from "@/lib/favorites";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import type { LookupResult } from "@/lib/roadmap";
-import { BarsOutline, ClockBack } from "./icons";
+import { ClockBack } from "./icons";
 import { PropertyHeader } from "./property-head";
 import { TileMap } from "./tile-map";
 import { BLUE, INK2, NAVY, SUB } from "./ui";
@@ -118,143 +120,59 @@ function Empty({ icon, title, body, action }: { icon: ReactNode; title: string; 
   );
 }
 
-const FEATURES: { Icon: LucideIcon | ((p: { size?: number; color?: string }) => ReactNode); title: string; body: string }[] = [
-  { Icon: Building2, title: "基本情報", body: "地番・用途地域・面積・建物" },
-  { Icon: MapPin, title: "周辺環境", body: "駅・学区・お店まで徒歩何分" },
-  { Icon: BarsOutline, title: "相場・取引", body: "公示地価・推移・路線価" },
-  { Icon: FileText, title: "法令・規制", body: "道路種別・建築の制限" },
-  { Icon: TriangleAlert, title: "ハザード", body: "洪水・土砂・避難場所" },
-  { Icon: Database, title: "取引事例", body: "近くの価格の事例" },
-];
-
-/** 検索する前のホーム */
-export function HomePage({
-  history,
-  favorites,
-  areaText,
-  cityCount,
-  onPick,
-  onMap,
-  onHere,
-  onChiban,
-  onHistory,
-  onFavorites,
-  onCities,
-  onHelp,
-  locating,
-}: {
-  history: HistoryItem[];
-  favorites: FavoriteItem[];
-  areaText: string;
-  cityCount: number;
-  onPick: (h: HistoryItem) => void;
-  onMap: () => void;
-  onHere: () => void;
-  onChiban: () => void;
-  onHistory: () => void;
-  onFavorites: () => void;
-  onCities: () => void;
-  onHelp: () => void;
-  locating: boolean;
-}) {
-  return (
-    <>
-      <PageHead icon={<Search size={13} strokeWidth={1.6} absoluteStrokeWidth color={NAVY} />} title="物件を調べる" sub="住所・地番・地図から、道路・法令・ハザード・相場をまとめて確認できます。" />
-      {/* 調べ方 */}
-      <div className="mt-[10px] grid grid-cols-3 gap-[6px] px-[9.2px]">
-        {[
-          { Icon: MapIcon, label: "地図で選ぶ", sub: "住所の無い土地も", onClick: onMap },
-          { Icon: LocateFixed, label: locating ? "現在地を確認中…" : "現在地で調べる", sub: "現地調査のときに", onClick: onHere },
-          { Icon: LandPlot, label: "地番で調べる", sub: "例：地番 松戸市…", onClick: onChiban },
-        ].map((a) => (
-          <button key={a.label} onClick={a.onClick} disabled={a.label.includes("確認中")} className="flex flex-col items-center rounded-[9px] bg-[#f1f6fc] px-[4px] pb-[8px] pt-[9px] active:bg-[#e6eefa]">
-            <span className="flex items-center justify-center rounded-full bg-white shadow-[0_1px_4px_rgba(20,45,85,0.1)]" style={{ width: 26, height: 26 }}>
-              <a.Icon size={13} strokeWidth={1.6} absoluteStrokeWidth color={NAVY} />
-            </span>
-            <span className="mt-[6px] font-bold leading-none" style={{ fontSize: 7.8, color: INK2 }}>
-              {a.label}
-            </span>
-            <span className="mt-[4px] leading-none" style={{ fontSize: 6.2, color: SUB }}>
-              {a.sub}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <SectionTitle title="最近調べた物件" onMore={history.length ? onHistory : undefined} />
-      {history.length ? (
-        <div className="mt-[2px]">
-          {history.slice(0, 3).map((h, i, a) => (
-            <PlaceRow key={historyKey(h)} item={h} onClick={() => onPick(h)} line={i < a.length - 1} />
-          ))}
-        </div>
-      ) : (
-        <p className="mt-[6px] px-[9.2px] leading-[1.5]" style={{ fontSize: 7.2, color: "#8a95a6" }}>
-          まだありません。上の検索窓に住所を入れて調べると、ここに出ます（この端末の中だけに保存）。
-        </p>
-      )}
-
-      {favorites.length > 0 && (
-        <>
-          <SectionTitle title="お気に入り" onMore={onFavorites} />
-          <div className="mt-[2px]">
-            {favorites.slice(0, 3).map((f, i, a) => (
-              <PlaceRow key={favoriteKey(f)} item={f} onClick={() => onPick(f)} line={i < a.length - 1} />
-            ))}
-          </div>
-        </>
-      )}
-
-      <SectionTitle title="できること" />
-      <div className="mt-[7px] grid grid-cols-3 gap-[6px] px-[9.2px]">
-        {FEATURES.map((f) => (
-          <div key={f.title} className="rounded-[8px] border border-[#e9eef4] bg-white px-[7px] pb-[7px] pt-[7.5px]">
-            <span className="flex items-center gap-[5px]">
-              <f.Icon size={11} color={NAVY} />
-              <span className="font-bold leading-none" style={{ fontSize: 7.6, color: INK2 }}>
-                {f.title}
-              </span>
-            </span>
-            <span className="mt-[5px] block leading-[1.35]" style={{ fontSize: 6.4, color: SUB }}>
-              {f.body}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div className="mx-[9.2px] mt-[10px] flex items-center rounded-[8px] bg-[#eef4fb] px-[10px] py-[9px]">
-        <MapPin size={14} strokeWidth={1.6} absoluteStrokeWidth color={NAVY} />
-        <span className="ml-[8px] min-w-0 flex-1">
-          <span className="block font-bold leading-none" style={{ fontSize: 8.2, color: INK2 }}>
-            対応エリア：{areaText}
-          </span>
-          <span className="mt-[4px] block leading-none" style={{ fontSize: 6.6, color: SUB }}>
-            {cityCount}市区町村の道路種別の地図と問い合わせ先
-          </span>
-        </span>
-        <button onClick={onCities} className="flex shrink-0 items-center gap-[1px] font-medium leading-none" style={{ fontSize: 7, color: BLUE }}>
-          一覧
-          <ChevronRight size={8} strokeWidth={1.5} absoluteStrokeWidth color={BLUE} />
-        </button>
-      </div>
-      <button onClick={onHelp} className="mx-[9.2px] mt-[6px] flex w-[calc(100%-18.4px)] items-center rounded-[8px] bg-[#f7f9fd] px-[10px] py-[8px] text-left">
-        <CircleHelp size={13} strokeWidth={1.5} absoluteStrokeWidth color={NAVY} />
-        <span className="ml-[8px] flex-1 font-semibold leading-none" style={{ fontSize: 7.8, color: INK2 }}>
-          使い方
-        </span>
-        <ChevronRight size={9} strokeWidth={1.4} absoluteStrokeWidth color="#1d2b48" />
-      </button>
-      <Disclaimer />
-    </>
-  );
-}
-
 export function Disclaimer() {
   return (
     <p className="mx-[9.2px] mb-[6px] mt-[10px] flex gap-[4px] leading-[1.6]" style={{ fontSize: 6.4, color: "#8a95a6" }}>
       <Info size={8} strokeWidth={1.5} absoluteStrokeWidth className="mt-[1.5px] shrink-0" />
       地図・データは参考情報です。MICHILUは判定をしません。重要事項説明などの最終確認は、必ず役所の窓口・公的な資料で行ってください。
     </p>
+  );
+}
+
+const DOCS: { Icon: LucideIcon; title: string; sub: string }[] = [
+  { Icon: ListChecks, title: "要注意点と次にやること", sub: "問題になりそうな所と、窓口ごとに確かめることの一覧" },
+  { Icon: Printer, title: "調査メモ（印刷・PDF）", sub: "道路・法令・ハザード・地価・周辺環境をA4にまとめる" },
+  { Icon: ScrollText, title: "重説・物件概要の下書き", sub: "重要事項説明書・販売図面の欄の順に、コピーして使える" },
+  { Icon: MapIcon, title: "案内図（印刷・PDF）", sub: "物件の場所の地図（A4）" },
+  { Icon: ClipboardCopy, title: "結果の文面", sub: "メール・チャット・社内の報告にそのまま貼れる文" },
+];
+
+/** 書類・出力（物件を開いていないとき）。作れる書類と、最近調べた物件から作る入口 */
+export function DocsPage({ history, onPick }: { history: HistoryItem[]; onPick: (h: HistoryItem) => void }) {
+  return (
+    <>
+      <PageHead icon={<FileText size={13} strokeWidth={1.6} absoluteStrokeWidth color={NAVY} />} title="書類・出力" sub="物件を調べると、その物件の書類をすぐ作れます。どれも参考の資料です。" />
+      <div className="mt-[6px]">
+        {DOCS.map((d, i) => (
+          <div key={d.title} className={`flex items-center gap-[8px] px-[9.2px] py-[8px] ${i < DOCS.length - 1 ? "border-b-[0.6px] border-[#eef2f6]" : ""}`}>
+            <span className="flex shrink-0 items-center justify-center rounded-full bg-[#f2f5f9]" style={{ width: 22, height: 22 }}>
+              <d.Icon size={10} strokeWidth={1.4} absoluteStrokeWidth color={NAVY} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold leading-[1.3]" style={{ fontSize: 8.2, color: INK2 }}>
+                {d.title}
+              </span>
+              <span className="mt-[2px] block leading-[1.4]" style={{ fontSize: 6.6, color: SUB }}>
+                {d.sub}
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+      <SectionTitle title="最近調べた物件から作る" />
+      {history.length ? (
+        <div className="mt-[2px]">
+          {history.slice(0, 5).map((h, i, a) => (
+            <PlaceRow key={historyKey(h)} item={h} onClick={() => onPick(h)} line={i < a.length - 1} />
+          ))}
+        </div>
+      ) : (
+        <p className="mt-[6px] px-[9.2px] leading-[1.5]" style={{ fontSize: 7.2, color: "#8a95a6" }}>
+          まだありません。ホームで物件を調べると、ここから書類を作れます。
+        </p>
+      )}
+      <Disclaimer />
+    </>
   );
 }
 
@@ -334,7 +252,7 @@ export function AccountPage({ onHelp, onCities, onHistory, onFavorites, onSource
   ];
   return (
     <>
-      <PageHead icon={<User size={13} strokeWidth={1.6} absoluteStrokeWidth color={NAVY} />} title="マイページ" sub="履歴とお気に入りは、この端末の中だけに保存しています。" />
+      <PageHead icon={<Ellipsis size={13} strokeWidth={2} absoluteStrokeWidth color={NAVY} />} title="その他" sub="使い方・対応エリア・データの出典。履歴とお気に入りは、この端末の中だけに保存しています。" />
       <div className="mx-[9.2px] mt-[8px] rounded-[9px] bg-[linear-gradient(135deg,#1b4280_0%,#133664_55%,#0a2248_100%)] px-[11px] py-[10px] text-white">
         <p className="flex items-center gap-[6px] font-bold leading-none" style={{ fontSize: 8.6 }}>
           <LogIn size={11} strokeWidth={1.6} absoluteStrokeWidth />

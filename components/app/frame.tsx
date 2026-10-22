@@ -1,12 +1,14 @@
 "use client";
 
-// スマホの新しい見た目（紺）の枠：上の写真の部分（ロゴ・右上のボタン・見出し・検索窓・最近の検索）、白いカードの台紙、いちばん下のメニュー。
+// スマホの新しい見た目（紺）の枠：物件・履歴などの画面の上の写真の部分（ロゴ・右上のボタン・見出し・検索窓・最近の検索）、白いカードの台紙、
+// いちばん下のメニュー（検索する前のホームは components/app/home.tsx）。
 // 寸法はデザインの絵（幅393pt。上のステータスバー24ptは切り落とす）から測った値で、画面の幅に合わせて全体を拡大・縮小する
 // （CSS の zoom。値は app/layout.tsx の <head> で決める。components/app/zoom.ts）
-import { Bookmark, LoaderCircle, Menu, Search, User, X } from "lucide-react";
+/* eslint-disable @next/next/no-img-element -- 書き出し（output: "export"）の静的なロゴ画像をそのまま置く */
+import { Bookmark, Ellipsis, FileText, LoaderCircle, Menu, Search, Star, X } from "lucide-react";
 import type { CSSProperties, ReactNode, RefObject } from "react";
 import type { HistoryItem } from "@/lib/history";
-import { ClockBack, HouseFill, MockLogoMark } from "./icons";
+import { ClockBack, HouseFill } from "./icons";
 import { NAVY } from "./ui";
 
 /** 絵の幅（pt）。この幅で描いて、画面の幅に合わせて拡大・縮小する */
@@ -71,20 +73,14 @@ export function Hero({
 
       {/* ロゴ（押すとホーム） */}
       <button onClick={onHome} aria-label="MICHILU ホーム" className="absolute" style={at(16, 12, 190, 36)}>
-        <MockLogoMark style={at(4.5, 5, 35.3, 25.9)} />
-        <span className="font-latin absolute whitespace-nowrap leading-none" style={{ left: 58, top: 5.26, fontSize: 15.2, letterSpacing: 3.95, fontWeight: 500, color: "#0f1b33" }}>
-          MICHILU
-        </span>
-        <span className="absolute whitespace-nowrap leading-none" style={{ left: 56.6, top: 23.74, fontSize: 7.2, letterSpacing: 0.64, color: "#3c4658" }}>
-          不動産の現場に、すぐ使える情報を。
-        </span>
+        <LogoLockup style={at(2, 3, undefined, 30)} />
       </button>
 
-      {/* 右上：検索履歴・保存・メニュー */}
+      {/* 右上：検索履歴・お気に入り・メニュー */}
       <TopButton cx={279.1} label="検索履歴" onClick={onHistory}>
         <ClockBack size={14} stroke={1.5} />
       </TopButton>
-      <TopButton cx={322.2} label="保存" onClick={onFavorites}>
+      <TopButton cx={322.2} label="お気に入り" onClick={onFavorites}>
         <Bookmark size={13} strokeWidth={1.3} absoluteStrokeWidth />
       </TopButton>
       <button onClick={onMenu} aria-label="メニュー" className="absolute flex items-center justify-center rounded-full bg-white/40 text-[#0f1b33] active:bg-white/70" style={at(365.8 - 14.75, 23.5 - 14.75, 29.5, 29.5)}>
@@ -145,23 +141,47 @@ export function Hero({
   );
 }
 
+/** ロゴ（新しいマーク・MICHILU・「不動産の現場に、すぐ使える情報を。」。届いた素材から切り出した透過の画像） */
+export function LogoLockup({ style }: { style?: CSSProperties }) {
+  return <img src="/home/logo.webp" alt="MICHILU 不動産の現場に、すぐ使える情報を。" width={900} height={160} draggable={false} style={{ width: "auto", ...style }} />;
+}
+
 /**
  * 検索窓の入力欄。iPhone は 16px より小さい字の入力欄に触れると画面を拡大するので、字を 16px（拡大・縮小の後で）で描いてから
- * transform で絵の大きさ（10pt）に縮める
+ * transform で絵の大きさ（size pt）に縮める
  */
-function ScaledInput({ value, onChange, inputRef }: { value: string; onChange: (v: string) => void; inputRef?: RefObject<HTMLInputElement | null> }) {
-  const k = "calc(10.06 * var(--app-zoom, 1) / 16)";
+export function ScaledInput({
+  value,
+  onChange,
+  inputRef,
+  placeholder = "住所・地番を入力（例：渋谷区神南1-19-11）",
+  label = "住所・地番",
+  size = 10.06,
+  autoComplete = "street-address",
+  className = "ml-[10.3px] mr-[4px]",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  inputRef?: RefObject<HTMLInputElement | null>;
+  placeholder?: string;
+  label?: string;
+  /** 絵の上の字の大きさ（pt） */
+  size?: number;
+  autoComplete?: string;
+  className?: string;
+}) {
+  const k = `calc(${size} * var(--app-zoom, 1) / 16)`;
   return (
-    <div className="relative ml-[10.3px] mr-[4px] h-full min-w-0 flex-1 overflow-hidden">
+    <div className={`relative h-full min-w-0 flex-1 overflow-hidden ${className}`}>
       <input
         ref={inputRef}
         type="search"
         enterKeyHint="search"
-        autoComplete="street-address"
+        autoComplete={autoComplete}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="住所・地番を入力（例：渋谷区神南1-19-11）"
-        aria-label="住所・地番"
+        placeholder={placeholder}
+        aria-label={label}
         className="absolute left-0 top-1/2 bg-transparent font-medium text-[#121a2b] outline-none placeholder:font-normal placeholder:text-[#8d97a8] [&::-webkit-search-cancel-button]:hidden"
         style={{ width: `calc(100% / ${k})`, fontSize: "calc(16px / var(--app-zoom, 1))", transform: `translateY(-50%) scale(${k})`, transformOrigin: "left center" }}
       />
@@ -191,21 +211,26 @@ export function SheetFrame({ children }: { children: ReactNode }) {
   );
 }
 
-export type NavKey = "home" | "history" | "favorites" | "account";
+export type NavKey = "home" | "history" | "favorites" | "docs" | "account";
 
-const NAV: { key: NavKey; label: string; cx: number; icon: (on: boolean) => ReactNode }[] = [
-  { key: "home", label: "ホーム", cx: 49.4, icon: (on) => <HouseFill size={15.5} color={on ? "#1b3563" : "#5f697c"} /> },
-  { key: "history", label: "検索履歴", cx: 146.2, icon: (on) => <ClockBack size={15.5} stroke={on ? 1.8 : 1.45} color={on ? "#1b3563" : "#5f697c"} /> },
-  { key: "favorites", label: "お気に入り", cx: 247.7, icon: (on) => <Bookmark size={15} strokeWidth={on ? 1.7 : 1.3} absoluteStrokeWidth color={on ? "#1b3563" : "#5f697c"} fill={on ? "#1b3563" : "none"} /> },
-  { key: "account", label: "マイページ", cx: 345.3, icon: (on) => <User size={15} strokeWidth={on ? 1.7 : 1.3} absoluteStrokeWidth color={on ? "#1b3563" : "#5f697c"} /> },
+const ON = "#1b3563";
+const OFF = "#5f697c";
+/** 5つを同じ幅で並べる（幅393pt ÷ 5） */
+const NAV_W = ART_W / 5;
+const NAV: { key: NavKey; label: string; icon: (on: boolean) => ReactNode }[] = [
+  { key: "home", label: "ホーム", icon: (on) => <HouseFill size={15.5} color={on ? ON : OFF} /> },
+  { key: "history", label: "履歴", icon: (on) => <ClockBack size={15.5} stroke={on ? 1.8 : 1.45} color={on ? ON : OFF} /> },
+  { key: "favorites", label: "お気に入り", icon: (on) => <Star size={15} strokeWidth={on ? 1.7 : 1.3} absoluteStrokeWidth color={on ? ON : OFF} fill={on ? ON : "none"} /> },
+  { key: "docs", label: "書類・出力", icon: (on) => <FileText size={15} strokeWidth={on ? 1.7 : 1.3} absoluteStrokeWidth color={on ? ON : OFF} /> },
+  { key: "account", label: "その他", icon: (on) => <Ellipsis size={16} strokeWidth={on ? 2.2 : 1.8} absoluteStrokeWidth color={on ? ON : OFF} /> },
 ];
 
-/** いちばん下のメニュー（ホーム・検索履歴・お気に入り・マイページ） */
+/** いちばん下のメニュー（ホーム・履歴・お気に入り・書類・出力・その他） */
 export function BottomNav({ active, onSelect }: { active: NavKey; onSelect: (key: NavKey) => void }) {
   return (
     <nav aria-label="画面の切り替え" className="shrink-0 overflow-hidden bg-white pb-[max(0px,calc(env(safe-area-inset-bottom)-12px))] shadow-[0_-1px_6px_rgba(16,40,80,0.06)]">
       <div className="relative mx-auto" style={{ width: ART_W, height: 51, zoom: ZOOM }}>
-        {NAV.map((n) => {
+        {NAV.map((n, i) => {
           const on = n.key === active;
           return (
             <button
@@ -213,10 +238,10 @@ export function BottomNav({ active, onSelect }: { active: NavKey; onSelect: (key
               onClick={() => onSelect(n.key)}
               aria-current={on ? "page" : undefined}
               className="absolute flex flex-col items-center pt-[7.4px]"
-              style={{ left: n.cx - 40, top: 0, width: 80, height: 51 }}
+              style={{ left: i * NAV_W, top: 0, width: NAV_W, height: 51 }}
             >
               {n.icon(on)}
-              <span className="leading-none" style={{ marginTop: on ? 5.2 : 4.7, fontSize: on ? 7.3 : 7.44, color: on ? "#1b3563" : "#6a7385", fontWeight: on ? 700 : 400 }}>
+              <span className="whitespace-nowrap leading-none" style={{ marginTop: on ? 5.2 : 4.7, fontSize: on ? 7.3 : 7.44, color: on ? ON : "#6a7385", fontWeight: on ? 700 : 400 }}>
                 {n.label}
               </span>
             </button>

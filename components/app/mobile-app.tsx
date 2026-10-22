@@ -1,7 +1,8 @@
 "use client";
 
-// スマホの画面（紺の新しい見た目）。上の写真の部分と検索窓・白いカード・下のメニューの枠の中に、検索する前のホーム、
-// 物件の6つのタブ（基本情報・周辺環境・相場・取引・法令・規制・ハザード・取引事例）、検索履歴・お気に入り・マイページを出す。
+// スマホの画面（紺の新しい見た目）。検索する前のホームは新しいUIの絵どおり（components/app/home.tsx）。
+// それ以外は上の写真の部分と検索窓・白いカード・下のメニューの枠の中に、物件の6つのタブ（基本情報・周辺環境・相場・取引・法令・規制・
+// ハザード・取引事例）、検索履歴・お気に入り・書類・出力・その他を出す。
 // 幅393ptの絵の寸法で描き、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。下から出す画面（シート）は拡大・縮小しない
 import { Info, LoaderCircle, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -34,7 +35,9 @@ import { useCopy } from "../use-copy";
 import { MapAppsSheet, ReportSheet } from "./app-sheets";
 import { DetailSheet } from "./detail-sheets";
 import { ART_W, BottomNav, Hero, SheetFrame, ZOOM, type NavKey } from "./frame";
-import { AccountPage, FavoritesPage, HistoryPage, HomePage, NotOkPage } from "./pages";
+import { HomeScreen, modeOf, type HomeMessage, type SearchMode } from "./home";
+import { markNewsSeen, NewsSheet, useUnreadNews } from "./news";
+import { AccountPage, DocsPage, FavoritesPage, HistoryPage, NotOkPage } from "./pages";
 import { BottomActions, PropertyHeader, TabBar, type TabKey } from "./property-head";
 import { AroundTab } from "./tab-around";
 import { BasicTab } from "./tab-basic";
@@ -86,6 +89,14 @@ export function MobileApp(props: MobileAppProps) {
   const [picker, setPicker] = useState<{ start?: { lat: number; lng: number } } | null>(null);
   const [locating, setLocating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // ホームの調べ方（住所・地番・地図）と、調査メニューで選んだ「調べたら開くタブ」・その案内
+  const [mode, setMode] = useState<SearchMode>(() => modeOf(input));
+  const [startTab, setStartTab] = useState<TabKey | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
+  // 物件の「レポートを作成」（書類・出力）。下のメニューの「書類・出力」からも開く
+  const [report, setReport] = useState(false);
+  const [news, setNews] = useState(false);
+  const unread = useUnreadNews();
   const offline = useOffline();
   const scroller = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -103,6 +114,16 @@ export function MobileApp(props: MobileAppProps) {
     queueMicrotask(() => setPage("home"));
     scroller.current?.scrollTo(0, 0);
   }, [resultKey]);
+  // 物件が開いたら、調査メニューで選んだタブ・案内は使い終わり。開けなかったら（見つからない等）、頼まれていたレポートも開かない
+  const status = shown?.result.status;
+  useEffect(() => {
+    if (!status) return;
+    queueMicrotask(() => {
+      setStartTab(null);
+      setHint(null);
+      if (status !== "ok") setReport(false);
+    });
+  }, [status, resultKey]);
 
   const go = useCallback((p: NavKey) => {
     setPage(p);
@@ -137,14 +158,46 @@ export function MobileApp(props: MobileAppProps) {
     setPage("home");
     onPickHistory(h);
   };
+  /** 調べ方の切り替え。地番の欄では入力に「地番 」を付けて調べる（入力欄には出さない） */
+  const changeMode = (m: SearchMode) => {
+    setMode(m);
+    setNotice(null);
+    const text = input.replace(/^\s*地番\s*/, "").trim();
+    if (m === "address") setInput(text);
+    else if (m === "chiban") setInput(text ? `地番 ${text}` : "");
+  };
+  const submitHome = () => {
+    if (!input.replace(/^\s*地番\s*/, "").trim()) {
+      setNotice(mode === "chiban" ? "地番を入れてください（例：松戸市古ヶ崎四丁目3556-1）。" : "住所を入れてください（例：渋谷区神南1-19-11）。地番のときは「地番から検索」を選んでください。");
+      inputRef.current?.focus();
+      return;
+    }
+    setNotice(null);
+    onSearch();
+  };
 
   const ok = shown?.result.status === "ok" ? (shown.result as Ok) : undefined;
+  // 検索する前のホーム（新しいUI）。調べている間もホームのまま（「調査を開始する」が回る）
+  const showHome = page === "home" && !shown;
+  const failure = error ?? (offline ? OFFLINE : null);
+  const homeMessage: HomeMessage = failure ? { text: failure, warn: true } : notice ? { text: notice, warn: true } : hint ? { text: hint, warn: false } : null;
   const isFav = (h: HistoryItem) => favorites.some((f) => favoriteKey(f) === favoriteKey(h));
 
   let body: ReactNode;
   if (page === "history")
     body = <HistoryPage history={history} isFavorite={isFav} onToggleFavorite={(h) => setFavorites(toggleFavorite(h))} onPick={pickRecent} onClear={props.onClearHistory} />;
   else if (page === "favorites") body = <FavoritesPage favorites={favorites} onPick={pickRecent} onRemove={(f) => setFavorites(removeFavorite(f))} />;
+  else if (page === "docs")
+    body = (
+      <DocsPage
+        history={history}
+        onPick={(h) => {
+          // 調べ終わったら、その物件の「レポートを作成」を開く
+          setReport(true);
+          pickRecent(h);
+        }}
+      />
+    );
   else if (page === "account")
     body = (
       <AccountPage
@@ -158,65 +211,93 @@ export function MobileApp(props: MobileAppProps) {
       />
     );
   else if (shown && shown.result.status !== "ok") body = <NotOkPage query={shown.query} result={shown.result} onPick={props.onPickAddress} onMap={openMap} />;
-  else if (!ok)
-    body = (
-      <HomePage
-        history={history}
-        favorites={favorites}
-        areaText={areaText}
-        cityCount={MUNICIPALITIES.length}
-        onPick={pickRecent}
-        onMap={openMap}
-        onHere={pickHere}
-        onChiban={typeChiban}
-        onHistory={() => go("history")}
-        onFavorites={() => go("favorites")}
-        onCities={() => setSheet("cities")}
-        onHelp={() => setSheet("help")}
-        locating={locating}
-      />
-    );
 
   return (
     <div className="theme-navy flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-[#f7f9fd]" style={{ fontFeatureSettings: "normal", letterSpacing: 0 }}>
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain">
         <div className="relative mx-auto" style={{ width: ART_W, zoom: ZOOM }}>
-          <Hero
-            input={input}
-            setInput={setInput}
-            onSearch={() => {
-              setPage("home");
-              // 空のまま押したら、何を入れるかを出して入力欄に戻す
-              if (!input.trim()) {
-                setNotice("住所か地番を入れてください（例：渋谷区神南1-19-11、地番 松戸市古ヶ崎四丁目3556-1）。");
-                inputRef.current?.focus();
-                return;
-              }
-              setNotice(null);
-              onSearch();
-            }}
-            loading={loading}
-            recent={history}
-            onPickRecent={pickRecent}
-            quick={[
-              { label: "地図で選ぶ", onClick: openMap },
-              { label: "現在地で調べる", onClick: pickHere },
-              { label: "地番で調べる", onClick: typeChiban },
-            ]}
-            onHome={() => {
-              setPage("home");
-              props.onHome();
-            }}
-            onHistory={() => go("history")}
-            onFavorites={() => go("favorites")}
-            onMenu={() => setSheet("menu")}
-            inputRef={inputRef}
-          />
+          {showHome ? (
+            <HomeScreen
+              input={input}
+              setInput={setInput}
+              mode={mode}
+              onMode={changeMode}
+              onSubmit={submitHome}
+              loading={loading}
+              locating={locating}
+              message={homeMessage}
+              onDismiss={() => {
+                setNotice(null);
+                setHint(null);
+              }}
+              history={history}
+              onPickRecent={pickRecent}
+              onHistory={() => go("history")}
+              onMap={openMap}
+              onHere={pickHere}
+              onMenu={(tab, title) => {
+                setStartTab(tab);
+                setNotice(null);
+                setHint(`調べたら「${title}」の情報から開きます。${mode === "map" ? "地図で場所を選んでください。" : "住所か地番を入れて「調査を開始する」を押してください。"}`);
+                // 押した操作の中で入力欄に入れる（iPhone はそうしないとキーボードが出ない）
+                if (mode === "map") scroller.current?.scrollTo({ top: 0, behavior: "smooth" });
+                else inputRef.current?.focus();
+              }}
+              onMenuAll={() => setSheet("help")}
+              onDocs={() => go("docs")}
+              onBell={() => {
+                setNews(true);
+                markNewsSeen();
+              }}
+              unread={unread}
+              onCities={() => setSheet("cities")}
+              onSources={() => setSheet("sources")}
+              onLogo={() => scroller.current?.scrollTo({ top: 0, behavior: "smooth" })}
+              areaText={areaText}
+              cityCount={MUNICIPALITIES.length}
+              inputRef={inputRef}
+            />
+          ) : (
+            <Hero
+              input={input}
+              setInput={setInput}
+              onSearch={() => {
+                setPage("home");
+                // 空のまま押したら、何を入れるかを出して入力欄に戻す
+                if (!input.trim()) {
+                  setNotice("住所か地番を入れてください（例：渋谷区神南1-19-11、地番 松戸市古ヶ崎四丁目3556-1）。");
+                  inputRef.current?.focus();
+                  return;
+                }
+                setNotice(null);
+                onSearch();
+              }}
+              loading={loading}
+              recent={history}
+              onPickRecent={pickRecent}
+              quick={[
+                { label: "地図で選ぶ", onClick: openMap },
+                { label: "現在地で調べる", onClick: pickHere },
+                { label: "地番で調べる", onClick: typeChiban },
+              ]}
+              onHome={() => {
+                setPage("home");
+                props.onHome();
+              }}
+              onHistory={() => go("history")}
+              onFavorites={() => go("favorites")}
+              onMenu={() => setSheet("menu")}
+              inputRef={inputRef}
+            />
+          )}
           {/* 物件の画面は、検索履歴などのページを見ているあいだも残す（戻ったときに読み直さない・タブもそのまま） */}
           {ok && (
             <div hidden={page !== "home"}>
               <PropertyView
                 key={`${ok.lat},${ok.lng},${ok.matchedAddress}`}
+                initialTab={startTab ?? undefined}
+                report={report}
+                setReport={setReport}
                 query={shown!.query}
                 result={ok}
                 loading={loading}
@@ -231,7 +312,7 @@ export function MobileApp(props: MobileAppProps) {
               />
             </div>
           )}
-          {(!ok || page !== "home") && (
+          {!showHome && (!ok || page !== "home") && (
             <SheetFrame>
               {/* 通信できないあいだは「調べています」より先に、通信できないことを出す */}
               <Banner loading={loading && !offline} error={error ?? (offline ? OFFLINE : null)} notice={notice} onDismiss={() => setNotice(null)} />
@@ -247,6 +328,10 @@ export function MobileApp(props: MobileAppProps) {
           if (k === "home" && page === "home") {
             if (shown) props.onHome();
             else scroller.current?.scrollTo({ top: 0, behavior: "smooth" });
+          } else if (k === "docs" && ok) {
+            // 物件を開いていれば、その物件の「レポートを作成」を開く
+            setPage("home");
+            setReport(true);
           } else go(k);
         }}
       />
@@ -260,6 +345,7 @@ export function MobileApp(props: MobileAppProps) {
         <HelpSheet open={sheet === "help"} onClose={() => setSheet(null)} />
         <CitiesSheet open={sheet === "cities"} onClose={() => setSheet(null)} />
         <SourcesSheet open={sheet === "sources"} onClose={() => setSheet(null)} />
+        <NewsSheet open={news} onClose={() => setNews(false)} />
         {picker && (
           <LocationPicker
             start={picker.start}
@@ -321,6 +407,9 @@ function Banner({ loading, error, notice, onDismiss }: { loading: boolean; error
 
 /** 物件の画面（6つのタブ）。データはここで読む */
 function PropertyView({
+  initialTab,
+  report,
+  setReport,
   query,
   result,
   loading,
@@ -333,6 +422,10 @@ function PropertyView({
   onFix,
   scroller,
 }: {
+  /** 開いたときのタブ（ホームの調査メニューで選んだもの） */
+  initialTab?: TabKey;
+  report: boolean;
+  setReport: (open: boolean) => void;
   query: string;
   result: Ok;
   loading: boolean;
@@ -346,10 +439,9 @@ function PropertyView({
   scroller: React.RefObject<HTMLDivElement | null>;
 }) {
   const data = useProperty(result);
-  const [tab, setTab] = useState<TabKey>("basic");
+  const [tab, setTab] = useState<TabKey>(initialTab ?? "basic");
   const [detail, setDetail] = useState<{ kind: SheetKind; arg?: number } | null>(null);
   const [mapApps, setMapApps] = useState(false);
-  const [report, setReport] = useState(false);
   const [triage, setTriage] = useState(false);
   const [draft, setDraft] = useState(false);
   const [guide, setGuide] = useState(false);
