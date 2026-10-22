@@ -39,8 +39,8 @@ const SAME_STATION_M = 1000;
 const M_LAT = 110_950;
 const distanceM = ([lng1, lat1]: LngLat, [lng2, lat2]: LngLat) => Math.hypot((lng2 - lng1) * 111_320 * Math.cos((((lat1 + lat2) / 2) * Math.PI) / 180), (lat2 - lat1) * M_LAT);
 
-/** 駅の名前の比べ方：かっこ書きと「駅」を外す（「押上（スカイツリー前）」→「押上」） */
-const nameKey = (n: string) => n.normalize("NFKC").replace(/\(.*?\)/g, "").replace(/駅$/, "").trim();
+/** 駅の名前の比べ方：かっこ書きと「駅」を外す（「押上（スカイツリー前）」「明治神宮前〈原宿〉」→「押上」「明治神宮前」） */
+const nameKey = (n: string) => n.normalize("NFKC").replace(/\(.*?\)|〈.*?〉/g, "").replace(/駅$/, "").trim();
 
 let file: Promise<RidershipFile | null> | undefined;
 const load = cachedJson(browserJson);
