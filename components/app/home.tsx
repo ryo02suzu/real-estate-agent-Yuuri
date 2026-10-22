@@ -1,6 +1,5 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- 書き出し（output: "export"）の静的な画像を、そのまま重ねて置く */
 // スマホの新しいホーム（検索する前の画面）。デザインの絵（新しいUI）の並びで、上から：街の写真の上にロゴ・お知らせ・見出し・強みの3つ、
 // 白いカードに調べ方の切り替え（住所・地番・地図）・入力欄・「調査を開始する」、最近の検索（町の写真つき）、調査メニュー（6つ）、
 // 書類を作るバナー。写真・ロゴ・ボタンの地・バナーの地は届いた素材から切り出したもの（public/home/。焼き込みの文字は消して、
@@ -10,7 +9,7 @@ import type { ReactNode, RefObject } from "react";
 import { placeholderScenes, placeTitle, SCENES, sceneSrc, stamp } from "@/lib/app/scene";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import { serif } from "./fonts";
-import { ART_W, LogoLockup, ScaledInput } from "./frame";
+import { ART_W, LogoLockup, PhoneImg, ScaledInput } from "./frame";
 import { HazardArt, HouseTreeArt, LayersArt, PinFill, RoadArt, ShieldFill, TownArt, YenArt } from "./home-art";
 import type { TabKey } from "./property-head";
 import { NAVY, SUB } from "./ui";
@@ -113,10 +112,10 @@ export function HomeScreen({
   const change = (v: string) => setInput(mode === "chiban" && v.trim() ? `地番 ${v.replace(CHIBAN, "")}` : v);
 
   return (
-    <div style={{ background: PAGE }}>
+    <div className={serif.variable} style={{ background: PAGE }}>
       {/* 街の写真の部分 */}
       <div className="relative overflow-hidden" style={{ height: HERO_H }}>
-        <img src="/home/hero.webp" alt="" draggable={false} className="absolute max-w-none" style={{ width: PHOTO_W, height: (PHOTO_W * 941) / 1672, left: ART_W - PHOTO_W, top: 0 }} />
+        <PhoneImg src="/home/hero.webp" alt="" draggable={false} className="absolute max-w-none" style={{ width: PHOTO_W, height: (PHOTO_W * 941) / 1672, left: ART_W - PHOTO_W, top: 0 }} />
         {/* 左は見出しのために白くぼかし、下は地の色へ */}
         <div className="absolute inset-0" style={{ background: "linear-gradient(90deg,rgba(248,250,253,0.95) 0%,rgba(248,250,253,0.84) 30%,rgba(248,250,253,0.32) 52%,rgba(248,250,253,0) 66%)" }} />
         <div className="absolute inset-x-0 bottom-0" style={{ height: 78, background: `linear-gradient(180deg,rgba(243,246,251,0) 0%,${PAGE} 88%)` }} />
@@ -134,7 +133,7 @@ export function HomeScreen({
           {unread && <span className="absolute rounded-full border border-white bg-[#f0263a]" style={{ right: 3.6, top: 3.4, width: 6.6, height: 6.6 }} />}
         </button>
 
-        <h1 className={`${serif.className} absolute whitespace-nowrap`} style={{ left: 21, top: 59, fontSize: 26.5, lineHeight: "35px", letterSpacing: 0.6, color: HEAD }}>
+        <h1 className="home-serif absolute whitespace-nowrap" style={{ left: 21, top: 59, fontSize: 26.5, lineHeight: "35px", letterSpacing: 0.6, color: HEAD }}>
           調べる時間を、
           <br />
           商談の時間に。
@@ -228,7 +227,7 @@ export function HomeScreen({
           )}
 
           <button type="submit" disabled={loading} className="relative mt-[9px] block w-full overflow-hidden rounded-[14px] text-white shadow-[0_6px_16px_rgba(12,40,90,0.25)] active:opacity-90" style={{ height: 46 }}>
-            <img src="/home/cta.webp" alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover" />
+            <PhoneImg src="/home/cta.webp" alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover" />
             <span className="absolute inset-y-0 left-0 flex items-center justify-center gap-[7px] whitespace-nowrap" style={{ width: "62%", fontSize: 14.5, letterSpacing: 1.6, fontWeight: 500 }}>
               {loading ? (
                 <>
@@ -270,7 +269,7 @@ export function HomeScreen({
                       aria-label={`${full}（${stamp(h.at)}${kind}）を開く`}
                       className="block w-full overflow-hidden rounded-[8px] bg-white text-left shadow-[0_2px_9px_rgba(20,45,85,0.12)] active:opacity-80"
                     >
-                      <img src={sceneSrc(scene)} alt="" loading="lazy" draggable={false} className="block w-full object-cover" style={{ height: 45.5, objectPosition: `50% ${SCENES[scene].y}%` }} />
+                      <PhoneImg src={sceneSrc(scene)} alt="" loading="lazy" draggable={false} className="block w-full object-cover" style={{ height: 45.5, objectPosition: `50% ${SCENES[scene].y}%` }} />
                       <span className="flex items-center gap-[2px] pb-[7px] pl-[7px] pr-[4px] pt-[6.5px]">
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-bold leading-[1.25]" style={{ fontSize: 8.3, color: TEXT, fontFeatureSettings: '"palt"' }}>
@@ -328,7 +327,7 @@ export function HomeScreen({
 
       {/* 書類を作る */}
       <button onClick={onDocs} className="relative mx-[13px] mb-[12px] mt-[10px] block overflow-hidden rounded-[12px] text-left shadow-[0_6px_20px_rgba(60,40,20,0.08)] active:opacity-90" style={{ width: ART_W - 26, height: ((ART_W - 26) * 272) / 1400 }}>
-        <img src="/home/docs.webp" alt="" loading="lazy" draggable={false} className="absolute inset-0 h-full w-full object-cover" />
+        <PhoneImg src="/home/docs.webp" alt="" loading="lazy" draggable={false} className="absolute inset-0 h-full w-full object-cover" />
         <span className="absolute" style={{ left: 14.5, top: 14.5 }}>
           <span className="block whitespace-nowrap font-bold leading-none" style={{ fontSize: 13.8, color: "#0f2a5c", letterSpacing: 0.2 }}>
             調査結果から書類を作成
@@ -348,7 +347,7 @@ export function HomeScreen({
 function Head({ icon, title, onMore }: { icon?: ReactNode; title: string; onMore?: () => void }) {
   return (
     <div className="flex items-center justify-between">
-      <h2 className={`${serif.className} flex items-center gap-[6px] leading-none`} style={{ fontSize: 12.4, color: HEAD, letterSpacing: 0.4 }}>
+      <h2 className="home-serif flex items-center gap-[6px] leading-none" style={{ fontSize: 12.4, color: HEAD, letterSpacing: 0.4 }}>
         {icon}
         {title}
       </h2>

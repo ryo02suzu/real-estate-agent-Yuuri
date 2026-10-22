@@ -109,6 +109,13 @@ body {
   letter-spacing: 0.01em;
 }
 
+/* スマホの新しいホームの明朝（components/app/fonts.ts）。PC の幅では使わない */
+@media (max-width: 1023px) {
+  .home-serif {
+    font-family: var(--font-serif-jp), serif;
+  }
+}
+
 /* 住所や電話番号の数字は桁を揃える */
 .tabular {
   font-variant-numeric: tabular-nums;

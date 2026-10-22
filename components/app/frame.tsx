@@ -4,9 +4,8 @@
 // いちばん下のメニュー（検索する前のホームは components/app/home.tsx）。
 // 寸法はデザインの絵（幅393pt。上のステータスバー24ptは切り落とす）から測った値で、画面の幅に合わせて全体を拡大・縮小する
 // （CSS の zoom。値は app/layout.tsx の <head> で決める。components/app/zoom.ts）
-/* eslint-disable @next/next/no-img-element -- 書き出し（output: "export"）の静的なロゴ画像をそのまま置く */
 import { Bookmark, Ellipsis, FileText, LoaderCircle, Menu, Search, Star, X } from "lucide-react";
-import type { CSSProperties, ReactNode, RefObject } from "react";
+import type { CSSProperties, ImgHTMLAttributes, ReactNode, RefObject } from "react";
 import type { HistoryItem } from "@/lib/history";
 import { ClockBack, HouseFill } from "./icons";
 import { NAVY } from "./ui";
@@ -141,9 +140,25 @@ export function Hero({
   );
 }
 
+/** 1×1 の透明な画像（PC の幅でスマホの画像の代わりに入れる） */
+const BLANK = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+/**
+ * スマホの画面だけで読む画像。最初の表示（書き出した HTML）はスマホの画面で、PC は表示のあとで PC の画面に切り替わるので、
+ * PC の幅では空の画像にして読み込ませない（<picture> の中の画像には React が先読みも付けない）
+ */
+export function PhoneImg(props: ImgHTMLAttributes<HTMLImageElement>) {
+  return (
+    <picture>
+      <source media="(min-width: 1024px)" srcSet={BLANK} />
+      <img {...props} alt={props.alt ?? ""} />
+    </picture>
+  );
+}
+
 /** ロゴ（新しいマーク・MICHILU・「不動産の現場に、すぐ使える情報を。」。届いた素材から切り出した透過の画像） */
 export function LogoLockup({ style }: { style?: CSSProperties }) {
-  return <img src="/home/logo.webp" alt="MICHILU 不動産の現場に、すぐ使える情報を。" width={900} height={160} draggable={false} style={{ width: "auto", ...style }} />;
+  return <PhoneImg src="/home/logo.webp" alt="MICHILU 不動産の現場に、すぐ使える情報を。" width={900} height={160} draggable={false} style={{ width: "auto", ...style }} />;
 }
 
 /**
