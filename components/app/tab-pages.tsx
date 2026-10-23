@@ -96,7 +96,7 @@ function Row({ icon, title, sub, onClick, right, value }: { icon: ReactNode; tit
         {icon}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block font-semibold leading-[1.35]" style={{ fontSize: 16, color: TEXT, wordBreak: "keep-all", overflowWrap: "anywhere" }}>
+        <span className="block font-semibold leading-[1.35]" style={{ fontSize: 16, color: TEXT }}>
           {title}
         </span>
         {sub && (
@@ -155,12 +155,22 @@ function Disclaimer() {
 
 /** 調べた物件の1行（市区町村から番地まで・日時と調べ方） */
 function PlaceRow({ item, onClick, right }: { item: HistoryItem; onClick: () => void; right?: ReactNode }) {
-  const { full, chiban } = placeParts(item);
+  const { city, full, chiban } = placeParts(item);
   const how = chiban ? "地番で調べた" : item.ll ? "地図で選んだ地点" : "";
+  // 長い住所は市区町村の後ろで折る（町名〜番地はひとかたまり。番地の途中では折らない。それでも長ければ「…」）
+  const rest = city && full.startsWith(`${city} `) ? full.slice(city.length + 1) : "";
+  const title = rest ? (
+    <>
+      {city}{" "}
+      <span className="inline-block max-w-full truncate align-bottom">{rest}</span>
+    </>
+  ) : (
+    full
+  );
   return (
     <Row
       icon={item.ll ? <MapIcon size={17} strokeWidth={1.7} absoluteStrokeWidth color={NAVY} /> : <MapPin size={17} strokeWidth={1.7} absoluteStrokeWidth color={NAVY} />}
-      title={full}
+      title={title}
       sub={[stamp(item.at), how].filter(Boolean).join("・")}
       onClick={onClick}
       right={right}
