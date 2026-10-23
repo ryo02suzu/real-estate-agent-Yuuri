@@ -6,11 +6,10 @@ import { Map as MapIcon } from "lucide-react";
 import { useState } from "react";
 import { parcelAreaM2, TSUBO_M2 } from "@/lib/app/area";
 import { asOfText, changeText, distanceText, kindText, type LandPriceHit } from "@/lib/roadmap/land-price";
-import { CARD, Ghost, LIGHT, Note, Primary, Stat, TEXT, yen } from "./r-ui";
+import { CARD, Ghost, LIGHT, manYen, Note, Primary, Stat, TEXT, yen } from "./r-ui";
 import type { TabProps } from "./types";
 import { NAVY } from "./ui";
 
-const tsubo = (perM2: number) => yen(perM2 * TSUBO_M2);
 
 /** 「3.02億円」「12.4億円」「8,500万円」 */
 export function okuText(v: number): string {
@@ -60,7 +59,7 @@ export function PriceTab({ data, go, expand }: TabProps) {
             円/㎡
           </span>
           <span className="ml-[10px]" style={{ fontSize: 13, color: LIGHT }}>
-            坪 約{tsubo(top.price)}円
+            坪 約{manYen(top.price * TSUBO_M2)}
           </span>
         </p>
         <div className="mt-[8px] flex items-center justify-between gap-[8px]">
@@ -77,7 +76,7 @@ export function PriceTab({ data, go, expand }: TabProps) {
       {/* 周辺の平均・幅・地点数 */}
       <div className="mt-[8px] grid grid-cols-3 gap-[8px]">
         <Stat label="周辺の平均" value={avg ? `${man(avg)}万` : "―"} unit={avg ? "円/㎡" : undefined} note={`半径2km・${near.length}地点`} />
-        <Stat label={`周辺の幅（${top.usage}）`} value={prices.length > 1 ? `${man(Math.min(...prices))}〜${man(Math.max(...prices))}万` : "―"} note={prices.length > 1 ? `円/㎡・近い${prices.length}地点` : "比べる地点なし"} small />
+        <Stat label="周辺の幅" value={prices.length > 1 ? `${man(Math.min(...prices))}〜${man(Math.max(...prices))}万` : "―"} note={prices.length > 1 ? `${top.usage}・近い${prices.length}地点` : "比べる地点なし"} small />
         <Stat label="土地の概算" value={area ? `約${okuText(area * top.price)}` : "―"} note={area ? `${area.toLocaleString("ja-JP", { maximumFractionDigits: 1 })}㎡ × 単価` : parcels.status === "loading" ? "筆を確認中…" : "地番か地図で調べると出ます"} />
       </div>
 

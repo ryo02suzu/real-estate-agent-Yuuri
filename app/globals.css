@@ -172,9 +172,28 @@ body {
   }
 }
 
-/* スマホの新しい画面（ホーム・タブのページ・下のメニュー）：押したときの灰色の四角と、画像の長押しのメニューを出さない（押した感じは各部品で出す） */
+/* スマホの幅では、スクロールできない所を引っぱっても画面全体が跳ねないようにする（components/app/no-bounce.ts と合わせて） */
+@media (max-width: 1023px) {
+  html,
+  body {
+    overscroll-behavior: none;
+  }
+}
+
+/*
+ * スマホの新しい画面（ホーム・物件・タブのページ・下のメニュー）：押したときの灰色の四角、2回押しの拡大と押した反応の遅れ、
+ * 字や画像の長押しの選択メニューを出さない（押した感じは各部品で出す）。入力欄の字は選べる
+ */
 .app-touch {
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.app-touch input,
+.app-touch textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 .app-touch img {
   -webkit-touch-callout: none;

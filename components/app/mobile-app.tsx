@@ -4,7 +4,7 @@
 // 今は NO IMAGE）と6つのタブの切り替えの下に、タブごとに1画面に収まる中身（components/app/r-*.tsx）。下のメニューのページ
 // （履歴・お気に入り・書類・出力・その他）は components/app/tab-pages.tsx、見つからない・候補・未対応は components/app/pages.tsx。
 // 幅393ptの絵の寸法で描き、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。下から出す画面（シート）は拡大・縮小しない
-import { LoaderCircle, TriangleAlert } from "lucide-react";
+import { Info, LoaderCircle, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { favoriteKey, toggleFavorite, removeFavorite, type FavoriteItem } from "@/lib/favorites";
@@ -24,7 +24,7 @@ import { buildSummary } from "@/lib/summary";
 import { DraftSheet } from "../draft-sheet";
 import { FullMap } from "../full-map";
 import { GuideMapSheet } from "../guide-map";
-import { CitiesSheet, HelpSheet, MenuSheet } from "../info-sheets";
+import { CitiesSheet, HelpSheet } from "../info-sheets";
 import { LocationPicker } from "../location-picker";
 import { addressOffLot, registryNeighbors } from "../parcel-card";
 import { PrintSheet } from "../print-sheet";
@@ -35,7 +35,9 @@ import { useCopy } from "../use-copy";
 import { MapAppsSheet, ReportSheet } from "./app-sheets";
 import { DetailSheet } from "./detail-sheets";
 import { ART_W, BottomNav, ZOOM, type NavKey } from "./frame";
-import { HomeScreen, PAGE, type HomeMessage } from "./home";
+import { HomeScreen, PAGE, SKY, type HomeMessage } from "./home";
+import { InstallSheet, useStandalone } from "./install";
+import { useFixedScreen } from "./no-bounce";
 import { markNewsSeen, NewsSheet, useUnreadNews } from "./news";
 import { NotOkPage } from "./pages";
 import { AroundTab } from "./r-around";
@@ -44,9 +46,9 @@ import { DealsTab } from "./r-deals";
 import { HazardTab } from "./r-hazard";
 import { LawTab } from "./r-law";
 import { PriceTab } from "./r-price";
-import { displayAddress, WARN } from "./r-ui";
+import { BAND_TOP, displayAddress, WARN } from "./r-ui";
 import { PlaceBanner, ResultBand, TabSegments, type TabKey } from "./result-head";
-import { AccountPage, DocsPage, FavoritesPage, HistoryPage, TabBanner } from "./tab-pages";
+import { AccountPage, DocsPage, FavoritesPage, HistoryPage, TabBanner, type DocKind } from "./tab-pages";
 import type { MapOpen, SheetKind, TabProps } from "./types";
 import { useProperty, type Ok, type PropertyData } from "./use-property";
 import { applyAppZoom } from "./zoom";
@@ -81,7 +83,7 @@ export type MobileAppProps = {
   onHome: () => void;
 };
 
-type AppSheet = "menu" | "help" | "cities" | "sources" | null;
+type AppSheet = "help" | "cities" | "sources" | "install" | null;
 
 export function MobileApp(props: MobileAppProps) {
   const { shown, input, setInput, loading, error, history, favorites, setFavorites, onSearch, onPickHistory, onPickPoint } = props;
@@ -94,6 +96,12 @@ export function MobileApp(props: MobileAppProps) {
   const [news, setNews] = useState(false);
   const unread = useUnreadNews();
   const offline = useOffline();
+  const standalone = useStandalone();
+  // 中身が画面に収まっていても、スワイプで画面全体が動かないようにする
+  useFixedScreen();
+  // 書類・出力のタイルで選んだ書類（その物件の画面が出たら、すぐ開く）
+  const [wanted, setWanted] = useState<{ kind: DocKind; key: string } | null>(null);
+  const wantedDone = useCallback(() => setWanted(null), []);
   const scroller = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // 開発中の再マウントで <html> の style が消えたときのため、拡大率をもう一度入れる
@@ -115,12 +123,19 @@ export function MobileApp(props: MobileAppProps) {
   useEffect(() => {
     if (!status) return;
     queueMicrotask(() => {
-      if (status !== "ok") setReport(false);
+      if (status !== "ok") {
+        setReport(false);
+        setWanted(null);
+      }
     });
   }, [status, resultKey]);
   // 調べられなかった（通信の失敗など）ときも、頼まれていたレポートは開かない（次に調べた物件で急に開かないように）
   useEffect(() => {
-    if (error) queueMicrotask(() => setReport(false));
+    if (error)
+      queueMicrotask(() => {
+        setReport(false);
+        setWanted(null);
+      });
   }, [error]);
 
   const go = useCallback((p: NavKey) => {
@@ -155,27 +170,54 @@ export function MobileApp(props: MobileAppProps) {
   const ok = shown?.result.status === "ok" ? (shown.result as Ok) : undefined;
   // 検索する前のホーム（新しいUI）。調べている間もホームのまま（「調査を開始する」が回る）
   const showHome = page === "home" && !shown;
+  // 時刻・電池の帯の色をページに合わせる（ホームは写真の上の空の色、ほかの画面は写真の帯の上の色。PC の色は変えない）
+  useEffect(() => {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"][media="(max-width: 1023px)"]');
+    meta?.setAttribute("content", showHome ? SKY : BAND_TOP);
+  }, [showHome]);
   const failure = error ?? (offline ? OFFLINE : null);
   const homeMessage: HomeMessage = failure ? { text: failure } : notice ? { text: notice } : null;
   const isFav = (h: HistoryItem) => favorites.some((f) => favoriteKey(f) === favoriteKey(h));
+  /** いま開いている物件（履歴・お気に入りと同じ形） */
+  const current = ok ? itemOf(shown!.query, ok) : undefined;
+  /** その物件のレポートの画面を開く（開いている物件ならそのまま、ほかの物件なら調べ直してから） */
+  const openDocsFor = (h: HistoryItem) => {
+    setReport(true);
+    if (current && favoriteKey(current) === favoriteKey(h)) setPage("home");
+    else pickRecent(h);
+  };
+  /** 書類の種類を押した：開いている物件（無ければ最近の物件）で、その書類をすぐ開く */
+  const makeDoc = (kind: DocKind) => {
+    const target = current ?? history[0];
+    if (!target) {
+      setNotice("先にホームで物件を調べると、ここから書類を作れます。");
+      return;
+    }
+    setWanted({ kind, key: favoriteKey(target) });
+    if (current) setPage("home");
+    else pickRecent(target);
+  };
 
   // 下のメニューのページ（履歴・お気に入り・書類・出力・その他）は、大きな見出しのページにする
   const tabPage = page !== "home";
   const tabBanner = <TabBanner loading={loading && !offline} error={failure} notice={notice} onDismiss={() => setNotice(null)} />;
   let body: ReactNode;
   if (page === "history")
-    body = <HistoryPage history={history} isFavorite={isFav} onToggleFavorite={(h) => setFavorites(toggleFavorite(h))} onPick={pickRecent} onClear={props.onClearHistory} banner={tabBanner} />;
-  else if (page === "favorites") body = <FavoritesPage favorites={favorites} onPick={pickRecent} onRemove={(f) => setFavorites(removeFavorite(f))} banner={tabBanner} />;
+    body = <HistoryPage history={history} isFavorite={isFav} onToggleFavorite={(h) => setFavorites(toggleFavorite(h))} onPick={pickRecent} onClear={props.onClearHistory} onHome={() => go("home")} banner={tabBanner} />;
+  else if (page === "favorites") body = <FavoritesPage favorites={favorites} onPick={pickRecent} onDocs={openDocsFor} onRemove={(f) => setFavorites(removeFavorite(f))} onHome={() => go("home")} banner={tabBanner} />;
   else if (page === "docs")
     body = (
       <DocsPage
         banner={tabBanner}
+        current={current}
         history={history}
-        onPick={(h) => {
-          // 調べ終わったら、その物件の「レポートを作成」を開く
+        onMake={makeDoc}
+        onReport={() => {
+          setPage("home");
           setReport(true);
-          pickRecent(h);
         }}
+        onPick={openDocsFor}
+        onHistory={() => go("history")}
       />
     );
   else if (page === "account")
@@ -186,6 +228,13 @@ export function MobileApp(props: MobileAppProps) {
         onHistory={() => go("history")}
         onFavorites={() => go("favorites")}
         onSources={() => setSheet("sources")}
+        onNews={() => {
+          setNews(true);
+          markNewsSeen();
+        }}
+        unread={unread}
+        onInstall={() => setSheet("install")}
+        standalone={standalone}
         historyCount={history.length}
         favoriteCount={favorites.length}
         banner={tabBanner}
@@ -195,7 +244,7 @@ export function MobileApp(props: MobileAppProps) {
     body = <NotOkPage query={shown.query} result={shown.result} onPick={props.onPickAddress} onMap={openMap} onBack={backHome} banner={<Banner loading={loading && !offline} error={failure} notice={notice} onDismiss={() => setNotice(null)} />} />;
 
   return (
-    <div className="theme-navy flex min-h-0 w-full flex-1 flex-col overflow-hidden" style={{ fontFeatureSettings: "normal", letterSpacing: 0, background: PAGE }}>
+    <div className="theme-navy app-touch flex min-h-0 w-full flex-1 flex-col overflow-hidden" style={{ fontFeatureSettings: "normal", letterSpacing: 0, background: PAGE }}>
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain">
         <div className="relative mx-auto" style={{ width: ART_W, zoom: ZOOM }}>
           {showHome && (
@@ -239,6 +288,8 @@ export function MobileApp(props: MobileAppProps) {
                 onPickPoint={onPickPoint}
                 onFix={openMap}
                 onBack={backHome}
+                wanted={wanted}
+                onWantedDone={wantedDone}
                 scroller={scroller}
               />
             </div>
@@ -253,21 +304,13 @@ export function MobileApp(props: MobileAppProps) {
           if (k === "home" && page === "home") {
             if (shown) props.onHome();
             else scroller.current?.scrollTo({ top: 0, behavior: "smooth" });
-          } else if (k === "docs" && ok) {
-            // 物件を開いていれば、その物件の「レポートを作成」を開く
-            setPage("home");
-            setReport(true);
           } else go(k);
         }}
       />
 
       <Portal>
-        <MenuSheet
-          open={sheet === "menu"}
-          onClose={() => setSheet(null)}
-          onOpen={(s) => (s === "history" ? (setSheet(null), go("history")) : setSheet(s))}
-        />
         <HelpSheet open={sheet === "help"} onClose={() => setSheet(null)} />
+        <InstallSheet open={sheet === "install"} onClose={() => setSheet(null)} />
         <CitiesSheet open={sheet === "cities"} onClose={() => setSheet(null)} />
         <SourcesSheet open={sheet === "sources"} onClose={() => setSheet(null)} />
         <NewsSheet open={news} onClose={() => setNews(false)} />
@@ -325,9 +368,10 @@ function Banner({ loading, error, notice, onDismiss }: { loading: boolean; error
     );
   const text = error ?? notice;
   if (!text) return null;
+  const warn = !!error;
   return (
-    <button onClick={onDismiss} className="mx-[16px] mt-[8px] flex w-[calc(100%-32px)] items-start gap-[6px] rounded-[12px] bg-[#fdf1ec] px-[12px] py-[9px] text-left leading-[1.45]" style={{ fontSize: 13, color: WARN }}>
-      <TriangleAlert size={15} strokeWidth={1.8} absoluteStrokeWidth className="mt-[2px] shrink-0" />
+    <button onClick={onDismiss} className="mx-[16px] mt-[8px] flex w-[calc(100%-32px)] items-start gap-[6px] rounded-[12px] px-[12px] py-[9px] text-left leading-[1.45]" style={{ fontSize: 13, background: warn ? "#fdf1ec" : "#eef4fb", color: warn ? WARN : "#1c3a6a" }}>
+      {warn ? <TriangleAlert size={15} strokeWidth={1.8} absoluteStrokeWidth className="mt-[2px] shrink-0" /> : <Info size={15} strokeWidth={1.8} absoluteStrokeWidth className="mt-[2px] shrink-0" />}
       {text}
     </button>
   );
@@ -348,6 +392,8 @@ function PropertyView({
   onPickPoint,
   onFix,
   onBack,
+  wanted,
+  onWantedDone,
   scroller,
 }: {
   report: boolean;
@@ -363,6 +409,9 @@ function PropertyView({
   onPickPoint: (lat: number, lng: number) => void;
   onFix: () => void;
   onBack: () => void;
+  /** 書類・出力のタイルで選んだ書類（この物件のものならすぐ開く） */
+  wanted: { kind: DocKind; key: string } | null;
+  onWantedDone: () => void;
   scroller: React.RefObject<HTMLDivElement | null>;
 }) {
   const data = useProperty(result);
@@ -379,6 +428,19 @@ function PropertyView({
   const checklist = useChecklist(result);
   // 共有の文の先頭に、要注意点と次にやること（済んだ印も）を入れる
   const input = { ...loaded({ ...data, landPrice: data.landPrice5 }), triage: data.triage, done: checklist.done };
+  // 書類・出力のタイルで選んだ書類を、この物件の画面が出たらすぐ開く（印刷とコピーは押した操作の中でないと動かないので、レポートの画面から）
+  const myKey = favoriteKey(itemOf(query, result));
+  useEffect(() => {
+    if (!wanted || wanted.key !== myKey) return;
+    const { kind } = wanted;
+    queueMicrotask(() => {
+      if (kind === "triage") setTriage(true);
+      else if (kind === "draft") setDraft(true);
+      else if (kind === "guide") setGuide(true);
+      else setReport(true);
+      onWantedDone();
+    });
+  }, [wanted, myKey, onWantedDone, setReport]);
 
   const changeTab = (t: TabKey) => {
     setTab(t);

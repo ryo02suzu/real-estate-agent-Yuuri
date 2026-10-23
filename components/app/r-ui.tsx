@@ -17,10 +17,24 @@ export const FAINT = "#8a95a6";
 export const RED = "#e0322f";
 /** 白い角丸のカード */
 export const CARD = "rounded-[18px] bg-white shadow-[0_4px_14px_rgba(20,45,85,0.08)]";
+/** すりガラス（後ろの写真を少しぼかして白く透かす。縁は白く光らせる） */
+export const GLASS: CSSProperties = {
+  background: "rgba(255,255,255,0.46)",
+  backdropFilter: "blur(10px) saturate(1.5)",
+  WebkitBackdropFilter: "blur(10px) saturate(1.5)",
+  border: "1px solid rgba(255,255,255,0.8)",
+};
 /** 見出しの左の印 */
 const ACCENT = "linear-gradient(180deg,#3d7bff 0%,#22c1ee 100%)";
 
 export const yen = (v: number) => Math.round(v).toLocaleString("ja-JP");
+
+/** 短い円の書き方：「9.9万円」「1,038万円」「1.2億円」 */
+export function manYen(v: number): string {
+  if (v >= 1e8) return `${(Math.round(v / 1e7) / 10).toFixed(1)}億円`;
+  if (v >= 1e5) return `${Math.round(v / 1e4).toLocaleString("ja-JP")}万円`;
+  return `${(v / 1e4).toFixed(1)}万円`;
+}
 
 /** 「東京都渋谷区神南一丁目19-11」→「渋谷区神南一丁目19-11」（都道府県を外す） */
 export function shortAddress(a: string): string {
@@ -31,6 +45,9 @@ export function shortAddress(a: string): string {
 export function displayAddress(a: string): string {
   return shortAddress(a.normalize("NFKC"));
 }
+
+/** 写真の帯の上端の色（NO IMAGE の札の上の色に薄い影が重なった色）。時刻・電池の帯をこの色にする */
+export const BAND_TOP = "#bec7d2";
 
 /** 写真が入る所（写真はあとで届く）。top で NO IMAGE の札を上に寄せる（下に字を重ねる帯のとき） */
 export function NoImage({ className = "", style, label = "NO IMAGE", size = 11, top = false }: { className?: string; style?: CSSProperties; label?: string; size?: number; top?: boolean }) {

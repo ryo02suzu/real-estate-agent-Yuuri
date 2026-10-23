@@ -146,7 +146,7 @@ export function AroundTab({ result, data, open, expand, mapApps }: TabProps) {
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate leading-none" style={{ fontSize: 12, color: LIGHT }}>
-            周辺環境の目安（駅・お店・病院までの距離から）
+            周辺環境の目安（駅・お店・病院までの距離）
           </span>
           <span className="mt-[5px] flex items-center gap-[8px] leading-none">
             <b className="font-bold" style={{ fontSize: 19, color: TEXT }}>

@@ -12,7 +12,7 @@ import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
 import { addressOffLot } from "../parcel-card";
 import { CoinStack } from "./icons";
 import { PropertyMap } from "./property-map";
-import { CARD, Cell, displayAddress, Faint, LIGHT, pendingText, Primary, TEXT, yen } from "./r-ui";
+import { CARD, Cell, displayAddress, Faint, LIGHT, manYen, pendingText, Primary, TEXT, yen } from "./r-ui";
 import { metersText } from "./shared";
 import type { TabProps } from "./types";
 
@@ -126,7 +126,7 @@ export function BasicTab({ result, data, go, open, expand, mapApps, report }: Ta
                 円/㎡
               </span>
               <span className="ml-[8px]" style={{ fontSize: 12, color: LIGHT }}>
-                坪 約{yen(top.price * TSUBO)}円・{metersText(top.distance)}先
+                坪 約{manYen(top.price * TSUBO)}・{metersText(top.distance)}先
               </span>
             </span>
           ) : (

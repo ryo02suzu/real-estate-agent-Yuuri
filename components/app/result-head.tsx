@@ -51,7 +51,7 @@ export function ResultBand({ title, sub, onBack, onCopy, copied, favorite, onFav
         </Round>
       </div>
       <button onClick={onCopy} aria-label="住所をコピー" className="absolute left-[16px] right-[16px] text-left" style={{ bottom: BAND_OVERLAP + 8 }}>
-        <span className="block truncate font-bold leading-[1.2] text-white" style={{ fontSize: 20, textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>
+        <span className="block truncate font-bold leading-[1.2] text-white" style={{ fontSize: title.length > 15 ? 18 : 20, textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>
           {title}
         </span>
         <span className="mt-[3px] flex items-center gap-[4px] leading-none" style={{ fontSize: 12, color: copied ? "#a6f0c6" : "rgba(255,255,255,0.88)", textShadow: "0 1px 4px rgba(0,0,0,0.4)" }}>

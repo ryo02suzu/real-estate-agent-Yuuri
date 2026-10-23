@@ -16,6 +16,7 @@ import type { CSSProperties, ReactNode, RefObject } from "react";
 import { monthDay, placeholderScenes, placeParts, SCENES, sceneSrc, type SceneKey } from "@/lib/app/scene";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import { LogoLockup, PhoneImg, ScaledInput } from "./frame";
+import { GLASS } from "./r-ui";
 import { NAVY } from "./ui";
 
 /** 時刻・電池の帯の色（app/layout.tsx の themeColor と同じ）。写真の上端をこの色からつなぐ */
@@ -38,15 +39,8 @@ const PHOTO_H = 275;
 
 /** 写真の上の字が建物に重なっても読めるよう、白くにじませる（届いた絵の見出しと同じ効き方） */
 const GLOW = "0 0 10px rgba(255,255,255,0.95), 0 0 3px rgba(255,255,255,0.95)";
-/** すりガラス（後ろの街並みを少しぼかして白く透かす。縁は白く光らせる） */
-const GLASS: CSSProperties = {
-  background: "rgba(255,255,255,0.46)",
-  backdropFilter: "blur(10px) saturate(1.5)",
-  WebkitBackdropFilter: "blur(10px) saturate(1.5)",
-  border: "1px solid rgba(255,255,255,0.8)",
-};
-/** 地の奥の淡い光（最近の検索のあたり。下の端に届く前に消える） */
-const AURORA =
+/** 地の奥の淡い光（最近の検索のあたり。下の端に届く前に消える）。下のメニューのページでも使う */
+export const AURORA =
   "radial-gradient(60% 42% at 0% 45%, rgba(110,140,255,0.13) 0%, rgba(110,140,255,0) 100%), radial-gradient(55% 38% at 100% 58%, rgba(40,190,255,0.12) 0%, rgba(40,190,255,0) 100%)";
 
 /** 最近の検索がまだ無いときに見せる写真（丸く重ねて3枚） */
