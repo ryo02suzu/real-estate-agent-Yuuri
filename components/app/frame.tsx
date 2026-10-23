@@ -257,7 +257,7 @@ export function BottomNav({ active, onSelect }: { active: NavKey; onSelect: (key
               style={{ left: i * NAV_W, top: 0, width: NAV_W, height: 54 }}
             >
               {n.icon(on)}
-              <span className="whitespace-nowrap leading-none" style={{ fontSize: 10.5, color: on ? ON : OFF, fontWeight: on ? 700 : 500 }}>
+              <span className="whitespace-nowrap leading-none" style={{ fontSize: 10.5, color: on ? ON : OFF, fontWeight: on ? 600 : 500 }}>
                 {n.label}
               </span>
             </button>

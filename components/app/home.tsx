@@ -6,7 +6,8 @@
 // （住所も地番も1つの欄に入れる。地図で選ぶボタンつき。写真入りの「調査を開始する」）、最近の検索（写真の小さな札つきの一覧に4件まで。
 // 続きは履歴のページ）。調べた物件がまだ少ないうちは、その下に「使い方」（住所・地番・地図の3つの入口。例を押すとそのまま調べる）を
 // 出して、画面の下が空かないようにする。調査メニューと書類のバナーは置かない（調べれば全部のタブが出る。書類は下のメニューの「書類・出力」から）。
-// 字はアプリ全体で Noto Sans JP の1種類（app/globals.css）。
+// 字は端末の標準の字（app/globals.css の .theme-navy）。大きさと太さは iPhone の標準の段階：見出し26pt太字、章の見出し18pt太字、
+// 入力・ボタン17pt、行の名前16pt中太字、説明・副題13pt、下のメニュー10.5pt。字の間は詰めない（palt を使わない）
 // 調べるカードはすりガラス（後ろの街の写真を少しぼかして透かす）。現れるときの動きとボタンの光は app/globals.css の .home-rise・.home-shine。
 // 寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。幅に対して背の低い画面（iPhone SE など）では、
 // low:（app/globals.css）でカードを少し詰める
@@ -128,12 +129,12 @@ export function HomeScreen({
         </button>
 
         {/* 見出しと副題（絵と同じ位置・大きさ。絵の字は消してある） */}
-        <h1 className="home-rise absolute whitespace-nowrap font-bold" style={{ left: 16, top: 44, fontSize: 25, lineHeight: "33px", letterSpacing: 0.8, color: HEAD, textShadow: GLOW, fontFeatureSettings: '"palt"' }}>
+        <h1 className="home-rise absolute whitespace-nowrap font-bold" style={{ left: 16, top: 44, fontSize: 26, lineHeight: "34px", letterSpacing: 0.2, color: HEAD, textShadow: GLOW }}>
           調べる時間を、
           <br />
           商談の時間に。
         </h1>
-        <p className="home-rise absolute whitespace-nowrap font-medium leading-none" style={{ left: 16, top: 112, fontSize: 12, letterSpacing: 0.9, color: "#26324a", textShadow: GLOW, fontFeatureSettings: '"palt"', ...rise(60) }}>
+        <p className="home-rise absolute whitespace-nowrap leading-none" style={{ left: 16, top: 115, fontSize: 13, letterSpacing: 0.2, color: "#26324a", textShadow: GLOW, ...rise(60) }}>
           不動産調査を、もっと早く、もっとシンプルに。
         </p>
       </div>
@@ -151,7 +152,7 @@ export function HomeScreen({
         >
           <div className="flex h-[44px] items-center rounded-full border border-[#d8e0eb] bg-white shadow-[inset_0_1px_2px_rgba(20,45,85,0.05)] transition-[border-color,box-shadow] focus-within:border-[#9db8e6] focus-within:shadow-[0_0_0_3px_rgba(61,123,255,0.12)]">
             <Search size={17} strokeWidth={1.8} absoluteStrokeWidth color="#7c8aa3" className="ml-[15px] shrink-0" />
-            <ScaledInput value={input} onChange={setInput} inputRef={inputRef} size={15} className="ml-[9px] mr-[2px]" label="住所・地番" autoComplete="off" placeholder="住所・地番を入力" />
+            <ScaledInput value={input} onChange={setInput} inputRef={inputRef} size={17} className="ml-[9px] mr-[2px]" label="住所・地番" autoComplete="off" placeholder="住所・地番を入力" />
             {input && (
               <button type="button" onClick={() => setInput("")} aria-label="入力を消す" className="flex h-[40px] w-[32px] shrink-0 items-center justify-center">
                 <span className="flex items-center justify-center rounded-full bg-[#e3e8f0]" style={{ width: 20, height: 20 }}>
@@ -165,7 +166,7 @@ export function HomeScreen({
               onClick={onMap}
               aria-label="地図で場所を選ぶ"
               className="mr-[3px] flex h-[38px] shrink-0 items-center gap-[4px] rounded-full px-[11px] font-semibold leading-none active:bg-[#eef3fa]"
-              style={{ fontSize: 12.5, color: NAVY }}
+              style={{ fontSize: 14, color: NAVY }}
             >
               <MapIcon size={15} strokeWidth={1.8} absoluteStrokeWidth />
               地図
@@ -179,7 +180,7 @@ export function HomeScreen({
             className="home-shine relative mt-[8px] block h-[48px] w-full overflow-hidden rounded-[14px] text-white shadow-[0_8px_20px_rgba(15,47,95,0.22)] transition-transform active:scale-[0.985] disabled:opacity-95 low:h-[44px]"
           >
             <PhoneImg src="/home/cta.webp" alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 45%" }} />
-            <span className="absolute inset-y-0 left-0 flex items-center justify-center gap-[7px] whitespace-nowrap font-bold" style={{ width: "62%", fontSize: 16, letterSpacing: 1.8 }}>
+            <span className="absolute inset-y-0 left-0 flex items-center justify-center gap-[7px] whitespace-nowrap font-semibold" style={{ width: "62%", fontSize: 17, letterSpacing: 0.4 }}>
               {loading ? (
                 <>
                   <LoaderCircle size={18} strokeWidth={2} absoluteStrokeWidth className="animate-spin" />
@@ -196,7 +197,7 @@ export function HomeScreen({
         </form>
 
         {message && (
-          <button type="button" onClick={onDismiss} className="mt-[8px] flex w-full items-start gap-[7px] rounded-[12px] bg-[#fdf1ec] px-[12px] py-[9px] text-left leading-[1.5]" style={{ fontSize: 12.5, color: "#8a4f3a" }}>
+          <button type="button" onClick={onDismiss} className="mt-[8px] flex w-full items-start gap-[7px] rounded-[12px] bg-[#fdf1ec] px-[12px] py-[9px] text-left leading-[1.5]" style={{ fontSize: 13, color: "#8a4f3a" }}>
             <TriangleAlert size={15} strokeWidth={1.8} absoluteStrokeWidth className="mt-[2px] shrink-0" />
             {message.text}
           </button>
@@ -217,10 +218,10 @@ export function HomeScreen({
                   <button onClick={() => onPickRecent(h)} aria-label={`${full}（${monthDay(h.at)}${kind}）を開く`} className="flex min-h-[72px] w-full items-center gap-[12px] py-[8px] pl-[10px] pr-[10px] text-left active:bg-[#f5f8fc] low:min-h-[64px]">
                     <PhoneImg src={sceneSrc(scene)} alt="" loading="lazy" draggable={false} className="block size-[56px] shrink-0 rounded-[14px] object-cover low:size-[48px]" style={{ objectPosition: `50% ${SCENES[scene].y}%` }} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-bold leading-[1.3]" style={{ fontSize: 15, color: TEXT, fontFeatureSettings: '"palt"' }}>
+                      <span className="block truncate font-semibold leading-[1.3]" style={{ fontSize: 16, color: TEXT }}>
                         {town || full}
                       </span>
-                      <span className="mt-[2px] block truncate leading-[1.35]" style={{ fontSize: 12.5, color: LIGHT }}>
+                      <span className="mt-[2px] block truncate leading-[1.35]" style={{ fontSize: 13, color: LIGHT }}>
                         {city || "対応エリアの外"}・{monthDay(h.at)}
                         {kind}
                       </span>
@@ -248,10 +249,10 @@ export function HomeScreen({
                     <t.Icon size={18} strokeWidth={1.8} absoluteStrokeWidth color={NAVY} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-bold leading-[1.3]" style={{ fontSize: 15, color: TEXT, fontFeatureSettings: '"palt"' }}>
+                    <span className="block truncate font-semibold leading-[1.3]" style={{ fontSize: 16, color: TEXT }}>
                       {t.title}
                     </span>
-                    <span className="mt-[1px] block truncate leading-[1.35]" style={{ fontSize: 12.5, color: LIGHT }}>
+                    <span className="mt-[1px] block truncate leading-[1.35]" style={{ fontSize: 13, color: LIGHT }}>
                       {t.sub}
                     </span>
                   </span>
@@ -262,7 +263,7 @@ export function HomeScreen({
           </ul>
         </section>
       )}
-      <div style={{ height: 8 }} />
+      <div style={{ height: 6 }} />
     </div>
   );
 }
@@ -270,15 +271,15 @@ export function HomeScreen({
 /** 章の見出し（左に青い印）と「すべて見る ›」（押せる高さは44pt） */
 function SectionHead({ title, more = "すべて見る", onMore }: { title: string; more?: ReactNode; onMore?: () => void }) {
   return (
-    <div className="flex h-[26px] items-center justify-between px-[16px]">
-      <div className="flex min-w-0 items-center gap-[7px]">
-        <span aria-hidden className="shrink-0 rounded-full" style={{ width: 3.5, height: 15, background: ACCENT }} />
-        <h2 className="whitespace-nowrap font-bold leading-none" style={{ fontSize: 17, color: HEAD, letterSpacing: 0.3 }}>
+    <div className="flex h-[28px] items-center justify-between px-[16px]">
+      <div className="flex min-w-0 items-center gap-[8px]">
+        <span aria-hidden className="shrink-0 rounded-full" style={{ width: 3.5, height: 16, background: ACCENT }} />
+        <h2 className="whitespace-nowrap font-bold leading-none" style={{ fontSize: 18, color: HEAD }}>
           {title}
         </h2>
       </div>
       {onMore && (
-        <button onClick={onMore} className="-mr-[8px] flex h-[44px] shrink-0 items-center gap-[1px] px-[8px] font-semibold active:opacity-60" style={{ fontSize: 13, color: LINK }}>
+        <button onClick={onMore} className="-mr-[8px] flex h-[44px] shrink-0 items-center px-[8px] active:opacity-60" style={{ fontSize: 15, color: LINK }}>
           {more}
           <ChevronRight size={15} strokeWidth={2} absoluteStrokeWidth />
         </button>
@@ -296,10 +297,10 @@ function FirstRun() {
           <PhoneImg key={k} src={sceneSrc(k)} alt="" loading="lazy" draggable={false} className="block h-[56px] w-full rounded-[12px] object-cover low:h-[44px]" style={{ objectPosition: `50% ${SCENES[k].y}%` }} />
         ))}
       </div>
-      <p className="mt-[8px] px-[2px] font-bold leading-[1.3]" style={{ fontSize: 14, color: TEXT }}>
+      <p className="mt-[9px] px-[2px] font-semibold leading-[1.3]" style={{ fontSize: 16, color: TEXT }}>
         まだ調べた物件はありません
       </p>
-      <p className="mt-[2px] px-[2px] leading-[1.3]" style={{ fontSize: 12, color: LIGHT }}>
+      <p className="mt-[2px] px-[2px] leading-[1.35]" style={{ fontSize: 13, color: LIGHT }}>
         住所か地番を入れて調べると、ここに並びます
       </p>
     </div>

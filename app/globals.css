@@ -43,9 +43,18 @@
   --color-mint: #e8eef5;
   --color-line: #dde5ee;
 }
-/* スマホの画面の字は Noto Sans JP の1種類にそろえる（数字・英字の Jost も使わない。PC はそのまま） */
+/*
+ * スマホの画面の字は、端末のアプリと同じ標準の字にする（iPhone・Mac は SF＋ヒラギノ角ゴ。Android と、標準の字が無い環境は
+ * Noto Sans JP。Android の標準の字は同じ Noto の系統）。数字・英字の Jost も使わない。PC の画面はそのまま（Noto Sans JP）。
+ * 太さは 400（本文）と 600〜700（見出し・行の名前・ボタン）の2段。ヒラギノは W3 と W6 の2つしか無いので、500 は 400 と同じに見える
+ */
 .theme-navy {
-  --font-latin: var(--font-noto-sans-jp), "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --font-app: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", var(--font-noto-sans-jp), "Noto Sans JP", sans-serif;
+  font-family: var(--font-app);
+}
+/* 結果の画面の数字・英字（.font-latin は @theme inline なので、変数ではなく rule で上書きする） */
+.theme-navy .font-latin {
+  font-family: var(--font-app);
 }
 .theme-navy .bg-gold {
   background: linear-gradient(135deg, #1b4280 0%, #0f2f5f 55%, #0a2248 100%);

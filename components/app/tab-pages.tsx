@@ -1,7 +1,8 @@
 "use client";
 
 // スマホの下のメニューのページ（履歴・お気に入り・書類・出力・その他）。iPhone のアプリと同じ形で、大きな見出しと白い角丸の一覧。
-// 文字は 名前16pt・説明13pt・いちばん小さい字12pt、1行の高さは60pt前後、押せる所は44pt以上。中身と動きは前のページと同じ。
+// 字は端末の標準の字（app/globals.css の .theme-navy）。大きな見出し32pt太字、名前16pt中太字、説明13pt、いちばん小さい字12pt、
+// 1行の高さは60pt前後、押せる所は44pt以上。中身と動きは前のページと同じ。
 // 寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）
 import {
   ChevronRight,
@@ -39,7 +40,7 @@ function TabScreen({ title, sub, banner, children }: { title: string; sub?: stri
   return (
     <div className="app-touch pb-[28px]" style={{ background: PAGE }}>
       <header className="px-[20px] pb-[6px] pt-[16px]" style={{ background: `linear-gradient(180deg,${SKY} 0%,${PAGE} 100%)` }}>
-        <h1 className="font-bold leading-[1.2]" style={{ fontSize: 30, color: HEAD, letterSpacing: 0.4 }}>
+        <h1 className="font-bold leading-[1.2]" style={{ fontSize: 32, color: HEAD }}>
           {title}
         </h1>
         {sub && (
@@ -78,7 +79,7 @@ function Group({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <section className="mt-[18px]">
       {title && (
-        <h2 className="mb-[8px] px-[4px] font-bold leading-none" style={{ fontSize: 13, color: LIGHT, letterSpacing: 0.3 }}>
+        <h2 className="mb-[8px] px-[4px] font-semibold leading-none" style={{ fontSize: 13, color: LIGHT }}>
           {title}
         </h2>
       )}
@@ -95,7 +96,7 @@ function Row({ icon, title, sub, onClick, right, value }: { icon: ReactNode; tit
         {icon}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block font-semibold leading-[1.35]" style={{ fontSize: 16, color: TEXT, fontFeatureSettings: '"palt"' }}>
+        <span className="block font-semibold leading-[1.35]" style={{ fontSize: 16, color: TEXT, wordBreak: "keep-all", overflowWrap: "anywhere" }}>
           {title}
         </span>
         {sub && (
@@ -133,7 +134,7 @@ function Empty({ icon, title, body }: { icon: ReactNode; title: string; body: st
       <span className="flex items-center justify-center rounded-full bg-[#eef3fa]" style={{ width: 56, height: 56 }}>
         {icon}
       </span>
-      <p className="mt-[12px] font-bold leading-[1.4]" style={{ fontSize: 16, color: TEXT }}>
+      <p className="mt-[12px] font-semibold leading-[1.4]" style={{ fontSize: 16, color: TEXT }}>
         {title}
       </p>
       <p className="mt-[6px] leading-[1.6]" style={{ fontSize: 13, color: GRAY }}>
@@ -203,7 +204,7 @@ export function HistoryPage({
             ))}
           </Group>
           <div className="mt-[16px] flex justify-center">
-            <button onClick={onClear} className="flex h-[44px] items-center gap-[6px] rounded-full bg-white px-[18px] font-semibold shadow-[0_2px_8px_rgba(20,45,85,0.06)] active:bg-[#f5f8fc]" style={{ fontSize: 14, color: "#b4533c" }}>
+            <button onClick={onClear} className="flex h-[44px] items-center gap-[6px] rounded-full bg-white px-[18px] font-semibold shadow-[0_2px_8px_rgba(20,45,85,0.06)] active:bg-[#f5f8fc]" style={{ fontSize: 15, color: "#b4533c" }}>
               <Trash2 size={16} strokeWidth={1.7} absoluteStrokeWidth />
               履歴をすべて消す
             </button>
@@ -306,7 +307,7 @@ export function AccountPage({
   return (
     <TabScreen title="その他" banner={banner}>
       <div className="mt-[14px] rounded-[16px] px-[16px] py-[14px] text-white" style={{ background: "linear-gradient(135deg,#1b4280 0%,#133664 55%,#0a2248 100%)" }}>
-        <p className="flex items-center gap-[8px] font-bold leading-none" style={{ fontSize: 16 }}>
+        <p className="flex items-center gap-[8px] font-semibold leading-none" style={{ fontSize: 17 }}>
           <LogIn size={18} strokeWidth={1.8} absoluteStrokeWidth />
           ログイン・会社での共有
           <span className="rounded-full bg-white/20 px-[8px] py-[4px] font-bold leading-none" style={{ fontSize: 11 }}>
