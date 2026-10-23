@@ -43,6 +43,10 @@
   --color-mint: #e8eef5;
   --color-line: #dde5ee;
 }
+/* スマホの画面の字は Noto Sans JP の1種類にそろえる（数字・英字の Jost も使わない。PC はそのまま） */
+.theme-navy {
+  --font-latin: var(--font-noto-sans-jp), "Hiragino Sans", "Noto Sans JP", sans-serif;
+}
 .theme-navy .bg-gold {
   background: linear-gradient(135deg, #1b4280 0%, #0f2f5f 55%, #0a2248 100%);
 }
@@ -84,7 +88,7 @@
 /*
  * スマホの新しいホーム（components/app/home.tsx）を1画面に収める詰め方。ホームは幅で拡大・縮小するので、幅に対して背の低い画面
  * （高さ÷幅が 1.985 より小さい。iPhone SE・8 Plus など）では、調べるカード・最近の検索・調査メニュー・バナーを少し詰める
- * （写真の見出しは写真の字なので詰められない。SE・8 Plus はそれでも少しスクロールする）。
+ * （写真の部分は写真の字と街並みなので詰められない。SE・8 Plus はそれでもスクロールする）。
  * iPhone の mini・無印・Pro・Pro Max（ホーム画面に追加したアプリ）は詰めずに収まる。ホームの高さを変えたら 1.985 も見直す
  */
 @custom-variant low {
@@ -119,13 +123,6 @@ body {
   font-family: var(--font-noto-sans-jp), "Hiragino Sans", "Noto Sans JP", sans-serif;
   font-feature-settings: "palt"; /* 約物を詰めて見た目を整える */
   letter-spacing: 0.01em;
-}
-
-/* スマホの新しいホームの章の見出しの明朝（components/app/fonts.ts。写真の見出しと同じ字）。PC の幅では使わない */
-@media (max-width: 1023px) {
-  .home-serif {
-    font-family: var(--font-serif-jp), serif;
-  }
 }
 
 /*

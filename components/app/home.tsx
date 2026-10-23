@@ -1,18 +1,18 @@
 "use client";
 
 // スマホの新しいホーム（検索する前の画面）。届いた絵をそのまま使い、iPhone 16 Pro などの画面でスクロールせずに1画面に収まるように組んだもの。
-// 上から：街の写真（見出し「調べる時間を、商談の時間に。」は写真に入っている明朝の字。副題は同じゴシックでアプリが描く）の上にロゴ・お知らせ、
-// 調べるカード（住所も地番も1つの欄に入れる。地図で選ぶボタンつき。写真入りの「調査を開始する」）、最近の検索（写真つきのカードを横に
-// すべらせる）、調査メニュー（届いた絵の3Dアイコン・6つ）、書類を作るバナー（届いた絵。押すと書類・出力のページ）。
-// 字は写真の見出しに合わせて、章の見出し（最近の検索・調査メニュー）だけ同じ明朝（components/app/fonts.ts）。ほかは本文のゴシック。
-// 調べるカードはすりガラス（後ろの街の写真をぼかして見せる）。現れるときの動きとボタンの光は app/globals.css の .home-rise・.home-shine。
+// 上から：街の写真（届いた絵の構図のまま。見出し「調べる時間を、商談の時間に。」と副題は絵の字を消して、絵と同じ位置・大きさに
+// アプリの字で描く。写真の街並みが見出しの下に見えるよう、調べるカードは街並みの途中に重ねる）の上にロゴ・お知らせ、調べるカード
+// （住所も地番も1つの欄に入れる。地図で選ぶボタンつき。写真入りの「調査を開始する」）、最近の検索（写真つきのカードを横にすべらせる）、
+// 調査メニュー（届いた絵の3Dアイコン・6つ）、書類を作るバナー（届いた絵。押すと書類・出力のページ）。
+// 字はアプリ全体で Noto Sans JP の1種類（app/globals.css）。
+// 調べるカードはすりガラス（後ろの街の写真を少しぼかして透かす）。現れるときの動きとボタンの光は app/globals.css の .home-rise・.home-shine。
 // 寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。幅に対して背の低い画面（iPhone SE など）では、
 // low:（app/globals.css）でカード・調査メニュー・バナーを少し詰める（それでも入りきらない分はスクロール）
 import { ArrowRight, Bell, ChevronRight, Info, LoaderCircle, Map as MapIcon, Search, TriangleAlert, X } from "lucide-react";
 import type { CSSProperties, RefObject } from "react";
 import { monthDay, placeholderScenes, placeParts, SCENES, sceneSrc, type SceneKey } from "@/lib/app/scene";
 import { historyKey, type HistoryItem } from "@/lib/history";
-import { serif } from "./fonts";
 import { LogoLockup, PhoneImg, ScaledInput } from "./frame";
 import type { TabKey } from "./property-head";
 import { NAVY } from "./ui";
@@ -29,19 +29,20 @@ const LINK = "#1f5fbf";
 const ACCENT = "linear-gradient(180deg,#3d7bff 0%,#22c1ee 100%)";
 
 /**
- * 写真の部分の高さ。写真（public/home/hero.webp）は届いた絵の 1672×941 から x125〜1380・y20〜786 を切り抜いたもので、幅393pt・高さ240pt
- * にぴったり合う（見出しの字は約25pt・上端は57pt）。調べるカードはこの下の方（158pt）に重ねる（カードの -mt）
+ * 写真の部分の高さ。写真（public/home/hero.webp）は届いた絵の 1672×941 から字を消して x125〜1380・y62〜941（下端まで）を切り抜いた
+ * もので、幅393pt・高さ275pt にぴったり合う。見出しは絵と同じ位置（上端44pt・字は25pt）に描く。街並みは147pt から下。
+ * 調べるカードは街並みが見えるよう 190pt から重ねる（カードの -mt）。写真の下端は地の色に溶かす
  */
-const PHOTO_H = 240;
+const PHOTO_H = 275;
 
-/** 写真の上の字が建物に重なっても読めるよう、白くにじませる（写真の見出しと同じ効き方） */
+/** 写真の上の字が建物に重なっても読めるよう、白くにじませる（届いた絵の見出しと同じ効き方） */
 const GLOW = "0 0 10px rgba(255,255,255,0.95), 0 0 3px rgba(255,255,255,0.95)";
-/** すりガラス（後ろをぼかして白く透かす。縁は白く光らせる） */
+/** すりガラス（後ろの街並みを少しぼかして白く透かす。縁は白く光らせる） */
 const GLASS: CSSProperties = {
-  background: "rgba(255,255,255,0.62)",
-  backdropFilter: "blur(18px) saturate(1.6)",
-  WebkitBackdropFilter: "blur(18px) saturate(1.6)",
-  border: "1px solid rgba(255,255,255,0.85)",
+  background: "rgba(255,255,255,0.46)",
+  backdropFilter: "blur(10px) saturate(1.5)",
+  WebkitBackdropFilter: "blur(10px) saturate(1.5)",
+  border: "1px solid rgba(255,255,255,0.8)",
 };
 /** 地の奥の淡い光（最近の検索から調査メニューのあたり。下の端に届く前に消える） */
 const AURORA =
@@ -109,34 +110,37 @@ export function HomeScreen({
   const scenes = placeholderScenes(recent);
 
   return (
-    <div className={`${serif.variable} app-touch relative overflow-hidden`} style={{ background: PAGE }}>
+    <div className="app-touch relative overflow-hidden" style={{ background: PAGE }}>
       <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0" style={{ top: 280, background: AURORA }} />
 
-      {/* 街の写真の部分（見出しは写真の字。上端は時刻・電池の帯の色からつなぐ） */}
+      {/* 街の写真の部分（上端は時刻・電池の帯の色からつなぐ） */}
       <div className="relative overflow-hidden" style={{ height: PHOTO_H }}>
-        <PhoneImg src="/home/hero.webp" alt="" width={1255} height={766} draggable={false} className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-x-0 top-0" style={{ height: 48, background: `linear-gradient(180deg,${SKY} 0%,rgba(230,239,249,0) 100%)` }} />
-        <div className="absolute inset-x-0 bottom-0" style={{ height: 70, background: `linear-gradient(180deg,rgba(243,246,251,0) 0%,${PAGE} 92%)` }} />
-        <h1 className="sr-only">調べる時間を、商談の時間に。</h1>
-
-        <button onClick={onLogo} aria-label="MICHILU ホーム" className="absolute flex items-center" style={{ left: 16, top: 6, height: 44 }}>
-          <LogoLockup style={{ height: 30 }} />
+        <PhoneImg src="/home/hero.webp" alt="" width={1255} height={879} draggable={false} className="absolute inset-0 h-full w-full object-cover" />
+        <div className="absolute inset-x-0 top-0" style={{ height: 36, background: `linear-gradient(180deg,${SKY} 0%,rgba(230,239,249,0) 100%)` }} />
+        <div className="absolute inset-x-0 bottom-0" style={{ height: 40, background: `linear-gradient(180deg,rgba(243,246,251,0) 0%,${PAGE} 100%)` }} />
+        <button onClick={onLogo} aria-label="MICHILU ホーム" className="absolute flex items-center" style={{ left: 16, top: 4, height: 40 }}>
+          <LogoLockup style={{ height: 28 }} />
         </button>
-        <button onClick={onBell} aria-label={unread ? "お知らせ（新しいお知らせがあります）" : "お知らせ"} className="absolute flex items-center justify-center active:opacity-70" style={{ right: 8, top: 6, width: 44, height: 44 }}>
+        <button onClick={onBell} aria-label={unread ? "お知らせ（新しいお知らせがあります）" : "お知らせ"} className="absolute flex items-center justify-center active:opacity-70" style={{ right: 8, top: 3, width: 44, height: 44 }}>
           <span className="flex items-center justify-center rounded-full shadow-[0_4px_14px_rgba(15,47,95,0.14)]" style={{ ...GLASS, width: 38, height: 38 }}>
             <Bell size={19} strokeWidth={1.7} absoluteStrokeWidth color={HEAD} />
           </span>
           {unread && <span className="absolute rounded-full border-2 border-white bg-[#f0263a]" style={{ right: 6, top: 6, width: 11, height: 11 }} />}
         </button>
 
-        {/* 副題（写真の中の字は消してある。写真のままだと8.5ptで小さいので、同じゴシックで描く） */}
-        <p className="home-rise absolute whitespace-nowrap font-medium leading-none" style={{ left: 16, top: 125, fontSize: 12, letterSpacing: 0.9, color: "#26324a", textShadow: GLOW, fontFeatureSettings: '"palt"', ...rise(60) }}>
+        {/* 見出しと副題（絵と同じ位置・大きさ。絵の字は消してある） */}
+        <h1 className="home-rise absolute whitespace-nowrap font-bold" style={{ left: 16, top: 44, fontSize: 25, lineHeight: "33px", letterSpacing: 0.8, color: HEAD, textShadow: GLOW, fontFeatureSettings: '"palt"' }}>
+          調べる時間を、
+          <br />
+          商談の時間に。
+        </h1>
+        <p className="home-rise absolute whitespace-nowrap font-medium leading-none" style={{ left: 16, top: 112, fontSize: 12, letterSpacing: 0.9, color: "#26324a", textShadow: GLOW, fontFeatureSettings: '"palt"', ...rise(60) }}>
           不動産調査を、もっと早く、もっとシンプルに。
         </p>
       </div>
 
       {/* 調べる（すりガラスのカード。住所も地番もこの欄に入れる） */}
-      <div className="home-rise relative mx-[16px] -mt-[82px] rounded-[22px] p-[10px] shadow-[0_14px_34px_rgba(20,48,95,0.13)] low:p-[8px]" style={{ ...GLASS, ...rise(100) }}>
+      <div className="home-rise relative mx-[16px] -mt-[85px] rounded-[22px] p-[9px] shadow-[0_14px_34px_rgba(20,48,95,0.13)] low:p-[8px]" style={{ ...GLASS, ...rise(100) }}>
         <form
           role="search"
           onSubmit={(e) => {
@@ -216,7 +220,7 @@ export function HomeScreen({
                     aria-label={`${full}（${monthDay(h.at)}${kind ? `・${kind}` : ""}）を開く`}
                     className="block w-full overflow-hidden rounded-[16px] bg-white text-left shadow-[0_4px_14px_rgba(20,45,85,0.10)] transition-transform active:scale-[0.97]"
                   >
-                    <span className="relative block h-[62px] low:h-[50px]">
+                    <span className="relative block h-[52px] low:h-[46px]">
                       <PhoneImg src={sceneSrc(scene)} alt="" loading="lazy" draggable={false} className="block h-full w-full object-cover" style={{ objectPosition: `50% ${SCENES[scene].y}%` }} />
                       {kind && (
                         <span className="absolute rounded-full bg-white/85 px-[7px] py-[4px] font-bold leading-none backdrop-blur" style={{ left: 6, top: 6, fontSize: 10.5, color: NAVY }}>
@@ -245,14 +249,14 @@ export function HomeScreen({
       {/* 調査メニュー（届いた絵の3Dアイコン） */}
       <section className="home-rise relative mt-[2px]" style={rise(220)}>
         <SectionHead title="調査メニュー" onMore={onMenuAll} />
-        <div className="mt-[2px] grid grid-cols-2 gap-[7px] px-[16px] low:gap-[6px]">
+        <div className="mt-[2px] grid grid-cols-2 gap-[6px] px-[16px] low:gap-[5px]">
           {MENU.map((m) => (
             <button
               key={m.title}
               onClick={() => onMenu(m.tab, m.title)}
-              className="flex h-[48px] min-w-0 items-center rounded-[16px] border border-white bg-white text-left shadow-[0_4px_14px_rgba(20,45,85,0.07)] transition-transform active:scale-[0.97] low:h-[44px]"
+              className="flex h-[44px] min-w-0 items-center rounded-[16px] border border-white bg-white text-left shadow-[0_4px_14px_rgba(20,45,85,0.07)] transition-transform active:scale-[0.97] low:h-[42px]"
             >
-              <PhoneImg src={`/home/menu/${m.icon}.webp`} alt="" draggable={false} className="ml-[2px] block size-[44px] shrink-0 low:size-[40px]" />
+              <PhoneImg src={`/home/menu/${m.icon}.webp`} alt="" draggable={false} className="ml-[2px] block size-[40px] shrink-0 low:size-[38px]" />
               <span className="ml-[4px] min-w-0 flex-1">
                 <span className="block whitespace-nowrap font-bold leading-[1.25]" style={{ fontSize: 14, color: TEXT, fontFeatureSettings: '"palt"' }}>
                   {m.title}
@@ -270,7 +274,7 @@ export function HomeScreen({
       {/* 書類を作る（届いた絵のバナー。写真の書類の左の空いた所に字を置く。押すと書類・出力のページ） */}
       <button
         onClick={onDocs}
-        className="home-rise relative mx-[16px] mb-[10px] mt-[10px] block h-[62px] w-[calc(100%-32px)] overflow-hidden rounded-[16px] text-left shadow-[0_6px_20px_rgba(60,40,20,0.10)] transition-transform active:scale-[0.985] low:mb-[8px] low:mt-[8px] low:h-[56px]"
+        className="home-rise relative mx-[16px] mb-[8px] mt-[8px] block h-[58px] w-[calc(100%-32px)] overflow-hidden rounded-[16px] text-left shadow-[0_6px_20px_rgba(60,40,20,0.10)] transition-transform active:scale-[0.985] low:mb-[6px] low:mt-[6px] low:h-[54px]"
         style={rise(280)}
       >
         <PhoneImg src="/home/docs.webp" alt="" loading="lazy" draggable={false} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "0% 50%" }} />
@@ -290,13 +294,13 @@ export function HomeScreen({
   );
 }
 
-/** 章の見出し（写真の見出しと同じ明朝。左に青い印）と「すべて見る ›」（押せる高さは44pt） */
+/** 章の見出し（左に青い印）と「すべて見る ›」（押せる高さは44pt） */
 function SectionHead({ title, onMore }: { title: string; onMore?: () => void }) {
   return (
-    <div className="flex h-[28px] items-center justify-between px-[16px] low:h-[26px]">
+    <div className="flex h-[26px] items-center justify-between px-[16px]">
       <div className="flex min-w-0 items-center gap-[7px]">
         <span aria-hidden className="shrink-0 rounded-full" style={{ width: 3.5, height: 15, background: ACCENT }} />
-        <h2 className="home-serif whitespace-nowrap font-bold leading-none" style={{ fontSize: 17, color: HEAD, letterSpacing: 0.5 }}>
+        <h2 className="whitespace-nowrap font-bold leading-none" style={{ fontSize: 17, color: HEAD, letterSpacing: 0.3 }}>
           {title}
         </h2>
       </div>
@@ -316,7 +320,7 @@ function FirstRun() {
     <div className="mx-[16px] mb-[4px] mt-[2px] rounded-[16px] bg-white p-[10px] shadow-[0_4px_14px_rgba(20,45,85,0.08)]">
       <div className="grid grid-cols-3 gap-[6px]">
         {SAMPLE.map((k) => (
-          <PhoneImg key={k} src={sceneSrc(k)} alt="" loading="lazy" draggable={false} className="block h-[46px] w-full rounded-[10px] object-cover low:h-[36px]" style={{ objectPosition: `50% ${SCENES[k].y}%` }} />
+          <PhoneImg key={k} src={sceneSrc(k)} alt="" loading="lazy" draggable={false} className="block h-[40px] w-full rounded-[10px] object-cover low:h-[34px]" style={{ objectPosition: `50% ${SCENES[k].y}%` }} />
         ))}
       </div>
       <p className="mt-[8px] px-[2px] font-bold leading-[1.3]" style={{ fontSize: 14, color: TEXT }}>
