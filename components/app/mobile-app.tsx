@@ -88,9 +88,6 @@ export function MobileApp(props: MobileAppProps) {
   const [sheet, setSheet] = useState<AppSheet>(null);
   const [picker, setPicker] = useState<{ start?: { lat: number; lng: number } } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  // 調査メニューで選んだ「調べたら開くタブ」と、その案内
-  const [startTab, setStartTab] = useState<TabKey | null>(null);
-  const [hint, setHint] = useState<string | null>(null);
   // 物件の「レポートを作成」（書類・出力）。下のメニューの「書類・出力」からも開く
   const [report, setReport] = useState(false);
   const [news, setNews] = useState(false);
@@ -112,13 +109,11 @@ export function MobileApp(props: MobileAppProps) {
     queueMicrotask(() => setPage("home"));
     scroller.current?.scrollTo(0, 0);
   }, [resultKey]);
-  // 物件が開いたら、調査メニューで選んだタブ・案内は使い終わり。開けなかったら（見つからない等）、頼まれていたレポートも開かない
+  // 物件を開けなかったら（見つからない等）、頼まれていたレポートも開かない
   const status = shown?.result.status;
   useEffect(() => {
     if (!status) return;
     queueMicrotask(() => {
-      setStartTab(null);
-      setHint(null);
       if (status !== "ok") setReport(false);
     });
   }, [status, resultKey]);
@@ -170,7 +165,7 @@ export function MobileApp(props: MobileAppProps) {
   // 検索する前のホーム（新しいUI）。調べている間もホームのまま（「調査を開始する」が回る）
   const showHome = page === "home" && !shown;
   const failure = error ?? (offline ? OFFLINE : null);
-  const homeMessage: HomeMessage = failure ? { text: failure, warn: true } : notice ? { text: notice, warn: true } : hint ? { text: hint, warn: false } : null;
+  const homeMessage: HomeMessage = failure ? { text: failure } : notice ? { text: notice } : null;
   const isFav = (h: HistoryItem) => favorites.some((f) => favoriteKey(f) === favoriteKey(h));
 
   // 下のメニューのページ（履歴・お気に入り・書類・出力・その他）は、大きな見出しのページにする（物件の画面の上の部分は出さない）
@@ -218,23 +213,11 @@ export function MobileApp(props: MobileAppProps) {
               onSubmit={submitHome}
               loading={loading}
               message={homeMessage}
-              onDismiss={() => {
-                setNotice(null);
-                setHint(null);
-              }}
+              onDismiss={() => setNotice(null)}
               history={history}
               onPickRecent={pickRecent}
               onHistory={() => go("history")}
               onMap={openMap}
-              onMenu={(tab, title) => {
-                setStartTab(tab);
-                setNotice(null);
-                setHint(`調べると「${title}」から開きます。住所か地番を入れるか、地図で選んでください。`);
-                // 押した操作の中で入力欄に入れる（iPhone はそうしないとキーボードが出ない）
-                inputRef.current?.focus();
-              }}
-              onMenuAll={() => setSheet("help")}
-              onDocs={() => go("docs")}
               onBell={() => {
                 setNews(true);
                 markNewsSeen();
@@ -281,7 +264,6 @@ export function MobileApp(props: MobileAppProps) {
             <div hidden={page !== "home"}>
               <PropertyView
                 key={`${ok.lat},${ok.lng},${ok.matchedAddress}`}
-                initialTab={startTab ?? undefined}
                 report={report}
                 setReport={setReport}
                 query={shown!.query}
@@ -397,7 +379,6 @@ function Banner({ loading, error, notice, onDismiss }: { loading: boolean; error
 
 /** 物件の画面（6つのタブ）。データはここで読む */
 function PropertyView({
-  initialTab,
   report,
   setReport,
   query,
@@ -412,8 +393,6 @@ function PropertyView({
   onFix,
   scroller,
 }: {
-  /** 開いたときのタブ（ホームの調査メニューで選んだもの） */
-  initialTab?: TabKey;
   report: boolean;
   setReport: (open: boolean) => void;
   query: string;
@@ -429,7 +408,7 @@ function PropertyView({
   scroller: React.RefObject<HTMLDivElement | null>;
 }) {
   const data = useProperty(result);
-  const [tab, setTab] = useState<TabKey>(initialTab ?? "basic");
+  const [tab, setTab] = useState<TabKey>("basic");
   const [detail, setDetail] = useState<{ kind: SheetKind; arg?: number } | null>(null);
   const [mapApps, setMapApps] = useState(false);
   const [triage, setTriage] = useState(false);

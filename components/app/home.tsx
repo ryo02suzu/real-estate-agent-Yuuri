@@ -3,18 +3,17 @@
 // スマホの新しいホーム（検索する前の画面）。届いた絵をそのまま使い、iPhone 16 Pro などの画面でスクロールせずに1画面に収まるように組んだもの。
 // 上から：街の写真（届いた絵の構図のまま。見出し「調べる時間を、商談の時間に。」と副題は絵の字を消して、絵と同じ位置・大きさに
 // アプリの字で描く。写真の街並みが見出しの下に見えるよう、調べるカードは街並みの途中に重ねる）の上にロゴ・お知らせ、調べるカード
-// （住所も地番も1つの欄に入れる。地図で選ぶボタンつき。写真入りの「調査を開始する」）、最近の検索（写真つきのカードを横にすべらせる）、
-// 調査メニュー（届いた絵の3Dアイコン・6つ）、書類を作るバナー（届いた絵。押すと書類・出力のページ）。
+// （住所も地番も1つの欄に入れる。地図で選ぶボタンつき。写真入りの「調査を開始する」）、最近の検索（写真つきの大きなカードを2列に4件まで。
+// 続きは履歴のページ）。調査メニューと書類のバナーは置かない（調べれば全部のタブが出る。書類は下のメニューの「書類・出力」から）。
 // 字はアプリ全体で Noto Sans JP の1種類（app/globals.css）。
 // 調べるカードはすりガラス（後ろの街の写真を少しぼかして透かす）。現れるときの動きとボタンの光は app/globals.css の .home-rise・.home-shine。
 // 寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。幅に対して背の低い画面（iPhone SE など）では、
-// low:（app/globals.css）でカード・調査メニュー・バナーを少し詰める（それでも入りきらない分はスクロール）
-import { ArrowRight, Bell, ChevronRight, Info, LoaderCircle, Map as MapIcon, Search, TriangleAlert, X } from "lucide-react";
+// low:（app/globals.css）でカードを少し詰める
+import { ArrowRight, Bell, ChevronRight, LoaderCircle, Map as MapIcon, Search, TriangleAlert, X } from "lucide-react";
 import type { CSSProperties, RefObject } from "react";
 import { monthDay, placeholderScenes, placeParts, SCENES, sceneSrc, type SceneKey } from "@/lib/app/scene";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import { LogoLockup, PhoneImg, ScaledInput } from "./frame";
-import type { TabKey } from "./property-head";
 import { NAVY } from "./ui";
 
 /** 時刻・電池の帯の色（app/layout.tsx の themeColor と同じ）。写真の上端をこの色からつなぐ */
@@ -44,23 +43,15 @@ const GLASS: CSSProperties = {
   WebkitBackdropFilter: "blur(10px) saturate(1.5)",
   border: "1px solid rgba(255,255,255,0.8)",
 };
-/** 地の奥の淡い光（最近の検索から調査メニューのあたり。下の端に届く前に消える） */
+/** 地の奥の淡い光（最近の検索のあたり。下の端に届く前に消える） */
 const AURORA =
   "radial-gradient(60% 42% at 0% 45%, rgba(110,140,255,0.13) 0%, rgba(110,140,255,0) 100%), radial-gradient(55% 38% at 100% 58%, rgba(40,190,255,0.12) 0%, rgba(40,190,255,0) 100%)";
-
-const MENU: { tab: TabKey; icon: string; title: string; sub: string }[] = [
-  { tab: "law", icon: "road", title: "道路", sub: "接道・種別・幅員" },
-  { tab: "law", icon: "law", title: "法令・都市計画", sub: "用途地域・建ぺい率" },
-  { tab: "hazard", icon: "hazard", title: "ハザード", sub: "洪水・土砂・高潮" },
-  { tab: "basic", icon: "land", title: "土地・建物", sub: "地番・筆形・建物" },
-  { tab: "price", icon: "price", title: "価格", sub: "地価公示・路線価" },
-  { tab: "around", icon: "around", title: "周辺環境", sub: "駅・学校・施設" },
-];
 
 /** 最近の検索がまだ無いときに見せる写真 */
 const SAMPLE: SceneKey[] = ["suburb", "newtown", "urban"];
 
-export type HomeMessage = { text: string; warn: boolean } | null;
+/** 調べるカードの下に出す注意（空のまま調べた・通信できない） */
+export type HomeMessage = { text: string } | null;
 
 /** 現れるときの動きの遅れ（上から順に） */
 const rise = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
@@ -76,9 +67,6 @@ export function HomeScreen({
   onPickRecent,
   onHistory,
   onMap,
-  onMenu,
-  onMenuAll,
-  onDocs,
   onBell,
   unread,
   onLogo,
@@ -96,17 +84,12 @@ export function HomeScreen({
   onHistory: () => void;
   /** 地図で場所を選ぶ（住所の無い土地も選べる） */
   onMap: () => void;
-  /** 調査メニュー（調べたら、そのタブから開く） */
-  onMenu: (tab: TabKey, title: string) => void;
-  onMenuAll: () => void;
-  /** 書類を作るバナー（書類・出力のページ） */
-  onDocs: () => void;
   onBell: () => void;
   unread: boolean;
   onLogo: () => void;
   inputRef: RefObject<HTMLInputElement | null>;
 }) {
-  const recent = history.slice(0, 10);
+  const recent = history.slice(0, 4);
   const scenes = placeholderScenes(recent);
 
   return (
@@ -197,42 +180,42 @@ export function HomeScreen({
         </form>
 
         {message && (
-          <button type="button" onClick={onDismiss} className="mt-[8px] flex w-full items-start gap-[7px] rounded-[12px] px-[12px] py-[9px] text-left leading-[1.5]" style={{ fontSize: 12.5, background: message.warn ? "#fdf1ec" : "#eef4fb", color: message.warn ? "#8a4f3a" : "#1c3a6a" }}>
-            {message.warn ? <TriangleAlert size={15} strokeWidth={1.8} absoluteStrokeWidth className="mt-[2px] shrink-0" /> : <Info size={15} strokeWidth={1.8} absoluteStrokeWidth className="mt-[2px] shrink-0" />}
+          <button type="button" onClick={onDismiss} className="mt-[8px] flex w-full items-start gap-[7px] rounded-[12px] bg-[#fdf1ec] px-[12px] py-[9px] text-left leading-[1.5]" style={{ fontSize: 12.5, color: "#8a4f3a" }}>
+            <TriangleAlert size={15} strokeWidth={1.8} absoluteStrokeWidth className="mt-[2px] shrink-0" />
             {message.text}
           </button>
         )}
       </div>
 
-      {/* 最近の検索（写真つきのカードを横にすべらせる） */}
-      <section className="home-rise relative mt-[8px] low:mt-[6px]" style={rise(160)}>
+      {/* 最近の検索（写真つきの大きなカードを2列に4件まで） */}
+      <section className="home-rise relative mt-[8px] pb-[8px] low:mt-[6px]" style={rise(160)}>
         <SectionHead title="最近の検索" onMore={history.length ? onHistory : undefined} />
         {recent.length ? (
-          <ul className="no-scrollbar mt-[2px] flex snap-x snap-mandatory scroll-pl-[16px] gap-[10px] overflow-x-auto px-[16px] pb-[4px] low:pb-[2px]">
+          <ul className="mt-[2px] grid grid-cols-2 gap-[10px] px-[16px] low:gap-[8px]">
             {recent.map((h, i) => {
               const { city, town, full, chiban } = placeParts(h);
               const scene = scenes[i];
               const kind = chiban ? "地番" : h.ll ? "地図" : "";
               return (
-                <li key={historyKey(h)} className="shrink-0 snap-start" style={{ width: 138 }}>
+                <li key={historyKey(h)} className="min-w-0">
                   <button
                     onClick={() => onPickRecent(h)}
                     aria-label={`${full}（${monthDay(h.at)}${kind ? `・${kind}` : ""}）を開く`}
-                    className="block w-full overflow-hidden rounded-[16px] bg-white text-left shadow-[0_4px_14px_rgba(20,45,85,0.10)] transition-transform active:scale-[0.97]"
+                    className="block w-full overflow-hidden rounded-[18px] bg-white text-left shadow-[0_4px_14px_rgba(20,45,85,0.10)] transition-transform active:scale-[0.97]"
                   >
-                    <span className="relative block h-[52px] low:h-[46px]">
+                    <span className="relative block h-[100px] low:h-[76px]">
                       <PhoneImg src={sceneSrc(scene)} alt="" loading="lazy" draggable={false} className="block h-full w-full object-cover" style={{ objectPosition: `50% ${SCENES[scene].y}%` }} />
                       {kind && (
-                        <span className="absolute rounded-full bg-white/85 px-[7px] py-[4px] font-bold leading-none backdrop-blur" style={{ left: 6, top: 6, fontSize: 10.5, color: NAVY }}>
+                        <span className="absolute rounded-full bg-white/85 px-[8px] py-[4px] font-bold leading-none backdrop-blur" style={{ left: 8, top: 8, fontSize: 11, color: NAVY }}>
                           {kind}
                         </span>
                       )}
                     </span>
-                    <span className="block px-[10px] pb-[9px] pt-[6px]">
-                      <span className="block truncate font-bold leading-[1.3]" style={{ fontSize: 14, color: TEXT, fontFeatureSettings: '"palt"' }}>
+                    <span className="block px-[12px] pb-[11px] pt-[8px] low:pb-[9px] low:pt-[6px]">
+                      <span className="block truncate font-bold leading-[1.3]" style={{ fontSize: 15, color: TEXT, fontFeatureSettings: '"palt"' }}>
                         {town || full}
                       </span>
-                      <span className="mt-[2px] block truncate leading-[1.3]" style={{ fontSize: 11.5, color: LIGHT }}>
+                      <span className="mt-[3px] block truncate leading-[1.3]" style={{ fontSize: 12, color: LIGHT }}>
                         {city || "対応エリアの外"}・{monthDay(h.at)}
                       </span>
                     </span>
@@ -245,51 +228,6 @@ export function HomeScreen({
           <FirstRun />
         )}
       </section>
-
-      {/* 調査メニュー（届いた絵の3Dアイコン） */}
-      <section className="home-rise relative mt-[2px]" style={rise(220)}>
-        <SectionHead title="調査メニュー" onMore={onMenuAll} />
-        <div className="mt-[2px] grid grid-cols-2 gap-[6px] px-[16px] low:gap-[5px]">
-          {MENU.map((m) => (
-            <button
-              key={m.title}
-              onClick={() => onMenu(m.tab, m.title)}
-              className="flex h-[44px] min-w-0 items-center rounded-[16px] border border-white bg-white text-left shadow-[0_4px_14px_rgba(20,45,85,0.07)] transition-transform active:scale-[0.97] low:h-[42px]"
-            >
-              <PhoneImg src={`/home/menu/${m.icon}.webp`} alt="" draggable={false} className="ml-[2px] block size-[40px] shrink-0 low:size-[38px]" />
-              <span className="ml-[4px] min-w-0 flex-1">
-                <span className="block whitespace-nowrap font-bold leading-[1.25]" style={{ fontSize: 14, color: TEXT, fontFeatureSettings: '"palt"' }}>
-                  {m.title}
-                </span>
-                <span className="mt-[2px] block whitespace-nowrap leading-[1.3]" style={{ fontSize: 10.5, color: LIGHT, fontFeatureSettings: '"palt"' }}>
-                  {m.sub}
-                </span>
-              </span>
-              <ChevronRight size={14} strokeWidth={2} absoluteStrokeWidth color="#9aa5b6" className="mr-[7px] shrink-0" />
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* 書類を作る（届いた絵のバナー。写真の書類の左の空いた所に字を置く。押すと書類・出力のページ） */}
-      <button
-        onClick={onDocs}
-        className="home-rise relative mx-[16px] mb-[8px] mt-[8px] block h-[58px] w-[calc(100%-32px)] overflow-hidden rounded-[16px] text-left shadow-[0_6px_20px_rgba(60,40,20,0.10)] transition-transform active:scale-[0.985] low:mb-[6px] low:mt-[6px] low:h-[54px]"
-        style={rise(280)}
-      >
-        <PhoneImg src="/home/docs.webp" alt="" loading="lazy" draggable={false} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "0% 50%" }} />
-        <span className="absolute top-1/2 -translate-y-1/2" style={{ left: 16 }}>
-          <span className="block whitespace-nowrap font-bold leading-none" style={{ fontSize: 15, color: "#0f2a5c", fontFeatureSettings: '"palt"' }}>
-            調査結果から書類を作成
-          </span>
-          <span className="mt-[6px] block whitespace-nowrap leading-none" style={{ fontSize: 11.5, color: "#4b5568", fontFeatureSettings: '"palt"' }}>
-            調査メモ・重説下書き・案内図
-          </span>
-        </span>
-        <span className="absolute top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full bg-[#3c4a64]/85 text-white" style={{ right: 10, width: 30, height: 30 }}>
-          <ChevronRight size={17} strokeWidth={2} absoluteStrokeWidth />
-        </span>
-      </button>
     </div>
   );
 }
@@ -317,10 +255,10 @@ function SectionHead({ title, onMore }: { title: string; onMore?: () => void }) 
 /** 最近の検索がまだ無いとき（初めて開いたとき） */
 function FirstRun() {
   return (
-    <div className="mx-[16px] mb-[4px] mt-[2px] rounded-[16px] bg-white p-[10px] shadow-[0_4px_14px_rgba(20,45,85,0.08)]">
+    <div className="mx-[16px] mt-[2px] rounded-[18px] bg-white p-[10px] shadow-[0_4px_14px_rgba(20,45,85,0.08)]">
       <div className="grid grid-cols-3 gap-[6px]">
         {SAMPLE.map((k) => (
-          <PhoneImg key={k} src={sceneSrc(k)} alt="" loading="lazy" draggable={false} className="block h-[40px] w-full rounded-[10px] object-cover low:h-[34px]" style={{ objectPosition: `50% ${SCENES[k].y}%` }} />
+          <PhoneImg key={k} src={sceneSrc(k)} alt="" loading="lazy" draggable={false} className="block h-[64px] w-full rounded-[12px] object-cover low:h-[48px]" style={{ objectPosition: `50% ${SCENES[k].y}%` }} />
         ))}
       </div>
       <p className="mt-[8px] px-[2px] font-bold leading-[1.3]" style={{ fontSize: 14, color: TEXT }}>
