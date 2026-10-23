@@ -49,7 +49,7 @@ const GLASS: CSSProperties = {
 const AURORA =
   "radial-gradient(60% 42% at 0% 45%, rgba(110,140,255,0.13) 0%, rgba(110,140,255,0) 100%), radial-gradient(55% 38% at 100% 58%, rgba(40,190,255,0.12) 0%, rgba(40,190,255,0) 100%)";
 
-/** 最近の検索がまだ無いときに見せる写真 */
+/** 最近の検索がまだ無いときに見せる写真（丸く重ねて3枚） */
 const SAMPLE: SceneKey[] = ["suburb", "newtown", "urban"];
 
 /** 「使い方」の3つの入口（例を押すと、そのまま調べる） */
@@ -244,7 +244,7 @@ export function HomeScreen({
           <ul className="mx-[16px] mt-[2px] overflow-hidden rounded-[18px] bg-white shadow-[0_4px_14px_rgba(20,45,85,0.08)]">
             {TRY.map((t) => (
               <li key={t.key} className="border-t border-[#eef2f6] first:border-t-0">
-                <button onClick={() => (t.example ? onTry(t.example) : onMap())} className="flex min-h-[60px] w-full items-center gap-[12px] py-[8px] pl-[12px] pr-[10px] text-left active:bg-[#f5f8fc] low:min-h-[54px]">
+                <button onClick={() => (t.example ? onTry(t.example) : onMap())} className="flex min-h-[56px] w-full items-center gap-[12px] py-[8px] pl-[12px] pr-[10px] text-left active:bg-[#f5f8fc] low:min-h-[52px]">
                   <span className="flex shrink-0 items-center justify-center rounded-full bg-[#eef3fa]" style={{ width: 38, height: 38 }}>
                     <t.Icon size={18} strokeWidth={1.8} absoluteStrokeWidth color={NAVY} />
                   </span>
@@ -288,21 +288,23 @@ function SectionHead({ title, more = "すべて見る", onMore }: { title: strin
   );
 }
 
-/** 最近の検索がまだ無いとき（初めて開いたとき） */
+/** 最近の検索がまだ無いとき（初めて開いたとき）。1行の高さに収める（Safari でも1画面に入るように） */
 function FirstRun() {
   return (
-    <div className="mx-[16px] mt-[2px] rounded-[18px] bg-white p-[10px] shadow-[0_4px_14px_rgba(20,45,85,0.08)]">
-      <div className="grid grid-cols-3 gap-[6px]">
-        {SAMPLE.map((k) => (
-          <PhoneImg key={k} src={sceneSrc(k)} alt="" loading="lazy" draggable={false} className="block h-[56px] w-full rounded-[12px] object-cover low:h-[44px]" style={{ objectPosition: `50% ${SCENES[k].y}%` }} />
+    <div className="mx-[16px] mt-[2px] flex items-center gap-[12px] rounded-[18px] bg-white py-[8px] pl-[10px] pr-[12px] shadow-[0_4px_14px_rgba(20,45,85,0.08)]" style={{ minHeight: 56 }}>
+      <div className="flex shrink-0 -space-x-[10px]">
+        {SAMPLE.map((k, i) => (
+          <PhoneImg key={k} src={sceneSrc(k)} alt="" loading="lazy" draggable={false} className="relative block size-[40px] rounded-full border-2 border-white object-cover" style={{ objectPosition: `50% ${SCENES[k].y}%`, zIndex: SAMPLE.length - i }} />
         ))}
       </div>
-      <p className="mt-[9px] px-[2px] font-semibold leading-[1.3]" style={{ fontSize: 16, color: TEXT }}>
-        まだ調べた物件はありません
-      </p>
-      <p className="mt-[2px] px-[2px] leading-[1.35]" style={{ fontSize: 13, color: LIGHT }}>
-        住所か地番を入れて調べると、ここに並びます
-      </p>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-semibold leading-[1.3]" style={{ fontSize: 15, color: TEXT }}>
+          まだ調べた物件はありません
+        </p>
+        <p className="mt-[1px] truncate leading-[1.35]" style={{ fontSize: 12.5, color: LIGHT }}>
+          調べた物件が、ここに並びます
+        </p>
+      </div>
     </div>
   );
 }

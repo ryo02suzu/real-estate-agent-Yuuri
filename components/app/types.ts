@@ -1,5 +1,5 @@
 import type { HazardKind } from "@/lib/roadmap/hazard";
-import type { TabKey } from "./property-head";
+import type { TabKey } from "./result-head";
 import type { Ok, PropertyData } from "./use-property";
 
 /** 下から出す詳しい画面（シート） */
@@ -33,4 +33,6 @@ export type TabProps = {
   expand: (o?: MapOpen) => void;
   /** 「地図アプリで開く」の選択 */
   mapApps: () => void;
+  /** 「レポートを作成」（書類・出力） */
+  report: () => void;
 };

@@ -1,10 +1,10 @@
 "use client";
 
-// スマホの画面（紺の新しい見た目）。検索する前のホームは新しいUIの絵どおり（components/app/home.tsx）。
-// それ以外は上の写真の部分と検索窓・白いカード・下のメニューの枠の中に、物件の6つのタブ（基本情報・周辺環境・相場・取引・法令・規制・
-// ハザード・取引事例）、検索履歴・お気に入り・書類・出力・その他を出す。
+// スマホの画面（紺の新しい見た目）。検索する前のホームは components/app/home.tsx。物件の画面は、上の街の写真の帯（写真はあとで届くので
+// 今は NO IMAGE）と6つのタブの切り替えの下に、タブごとに1画面に収まる中身（components/app/r-*.tsx）。下のメニューのページ
+// （履歴・お気に入り・書類・出力・その他）は components/app/tab-pages.tsx、見つからない・候補・未対応は components/app/pages.tsx。
 // 幅393ptの絵の寸法で描き、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。下から出す画面（シート）は拡大・縮小しない
-import { Info, LoaderCircle, TriangleAlert } from "lucide-react";
+import { LoaderCircle, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { favoriteKey, toggleFavorite, removeFavorite, type FavoriteItem } from "@/lib/favorites";
@@ -12,7 +12,7 @@ import type { HistoryItem } from "@/lib/history";
 import type { LookupResult } from "@/lib/roadmap";
 import { BUILDING_DATA } from "@/lib/roadmap/building-data";
 import { LAND_PRICE_DATA } from "@/lib/roadmap/land-price-data";
-import { chibanLabel, chibanQueryOf, kuikiLabel, parcelMark, registryChiban } from "@/lib/roadmap/parcel";
+import { chibanLabel, chibanQueryOf, registryChiban } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { HOSPITAL_SOURCE } from "@/lib/roadmap/facilities";
 import { POI_DATA } from "@/lib/roadmap/poi";
@@ -34,18 +34,19 @@ import { Sheet } from "../sheet";
 import { useCopy } from "../use-copy";
 import { MapAppsSheet, ReportSheet } from "./app-sheets";
 import { DetailSheet } from "./detail-sheets";
-import { ART_W, BottomNav, Hero, SheetFrame, ZOOM, type NavKey } from "./frame";
+import { ART_W, BottomNav, ZOOM, type NavKey } from "./frame";
 import { HomeScreen, PAGE, type HomeMessage } from "./home";
 import { markNewsSeen, NewsSheet, useUnreadNews } from "./news";
 import { NotOkPage } from "./pages";
+import { AroundTab } from "./r-around";
+import { BasicTab } from "./r-basic";
+import { DealsTab } from "./r-deals";
+import { HazardTab } from "./r-hazard";
+import { LawTab } from "./r-law";
+import { PriceTab } from "./r-price";
+import { displayAddress, WARN } from "./r-ui";
+import { PlaceBanner, ResultBand, TabSegments, type TabKey } from "./result-head";
 import { AccountPage, DocsPage, FavoritesPage, HistoryPage, TabBanner } from "./tab-pages";
-import { BottomActions, PropertyHeader, TabBar, type TabKey } from "./property-head";
-import { AroundTab } from "./tab-around";
-import { BasicTab } from "./tab-basic";
-import { DealsTab } from "./tab-deals";
-import { HazardTab } from "./tab-hazard";
-import { LawTab } from "./tab-law";
-import { PriceTab } from "./tab-price";
 import type { MapOpen, SheetKind, TabProps } from "./types";
 import { useProperty, type Ok, type PropertyData } from "./use-property";
 import { applyAppZoom } from "./zoom";
@@ -127,21 +128,6 @@ export function MobileApp(props: MobileAppProps) {
     scroller.current?.scrollTo(0, 0);
   }, []);
 
-  const pickHere = () => {
-    if (!navigator.geolocation) return setNotice("この端末では現在地を使えません。");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => onPickPoint(pos.coords.latitude, pos.coords.longitude),
-      () => {
-        setNotice("現在地を取得できませんでした。位置情報の利用を許可してください。");
-      },
-      { enableHighAccuracy: true, timeout: 15000 },
-    );
-  };
-  const typeChiban = () => {
-    setInput("地番 ");
-    // 押した操作の中で入力欄に入れる（iPhone はそうしないとキーボードが出ない）
-    inputRef.current?.focus();
-  };
   const openMap = () => {
     const r = shown?.result;
     setPicker({ start: r && (r.status === "ok" || r.status === "unsupported") ? { lat: r.lat, lng: r.lng } : undefined });
@@ -149,6 +135,11 @@ export function MobileApp(props: MobileAppProps) {
   const pickRecent = (h: HistoryItem) => {
     setPage("home");
     onPickHistory(h);
+  };
+  /** 物件の画面の「戻る」。検索する前のホームに戻る */
+  const backHome = () => {
+    setPage("home");
+    props.onHome();
   };
   /** ホームの「調査を開始する」。住所も地番も同じ欄（地番かどうかは調べるときに見分ける。lib/roadmap の splitChiban） */
   const submitHome = () => {
@@ -168,7 +159,7 @@ export function MobileApp(props: MobileAppProps) {
   const homeMessage: HomeMessage = failure ? { text: failure } : notice ? { text: notice } : null;
   const isFav = (h: HistoryItem) => favorites.some((f) => favoriteKey(f) === favoriteKey(h));
 
-  // 下のメニューのページ（履歴・お気に入り・書類・出力・その他）は、大きな見出しのページにする（物件の画面の上の部分は出さない）
+  // 下のメニューのページ（履歴・お気に入り・書類・出力・その他）は、大きな見出しのページにする
   const tabPage = page !== "home";
   const tabBanner = <TabBanner loading={loading && !offline} error={failure} notice={notice} onDismiss={() => setNotice(null)} />;
   let body: ReactNode;
@@ -200,13 +191,14 @@ export function MobileApp(props: MobileAppProps) {
         banner={tabBanner}
       />
     );
-  else if (shown && shown.result.status !== "ok") body = <NotOkPage query={shown.query} result={shown.result} onPick={props.onPickAddress} onMap={openMap} />;
+  else if (shown && shown.result.status !== "ok")
+    body = <NotOkPage query={shown.query} result={shown.result} onPick={props.onPickAddress} onMap={openMap} onBack={backHome} banner={<Banner loading={loading && !offline} error={failure} notice={notice} onDismiss={() => setNotice(null)} />} />;
 
   return (
-    <div className="theme-navy flex min-h-0 w-full flex-1 flex-col overflow-hidden" style={{ fontFeatureSettings: "normal", letterSpacing: 0, background: showHome || tabPage ? PAGE : "#f7f9fd" }}>
+    <div className="theme-navy flex min-h-0 w-full flex-1 flex-col overflow-hidden" style={{ fontFeatureSettings: "normal", letterSpacing: 0, background: PAGE }}>
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain">
         <div className="relative mx-auto" style={{ width: ART_W, zoom: ZOOM }}>
-          {showHome ? (
+          {showHome && (
             <HomeScreen
               input={input}
               setInput={setInput}
@@ -228,38 +220,6 @@ export function MobileApp(props: MobileAppProps) {
               onLogo={() => scroller.current?.scrollTo({ top: 0, behavior: "smooth" })}
               inputRef={inputRef}
             />
-          ) : tabPage ? null : (
-            <Hero
-              input={input}
-              setInput={setInput}
-              onSearch={() => {
-                setPage("home");
-                // 空のまま押したら、何を入れるかを出して入力欄に戻す
-                if (!input.trim()) {
-                  setNotice(EMPTY);
-                  inputRef.current?.focus();
-                  return;
-                }
-                setNotice(null);
-                onSearch();
-              }}
-              loading={loading}
-              recent={history}
-              onPickRecent={pickRecent}
-              quick={[
-                { label: "地図で選ぶ", onClick: openMap },
-                { label: "現在地で調べる", onClick: pickHere },
-                { label: "地番で調べる", onClick: typeChiban },
-              ]}
-              onHome={() => {
-                setPage("home");
-                props.onHome();
-              }}
-              onHistory={() => go("history")}
-              onFavorites={() => go("favorites")}
-              onMenu={() => setSheet("menu")}
-              inputRef={inputRef}
-            />
           )}
           {/* 物件の画面は、検索履歴などのページを見ているあいだも残す（戻ったときに読み直さない・タブもそのまま） */}
           {ok && (
@@ -278,19 +238,13 @@ export function MobileApp(props: MobileAppProps) {
                 onPick={props.onPickAddress}
                 onPickPoint={onPickPoint}
                 onFix={openMap}
+                onBack={backHome}
                 scroller={scroller}
               />
             </div>
           )}
           {tabPage && body}
-          {!showHome && !tabPage && !ok && (
-            <SheetFrame>
-              {/* 通信できないあいだは「調べています」より先に、通信できないことを出す */}
-              <Banner loading={loading && !offline} error={error ?? (offline ? OFFLINE : null)} notice={notice} onDismiss={() => setNotice(null)} />
-              {body}
-            </SheetFrame>
-          )}
-          <div style={{ height: 8 }} />
+          {!showHome && !tabPage && !ok && body}
         </div>
       </div>
       <BottomNav
@@ -360,20 +314,20 @@ function itemOf(query: string, r: Ok): HistoryItem {
   return { address: r.picked ? r.matchedAddress : query, city: r.municipality.name, coverage: r.municipality.coverage, at: Date.now(), ...(r.picked ? { ll: [r.lat, r.lng] as [number, number] } : {}) };
 }
 
-/** 調べている・通信の失敗・お知らせ */
+/** 調べている・通信の失敗・お知らせ（物件の画面と見つからない画面の上） */
 function Banner({ loading, error, notice, onDismiss }: { loading: boolean; error: string | null; notice?: string | null; onDismiss?: () => void }) {
   if (loading)
     return (
-      <p className="mx-[9px] mt-[8px] flex items-center gap-[5px] rounded-[7px] bg-[#eef4fb] px-[9px] py-[7px] leading-none" style={{ fontSize: 7.4, color: "#1c3a6a" }}>
-        <LoaderCircle size={10} strokeWidth={1.6} absoluteStrokeWidth className="animate-spin" />
+      <p className="mx-[16px] mt-[8px] flex items-center gap-[6px] rounded-[12px] bg-[#eef4fb] px-[12px] py-[9px] leading-none" style={{ fontSize: 13, color: "#1c3a6a" }}>
+        <LoaderCircle size={15} strokeWidth={1.8} absoluteStrokeWidth className="animate-spin" />
         調べています…
       </p>
     );
   const text = error ?? notice;
   if (!text) return null;
   return (
-    <button onClick={onDismiss} className="mx-[9px] mt-[8px] flex w-[calc(100%-18px)] items-start gap-[5px] rounded-[7px] bg-[#fdf1ec] px-[9px] py-[7px] text-left leading-[1.5]" style={{ fontSize: 7.4, color: "#8a4f3a" }}>
-      <TriangleAlert size={10} strokeWidth={1.6} absoluteStrokeWidth className="mt-[1px] shrink-0" />
+    <button onClick={onDismiss} className="mx-[16px] mt-[8px] flex w-[calc(100%-32px)] items-start gap-[6px] rounded-[12px] bg-[#fdf1ec] px-[12px] py-[9px] text-left leading-[1.45]" style={{ fontSize: 13, color: WARN }}>
+      <TriangleAlert size={15} strokeWidth={1.8} absoluteStrokeWidth className="mt-[2px] shrink-0" />
       {text}
     </button>
   );
@@ -393,6 +347,7 @@ function PropertyView({
   onPick,
   onPickPoint,
   onFix,
+  onBack,
   scroller,
 }: {
   report: boolean;
@@ -407,6 +362,7 @@ function PropertyView({
   onPick: (address: string) => void;
   onPickPoint: (lat: number, lng: number) => void;
   onFix: () => void;
+  onBack: () => void;
   scroller: React.RefObject<HTMLDivElement | null>;
 }) {
   const data = useProperty(result);
@@ -417,7 +373,6 @@ function PropertyView({
   const [draft, setDraft] = useState(false);
   const [guide, setGuide] = useState(false);
   const [full, setFull] = useState<MapOpen | null>(null);
-  const tabBar = useRef<HTMLDivElement>(null);
   const addr = useCopy();
   const shareCopy = useCopy();
   const reportCopy = useCopy();
@@ -427,10 +382,8 @@ function PropertyView({
 
   const changeTab = (t: TabKey) => {
     setTab(t);
-    // タブの並びが画面の上に隠れていたら、タブが見える所まで戻す
-    const bar = tabBar.current;
-    const box = scroller.current;
-    if (bar && box && bar.getBoundingClientRect().top < box.getBoundingClientRect().top) bar.scrollIntoView({ block: "start" });
+    // タブを変えたら、その画面のいちばん上から
+    scroller.current?.scrollTo(0, 0);
   };
   const share = async () => {
     const text = buildSummary(result, input);
@@ -451,28 +404,26 @@ function PropertyView({
     open: (kind, arg) => setDetail({ kind, arg }),
     expand: (o) => setFull(o ?? {}),
     mapApps: () => setMapApps(true),
+    report: () => setReport(true),
   };
   const p = result.parcel;
   const found = p && !result.picked ? p : undefined;
-  const title = found ? `${result.matchedAddress} ${chibanLabel(found.chibanRaw)}` : result.matchedAddress;
+  const title = `${displayAddress(result.matchedAddress)}${found ? ` ${chibanLabel(found.chibanRaw)}` : ""}`;
 
   return (
     <>
-      <SheetFrame>
-        <PropertyHeader title={title} sub={copyText(result)} onCopy={() => addr.copy(copyText(result))} copied={addr.done} favorite={favorite} onFavorite={onFavorite} onShare={share} />
-        <Banner loading={loading && !offline} error={error ?? (offline ? OFFLINE : null)} />
-        <PlaceNote query={query} result={result} data={data} onPick={onPick} onFix={onFix} />
-        <div className="mt-[10.5px]">
-          <TabBar tab={tab} onTab={changeTab} refEl={tabBar} />
-        </div>
+      <ResultBand title={title} sub={copyText(result)} onBack={onBack} onCopy={() => addr.copy(copyText(result))} copied={addr.done} favorite={favorite} onFavorite={onFavorite} onShare={share} />
+      <TabSegments tab={tab} onTab={changeTab} />
+      <Banner loading={loading && !offline} error={error ?? (offline ? OFFLINE : null)} notice={shareCopy.done ? "共有の文をコピーしました" : null} />
+      <PlaceNote query={query} result={result} data={data} onPick={onPick} onFix={onFix} />
+      <div className="px-[16px] pb-[8px] pt-[8px]">
         {tab === "basic" && <BasicTab {...props} />}
         {tab === "around" && <AroundTab {...props} />}
         {tab === "price" && <PriceTab {...props} />}
         {tab === "law" && <LawTab {...props} />}
         {tab === "hazard" && <HazardTab {...props} />}
         {tab === "deals" && <DealsTab {...props} />}
-        <BottomActions onShare={share} onReport={() => setReport(true)} shared={shareCopy.done} />
-      </SheetFrame>
+      </div>
 
       <Portal>
         <DetailSheet kind={detail?.kind ?? null} arg={detail?.arg} onClose={() => setDetail(null)} result={result} data={data} expand={(o) => setFull(o ?? {})} />
@@ -511,10 +462,23 @@ function PropertyView({
   );
 }
 
-/** 物件の場所の確かさ（番地まで一致しない・地番が見つからない・地図で選んだ地点）と、場所を直す */
+/** 地番の候補などの小さなボタン（注意の中） */
+function MiniButton({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <button onClick={onClick} className="rounded-full bg-white px-[9px] py-[5px] font-semibold leading-none shadow-[0_1px_3px_rgba(20,45,85,0.1)]" style={{ fontSize: 12.5, color: "#133664" }}>
+      {children}
+    </button>
+  );
+}
+
+/**
+ * 物件の場所の確かさで注意がいるとき（番地まで一致しない・地番が見つからない・住所の地点が道路の筆・地図で選んだ地点で筆が無い）
+ * だけ出す。地番で探した筆・地図で選んだ地点の筆は、基本情報の「地番」の札に書く（1画面に収めるため）
+ */
 function PlaceNote({ query, result, data, onPick, onFix }: { query: string; result: Ok; data: PropertyData; onPick: (address: string) => void; onFix: () => void }) {
-  const { approximate, picked, parcel, parcelMiss, parcelOthers } = result;
+  const { approximate, picked, parcel, parcelMiss } = result;
   let text: ReactNode = null;
+  let short: ReactNode = null;
   let warn = false;
   // 住所で調べた地点が、道路・水路の筆か隣地のとても多い筆（地番の付いた公道など）の上。番地が地番の地域なら
   // （住居表示の「号」まで合った地点でなければ）地番で探し直せるようにする
@@ -524,6 +488,7 @@ function PlaceNote({ query, result, data, onPick, onFix }: { query: string; resu
   const asChiban = chibanArea ? chibanQueryOf(query, /丁目/.test(result.town)) : undefined;
   if (parcelMiss) {
     warn = true;
+    short = parcelMiss.reason === "not_found" ? `地番 ${parcelMiss.chiban} は見つかりません` : parcelMiss.reason === "no_map" ? "地番の地図データがない地域です" : "地番の地図を読み込めませんでした";
     text = (
       <>
         {parcelMiss.reason === "not_found"
@@ -533,12 +498,12 @@ function PlaceNote({ query, result, data, onPick, onFix }: { query: string; resu
             : "地番の地図データを読み込めませんでした。"}
         {approximate && "町の中心を表示しています。"}
         {parcelMiss.similar.length > 0 && (
-          <span className="mt-[3px] flex flex-wrap items-center gap-[4px]">
+          <span className="mt-[5px] flex flex-wrap items-center gap-[5px]">
             近い地番：
             {parcelMiss.similar.slice(0, 4).map((c) => (
-              <button key={c} onClick={() => onPick(`地番 ${result.matchedAddress}${c}`)} className="rounded-full bg-white px-[6px] py-[2px] font-bold" style={{ color: "#133664" }}>
+              <MiniButton key={c} onClick={() => onPick(`地番 ${result.matchedAddress}${c}`)}>
                 {c}
-              </button>
+              </MiniButton>
             ))}
           </span>
         )}
@@ -546,37 +511,32 @@ function PlaceNote({ query, result, data, onPick, onFix }: { query: string; resu
     );
   } else if (approximate) {
     warn = true;
+    short = "番地が見つからず、町の中心を表示しています";
     text = "番地が見つからず、町の中心を表示しています。地番・建物は、場所を直すと出ます。";
   } else if (onRoad) {
     warn = true;
+    short = off === "large" && data.parcels.status === "ok" ? `住所の地点が道路などの筆の可能性（地番 ${registryChiban(data.parcels.parcel.chibanRaw)}）` : `住所の地点が${off}の筆の上です`;
     text = (
       <>
         {off === "large" && data.parcels.status === "ok"
           ? `住所の地点の筆（地番 ${registryChiban(data.parcels.parcel.chibanRaw)}）は隣地が${registryNeighbors(data.parcels).length}筆あり、道路など物件の外の土地の可能性があります。${chibanArea ? "番地が地番の地域なら、地番で探すと土地（筆）が出ます。" : "「場所を直す」で建物の位置を選ぶと、物件の土地の地番・面積が出ます。"}`
           : `住所の地点が${off}の上です。番地が地番の地域なら、地番で探すと土地（筆）が出ます。`}
         {asChiban && (
-          <span className="mt-[3px] flex">
-            <button onClick={() => onPick(asChiban)} className="rounded-full bg-white px-[6px] py-[2px] font-bold" style={{ color: "#133664" }}>
-              「{asChiban}」で探す
-            </button>
+          <span className="mt-[5px] flex">
+            <MiniButton onClick={() => onPick(asChiban)}>「{asChiban}」で探す</MiniButton>
           </span>
         )}
       </>
     );
-  } else if (parcel && !picked) {
-    text = `地番で探した筆です（${kuikiLabel(parcel.kuiki)}）${parcelMark(parcel)}。筆は${PARCEL_DATA.edition}の地図で、分筆などで変わることがあります。${parcelOthers ? `同じ地番の筆がほかに${parcelOthers}件あります。` : ""}`;
-  } else if (picked) {
-    text = parcel ? `地図で選んだ地点の筆：${chibanLabel(parcel.chibanRaw)}（${kuikiLabel(parcel.kuiki)}）${parcelMark(parcel)}` : "地図で選んだ地点です（番地は分からないので町名まで）。";
+  } else if (picked && !parcel) {
+    short = "地図で選んだ地点です（町名まで）";
+    text = "地図で選んだ地点です（番地は分からないので町名まで）。";
   }
   if (!text) return null;
   return (
-    <div className={`mx-[9px] mt-[7px] flex items-start gap-[5px] rounded-[7px] px-[8px] py-[6px] leading-[1.5] ${warn ? "bg-[#fdf1ec]" : "bg-[#f4f7fb]"}`} style={{ fontSize: 6.8, color: warn ? "#8a4f3a" : "#5d6880" }}>
-      {warn ? <TriangleAlert size={9} strokeWidth={1.6} absoluteStrokeWidth className="mt-[1.5px] shrink-0" /> : <Info size={9} strokeWidth={1.5} absoluteStrokeWidth className="mt-[1.5px] shrink-0" />}
-      <span className="min-w-0 flex-1">{text}</span>
-      <button onClick={onFix} className="shrink-0 rounded-full border border-current px-[6px] py-[2.5px] font-bold leading-none">
-        場所を直す
-      </button>
-    </div>
+    <PlaceBanner warn={warn} short={short} onFix={onFix} open={!!parcelMiss}>
+      {text}
+    </PlaceBanner>
   );
 }
 

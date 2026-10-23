@@ -10,7 +10,9 @@ import { livingScores, SCORE_METHOD } from "@/lib/app/scores";
 import { chibanzuFor } from "@/lib/roadmap/chibanzu";
 import { EVAC_CREDIT, EVAC_KINDS } from "@/lib/roadmap/evac";
 import { asOfText, changeText, distanceText, kindText, landPriceRows, priceText, tsuboText } from "@/lib/roadmap/land-price";
+import { LIQ_CREDIT } from "@/lib/roadmap/liquefaction";
 import { POI_CREDIT, POI_KINDS, POI_ORDER, POI_SOURCES } from "@/lib/roadmap/poi";
+import { REINFOLIB_NOTE } from "@/lib/roadmap/reinfolib";
 import { ROAD_RADIUS_M } from "@/lib/roadmap/road-read";
 import { BuildingDetail } from "../building-card";
 import { ContactCard } from "../contact-card";
@@ -77,14 +79,26 @@ export function DetailSheet({ kind, arg, onClose, result, data, expand }: { kind
     case "hazard":
       body =
         data.hazard.status === "ok" ? (
-          <HazardDetail
-            state={data.hazard}
-            city={m.name}
-            onShowMap={(k) => {
-              onClose();
-              expand({ hazard: k });
-            }}
-          />
+          <>
+            <HazardDetail
+              state={data.hazard}
+              city={m.name}
+              onShowMap={(k) => {
+                onClose();
+                expand({ hazard: k });
+              }}
+            />
+            {/* 液状化の発生傾向（国の地点データ）。タブの印の正式な区分と出典 */}
+            {data.liq.status === "ok" && data.liq.value && (
+              <section className="mt-3">
+                <h3 className="text-[14px] font-bold text-ink">液状化の発生傾向</h3>
+                <p className="mt-1 text-[14px] text-ink">{data.liq.value.label}</p>
+                <p className="mt-1 text-[11.5px] leading-[1.6] text-muted">
+                  {LIQ_CREDIT}。{REINFOLIB_NOTE}。
+                </p>
+              </section>
+            )}
+          </>
         ) : (
           <Loading state={data.hazard} />
         );

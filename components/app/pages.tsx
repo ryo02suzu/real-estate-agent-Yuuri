@@ -1,132 +1,117 @@
 "use client";
 
-// 紺の見た目のページのうち、住所が見つからない・候補から選ぶ・未対応のときの画面（物件の画面と同じく、上の写真の部分と白いカードの中に出す）。
-// 検索する前のホームは components/app/home.tsx、下のメニューのページ（履歴・お気に入り・書類・出力・その他）は components/app/tab-pages.tsx
-import { ChevronRight, Info, Map as MapIcon, MapPin, Search, Share2, TriangleAlert } from "lucide-react";
+// 住所が見つからない・候補から選ぶ・未対応の市区町村のときの画面。ホームと同じ見た目（白い角丸のカード・端末の字・iPhone の大きさの段階）。
+// 検索する前のホームは components/app/home.tsx、物件の画面は components/app/mobile-app.tsx と r-*.tsx
+import { ArrowLeft, ChevronRight, Map as MapIcon, MapPin, Search, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import type { LookupResult } from "@/lib/roadmap";
-import { PropertyHeader } from "./property-head";
+import { CARD, HEAD, LIGHT, Note, Primary, shortAddress, TEXT } from "./r-ui";
 import { TileMap } from "./tile-map";
-import { INK2, NAVY, SUB } from "./ui";
+import { NAVY } from "./ui";
 
-/** ページの見出しのアイコン（物件のピンと同じ丸） */
-function HeadIcon({ children }: { children: ReactNode }) {
+/** 上の欄（戻る・見出し・副題） */
+function Top({ title, sub, onBack }: { title: string; sub?: string; onBack: () => void }) {
   return (
-    <span className="flex shrink-0 items-center justify-center rounded-full bg-[#eef4fb]" style={{ width: 30.9, height: 30.9 }}>
-      {children}
-    </span>
-  );
-}
-
-export function PageHead({ icon, title, sub, right }: { icon: ReactNode; title: string; sub?: string; right?: ReactNode }) {
-  return (
-    <div className="flex items-start pb-[2px] pl-[9.7px] pr-[8.8px] pt-[8.4px]">
-      <HeadIcon>{icon}</HeadIcon>
-      <div className="ml-[8.3px] min-w-0 flex-1 pt-[5.4px]">
-        <h2 className="font-bold leading-[1.3] text-[#111827]" style={{ fontSize: 10.5 }}>
+    <div className="flex items-center pl-[4px] pr-[16px]" style={{ height: 56 }}>
+      <button onClick={onBack} aria-label="ホームに戻る" className="flex size-[44px] shrink-0 items-center justify-center rounded-full active:bg-[#e6ecf4]">
+        <ArrowLeft size={23} strokeWidth={2} absoluteStrokeWidth color={HEAD} />
+      </button>
+      <div className="min-w-0 flex-1 pl-[4px]">
+        <h2 className="truncate font-semibold leading-[1.25]" style={{ fontSize: 17, color: HEAD }}>
           {title}
         </h2>
         {sub && (
-          <p className="mt-[3.2px] leading-[1.35]" style={{ fontSize: 7.4, color: "#6b7789" }}>
+          <p className="mt-[2px] truncate leading-none" style={{ fontSize: 12, color: LIGHT }}>
             {sub}
           </p>
         )}
       </div>
-      {right && <div className="ml-[6px] shrink-0 pt-[3.9px]">{right}</div>}
     </div>
   );
 }
 
-function Empty({ icon, title, body, action }: { icon: ReactNode; title: string; body: string; action?: ReactNode }) {
+function Empty({ icon, title, body, children }: { icon: ReactNode; title: string; body: string; children?: ReactNode }) {
   return (
-    <div className="mx-[9.2px] mt-[10px] flex flex-col items-center rounded-[10px] bg-[#f7f9fd] px-[16px] py-[20px] text-center">
+    <div className={`flex flex-col items-center px-[16px] pb-[14px] pt-[20px] text-center ${CARD}`}>
       {icon}
-      <p className="mt-[8px] font-bold leading-none" style={{ fontSize: 9, color: INK2 }}>
+      <p className="mt-[10px] font-semibold leading-[1.3]" style={{ fontSize: 16, color: TEXT }}>
         {title}
       </p>
-      <p className="mt-[6px] leading-[1.6]" style={{ fontSize: 7.2, color: SUB }}>
+      <p className="mt-[6px] leading-[1.55]" style={{ fontSize: 13, color: LIGHT }}>
         {body}
       </p>
-      {action}
+      {children && <div className="mt-[14px] w-full">{children}</div>}
     </div>
   );
 }
 
-export function Disclaimer() {
-  return (
-    <p className="mx-[9.2px] mb-[6px] mt-[10px] flex gap-[4px] leading-[1.6]" style={{ fontSize: 6.4, color: "#8a95a6" }}>
-      <Info size={8} strokeWidth={1.5} absoluteStrokeWidth className="mt-[1.5px] shrink-0" />
-      地図・データは参考情報です。MICHILUは判定をしません。重要事項説明などの最終確認は、必ず役所の窓口・公的な資料で行ってください。
-    </p>
-  );
-}
+const DISCLAIMER = "地図・データは参考情報です。MICHILUは判定をしません。重要事項説明などの最終確認は、必ず役所の窓口・公的な資料で行ってください。";
 
 /** 住所が見つからない・候補が複数・未対応の市区町村 */
-export function NotOkPage({ query, result, onPick, onMap }: { query: string; result: Exclude<LookupResult, { status: "ok" }>; onPick: (address: string) => void; onMap: () => void }) {
+export function NotOkPage({ query, result, onPick, onMap, onBack, banner }: { query: string; result: Exclude<LookupResult, { status: "ok" }>; onPick: (address: string) => void; onMap: () => void; onBack: () => void; banner?: ReactNode }) {
   if (result.status === "not_found")
     return (
       <>
-        <PageHead icon={<Search size={13} strokeWidth={1.6} absoluteStrokeWidth color={NAVY} />} title="住所が見つかりませんでした" sub={`「${query}」`} />
-        <Empty
-          icon={<TriangleAlert size={22} strokeWidth={1.4} absoluteStrokeWidth color="#c99700" />}
-          title="入れ方を変えると見つかることがあります"
-          body="都道府県・市区町村から入力してください。建物名や部屋番号は外すと見つかりやすくなります。地番は「地番 松戸市古ヶ崎四丁目3556-1」のように入れます。"
-          action={<MapButton onClick={onMap} />}
-        />
-        <Disclaimer />
+        <Top title="住所が見つかりませんでした" sub={`「${query}」`} onBack={onBack} />
+        {banner}
+        <div className="px-[16px] pt-[8px]">
+          <Empty icon={<TriangleAlert size={30} strokeWidth={1.6} absoluteStrokeWidth color="#c99700" />} title="入れ方を変えると見つかることがあります" body="都道府県・市区町村から入力してください。建物名や部屋番号は外すと見つかりやすくなります。地番は「松戸市古ヶ崎四丁目3556-1」のように、町名のあとに地番を続けます。">
+            <Primary onClick={onMap} icon={<MapIcon size={18} strokeWidth={1.8} absoluteStrokeWidth />}>
+              地図で場所を選ぶ
+            </Primary>
+          </Empty>
+          <Note className="mt-[10px]">{DISCLAIMER}</Note>
+        </div>
       </>
     );
   if (result.status === "choose")
     return (
       <>
-        <PageHead icon={<MapPin size={13} strokeWidth={1.6} absoluteStrokeWidth color={NAVY} />} title="当てはまる場所が複数あります" sub="物件の場所を選んでください。無ければ都道府県から入れ直すと一度で見つかります。" />
-        <div className="mt-[6px]">
-          {result.candidates.slice(0, 10).map((c, i, a) => (
-            <button key={c.matchedAddress} onClick={() => onPick(c.matchedAddress)} className={`flex w-full items-center gap-[8px] px-[9.2px] py-[9px] text-left active:bg-[#f7f9fd] ${i < a.length - 1 ? "border-b-[0.6px] border-[#eef2f6]" : ""}`}>
-              <MapPin size={11} strokeWidth={1.5} absoluteStrokeWidth color={NAVY} />
-              <span className="min-w-0 flex-1 font-semibold leading-[1.3]" style={{ fontSize: 8.2, color: INK2 }}>
-                {c.matchedAddress}
-              </span>
-              <ChevronRight size={9} strokeWidth={1.4} absoluteStrokeWidth color="#1d2b48" />
-            </button>
-          ))}
+        <Top title="当てはまる場所が複数あります" sub="物件の場所を選んでください" onBack={onBack} />
+        {banner}
+        <div className="px-[16px] pt-[8px]">
+          <ul className={`overflow-hidden ${CARD}`}>
+            {result.candidates.slice(0, 10).map((c) => (
+              <li key={c.matchedAddress} className="border-t border-[#eef2f6] first:border-t-0">
+                <button onClick={() => onPick(c.matchedAddress)} className="flex min-h-[56px] w-full items-center gap-[12px] px-[12px] py-[8px] text-left active:bg-[#f5f8fc]">
+                  <span className="flex shrink-0 items-center justify-center rounded-full bg-[#eef3fa]" style={{ width: 36, height: 36 }}>
+                    <MapPin size={17} strokeWidth={1.8} absoluteStrokeWidth color={NAVY} />
+                  </span>
+                  <span className="min-w-0 flex-1 font-semibold leading-[1.3]" style={{ fontSize: 15, color: TEXT }}>
+                    {c.matchedAddress}
+                  </span>
+                  <ChevronRight size={18} strokeWidth={1.8} absoluteStrokeWidth color="#a3adbd" className="shrink-0" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <Note className="mt-[10px]">無ければ、都道府県から入れ直すと一度で見つかります。{DISCLAIMER}</Note>
         </div>
-        <Disclaimer />
       </>
     );
-  const city = result.matchedAddress.replace(/^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/, "").match(/^.+?[市区町村]/)?.[0] ?? "";
+  const city = shortAddress(result.matchedAddress).match(/^.+?[市区町村]/)?.[0] ?? "";
   return (
     <>
-      <PropertyHeader title={`${result.matchedAddress} 付近`} sub={city ? `${city}は対応エリアの外です` : "対応エリアの外です"} />
-      <div className="mx-[9.2px] mt-[9px] overflow-hidden rounded-[8px]">
-        <TileMap lat={result.lat} lng={result.lng} width={363.5} height={150} z={16}>
-          {(project) => {
-            const [x, y] = project([result.lng, result.lat]);
-            return <span className="absolute rounded-full border-2 border-white bg-[#f0263a] shadow" style={{ left: x - 5, top: y - 5, width: 10, height: 10 }} />;
-          }}
-        </TileMap>
+      <Top title={`${shortAddress(result.matchedAddress)} 付近`} sub={city ? `${city}は対応エリアの外です` : "対応エリアの外です"} onBack={onBack} />
+      {banner}
+      <div className="px-[16px] pt-[8px]">
+        <div className={`overflow-hidden ${CARD}`}>
+          <TileMap lat={result.lat} lng={result.lng} width={361} height={150} z={16}>
+            {(project) => {
+              const [x, y] = project([result.lng, result.lat]);
+              return <span className="absolute rounded-full border-2 border-white bg-[#f0263a] shadow" style={{ left: x - 6, top: y - 6, width: 12, height: 12 }} />;
+            }}
+          </TileMap>
+        </div>
+        <div className="mt-[10px]">
+          <Empty icon={<Search size={28} strokeWidth={1.6} absoluteStrokeWidth color="#9fb0c8" />} title={`${city || "この市町村"}はまだ未対応です`} body="MICHILUは関東1都6県の市区町村に対応しています。市町村の公式サイトで「指定道路図」や「道路種別」を探してください。">
+            <Primary href={`https://www.google.com/search?q=${encodeURIComponent(`${city} 建築基準法 道路種別`)}`} icon={<Search size={17} strokeWidth={2} absoluteStrokeWidth />}>
+              Googleで探す
+            </Primary>
+          </Empty>
+        </div>
+        <Note className="mt-[10px]">{DISCLAIMER}</Note>
       </div>
-      <Empty
-        icon={<Share2 size={20} strokeWidth={1.4} absoluteStrokeWidth color="#9fb0c8" />}
-        title={`${city || "この市町村"}はまだ未対応です`}
-        body="MICHILUは関東1都6県の市区町村に対応しています。市町村の公式サイトで「指定道路図」や「道路種別」を探してください。"
-        action={
-          <a href={`https://www.google.com/search?q=${encodeURIComponent(`${city} 建築基準法 道路種別`)}`} target="_blank" rel="noreferrer" className="mt-[10px] flex items-center gap-[5px] rounded-full px-[14px] py-[7px] font-bold leading-none text-white" style={{ fontSize: 7.6, background: NAVY }}>
-            <Search size={9} strokeWidth={1.6} absoluteStrokeWidth />
-            Googleで探す
-          </a>
-        }
-      />
-      <Disclaimer />
     </>
-  );
-}
-
-function MapButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button onClick={onClick} className="mt-[10px] flex items-center gap-[5px] rounded-full px-[14px] py-[7px] font-bold leading-none text-white" style={{ fontSize: 7.6, background: NAVY }}>
-      <MapIcon size={9} strokeWidth={1.6} absoluteStrokeWidth />
-      地図で場所を選ぶ
-    </button>
   );
 }
