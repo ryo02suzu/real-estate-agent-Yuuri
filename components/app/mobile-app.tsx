@@ -218,6 +218,8 @@ export function MobileApp(props: MobileAppProps) {
               onPickRecent={pickRecent}
               onHistory={() => go("history")}
               onMap={openMap}
+              onTry={props.onPickAddress}
+              onHelp={() => setSheet("help")}
               onBell={() => {
                 setNews(true);
                 markNewsSeen();
