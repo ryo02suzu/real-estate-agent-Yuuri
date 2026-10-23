@@ -487,9 +487,9 @@ export function DocsPage({
   onHistory: () => void;
   banner?: ReactNode;
 }) {
-  // 1画面に収めるため3件まで（続きは履歴のページから）
+  // 1画面に収めるため3件まで（開いている物件の行があるときは2件。続きは履歴のページから）
   const others = history.filter((h) => !current || historyKey(h) !== historyKey(current));
-  const recent = others.slice(0, 3);
+  const recent = others.slice(0, current ? 2 : 3);
   const all = useMemo(() => (current ? [current, ...recent] : recent), [current, recent]);
   const scenes = useScenes(all);
   const now = useNow();
