@@ -1,17 +1,19 @@
 "use client";
 
-// スマホの新しいホーム（検索する前の画面）。届いた絵（街の写真・写真入りの「調査を開始する」・調査メニューの3Dアイコン）を使い、
-// iPhone 16 Pro などの画面でスクロールせずに1画面に収まるように組んだもの。
-// 上から：街の写真の上にロゴ・お知らせ・見出し、調べるカード（住所も地番も1つの欄に入れる。地図で選ぶボタンつき）、
-// 最近の検索（町の写真つきのカードを横にすべらせる）、調査メニュー（6つ）。文字はゴシック1種類（本文と同じ Noto Sans JP）。
+// スマホの新しいホーム（検索する前の画面）。届いた絵をそのまま使い、iPhone 16 Pro などの画面でスクロールせずに1画面に収まるように組んだもの。
+// 上から：街の写真（見出し「調べる時間を、商談の時間に。」は写真に入っている明朝の字。副題は同じゴシックでアプリが描く）の上にロゴ・お知らせ、
+// 調べるカード（住所も地番も1つの欄に入れる。地図で選ぶボタンつき。写真入りの「調査を開始する」）、最近の検索（写真つきのカードを横に
+// すべらせる）、調査メニュー（届いた絵の3Dアイコン・6つ）、書類を作るバナー（届いた絵。押すと書類・出力のページ）。
+// 字は写真の見出しに合わせて、章の見出し（最近の検索・調査メニュー）だけ同じ明朝（components/app/fonts.ts）。ほかは本文のゴシック。
 // 調べるカードはすりガラス（後ろの街の写真をぼかして見せる）。現れるときの動きとボタンの光は app/globals.css の .home-rise・.home-shine。
 // 寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。幅に対して背の低い画面（iPhone SE など）では、
-// low:（app/globals.css）で見出し・カード・調査メニューを少し詰めて1画面に収める
+// low:（app/globals.css）でカード・調査メニュー・バナーを少し詰める（それでも入りきらない分はスクロール）
 import { ArrowRight, Bell, ChevronRight, Info, LoaderCircle, Map as MapIcon, Search, TriangleAlert, X } from "lucide-react";
 import type { CSSProperties, RefObject } from "react";
 import { monthDay, placeholderScenes, placeParts, SCENES, sceneSrc, type SceneKey } from "@/lib/app/scene";
 import { historyKey, type HistoryItem } from "@/lib/history";
-import { ART_W, LogoLockup, PhoneImg, ScaledInput } from "./frame";
+import { serif } from "./fonts";
+import { LogoLockup, PhoneImg, ScaledInput } from "./frame";
 import type { TabKey } from "./property-head";
 import { NAVY } from "./ui";
 
@@ -26,12 +28,13 @@ const LINK = "#1f5fbf";
 /** 見出しの左の印（近未来の青） */
 const ACCENT = "linear-gradient(180deg,#3d7bff 0%,#22c1ee 100%)";
 
-/** 写真の部分の高さ。調べるカードはこの下の方に重ねる（カードの上端は 158pt。背の低い画面は 134pt。カードの -mt） */
+/**
+ * 写真の部分の高さ。写真（public/home/hero.webp）は届いた絵の 1672×941 から x125〜1380・y20〜786 を切り抜いたもので、幅393pt・高さ240pt
+ * にぴったり合う（見出しの字は約25pt・上端は57pt）。調べるカードはこの下の方（158pt）に重ねる（カードの -mt）
+ */
 const PHOTO_H = 240;
-/** 街の写真の幅（右に寄せる。元の写真は 1672×941） */
-const PHOTO_W = 432;
 
-/** 写真の上の文字が建物に重なっても読めるよう、白くにじませる（届いた写真の見出しと同じ効き方） */
+/** 写真の上の字が建物に重なっても読めるよう、白くにじませる（写真の見出しと同じ効き方） */
 const GLOW = "0 0 10px rgba(255,255,255,0.95), 0 0 3px rgba(255,255,255,0.95)";
 /** すりガラス（後ろをぼかして白く透かす。縁は白く光らせる） */
 const GLASS: CSSProperties = {
@@ -40,8 +43,6 @@ const GLASS: CSSProperties = {
   WebkitBackdropFilter: "blur(18px) saturate(1.6)",
   border: "1px solid rgba(255,255,255,0.85)",
 };
-/** 入力欄の縁の細い光（青・紫・水色） */
-const FIELD_EDGE = "linear-gradient(#fff,#fff) padding-box, linear-gradient(120deg,#b4cbfb 0%,#cbbcfa 50%,#a6def9 100%) border-box";
 /** 地の奥の淡い光（最近の検索から調査メニューのあたり。下の端に届く前に消える） */
 const AURORA =
   "radial-gradient(60% 42% at 0% 45%, rgba(110,140,255,0.13) 0%, rgba(110,140,255,0) 100%), radial-gradient(55% 38% at 100% 58%, rgba(40,190,255,0.12) 0%, rgba(40,190,255,0) 100%)";
@@ -55,7 +56,7 @@ const MENU: { tab: TabKey; icon: string; title: string; sub: string }[] = [
   { tab: "around", icon: "around", title: "周辺環境", sub: "駅・学校・施設" },
 ];
 
-/** 最近の検索がまだ無いときに見せる町の写真 */
+/** 最近の検索がまだ無いときに見せる写真 */
 const SAMPLE: SceneKey[] = ["suburb", "newtown", "urban"];
 
 export type HomeMessage = { text: string; warn: boolean } | null;
@@ -76,11 +77,10 @@ export function HomeScreen({
   onMap,
   onMenu,
   onMenuAll,
+  onDocs,
   onBell,
   unread,
-  onCities,
   onLogo,
-  cityCount,
   inputRef,
 }: {
   input: string;
@@ -98,26 +98,26 @@ export function HomeScreen({
   /** 調査メニュー（調べたら、そのタブから開く） */
   onMenu: (tab: TabKey, title: string) => void;
   onMenuAll: () => void;
+  /** 書類を作るバナー（書類・出力のページ） */
+  onDocs: () => void;
   onBell: () => void;
   unread: boolean;
-  onCities: () => void;
   onLogo: () => void;
-  cityCount: number;
   inputRef: RefObject<HTMLInputElement | null>;
 }) {
   const recent = history.slice(0, 10);
   const scenes = placeholderScenes(recent);
 
   return (
-    <div className="app-touch relative overflow-hidden" style={{ background: PAGE }}>
+    <div className={`${serif.variable} app-touch relative overflow-hidden`} style={{ background: PAGE }}>
       <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0" style={{ top: 280, background: AURORA }} />
 
-      {/* 街の写真の部分（上端は時刻・電池の帯の色からつなぐ） */}
+      {/* 街の写真の部分（見出しは写真の字。上端は時刻・電池の帯の色からつなぐ） */}
       <div className="relative overflow-hidden" style={{ height: PHOTO_H }}>
-        <PhoneImg src="/home/hero.webp" alt="" draggable={false} className="absolute max-w-none" style={{ width: PHOTO_W, height: (PHOTO_W * 941) / 1672, left: ART_W - PHOTO_W, top: -6 }} />
-        <div className="absolute inset-x-0 top-0" style={{ height: 56, background: `linear-gradient(180deg,${SKY} 0%,rgba(230,239,249,0) 100%)` }} />
-        <div className="absolute inset-0" style={{ background: "linear-gradient(90deg,rgba(247,250,253,0.9) 0%,rgba(247,250,253,0.72) 30%,rgba(247,250,253,0.2) 50%,rgba(247,250,253,0) 60%)" }} />
-        <div className="absolute inset-x-0 bottom-0" style={{ height: 84, background: `linear-gradient(180deg,rgba(243,246,251,0) 0%,${PAGE} 92%)` }} />
+        <PhoneImg src="/home/hero.webp" alt="" width={1255} height={766} draggable={false} className="absolute inset-0 h-full w-full object-cover" />
+        <div className="absolute inset-x-0 top-0" style={{ height: 48, background: `linear-gradient(180deg,${SKY} 0%,rgba(230,239,249,0) 100%)` }} />
+        <div className="absolute inset-x-0 bottom-0" style={{ height: 70, background: `linear-gradient(180deg,rgba(243,246,251,0) 0%,${PAGE} 92%)` }} />
+        <h1 className="sr-only">調べる時間を、商談の時間に。</h1>
 
         <button onClick={onLogo} aria-label="MICHILU ホーム" className="absolute flex items-center" style={{ left: 16, top: 6, height: 44 }}>
           <LogoLockup style={{ height: 30 }} />
@@ -129,24 +129,14 @@ export function HomeScreen({
           {unread && <span className="absolute rounded-full border-2 border-white bg-[#f0263a]" style={{ right: 6, top: 6, width: 11, height: 11 }} />}
         </button>
 
-        <h1
-          className="home-rise absolute top-[54px] whitespace-nowrap text-[27px] font-bold leading-[35px] low:top-[50px] low:text-[23px] low:leading-[29px]"
-          style={{ left: 16, letterSpacing: 0.6, color: HEAD, textShadow: GLOW, fontFeatureSettings: '"palt"' }}
-        >
-          調べる時間を、
-          <br />
-          商談の時間に。
-        </h1>
-        <p
-          className="home-rise absolute top-[131px] whitespace-nowrap text-[12.5px] font-medium leading-none low:top-[113px] low:text-[11.5px]"
-          style={{ left: 17, letterSpacing: 0.6, color: "#2b3954", textShadow: GLOW, fontFeatureSettings: '"palt"', ...rise(60) }}
-        >
+        {/* 副題（写真の中の字は消してある。写真のままだと8.5ptで小さいので、同じゴシックで描く） */}
+        <p className="home-rise absolute whitespace-nowrap font-medium leading-none" style={{ left: 16, top: 125, fontSize: 12, letterSpacing: 0.9, color: "#26324a", textShadow: GLOW, fontFeatureSettings: '"palt"', ...rise(60) }}>
           不動産調査を、もっと早く、もっとシンプルに。
         </p>
       </div>
 
       {/* 調べる（すりガラスのカード。住所も地番もこの欄に入れる） */}
-      <div className="home-rise relative mx-[16px] -mt-[82px] rounded-[22px] p-[12px] shadow-[0_14px_34px_rgba(20,48,95,0.13)] low:-mt-[106px] low:p-[10px]" style={{ ...GLASS, ...rise(100) }}>
+      <div className="home-rise relative mx-[16px] -mt-[82px] rounded-[22px] p-[10px] shadow-[0_14px_34px_rgba(20,48,95,0.13)] low:p-[8px]" style={{ ...GLASS, ...rise(100) }}>
         <form
           role="search"
           onSubmit={(e) => {
@@ -156,47 +146,46 @@ export function HomeScreen({
             onSubmit();
           }}
         >
-          <div
-            className="flex h-[52px] items-center rounded-[15px] border border-transparent transition-shadow focus-within:shadow-[0_0_0_3px_rgba(61,123,255,0.16),0_8px_22px_rgba(61,123,255,0.18)] low:h-[48px]"
-            style={{ background: FIELD_EDGE }}
-          >
-            <Search size={19} strokeWidth={1.9} absoluteStrokeWidth color={NAVY} className="ml-[14px] shrink-0" />
-            <ScaledInput value={input} onChange={setInput} inputRef={inputRef} size={16} className="ml-[10px] mr-[2px]" label="住所・地番" autoComplete="off" placeholder="住所・地番を入力" />
+          <div className="flex h-[44px] items-center rounded-full border border-[#d8e0eb] bg-white shadow-[inset_0_1px_2px_rgba(20,45,85,0.05)] transition-[border-color,box-shadow] focus-within:border-[#9db8e6] focus-within:shadow-[0_0_0_3px_rgba(61,123,255,0.12)]">
+            <Search size={17} strokeWidth={1.8} absoluteStrokeWidth color="#7c8aa3" className="ml-[15px] shrink-0" />
+            <ScaledInput value={input} onChange={setInput} inputRef={inputRef} size={15} className="ml-[9px] mr-[2px]" label="住所・地番" autoComplete="off" placeholder="住所・地番を入力" />
             {input && (
-              <button type="button" onClick={() => setInput("")} aria-label="入力を消す" className="flex h-[40px] w-[34px] shrink-0 items-center justify-center">
-                <span className="flex items-center justify-center rounded-full bg-[#dfe4ec]" style={{ width: 22, height: 22 }}>
-                  <X size={13} strokeWidth={2.2} absoluteStrokeWidth color="#4d586d" />
+              <button type="button" onClick={() => setInput("")} aria-label="入力を消す" className="flex h-[40px] w-[32px] shrink-0 items-center justify-center">
+                <span className="flex items-center justify-center rounded-full bg-[#e3e8f0]" style={{ width: 20, height: 20 }}>
+                  <X size={12} strokeWidth={2.2} absoluteStrokeWidth color="#4d586d" />
                 </span>
               </button>
             )}
+            <span aria-hidden className="mx-[2px] h-[20px] w-px shrink-0 bg-[#e3e9f1]" />
             <button
               type="button"
               onClick={onMap}
               aria-label="地図で場所を選ぶ"
-              className="mr-[6px] flex h-[38px] shrink-0 items-center gap-[4px] rounded-[11px] bg-[#edf2fb] px-[10px] font-bold leading-none active:bg-[#e1e9f7]"
-              style={{ fontSize: 13, color: NAVY }}
+              className="mr-[3px] flex h-[38px] shrink-0 items-center gap-[4px] rounded-full px-[11px] font-semibold leading-none active:bg-[#eef3fa]"
+              style={{ fontSize: 12.5, color: NAVY }}
             >
-              <MapIcon size={16} strokeWidth={1.9} absoluteStrokeWidth />
+              <MapIcon size={15} strokeWidth={1.8} absoluteStrokeWidth />
               地図
             </button>
           </div>
 
+          {/* 届いた写真入りのボタン（文字はアプリで描く） */}
           <button
             type="submit"
             disabled={loading}
-            className="home-shine relative mt-[10px] block h-[56px] w-full overflow-hidden rounded-[16px] text-white shadow-[0_10px_22px_rgba(15,47,95,0.28)] transition-transform active:scale-[0.985] disabled:opacity-95 low:mt-[8px] low:h-[50px]"
+            className="home-shine relative mt-[8px] block h-[48px] w-full overflow-hidden rounded-[14px] text-white shadow-[0_8px_20px_rgba(15,47,95,0.22)] transition-transform active:scale-[0.985] disabled:opacity-95 low:h-[44px]"
           >
-            <PhoneImg src="/home/cta.webp" alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover" />
-            <span className="absolute inset-y-0 left-0 flex items-center justify-center gap-[8px] whitespace-nowrap font-bold" style={{ width: "62%", fontSize: 17, letterSpacing: 2 }}>
+            <PhoneImg src="/home/cta.webp" alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 45%" }} />
+            <span className="absolute inset-y-0 left-0 flex items-center justify-center gap-[7px] whitespace-nowrap font-bold" style={{ width: "62%", fontSize: 16, letterSpacing: 1.8 }}>
               {loading ? (
                 <>
-                  <LoaderCircle size={19} strokeWidth={2} absoluteStrokeWidth className="animate-spin" />
+                  <LoaderCircle size={18} strokeWidth={2} absoluteStrokeWidth className="animate-spin" />
                   調べています…
                 </>
               ) : (
                 <>
                   調査を開始する
-                  <ArrowRight size={19} strokeWidth={2} absoluteStrokeWidth />
+                  <ArrowRight size={18} strokeWidth={2} absoluteStrokeWidth />
                 </>
               )}
             </span>
@@ -204,18 +193,18 @@ export function HomeScreen({
         </form>
 
         {message && (
-          <button type="button" onClick={onDismiss} className="mt-[10px] flex w-full items-start gap-[7px] rounded-[12px] px-[12px] py-[9px] text-left leading-[1.5]" style={{ fontSize: 12.5, background: message.warn ? "#fdf1ec" : "#eef4fb", color: message.warn ? "#8a4f3a" : "#1c3a6a" }}>
+          <button type="button" onClick={onDismiss} className="mt-[8px] flex w-full items-start gap-[7px] rounded-[12px] px-[12px] py-[9px] text-left leading-[1.5]" style={{ fontSize: 12.5, background: message.warn ? "#fdf1ec" : "#eef4fb", color: message.warn ? "#8a4f3a" : "#1c3a6a" }}>
             {message.warn ? <TriangleAlert size={15} strokeWidth={1.8} absoluteStrokeWidth className="mt-[2px] shrink-0" /> : <Info size={15} strokeWidth={1.8} absoluteStrokeWidth className="mt-[2px] shrink-0" />}
             {message.text}
           </button>
         )}
       </div>
 
-      {/* 最近の検索（町の写真つきのカードを横にすべらせる） */}
-      <section className="home-rise relative mt-[12px] low:mt-[10px]" style={rise(160)}>
-        <SectionHead title="最近の検索" note="写真は町のイメージ" onMore={history.length ? onHistory : undefined} />
+      {/* 最近の検索（写真つきのカードを横にすべらせる） */}
+      <section className="home-rise relative mt-[8px] low:mt-[6px]" style={rise(160)}>
+        <SectionHead title="最近の検索" onMore={history.length ? onHistory : undefined} />
         {recent.length ? (
-          <ul className="no-scrollbar mt-[4px] flex snap-x snap-mandatory scroll-pl-[16px] gap-[10px] overflow-x-auto px-[16px] pb-[8px]">
+          <ul className="no-scrollbar mt-[2px] flex snap-x snap-mandatory scroll-pl-[16px] gap-[10px] overflow-x-auto px-[16px] pb-[4px] low:pb-[2px]">
             {recent.map((h, i) => {
               const { city, town, full, chiban } = placeParts(h);
               const scene = scenes[i];
@@ -227,7 +216,7 @@ export function HomeScreen({
                     aria-label={`${full}（${monthDay(h.at)}${kind ? `・${kind}` : ""}）を開く`}
                     className="block w-full overflow-hidden rounded-[16px] bg-white text-left shadow-[0_4px_14px_rgba(20,45,85,0.10)] transition-transform active:scale-[0.97]"
                   >
-                    <span className="relative block h-[68px] low:h-[54px]">
+                    <span className="relative block h-[62px] low:h-[50px]">
                       <PhoneImg src={sceneSrc(scene)} alt="" loading="lazy" draggable={false} className="block h-full w-full object-cover" style={{ objectPosition: `50% ${SCENES[scene].y}%` }} />
                       {kind && (
                         <span className="absolute rounded-full bg-white/85 px-[7px] py-[4px] font-bold leading-none backdrop-blur" style={{ left: 6, top: 6, fontSize: 10.5, color: NAVY }}>
@@ -235,11 +224,11 @@ export function HomeScreen({
                         </span>
                       )}
                     </span>
-                    <span className="block px-[10px] pb-[10px] pt-[7px] low:pb-[8px] low:pt-[6px]">
+                    <span className="block px-[10px] pb-[9px] pt-[6px]">
                       <span className="block truncate font-bold leading-[1.3]" style={{ fontSize: 14, color: TEXT, fontFeatureSettings: '"palt"' }}>
                         {town || full}
                       </span>
-                      <span className="mt-[3px] block truncate leading-[1.3]" style={{ fontSize: 11.5, color: LIGHT }}>
+                      <span className="mt-[2px] block truncate leading-[1.3]" style={{ fontSize: 11.5, color: LIGHT }}>
                         {city || "対応エリアの外"}・{monthDay(h.at)}
                       </span>
                     </span>
@@ -249,21 +238,21 @@ export function HomeScreen({
             })}
           </ul>
         ) : (
-          <FirstRun cityCount={cityCount} onCities={onCities} />
+          <FirstRun />
         )}
       </section>
 
       {/* 調査メニュー（届いた絵の3Dアイコン） */}
-      <section className="home-rise relative mt-[6px] pb-[8px] low:mt-[4px]" style={rise(220)}>
+      <section className="home-rise relative mt-[2px]" style={rise(220)}>
         <SectionHead title="調査メニュー" onMore={onMenuAll} />
-        <div className="mt-[4px] grid grid-cols-2 gap-[8px] px-[16px] low:gap-[6px]">
+        <div className="mt-[2px] grid grid-cols-2 gap-[7px] px-[16px] low:gap-[6px]">
           {MENU.map((m) => (
             <button
               key={m.title}
               onClick={() => onMenu(m.tab, m.title)}
-              className="flex h-[52px] min-w-0 items-center rounded-[16px] border border-white bg-white text-left shadow-[0_4px_14px_rgba(20,45,85,0.07)] transition-transform active:scale-[0.97] low:h-[46px]"
+              className="flex h-[48px] min-w-0 items-center rounded-[16px] border border-white bg-white text-left shadow-[0_4px_14px_rgba(20,45,85,0.07)] transition-transform active:scale-[0.97] low:h-[44px]"
             >
-              <PhoneImg src={`/home/menu/${m.icon}.webp`} alt="" draggable={false} className="ml-[3px] block size-[46px] shrink-0 low:size-[42px]" />
+              <PhoneImg src={`/home/menu/${m.icon}.webp`} alt="" draggable={false} className="ml-[2px] block size-[44px] shrink-0 low:size-[40px]" />
               <span className="ml-[4px] min-w-0 flex-1">
                 <span className="block whitespace-nowrap font-bold leading-[1.25]" style={{ fontSize: 14, color: TEXT, fontFeatureSettings: '"palt"' }}>
                   {m.title}
@@ -277,24 +266,39 @@ export function HomeScreen({
           ))}
         </div>
       </section>
+
+      {/* 書類を作る（届いた絵のバナー。写真の書類の左の空いた所に字を置く。押すと書類・出力のページ） */}
+      <button
+        onClick={onDocs}
+        className="home-rise relative mx-[16px] mb-[10px] mt-[10px] block h-[62px] w-[calc(100%-32px)] overflow-hidden rounded-[16px] text-left shadow-[0_6px_20px_rgba(60,40,20,0.10)] transition-transform active:scale-[0.985] low:mb-[8px] low:mt-[8px] low:h-[56px]"
+        style={rise(280)}
+      >
+        <PhoneImg src="/home/docs.webp" alt="" loading="lazy" draggable={false} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "0% 50%" }} />
+        <span className="absolute top-1/2 -translate-y-1/2" style={{ left: 16 }}>
+          <span className="block whitespace-nowrap font-bold leading-none" style={{ fontSize: 15, color: "#0f2a5c", fontFeatureSettings: '"palt"' }}>
+            調査結果から書類を作成
+          </span>
+          <span className="mt-[6px] block whitespace-nowrap leading-none" style={{ fontSize: 11.5, color: "#4b5568", fontFeatureSettings: '"palt"' }}>
+            調査メモ・重説下書き・案内図
+          </span>
+        </span>
+        <span className="absolute top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full bg-[#3c4a64]/85 text-white" style={{ right: 10, width: 30, height: 30 }}>
+          <ChevronRight size={17} strokeWidth={2} absoluteStrokeWidth />
+        </span>
+      </button>
     </div>
   );
 }
 
-/** カードの見出し（左に青い印）と「すべて見る ›」（押せる高さは44pt） */
-function SectionHead({ title, note, onMore }: { title: string; note?: string; onMore?: () => void }) {
+/** 章の見出し（写真の見出しと同じ明朝。左に青い印）と「すべて見る ›」（押せる高さは44pt） */
+function SectionHead({ title, onMore }: { title: string; onMore?: () => void }) {
   return (
-    <div className="flex h-[30px] items-center justify-between px-[16px] low:h-[28px]">
+    <div className="flex h-[28px] items-center justify-between px-[16px] low:h-[26px]">
       <div className="flex min-w-0 items-center gap-[7px]">
         <span aria-hidden className="shrink-0 rounded-full" style={{ width: 3.5, height: 15, background: ACCENT }} />
-        <h2 className="whitespace-nowrap font-bold leading-none" style={{ fontSize: 17, color: HEAD, letterSpacing: 0.3 }}>
+        <h2 className="home-serif whitespace-nowrap font-bold leading-none" style={{ fontSize: 17, color: HEAD, letterSpacing: 0.5 }}>
           {title}
         </h2>
-        {note && (
-          <span className="truncate leading-none" style={{ fontSize: 11, color: LIGHT }}>
-            {note}
-          </span>
-        )}
       </div>
       {onMore && (
         <button onClick={onMore} className="-mr-[8px] flex h-[44px] shrink-0 items-center gap-[1px] px-[8px] font-semibold active:opacity-60" style={{ fontSize: 13, color: LINK }}>
@@ -306,27 +310,21 @@ function SectionHead({ title, note, onMore }: { title: string; note?: string; on
   );
 }
 
-/** 最近の検索がまだ無いとき（初めて開いたとき）：ここに町の写真つきで並ぶことと、対応エリア */
-function FirstRun({ cityCount, onCities }: { cityCount: number; onCities: () => void }) {
+/** 最近の検索がまだ無いとき（初めて開いたとき） */
+function FirstRun() {
   return (
-    <div className="mx-[16px] mb-[8px] mt-[4px] rounded-[16px] bg-white p-[10px] shadow-[0_4px_14px_rgba(20,45,85,0.08)]">
+    <div className="mx-[16px] mb-[4px] mt-[2px] rounded-[16px] bg-white p-[10px] shadow-[0_4px_14px_rgba(20,45,85,0.08)]">
       <div className="grid grid-cols-3 gap-[6px]">
         {SAMPLE.map((k) => (
-          <PhoneImg key={k} src={sceneSrc(k)} alt="" loading="lazy" draggable={false} className="block h-[50px] w-full rounded-[10px] object-cover low:h-[38px]" style={{ objectPosition: `50% ${SCENES[k].y}%` }} />
+          <PhoneImg key={k} src={sceneSrc(k)} alt="" loading="lazy" draggable={false} className="block h-[46px] w-full rounded-[10px] object-cover low:h-[36px]" style={{ objectPosition: `50% ${SCENES[k].y}%` }} />
         ))}
       </div>
       <p className="mt-[8px] px-[2px] font-bold leading-[1.3]" style={{ fontSize: 14, color: TEXT }}>
         まだ調べた物件はありません
       </p>
-      <div className="mt-[2px] flex items-center justify-between px-[2px]">
-        <p className="min-w-0 truncate leading-[1.3]" style={{ fontSize: 12, color: LIGHT }}>
-          調べると、町の写真つきで並びます
-        </p>
-        <button onClick={onCities} className="-my-[12px] flex h-[40px] shrink-0 items-center font-semibold active:opacity-60" style={{ fontSize: 12, color: LINK }}>
-          {cityCount}市区町村に対応
-          <ChevronRight size={14} strokeWidth={2} absoluteStrokeWidth />
-        </button>
-      </div>
+      <p className="mt-[2px] px-[2px] leading-[1.3]" style={{ fontSize: 12, color: LIGHT }}>
+        住所か地番を入れて調べると、ここに並びます
+      </p>
     </div>
   );
 }

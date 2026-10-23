@@ -26,7 +26,8 @@ export function CitiesSheet({ open, onClose }: { open: boolean; onClose: () => v
           </button>
         ))}
       </div>
-      <div className="space-y-2.5">
+      {/* 都県を切り替えてもシートの高さが変わらないよう、一覧の高さは最低312px（いちばん長い埼玉の高さ。PC は変えない） */}
+      <div className="min-h-[312px] space-y-2.5 lg:min-h-0">
         {ORDER.map((cov) => {
           const list = inPref.filter((m) => m.coverage === cov);
           if (list.length === 0) return null;

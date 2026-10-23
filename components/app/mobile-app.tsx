@@ -9,7 +9,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExter
 import { createPortal } from "react-dom";
 import { favoriteKey, toggleFavorite, removeFavorite, type FavoriteItem } from "@/lib/favorites";
 import type { HistoryItem } from "@/lib/history";
-import { MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
+import type { LookupResult } from "@/lib/roadmap";
 import { BUILDING_DATA } from "@/lib/roadmap/building-data";
 import { LAND_PRICE_DATA } from "@/lib/roadmap/land-price-data";
 import { chibanLabel, chibanQueryOf, kuikiLabel, parcelMark, registryChiban } from "@/lib/roadmap/parcel";
@@ -234,14 +234,13 @@ export function MobileApp(props: MobileAppProps) {
                 inputRef.current?.focus();
               }}
               onMenuAll={() => setSheet("help")}
+              onDocs={() => go("docs")}
               onBell={() => {
                 setNews(true);
                 markNewsSeen();
               }}
               unread={unread}
-              onCities={() => setSheet("cities")}
               onLogo={() => scroller.current?.scrollTo({ top: 0, behavior: "smooth" })}
-              cityCount={MUNICIPALITIES.length}
               inputRef={inputRef}
             />
           ) : tabPage ? null : (

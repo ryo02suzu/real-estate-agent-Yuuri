@@ -83,7 +83,8 @@
 
 /*
  * スマホの新しいホーム（components/app/home.tsx）を1画面に収める詰め方。ホームは幅で拡大・縮小するので、幅に対して背の低い画面
- * （高さ÷幅が 1.985 より小さい。iPhone SE・8 Plus など）では、写真の見出し・調べるカード・最近の検索・調査メニューを少し詰める。
+ * （高さ÷幅が 1.985 より小さい。iPhone SE・8 Plus など）では、調べるカード・最近の検索・調査メニュー・バナーを少し詰める
+ * （写真の見出しは写真の字なので詰められない。SE・8 Plus はそれでも少しスクロールする）。
  * iPhone の mini・無印・Pro・Pro Max（ホーム画面に追加したアプリ）は詰めずに収まる。ホームの高さを変えたら 1.985 も見直す
  */
 @custom-variant low {
@@ -118,6 +119,13 @@ body {
   font-family: var(--font-noto-sans-jp), "Hiragino Sans", "Noto Sans JP", sans-serif;
   font-feature-settings: "palt"; /* 約物を詰めて見た目を整える */
   letter-spacing: 0.01em;
+}
+
+/* スマホの新しいホームの章の見出しの明朝（components/app/fonts.ts。写真の見出しと同じ字）。PC の幅では使わない */
+@media (max-width: 1023px) {
+  .home-serif {
+    font-family: var(--font-serif-jp), serif;
+  }
 }
 
 /*
