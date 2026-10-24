@@ -12,7 +12,6 @@ export function CitiesSheet({ open, onClose }: { open: boolean; onClose: () => v
   const prefs = [...new Set(MUNICIPALITIES.map((m) => m.pref))];
   // スクロールさせないよう、都県ごとのタブで1つずつ見せる
   const [pref, setPref] = useState(prefs[0]);
-  const inPref = MUNICIPALITIES.filter((m) => m.pref === pref);
   return (
     <Sheet title={`対応している市区町村（全${MUNICIPALITIES.length}）`} open={open} onClose={onClose}>
       <div className="-mx-1 mb-3 flex flex-wrap gap-1.5">
@@ -20,27 +19,35 @@ export function CitiesSheet({ open, onClose }: { open: boolean; onClose: () => v
           <button
             key={p}
             onClick={() => setPref(p)}
-            className={`rounded-full px-3 py-1 text-[12px] ${p === pref ? "bg-gold text-white" : "border border-line text-ink"}`}
+            // 押した県も同じ太さの枝（金色）を持たせ、押す県を変えてもボタンの大きさ（行の高さ）が変わらないようにする
+            className={`rounded-full border px-3 py-1 text-[12px] ${p === pref ? "border-gold bg-gold text-white" : "border-line text-ink"}`}
           >
             {p.replace(/[都県]$/, "")}
           </button>
         ))}
       </div>
-      {/* 都県を切り替えてもシートの高さが変わらないよう、一覧の高さは最低312px（いちばん長い埼玉の高さ。PC は変えない） */}
-      <div className="min-h-[312px] space-y-2.5 lg:min-h-0">
-        {ORDER.map((cov) => {
-          const list = inPref.filter((m) => m.coverage === cov);
-          if (list.length === 0) return null;
-          return (
-            <div key={cov}>
-              <div className="mb-0.5 flex items-center gap-2">
-                <CoverageBadge coverage={cov} />
-                <span className="text-[11px] text-muted">{list.length}</span>
-              </div>
-              <p className="text-[11.5px] leading-[1.65] text-ink">{list.map((m) => m.name).join("、")}</p>
-            </div>
-          );
-        })}
+      {/*
+       * 都県を切り替えてもシートの高さが変わらないよう、全県の一覧を同じ枠に重ねて置き、いちばん高い県の高さにそろえる
+       * （押した県だけ見せ、ほかは見えないまま高さだけ効かせる）。PC は押した県だけ置く（変えない）
+       */}
+      <div className="grid">
+        {prefs.map((p) => (
+          <div key={p} className={`col-start-1 row-start-1 space-y-2.5 ${p === pref ? "" : "invisible lg:hidden"}`} aria-hidden={p !== pref}>
+            {ORDER.map((cov) => {
+              const list = MUNICIPALITIES.filter((m) => m.pref === p && m.coverage === cov);
+              if (list.length === 0) return null;
+              return (
+                <div key={cov}>
+                  <div className="mb-0.5 flex items-center gap-2">
+                    <CoverageBadge coverage={cov} />
+                    <span className="text-[11px] text-muted">{list.length}</span>
+                  </div>
+                  <p className="text-[11.5px] leading-[1.65] text-ink">{list.map((m) => m.name).join("、")}</p>
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
       <p className="mt-3 text-[11px] text-muted">一覧にない市区町村は「未対応」と表示されます。</p>
     </Sheet>
