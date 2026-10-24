@@ -5,7 +5,7 @@
 // 場所の注意（番地まで一致しないなど）。押せる所は iPhone と同じ 36〜44pt
 import { ArrowLeft, Check, ChevronDown, Copy, Info, Share2, Star, TriangleAlert } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { HEAD, NoImage, WARN } from "./r-ui";
+import { HEAD, NoImage, useLowScreen, WARN } from "./r-ui";
 import { NAVY } from "./ui";
 
 export type TabKey = "basic" | "around" | "price" | "law" | "hazard" | "deals";
@@ -33,8 +33,9 @@ function Round({ onClick, label, pressed, children }: { onClick: () => void; lab
 
 /** 街の写真の帯：戻る・お気に入り・共有と、住所（押すとコピー） */
 export function ResultBand({ title, sub, onBack, onCopy, copied, favorite, onFavorite, onShare }: { title: string; sub: string; onBack: () => void; onCopy: () => void; copied: boolean; favorite: boolean; onFavorite: () => void; onShare: () => void }) {
+  const low = useLowScreen();
   return (
-    <div className="relative overflow-hidden" style={{ height: BAND_H }}>
+    <div className="relative overflow-hidden" style={{ height: low ? BAND_H - 16 : BAND_H }}>
       <NoImage top size={10} className="absolute inset-0" />
       {/* 写真の下を暗くして、白い字を読めるようにする */}
       <div aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(10,25,50,0.12) 0%, rgba(10,25,50,0) 28%, rgba(10,25,50,0.1) 50%, rgba(10,25,50,0.68) 100%)" }} />

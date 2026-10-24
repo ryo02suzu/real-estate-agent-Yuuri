@@ -4,7 +4,7 @@
 // iPhone の大きさの段階（章の見出し17pt太字、値16pt中太字、行の名前15pt中太字、説明13pt、小さな字12〜11pt）。
 // 寸法は幅393ptの値（1px = 1pt。画面の幅に合わせて拡大・縮小する）
 import { ChevronRight, ExternalLink, ImageIcon } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
+import { useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import type { Tone } from "@/lib/app/hazard-level";
 import { NAVY, TONE } from "./ui";
 
@@ -44,6 +44,20 @@ export function shortAddress(a: string): string {
 /** 画面に出す住所：都道府県を外し、全角の数字・記号を半角に（「１９番１１号」→「19番11号」）。コピーする文には使わない */
 export function displayAddress(a: string): string {
   return shortAddress(a.normalize("NFKC"));
+}
+
+/** 幅に対して背の低い画面（iPhone SE など。app/globals.css の low: と同じ条件）か。帯や地図を少し低くして1画面に収める */
+const LOW = "(max-width: 520px) and (min-aspect-ratio: 1000/1985)";
+export function useLowScreen(): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      const mq = matchMedia(LOW);
+      mq.addEventListener("change", cb);
+      return () => mq.removeEventListener("change", cb);
+    },
+    () => matchMedia(LOW).matches,
+    () => false,
+  );
 }
 
 /** 写真の帯の上端の色（NO IMAGE の札の上の色に薄い影が重なった色）。時刻・電池の帯をこの色にする */

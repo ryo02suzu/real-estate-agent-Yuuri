@@ -40,7 +40,7 @@ import { CARD, GLASS, Head, HEAD, LIGHT, NoImage, Note, Row, TEXT } from "./r-ui
 import { NAVY } from "./ui";
 
 /** 写真の帯の高さと、ガラスのカードを重ねる量 */
-const BAND_H = 150;
+const BAND_H = 124;
 const OVERLAP = 28;
 
 /** ページの枠：写真の帯（見出し・副題。右上に小さなボタン）、重ねるガラスのカード、その下の中身 */
@@ -56,8 +56,8 @@ function TabScreen({ title, sub, action, hero, banner, children }: { title: stri
             {action}
           </div>
         )}
-        <div className="absolute left-[20px] right-[20px]" style={{ bottom: OVERLAP + 12 }}>
-          <h1 className="truncate font-bold leading-[1.15] text-white" style={{ fontSize: 28, textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>
+        <div className="absolute left-[20px] right-[20px]" style={{ bottom: OVERLAP + 10 }}>
+          <h1 className="truncate font-bold leading-[1.15] text-white" style={{ fontSize: 27, textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>
             {title}
           </h1>
           {sub && (
@@ -447,7 +447,7 @@ const DOCS: { kind: DocKind; Icon: LucideIcon; title: string; sub: string }[] = 
 
 function DocTile({ Icon, title, sub, wide, onClick }: { Icon: LucideIcon; title: string; sub: string; wide?: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} className={`${wide ? "col-span-2" : ""} flex items-center gap-[10px] rounded-[14px] bg-white px-[11px] py-[9px] text-left shadow-[0_2px_8px_rgba(20,45,85,0.06)] active:bg-[#f5f8fc]`} style={{ minHeight: 56 }}>
+    <button onClick={onClick} className={`${wide ? "col-span-2" : ""} flex items-center gap-[10px] rounded-[14px] bg-white px-[11px] py-[8px] text-left shadow-[0_2px_8px_rgba(20,45,85,0.06)] active:bg-[#f5f8fc]`} style={{ minHeight: 52 }}>
       <span className="flex shrink-0 items-center justify-center rounded-full bg-[#eef3fa]" style={{ width: 34, height: 34 }}>
         <Icon size={17} strokeWidth={1.8} absoluteStrokeWidth color={NAVY} />
       </span>
@@ -533,7 +533,7 @@ export function DocsPage({
           </p>
         )}
       </section>
-      <Note className="mt-[12px] px-[4px]">どれも参考の資料です。印刷・PDF は iPhone ならプリントの画面から PDF にできます。重要事項説明などの最終確認は、役所の窓口・公的な資料で行ってください。</Note>
+      <Note className="mt-[12px] px-[4px]">どれも参考の資料です（iPhone はプリントの画面から PDF にできます）。最終確認は役所の窓口・公的な資料で。</Note>
     </TabScreen>
   );
 }
@@ -616,7 +616,7 @@ export function AccountPage({
       banner={banner}
     >
       <section>
-        <Head title="使い方・データ" className="mt-[10px]" />
+        <Head title="使い方・データ・アプリ" className="mt-[10px]" />
         <div className={`overflow-hidden ${CARD}`}>
           <Row icon={icon(CircleHelp)} title="使い方" sub="住所・地番・地図で調べて、市の地図を開くまで" minH={52} onClick={onHelp} />
           <Row icon={icon(MapPin)} title="対応している市区町村" right={`${MUNICIPALITIES.length}`} rightColor={LIGHT} sub="関東1都6県" minH={52} onClick={onCities} />
@@ -635,16 +635,11 @@ export function AccountPage({
             minH={52}
             onClick={onNews}
           />
-        </div>
-      </section>
-      <section>
-        <Head title="アプリ" className="mt-[10px]" />
-        <div className={`overflow-hidden ${CARD}`}>
           <Row icon={icon(Smartphone)} title="ホーム画面に追加" sub={standalone ? "追加したアプリで開いています" : "ブラウザの枠なしで、アプリのように使う"} right={standalone ? "追加済み" : undefined} rightColor={LIGHT} minH={52} onClick={onInstall} />
         </div>
       </section>
       <Note className="mt-[12px] px-[4px]">
-        MICHILU は不動産会社の営業のための調査アプリです。市区町村の公式の地図を物件の場所で開き、国・自治体の公開データをまとめて見られます（最終更新 {NEWS[0].date}）。共有は、物件の住所をサーバーに送らない作りのため「結果の文面」で。地図・データは参考情報で、MICHILUは判定をしません。最終確認は役所の窓口・公的な資料で。
+        MICHILU は不動産会社の営業のための調査アプリ（最終更新 {NEWS[0].date}）。住所はサーバーに送らないので、共有は「結果の文面」で。地図・データは参考情報で、MICHILUは判定をしません。
       </Note>
     </TabScreen>
   );

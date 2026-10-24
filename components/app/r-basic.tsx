@@ -12,7 +12,7 @@ import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
 import { addressOffLot } from "../parcel-card";
 import { CoinStack } from "./icons";
 import { PropertyMap } from "./property-map";
-import { CARD, Cell, displayAddress, Faint, LIGHT, manYen, pendingText, Primary, TEXT, yen } from "./r-ui";
+import { CARD, Cell, displayAddress, Faint, LIGHT, manYen, pendingText, Primary, TEXT, yen, useLowScreen } from "./r-ui";
 import { metersText } from "./shared";
 import type { TabProps } from "./types";
 
@@ -22,6 +22,7 @@ const MAP_H = 128;
 
 export function BasicTab({ result, data, go, open, expand, mapApps, report }: TabProps) {
   const { zoning, parcels, building, stations, schools, landPrice } = data;
+  const low = useLowScreen();
   const parcel = parcels.status === "ok" ? parcels.parcel : undefined;
   const z = zoning.status === "ok" ? zoning.zoning : undefined;
   const y = z?.youto[0];
@@ -50,7 +51,7 @@ export function BasicTab({ result, data, go, open, expand, mapApps, report }: Ta
           lat={result.lat}
           lng={result.lng}
           width={361}
-          height={MAP_H}
+          height={MAP_H - (low ? 14 : 0)}
           z={parcel ? 18 : 17}
           parcel={parcel}
           bubble={displayAddress(result.matchedAddress)}

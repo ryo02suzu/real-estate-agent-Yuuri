@@ -9,7 +9,7 @@ import { hazardCards, hazardTotal, type HazardCardInfo, type Tone } from "@/lib/
 import { groupHazardMaps, HAZARD_MAP_LABELS, HAZARDS, hazardTileUrl, wagamachiUrl } from "@/lib/roadmap/hazard";
 import { Gauge, Landslide, Liquefaction, Quake, RainCloud, Runner, WavesFill } from "./icons";
 import { PropertyMap } from "./property-map";
-import { Badge, CARD, LIGHT, Note, TEXT } from "./r-ui";
+import { Badge, CARD, LIGHT, Note, TEXT, useLowScreen } from "./r-ui";
 import { metersText } from "./shared";
 import type { TabProps } from "./types";
 
@@ -45,6 +45,7 @@ const LINK_CHIP = "flex h-[36px] shrink-0 items-center gap-[4px] rounded-full bg
 
 export function HazardTab({ result, data, open, expand }: TabProps) {
   const { hazard, evac, liq } = data;
+  const low = useLowScreen();
   const liqHit = liq.status === "ok" ? liq.value : null;
   const [shown, setShown] = useState<Kind>("flood");
   const ok = hazard.status === "ok" ? hazard : undefined;
@@ -77,7 +78,7 @@ export function HazardTab({ result, data, open, expand }: TabProps) {
           lat={result.lat}
           lng={result.lng}
           width={361}
-          height={MAP_H}
+          height={MAP_H - (low ? 14 : 0)}
           z={15}
           overlay={layers.map((l) => hazardTileUrl(l.id))}
           overlayOpacity={0.72}

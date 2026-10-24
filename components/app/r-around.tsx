@@ -10,7 +10,7 @@ import { schoolShort } from "@/lib/roadmap/school";
 import { lineLabel } from "@/lib/roadmap/walk";
 import { AwardFill, CapFill, CutleryFill, PillIcon, TrainOutline, TreeFill } from "./icons";
 import { PropertyMap } from "./property-map";
-import { CARD, LIGHT, Note, RED, Row, TEXT } from "./r-ui";
+import { CARD, LIGHT, Note, RED, Row, TEXT, useLowScreen } from "./r-ui";
 import { KIND_STYLE, metersText, wayMeters } from "./shared";
 import { projector } from "./tile-map";
 import type { TabProps } from "./types";
@@ -54,6 +54,7 @@ function walkText(w: { routed: boolean; minutes?: number; meters?: number; strai
 
 export function AroundTab({ result, data, open, expand, mapApps }: TabProps) {
   const { stations, schools, around } = data;
+  const low = useLowScreen();
   const nearest = around.status === "ok" ? around.nearest : [];
   const st = stations.status === "ok" ? stations.stations : [];
   const e = schools.status === "ok" ? schools.schools.elementary : undefined;
@@ -86,7 +87,7 @@ export function AroundTab({ result, data, open, expand, mapApps }: TabProps) {
           lat={result.lat}
           lng={result.lng}
           width={MAP_W}
-          height={MAP_H}
+          height={MAP_H - (low ? 14 : 0)}
           z={z}
           pinScale={0.9}
           onExpand={() => expand()}
