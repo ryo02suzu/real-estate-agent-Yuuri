@@ -3,7 +3,8 @@
 // 時間連動の空（ホームの帯・各ページの帯）。天体の計算は lib/app/sun.ts、CSS 変数は lib/app/sky-vars.ts。
 // ここは描く側：写真4枚（昼・夕方・薄暮・夜）の重ね、地平線の光、各ページの帯の空の色、スクロールで縮む帯の仕組み。
 // 太陽本体は、写真のカメラの向き・画角が設定されるまで描かない（--sun-in が 1 のときだけ）
-import { HOME_CAMERA, PHOTO_ORDER, type Camera } from "@/lib/app/sun";
+import { HOME_CAMERA, overrideTime, PHOTO_ORDER, solar, type Camera } from "@/lib/app/sun";
+import { fetchWeather, setLiveWeather } from "@/lib/app/weather";
 import { useEffect, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { applySky } from "@/lib/app/sky-vars";
 import { PhoneImg } from "./frame";
@@ -13,26 +14,49 @@ import { SkyCanvas } from "./sky-canvas";
 import { SKY_EVENT } from "./sky-event";
 export { SKY_EVENT };
 
-/** 1分ごと（分の頭）・バックグラウンドから戻ったとき・#t= が変わったときに空を入れ直す。スマホの画面の根元で1回呼ぶ */
+/**
+ * 1分ごと（分の頭）・バックグラウンドから戻ったとき・#t= / #w= が変わったときに空を入れ直す。スマホの画面の根元で1回呼ぶ。
+ * 天気は気象庁から 10 分ごと（観測の更新に合わせて 3 分ずらす）と、戻ったときに読み直す（lib/app/weather.ts）
+ */
 export function useSkyClock() {
   useEffect(() => {
     const tick = () => {
       applySky();
       dispatchEvent(new Event(SKY_EVENT));
     };
+    let lastFetch = 0;
+    const weather = async () => {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+      if (Date.now() - lastFetch < 4 * 60e3) return;
+      lastFetch = Date.now();
+      const at = overrideTime(location.hash) ?? new Date();
+      const w = await fetchWeather(new Date(), solar(new Date()).altitude);
+      if (w) {
+        setLiveWeather(w);
+        // 固定の日時で見ているときも、天気は今のもの
+        void at;
+        tick();
+      }
+    };
     tick();
+    void weather();
     let timer = 0;
     const schedule = () => {
       timer = window.setTimeout(
         () => {
           tick();
+          if (new Date().getMinutes() % 10 === 3) void weather();
           schedule();
         },
         60_000 - (Date.now() % 60_000) + 50,
       );
     };
     schedule();
-    const onVisible = () => document.visibilityState === "visible" && tick();
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      tick();
+      void weather();
+    };
     document.addEventListener("visibilitychange", onVisible);
     addEventListener("hashchange", tick);
     addEventListener("pageshow", tick);
@@ -108,7 +132,6 @@ export function SkyPhotos() {
   return (
     <div className="absolute inset-0 overflow-hidden" aria-hidden>
       <div className="sky-layer absolute inset-0" style={{ background: SKY_GRADIENT }} />
-      <SkyCanvas className="absolute inset-0" />
       <div className="absolute inset-0" style={CITY_MASK}>
         {PHOTOS.map((k) => (
           <PhoneImg
@@ -125,6 +148,8 @@ export function SkyPhotos() {
         ))}
       </div>
       <PhoneImg src="/home/sky/lights@2x.webp" srcSet="/home/sky/lights@2x.webp 2x, /home/sky/lights@3x.webp 3x" alt="" width={786} height={550} draggable={false} className="sky-layer absolute inset-0 h-full w-full object-cover" style={{ opacity: "var(--sky-lights, 0)" }} />
+      {/* コードで描く帯（空・太陽・月・星・雲・街・明かり・天気）。描けたら上に現れ、下の層は見えなくなる */}
+      <SkyCanvas city className="absolute inset-0" />
     </div>
   );
 }

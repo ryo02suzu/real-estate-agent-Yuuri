@@ -4,7 +4,8 @@
 // 1分ごと・復帰時・日時の固定（#t=）の変化で入れ直す。React は変数の値を描かないので、サーバーで作った HTML と食い違わず
 // （Hydration の問題が出ない）、夜に開いても昼の空が一瞬出ない
 import { ATMOS, dirFromAltAz, skyColor, type Vec3 } from "./atmosphere";
-import { blend, HOME_CAMERA, layerOpacity, light, lightX, overrideTime, PHOTO_ORDER, projectSun, smoothstep, solar, type Camera, type Light } from "./sun";
+import { blend, HOME_CAMERA, layerOpacity, light, lightX, overrideTime, PHOTO_ORDER, projectSun, solar, type Camera, type Light } from "./sun";
+import { currentWeather, lightsLevel, type Weather } from "./weather";
 
 /** 空の変数の名前と意味 */
 export const SKY_VARS = {
@@ -43,8 +44,12 @@ export const SKY_VARS = {
   sunX: "--sun-x",
   sunY: "--sun-y",
   sunIn: "--sun-in",
-  /** 街の窓の明かり（0〜1。夕方は日没の前から点き、朝は日の出の後に消える） */
+  /** 街の窓の明かり（0〜1。暗さと、時刻ごとに点いている割合から） */
   lights: "--sky-lights",
+  /** 天気（雲量・降水・霧。0〜1） */
+  cloud: "--sky-cloud",
+  precip: "--sky-precip",
+  fog: "--sky-fog",
 } as const;
 
 const R = Math.PI / 180;
@@ -63,23 +68,31 @@ export function viewDir(cam: Camera, sx: number, sy: number): Vec3 {
   return [d[0] / n, d[1] / n, d[2] / n];
 }
 
-/** 帯の上端・中ほど・地平線のすぐ上（横は中央）の空の色を、大気の式で出す */
-export function bandColors(altitude: number, azimuth: number, cam: Camera = HOME_CAMERA): { top: Vec3; mid: Vec3; horizon: Vec3 } {
-  const s = dirFromAltAz(altitude, azimuth);
-  const hy = 1 - 2 * cam.horizon;
-  return { top: skyColor(viewDir(cam, 0, 1), s, altitude), mid: skyColor(viewDir(cam, 0, (1 + hy) / 2), s, altitude), horizon: skyColor(viewDir(cam, 0, hy + 0.04), s, altitude) };
+/** 雲で灰色に寄せる（雲量が多いほど彩度を落とし、少し暗く） */
+export function cloudy(c: Vec3, cloud: number): Vec3 {
+  const g = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  const k = cloud * 0.85;
+  return [0, 1, 2].map((i) => Math.round((c[i] * (1 - k) + g * k * [0.97, 0.98, 1][i]) * (1 - cloud * 0.1))) as Vec3;
 }
 
-/** 街の窓の明かり（0〜1）。夕方は +2° から −7° で点き、朝は −3° から +4° で消える */
-export function lightsFor(altitude: number, rising: boolean): number {
-  return rising ? 1 - smoothstep(-3, 4, altitude) : smoothstep(2, -7, altitude);
+/** 帯の上端・中ほど・地平線のすぐ上（横は中央）の空の色を、大気の式で出す（雲があれば灰色に寄せる） */
+export function bandColors(altitude: number, azimuth: number, cam: Camera = HOME_CAMERA, weather: Weather = currentWeather()): { top: Vec3; mid: Vec3; horizon: Vec3 } {
+  const s = dirFromAltAz(altitude, azimuth);
+  const hy = 1 - 2 * cam.horizon;
+  const c = weather.cloud;
+  return {
+    top: cloudy(skyColor(viewDir(cam, 0, 1), s, altitude), c),
+    mid: cloudy(skyColor(viewDir(cam, 0, (1 + hy) / 2), s, altitude), c),
+    horizon: cloudy(skyColor(viewDir(cam, 0, hy + 0.04), s, altitude), c),
+  };
 }
 
 /** 変数の値を計算する（画面に書く前の形） */
 export function skyValues(at: Date): { vars: Record<string, string>; light: Light } {
   const s = solar(at);
   const b = blend(s.altitude, s.rising);
-  const l = light(s.altitude, s.rising, b, bandColors(s.altitude, s.azimuth));
+  const w = currentWeather();
+  const l = light(s.altitude, s.rising, b, bandColors(s.altitude, s.azimuth, HOME_CAMERA, w));
   const sun = projectSun(s, HOME_CAMERA);
   const lo = layerOpacity(b);
   const vars: Record<string, string> = {
@@ -102,7 +115,10 @@ export function skyValues(at: Date): { vars: Record<string, string>; light: Ligh
     [SKY_VARS.nightness]: l.nightness.toFixed(2),
     [SKY_VARS.lightX]: String(lightX(s.azimuth)),
     [SKY_VARS.sunIn]: sun && sun.inside && s.altitude > -1 ? "1" : "0",
-    [SKY_VARS.lights]: lightsFor(s.altitude, s.rising).toFixed(2),
+    [SKY_VARS.lights]: lightsLevel(at, s.altitude).toFixed(2),
+    [SKY_VARS.cloud]: w.cloud.toFixed(2),
+    [SKY_VARS.precip]: w.precip.toFixed(2),
+    [SKY_VARS.fog]: w.fog.toFixed(2),
     ...(sun ? { [SKY_VARS.sunX]: sun.x.toFixed(4), [SKY_VARS.sunY]: sun.y.toFixed(4) } : {}),
   };
   return { vars, light: l };
@@ -139,6 +155,13 @@ function expo(a){var k=A.ek;if(a>=k[0][0])return k[0][1];for(var i=0;i<k.length-
 function skyc(v,s,alt){var L=rad(v,s),e=expo(alt),el=Math.asin(Math.max(-1,Math.min(1,v[2])))/P,f=Math.exp(-Math.max(0,el)/A.nF),o=[0,0,0];for(var j=0;j<3;j++)o[j]=Math.round(255*Math.pow(1-Math.exp(-Math.max(0,L[j]*e+A.nZ[j]+A.nH[j]*f)),1/2.2));return o}
 function vdir(sx,sy){var tH=Math.tan(CAM.hfov/2*P),tV=tH/CAM.aspect,pi=Math.atan((2*CAM.horizon-1)*tV),y0=CAM.bearing*P,f=[Math.sin(y0)*Math.cos(pi),Math.cos(y0)*Math.cos(pi),Math.sin(pi)],r=[Math.cos(y0),-Math.sin(y0),0],u=[-Math.sin(y0)*Math.sin(pi),-Math.cos(y0)*Math.sin(pi),Math.cos(pi)],d=[0,1,2].map(function(i){return f[i]+r[i]*sx*tH+u[i]*sy*tV}),n=Math.sqrt(dt(d,d));return[d[0]/n,d[1]/n,d[2]/n]}
 function sdir(alt,az){return[Math.cos(alt*P)*Math.sin(az*P),Math.cos(alt*P)*Math.cos(az*P),Math.sin(alt*P)]}
+function weather(){try{var m=location.hash.replace(/^#/,"").match(/(?:^|&)w=([^&]+)/);if(m){var kd=decodeURIComponent(m[1]).split(":")[0],n=Number(decodeURIComponent(m[1]).split(":")[1]),a=isNaN(n)?0.5:Math.min(1,Math.max(0,n));
+if(kd==="clear")return{cloud:0.05,precip:0,fog:0};if(kd==="partly")return{cloud:isNaN(n)?0.5:a,precip:0,fog:0};if(kd==="cloudy")return{cloud:isNaN(n)?0.97:Math.max(0.85,a),precip:0,fog:0};
+if(kd==="rain")return{cloud:0.97,precip:a,fog:0.25};if(kd==="snow")return{cloud:0.95,precip:a,fog:0.3};if(kd==="fog")return{cloud:0.9,precip:0,fog:isNaN(n)?0.7:a}}
+var raw=localStorage.getItem("michilu:weather");if(raw){var v=JSON.parse(raw);if(v&&v.w&&typeof v.t==="number"&&Date.now()-v.t<=${30 * 60e3})return v.w}}catch(e){}return{cloud:0.08,precip:0,fog:0}}
+function cloudy(c,cl){var gy=0.2126*c[0]+0.7152*c[1]+0.0722*c[2],k=cl*0.85,m=[0.97,0.98,1],o=[0,0,0];for(var i=0;i<3;i++)o[i]=Math.round((c[i]*(1-k)+gy*k*m[i])*(1-cl*0.1));return o}
+var OCC=${JSON.stringify([[0, 0.55], [1, 0.42], [2, 0.32], [3, 0.28], [4, 0.28], [5, 0.36], [6, 0.5], [7, 0.62], [8, 0.75], [9, 0.8], [16, 0.8], [17, 0.9], [18, 1], [21, 1], [22, 0.92], [23, 0.75], [24, 0.55]])};
+function occ(h){h=((h%24)+24)%24;for(var i=0;i<OCC.length-1;i++){if(h>=OCC[i][0]&&h<=OCC[i+1][0])return OCC[i][1]+(OCC[i+1][1]-OCC[i][1])*(h-OCC[i][0])/(OCC[i+1][0]-OCC[i][0])}return 0.55}
 function ss(a,b,x){var t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t)}
 function sun(d){var lat=35.6812,lng=139.7671,jd=d.getTime()/864e5+2440587.5,C=(jd-2451545)/36525;
 var L0=((280.46646+C*(36000.76983+C*3.032e-4))%360+360)%360,M=357.52911+C*(35999.05029-1.537e-4*C),e=0.016708634-C*4.2037e-5;
@@ -156,14 +179,15 @@ if(!up){if(a>=0){b.day=ss(0,10,a);b.golden=1-b.day}else if(a>=-6){b.golden=ss(-6
 else if(a>=0){b.day=ss(0,10,a);b.dawn=1-b.day}else if(a>=-6){b.dawn=ss(-6,0,a);b.night=1-b.dawn}else b.night=1;return b}
 function hex(c){var s="#";for(var i=0;i<3;i++){var v=Math.round(Math.min(255,Math.max(0,c[i]))).toString(16);s+=(v.length<2?"0":"")+v}return s}
 function at(){var m=location.hash.replace(/^#/,"").match(/(?:^|&)t=([^&]+)/);if(m){var v=decodeURIComponent(m[1]),d=new Date(/[zZ]|[+-]\\d\\d:?\\d\\d$/.test(v)?v:v+(v.length<=10?"T12:00":"")+"+09:00");if(!isNaN(d.getTime()))return d}return new Date()}
-var s=sun(at()),a=s[0],up=s[1],az=s[2],b=blend(a,up),sd=sdir(a,az),hy=1-2*CAM.horizon,top=skyc(vdir(0,1),sd,a),md=skyc(vdir(0,(1+hy)/2),sd,a),hz=skyc(vdir(0,hy+0.04),sd,a);
+var d0=at(),s=sun(d0),a=s[0],up=s[1],az=s[2],b=blend(a,up),sd=sdir(a,az),hy=1-2*CAM.horizon,W=weather(),top=cloudy(skyc(vdir(0,1),sd,a),W.cloud),md=cloudy(skyc(vdir(0,(1+hy)/2),sd,a),W.cloud),hz=cloudy(skyc(vdir(0,hy+0.04),sd,a),W.cloud);
+var jh=(((d0.getTime()+32400000)%86400000)+86400000)%86400000/3600000,lightsV=ss(4,-6,a)*occ(jh);
 var lum=(0.2126*top[0]+0.7152*top[1]+0.0722*top[2])/255,dark=lum<0.42;
 var near=Math.exp(-((a+1)*(a+1))/(2*4.5*4.5)),warm=a<8&&a>-8?ss(8,0,a)*(1-ss(-2,-8,a)):0,n=b.night+0.5*(b.twilight+b.dawn);
 var hl=[0,1,2].map(function(i){return [255,255,255][i]*(1-warm)*(1-n)+[255,222,160][i]*warm*(1-n)+[190,208,245][i]*n});
 var st=document.documentElement.style,set=function(k,v){st.setProperty(k,v)};
 set(V.day,b.day.toFixed(3));set(V.golden,b.golden.toFixed(3));set(V.twilight,b.twilight.toFixed(3));set(V.dawn,b.dawn.toFixed(3));set(V.night,b.night.toFixed(3));
 var O=["night","twilight","dawn","golden","day"],sm=0;for(var j=0;j<O.length;j++){sm+=b[O[j]];set("--sky-l-"+O[j],(sm>0?b[O[j]]/sm:0).toFixed(3))}
-set(V.top,hex(top));set(V.mid,hex(md));set(V.horizon,hex(hz));set(V.glow,up?"#ffd6aa":"#ffb278");set(V.glowA,near.toFixed(2));set(V.hl,hex(hl));set(V.lights,(up?1-ss(-3,4,a):ss(2,-7,a)).toFixed(2));
+set(V.top,hex(top));set(V.mid,hex(md));set(V.horizon,hex(hz));set(V.glow,up?"#ffd6aa":"#ffb278");set(V.glowA,near.toFixed(2));set(V.hl,hex(hl));set(V.lights,lightsV.toFixed(2));set(V.cloud,W.cloud.toFixed(2));set(V.precip,W.precip.toFixed(2));set(V.fog,W.fog.toFixed(2));
 set(V.ink,dark?"255,255,255":"15,27,51");set(V.inkSoft,dark?"232,238,248":"38,50,74");set(V.halo,dark?"0,12,40":"255,255,255");
 set(V.dark,dark?"1":"0");set(V.nightness,n.toFixed(2));set(V.lightX,String(Math.round(Math.min(100,Math.max(0,(az-60)/240*100)))));set(V.sunIn,"0");
 document.documentElement.dataset.skyDark=dark?"1":"0";
