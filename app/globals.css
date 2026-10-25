@@ -513,3 +513,65 @@ body {
     opacity: 0;
   }
 }
+
+/* 第4段階：その場で1段広がる段（高さが伸び、中身は少し遅れて現れる。中身は1つの要素で包む）、下部操作バー、物件の画面の固定のタブ */
+.expand {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.expand[data-open="1"] {
+  grid-template-rows: 1fr;
+}
+.expand > * {
+  min-height: 0;
+  overflow: hidden;
+}
+.expand > * > * {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.expand[data-open="1"] > * > * {
+  opacity: 1;
+  transition-delay: 60ms;
+}
+.action-bar {
+  z-index: 30;
+  transition:
+    opacity 200ms ease,
+    transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.action-bar[data-hidden="1"] {
+  opacity: 0;
+  transform: translateY(110%);
+  pointer-events: none;
+}
+.action-bar[data-dim="1"] {
+  opacity: 0.55;
+}
+/* 帯が縮んだら、固定したタブの切り替えの後ろに地の色のすりガラスを敷く */
+.sticky-tabs::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 -8px 0;
+  background: rgba(243, 246, 251, 0.86);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+[data-compact="1"] .sticky-tabs::before {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .expand,
+  .expand > * > *,
+  .action-bar,
+  .sticky-tabs::before {
+    transition: none;
+  }
+  .action-bar[data-hidden="1"] {
+    transform: none;
+  }
+}

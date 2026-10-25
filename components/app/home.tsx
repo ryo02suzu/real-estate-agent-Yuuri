@@ -15,7 +15,9 @@ import { ArrowRight, Bell, ChevronRight, LoaderCircle, Map as MapIcon, MapPinned
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { monthDay, placeholderScenes, placeParts, SCENES, sceneSrc, type SceneKey } from "@/lib/app/scene";
 import { historyKey, type HistoryItem } from "@/lib/history";
+import type { Resume } from "@/lib/resume";
 import { LogoLockup, PhoneImg, ScaledInput } from "./frame";
+import { TABS } from "./result-head";
 import { GLASS } from "./r-ui";
 import { BottomFade, CompactBar, SkyPhotos, useShrink } from "./sky";
 import { PAGE } from "./tokens";
@@ -81,6 +83,7 @@ export function HomeScreen({
   unread,
   onLogo,
   inputRef,
+  resume,
 }: {
   input: string;
   setInput: (v: string) => void;
@@ -102,6 +105,8 @@ export function HomeScreen({
   unread: boolean;
   onLogo: () => void;
   inputRef: RefObject<HTMLInputElement | null>;
+  /** 直近7日に見ていた物件（最近の検索のその行に「続きから」と、見ていたタブを添える。開くとそのタブから） */
+  resume?: Resume;
 }) {
   const recent = history.slice(0, 4);
   const scenes = placeholderScenes(recent);
@@ -243,6 +248,11 @@ export function HomeScreen({
                       <span className="mt-[2px] block truncate leading-[1.35]" style={{ fontSize: 13, color: LIGHT }}>
                         {city || "対応エリアの外"}・{monthDay(h.at)}
                         {kind}
+                        {resume && historyKey(h) === resume.historyKey && (
+                          <span className="ml-[6px] font-semibold" style={{ color: LINK }}>
+                            続きから：{TABS.find((t) => t.key === resume.tab)?.long ?? "基本情報"}
+                          </span>
+                        )}
                       </span>
                     </span>
                     <ChevronRight size={18} strokeWidth={1.8} absoluteStrokeWidth color="#a3adbd" className="shrink-0" />

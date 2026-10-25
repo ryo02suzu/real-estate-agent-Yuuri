@@ -31,6 +31,26 @@ function save(all: Stored): void {
   }
 }
 
+/** 書き出し用：全部 */
+export function exportChecklist(): Stored {
+  return load();
+}
+
+/** 読み込み（書き出したファイルから）：足すだけ。同じ物件は印を合わせる。足した物件の数を返す */
+export function mergeChecklist(incoming: Stored): number {
+  const all = load();
+  let added = 0;
+  for (const [k, v] of Object.entries(incoming ?? {})) {
+    if (!v || !Array.isArray(v.done)) continue;
+    const mine = all[k];
+    const done = new Set([...(mine?.done ?? []), ...v.done.filter((d) => typeof d === "string")]);
+    if (!mine || done.size > mine.done.length) added++;
+    all[k] = { done: [...done], at: Math.max(mine?.at ?? 0, typeof v.at === "number" ? v.at : 0) };
+  }
+  save(all);
+  return added;
+}
+
 /** 済んだやることの印（id の集まり） */
 export function loadDone(key: string): Set<string> {
   return new Set(load()[key]?.done ?? []);

@@ -1,7 +1,8 @@
 "use client";
 
-// 「基本情報」タブ：地図、物件の要点の6つの札（用途地域・地番・面積・現況・最寄り駅・小学校区）、土地の参考価格、レポートを作成。
-// 1画面に収める。くわしい話は札を押して下から出る画面で（地番・建物・駅・学区）。都市計画・防火などは法令・規制のタブで
+// 「基本情報」タブ：いちばん上に調査の状況（6つの項目の札。押すと確認の記録）、地図、物件の要点の6つの札（用途地域・地番・面積・現況・
+// 最寄り駅・小学校区）、土地の参考価格。「レポートを作成」は下部操作バー（components/app/action-bar.tsx）。
+// くわしい話は札を押して下から出る画面で（地番・建物・駅・学区）。都市計画・防火などは法令・規制のタブで
 import { ChevronRight, SquareArrowOutUpRight } from "lucide-react";
 import { parcelAreaM2 } from "@/lib/app/area";
 import { ratioHint } from "@/lib/app/ratio-hint";
@@ -12,15 +13,17 @@ import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
 import { addressOffLot } from "../parcel-card";
 import { CoinStack } from "./icons";
 import { PropertyMap } from "./property-map";
-import { CARD, Cell, displayAddress, Faint, LIGHT, manYen, pendingText, Primary, TEXT, yen, useLowScreen } from "./r-ui";
+import { CARD, Cell, displayAddress, Faint, LIGHT, manYen, pendingText, TEXT, yen, useLowScreen } from "./r-ui";
+import { ResearchCard } from "./research";
 import { metersText } from "./shared";
+import { statusSummary } from "./status";
 import type { TabProps } from "./types";
 
 const TSUBO = 400 / 121;
 /** 地図の高さ（1画面に収めるため） */
 const MAP_H = 128;
 
-export function BasicTab({ result, data, go, open, expand, mapApps, report }: TabProps) {
+export function BasicTab({ result, data, go, open, expand, mapApps, statuses, record }: TabProps) {
   const { zoning, parcels, building, stations, schools, landPrice } = data;
   const low = useLowScreen();
   const parcel = parcels.status === "ok" ? parcels.parcel : undefined;
@@ -46,7 +49,10 @@ export function BasicTab({ result, data, go, open, expand, mapApps, report }: Ta
 
   return (
     <div>
-      <div className={`overflow-hidden ${CARD}`}>
+      {/* 調査の状況（押すと、その項目の確認を記録） */}
+      <ResearchCard statuses={statuses} summary={statusSummary(statuses)} onTopic={record} />
+
+      <div className={`mt-[8px] overflow-hidden ${CARD}`}>
         <PropertyMap
           lat={result.lat}
           lng={result.lng}
@@ -138,10 +144,6 @@ export function BasicTab({ result, data, go, open, expand, mapApps, report }: Ta
         </span>
         <ChevronRight size={18} strokeWidth={1.8} absoluteStrokeWidth color="#a3adbd" className="shrink-0" />
       </button>
-
-      <Primary onClick={report} className="mt-[8px]">
-        レポートを作成
-      </Primary>
     </div>
   );
 }

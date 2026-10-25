@@ -6,6 +6,7 @@
 import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 import { buildingNotes } from "@/lib/app/legal";
+import type { RecordTopic } from "@/lib/records";
 import { livingScores, SCORE_METHOD } from "@/lib/app/scores";
 import { chibanzuFor } from "@/lib/roadmap/chibanzu";
 import { EVAC_CREDIT, EVAC_KINDS } from "@/lib/roadmap/evac";
@@ -25,7 +26,9 @@ import { SchoolDetail } from "../school-card";
 import { Sheet } from "../sheet";
 import { StationList } from "../station-card";
 import { ZoningDetail } from "../zoning-card";
+import { RecordEntry } from "./research";
 import { KIND_STYLE, metersText } from "./shared";
+import type { TopicStatus } from "./status";
 import type { MapOpen, SheetKind } from "./types";
 import type { Ok, PropertyData } from "./use-property";
 
@@ -46,13 +49,37 @@ const TITLES: Record<SheetKind, string> = {
   deal: "価格の事例",
 };
 
+/** シートの種類 → 確認の記録の項目（記録できるものだけ） */
+const TOPIC_OF: Partial<Record<SheetKind, RecordTopic>> = { parcel: "parcel", zoning: "zoning", hazard: "hazard", roads: "road", notes: "law", pois: "around", scores: "around", evac: "hazard", contact: "road" };
+
 function Loading({ state }: { state: { status: string } }) {
   return <p className="py-2 text-[13px] text-muted">{state.status === "loading" ? "読み込んでいます…" : state.status === "error" ? "読み込めませんでした。時間をおいて調べ直してください。" : "この地点のデータはありません。"}</p>;
 }
 
-export function DetailSheet({ kind, arg, onClose, result, data, expand }: { kind: SheetKind | null; arg?: number; onClose: () => void; result: Ok; data: PropertyData; expand: (o?: MapOpen) => void }) {
+export function DetailSheet({
+  kind,
+  arg,
+  onClose,
+  result,
+  data,
+  expand,
+  statuses,
+  onRecord,
+}: {
+  kind: SheetKind | null;
+  arg?: number;
+  onClose: () => void;
+  result: Ok;
+  data: PropertyData;
+  expand: (o?: MapOpen) => void;
+  /** 調査の状況（上に「この項目の確認を記録」を出す） */
+  statuses?: TopicStatus[];
+  onRecord?: (topic: RecordTopic) => void;
+}) {
   if (!kind) return null;
   const m = result.municipality;
+  const topic = TOPIC_OF[kind];
+  const status = topic ? statuses?.find((s) => s.topic === topic) : undefined;
   let body: ReactNode = null;
   switch (kind) {
     case "parcel": {
@@ -152,6 +179,7 @@ export function DetailSheet({ kind, arg, onClose, result, data, expand }: { kind
   return (
     <div className="theme-navy">
       <Sheet title={TITLES[kind]} open onClose={onClose}>
+        {topic && status && onRecord && <RecordEntry status={status} onClick={() => onRecord(topic)} />}
         {body}
       </Sheet>
     </div>

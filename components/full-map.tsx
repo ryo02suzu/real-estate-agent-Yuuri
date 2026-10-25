@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { LookupResult } from "@/lib/roadmap";
 import type { HazardKind } from "@/lib/roadmap/hazard";
 import { displayAddress, GLASS, HEAD, LIGHT } from "./app/r-ui";
+import { NAVY } from "./app/ui";
 import { MapPanel } from "./map-panel";
 import { MapPreview } from "./map-preview";
 
@@ -36,6 +37,8 @@ export function FullMap({
 }) {
   // 凡例は地図の下に出す（地図とピンを隠さない）
   const [legendSlot, setLegendSlot] = useState<HTMLDivElement | null>(null);
+  // 重ねた色の濃さ（%）。用途地域・道路種別・ハザードの色を薄くして、下の地図を読む
+  const [opacity, setOpacity] = useState(100);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
@@ -58,6 +61,7 @@ export function FullMap({
           initial={withRoads && roads ? { roads: true } : landPrice ? { landPrice: true } : undefined}
           initialHazard={hazard}
           initialLandPrice={landPrice}
+          overlayOpacity={opacity / 100}
           legendTarget={legendSlot}
           onPick={(lat, lng) => {
             onClose();
@@ -86,6 +90,13 @@ export function FullMap({
       {/* 下の白い板：凡例と注記 */}
       <div className="relative -mt-[22px] max-h-[38vh] shrink-0 overflow-y-auto rounded-t-[22px] bg-white px-[16px] pb-[max(12px,env(safe-area-inset-bottom))] pt-[12px] shadow-[0_-8px_24px_rgba(20,45,85,0.12)]">
         <div className="mx-auto mb-[10px] h-[4px] w-[40px] rounded-full bg-[#dde5ee]" />
+        <label className="mb-[8px] flex items-center gap-[10px]" style={{ fontSize: 12, color: LIGHT }}>
+          <span className="shrink-0">重ねた色の濃さ</span>
+          <input type="range" min={20} max={100} step={5} value={opacity} onChange={(e) => setOpacity(Number(e.target.value))} aria-label="重ねた色の濃さ" className="h-[28px] min-w-0 flex-1" style={{ accentColor: NAVY }} />
+          <span className="w-[36px] shrink-0 text-right tabular-nums" style={{ color: HEAD }}>
+            {opacity}%
+          </span>
+        </label>
         <div ref={setLegendSlot} className="empty:hidden [&:not(:empty)]:mb-2" />
         <p className="leading-[1.6]" style={{ fontSize: 11, color: LIGHT }}>
           地図をタップすると、その地点の地番・用途地域・道路種別・建物・地価・ハザード（表示中のもの）と「ここで調べる」が出ます。地図は参考情報です。最終確認は窓口で。

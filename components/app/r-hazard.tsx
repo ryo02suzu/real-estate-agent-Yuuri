@@ -10,6 +10,7 @@ import { groupHazardMaps, HAZARD_MAP_LABELS, HAZARDS, hazardTileUrl, wagamachiUr
 import { Gauge, Landslide, Liquefaction, Quake, RainCloud, Runner, WavesFill } from "./icons";
 import { PropertyMap } from "./property-map";
 import { Badge, CARD, LIGHT, Note, TEXT, useLowScreen } from "./r-ui";
+import { Expand } from "./research";
 import { metersText } from "./shared";
 import type { TabProps } from "./types";
 
@@ -70,6 +71,8 @@ export function HazardTab({ result, data, open, expand }: TabProps) {
   const disaportal = `https://disaportal.gsi.go.jp/maps/?ll=${ll}&z=16&base=pale&vs=c1j0l0u0t0h0z0`;
   const groups = ok ? groupHazardMaps(ok.maps) : [];
   const name = result.municipality.name;
+  // 選んだ種類の読み取り（印の下にその場で広がる）
+  const sel = cards.find((c) => c.kind === shown);
 
   return (
     <div>
@@ -107,6 +110,20 @@ export function HazardTab({ result, data, open, expand }: TabProps) {
         ))}
         <HazCell icon={ICONS.ekijo} title="液状化" chip={liqHit ? (LIQ_CHIP[liqHit.level]?.[0] ?? liqHit.label) : "地図で確認"} tone={liqHit ? (LIQ_CHIP[liqHit.level]?.[1] ?? "none") : "map"} href={ekijo?.url ?? `https://disaportal.gsi.go.jp/maps/?ll=${ll}&z=15&base=pale&ls=ekijouka_zenkoku%2C0.8&disp=1&vs=c1j0l0u0t0h0z0`} />
       </div>
+      <Expand open={!!sel && sel.lines.length > 0}>
+        <div>
+          <div className={`mt-[8px] px-[12px] py-[8px] ${CARD}`}>
+            <p className="font-bold leading-none" style={{ fontSize: 12, color: LIGHT }}>
+              {sel?.title}の読み取り
+            </p>
+            {sel?.lines.map((l) => (
+              <p key={l} className="mt-[4px] leading-[1.5]" style={{ fontSize: 12.5, color: TEXT }}>
+                {l}
+              </p>
+            ))}
+          </div>
+        </div>
+      </Expand>
 
       {/* 近い避難場所 */}
       <button onClick={() => open("evac")} className={`mt-[8px] flex w-full items-center gap-[8px] px-[12px] text-left active:bg-[#f5f8fc] ${CARD}`} style={{ height: 42 }}>

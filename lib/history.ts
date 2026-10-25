@@ -9,6 +9,8 @@ export type HistoryItem = {
   at: number;
   /** 地図で選んだ地点（[緯度, 経度]）。住所は町までなので、選び直すときはこの座標で調べる */
   ll?: [number, number];
+  /** 物件の鍵（lib/property-id.ts）。信頼できる識別情報があるときだけ同じ物件としてまとめる */
+  pid?: string;
 };
 
 /** 同じ検索かどうか（地図で選んだ地点は座標で比べる） */
@@ -37,6 +39,29 @@ export function addHistory(item: HistoryItem): HistoryItem[] {
     // 保存できなくても検索自体は続ける
   }
   return next;
+}
+
+/** 読み込み（書き出したファイルから）：足すだけ。同じ検索は新しい方を残す。足した数を返す */
+export function mergeHistory(items: HistoryItem[]): number {
+  const cur = loadHistory();
+  const map = new Map(cur.map((h) => [historyKey(h), h]));
+  let added = 0;
+  for (const h of items) {
+    if (!h || typeof h.address !== "string" || typeof h.at !== "number") continue;
+    const k = historyKey(h);
+    const mine = map.get(k);
+    if (!mine || h.at > mine.at) {
+      map.set(k, mine ? { ...mine, ...h } : h);
+      added++;
+    }
+  }
+  const next = [...map.values()].sort((a, b) => b.at - a.at).slice(0, MAX);
+  try {
+    localStorage.setItem(KEY, JSON.stringify(next));
+  } catch {
+    // 保存できなくても続ける
+  }
+  return added;
 }
 
 export function clearHistory(): void {

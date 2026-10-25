@@ -6,7 +6,7 @@ import { Map as MapIcon } from "lucide-react";
 import { useState } from "react";
 import { parcelAreaM2, TSUBO_M2 } from "@/lib/app/area";
 import { asOfText, changeText, distanceText, kindText, type LandPriceHit } from "@/lib/roadmap/land-price";
-import { CARD, Ghost, LIGHT, manYen, Note, Primary, Stat, TEXT, yen } from "./r-ui";
+import { CARD, Ghost, LIGHT, manYen, Note, Stat, TEXT, yen } from "./r-ui";
 import type { TabProps } from "./types";
 import { NAVY } from "./ui";
 
@@ -18,7 +18,7 @@ export function okuText(v: number): string {
   return `${Math.round(v / 1e4).toLocaleString("ja-JP")}万円`;
 }
 
-export function PriceTab({ data, go, expand }: TabProps) {
+export function PriceTab({ data, expand }: TabProps) {
   const { landPrice, parcels } = data;
   const hits = landPrice.status === "ok" ? landPrice.hits : [];
   const top = hits[0];
@@ -95,9 +95,6 @@ export function PriceTab({ data, go, expand }: TabProps) {
           ))}
         </div>
       )}
-      <Primary onClick={() => go("deals")} className="mt-[8px]">
-        価格の事例を一覧で見る
-      </Primary>
       <Note className="mt-[8px]">出典：国土数値情報（地価公示・地価調査）。地域の標準的な土地の価格で、物件そのものの価格・査定ではありません。</Note>
     </div>
   );

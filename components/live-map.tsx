@@ -223,7 +223,19 @@ export type LiveMapProps = {
   initialHazard?: HazardKind;
   /** 最初に見せる地価の地点（[経度, 緯度]。スマホの地価の一覧から「地図」で開いたとき）。物件と両方が見える範囲にする */
   initialLandPrice?: [number, number];
+  /** 重ねた色の濃さ（1 でいつもの濃さ。用途地域・道路種別・ハザードの元の不透明度に掛ける） */
+  overlayOpacity?: number;
 };
+
+/** 濃さを変えるレイヤとその不透明度の属性（ハザードのタイルはこれに加えて raster-opacity） */
+type OpacityProp = "fill-opacity" | "line-opacity" | "raster-opacity";
+const OPACITY_LAYERS: [string, OpacityProp][] = [
+  ["zoning-youto-fill", "fill-opacity"],
+  ["zoning-douro", "line-opacity"],
+  ["road-fill", "fill-opacity"],
+  ["road-outline", "line-opacity"],
+  ["road-line", "line-opacity"],
+];
 
 /** 地価の地点と物件が両方見える範囲へ（物件が無ければ地点へ寄る） */
 function fitLandPrice(map: MapLibreMap, [plng, plat]: [number, number], point?: Point) {
@@ -259,6 +271,7 @@ export default function LiveMap({
   legendTarget,
   initialHazard,
   initialLandPrice,
+  overlayOpacity,
 }: LiveMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -608,6 +621,27 @@ export default function LiveMap({
     const shown = new Set(hazard ? HAZARDS[hazard].layers.map((l) => l.id) : []);
     for (const l of HAZARD_LAYERS) map.setLayoutProperty(hazardLayerId(l.id), "visibility", shown.has(l.id) ? "visible" : "none");
   }, [hazard, loaded]);
+
+  // 重ねた色の濃さ：レイヤごとの元の不透明度を最初に覚え、それに掛ける（スマホの全画面の地図のつまみ）
+  const baseOpacity = useRef(new Map<string, number>());
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded) return;
+    const o = overlayOpacity ?? 1;
+    const apply = (id: string, prop: OpacityProp) => {
+      if (!map.getLayer(id)) return;
+      const k = `${id}|${prop}`;
+      let base = baseOpacity.current.get(k);
+      if (base === undefined) {
+        const v: unknown = map.getPaintProperty(id, prop);
+        base = typeof v === "number" ? v : 1;
+        baseOpacity.current.set(k, base);
+      }
+      map.setPaintProperty(id, prop, base * o);
+    };
+    for (const [id, prop] of OPACITY_LAYERS) apply(id, prop);
+    for (const l of HAZARD_LAYERS) apply(hazardLayerId(l.id), "raster-opacity");
+  }, [overlayOpacity, loaded]);
 
   // PC：パネルの「地図に重ねる」。その種類を重ね、物件の辺り（町が見える大きさ）を見せる
   useEffect(() => {

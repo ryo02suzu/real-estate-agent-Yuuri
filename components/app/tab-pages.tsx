@@ -10,6 +10,7 @@ import {
   CircleHelp,
   ClipboardCopy,
   Database,
+  Download,
   FileText,
   Info,
   ListChecks,
@@ -31,6 +32,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { placeholderScenes, placeParts, sceneSrc, SCENES, type SceneKey } from "@/lib/app/scene";
 import { favoriteKey, type FavoriteItem } from "@/lib/favorites";
 import { historyKey, type HistoryItem } from "@/lib/history";
+import { allRecords, recordsSummary, type PropertyRecords } from "@/lib/records";
 import { MUNICIPALITIES } from "@/lib/roadmap";
 import { PhoneImg, ScaledInput } from "./frame";
 import { AURORA, PAGE } from "./home";
@@ -39,6 +41,7 @@ import { FavStar } from "./star";
 import { NEWS } from "./news";
 import { CARD, GLASS, Head, HEAD, LIGHT, Note, Row, TEXT } from "./r-ui";
 import { BottomFade, CompactBar, SkyWash, useShrink, type WashVariant } from "./sky";
+import { STATUS } from "./tokens";
 import { NAVY } from "./ui";
 
 /** 写真の帯の高さと、ガラスのカードを重ねる量 */
@@ -168,6 +171,46 @@ const KINDS: { key: Kind | "all"; label: string }[] = [
   { key: "map", label: "地図" },
 ];
 const kindOf = (h: HistoryItem): Kind => (h.ll ? "map" : placeParts(h).chiban ? "chiban" : "address");
+const KIND_LABEL: Record<Kind, string> = { address: "住所", chiban: "地番", map: "地図" };
+
+/** 同じ物件（信頼できる識別情報が同じ。lib/property-id.ts）をひとつの行にまとめたもの */
+type Grouped = { item: HistoryItem; kinds: Kind[]; count: number; pid?: string };
+function groupByProperty(list: HistoryItem[]): Grouped[] {
+  const out: Grouped[] = [];
+  const byPid = new Map<string, Grouped>();
+  for (const h of list) {
+    const k = kindOf(h);
+    const g = h.pid ? byPid.get(h.pid) : undefined;
+    if (g) {
+      if (!g.kinds.includes(k)) g.kinds.push(k);
+      g.count++;
+      continue;
+    }
+    const n: Grouped = { item: h, kinds: [k], count: 1, pid: h.pid };
+    out.push(n);
+    if (h.pid) byPid.set(h.pid, n);
+  }
+  return out;
+}
+
+/** 行の3行目の札：同じ物件の件数と調べ方、あなたの確認の記録の要約 */
+function groupPills(g: Grouped, recs: Map<string, PropertyRecords>): ReactNode {
+  const s = g.pid ? recordsSummary(recs.get(g.pid)) : undefined;
+  const pills: ReactNode[] = [];
+  if (g.count > 1)
+    pills.push(
+      <Pill key="n" color="#2b3a55" bg="#eef1f5">
+        同じ物件 {g.count}件・{g.kinds.map((k) => KIND_LABEL[k]).join("・")}
+      </Pill>,
+    );
+  if (s && (s.all || s.partial))
+    pills.push(
+      <Pill key="r" color={STATUS.confirmed.color} bg={STATUS.confirmed.bg}>
+        {[s.all ? `確認済み ${s.all}` : "", s.partial ? `一部確認 ${s.partial}` : ""].filter(Boolean).join("・")}
+      </Pill>,
+    );
+  return pills.length ? pills : undefined;
+}
 
 /** 絞り込みの文字に合うか（町名・市区町村・住所のどこかに含む。全角・半角は同じに） */
 function matches(h: HistoryItem, q: string): boolean {
@@ -197,8 +240,17 @@ function when(t: number, now: number): string {
   return d.getFullYear() === n.getFullYear() ? `${d.getMonth() + 1}/${d.getDate()}` : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-/** 調べた物件の1行（写真の札・町名・市区町村と日時と調べ方）。右に小さなボタン */
-function PlaceRow({ item, scene, time, onClick, trailing }: { item: HistoryItem; scene: SceneKey; time?: string; onClick: () => void; trailing?: ReactNode }) {
+/** 行の中の小さな札（同じ物件の件数・確認の記録） */
+function Pill({ color, bg, children }: { color: string; bg: string; children: ReactNode }) {
+  return (
+    <span className="inline-flex h-[18px] max-w-full items-center truncate rounded-full px-[7px] font-bold leading-none" style={{ fontSize: 10.5, color, background: bg }}>
+      {children}
+    </span>
+  );
+}
+
+/** 調べた物件の1行（写真の札・町名・市区町村と日時と調べ方。extra は3行目の札）。右に小さなボタン */
+function PlaceRow({ item, scene, time, onClick, trailing, extra }: { item: HistoryItem; scene: SceneKey; time?: string; onClick: () => void; trailing?: ReactNode; extra?: ReactNode }) {
   const { city, town, full, chiban } = placeParts(item);
   const kind = chiban ? "・地番" : item.ll ? "・地図" : "";
   return (
@@ -214,6 +266,7 @@ function PlaceRow({ item, scene, time, onClick, trailing }: { item: HistoryItem;
               {[city || "対応エリアの外", time].filter(Boolean).join("・")}
               {kind}
             </span>
+            {extra && <span className="mt-[4px] flex flex-wrap gap-[4px]">{extra}</span>}
           </span>
           {!trailing && <ChevronRight size={18} strokeWidth={1.8} absoluteStrokeWidth color="#a3adbd" className="mr-[6px] shrink-0" />}
         </button>
@@ -279,13 +332,15 @@ export function HistoryPage({
     return c;
   }, [history]);
   const list = history.filter((h) => (kind === "all" || kindOf(h) === kind) && matches(h, q));
-  // 日付ごとの章（新しい順のまま）
-  const groups: { label: string; items: HistoryItem[] }[] = [];
-  for (const h of list) {
-    const label = dayGroup(h.at, now);
-    const g = groups[groups.length - 1];
-    if (g && g.label === label) g.items.push(h);
-    else groups.push({ label, items: [h] });
+  // あなたの確認の記録（行の札に。ページを開くたびに読む）
+  const [recs] = useState(() => new Map(allRecords().map((r) => [r.key, r])));
+  // 同じ物件はひとつの行に、日付ごとの章（新しい順のまま）
+  const groups: { label: string; items: Grouped[] }[] = [];
+  for (const g of groupByProperty(list)) {
+    const label = dayGroup(g.item.at, now);
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) last.items.push(g);
+    else groups.push({ label, items: [g] });
   }
 
   return (
@@ -324,13 +379,14 @@ export function HistoryPage({
           <section key={g.label}>
             <Head title={g.label} note={`${g.items.length}件`} className="mt-[10px]" />
             <ul className={`overflow-hidden ${CARD}`}>
-              {g.items.map((h) => (
+              {g.items.map(({ item: h, ...grp }) => (
                 <PlaceRow
                   key={historyKey(h)}
                   item={h}
                   scene={scenes.get(historyKey(h)) ?? "suburb"}
                   time={when(h.at, now)}
                   onClick={() => onPick(h)}
+                  extra={groupPills({ item: h, ...grp }, recs)}
                   trailing={
                     <IconButton label={isFavorite(h) ? "お気に入りから外す" : "お気に入りに保存"} onClick={() => onToggleFavorite(h)}>
                       <FavStar on={isFavorite(h)} size={21} stroke={1.7} />
@@ -566,6 +622,7 @@ export function AccountPage({
   onNews,
   unread,
   onInstall,
+  onStorage,
   standalone,
   historyCount,
   favoriteCount,
@@ -579,6 +636,8 @@ export function AccountPage({
   onNews: () => void;
   unread: boolean;
   onInstall: () => void;
+  /** 調査記録の書き出し・読み込み（データの保存について） */
+  onStorage: () => void;
   standalone: boolean;
   historyCount: number;
   favoriteCount: number;
@@ -655,6 +714,7 @@ export function AccountPage({
             onClick={onNews}
           />
           <Row icon={icon(Smartphone)} title="ホーム画面に追加" sub={standalone ? "追加したアプリで開いています" : "ブラウザの枠なしで、アプリのように使う"} right={standalone ? "追加済み" : undefined} rightColor={LIGHT} minH={52} onClick={onInstall} />
+          <Row icon={icon(Download)} title="調査記録の書き出し・読み込み" sub="機種変更・データ消失への備え。保存の仕組みも" minH={52} onClick={onStorage} />
         </div>
       </section>
       <Note className="mt-[12px] px-[4px]">

@@ -12,6 +12,7 @@ import { GuideMapSheet } from "@/components/guide-map";
 import { Sheet } from "@/components/sheet";
 import { favoriteKey, loadFavorites, removeFavorite, type FavoriteItem } from "@/lib/favorites";
 import { addHistory, clearHistory, loadHistory, type HistoryItem } from "@/lib/history";
+import { propertyIdOf } from "@/lib/property-id";
 import { GeocoderUnavailable, lookup, lookupPoint, MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
 import { buildHash, pageUrl, readUrlState } from "@/lib/app/url";
 
@@ -63,6 +64,8 @@ export default function Home() {
             coverage: result.status === "ok" ? result.municipality.coverage : undefined,
             at: Date.now(),
             ...("ll" in target ? { ll: target.ll } : {}),
+            // 同じ物件の見分け（信頼できる識別情報があるときだけ。lib/property-id.ts）
+            ...(result.status === "ok" ? { pid: propertyIdOf(query, result) } : {}),
           }),
         );
       }
@@ -261,6 +264,10 @@ export default function Home() {
       onClearHistory={() => {
         clearHistory();
         setHistory([]);
+      }}
+      onReloadStores={() => {
+        setHistory(loadHistory());
+        setFavorites(loadFavorites());
       }}
       onHome={backHome}
     />

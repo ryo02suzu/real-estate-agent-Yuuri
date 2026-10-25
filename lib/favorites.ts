@@ -56,3 +56,12 @@ export function toggleFavoriteChecked(item: FavoriteItem): { items: FavoriteItem
 }
 
 export const removeFavorite = (item: FavoriteItem): FavoriteItem[] => save(loadFavorites().filter((f) => favoriteKey(f) !== favoriteKey(item)));
+
+/** 読み込み（書き出したファイルから）：無いものだけ足す。足した数を返す */
+export function mergeFavorites(items: FavoriteItem[]): number {
+  const cur = loadFavorites();
+  const have = new Set(cur.map(favoriteKey));
+  const add = items.filter((f) => f && typeof f.address === "string" && !have.has(favoriteKey(f)));
+  if (add.length) save([...cur, ...add].slice(0, MAX));
+  return add.length;
+}

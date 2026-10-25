@@ -2,7 +2,9 @@
 
 // スマホの「その他」から開く案内のシート：使い方・対応している市区町村・データの出典と時点・データの保存について。
 // PC は components/info-sheets.tsx の金色のまま（ここはスマホの紺の見た目）。シートの動きは components/sheet.tsx
-import { useState } from "react";
+import { Download, Upload } from "lucide-react";
+import { useRef, useState } from "react";
+import { bundleFileName, bundleSummary, importBundle, makeBundle, type BundleSummary } from "@/lib/backup";
 import { MUNICIPALITIES, type Municipality } from "@/lib/roadmap";
 import { BUILDING_DATA } from "@/lib/roadmap/building-data";
 import { DEALS_DATA, DEALS_NOTE } from "@/lib/roadmap/deals";
@@ -156,18 +158,119 @@ export function AppSourcesSheet({ open, onClose }: { open: boolean; onClose: () 
 }
 
 /** データの保存について（Safari とホーム画面のアプリで条件が違う） */
-export function StorageSheet({ open, onClose, standalone, onExport }: { open: boolean; onClose: () => void; standalone: boolean; onExport?: () => void }) {
+export function StorageSheet({ open, onClose, standalone, onImported }: { open: boolean; onClose: () => void; standalone: boolean; /** 読み込んだあと（履歴・お気に入りを読み直す） */ onImported?: () => void }) {
+  const [msg, setMsg] = useState<{ text: string; warn?: boolean } | null>(null);
+  // 読み込む前の確認（書き出した日時・件数・最初の3件）
+  const [pending, setPending] = useState<{ text: string; summary: Extract<BundleSummary, { ok: true }> } | null>(null);
+  const file = useRef<HTMLInputElement>(null);
   const rows: [string, string][] = [
     ["どこに残るか", "履歴・お気に入り・確認の記録・済んだ印は、すべてこの端末のブラウザの中にあります。MICHILU のサーバーには送りません。"],
     ["Safari とホーム画面のアプリ", "保存場所が別です。片方で調べた物件は、もう片方には出ません。"],
     ["Safari で使っているとき", "Safari を使った日が7日分たまる間に MICHILU を一度も開かないと、Safari が保存データを消すことがあります。カレンダーの7日ではなく、Safari を使わない日は数えません。MICHILU を開けば数え直しです。"],
     ["ホーム画面のアプリで使っているとき", "アプリを開くたびに数え直されるため、この条件では消えない想定です。ただしアプリを削除すると消えます。"],
     ["ほかに消える場合", "設定で Web サイトデータを削除したとき、端末の容量が足りないとき、プライベートブラウズ（保存されません）。"],
-    ["機種変更・別の端末", "引き継がれません。「調査記録の書き出し」でファイルにして、新しい端末で読み込んでください。"],
+    ["機種変更・別の端末", "引き継がれません。「書き出す」でファイルにして、新しい端末で「読み込む」。読み込みは足すだけで、いまの記録は消しません。"],
   ];
+  /** 1つのファイル（JSON）にまとめ、共有シート（iPhone）かダウンロードで保存する。端末の中で作る */
+  const exportNow = async () => {
+    const text = JSON.stringify(makeBundle(), null, 1);
+    const name = bundleFileName();
+    const f = new File([text], name, { type: "application/json" });
+    try {
+      if (typeof navigator.share === "function" && typeof navigator.canShare === "function" && navigator.canShare({ files: [f] })) {
+        await navigator.share({ files: [f], title: "MICHILU の調査記録" });
+        setMsg({ text: `書き出しました（${name}）。共有先に保存されています。` });
+        return;
+      }
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
+    }
+    const url = URL.createObjectURL(f);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    setMsg({ text: `${name} をダウンロードしました。` });
+  };
+  const onFile = async (f: File | undefined) => {
+    if (!f) return;
+    const text = await f.text();
+    const summary = bundleSummary(text);
+    if (!summary.ok) {
+      setPending(null);
+      setMsg({ text: summary.reason, warn: true });
+    } else {
+      setMsg(null);
+      setPending({ text, summary });
+    }
+  };
+  const apply = () => {
+    if (!pending) return;
+    const r = importBundle(pending.text);
+    const a = r.added;
+    setMsg(r.ok ? { text: `読み込みました。履歴 ${a.history}件・お気に入り ${a.favorites}件・確認の記録 ${a.records}件・済んだ印 ${a.checklist}件を足しました（元の記録はそのまま）。` } : { text: "読み込めませんでした。", warn: true });
+    setPending(null);
+    onImported?.();
+  };
+  const fmt = (iso: string) => {
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? "不明" : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
   return (
-    <Sheet title="データの保存について" open={open} onClose={onClose}>
-      <dl className="divide-y divide-line/70">
+    <Sheet title="調査記録の書き出し・読み込み" open={open} onClose={onClose}>
+      <p className="text-[13px] leading-[1.6] text-ink">履歴・お気に入り・確認の記録・済んだ印を1つのファイルにまとめます。機種変更や、Safari のデータ削除への備えに。</p>
+      <div className="mt-3 flex gap-2">
+        <button onClick={() => void exportNow()} className="press flex h-[46px] flex-1 items-center justify-center gap-1.5 rounded-[14px] font-semibold leading-none text-white" style={{ fontSize: 15, background: NAVY }}>
+          <Download size={17} strokeWidth={2} absoluteStrokeWidth />
+          書き出す
+        </button>
+        <button onClick={() => file.current?.click()} className="press flex h-[46px] flex-1 items-center justify-center gap-1.5 rounded-[14px] border bg-white font-semibold leading-none" style={{ fontSize: 15, color: NAVY, borderColor: "#c9d5e6" }}>
+          <Upload size={17} strokeWidth={2} absoluteStrokeWidth />
+          読み込む
+        </button>
+        <input
+          ref={file}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          aria-label="書き出したファイルを選ぶ"
+          onChange={(e) => {
+            void onFile(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+      </div>
+      {pending && (
+        <div className="mt-3 rounded-2xl border border-line bg-white px-4 py-3">
+          <p className="text-[14px] font-bold text-ink">このファイルを読み込みますか？</p>
+          <p className="mt-1 text-[13px] leading-[1.7] text-ink">
+            書き出した日時：{fmt(pending.summary.exportedAt)}
+            <br />
+            履歴 {pending.summary.history}件・お気に入り {pending.summary.favorites}件・確認の記録 {pending.summary.records}件
+            {pending.summary.first.length > 0 && (
+              <>
+                <br />
+                例：{pending.summary.first.join("、")}
+              </>
+            )}
+          </p>
+          <p className="mt-1 text-[12px] leading-[1.6] text-muted">足すだけで、いまの記録は消しません。同じ物件・同じ確認事項は新しい方を残します。</p>
+          <div className="mt-2 flex gap-2">
+            <button onClick={apply} className="press h-[40px] flex-1 rounded-full font-semibold leading-none text-white" style={{ fontSize: 14, background: NAVY }}>
+              読み込む
+            </button>
+            <button onClick={() => setPending(null)} className="press h-[40px] flex-1 rounded-full border bg-white font-semibold leading-none" style={{ fontSize: 14, color: NAVY, borderColor: "#c9d5e6" }}>
+              やめる
+            </button>
+          </div>
+        </div>
+      )}
+      {msg && <p className={`mt-3 text-[13px] leading-[1.6] ${msg.warn ? "text-[#c2561f]" : "text-ink"}`}>{msg.text}</p>}
+      <dl className="mt-3 divide-y divide-line/70">
         {rows.map(([k, v]) => (
           <div key={k} className="py-2">
             <dt className="text-[12px] text-muted">{k}</dt>
@@ -176,13 +279,8 @@ export function StorageSheet({ open, onClose, standalone, onExport }: { open: bo
         ))}
       </dl>
       <Callout title={standalone ? "ホーム画面のアプリで開いています" : "ホーム画面に追加すると消えにくくなります"}>
-        {standalone ? "この開き方なら、Safari の7日の条件は当てはまりません。念のため、ときどき書き出しておくと安心です。" : "「その他」の「ホーム画面に追加」から追加できます。追加したアプリは Safari とは別の保存場所になるので、履歴は引き継がれません。"}
+        {standalone ? "この開き方なら、Safari の7日の条件は当てはまりません。念のため、ときどき書き出しておくと安心です。" : "「その他」の「ホーム画面に追加」から追加できます。追加したアプリは Safari とは別の保存場所になるので、履歴は引き継がれません（書き出して読み込めば移せます）。"}
       </Callout>
-      {onExport && (
-        <button onClick={onExport} className="press mt-[14px] flex h-[46px] w-full items-center justify-center rounded-[14px] font-semibold leading-none text-white" style={{ fontSize: 15, background: NAVY }}>
-          調査記録を書き出す
-        </button>
-      )}
     </Sheet>
   );
 }

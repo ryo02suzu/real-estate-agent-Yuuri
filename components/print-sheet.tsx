@@ -35,6 +35,7 @@ import { MapPreview } from "./map-preview";
 import type { RoadsState } from "./nearby-roads";
 import type { Triage } from "@/lib/app/triage";
 import { checklistKey, loadDone } from "@/lib/checklist";
+import { RECORD_ITEMS, RECORD_TOPICS, type PropertyRecords } from "@/lib/records";
 import { addressOffLot, parcelLines, type ParcelInfo } from "./parcel-card";
 import type { ZoningState } from "./zoning-card";
 
@@ -62,6 +63,8 @@ export function PrintSheet(props: {
   pois: PoiState;
   /** 要注意点と次にやること（見出しのすぐ下に出す） */
   triage?: Triage;
+  /** あなたの確認の記録（端末に残したもの） */
+  records?: PropertyRecords;
 }) {
   // document.body に出す（画面の作りの外に置き、印刷では画面の作りを丸ごと隠す）。サーバーでは何も出さない
   const client = useSyncExternalStore(
@@ -85,6 +88,7 @@ function Memo({
   stations,
   pois,
   triage,
+  records,
 }: {
   result: Ok;
   zoning: ZoningState;
@@ -97,6 +101,7 @@ function Memo({
   stations: StationState;
   pois: PoiState;
   triage?: Triage;
+  records?: PropertyRecords;
 }) {
   const walks = stations.status === "ok" ? stations.stations : [];
   const facilities = pois.status === "ok" ? pois.pois : [];
@@ -134,6 +139,7 @@ function Memo({
       </header>
 
       {triage && <TriageBlock triage={triage} done={loadDone(checklistKey(result.lat, result.lng))} />}
+      {records && <RecordsBlock records={records} />}
 
       {/* 物件：場所の表と地図 */}
       <section className="mt-2.5 flex gap-4">
@@ -473,6 +479,40 @@ function Memo({
 }
 
 /** 要注意点（▲ 要注意・・要確認）と、次にやること（窓口ごと。済んだものは ☑） */
+/** あなたの確認の記録（端末に残したもの。MICHILU の判定ではない） */
+function RecordsBlock({ records }: { records: PropertyRecords }) {
+  const md = (t: number) => {
+    const d = new Date(t);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+  const rows = RECORD_TOPICS.flatMap((t) =>
+    RECORD_ITEMS[t].subs.flatMap((s) => {
+      const r = records.items[t]?.[s.id];
+      return r ? [{ topic: RECORD_ITEMS[t].label, sub: s.label, r }] : [];
+    }),
+  );
+  if (!rows.length) return null;
+  return (
+    <section className="mt-2.5 rounded border border-[#d9cfbf] px-3 py-2">
+      <h2 className="text-[12px] font-bold">
+        あなたの確認の記録 <span className="text-[10px] font-normal text-[#7a6a55]">この端末に残した記録です（MICHILU の判定ではありません）</span>
+      </h2>
+      <table className="mt-1 w-full text-[10.5px]">
+        <tbody>
+          {rows.map(({ topic, sub, r }) => (
+            <tr key={`${topic}${sub}`} className="border-t border-[#eee6d8]">
+              <td className="w-[5.5em] py-0.5 text-[#7a6a55]">{topic}</td>
+              <td className="w-[10em] py-0.5">{sub}</td>
+              <td className="w-[6em] py-0.5">{r.done ? `確認済み ${md(r.at)}` : "未確認"}</td>
+              <td className="py-0.5">{[r.method, r.source, r.note].filter(Boolean).join("・")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 function TriageBlock({ triage, done }: { triage: Triage; done: Set<string> }) {
   return (
     <section className="mt-2.5 flex gap-4 break-inside-avoid">
