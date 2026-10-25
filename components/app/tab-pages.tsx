@@ -27,7 +27,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { placeholderScenes, placeParts, sceneSrc, SCENES, type SceneKey } from "@/lib/app/scene";
 import { favoriteKey, type FavoriteItem } from "@/lib/favorites";
 import { historyKey, type HistoryItem } from "@/lib/history";
@@ -36,27 +36,41 @@ import { PhoneImg, ScaledInput } from "./frame";
 import { AURORA, PAGE } from "./home";
 import { ClockBack } from "./icons";
 import { NEWS } from "./news";
-import { CARD, GLASS, Head, HEAD, LIGHT, NoImage, Note, Row, TEXT } from "./r-ui";
+import { CARD, GLASS, Head, HEAD, LIGHT, Note, Row, TEXT } from "./r-ui";
+import { BottomFade, CompactBar, SkyWash, useShrink, type WashVariant } from "./sky";
 import { NAVY } from "./ui";
 
 /** 写真の帯の高さと、ガラスのカードを重ねる量 */
 const BAND_H = 124;
 const OVERLAP = 28;
 
-/** ページの枠：写真の帯（見出し・副題。右上に小さなボタン）、重ねるガラスのカード、その下の中身 */
-function TabScreen({ title, sub, action, hero, banner, children }: { title: string; sub?: string; action?: ReactNode; hero?: ReactNode; banner?: ReactNode; children: ReactNode }) {
+/**
+ * ページの枠：時間連動の空の帯（見出し・副題。右上に小さなボタン）、重ねるガラスのカード、その下の中身。
+ * スクロールが出ると帯が縮み（写真は半分の速さで上へ、見出しは薄れる）、56pt のバーに見出しが残る
+ */
+function TabScreen({ title, sub, action, hero, banner, variant, children }: { title: string; sub?: string; action?: ReactNode; hero?: ReactNode; banner?: ReactNode; variant: WashVariant; children: ReactNode }) {
+  const root = useRef<HTMLDivElement>(null);
+  useShrink(root, BAND_H - 56);
   return (
-    <div className="app-touch relative pb-[16px]" style={{ background: PAGE }}>
+    <div ref={root} className="app-touch relative pb-[16px]" style={{ background: PAGE }}>
+      <CompactBar>
+        <span className="min-w-0 flex-1 truncate font-bold leading-none" style={{ fontSize: 17, color: HEAD }}>
+          {title}
+        </span>
+        {action}
+      </CompactBar>
       <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0" style={{ top: BAND_H, background: AURORA }} />
       <div className="relative overflow-hidden" style={{ height: BAND_H }}>
-        <NoImage top size={10} className="absolute inset-0" />
-        <div aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(10,25,50,0.08) 0%, rgba(10,25,50,0) 30%, rgba(10,25,50,0.14) 55%, rgba(10,25,50,0.7) 100%)" }} />
+        <div className="shrink-photo absolute inset-0">
+          <SkyWash variant={variant} />
+        </div>
+        <BottomFade height={18} />
         {action && (
           <div className="absolute" style={{ right: 8, top: 6 }}>
             {action}
           </div>
         )}
-        <div className="absolute left-[20px] right-[20px]" style={{ bottom: OVERLAP + 10 }}>
+        <div className="shrink-title absolute left-[20px] right-[20px]" style={{ bottom: OVERLAP + 10 }}>
           <h1 className="truncate font-bold leading-[1.15] text-white" style={{ fontSize: 27, textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>
             {title}
           </h1>
@@ -275,6 +289,7 @@ export function HistoryPage({
 
   return (
     <TabScreen
+      variant="sky"
       title="履歴"
       sub={history.length ? `${history.length}件・この端末だけに保存（最大30件）` : "調べた物件がここに残ります"}
       hero={
@@ -391,6 +406,7 @@ export function FavoritesPage({
 
   return (
     <TabScreen
+      variant="warm"
       title="お気に入り"
       sub={favorites.length ? `${favorites.length}件・この端末だけに保存（最大50件）` : "案内の前の下調べや、見返したい物件を"}
       hero={
@@ -495,6 +511,7 @@ export function DocsPage({
   const now = useNow();
   return (
     <TabScreen
+      variant="paper"
       title="書類・出力"
       sub={current ? `${placeParts(current).town || placeParts(current).full} の書類を作れます` : "調べた物件から、参考の資料をすぐ作れます"}
       hero={
@@ -588,6 +605,7 @@ export function AccountPage({
   );
   return (
     <TabScreen
+      variant="blue"
       title="その他"
       sub="MICHILU（ミチル）・不動産の現場に、すぐ使える情報を。"
       action={

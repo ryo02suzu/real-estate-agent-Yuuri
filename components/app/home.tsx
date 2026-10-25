@@ -12,17 +12,18 @@
 // 寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。幅に対して背の低い画面（iPhone SE など）では、
 // low:（app/globals.css）でカードを少し詰める
 import { ArrowRight, Bell, ChevronRight, LoaderCircle, Map as MapIcon, MapPinned, Search, TriangleAlert, X } from "lucide-react";
-import type { CSSProperties, ReactNode, RefObject } from "react";
+import { useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { monthDay, placeholderScenes, placeParts, SCENES, sceneSrc, type SceneKey } from "@/lib/app/scene";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import { LogoLockup, PhoneImg, ScaledInput } from "./frame";
 import { GLASS } from "./r-ui";
+import { BottomFade, CompactBar, SkyPhotos, useShrink } from "./sky";
+import { PAGE } from "./tokens";
 import { NAVY } from "./ui";
 
-/** 時刻・電池の帯の色（app/layout.tsx の themeColor と同じ）。写真の上端をこの色からつなぐ */
+/** 時刻・電池の帯の色（空の変数 --sky-top が入る前の値。app/layout.tsx の themeColor と同じ） */
 export const SKY = "#e6eff9";
-/** 画面の地の色 */
-export const PAGE = "#f3f6fb";
+export { PAGE };
 const HEAD = "#0f1b33";
 const TEXT = "#162033";
 const LIGHT = "#66728a";
@@ -37,8 +38,8 @@ const ACCENT = "linear-gradient(180deg,#3d7bff 0%,#22c1ee 100%)";
  */
 const PHOTO_H = 275;
 
-/** 写真の上の字が建物に重なっても読めるよう、白くにじませる（届いた絵の見出しと同じ効き方） */
-const GLOW = "0 0 10px rgba(255,255,255,0.95), 0 0 3px rgba(255,255,255,0.95)";
+/** 写真の上の字が建物に重なっても読めるよう、にじませる（昼は白、夜は紺。空の変数 --sky-halo） */
+const GLOW = "0 0 10px rgba(var(--sky-halo, 255,255,255),0.95), 0 0 3px rgba(var(--sky-halo, 255,255,255),0.95)";
 /** 地の奥の淡い光（最近の検索のあたり。下の端に届く前に消える）。下のメニューのページでも使う */
 export const AURORA =
   "radial-gradient(60% 42% at 0% 45%, rgba(110,140,255,0.13) 0%, rgba(110,140,255,0) 100%), radial-gradient(55% 38% at 100% 58%, rgba(40,190,255,0.12) 0%, rgba(40,190,255,0) 100%)";
@@ -102,18 +103,31 @@ export function HomeScreen({
 }) {
   const recent = history.slice(0, 4);
   const scenes = placeholderScenes(recent);
+  // スクロールすると写真が半分の速さで上へ動き、見出しが薄れ、230pt を越えると上に小さなバーが残る
+  const root = useRef<HTMLDivElement>(null);
+  useShrink(root, 230);
 
   return (
-    <div className="app-touch relative overflow-hidden" style={{ background: PAGE }}>
+    <div ref={root} className="app-touch relative overflow-hidden" style={{ background: PAGE }}>
+      <CompactBar>
+        <button onClick={onLogo} aria-label="MICHILU ホーム" className="press flex h-[40px] shrink-0 items-center">
+          <LogoLockup style={{ height: 22 }} />
+        </button>
+        <button onClick={() => inputRef.current?.focus()} className="press flex h-[38px] min-w-0 flex-1 items-center gap-[8px] rounded-full border border-[#d8e0eb] bg-white pl-[12px] pr-[12px] text-left shadow-[inset_0_1px_2px_rgba(20,45,85,0.05)]" style={{ fontSize: 14, color: input ? TEXT : "#8d97a8" }}>
+          <Search size={15} strokeWidth={1.9} absoluteStrokeWidth color="#7c8aa3" className="shrink-0" />
+          <span className="truncate">{input || "住所・地番を入力"}</span>
+        </button>
+      </CompactBar>
       <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0" style={{ top: 280, background: AURORA }} />
 
-      {/* 街の写真の部分（上端は時刻・電池の帯の色からつなぐ） */}
+      {/* 街の写真の部分：時間連動の空（components/app/sky.tsx）。上端は時刻・電池の帯の色（--sky-top）と同じ */}
       <div className="relative overflow-hidden" style={{ height: PHOTO_H }}>
-        <PhoneImg src="/home/hero.webp" alt="" width={1255} height={879} draggable={false} className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-x-0 top-0" style={{ height: 36, background: `linear-gradient(180deg,${SKY} 0%,rgba(230,239,249,0) 100%)` }} />
-        <div className="absolute inset-x-0 bottom-0" style={{ height: 40, background: `linear-gradient(180deg,rgba(243,246,251,0) 0%,${PAGE} 100%)` }} />
-        <button onClick={onLogo} aria-label="MICHILU ホーム" className="absolute flex items-center" style={{ left: 16, top: 4, height: 40 }}>
-          <LogoLockup style={{ height: 28 }} />
+        <div className="shrink-photo absolute inset-0">
+          <SkyPhotos />
+        </div>
+        <BottomFade />
+        <button onClick={onLogo} aria-label="MICHILU ホーム" className="press absolute flex items-center" style={{ left: 16, top: 4, height: 40 }}>
+          <LogoLockup style={{ height: 28 }} sky />
         </button>
         <button onClick={onBell} aria-label={unread ? "お知らせ（新しいお知らせがあります）" : "お知らせ"} className="press absolute flex items-center justify-center" style={{ right: 8, top: 3, width: 44, height: 44 }}>
           <span className="flex items-center justify-center rounded-full shadow-[0_4px_14px_rgba(15,47,95,0.14)]" style={{ ...GLASS, width: 38, height: 38 }}>
@@ -122,19 +136,22 @@ export function HomeScreen({
           {unread && <span className="absolute rounded-full border-2 border-white bg-[#f0263a]" style={{ right: 6, top: 6, width: 11, height: 11 }} />}
         </button>
 
-        {/* 見出しと副題（絵と同じ位置・大きさ。絵の字は消してある） */}
-        <h1 className="home-rise absolute whitespace-nowrap font-bold" style={{ left: 16, top: 44, fontSize: 26, lineHeight: "34px", letterSpacing: 0.2, color: HEAD, textShadow: GLOW }}>
-          調べる時間を、
-          <br />
-          商談の時間に。
-        </h1>
-        <p className="home-rise absolute whitespace-nowrap leading-none" style={{ left: 16, top: 115, fontSize: 13, letterSpacing: 0.2, color: "#26324a", textShadow: GLOW, ...rise(60) }}>
-          不動産調査を、もっと早く、もっとシンプルに。
-        </p>
+        {/* 見出しと副題。字の色は空の明るさで紺↔白（.sky-ink）。スクロールで薄れる（.shrink-title） */}
+        <div className="shrink-title absolute" style={{ left: 16, top: 44 }}>
+          <h1 className="home-rise sky-ink whitespace-nowrap font-bold" style={{ fontSize: 26, lineHeight: "34px", letterSpacing: 0.2, textShadow: GLOW }}>
+            調べる時間を、
+            <br />
+            商談の時間に。
+          </h1>
+          <p className="home-rise sky-ink-soft mt-[3px] whitespace-nowrap leading-none" style={{ fontSize: 13, letterSpacing: 0.2, textShadow: GLOW, ...rise(60) }}>
+            不動産調査を、もっと早く、もっとシンプルに。
+          </p>
+        </div>
       </div>
 
-      {/* 調べる（すりガラスのカード。住所も地番もこの欄に入れる） */}
+      {/* 調べる（すりガラスのカード。住所も地番もこの欄に入れる。縁に空の光のハイライト） */}
       <div className="home-rise relative mx-[16px] -mt-[85px] rounded-[22px] p-[9px] shadow-[0_14px_34px_rgba(20,48,95,0.13)] low:p-[8px]" style={{ ...GLASS, ...rise(100) }}>
+        <div aria-hidden className="sky-layer pointer-events-none absolute inset-0 rounded-[22px]" style={{ background: "radial-gradient(120% 70% at 14% 0%, var(--sky-hl, #fff) 0%, rgba(255,255,255,0) 60%)", opacity: 0.55, boxShadow: "inset 0 1px 0 var(--sky-hl, #fff)" }} />
         <form
           role="search"
           onSubmit={(e) => {

@@ -12,6 +12,9 @@ export const STATUS = {
 } as const;
 export type StatusKey = keyof typeof STATUS;
 
+/** 画面の地の色 */
+export const PAGE = "#f3f6fb";
+
 /** お気に入りの星の金色（状態の色とは別。保存できたときだけ） */
 export const STAR = "#f5a524";
 

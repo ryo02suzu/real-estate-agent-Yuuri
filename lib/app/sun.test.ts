@@ -136,3 +136,32 @@ describe("overrideTime（プレビュー用の日時）", () => {
     expect(overrideTime("#t=xyz")).toBeNull();
   });
 });
+
+describe("SKY_HEAD_SCRIPT（最初に描く前の簡単な計算）", () => {
+  it("1年を通して、SunCalc で入れる変数とほぼ同じになる", async () => {
+    const { SKY_HEAD_SCRIPT, skyValues } = await import("./sky-vars");
+    const vm = await import("node:vm");
+    let worst = 0;
+    for (let k = 0; k < 365; k += 3)
+      for (const hm of ["04:30", "05:30", "06:30", "09:00", "12:00", "15:30", "16:30", "17:30", "18:30", "19:30", "23:00"]) {
+        const d = new Date(jst("2026-01-01", hm).getTime() + k * 86400e3);
+        const store: Record<string, string> = {};
+        const ctx = {
+          location: { hash: `#t=${d.toISOString()}` },
+          document: { documentElement: { style: { setProperty: (key: string, v: string) => (store[key] = v) }, dataset: {} as Record<string, string> } },
+          Math,
+          Date,
+          isNaN,
+          decodeURIComponent,
+        };
+        vm.runInNewContext(SKY_HEAD_SCRIPT, ctx);
+        const ref = skyValues(d).vars;
+        for (const key of ["--sky-day", "--sky-golden", "--sky-twilight", "--sky-night"]) worst = Math.max(worst, Math.abs(Number(store[key]) - Number(ref[key])));
+        // 字を白にする境目（上端の明るさ 0.42）のすぐ近くでは、わずかな高度の差で結果が分かれてよい
+        const top = ref["--sky-top"].match(/[0-9a-f]{2}/g)!.map((h) => parseInt(h, 16));
+        const lum = (0.2126 * top[0] + 0.7152 * top[1] + 0.0722 * top[2]) / 255;
+        if (Math.abs(lum - 0.42) > 0.03) expect(store["--sky-dark"]).toBe(ref["--sky-dark"]);
+      }
+    expect(worst).toBeLessThan(0.05);
+  });
+});

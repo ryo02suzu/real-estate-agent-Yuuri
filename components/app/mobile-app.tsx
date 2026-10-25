@@ -29,6 +29,7 @@ import { HomeScreen, PAGE, SKY, type HomeMessage } from "./home";
 import { AppCitiesSheet, AppHelpSheet, AppSourcesSheet } from "./info";
 import { InstallSheet, useStandalone } from "./install";
 import { useFixedScreen } from "./no-bounce";
+import { SKY_EVENT, skyTop, useSkyClock } from "./sky";
 import { markNewsSeen, NewsSheet, useUnreadNews } from "./news";
 import { NotOkPage } from "./pages";
 import { AroundTab } from "./r-around";
@@ -90,6 +91,8 @@ export function MobileApp(props: MobileAppProps) {
   const standalone = useStandalone();
   // 中身が画面に収まっていても、スワイプで画面全体が動かないようにする
   useFixedScreen();
+  // 時間連動の空（1分ごとに入れ直す）
+  useSkyClock();
   // 書類・出力のタイルで選んだ書類（その物件の画面が出たら、すぐ開く）
   const [wanted, setWanted] = useState<{ kind: DocKind; key: string } | null>(null);
   const wantedDone = useCallback(() => setWanted(null), []);
@@ -161,11 +164,17 @@ export function MobileApp(props: MobileAppProps) {
   const ok = shown?.result.status === "ok" ? (shown.result as Ok) : undefined;
   // 検索する前のホーム（新しいUI）。調べている間もホームのまま（「調査を開始する」が回る）
   const showHome = page === "home" && !shown;
-  // 時刻・電池の帯の色をページに合わせる（ホームは写真の上の空の色、ほかの画面は写真の帯の上の色。PC の色は変えない）
+  // 下のメニューのページ（履歴・お気に入り・書類・出力・その他）は、大きな見出しのページにする
+  const tabPage = page !== "home";
+  // 時刻・電池の帯の色をページに合わせる（ホームと下のメニューのページは時間連動の空の上端の色、物件の画面は写真の帯の上の色。
+  // PC の色は変えない）。空が変わるたびに合わせ直す
   useEffect(() => {
     const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"][media="(max-width: 1023px)"]');
-    meta?.setAttribute("content", showHome ? SKY : BAND_TOP);
-  }, [showHome]);
+    const set = () => meta?.setAttribute("content", showHome || tabPage ? (skyTop() ?? SKY) : BAND_TOP);
+    set();
+    addEventListener(SKY_EVENT, set);
+    return () => removeEventListener(SKY_EVENT, set);
+  }, [showHome, tabPage]);
   const failure = error ?? (offline ? OFFLINE : null);
   const homeMessage: HomeMessage = failure ? { text: failure } : notice ? { text: notice } : null;
   const isFav = (h: HistoryItem) => favorites.some((f) => favoriteKey(f) === favoriteKey(h));
@@ -195,8 +204,7 @@ export function MobileApp(props: MobileAppProps) {
     else pickRecent(target);
   };
 
-  // 下のメニューのページ（履歴・お気に入り・書類・出力・その他）は、大きな見出しのページにする
-  const tabPage = page !== "home";
+
   const tabBanner = <TabBanner loading={loading && !offline} error={failure} notice={notice} onDismiss={() => setNotice(null)} />;
   let body: ReactNode;
   if (page === "history")
@@ -242,7 +250,7 @@ export function MobileApp(props: MobileAppProps) {
 
   return (
     <div className="theme-navy app-touch flex min-h-0 w-full flex-1 flex-col overflow-hidden" style={{ fontFeatureSettings: "normal", letterSpacing: 0, background: PAGE }}>
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain">
+      <div ref={scroller} data-scroller className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain">
         <div className="relative mx-auto" style={{ width: ART_W, zoom: ZOOM }}>
           {showHome && (
             <HomeScreen

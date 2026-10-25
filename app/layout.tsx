@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Jost, Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
 import { APP_ZOOM_SCRIPT } from "@/components/app/zoom";
+import { SKY_HEAD_SCRIPT } from "@/lib/app/sky-vars";
 
 // 本文は Noto Sans JP を同梱し、どの端末でも同じ見た目にする。ロゴ文字（MICHILU）は Jost
 const notoSansJP = Noto_Sans_JP({ weight: ["400", "500", "600", "700"], subsets: ["latin"], display: "swap", variable: "--font-noto-sans-jp" });
@@ -32,6 +33,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         {/* スマホの画面の拡大率を、最初に描く前に決める（components/app/zoom.ts） */}
         <script dangerouslySetInnerHTML={{ __html: APP_ZOOM_SCRIPT }} />
+        {/* 時間連動の空の色を、最初に描く前に決める（lib/app/sky-vars.ts。夜に開いても昼の空が一瞬出ない） */}
+        <script dangerouslySetInnerHTML={{ __html: SKY_HEAD_SCRIPT }} />
       </head>
       <body className="flex h-dvh flex-col overflow-hidden">{children}</body>
     </html>

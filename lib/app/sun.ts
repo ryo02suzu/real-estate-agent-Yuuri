@@ -100,12 +100,25 @@ export function blend(altitude: number, rising: boolean): Blend {
 }
 
 type RGB = [number, number, number];
-/** 写真の上端（時刻・電池の帯につなぐ）の色。届いた4枚の上端を測った値（components/app/sky.tsx の帯の切り抜きと同じ） */
+/** 写真の上端（時刻・電池の帯につなぐ）の色。届いた4枚の帯の切り抜き（public/home/sky）の上端を測った値 */
 export const SKY_TOP: Record<keyof Blend, RGB> = {
   day: [123, 185, 232],
   golden: [150, 154, 183],
   twilight: [116, 116, 153],
   night: [24, 38, 79],
+};
+/** 空の中ほど（見出しの後ろ）と地平線の近くの色。各ページの帯のグラデーションに使う */
+export const SKY_MID: Record<keyof Blend, RGB> = {
+  day: [176, 215, 239],
+  golden: [212, 170, 162],
+  twilight: [173, 135, 151],
+  night: [40, 50, 90],
+};
+export const SKY_HORIZON: Record<keyof Blend, RGB> = {
+  day: [191, 204, 218],
+  golden: [202, 160, 137],
+  twilight: [174, 128, 132],
+  night: [50, 54, 83],
 };
 
 const mix = (cols: Record<keyof Blend, RGB>, b: Blend): RGB => {
@@ -121,6 +134,9 @@ const luminance = (c: RGB) => (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 
 export type Light = {
   /** 写真の上端の色（時刻・電池の帯をこの色に） */
   top: string;
+  /** 空の中ほどと地平線の近くの色（各ページの帯のグラデーション） */
+  mid: string;
+  horizon: string;
   /** 地平線の光（色と強さ 0〜1）。空のマスクの中にだけ乗せる */
   glow: { color: string; strength: number };
   /** ガラスのカードの縁のハイライトの色 */
@@ -131,8 +147,18 @@ export type Light = {
   nightness: number;
 };
 
+/**
+ * 光の差す向き（画面の左 0 〜 右 100）。東（方位 60°）から昇って西（300°）に沈む太陽を、画面の左から右へ当てはめる
+ * （書類・出力の帯の差し込む光などに使う。写真の中の位置ではない）
+ */
+export function lightX(azimuth: number): number {
+  return Math.round(Math.min(100, Math.max(0, ((azimuth - 60) / 240) * 100)));
+}
+
 export function light(altitude: number, rising: boolean, b: Blend = blend(altitude, rising)): Light {
   const top = mix(SKY_TOP, b);
+  const mid = mix(SKY_MID, b);
+  const horizon = mix(SKY_HORIZON, b);
   // 地平線の光：太陽が地平線の近く（−8°〜+6°）で強い。朝は桃色、夕方は橙
   const near = Math.exp(-((altitude + 1) * (altitude + 1)) / (2 * 4.5 * 4.5));
   const glowColor: RGB = rising ? [255, 214, 170] : [255, 178, 120];
@@ -145,6 +171,8 @@ export function light(altitude: number, rising: boolean, b: Blend = blend(altitu
   const hl: RGB = [0, 1, 2].map((i) => white[i] * (1 - warm) * (1 - nightness) + gold[i] * warm * (1 - nightness) + blue[i] * nightness) as RGB;
   return {
     top: hex(top),
+    mid: hex(mid),
+    horizon: hex(horizon),
     glow: { color: hex(glowColor), strength: Math.round(near * 100) / 100 },
     highlight: hex(hl),
     dark: luminance(top) < 0.42,

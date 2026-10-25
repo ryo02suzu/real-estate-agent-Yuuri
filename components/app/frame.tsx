@@ -27,9 +27,19 @@ export function PhoneImg(props: ImgHTMLAttributes<HTMLImageElement>) {
   );
 }
 
-/** ロゴ（新しいマーク・MICHILU・「不動産の現場に、すぐ使える情報を。」。届いた素材から切り出した透過の画像） */
-export function LogoLockup({ style }: { style?: CSSProperties }) {
-  return <PhoneImg src="/home/logo.webp" alt="MICHILU 不動産の現場に、すぐ使える情報を。" width={900} height={160} draggable={false} style={{ width: "auto", ...style }} />;
+/**
+ * ロゴ（新しいマーク・MICHILU・「不動産の現場に、すぐ使える情報を。」。届いた素材から切り出した透過の画像）。
+ * sky のときは白い版（形はそのまま、色だけ白。public/home/logo-white.webp）を重ね、空が暗いときに白へ切り替える（--sky-dark）
+ */
+export function LogoLockup({ style, sky = false }: { style?: CSSProperties; sky?: boolean }) {
+  const alt = "MICHILU 不動産の現場に、すぐ使える情報を。";
+  if (!sky) return <PhoneImg src="/home/logo.webp" alt={alt} width={900} height={160} draggable={false} style={{ width: "auto", ...style }} />;
+  return (
+    <span className="relative inline-block" style={{ height: style?.height }}>
+      <PhoneImg src="/home/logo.webp" alt={alt} width={900} height={160} draggable={false} className="sky-logo-navy block" style={{ width: "auto", ...style }} />
+      <PhoneImg src="/home/logo-white.webp" alt="" aria-hidden width={900} height={160} draggable={false} className="sky-logo-white absolute left-0 top-0 block" style={{ width: "auto", ...style }} />
+    </span>
+  );
 }
 
 /**
