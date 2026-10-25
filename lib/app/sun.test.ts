@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blend, BASE, HOME_CAMERA, light, overrideTime, projectSun, solar } from "./sun";
+import { BASE, blend, HOME_CAMERA, layerOpacity, light, overrideTime, PHOTO_ORDER, projectSun, solar } from "./sun";
 
 // 国立天文台「こよみの計算」東京（35.6581, 139.7414）2026年の日の出入り・南中（分と 0.1° に丸めた値）
 const NAOJ = { lat: 35.6581, lng: 139.7414, utcOffset: 540 };
@@ -64,7 +64,7 @@ describe("blend（写真の混ぜ方）", () => {
     for (const rising of [true, false])
       for (let alt = -30; alt <= 90; alt += 0.5) {
         const b = blend(alt, rising);
-        const sum = b.day + b.golden + b.twilight + b.night;
+        const sum = b.day + b.golden + b.twilight + b.dawn + b.night;
         expect(Math.abs(sum - 1)).toBeLessThan(1e-9);
         for (const v of Object.values(b)) expect(v).toBeGreaterThanOrEqual(0);
       }
@@ -79,7 +79,30 @@ describe("blend（写真の混ぜ方）", () => {
     const morning = blend(4, true);
     expect(evening.golden).toBeGreaterThan(0);
     expect(morning.golden).toBe(0);
-    expect(morning.twilight).toBeGreaterThan(0);
+    expect(morning.twilight).toBe(0);
+    expect(morning.dawn).toBeGreaterThan(0);
+    // 夜明け前の薄明は dawn、夕方の薄明は twilight
+    expect(blend(-3, true).dawn).toBeGreaterThan(0);
+    expect(blend(-3, true).twilight).toBe(0);
+    expect(blend(-3, false).twilight).toBeGreaterThan(0);
+    expect(blend(-3, false).dawn).toBe(0);
+  });
+  it("重ねた写真の不透明度は、重みどおりの混色になる", () => {
+    for (const rising of [true, false])
+      for (let alt = -14; alt <= 12; alt += 0.7) {
+        const b = blend(alt, rising);
+        const o = layerOpacity(b);
+        // 下から順に重ねたときの合成の重みを求め、blend の重みと比べる
+        let acc = 0;
+        const got: Record<string, number> = {};
+        for (const k of PHOTO_ORDER) {
+          for (const j of Object.keys(got)) got[j] *= 1 - o[k];
+          got[k] = o[k];
+          acc = acc * (1 - o[k]) + o[k];
+        }
+        for (const k of PHOTO_ORDER) expect(Math.abs(got[k] - b[k])).toBeLessThan(1e-9);
+        expect(Math.abs(acc - 1)).toBeLessThan(1e-9);
+      }
   });
   it("境界で連続している（0° と −6° の前後で飛ばない）", () => {
     for (const rising of [true, false])
@@ -156,7 +179,7 @@ describe("SKY_HEAD_SCRIPT（最初に描く前の簡単な計算）", () => {
         };
         vm.runInNewContext(SKY_HEAD_SCRIPT, ctx);
         const ref = skyValues(d).vars;
-        for (const key of ["--sky-day", "--sky-golden", "--sky-twilight", "--sky-night"]) worst = Math.max(worst, Math.abs(Number(store[key]) - Number(ref[key])));
+        for (const key of ["--sky-day", "--sky-golden", "--sky-twilight", "--sky-dawn", "--sky-night", "--sky-l-night", "--sky-l-twilight", "--sky-l-dawn", "--sky-l-golden", "--sky-l-day"]) worst = Math.max(worst, Math.abs(Number(store[key]) - Number(ref[key])));
         // 字を白にする境目（上端の明るさ 0.42）のすぐ近くでは、わずかな高度の差で結果が分かれてよい
         const top = ref["--sky-top"].match(/[0-9a-f]{2}/g)!.map((h) => parseInt(h, 16));
         const lum = (0.2126 * top[0] + 0.7152 * top[1] + 0.0722 * top[2]) / 255;

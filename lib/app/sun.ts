@@ -67,15 +67,16 @@ export function smoothstep(a: number, b: number, x: number): number {
 }
 
 /** 街の写真4枚の混ぜ方（合計 1）。昼・夕方・薄暮・夜 */
-export type Blend = { day: number; golden: number; twilight: number; night: number };
+export type Blend = { day: number; golden: number; twilight: number; dawn: number; night: number };
 
 /**
  * 太陽の高度と「昇っているか」から、写真の混ぜ方を決める（時刻では決めない）。
  * 夕方（沈む）：+10°以上 昼 → 0° 夕方 → −6° 薄暮 → −12° 夜。
- * 朝（昇る）：−6°以下 夜 → 0° 薄暮 → +10° 昼。夕方の絵は夜明けには使わない（朝と夕方で同じ高度でも色が違う）
+ * 朝（昇る）：−6°以下 夜 → 0° 夜明け（dawn：薄暮の空に、光の消えた街） → +10° 昼。
+ * 夕方の絵（街に明かりが点いている薄暮・夕焼け）は夜明けには使わない（朝と夕方で同じ高度でも色が違う）
  */
 export function blend(altitude: number, rising: boolean): Blend {
-  const b: Blend = { day: 0, golden: 0, twilight: 0, night: 0 };
+  const b: Blend = { day: 0, golden: 0, twilight: 0, dawn: 0, night: 0 };
   if (!rising) {
     if (altitude >= 0) {
       b.day = smoothstep(0, 10, altitude);
@@ -89,14 +90,31 @@ export function blend(altitude: number, rising: boolean): Blend {
     }
   } else if (altitude >= 0) {
     b.day = smoothstep(0, 10, altitude);
-    b.twilight = 1 - b.day;
+    b.dawn = 1 - b.day;
   } else if (altitude >= -6) {
-    b.twilight = smoothstep(-6, 0, altitude);
-    b.night = 1 - b.twilight;
+    b.dawn = smoothstep(-6, 0, altitude);
+    b.night = 1 - b.dawn;
   } else {
     b.night = 1;
   }
   return b;
+}
+
+/** 写真の重ね順（下から上）。components/app/sky.tsx はこの順に重ねる */
+export const PHOTO_ORDER = ["night", "twilight", "dawn", "golden", "day"] as const;
+
+/**
+ * 重ねた写真それぞれの不透明度。混ぜ方（合計 1）をそのまま不透明度にすると、重なった所で下の地が透けて薄くなるので、
+ * 下から k 枚目は「k 枚目までの重みの合計に対する自分の重み」にする（下の1枚は 1）。こうすると合成の色が重みどおりの混色になる
+ */
+export function layerOpacity(b: Blend): Record<keyof Blend, number> {
+  const out = { day: 0, golden: 0, twilight: 0, dawn: 0, night: 0 };
+  let sum = 0;
+  for (const k of PHOTO_ORDER) {
+    sum += b[k];
+    out[k] = sum > 0 ? b[k] / sum : 0;
+  }
+  return out;
 }
 
 type RGB = [number, number, number];
@@ -105,6 +123,7 @@ export const SKY_TOP: Record<keyof Blend, RGB> = {
   day: [123, 185, 232],
   golden: [150, 154, 183],
   twilight: [116, 116, 153],
+  dawn: [116, 116, 153],
   night: [24, 38, 79],
 };
 /** 空の中ほど（見出しの後ろ）と地平線の近くの色。各ページの帯のグラデーションに使う */
@@ -112,13 +131,15 @@ export const SKY_MID: Record<keyof Blend, RGB> = {
   day: [176, 215, 239],
   golden: [212, 170, 162],
   twilight: [173, 135, 151],
-  night: [40, 50, 90],
+  dawn: [173, 135, 151],
+  night: [41, 50, 91],
 };
 export const SKY_HORIZON: Record<keyof Blend, RGB> = {
   day: [191, 204, 218],
   golden: [202, 160, 137],
   twilight: [174, 128, 132],
-  night: [50, 54, 83],
+  dawn: [175, 130, 137],
+  night: [67, 65, 90],
 };
 
 const mix = (cols: Record<keyof Blend, RGB>, b: Blend): RGB => {
@@ -164,7 +185,7 @@ export function light(altitude: number, rising: boolean, b: Blend = blend(altitu
   const glowColor: RGB = rising ? [255, 214, 170] : [255, 178, 120];
   // ガラスの縁：昼は白、夕方・朝は金、夜は青み
   const warm = altitude < 8 && altitude > -8 ? smoothstep(8, 0, altitude) * (1 - smoothstep(-2, -8, altitude)) : 0;
-  const nightness = b.night + 0.5 * b.twilight;
+  const nightness = b.night + 0.5 * (b.twilight + b.dawn);
   const white: RGB = [255, 255, 255];
   const gold: RGB = [255, 222, 160];
   const blue: RGB = [190, 208, 245];

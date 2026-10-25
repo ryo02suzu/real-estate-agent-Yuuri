@@ -3,14 +3,22 @@
 // 変数は <html> に置く：(1) 最初に描く前に <head> の小さなスクリプト（SKY_HEAD_SCRIPT）が入れ、(2) 表示中は useSkyClock が
 // 1分ごと・復帰時・日時の固定（#t=）の変化で入れ直す。React は変数の値を描かないので、サーバーで作った HTML と食い違わず
 // （Hydration の問題が出ない）、夜に開いても昼の空が一瞬出ない
-import { blend, HOME_CAMERA, light, lightX, overrideTime, projectSun, SKY_HORIZON, SKY_MID, SKY_TOP, solar, type Light } from "./sun";
+import { blend, HOME_CAMERA, layerOpacity, light, lightX, overrideTime, PHOTO_ORDER, projectSun, SKY_HORIZON, SKY_MID, SKY_TOP, solar, type Light } from "./sun";
 
 /** 空の変数の名前と意味 */
 export const SKY_VARS = {
+  /** 写真の混ぜ方（重み。合計 1） */
   day: "--sky-day",
   golden: "--sky-golden",
   twilight: "--sky-twilight",
+  dawn: "--sky-dawn",
   night: "--sky-night",
+  /** 重ねた写真それぞれの不透明度（lib/app/sun.ts の layerOpacity。下から night, twilight, dawn, golden, day） */
+  lNight: "--sky-l-night",
+  lTwilight: "--sky-l-twilight",
+  lDawn: "--sky-l-dawn",
+  lGolden: "--sky-l-golden",
+  lDay: "--sky-l-day",
   /** 写真の上端・中ほど・地平線の近くの色（時刻・電池の帯と、各ページの帯のグラデーション） */
   top: "--sky-top",
   mid: "--sky-mid",
@@ -42,11 +50,14 @@ export function skyValues(at: Date): { vars: Record<string, string>; light: Ligh
   const b = blend(s.altitude, s.rising);
   const l = light(s.altitude, s.rising, b);
   const sun = projectSun(s, HOME_CAMERA);
+  const lo = layerOpacity(b);
   const vars: Record<string, string> = {
     [SKY_VARS.day]: b.day.toFixed(3),
     [SKY_VARS.golden]: b.golden.toFixed(3),
     [SKY_VARS.twilight]: b.twilight.toFixed(3),
+    [SKY_VARS.dawn]: b.dawn.toFixed(3),
     [SKY_VARS.night]: b.night.toFixed(3),
+    ...Object.fromEntries(PHOTO_ORDER.map((k) => [`--sky-l-${k}`, lo[k].toFixed(3)])),
     [SKY_VARS.top]: l.top,
     [SKY_VARS.mid]: l.mid,
     [SKY_VARS.horizon]: l.horizon,
@@ -92,18 +103,19 @@ var sa=Math.sin(lat*P)*Math.sin(dec)+Math.cos(lat*P)*Math.cos(dec)*Math.cos(ha),
 var hh=h<0?0:h,r=1.02/Math.tan((hh+10.26/(hh+5.1))*P)/60;
 var ac=(Math.sin(lat*P)*Math.cos(zen)-Math.sin(dec))/(Math.cos(lat*P)*Math.sin(zen)),a=Math.acos(Math.max(-1,Math.min(1,ac)))/P,az=ha>0?(a+180)%360:(540-a)%360;
 return[h+r,ha<0,az]}
-function blend(a,up){var b={day:0,golden:0,twilight:0,night:0};
+function blend(a,up){var b={day:0,golden:0,twilight:0,dawn:0,night:0};
 if(!up){if(a>=0){b.day=ss(0,10,a);b.golden=1-b.day}else if(a>=-6){b.golden=ss(-6,0,a);b.twilight=1-b.golden}else{b.twilight=ss(-12,-6,a);b.night=1-b.twilight}}
-else if(a>=0){b.day=ss(0,10,a);b.twilight=1-b.day}else if(a>=-6){b.twilight=ss(-6,0,a);b.night=1-b.twilight}else b.night=1;return b}
+else if(a>=0){b.day=ss(0,10,a);b.dawn=1-b.day}else if(a>=-6){b.dawn=ss(-6,0,a);b.night=1-b.dawn}else b.night=1;return b}
 function mix(c,b){var o=[0,0,0],k;for(k in b)for(var i=0;i<3;i++)o[i]+=c[k][i]*b[k];return o}
 function hex(c){var s="#";for(var i=0;i<3;i++){var v=Math.round(Math.min(255,Math.max(0,c[i]))).toString(16);s+=(v.length<2?"0":"")+v}return s}
 function at(){var m=location.hash.replace(/^#/,"").match(/(?:^|&)t=([^&]+)/);if(m){var v=decodeURIComponent(m[1]),d=new Date(/[zZ]|[+-]\\d\\d:?\\d\\d$/.test(v)?v:v+(v.length<=10?"T12:00":"")+"+09:00");if(!isNaN(d.getTime()))return d}return new Date()}
 var s=sun(at()),a=s[0],up=s[1],az=s[2],b=blend(a,up),top=mix(T,b);
 var lum=(0.2126*top[0]+0.7152*top[1]+0.0722*top[2])/255,dark=lum<0.42;
-var near=Math.exp(-((a+1)*(a+1))/(2*4.5*4.5)),warm=a<8&&a>-8?ss(8,0,a)*(1-ss(-2,-8,a)):0,n=b.night+0.5*b.twilight;
+var near=Math.exp(-((a+1)*(a+1))/(2*4.5*4.5)),warm=a<8&&a>-8?ss(8,0,a)*(1-ss(-2,-8,a)):0,n=b.night+0.5*(b.twilight+b.dawn);
 var hl=[0,1,2].map(function(i){return [255,255,255][i]*(1-warm)*(1-n)+[255,222,160][i]*warm*(1-n)+[190,208,245][i]*n});
 var st=document.documentElement.style,set=function(k,v){st.setProperty(k,v)};
-set(V.day,b.day.toFixed(3));set(V.golden,b.golden.toFixed(3));set(V.twilight,b.twilight.toFixed(3));set(V.night,b.night.toFixed(3));
+set(V.day,b.day.toFixed(3));set(V.golden,b.golden.toFixed(3));set(V.twilight,b.twilight.toFixed(3));set(V.dawn,b.dawn.toFixed(3));set(V.night,b.night.toFixed(3));
+var O=["night","twilight","dawn","golden","day"],sm=0;for(var j=0;j<O.length;j++){sm+=b[O[j]];set("--sky-l-"+O[j],(sm>0?b[O[j]]/sm:0).toFixed(3))}
 set(V.top,hex(top));set(V.mid,hex(mix(MD,b)));set(V.horizon,hex(mix(HZ,b)));set(V.glow,up?"#ffd6aa":"#ffb278");set(V.glowA,near.toFixed(2));set(V.hl,hex(hl));
 set(V.ink,dark?"255,255,255":"15,27,51");set(V.inkSoft,dark?"232,238,248":"38,50,74");set(V.halo,dark?"0,12,40":"255,255,255");
 set(V.dark,dark?"1":"0");set(V.nightness,n.toFixed(2));set(V.lightX,String(Math.round(Math.min(100,Math.max(0,(az-60)/240*100)))));set(V.sunIn,"0");

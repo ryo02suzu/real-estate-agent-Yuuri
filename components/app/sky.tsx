@@ -3,6 +3,7 @@
 // 時間連動の空（ホームの帯・各ページの帯）。天体の計算は lib/app/sun.ts、CSS 変数は lib/app/sky-vars.ts。
 // ここは描く側：写真4枚（昼・夕方・薄暮・夜）の重ね、地平線の光、各ページの帯の空の色、スクロールで縮む帯の仕組み。
 // 太陽本体は、写真のカメラの向き・画角が設定されるまで描かない（--sun-in が 1 のときだけ）
+import { PHOTO_ORDER } from "@/lib/app/sun";
 import { useEffect, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { applySky } from "@/lib/app/sky-vars";
 import { PhoneImg } from "./frame";
@@ -91,7 +92,8 @@ function writeShrink(el: HTMLElement, scroll: number | null, compact: boolean | 
   else if (compact === false) delete el.dataset.compact;
 }
 
-const PHOTOS = ["day", "golden", "twilight", "night"] as const;
+/** 写真の重ね順（下から上）。不透明度は --sky-l-* （lib/app/sun.ts の layerOpacity） */
+const PHOTOS = PHOTO_ORDER;
 
 /**
  * ホームの帯の写真（幅393×高さ275pt の切り抜き。public/home/sky）。4枚を重ね、不透明度を空の変数で混ぜる。
@@ -110,7 +112,7 @@ export function SkyPhotos() {
           height={550}
           draggable={false}
           className="sky-layer absolute inset-0 h-full w-full object-cover"
-          style={{ opacity: `var(--sky-${k}, ${k === "day" ? 1 : 0})` }}
+          style={{ opacity: `var(--sky-l-${k}, ${k === "day" ? 1 : 0})` }}
         />
       ))}
       {/* 太陽本体（カメラの向き・画角を設定したときだけ。建物の後ろに隠れるよう、空のマスクの中だけに描く） */}
