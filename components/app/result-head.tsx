@@ -3,9 +3,10 @@
 // 物件の画面の上の部分：街の写真の帯（写真はあとで届くので今は NO IMAGE。戻る・お気に入り・共有のボタンと、住所の見出し。
 // 住所は押すとコピー）、その帯に重ねる6つのタブの切り替え（iPhone のセグメントと同じ形。横にすべらせず、6つが同じ幅で並ぶ）、
 // 場所の注意（番地まで一致しないなど）。押せる所は iPhone と同じ 36〜44pt
-import { ArrowLeft, Check, ChevronDown, Copy, Info, Share2, Star, TriangleAlert } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Copy, Info, Share2, TriangleAlert } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { HEAD, NoImage, useLowScreen, WARN } from "./r-ui";
+import { FavStar } from "./star";
 import { NAVY } from "./ui";
 
 export type TabKey = "basic" | "around" | "price" | "law" | "hazard" | "deals";
@@ -32,10 +33,10 @@ function Round({ onClick, label, pressed, children }: { onClick: () => void; lab
 }
 
 /** 街の写真の帯：戻る・お気に入り・共有と、住所（押すとコピー） */
-export function ResultBand({ title, sub, onBack, onCopy, copied, favorite, onFavorite, onShare }: { title: string; sub: string; onBack: () => void; onCopy: () => void; copied: boolean; favorite: boolean; onFavorite: () => void; onShare: () => void }) {
+export function ResultBand({ title, sub, onBack, onCopy, copied, favorite, onFavorite, onShare, named = true }: { title: string; sub: string; onBack: () => void; onCopy: () => void; copied: boolean; favorite: boolean; onFavorite: () => void; onShare: () => void; /** 地図の板からつながる名前を持つか（地図を開いている間は板の方が持つので false） */ named?: boolean }) {
   const low = useLowScreen();
   return (
-    <div className="relative overflow-hidden" style={{ height: low ? BAND_H - 16 : BAND_H }}>
+    <div className="relative overflow-hidden" style={{ height: low ? BAND_H - 16 : BAND_H, viewTransitionName: named ? "place-panel" : undefined }}>
       <NoImage top size={10} className="absolute inset-0" />
       {/* 写真の下を暗くして、白い字を読めるようにする */}
       <div aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(10,25,50,0.12) 0%, rgba(10,25,50,0) 28%, rgba(10,25,50,0.1) 50%, rgba(10,25,50,0.68) 100%)" }} />
@@ -45,14 +46,14 @@ export function ResultBand({ title, sub, onBack, onCopy, copied, favorite, onFav
         </Round>
         <span className="flex-1" />
         <Round onClick={onFavorite} label={favorite ? "お気に入りから外す" : "お気に入りに保存"} pressed={favorite}>
-          <Star size={20} strokeWidth={1.8} absoluteStrokeWidth color={favorite ? "#f5a524" : HEAD} fill={favorite ? "#f5a524" : "none"} />
+          <FavStar on={favorite} size={20} off={HEAD} />
         </Round>
         <Round onClick={onShare} label="共有">
           <Share2 size={19} strokeWidth={1.8} absoluteStrokeWidth color={HEAD} />
         </Round>
       </div>
       <button onClick={onCopy} aria-label="住所をコピー" className="absolute left-[16px] right-[16px] text-left" style={{ bottom: BAND_OVERLAP + 8 }}>
-        <span className="block truncate font-bold leading-[1.2] text-white" style={{ fontSize: title.length > 15 ? 18 : 20, textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>
+        <span className="block truncate font-bold leading-[1.2] text-white" style={{ fontSize: title.length > 15 ? 18 : 20, textShadow: "0 1px 8px rgba(0,0,0,0.4)", viewTransitionName: named ? "place-title" : undefined }}>
           {title}
         </span>
         <span className="mt-[3px] flex items-center gap-[4px] leading-none" style={{ fontSize: 12, color: copied ? "#a6f0c6" : "rgba(255,255,255,0.88)", textShadow: "0 1px 4px rgba(0,0,0,0.4)" }}>

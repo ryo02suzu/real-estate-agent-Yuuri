@@ -35,6 +35,7 @@ import { MUNICIPALITIES } from "@/lib/roadmap";
 import { PhoneImg, ScaledInput } from "./frame";
 import { AURORA, PAGE } from "./home";
 import { ClockBack } from "./icons";
+import { FavStar } from "./star";
 import { NEWS } from "./news";
 import { CARD, GLASS, Head, HEAD, LIGHT, Note, Row, TEXT } from "./r-ui";
 import { BottomFade, CompactBar, SkyWash, useShrink, type WashVariant } from "./sky";
@@ -332,7 +333,7 @@ export function HistoryPage({
                   onClick={() => onPick(h)}
                   trailing={
                     <IconButton label={isFavorite(h) ? "お気に入りから外す" : "お気に入りに保存"} onClick={() => onToggleFavorite(h)}>
-                      <Star size={21} strokeWidth={1.7} absoluteStrokeWidth color={isFavorite(h) ? "#f5a524" : "#a3adbd"} fill={isFavorite(h) ? "#f5a524" : "none"} />
+                      <FavStar on={isFavorite(h)} size={21} stroke={1.7} />
                     </IconButton>
                   }
                 />

@@ -4,7 +4,7 @@
 // 住所が番地まで見つからないときや、地番しか分からない土地で使う。開くときに作り、閉じたら外す。
 // 見た目はホームと同じ系統：地図の上に浮かぶガラスのバー（戻る・見出し）と、下のガラスの板（町名・地番・紺のボタン）。
 // 町名は地図を止めて少し待ってから入れ替わる。板の中の町名は、結果の画面の見出しへつながる（view-transition）
-import { ArrowLeft, Crosshair } from "lucide-react";
+import { ArrowLeft, Crosshair, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { muniName, reverseGeocode } from "@/lib/roadmap";
 import { GLASS, HEAD, LIGHT, TEXT } from "./app/r-ui";
@@ -18,11 +18,14 @@ type Center = { lat: number; lng: number; zoom: number; parcel?: string };
 
 export function LocationPicker({
   start,
+  busy = false,
   onClose,
   onPick,
 }: {
   /** 最初に表示する地点（無ければ関東全体） */
   start?: { lat: number; lng: number };
+  /** 「この場所で調べる」を押して読んでいる間（板に「調べています…」。読み終わると結果の帯につながる） */
+  busy?: boolean;
   onClose: () => void;
   onPick: (lat: number, lng: number) => void;
 }) {
@@ -80,7 +83,7 @@ export function LocationPicker({
 
         {/* 下のガラスの板：案内・町名と地番・「この場所で調べる」 */}
         <div className="absolute inset-x-0 bottom-0 px-[12px]" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
-          <div className="rounded-[22px] px-[14px] pb-[12px] pt-[12px] shadow-[0_14px_34px_rgba(20,48,95,0.18)]" style={GLASS}>
+          <div className="rounded-[22px] px-[14px] pb-[12px] pt-[12px] shadow-[0_14px_34px_rgba(20,48,95,0.18)]" style={{ ...GLASS, viewTransitionName: "place-panel" }}>
             <p className="leading-none" style={{ fontSize: 12, color: LIGHT }}>
               {zoomedIn ? "地図を動かして、印の先を物件に合わせてください" : "地図を拡大して、物件の場所に印を合わせてください"}
             </p>
@@ -93,13 +96,22 @@ export function LocationPicker({
               )}
             </p>
             <button
-              disabled={!zoomedIn}
+              disabled={!zoomedIn || busy}
               onClick={() => center && onPick(center.lat, center.lng)}
-              className="press mt-[10px] flex h-[48px] w-full items-center justify-center gap-[8px] rounded-[14px] font-semibold leading-none text-white shadow-[0_8px_20px_rgba(15,47,95,0.22)] disabled:opacity-50 disabled:shadow-none"
-              style={{ fontSize: 16, background: `linear-gradient(135deg,#1b4280 0%,${NAVY} 60%,#0a2248 100%)` }}
+              className="press mt-[10px] flex h-[48px] w-full items-center justify-center gap-[8px] rounded-[14px] font-semibold leading-none text-white shadow-[0_8px_20px_rgba(15,47,95,0.22)] disabled:shadow-none"
+              style={{ fontSize: 16, background: `linear-gradient(135deg,#1b4280 0%,${NAVY} 60%,#0a2248 100%)`, opacity: busy ? 0.95 : zoomedIn ? 1 : 0.5 }}
             >
-              <Crosshair size={18} strokeWidth={2} absoluteStrokeWidth />
-              この場所で調べる
+              {busy ? (
+                <>
+                  <LoaderCircle size={18} strokeWidth={2} absoluteStrokeWidth className="animate-spin" />
+                  調べています…
+                </>
+              ) : (
+                <>
+                  <Crosshair size={18} strokeWidth={2} absoluteStrokeWidth />
+                  この場所で調べる
+                </>
+              )}
             </button>
           </div>
         </div>

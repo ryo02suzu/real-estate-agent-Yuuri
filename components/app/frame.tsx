@@ -112,7 +112,7 @@ export function BottomNav({ active, onSelect }: { active: NavKey; onSelect: (key
               key={n.key}
               onClick={() => onSelect(n.key)}
               aria-current={on ? "page" : undefined}
-              className="absolute flex flex-col items-center justify-center gap-[4px] active:opacity-60"
+              className="nav-item absolute flex flex-col items-center justify-center gap-[4px] active:opacity-60"
               style={{ left: i * NAV_W, top: 0, width: NAV_W, height: 54 }}
             >
               {n.icon(on)}

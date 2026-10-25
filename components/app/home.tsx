@@ -12,7 +12,7 @@
 // 寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。幅に対して背の低い画面（iPhone SE など）では、
 // low:（app/globals.css）でカードを少し詰める
 import { ArrowRight, Bell, ChevronRight, LoaderCircle, Map as MapIcon, MapPinned, Search, TriangleAlert, X } from "lucide-react";
-import { useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { monthDay, placeholderScenes, placeParts, SCENES, sceneSrc, type SceneKey } from "@/lib/app/scene";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import { LogoLockup, PhoneImg, ScaledInput } from "./frame";
@@ -61,6 +61,8 @@ export type HomeMessage = { text: string } | null;
 
 /** 現れるときの動きの遅れ（上から順に） */
 const rise = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
+/** 浮き上がる動きは開いた最初の1回だけ（下のメニューで戻ったときは短いフェード） */
+let risen = false;
 
 export function HomeScreen({
   input,
@@ -106,9 +108,15 @@ export function HomeScreen({
   // スクロールすると写真が半分の速さで上へ動き、見出しが薄れ、230pt を越えると上に小さなバーが残る
   const root = useRef<HTMLDivElement>(null);
   useShrink(root, 230);
+  // 最初の1回かは、このマウントの間は変えない（履歴の読み込みなどで描き直しても、動きの途中で切り替わらない）
+  const [first] = useState(() => !risen);
+  useEffect(() => {
+    risen = true;
+  }, []);
+  const riseClass = first ? "home-rise" : "";
 
   return (
-    <div ref={root} className="app-touch relative overflow-hidden" style={{ background: PAGE }}>
+    <div ref={root} className={`app-touch relative overflow-hidden ${first ? "" : "page-in"}`} style={{ background: PAGE }}>
       <CompactBar>
         <button onClick={onLogo} aria-label="MICHILU ホーム" className="press flex h-[40px] shrink-0 items-center">
           <LogoLockup style={{ height: 22 }} />
@@ -138,19 +146,19 @@ export function HomeScreen({
 
         {/* 見出しと副題。字の色は空の明るさで紺↔白（.sky-ink）。スクロールで薄れる（.shrink-title） */}
         <div className="shrink-title absolute" style={{ left: 16, top: 44 }}>
-          <h1 className="home-rise sky-ink whitespace-nowrap font-bold" style={{ fontSize: 26, lineHeight: "34px", letterSpacing: 0.2, textShadow: GLOW }}>
+          <h1 className={`${riseClass} sky-ink whitespace-nowrap font-bold`} style={{ fontSize: 26, lineHeight: "34px", letterSpacing: 0.2, textShadow: GLOW }}>
             調べる時間を、
             <br />
             商談の時間に。
           </h1>
-          <p className="home-rise sky-ink-soft mt-[3px] whitespace-nowrap leading-none" style={{ fontSize: 13, letterSpacing: 0.2, textShadow: GLOW, ...rise(60) }}>
+          <p className={`${riseClass} sky-ink-soft mt-[3px] whitespace-nowrap leading-none`} style={{ fontSize: 13, letterSpacing: 0.2, textShadow: GLOW, ...rise(60) }}>
             不動産調査を、もっと早く、もっとシンプルに。
           </p>
         </div>
       </div>
 
       {/* 調べる（すりガラスのカード。住所も地番もこの欄に入れる。縁に空の光のハイライト） */}
-      <div className="home-rise relative mx-[16px] -mt-[85px] rounded-[22px] p-[9px] shadow-[0_14px_34px_rgba(20,48,95,0.13)] low:p-[8px]" style={{ ...GLASS, ...rise(100) }}>
+      <div className={`${riseClass} relative mx-[16px] -mt-[85px] rounded-[22px] p-[9px] shadow-[0_14px_34px_rgba(20,48,95,0.13)] low:p-[8px]`} style={{ ...GLASS, ...rise(100) }}>
         <div aria-hidden className="sky-layer pointer-events-none absolute inset-0 rounded-[22px]" style={{ background: "radial-gradient(120% 70% at 14% 0%, var(--sky-hl, #fff) 0%, rgba(255,255,255,0) 60%)", opacity: 0.55, boxShadow: "inset 0 1px 0 var(--sky-hl, #fff)" }} />
         <form
           role="search"
@@ -216,7 +224,7 @@ export function HomeScreen({
       </div>
 
       {/* 最近の検索（写真の小さな札つきの一覧に4件まで） */}
-      <section className="home-rise relative mt-[8px] low:mt-[6px]" style={rise(160)}>
+      <section className={`${riseClass} relative mt-[8px] low:mt-[6px]`} style={rise(160)}>
         <SectionHead title="最近の検索" onMore={history.length ? onHistory : undefined} />
         {recent.length ? (
           <ul className="mx-[16px] mt-[2px] overflow-hidden rounded-[18px] bg-white shadow-[0_4px_14px_rgba(20,45,85,0.08)]">
@@ -250,7 +258,7 @@ export function HomeScreen({
 
       {/* 使い方（調べた物件がまだ少ないうちだけ。例を押すとそのまま調べる） */}
       {history.length < TRY_UNTIL && (
-        <section className="home-rise relative mt-[10px] low:mt-[8px]" style={rise(220)}>
+        <section className={`${riseClass} relative mt-[10px] low:mt-[8px]`} style={rise(220)}>
           <SectionHead title="使い方" more="くわしく" onMore={onHelp} />
           <ul className="mx-[16px] mt-[2px] overflow-hidden rounded-[18px] bg-white shadow-[0_4px_14px_rgba(20,45,85,0.08)]">
             {TRY.map((t) => (

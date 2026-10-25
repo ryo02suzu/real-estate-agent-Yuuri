@@ -446,3 +446,70 @@ body {
     transform: none;
   }
 }
+
+/*
+ * 第3段階の操作感（スマホ）。お気に入りの星は保存できたときだけ弾む（components/app/star.tsx）。タブの中身は 160ms のクロスフェード。
+ * 下のメニューは押した項目のアイコンが 2pt 浮く。地図の板 → 結果の帯のつながり（View Transitions。未対応の端末ではそのまま切り替わる）
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .star-pop {
+    animation: star-pop 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .star-ring::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 9999px;
+    border: 2px solid rgba(245, 165, 36, 0.55);
+    animation: star-ring 360ms ease-out forwards;
+    pointer-events: none;
+  }
+  .tab-in {
+    animation: page-fade 160ms ease-out both;
+  }
+  .nav-item > :first-child {
+    transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .nav-item[aria-current="page"] > :first-child {
+    transform: translateY(-2px);
+  }
+  ::view-transition-old(place-panel),
+  ::view-transition-new(place-panel),
+  ::view-transition-old(place-title),
+  ::view-transition-new(place-title) {
+    animation-duration: 360ms;
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 240ms;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+@keyframes star-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes star-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}

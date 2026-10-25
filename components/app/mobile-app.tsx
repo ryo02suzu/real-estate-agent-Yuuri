@@ -6,7 +6,7 @@
 // 幅393ptの絵の寸法で描き、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。下から出す画面（シート）は拡大・縮小しない
 import { Info, LoaderCircle, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { favoriteKey, removeFavorite, toggleFavoriteChecked, type FavoriteItem } from "@/lib/favorites";
 import type { HistoryItem } from "@/lib/history";
 import type { LookupResult } from "@/lib/roadmap";
@@ -42,6 +42,7 @@ import { BAND_TOP, displayAddress, WARN } from "./r-ui";
 import { PlaceBanner, ResultBand, TabSegments, type TabKey } from "./result-head";
 import { AccountPage, DocsPage, FavoritesPage, HistoryPage, TabBanner, type DocKind } from "./tab-pages";
 import type { MapOpen, SheetKind, TabProps } from "./types";
+import { reducedMotion } from "./tokens";
 import { useProperty, type Ok, type PropertyData } from "./use-property";
 import { applyAppZoom } from "./zoom";
 
@@ -81,7 +82,9 @@ export function MobileApp(props: MobileAppProps) {
   const { shown, input, setInput, loading, error, history, favorites, setFavorites, onSearch, onPickHistory, onPickPoint } = props;
   const [page, setPage] = useState<NavKey>("home");
   const [sheet, setSheet] = useState<AppSheet>(null);
-  const [picker, setPicker] = useState<{ start?: { lat: number; lng: number } } | null>(null);
+  const [picker, setPicker] = useState<{ start?: { lat: number; lng: number }; busy?: boolean } | null>(null);
+  // 地図で選んで読んでいる間（読み終わったら地図を閉じ、板が結果の帯につながる）
+  const sawLoading = useRef(false);
   const [notice, setNotice] = useState<string | null>(null);
   // 物件の「レポートを作成」（書類・出力）。下のメニューの「書類・出力」からも開く
   const [report, setReport] = useState(false);
@@ -178,12 +181,38 @@ export function MobileApp(props: MobileAppProps) {
   const failure = error ?? (offline ? OFFLINE : null);
   const homeMessage: HomeMessage = failure ? { text: failure } : notice ? { text: notice } : null;
   const isFav = (h: HistoryItem) => favorites.some((f) => favoriteKey(f) === favoriteKey(h));
+  /** 短いお知らせ（1.8秒で消える。コピー・保存の完了など、動きだけでなく文字でも伝える） */
+  const flashTimer = useRef(0);
+  const flash = (text: string) => {
+    setNotice(text);
+    clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => setNotice(null), 1800);
+  };
   /** ★を押した。保存できなかったら元のまま（見た目だけ保存済みにしない）で、その旨を知らせる */
   const toggleFav = (h: HistoryItem) => {
     const r = toggleFavoriteChecked(h);
     setFavorites(r.items);
     if (!r.saved) setNotice("お気に入りを保存できませんでした。端末の空き容量と、プライベートブラウズでないことを確かめてください。");
+    else flash(r.added ? "お気に入りに保存しました" : "お気に入りから外しました");
   };
+  // 地図で選んで読み終わったら地図を閉じる。対応している端末では、板が結果の帯へつながる動き（View Transitions）
+  const pickerBusy = !!picker?.busy;
+  useEffect(() => {
+    if (!pickerBusy) return;
+    if (loading) {
+      sawLoading.current = true;
+      return;
+    }
+    if (!sawLoading.current) return;
+    sawLoading.current = false;
+    const close = () => setPicker(null);
+    if (typeof document.startViewTransition === "function" && !reducedMotion()) {
+      // つながる動きが作れなかったときは、そのまま閉じる（失敗を画面のエラーにしない）
+      const t = document.startViewTransition(() => flushSync(close));
+      t.ready.catch(() => {});
+      t.finished.catch(() => {});
+    } else queueMicrotask(close);
+  }, [pickerBusy, loading]);
   /** いま開いている物件（履歴・お気に入りと同じ形） */
   const current = ok ? itemOf(shown!.query, ok) : undefined;
   /** その物件のレポートの画面を開く（開いている物件ならそのまま、ほかの物件なら調べ直してから） */
@@ -291,6 +320,7 @@ export function MobileApp(props: MobileAppProps) {
                 onFavorite={() => toggleFav(itemOf(shown!.query, ok))}
                 notice={notice}
                 onDismiss={() => setNotice(null)}
+                named={!picker}
                 onPick={props.onPickAddress}
                 onPickPoint={onPickPoint}
                 onFix={openMap}
@@ -301,7 +331,11 @@ export function MobileApp(props: MobileAppProps) {
               />
             </div>
           )}
-          {tabPage && body}
+          {tabPage && (
+            <div key={page} className="page-in">
+              {body}
+            </div>
+          )}
           {!showHome && !tabPage && !ok && body}
         </div>
       </div>
@@ -324,9 +358,10 @@ export function MobileApp(props: MobileAppProps) {
         {picker && (
           <LocationPicker
             start={picker.start}
+            busy={picker.busy}
             onClose={() => setPicker(null)}
             onPick={(lat, lng) => {
-              setPicker(null);
+              setPicker({ start: picker.start, busy: true });
               setPage("home");
               onPickPoint(lat, lng);
             }}
@@ -397,6 +432,7 @@ function PropertyView({
   onFavorite,
   notice,
   onDismiss,
+  named,
   onPick,
   onPickPoint,
   onFix,
@@ -417,6 +453,8 @@ function PropertyView({
   /** お知らせ（お気に入りを保存できなかった、など） */
   notice: string | null;
   onDismiss: () => void;
+  /** 帯が地図の板からつながる名前を持つか（地図を開いている間は false） */
+  named: boolean;
   onPick: (address: string) => void;
   onPickPoint: (lat: number, lng: number) => void;
   onFix: () => void;
@@ -486,11 +524,11 @@ function PropertyView({
 
   return (
     <>
-      <ResultBand title={title} sub={copyText(result)} onBack={onBack} onCopy={() => addr.copy(copyText(result))} copied={addr.done} favorite={favorite} onFavorite={onFavorite} onShare={share} />
+      <ResultBand title={title} sub={copyText(result)} onBack={onBack} onCopy={() => addr.copy(copyText(result))} copied={addr.done} favorite={favorite} onFavorite={onFavorite} onShare={share} named={named} />
       <TabSegments tab={tab} onTab={changeTab} />
       <Banner loading={loading && !offline} error={error ?? (offline ? OFFLINE : null)} notice={notice ?? (shareCopy.done ? "共有の文をコピーしました" : null)} onDismiss={onDismiss} />
       <PlaceNote query={query} result={result} data={data} onPick={onPick} onFix={onFix} />
-      <div className="px-[16px] pb-[8px] pt-[8px]">
+      <div key={tab} className="tab-in px-[16px] pb-[8px] pt-[8px]">
         {tab === "basic" && <BasicTab {...props} />}
         {tab === "around" && <AroundTab {...props} />}
         {tab === "price" && <PriceTab {...props} />}
