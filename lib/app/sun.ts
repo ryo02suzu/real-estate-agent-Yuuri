@@ -117,7 +117,7 @@ export function layerOpacity(b: Blend): Record<keyof Blend, number> {
   return out;
 }
 
-type RGB = [number, number, number];
+export type RGB = [number, number, number];
 /** 写真の上端（時刻・電池の帯につなぐ）の色。届いた4枚の帯の切り抜き（public/home/sky）の上端を測った値 */
 export const SKY_TOP: Record<keyof Blend, RGB> = {
   day: [123, 185, 232],
@@ -176,10 +176,11 @@ export function lightX(azimuth: number): number {
   return Math.round(Math.min(100, Math.max(0, ((azimuth - 60) / 240) * 100)));
 }
 
-export function light(altitude: number, rising: boolean, b: Blend = blend(altitude, rising)): Light {
-  const top = mix(SKY_TOP, b);
-  const mid = mix(SKY_MID, b);
-  const horizon = mix(SKY_HORIZON, b);
+export function light(altitude: number, rising: boolean, b: Blend = blend(altitude, rising), colors?: { top: RGB; mid: RGB; horizon: RGB }): Light {
+  // 空の色は、大気の式（lib/app/atmosphere.ts）から渡されればそれ。無ければ写真の帯を測った値を混ぜる
+  const top = colors?.top ?? mix(SKY_TOP, b);
+  const mid = colors?.mid ?? mix(SKY_MID, b);
+  const horizon = colors?.horizon ?? mix(SKY_HORIZON, b);
   // 地平線の光：太陽が地平線の近く（−8°〜+6°）で強い。朝は桃色、夕方は橙
   const near = Math.exp(-((altitude + 1) * (altitude + 1)) / (2 * 4.5 * 4.5));
   const glowColor: RGB = rising ? [255, 214, 170] : [255, 178, 120];
@@ -215,8 +216,11 @@ export type Camera = {
   aspect: number;
 };
 
-/** ホームの帯のカメラ。地平線は上から 55%（帯の切り抜きで決めた）。方位・画角は未設定（calibrated=false） */
-export const HOME_CAMERA: Camera = { calibrated: false, bearing: 0, hfov: 62, horizon: 0.55, aspect: 393 / 275 };
+/**
+ * ホームの帯のカメラ。地平線は上から 55%（帯の切り抜きで決めた）。向きは西（方位 262°。生成画像なので実測の向きは無く、
+ * 一年を通して夕日が画面の中に沈むように決めた。6月の日の入（方位 300°）だけ右の端のすぐ外）。画角は 62°
+ */
+export const HOME_CAMERA: Camera = { calibrated: true, bearing: 262, hfov: 62, horizon: 0.55, aspect: 393 / 275 };
 
 const R = Math.PI / 180;
 

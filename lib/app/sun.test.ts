@@ -131,7 +131,17 @@ describe("light（コードで描く光）", () => {
 
 describe("projectSun（画面の位置）", () => {
   it("カメラが未設定なら描かない", () => {
-    expect(projectSun({ altitude: 10, azimuth: 270 }, HOME_CAMERA)).toBeNull();
+    expect(projectSun({ altitude: 10, azimuth: 270 }, { ...HOME_CAMERA, calibrated: false })).toBeNull();
+  });
+  it("ホームのカメラは西向き：冬至と春分の日の入は画面の中、夏至の日の入は右の端のすぐ外", () => {
+    expect(projectSun({ altitude: 0, azimuth: 241.4 }, HOME_CAMERA)!.inside).toBe(true);
+    expect(projectSun({ altitude: 0, azimuth: 270.5 }, HOME_CAMERA)!.inside).toBe(true);
+    const june = projectSun({ altitude: 0, azimuth: 300 }, HOME_CAMERA)!;
+    expect(june.inside).toBe(false);
+    expect(june.x).toBeGreaterThan(1);
+    expect(june.x).toBeLessThan(1.5);
+    // 午後の高い太陽は画面の上の外
+    expect(projectSun({ altitude: 40, azimuth: 262 }, HOME_CAMERA)!.inside).toBe(false);
   });
   it("設定後は、正面の地平線の太陽が画面の中央の地平線の位置に来る", () => {
     const cam = { ...HOME_CAMERA, calibrated: true, bearing: 270 };
@@ -165,6 +175,7 @@ describe("SKY_HEAD_SCRIPT（最初に描く前の簡単な計算）", () => {
     const { SKY_HEAD_SCRIPT, skyValues } = await import("./sky-vars");
     const vm = await import("node:vm");
     let worst = 0;
+    let worstColor = 0;
     for (let k = 0; k < 365; k += 3)
       for (const hm of ["04:30", "05:30", "06:30", "09:00", "12:00", "15:30", "16:30", "17:30", "18:30", "19:30", "23:00"]) {
         const d = new Date(jst("2026-01-01", hm).getTime() + k * 86400e3);
@@ -179,12 +190,19 @@ describe("SKY_HEAD_SCRIPT（最初に描く前の簡単な計算）", () => {
         };
         vm.runInNewContext(SKY_HEAD_SCRIPT, ctx);
         const ref = skyValues(d).vars;
-        for (const key of ["--sky-day", "--sky-golden", "--sky-twilight", "--sky-dawn", "--sky-night", "--sky-l-night", "--sky-l-twilight", "--sky-l-dawn", "--sky-l-golden", "--sky-l-day"]) worst = Math.max(worst, Math.abs(Number(store[key]) - Number(ref[key])));
+        for (const key of ["--sky-day", "--sky-golden", "--sky-twilight", "--sky-dawn", "--sky-night", "--sky-l-night", "--sky-l-twilight", "--sky-l-dawn", "--sky-l-golden", "--sky-l-day", "--sky-lights"]) worst = Math.max(worst, Math.abs(Number(store[key]) - Number(ref[key])));
+        // 帯の色（大気の式）は、太陽の位置のわずかな差で 1〜2 だけ違ってよい
+        for (const key of ["--sky-top", "--sky-mid", "--sky-horizon"]) {
+          const a = store[key].match(/[0-9a-f]{2}/g)!.map((h) => parseInt(h, 16));
+          const b = ref[key].match(/[0-9a-f]{2}/g)!.map((h) => parseInt(h, 16));
+          for (let i = 0; i < 3; i++) worstColor = Math.max(worstColor, Math.abs(a[i] - b[i]));
+        }
         // 字を白にする境目（上端の明るさ 0.42）のすぐ近くでは、わずかな高度の差で結果が分かれてよい
         const top = ref["--sky-top"].match(/[0-9a-f]{2}/g)!.map((h) => parseInt(h, 16));
         const lum = (0.2126 * top[0] + 0.7152 * top[1] + 0.0722 * top[2]) / 255;
         if (Math.abs(lum - 0.42) > 0.03) expect(store["--sky-dark"]).toBe(ref["--sky-dark"]);
       }
     expect(worst).toBeLessThan(0.05);
+    expect(worstColor).toBeLessThanOrEqual(3);
   });
 });

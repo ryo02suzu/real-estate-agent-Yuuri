@@ -3,14 +3,15 @@
 // 時間連動の空（ホームの帯・各ページの帯）。天体の計算は lib/app/sun.ts、CSS 変数は lib/app/sky-vars.ts。
 // ここは描く側：写真4枚（昼・夕方・薄暮・夜）の重ね、地平線の光、各ページの帯の空の色、スクロールで縮む帯の仕組み。
 // 太陽本体は、写真のカメラの向き・画角が設定されるまで描かない（--sun-in が 1 のときだけ）
-import { PHOTO_ORDER } from "@/lib/app/sun";
+import { HOME_CAMERA, PHOTO_ORDER, type Camera } from "@/lib/app/sun";
 import { useEffect, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { applySky } from "@/lib/app/sky-vars";
 import { PhoneImg } from "./frame";
 import { PAGE } from "./tokens";
 
-/** 空を入れ直したときに知らせる（時刻・電池の帯の色を合わせる。components/app/mobile-app.tsx） */
-export const SKY_EVENT = "michilu:sky";
+import { SkyCanvas } from "./sky-canvas";
+import { SKY_EVENT } from "./sky-event";
+export { SKY_EVENT };
 
 /** 1分ごと（分の頭）・バックグラウンドから戻ったとき・#t= が変わったときに空を入れ直す。スマホの画面の根元で1回呼ぶ */
 export function useSkyClock() {
@@ -95,59 +96,43 @@ function writeShrink(el: HTMLElement, scroll: number | null, compact: boolean | 
 /** 写真の重ね順（下から上）。不透明度は --sky-l-* （lib/app/sun.ts の layerOpacity） */
 const PHOTOS = PHOTO_ORDER;
 
+/** 空の CSS のグラデーション（大気の式から出した上端・中ほど・地平線の色。キャンバスが描けるまで、描けない端末ではずっと） */
+const SKY_GRADIENT = "linear-gradient(180deg, var(--sky-top, #7bb9e8) 0%, var(--sky-mid, #b0d7ef) 32%, var(--sky-horizon, #bfccda) 56%, var(--sky-horizon, #bfccda) 100%)";
+
 /**
- * ホームの帯の写真（幅393×高さ275pt の切り抜き。public/home/sky）。4枚を重ね、不透明度を空の変数で混ぜる。
- * その上に地平線の光（空のマスクの中だけ）と、カメラ設定後だけの太陽本体
+ * ホームの帯（幅393×高さ275pt）。空はコードで描く（SkyCanvas。太陽の実位置から大気の散乱・太陽本体・月・星）。
+ * 街は写真（public/home/sky。街のマスクで空の部分は見せない）で、昼・夕焼け・薄暮・夜明け・夜を太陽の高度で混ぜる。
+ * その上に窓の明かりの層（薄暮の写真から抜き出した光。暗さに応じて点く）
  */
 export function SkyPhotos() {
   return (
     <div className="absolute inset-0 overflow-hidden" aria-hidden>
-      {PHOTOS.map((k) => (
-        <PhoneImg
-          key={k}
-          src={`/home/sky/${k}@2x.webp`}
-          srcSet={`/home/sky/${k}@2x.webp 2x, /home/sky/${k}@3x.webp 3x`}
-          alt=""
-          width={786}
-          height={550}
-          draggable={false}
-          className="sky-layer absolute inset-0 h-full w-full object-cover"
-          style={{ opacity: `var(--sky-l-${k}, ${k === "day" ? 1 : 0})` }}
-        />
-      ))}
-      {/* 太陽本体（カメラの向き・画角を設定したときだけ。建物の後ろに隠れるよう、空のマスクの中だけに描く） */}
-      <div className="sky-layer absolute inset-0" style={{ opacity: "var(--sun-in, 0)", ...SKY_MASK }}>
-        <div
-          className="absolute rounded-full"
-          style={{
-            left: "calc(var(--sun-x, 0.5) * 100%)",
-            top: "calc(var(--sun-y, 0.5) * 100%)",
-            width: 18,
-            height: 18,
-            transform: "translate(-50%, -50%)",
-            background: "radial-gradient(circle, #fffdf2 0%, #ffe9b0 45%, rgba(255,220,150,0) 72%)",
-            boxShadow: "0 0 24px 10px rgba(255,214,140,0.55), 0 0 80px 40px rgba(255,190,110,0.25)",
-          }}
-        />
+      <div className="sky-layer absolute inset-0" style={{ background: SKY_GRADIENT }} />
+      <SkyCanvas className="absolute inset-0" />
+      <div className="absolute inset-0" style={CITY_MASK}>
+        {PHOTOS.map((k) => (
+          <PhoneImg
+            key={k}
+            src={`/home/sky/${k}@2x.webp`}
+            srcSet={`/home/sky/${k}@2x.webp 2x, /home/sky/${k}@3x.webp 3x`}
+            alt=""
+            width={786}
+            height={550}
+            draggable={false}
+            className="sky-layer absolute inset-0 h-full w-full object-cover"
+            style={{ opacity: `var(--sky-l-${k}, ${k === "day" ? 1 : 0})` }}
+          />
+        ))}
       </div>
-      {/* 地平線の光（太陽が地平線の近くのときに強い。空のマスクの中だけ） */}
-      <div
-        className="sky-layer absolute inset-0"
-        style={{
-          opacity: "calc(var(--sky-glow-a, 0) * 0.55)",
-          background: "radial-gradient(75% 42% at 50% 58%, var(--sky-glow, #ffb278) 0%, rgba(255,180,120,0) 70%)",
-          mixBlendMode: "screen",
-          ...SKY_MASK,
-        }}
-      />
+      <PhoneImg src="/home/sky/lights@2x.webp" srcSet="/home/sky/lights@2x.webp 2x, /home/sky/lights@3x.webp 3x" alt="" width={786} height={550} draggable={false} className="sky-layer absolute inset-0 h-full w-full object-cover" style={{ opacity: "var(--sky-lights, 0)" }} />
     </div>
   );
 }
 
-/** 空のマスク（空が白＝見える。建物は見えない） */
-const SKY_MASK: CSSProperties = {
-  maskImage: "url(/home/sky/sky-mask.png)",
-  WebkitMaskImage: "url(/home/sky/sky-mask.png)",
+/** 街のマスク（街が白＝見える。空の部分は見えない） */
+const CITY_MASK: CSSProperties = {
+  maskImage: "url(/home/sky/city-mask.png)",
+  WebkitMaskImage: "url(/home/sky/city-mask.png)",
   maskSize: "100% 100%",
   WebkitMaskSize: "100% 100%",
 };
@@ -159,6 +144,9 @@ export type WashVariant = "sky" | "warm" | "paper" | "blue";
  * sky：履歴（東京のスカイラインの影つき）、warm：お気に入り（少し暖かく）、paper：書類・出力（図面風の格子と差し込む光）、
  * blue：その他（ブルーのグラデーション）。下は見出しが読めるよう少し暗くする
  */
+/** 各ページの帯（幅393×高さ124pt）のカメラ：ホームと同じ向きで、地平線を下端の近くに */
+const WASH_CAMERA: Camera = { ...HOME_CAMERA, aspect: 393 / 124, horizon: 0.95 };
+
 export function SkyWash({ variant }: { variant: WashVariant }) {
   const sky = "linear-gradient(180deg, var(--sky-top, #7bb9e8) 0%, var(--sky-mid, #b0d7ef) 55%, var(--sky-horizon, #bfccda) 100%)";
   const skyline = (
@@ -178,6 +166,7 @@ export function SkyWash({ variant }: { variant: WashVariant }) {
   return (
     <div className="absolute inset-0 overflow-hidden" aria-hidden>
       <div className="sky-layer absolute inset-0" style={{ background: sky }} />
+      {variant === "sky" && <SkyCanvas camera={WASH_CAMERA} className="absolute inset-0" />}
       {variant === "warm" && <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(255,214,170,0.18) 0%, rgba(255,200,150,0.28) 100%)" }} />}
       {variant === "paper" && (
         <>
