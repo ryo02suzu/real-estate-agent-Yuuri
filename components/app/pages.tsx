@@ -13,7 +13,7 @@ import { NAVY } from "./ui";
 function Top({ title, sub, onBack }: { title: string; sub?: string; onBack: () => void }) {
   return (
     <div className="flex items-center pl-[4px] pr-[16px]" style={{ height: 56 }}>
-      <button onClick={onBack} aria-label="ホームに戻る" className="flex size-[44px] shrink-0 items-center justify-center rounded-full active:bg-[#e6ecf4]">
+      <button onClick={onBack} aria-label="ホームに戻る" className="press flex size-[44px] shrink-0 items-center justify-center rounded-full active:bg-[#e6ecf4]">
         <ArrowLeft size={23} strokeWidth={2} absoluteStrokeWidth color={HEAD} />
       </button>
       <div className="min-w-0 flex-1 pl-[4px]">

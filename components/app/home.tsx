@@ -115,7 +115,7 @@ export function HomeScreen({
         <button onClick={onLogo} aria-label="MICHILU ホーム" className="absolute flex items-center" style={{ left: 16, top: 4, height: 40 }}>
           <LogoLockup style={{ height: 28 }} />
         </button>
-        <button onClick={onBell} aria-label={unread ? "お知らせ（新しいお知らせがあります）" : "お知らせ"} className="absolute flex items-center justify-center active:opacity-70" style={{ right: 8, top: 3, width: 44, height: 44 }}>
+        <button onClick={onBell} aria-label={unread ? "お知らせ（新しいお知らせがあります）" : "お知らせ"} className="press absolute flex items-center justify-center" style={{ right: 8, top: 3, width: 44, height: 44 }}>
           <span className="flex items-center justify-center rounded-full shadow-[0_4px_14px_rgba(15,47,95,0.14)]" style={{ ...GLASS, width: 38, height: 38 }}>
             <Bell size={19} strokeWidth={1.7} absoluteStrokeWidth color={HEAD} />
           </span>
@@ -159,7 +159,7 @@ export function HomeScreen({
               type="button"
               onClick={onMap}
               aria-label="地図で場所を選ぶ"
-              className="mr-[3px] flex h-[38px] shrink-0 items-center gap-[4px] rounded-full px-[11px] font-semibold leading-none active:bg-[#eef3fa]"
+              className="press mr-[3px] flex h-[38px] shrink-0 items-center gap-[4px] rounded-full px-[11px] font-semibold leading-none active:bg-[#eef3fa]"
               style={{ fontSize: 14, color: NAVY }}
             >
               <MapIcon size={15} strokeWidth={1.8} absoluteStrokeWidth />
@@ -171,7 +171,7 @@ export function HomeScreen({
           <button
             type="submit"
             disabled={loading}
-            className="home-shine relative mt-[8px] block h-[48px] w-full overflow-hidden rounded-[14px] text-white shadow-[0_8px_20px_rgba(15,47,95,0.22)] transition-transform active:scale-[0.985] disabled:opacity-95 low:h-[44px]"
+            className="home-shine press relative mt-[8px] block h-[48px] w-full overflow-hidden rounded-[14px] text-white shadow-[0_8px_20px_rgba(15,47,95,0.22)] disabled:opacity-95 low:h-[44px]"
           >
             <PhoneImg src="/home/cta.webp" alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 45%" }} />
             <span className="absolute inset-y-0 left-0 flex items-center justify-center gap-[7px] whitespace-nowrap font-semibold" style={{ width: "62%", fontSize: 17, letterSpacing: 0.4 }}>

@@ -116,7 +116,7 @@ function SearchField({ value, onChange, placeholder, label }: { value: string; o
 /** 絞り込みのチップ（ガラスのカードの中） */
 function Chip({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} aria-pressed={on} className="flex h-[32px] shrink-0 items-center rounded-full px-[12px] font-semibold leading-none transition-colors" style={{ fontSize: 13, background: on ? NAVY : "rgba(255,255,255,0.8)", color: on ? "#fff" : "#26324a", boxShadow: on ? "0 3px 10px rgba(15,47,95,0.22)" : "none" }}>
+    <button onClick={onClick} aria-pressed={on} className="press flex h-[32px] shrink-0 items-center rounded-full px-[12px] font-semibold leading-none transition-colors" style={{ fontSize: 13, background: on ? NAVY : "rgba(255,255,255,0.8)", color: on ? "#fff" : "#26324a", boxShadow: on ? "0 3px 10px rgba(15,47,95,0.22)" : "none" }}>
       {label}
     </button>
   );
@@ -211,7 +211,7 @@ function PlaceRow({ item, scene, time, onClick, trailing }: { item: HistoryItem;
 /** 行の右の丸いボタン（44pt） */
 function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (
-    <button onClick={onClick} aria-label={label} className="flex size-[44px] shrink-0 items-center justify-center rounded-full active:bg-[#eef2f7]">
+    <button onClick={onClick} aria-label={label} className="press flex size-[44px] shrink-0 items-center justify-center rounded-full active:bg-[#eef2f7]">
       {children}
     </button>
   );
@@ -295,7 +295,7 @@ export function HistoryPage({
           title="検索履歴はまだありません"
           body="住所・地番・地図で調べると、ここに残ります。顧客物件の住所なのでサーバーには送らず、この端末の中だけに保存します。"
           action={
-            <button onClick={onHome} className="flex h-[40px] items-center gap-[6px] rounded-full px-[16px] font-semibold leading-none text-white" style={{ fontSize: 14, background: NAVY }}>
+            <button onClick={onHome} className="press flex h-[40px] items-center gap-[6px] rounded-full px-[16px] font-semibold leading-none text-white" style={{ fontSize: 14, background: NAVY }}>
               <Search size={15} strokeWidth={2} absoluteStrokeWidth />
               ホームで調べる
             </button>
@@ -335,7 +335,7 @@ export function HistoryPage({
                 onClear();
               } else setConfirm(true);
             }}
-            className="flex h-[44px] items-center gap-[6px] rounded-full px-[18px] font-semibold shadow-[0_2px_8px_rgba(20,45,85,0.06)] transition-colors"
+            className="press flex h-[44px] items-center gap-[6px] rounded-full px-[18px] font-semibold shadow-[0_2px_8px_rgba(20,45,85,0.06)] transition-colors"
             style={{ fontSize: 15, background: confirm ? "#c0391b" : "#fff", color: confirm ? "#fff" : "#b4533c" }}
           >
             <Trash2 size={16} strokeWidth={1.8} absoluteStrokeWidth />
@@ -410,7 +410,7 @@ export function FavoritesPage({
           title="保存した物件はまだありません"
           body="物件を調べた画面の右上の ☆ を押すと保存できます。履歴の行の ☆ からも保存できます。"
           action={
-            <button onClick={onHome} className="flex h-[40px] items-center gap-[6px] rounded-full px-[16px] font-semibold leading-none text-white" style={{ fontSize: 14, background: NAVY }}>
+            <button onClick={onHome} className="press flex h-[40px] items-center gap-[6px] rounded-full px-[16px] font-semibold leading-none text-white" style={{ fontSize: 14, background: NAVY }}>
               <Search size={15} strokeWidth={2} absoluteStrokeWidth />
               ホームで調べる
             </button>
@@ -447,7 +447,7 @@ const DOCS: { kind: DocKind; Icon: LucideIcon; title: string; sub: string }[] = 
 
 function DocTile({ Icon, title, sub, wide, onClick }: { Icon: LucideIcon; title: string; sub: string; wide?: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} className={`${wide ? "col-span-2" : ""} flex items-center gap-[10px] rounded-[14px] bg-white px-[11px] py-[8px] text-left shadow-[0_2px_8px_rgba(20,45,85,0.06)] active:bg-[#f5f8fc]`} style={{ minHeight: 52 }}>
+    <button onClick={onClick} className={`${wide ? "col-span-2" : ""} press-soft flex items-center gap-[10px] rounded-[14px] bg-white px-[11px] py-[8px] text-left shadow-[0_2px_8px_rgba(20,45,85,0.06)] active:bg-[#f5f8fc]`} style={{ minHeight: 52 }}>
       <span className="flex shrink-0 items-center justify-center rounded-full bg-[#eef3fa]" style={{ width: 34, height: 34 }}>
         <Icon size={17} strokeWidth={1.8} absoluteStrokeWidth color={NAVY} />
       </span>
@@ -568,7 +568,7 @@ export function AccountPage({
 }) {
   const icon = (Icon: LucideIcon) => <Icon size={17} strokeWidth={1.8} absoluteStrokeWidth color={NAVY} />;
   const stat = (label: string, count: number, ic: ReactNode, onClick: () => void) => (
-    <button onClick={onClick} className="flex min-w-0 flex-1 items-center gap-[10px] rounded-[14px] bg-white px-[12px] text-left shadow-[0_2px_8px_rgba(20,45,85,0.06)] active:bg-[#f5f8fc]" style={{ height: 58 }}>
+    <button onClick={onClick} className="press-soft flex min-w-0 flex-1 items-center gap-[10px] rounded-[14px] bg-white px-[12px] text-left shadow-[0_2px_8px_rgba(20,45,85,0.06)] active:bg-[#f5f8fc]" style={{ height: 58 }}>
       <span className="flex shrink-0 items-center justify-center rounded-full bg-[#eef3fa]" style={{ width: 34, height: 34 }}>
         {ic}
       </span>
@@ -591,7 +591,7 @@ export function AccountPage({
       title="その他"
       sub="MICHILU（ミチル）・不動産の現場に、すぐ使える情報を。"
       action={
-        <button onClick={onNews} aria-label={unread ? "お知らせ（新しいお知らせがあります）" : "お知らせ"} className="relative flex size-[36px] items-center justify-center rounded-full bg-white/90 shadow-[0_2px_8px_rgba(10,30,60,0.18)] active:bg-white">
+        <button onClick={onNews} aria-label={unread ? "お知らせ（新しいお知らせがあります）" : "お知らせ"} className="press relative flex size-[36px] items-center justify-center rounded-full bg-white/90 shadow-[0_2px_8px_rgba(10,30,60,0.18)] active:bg-white">
           <Bell size={18} strokeWidth={1.8} absoluteStrokeWidth color={HEAD} />
           {unread && <span className="absolute rounded-full border-2 border-white bg-[#f0263a]" style={{ right: 4, top: 4, width: 11, height: 11 }} />}
         </button>

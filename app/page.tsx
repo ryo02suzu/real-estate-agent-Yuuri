@@ -13,18 +13,13 @@ import { Sheet } from "@/components/sheet";
 import { favoriteKey, loadFavorites, removeFavorite, type FavoriteItem } from "@/lib/favorites";
 import { addHistory, clearHistory, loadHistory, type HistoryItem } from "@/lib/history";
 import { GeocoderUnavailable, lookup, lookupPoint, MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
+import { buildHash, pageUrl, readUrlState } from "@/lib/app/url";
 
 type Shown = { query: string; result: LookupResult };
-/** 地図で選んだ地点の URL（?ll=緯度,経度）。小数5桁（約1m） */
-const llParam = (lat: number, lng: number) => `${lat.toFixed(5)},${lng.toFixed(5)}`;
 /** いまの画面が、ホームから何画面進んだところか（pushState で積んだ数） */
 function historyDepth(): number {
   const d = (window.history.state as { depth?: unknown } | null)?.depth;
   return typeof d === "number" ? d : 0;
-}
-function parseLl(v: string | null): [number, number] | null {
-  const m = v?.match(/^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/);
-  return m ? [Number(m[1]), Number(m[2])] : null;
 }
 
 const PREFS = [...new Set(MUNICIPALITIES.map((m) => m.pref))];
@@ -71,8 +66,9 @@ export default function Home() {
           }),
         );
       }
-      // 端末の「戻る」でひとつ前の画面に戻れるよう、結果画面を履歴に積む
-      const url = "q" in target ? `?q=${encodeURIComponent(target.q)}` : `?ll=${llParam(...target.ll)}`;
+      // 端末の「戻る」でひとつ前の画面に戻れるよう、結果画面を履歴に積む。物件は URL の「#」の後ろに入れる
+      // （「#」以降はサーバーに送られないので、リロード・共有リンクでも住所が外に出ない。lib/app/url.ts）
+      const url = pageUrl(window.location, buildHash("q" in target ? { q: target.q } : { ll: target.ll }, window.location.hash));
       // depth: ホームから何画面進んだか（ロゴで一度にホームへ戻るのに使う）
       if (push) window.history.pushState({ ...window.history.state, depth: historyDepth() + 1 }, "", url);
       window.scrollTo(0, 0);
@@ -102,9 +98,9 @@ export default function Home() {
   // 初回表示: 端末の履歴を読み、?q= / ?ll= 付きで開かれたらそのまま調べる
   useEffect(() => {
     const fromUrl = () => {
-      const params = new URLSearchParams(window.location.search);
-      const q = params.get("q");
-      const ll = parseLl(params.get("ll"));
+      const { q, ll, fromQuery } = readUrlState(window.location);
+      // 古い「?q=」の形のリンクで開いたら、「#」の形に書き換える（次のリロードから住所がサーバーに送られないように）
+      if (fromQuery) window.history.replaceState(window.history.state, "", pageUrl(window.location, buildHash({ q, ll }, window.location.hash)));
       if (q) void search(q, false);
       else if (ll) void searchPoint(ll[0], ll[1], false);
       return !!(q || ll);
@@ -126,7 +122,7 @@ export default function Home() {
     const depth = historyDepth();
     if (depth > 0) window.history.go(-depth);
     else {
-      window.history.replaceState(window.history.state, "", window.location.pathname);
+      window.history.replaceState(window.history.state, "", pageUrl(window.location, buildHash({}, window.location.hash)));
       setShown(null);
     }
   }

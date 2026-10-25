@@ -22,7 +22,8 @@
     "pbf": "5.1.2",
     "pmtiles": "4.5.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "suncalc": "2.1.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

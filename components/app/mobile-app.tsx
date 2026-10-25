@@ -7,35 +7,26 @@
 import { Info, LoaderCircle, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { favoriteKey, toggleFavorite, removeFavorite, type FavoriteItem } from "@/lib/favorites";
+import { favoriteKey, removeFavorite, toggleFavoriteChecked, type FavoriteItem } from "@/lib/favorites";
 import type { HistoryItem } from "@/lib/history";
 import type { LookupResult } from "@/lib/roadmap";
-import { BUILDING_DATA } from "@/lib/roadmap/building-data";
-import { LAND_PRICE_DATA } from "@/lib/roadmap/land-price-data";
 import { chibanLabel, chibanQueryOf, registryChiban } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
-import { HOSPITAL_SOURCE } from "@/lib/roadmap/facilities";
-import { POI_DATA } from "@/lib/roadmap/poi";
-import { SCHOOL_DATA } from "@/lib/roadmap/school-data";
-import { STATION_DATA } from "@/lib/roadmap/walk";
-import { ZONING_DATA } from "@/lib/roadmap/zoning-data";
-import { DEALS_DATA, DEALS_NOTE } from "@/lib/roadmap/deals";
 import { buildSummary } from "@/lib/summary";
 import { DraftSheet } from "../draft-sheet";
 import { FullMap } from "../full-map";
 import { GuideMapSheet } from "../guide-map";
-import { CitiesSheet, HelpSheet } from "../info-sheets";
 import { LocationPicker } from "../location-picker";
 import { addressOffLot, registryNeighbors } from "../parcel-card";
 import { PrintSheet } from "../print-sheet";
 import { copyText, loaded } from "../result-view";
 import { TriageSheet, useChecklist } from "../triage-sheet";
-import { Sheet } from "../sheet";
 import { useCopy } from "../use-copy";
 import { MapAppsSheet, ReportSheet } from "./app-sheets";
 import { DetailSheet } from "./detail-sheets";
 import { ART_W, BottomNav, ZOOM, type NavKey } from "./frame";
 import { HomeScreen, PAGE, SKY, type HomeMessage } from "./home";
+import { AppCitiesSheet, AppHelpSheet, AppSourcesSheet } from "./info";
 import { InstallSheet, useStandalone } from "./install";
 import { useFixedScreen } from "./no-bounce";
 import { markNewsSeen, NewsSheet, useUnreadNews } from "./news";
@@ -178,6 +169,12 @@ export function MobileApp(props: MobileAppProps) {
   const failure = error ?? (offline ? OFFLINE : null);
   const homeMessage: HomeMessage = failure ? { text: failure } : notice ? { text: notice } : null;
   const isFav = (h: HistoryItem) => favorites.some((f) => favoriteKey(f) === favoriteKey(h));
+  /** ★を押した。保存できなかったら元のまま（見た目だけ保存済みにしない）で、その旨を知らせる */
+  const toggleFav = (h: HistoryItem) => {
+    const r = toggleFavoriteChecked(h);
+    setFavorites(r.items);
+    if (!r.saved) setNotice("お気に入りを保存できませんでした。端末の空き容量と、プライベートブラウズでないことを確かめてください。");
+  };
   /** いま開いている物件（履歴・お気に入りと同じ形） */
   const current = ok ? itemOf(shown!.query, ok) : undefined;
   /** その物件のレポートの画面を開く（開いている物件ならそのまま、ほかの物件なら調べ直してから） */
@@ -203,7 +200,7 @@ export function MobileApp(props: MobileAppProps) {
   const tabBanner = <TabBanner loading={loading && !offline} error={failure} notice={notice} onDismiss={() => setNotice(null)} />;
   let body: ReactNode;
   if (page === "history")
-    body = <HistoryPage history={history} isFavorite={isFav} onToggleFavorite={(h) => setFavorites(toggleFavorite(h))} onPick={pickRecent} onClear={props.onClearHistory} onHome={() => go("home")} banner={tabBanner} />;
+    body = <HistoryPage history={history} isFavorite={isFav} onToggleFavorite={toggleFav} onPick={pickRecent} onClear={props.onClearHistory} onHome={() => go("home")} banner={tabBanner} />;
   else if (page === "favorites") body = <FavoritesPage favorites={favorites} onPick={pickRecent} onDocs={openDocsFor} onRemove={(f) => setFavorites(removeFavorite(f))} onHome={() => go("home")} banner={tabBanner} />;
   else if (page === "docs")
     body = (
@@ -283,7 +280,9 @@ export function MobileApp(props: MobileAppProps) {
                 error={error}
                 offline={offline}
                 favorite={isFav(itemOf(shown!.query, ok))}
-                onFavorite={() => setFavorites(toggleFavorite(itemOf(shown!.query, ok)))}
+                onFavorite={() => toggleFav(itemOf(shown!.query, ok))}
+                notice={notice}
+                onDismiss={() => setNotice(null)}
                 onPick={props.onPickAddress}
                 onPickPoint={onPickPoint}
                 onFix={openMap}
@@ -309,10 +308,10 @@ export function MobileApp(props: MobileAppProps) {
       />
 
       <Portal>
-        <HelpSheet open={sheet === "help"} onClose={() => setSheet(null)} />
+        <AppHelpSheet open={sheet === "help"} onClose={() => setSheet(null)} />
         <InstallSheet open={sheet === "install"} onClose={() => setSheet(null)} />
-        <CitiesSheet open={sheet === "cities"} onClose={() => setSheet(null)} />
-        <SourcesSheet open={sheet === "sources"} onClose={() => setSheet(null)} />
+        <AppCitiesSheet open={sheet === "cities"} onClose={() => setSheet(null)} />
+        <AppSourcesSheet open={sheet === "sources"} onClose={() => setSheet(null)} />
         <NewsSheet open={news} onClose={() => setNews(false)} />
         {picker && (
           <LocationPicker
@@ -388,6 +387,8 @@ function PropertyView({
   offline,
   favorite,
   onFavorite,
+  notice,
+  onDismiss,
   onPick,
   onPickPoint,
   onFix,
@@ -405,6 +406,9 @@ function PropertyView({
   offline: boolean;
   favorite: boolean;
   onFavorite: () => void;
+  /** お知らせ（お気に入りを保存できなかった、など） */
+  notice: string | null;
+  onDismiss: () => void;
   onPick: (address: string) => void;
   onPickPoint: (lat: number, lng: number) => void;
   onFix: () => void;
@@ -476,7 +480,7 @@ function PropertyView({
     <>
       <ResultBand title={title} sub={copyText(result)} onBack={onBack} onCopy={() => addr.copy(copyText(result))} copied={addr.done} favorite={favorite} onFavorite={onFavorite} onShare={share} />
       <TabSegments tab={tab} onTab={changeTab} />
-      <Banner loading={loading && !offline} error={error ?? (offline ? OFFLINE : null)} notice={shareCopy.done ? "共有の文をコピーしました" : null} />
+      <Banner loading={loading && !offline} error={error ?? (offline ? OFFLINE : null)} notice={notice ?? (shareCopy.done ? "共有の文をコピーしました" : null)} onDismiss={onDismiss} />
       <PlaceNote query={query} result={result} data={data} onPick={onPick} onFix={onFix} />
       <div className="px-[16px] pb-[8px] pt-[8px]">
         {tab === "basic" && <BasicTab {...props} />}
@@ -527,7 +531,7 @@ function PropertyView({
 /** 地番の候補などの小さなボタン（注意の中） */
 function MiniButton({ onClick, children }: { onClick: () => void; children: ReactNode }) {
   return (
-    <button onClick={onClick} className="rounded-full bg-white px-[9px] py-[5px] font-semibold leading-none shadow-[0_1px_3px_rgba(20,45,85,0.1)]" style={{ fontSize: 12.5, color: "#133664" }}>
+    <button onClick={onClick} className="press rounded-full bg-white px-[9px] py-[5px] font-semibold leading-none shadow-[0_1px_3px_rgba(20,45,85,0.1)]" style={{ fontSize: 12.5, color: "#133664" }}>
       {children}
     </button>
   );
@@ -599,36 +603,5 @@ function PlaceNote({ query, result, data, onPick, onFix }: { query: string; resu
     <PlaceBanner warn={warn} short={short} onFix={onFix} open={!!parcelMiss}>
       {text}
     </PlaceBanner>
-  );
-}
-
-/** データの出典と時点 */
-function SourcesSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const rows: [string, string][] = [
-    ["道路種別の地図・問い合わせ先", "関東1都6県の市区町村の公開ページ（毎週リンクを自動で確認）"],
-    ["用途地域など（都市計画）", `都市計画決定GISデータ（国土交通省）${ZONING_DATA.edition}`],
-    ["地番・筆の形", `登記所備付地図データ（法務省）${PARCEL_DATA.edition}・市町村の地番参考図`],
-    ["建物", `3D都市モデル PLATEAU（国土交通省）${BUILDING_DATA.edition ?? ""}`],
-    ["地価", `地価公示・都道府県地価調査（国土数値情報）${LAND_PRICE_DATA.edition}`],
-    ...(DEALS_DATA.url ? ([["取引事例", `不動産情報ライブラリ（国土交通省）の取引価格・成約価格 ${DEALS_DATA.periods}。${DEALS_NOTE}`]] as [string, string][]) : []),
-    ["学区", `小学校区・中学校区（国土数値情報）${SCHOOL_DATA.edition}`],
-    ["駅", `鉄道データ（国土数値情報）${STATION_DATA.year}年`],
-    ["周辺施設", `© OpenStreetMap contributors（ODbL）${POI_DATA.date}時点${HOSPITAL_SOURCE ? `。病院は${HOSPITAL_SOURCE}` : ""}`],
-    ["ハザード", "重ねるハザードマップ（国土交通省・国土地理院）を開くたびに読む"],
-    ["避難場所", "指定緊急避難場所データ（国土地理院）を開くたびに読む"],
-    ["地図・航空写真・道のり", "地理院タイル・地理院地図Vector（国土地理院）"],
-  ];
-  return (
-    <Sheet title="データの出典と時点" open={open} onClose={onClose}>
-      <dl className="divide-y divide-line/70">
-        {rows.map(([k, v]) => (
-          <div key={k} className="py-2">
-            <dt className="text-[12px] text-muted">{k}</dt>
-            <dd className="text-[13.5px] leading-[1.55] text-ink">{v}</dd>
-          </div>
-        ))}
-      </dl>
-      <p className="mt-2 text-[11.5px] leading-[1.6] text-muted">国・自治体の公開データを加工して表示しています。データは参考情報で、最新の状況や法的な判断は、役所の窓口・公的な資料で確認してください。</p>
-    </Sheet>
   );
 }

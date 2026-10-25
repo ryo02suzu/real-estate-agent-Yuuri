@@ -291,3 +291,96 @@ body {
     -webkit-print-color-adjust: exact;
   }
 }
+
+/*
+ * スマホの押した反応（components/app/tokens.ts の MOTION）：触れた瞬間に 0.98 倍に沈み（80ms）、離すと戻る（220ms）。発光しない。
+ * 動きを減らす設定では沈まない（色の変化だけ）
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .press {
+    transition:
+      transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 220ms ease,
+      box-shadow 220ms ease;
+  }
+  .press:active {
+    transform: scale(0.98);
+    transition-duration: 80ms;
+  }
+  .press-soft:active {
+    transform: scale(0.99);
+  }
+}
+
+/*
+ * 下から出るシート（components/sheet.tsx）。スマホだけ：開く 320ms、閉じる 240ms。背景は黒 40% にフェード。
+ * 指で下にすべらせている間（data-drag）は動きを止め、離して戻るとき（data-settle）は 200ms で戻る。PC は今までどおり動かさない
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .sheet-backdrop {
+    animation: sheet-dim 320ms ease both;
+  }
+  .sheet-panel {
+    animation: sheet-up 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  [data-state="closing"] .sheet-backdrop {
+    animation: sheet-dim 240ms ease reverse both;
+  }
+  [data-state="closing"] .sheet-panel {
+    animation: sheet-up 240ms cubic-bezier(0.4, 0, 1, 1) reverse both;
+  }
+  .sheet-panel[data-drag] {
+    animation: none;
+    transition: none;
+  }
+  .sheet-panel[data-settle] {
+    animation: none;
+    transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sheet-dim {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* スマホのページの切り替え（下のメニュー）：8pt 下から浮き上がりながら現れる（180ms）。動きを減らす設定ではフェードだけ */
+@media (max-width: 1023px) {
+  .page-in {
+    animation: page-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .page-in {
+      animation: page-fade 120ms ease both;
+    }
+  }
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes page-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

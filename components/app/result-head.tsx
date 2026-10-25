@@ -25,7 +25,7 @@ export const BAND_OVERLAP = 24;
 
 function Round({ onClick, label, pressed, children }: { onClick: () => void; label: string; pressed?: boolean; children: ReactNode }) {
   return (
-    <button onClick={onClick} aria-label={label} aria-pressed={pressed} className="flex size-[36px] shrink-0 items-center justify-center rounded-full bg-white/90 shadow-[0_2px_8px_rgba(10,30,60,0.18)] active:bg-white">
+    <button onClick={onClick} aria-label={label} aria-pressed={pressed} className="press flex size-[36px] shrink-0 items-center justify-center rounded-full bg-white/90 shadow-[0_2px_8px_rgba(10,30,60,0.18)] active:bg-white">
       {children}
     </button>
   );
@@ -104,7 +104,7 @@ export function PlaceBanner({ warn, short, children, onFix, open: openFirst = fa
           </span>
         )}
       </button>
-      <button onClick={onFix} className="mt-[0px] shrink-0 rounded-full border border-current px-[10px] py-[6px] font-semibold leading-none" style={{ fontSize: 12 }}>
+      <button onClick={onFix} className="press mt-[0px] shrink-0 rounded-full border border-current px-[10px] py-[6px] font-semibold leading-none" style={{ fontSize: 12 }}>
         場所を直す
       </button>
     </div>

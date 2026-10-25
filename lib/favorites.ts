@@ -19,12 +19,19 @@ export function loadFavorites(): FavoriteItem[] {
   }
 }
 
-function save(items: FavoriteItem[]): FavoriteItem[] {
+/** 保存できたか（プライベートブラウズや容量不足で保存できないことがある） */
+function store(items: FavoriteItem[]): boolean {
   try {
     localStorage.setItem(KEY, JSON.stringify(items));
+    return true;
   } catch {
-    // 保存できなくても画面は続ける
+    return false;
   }
+}
+
+function save(items: FavoriteItem[]): FavoriteItem[] {
+  // 保存できなくても画面は続ける（スマホの★は toggleFavoriteChecked で保存できたかを見る）
+  store(items);
   return items;
 }
 
@@ -34,6 +41,18 @@ export const isFavorite = (item: FavoriteItem) => loadFavorites().some((f) => fa
 export function toggleFavorite(item: FavoriteItem): FavoriteItem[] {
   const rest = loadFavorites().filter((f) => favoriteKey(f) !== favoriteKey(item));
   return save(isFavorite(item) ? rest : [item, ...rest].slice(0, MAX));
+}
+
+/**
+ * 同じだが、保存できたかも返す。保存できなかったときは、保存前の一覧を返す（見た目だけ保存済みにしない。
+ * スマホの★は元に戻して「保存できませんでした」と知らせる）
+ */
+export function toggleFavoriteChecked(item: FavoriteItem): { items: FavoriteItem[]; saved: boolean; added: boolean } {
+  const before = loadFavorites();
+  const added = !before.some((f) => favoriteKey(f) === favoriteKey(item));
+  const next = added ? [item, ...before].slice(0, MAX) : before.filter((f) => favoriteKey(f) !== favoriteKey(item));
+  const saved = store(next);
+  return { items: saved ? next : before, saved, added };
 }
 
 export const removeFavorite = (item: FavoriteItem): FavoriteItem[] => save(loadFavorites().filter((f) => favoriteKey(f) !== favoriteKey(item)));

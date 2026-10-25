@@ -121,7 +121,7 @@ export function Cell({ label, value, sub, onClick, warn, height = 62 }: { label:
   const cls = "relative block min-w-0 overflow-hidden rounded-[14px] bg-white px-[12px] text-left shadow-[0_2px_8px_rgba(20,45,85,0.06)]";
   const style: CSSProperties = { height, paddingTop: 7, paddingBottom: 6 };
   return onClick ? (
-    <button onClick={onClick} className={`${cls} w-full active:bg-[#f5f8fc]`} style={style}>
+    <button onClick={onClick} className={`${cls} press-soft w-full active:bg-[#f5f8fc]`} style={style}>
       {body}
     </button>
   ) : (
@@ -178,7 +178,7 @@ export function Row({ icon, iconBg = "#eef3fa", title, sub, right, rightColor = 
 
 /** 紺の大きなボタン */
 export function Primary({ children, onClick, href, icon, className = "" }: { children: ReactNode; onClick?: () => void; href?: string; icon?: ReactNode; className?: string }) {
-  const cls = `flex h-[48px] w-full items-center justify-center gap-[8px] rounded-[14px] font-semibold leading-none text-white shadow-[0_8px_20px_rgba(15,47,95,0.22)] active:opacity-90 ${className}`;
+  const cls = `press flex h-[48px] w-full items-center justify-center gap-[8px] rounded-[14px] font-semibold leading-none text-white shadow-[0_8px_20px_rgba(15,47,95,0.22)] ${className}`;
   const style: CSSProperties = { fontSize: 16, background: `linear-gradient(135deg,#1b4280 0%,${NAVY} 60%,#0a2248 100%)` };
   return href ? (
     <a href={href} target="_blank" rel="noreferrer" className={cls} style={style}>
@@ -197,7 +197,7 @@ export function Primary({ children, onClick, href, icon, className = "" }: { chi
 
 /** 細い線の小さなボタン（白） */
 export function Ghost({ children, onClick, href, icon, className = "" }: { children: ReactNode; onClick?: () => void; href?: string; icon?: ReactNode; className?: string }) {
-  const cls = `flex h-[40px] items-center justify-center gap-[6px] rounded-full border border-[#cfd8e4] bg-white px-[14px] font-semibold leading-none active:bg-[#f2f5f9] ${className}`;
+  const cls = `press flex h-[40px] items-center justify-center gap-[6px] rounded-full border border-[#cfd8e4] bg-white px-[14px] font-semibold leading-none active:bg-[#f2f5f9] ${className}`;
   const style: CSSProperties = { fontSize: 14, color: NAVY };
   return href ? (
     <a href={href} target="_blank" rel="noreferrer" className={cls} style={style}>

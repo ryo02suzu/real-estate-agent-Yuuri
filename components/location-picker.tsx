@@ -1,8 +1,14 @@
 "use client";
 
+// スマホの「地図で場所を選ぶ」画面（全画面）。地図を動かして中央の印を物件に合わせ、「この場所で調べる」。
+// 住所が番地まで見つからないときや、地番しか分からない土地で使う。開くときに作り、閉じたら外す。
+// 見た目はホームと同じ系統：地図の上に浮かぶガラスのバー（戻る・見出し）と、下のガラスの板（町名・地番・紺のボタン）。
+// 町名は地図を止めて少し待ってから入れ替わる。板の中の町名は、結果の画面の見出しへつながる（view-transition）
+import { ArrowLeft, Crosshair } from "lucide-react";
 import { useEffect, useState } from "react";
 import { muniName, reverseGeocode } from "@/lib/roadmap";
-import { CloseIcon, PinIcon } from "./icons";
+import { GLASS, HEAD, LIGHT, TEXT } from "./app/r-ui";
+import { NAVY } from "./app/ui";
 import { MapPanel } from "./map-panel";
 
 /** 町名まで読める程度に拡大してから選んでもらう */
@@ -10,10 +16,6 @@ const MIN_ZOOM = 14;
 
 type Center = { lat: number; lng: number; zoom: number; parcel?: string };
 
-/**
- * スマホの「地図で場所を選ぶ」画面（全画面）。地図を動かして中央の印を物件に合わせ、「この場所で調べる」。
- * 住所が番地まで見つからないときや、地番しか分からない土地で使う。開くときに作り、閉じたら外す
- */
 export function LocationPicker({
   start,
   onClose,
@@ -55,14 +57,7 @@ export function LocationPicker({
 
   const zoomedIn = !!center && center.zoom >= MIN_ZOOM;
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white" role="dialog" aria-modal="true" aria-label="地図で物件の場所を選ぶ">
-      <header className="flex items-center gap-2 px-4 pb-2 pt-[max(10px,env(safe-area-inset-top))]">
-        <PinIcon className="h-5 w-5 text-brand" />
-        <h2 className="flex-1 text-[15px] font-semibold text-ink">地図で物件の場所を選ぶ</h2>
-        <button onClick={onClose} aria-label="閉じる" className="rounded-full p-2 text-muted hover:bg-mint">
-          <CloseIcon className="h-5 w-5" />
-        </button>
-      </header>
+    <div className="app-touch fixed inset-0 z-50 flex flex-col bg-[#e8eef5]" role="dialog" aria-modal="true" aria-label="地図で物件の場所を選ぶ">
       <div className="relative min-h-0 flex-1">
         <MapPanel
           mode="crosshair"
@@ -70,20 +65,44 @@ export function LocationPicker({
           onCenter={(lat, lng, zoom, parcel) => setCenter({ lat, lng, zoom, parcel })}
           fallback={<p className="p-6 text-center text-sm text-muted">この端末では地図を表示できません。住所で検索してください。</p>}
         />
-      </div>
-      <div className="relative px-4 pb-[max(14px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-6px_20px_rgba(60,44,20,0.08)]">
-        <p className="text-[11px] text-muted">{zoomedIn ? "地図を動かして、印の先を物件に合わせてください" : "地図を拡大して、物件の場所に印を合わせてください"}</p>
-        <p className="mt-1 h-6 truncate text-[15px] font-semibold text-ink">
-          {zoomedIn ? place || "…" : ""}
-          {zoomedIn && center?.parcel && <span className="ml-2 text-[12px] font-normal text-brand">{center.parcel}</span>}
-        </p>
-        <button
-          disabled={!zoomedIn}
-          onClick={() => center && onPick(center.lat, center.lng)}
-          className="bg-gold mt-2 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-[15px] font-semibold text-white shadow-[0_6px_16px_rgba(138,102,50,0.28)] disabled:opacity-50"
-        >
-          この場所で調べる
-        </button>
+
+        {/* 上のガラスのバー：戻る・見出し */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 px-[12px]" style={{ paddingTop: "max(10px, env(safe-area-inset-top))" }}>
+          <div className="pointer-events-auto flex h-[46px] items-center gap-[6px] rounded-full pl-[3px] pr-[16px] shadow-[0_6px_18px_rgba(20,45,85,0.16)]" style={GLASS}>
+            <button onClick={onClose} aria-label="閉じる" className="press flex size-[40px] shrink-0 items-center justify-center rounded-full">
+              <ArrowLeft size={22} strokeWidth={2} absoluteStrokeWidth color={HEAD} />
+            </button>
+            <span className="min-w-0 flex-1 truncate font-semibold leading-none" style={{ fontSize: 15, color: HEAD }}>
+              地図で物件の場所を選ぶ
+            </span>
+          </div>
+        </div>
+
+        {/* 下のガラスの板：案内・町名と地番・「この場所で調べる」 */}
+        <div className="absolute inset-x-0 bottom-0 px-[12px]" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
+          <div className="rounded-[22px] px-[14px] pb-[12px] pt-[12px] shadow-[0_14px_34px_rgba(20,48,95,0.18)]" style={GLASS}>
+            <p className="leading-none" style={{ fontSize: 12, color: LIGHT }}>
+              {zoomedIn ? "地図を動かして、印の先を物件に合わせてください" : "地図を拡大して、物件の場所に印を合わせてください"}
+            </p>
+            <p className="mt-[8px] flex h-[24px] items-center gap-[8px] font-semibold leading-none" style={{ fontSize: 16, color: TEXT, viewTransitionName: "place-title" }}>
+              <span className="min-w-0 truncate">{zoomedIn ? place || "…" : "　"}</span>
+              {zoomedIn && center?.parcel && (
+                <span className="shrink-0 rounded-full px-[8px] py-[4px] font-semibold leading-none" style={{ fontSize: 12, color: NAVY, background: "rgba(19,54,100,0.1)" }}>
+                  {center.parcel}
+                </span>
+              )}
+            </p>
+            <button
+              disabled={!zoomedIn}
+              onClick={() => center && onPick(center.lat, center.lng)}
+              className="press mt-[10px] flex h-[48px] w-full items-center justify-center gap-[8px] rounded-[14px] font-semibold leading-none text-white shadow-[0_8px_20px_rgba(15,47,95,0.22)] disabled:opacity-50 disabled:shadow-none"
+              style={{ fontSize: 16, background: `linear-gradient(135deg,#1b4280 0%,${NAVY} 60%,#0a2248 100%)` }}
+            >
+              <Crosshair size={18} strokeWidth={2} absoluteStrokeWidth />
+              この場所で調べる
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

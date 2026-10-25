@@ -35,15 +35,16 @@ export function NationalCheck() {
     try {
       const ll = text.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
       setResult(ll ? await lookupPoint(Number(ll[1]), Number(ll[2])) : await lookup(text));
-      window.history.replaceState(null, "", `?q=${encodeURIComponent(text)}`);
+      // 「#」の後ろに入れる（サーバーに送られない。lib/app/url.ts）
+      window.history.replaceState(null, "", `${window.location.pathname}#q=${encodeURIComponent(text)}`);
     } finally {
       setBusy(false);
     }
   };
 
-  // ?q= の住所（か緯度,経度）で開いたら、そのまま調べる（最初の1回だけ）
+  // #q=（古い形は ?q=）の住所（か緯度,経度）で開いたら、そのまま調べる（最初の1回だけ）
   useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get("q");
+    const q = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("q") ?? new URLSearchParams(window.location.search).get("q");
     if (!q) return;
     queueMicrotask(() => {
       setInput(q);
