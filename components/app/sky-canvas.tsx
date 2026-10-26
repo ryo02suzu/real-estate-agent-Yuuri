@@ -1,7 +1,7 @@
 "use client";
 
 // 帯をコードで描く（WebGL）。写真は使わない。
-//  空：今の太陽の位置（lib/app/sun.ts）から大気の散乱（lib/app/atmosphere.ts と同じ式）。雲（雲量は気象庁の観測から。lib/app/weather.ts）、
+//  空：今の太陽の位置（lib/app/sun.ts）から大気の散乱（lib/app/atmosphere.ts と同じ式。霞の量は湿度と季節から。lib/app/air.ts）。雲（雲量は気象庁の観測から。lib/app/weather.ts）、
 //      太陽本体とにじみ、月（満ち欠けは太陽の向きから）、星。
 //  街（ホームだけ）：PLATEAU（国土交通省の 3D 都市モデル）の実在の建物と、地理院の空中写真・標高から、汐留の上空 260m の視点で
 //      焼き込んだ層（public/home/city。色・面の向き・距離と種類・窓・塔と道路・影用の高さ地図）を、今の光で照らす。
@@ -15,6 +15,7 @@
 import * as SunCalc from "suncalc";
 import { useEffect, useRef, type CSSProperties } from "react";
 import { ATMOS, dirFromAltAz, exposureFor, sunTransmittance } from "@/lib/app/atmosphere";
+import { airFrom } from "@/lib/app/air";
 import { snowlineM, treeSeason, visibilityKm, windowOccupancy } from "@/lib/app/city";
 import { artificialVisibility, cityAmbient, skyIrradianceSH, sunIrradiance } from "@/lib/app/city-light";
 import { BASE, HOME_CAMERA, overrideTime, smoothstep, solar, type Camera } from "@/lib/app/sun";
@@ -28,7 +29,7 @@ const VERT = `attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}`;
 const ATMOS_GLSL = `
 const float Re=${ATMOS.Re.toFixed(1)},Ra=${ATMOS.Ra.toFixed(1)},h0=${ATMOS.h0};
 const vec3 betaR=vec3(${ATMOS.betaR.join(",")});const float HR=${ATMOS.HR.toFixed(1)};
-const float betaM=${ATMOS.betaM},HM=${ATMOS.HM},g=${ATMOS.g},mieExt=${ATMOS.mieExt};
+const float betaM=${ATMOS.betaM},HM=${ATMOS.HM},bgMie=${ATMOS.bgMie},g=${ATMOS.g},mieExt=${ATMOS.mieExt};float AERO=1.0;
 const vec3 betaO=vec3(${ATMOS.betaO.join(",")});
 const float SUN=${ATMOS.sun.toFixed(1)};
 const vec3 msColor=vec3(${ATMOS.msColor.join(",")});const float msStrength=${ATMOS.msStrength},msLow=${ATMOS.msLow.toFixed(1)},msHigh=${ATMOS.msHigh.toFixed(1)},msLowW=${ATMOS.msLowWeight};
@@ -36,7 +37,7 @@ const vec3 nightZenith=vec3(${ATMOS.nightZenith.join(",")}),nightHorizon=vec3(${
 const int N=${ATMOS.samples},NL=${ATMOS.lightSamples};
 float hitFar(vec3 o,vec3 d,float r){float b=dot(o,d);float c=dot(o,o)-r*r;float q=b*b-c;if(q<0.0)return -1.0;return -b+sqrt(q);}
 float hitNear(vec3 o,vec3 d,float r){float b=dot(o,d);float c=dot(o,o)-r*r;float q=b*b-c;if(q<0.0)return -1.0;float t=-b-sqrt(q);return t>0.0?t:-1.0;}
-vec3 dens(float h){return vec3(exp(-h/HR),exp(-h/HM),max(0.0,1.0-abs(h-25.0)/15.0));}
+vec3 dens(float h){return vec3(exp(-h/HR),AERO*exp(-h/HM)+bgMie*exp(-h/HR),max(0.0,1.0-abs(h-25.0)/15.0));}
 bool depthToSun(vec3 p,vec3 s,out vec3 tau){if(hitNear(p,s,Re)>0.0){tau=vec3(0.0);return false;}float t=hitFar(p,s,Ra);float st=t/float(NL);vec3 d=vec3(0.0);
 for(int i=0;i<NL;i++){float k=(float(i)+0.5)*st;vec3 q=p+s*k;d+=dens(length(q)-Re)*st;}
 tau=betaR*d.x+vec3(betaM*mieExt*d.y)+betaO*d.z;return true;}
@@ -53,11 +54,11 @@ vec3 viewDir(vec2 uv,vec3 f,vec3 r,vec3 u,vec2 tn){float sx=uv.x*2.0-1.0;float s
 
 /** 1 枚目：空（露出をかけた線形の明るさ。夜の地も足す）。暗い所の階調を残すため平方根で保存する */
 const FRAG_SKY = `precision highp float;
-uniform vec2 u_res;uniform vec3 u_f,u_r,u_u;uniform vec2 u_tan;uniform vec3 u_sun;uniform float u_exposure;
+uniform vec2 u_res;uniform vec3 u_f,u_r,u_u;uniform vec2 u_tan;uniform vec3 u_sun;uniform float u_exposure;uniform float u_aero;uniform float u_glow;
 ${ATMOS_GLSL}
-void main(){vec2 uv=gl_FragCoord.xy/u_res;vec3 v=viewDir(uv,u_f,u_r,u_u,u_tan);
+void main(){AERO=u_aero;vec2 uv=gl_FragCoord.xy/u_res;vec3 v=viewDir(uv,u_f,u_r,u_u,u_tan);
 float elev=degrees(asin(clamp(v.z,-1.0,1.0)));
-vec3 c=radiance(v,u_sun)*u_exposure+nightZenith+nightHorizon*exp(-max(0.0,elev)/nightFall);
+vec3 c=radiance(v,u_sun)*u_exposure+(nightZenith+nightHorizon*exp(-max(0.0,elev)/nightFall))*u_glow;
 gl_FragColor=vec4(sqrt(clamp(c/4.0,0.0,1.0)),1.0);}`;
 
 /** 距離（2 バイト、対数）・種類の復元と、視線の向き */
@@ -108,7 +109,7 @@ uniform float u_city;uniform float u_horizon;
 uniform vec3 u_sunE;uniform vec3 u_sh0;uniform vec3 u_sh1;uniform vec3 u_sh2;uniform vec3 u_sh3;uniform vec3 u_amb;uniform float u_lightsVis;uniform float u_sigma;
 uniform vec4 u_season;uniform float u_snowline;uniform float u_snowCover;uniform float u_wet;
 uniform float u_towerOn;uniform float u_towerMode;uniform float u_towerWhite;uniform vec3 u_towerCol;uniform float u_sparkle;uniform float u_decks;
-uniform float u_cloud;uniform float u_precip;uniform float u_snow;uniform float u_fog;uniform float u_time;uniform vec2 u_wind;uniform float u_expAdj;
+uniform float u_cloud;uniform float u_precip;uniform float u_snow;uniform float u_fog;uniform float u_time;uniform vec2 u_wind;uniform float u_expAdj;uniform float u_haze;
 const float sunRad=${((ATMOS.sunRadius * Math.PI) / 180).toFixed(6)},moonRad=${((ATMOS.moonRadius * Math.PI) / 180).toFixed(6)};
 ${CITY_GLSL}
 float hash21(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(0.1031,0.1030,0.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
@@ -148,12 +149,12 @@ vec3 cloudCol=mix(nightCol,dayCol,u_day);
 /* 太陽：本体とにじみ（雲でさえぎられる） */
 float th=acos(clamp(dot(v,u_sun),-1.0,1.0));
 float disc=1.0-smoothstep(sunRad*0.85,sunRad,th);
-sky+=u_sunT*(disc*8.0*sunVis*sunVis+(4.0*exp(-th*th/(2.0*0.028*0.028))+0.9*exp(-th/0.052)+0.2*exp(-th/0.157))*sunVis);
+sky+=u_sunT*(disc*8.0*sunVis*sunVis+(4.0*exp(-th*th/(2.0*0.028*0.028))+(0.9*exp(-th/0.052)+0.2*exp(-th/0.157))*u_haze)*sunVis);
 /* 月 */
 if(u_moonOn>0.5){vec3 m=u_moon;vec3 mu_=normalize(cross(m,vec3(0.0,0.0,1.0)));vec3 mv=cross(mu_,m);vec3 dl=v-m;float dx=dot(dl,mu_)/moonRad;float dy=dot(dl,mv)/moonRad;float rr=dx*dx+dy*dy;
 float vis=clamp(1.0-skyLum*3.0,0.08,1.0)*(1.0-u_cloud*0.85);float tm=acos(clamp(dot(v,m),-1.0,1.0));
 if(rr<1.0){float nz=sqrt(1.0-rr);vec3 n=-m*nz+mu_*dx+mv*dy;float l=max(0.0,dot(n,u_sun));float edge=1.0-smoothstep(0.9,1.0,rr);sky+=vec3(1.0,0.97,0.9)*(l*0.85+0.03)*edge*vis;}
-sky+=vec3(0.9,0.92,1.0)*0.09*exp(-tm/0.04)*vis;}
+sky+=vec3(0.9,0.92,1.0)*0.09*exp(-tm/(0.04*u_haze))*vis;}
 /* 星（暗いときだけ。雲の後ろ。街明かりで地平線の近くは見えない） */
 if(u_stars>0.0){float az=atan(v.x,v.y);vec2 cell=vec2(az,asin(clamp(v.z,-1.0,1.0)))/0.0061;vec2 id=floor(cell);float h1=hash21(id);
 if(h1<0.013){vec2 cen=id+0.5+vec2(hash21(id+1.3),hash21(id+7.1))*0.6-0.3;float dd=length(cell-cen);float b=pow(hash21(id+3.7),3.0)*0.9+0.08;
@@ -252,9 +253,9 @@ type Gl = {
   dsmZ: [number, number];
 };
 
-const SKY_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_exposure"];
+const SKY_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_exposure", "u_aero", "u_glow"];
 const PRE_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_geo", "u_nrm", "u_win", "u_emis", "u_dsm", "u_dsmGrid", "u_dsmZ", "u_occA", "u_occB", "u_lightsVis"];
-const MAIN_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_sunT", "u_moon", "u_moonOn", "u_stars", "u_day", "u_sky", "u_alb", "u_nrm", "u_geo", "u_win", "u_emis", "u_pre", "u_city", "u_horizon", "u_sunE", "u_sh0", "u_sh1", "u_sh2", "u_sh3", "u_amb", "u_lightsVis", "u_sigma", "u_season", "u_snowline", "u_snowCover", "u_wet", "u_towerOn", "u_towerMode", "u_towerWhite", "u_towerCol", "u_sparkle", "u_decks", "u_cloud", "u_precip", "u_snow", "u_fog", "u_time", "u_wind", "u_expAdj"];
+const MAIN_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_sunT", "u_moon", "u_moonOn", "u_stars", "u_day", "u_sky", "u_alb", "u_nrm", "u_geo", "u_win", "u_emis", "u_pre", "u_city", "u_horizon", "u_sunE", "u_sh0", "u_sh1", "u_sh2", "u_sh3", "u_amb", "u_lightsVis", "u_sigma", "u_season", "u_snowline", "u_snowCover", "u_wet", "u_towerOn", "u_towerMode", "u_towerWhite", "u_towerCol", "u_sparkle", "u_decks", "u_cloud", "u_precip", "u_snow", "u_fog", "u_time", "u_wind", "u_expAdj", "u_haze"];
 const LIGHT_UNIFORMS = ["u_px", "u_time", "u_vis", "u_sigma", "u_still"];
 
 function compile(gl: WebGLRenderingContext, frag: string, names: string[], vert = VERT): Prog | null {
@@ -430,14 +431,15 @@ function bindQuad(g: Gl, p: Prog) {
 let lightCache: { key: string; v: ReturnType<typeof cityLightValues> } | null = null;
 function cityLightValues(at: Date, sun: [number, number, number], altitude: number) {
   const w = currentWeather();
-  const sh = skyIrradianceSH(sun, altitude, w.cloud);
+  const air = airFrom(w, at);
+  const sh = skyIrradianceSH(sun, altitude, w.cloud, air);
   const occ = windowOccupancy(at);
   const vis = visibilityKm(w, at);
   const season = treeSeason(at);
   const tower = towerLight(at, altitude);
   return {
     sh,
-    sunE: sunIrradiance(sun, altitude),
+    sunE: sunIrradiance(sun, altitude, air.aero),
     amb: cityAmbient(altitude),
     lightsVis: artificialVisibility(altitude),
     occ,
@@ -475,7 +477,8 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
   const moon = dirFromAltAz(mp.altitude, mp.azimuth);
   const b = basis(cam);
   const w = currentWeather();
-  const T = sunTransmittance(sun);
+  const air = airFrom(w, at);
+  const T = sunTransmittance(sun, air.aero);
   const showCity = city && g.cityReady && !!g.pre && !!g.preT;
   const lv = showCity ? lightValues(at, sun, s.altitude) : null;
   const setCam = (p: Prog, width: number, height: number) => {
@@ -500,6 +503,8 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
   bindQuad(g, g.sky);
   setCam(g.sky, g.skyT.w, g.skyT.h);
   gl.uniform1f(g.sky.loc.u_exposure, exposureFor(s.altitude));
+  gl.uniform1f(g.sky.loc.u_aero, air.aero);
+  gl.uniform1f(g.sky.loc.u_glow, air.glow);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   // 街の下ごしらえ（分・天気が変わったときだけ）
   if (showCity && lv) {
@@ -531,7 +536,8 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
   gl.uniform3f(m.u_sunT, T[0], T[1], T[2]);
   gl.uniform3f(m.u_moon, moon[0], moon[1], moon[2]);
   gl.uniform1f(m.u_moonOn, mp.altitude > -0.5 ? 1 : 0);
-  gl.uniform1f(m.u_stars, smoothstep(-8, -16, s.altitude));
+  gl.uniform1f(m.u_stars, smoothstep(-8, -16, s.altitude) * air.stars);
+  gl.uniform1f(m.u_haze, Math.min(2.2, Math.max(0.7, air.aero)));
   gl.uniform1f(m.u_day, smoothstep(-6, 4, s.altitude));
   bindTex(g.main, [["u_sky", g.skyT.tex], ["u_alb", g.tex.alb], ["u_nrm", g.tex.nrm], ["u_geo", g.tex.geo], ["u_win", g.tex.win], ["u_emis", g.tex.emis], ["u_pre", g.preT ? g.preT.tex : g.tex.dsm]]);
   gl.uniform1f(m.u_city, showCity ? 1 : 0);

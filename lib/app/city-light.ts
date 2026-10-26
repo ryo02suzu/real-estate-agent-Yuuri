@@ -1,7 +1,7 @@
 // ホームの街を照らす光（WebGL のシェーダーに渡す値）。空の色と同じ大気の式（lib/app/atmosphere.ts）から：
 //  太陽の直射（届く光の色 × 露出）と、空からの光（向きごとの強さを 1 次の球面調和で近似。夕方は西を向いた壁が橙に、昼は屋根が明るい）。
 //  曇りは空からの光を灰色の一様な光に寄せる（直射は雲の影でさえぎる）。夜は街明かりの照り返し（ほのかな橙）を足す
-import { ATMOS, exposureFor, nightBase, radiance, sunTransmittance, type Vec3 } from "./atmosphere";
+import { ATMOS, CLEAN_AIR, exposureFor, nightBase, radiance, sunTransmittance, type AirParams, type Vec3 } from "./atmosphere";
 import { smoothstep } from "./sun";
 
 export type SH = [Vec3, Vec3, Vec3, Vec3];
@@ -23,15 +23,15 @@ const DIRS = sphere(64);
  * 面の向き n が受ける空からの光（露出をかけた放射照度）を E(n) = c0 + c1·n.x + c2·n.y + c3·n.z で近似した係数。
  * 地面からの照り返し（反射率 0.12）も含む。cloud（0〜1）が大きいほど灰色の一様な光に寄せる
  */
-export function skyIrradianceSH(sun: Vec3, sunAltitude: number, cloud: number): SH {
+export function skyIrradianceSH(sun: Vec3, sunAltitude: number, cloud: number, air: AirParams = CLEAN_AIR): SH {
   const e = exposureFor(sunAltitude);
   const L: Vec3[] = [];
   let upSum: Vec3 = [0, 0, 0];
   let upN = 0;
   for (const d of DIRS) {
     if (d[2] > 0.02) {
-      const r = radiance(d, sun);
-      const nb = nightBase((Math.asin(d[2]) * 180) / Math.PI);
+      const r = radiance(d, sun, air.aero);
+      const nb = nightBase((Math.asin(d[2]) * 180) / Math.PI, air.glow);
       const v: Vec3 = [r[0] * e + nb[0], r[1] * e + nb[1], r[2] * e + nb[2]];
       L.push(v);
       upSum = [upSum[0] + v[0] * d[2], upSum[1] + v[1] * d[2], upSum[2] + v[2] * d[2]];
@@ -40,7 +40,7 @@ export function skyIrradianceSH(sun: Vec3, sunAltitude: number, cloud: number): 
   }
   // 上向きの面への空の放射照度 ≒ 2π × 平均（cos の重み）
   const Eup: Vec3 = upSum.map((x) => (x / Math.max(upN, 1e-6)) * Math.PI) as Vec3;
-  const T = sunTransmittance(sun);
+  const T = sunTransmittance(sun, air.aero);
   const Esun: Vec3 = T.map((t) => t * ATMOS.sun * e * Math.max(0, sun[2])) as Vec3;
   const ground: Vec3 = [0, 1, 2].map((j) => (0.12 * (Eup[j] + Esun[j])) / Math.PI) as Vec3;
   // 曇り：上からの灰色の光（晴れの日の上向きの光の 4 割ほど）
@@ -68,9 +68,9 @@ export function skyIrradianceSH(sun: Vec3, sunAltitude: number, cloud: number): 
 export const irradiance = (sh: SH, n: Vec3): Vec3 => [0, 1, 2].map((j) => sh[0][j] + sh[1][j] * n[0] + sh[2][j] * n[1] + sh[3][j] * n[2]) as Vec3;
 
 /** 太陽の直射（露出をかけた放射照度。太陽に向いた面）。沈んでいれば 0 */
-export function sunIrradiance(sun: Vec3, sunAltitude: number): Vec3 {
+export function sunIrradiance(sun: Vec3, sunAltitude: number, aero = 1): Vec3 {
   const e = exposureFor(sunAltitude);
-  return sunTransmittance(sun).map((t) => Math.round(t * ATMOS.sun * e * 1e4) / 1e4) as Vec3;
+  return sunTransmittance(sun, aero).map((t) => Math.round(t * ATMOS.sun * e * 1e4) / 1e4) as Vec3;
 }
 
 /** 窓・街灯・タワーの明かりが見える度合い（日没前から、朝は日の出の後に消える） */

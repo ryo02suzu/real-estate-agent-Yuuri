@@ -9,13 +9,24 @@ describe("大気の計算（空をコードで描く式）", () => {
     expect(top[2]).toBeGreaterThan(top[0] + 60);
     expect(Math.min(...hz)).toBeGreaterThan(200);
   });
-  it("日没の太陽の方向は赤く、反対側より明るい", () => {
+  it("日没の太陽の方向は赤く、反対側より明るい（澄んだ冬の空気）。霞が濃いと差が小さい", () => {
     const s = dirFromAltAz(-3, 262);
-    const toward = radiance(dirFromAltAz(2, 262), s);
-    const away = radiance(dirFromAltAz(2, 82), s);
+    const toward = radiance(dirFromAltAz(2, 262), s, 0.3);
+    const away = radiance(dirFromAltAz(2, 82), s, 0.3);
     expect(toward[0]).toBeGreaterThan(toward[2] * 3);
     expect(toward[0]).toBeGreaterThan(away[0] * 1.5);
     expect(toward[0] / toward[2]).toBeGreaterThan(away[0] / away[2]);
+    const hazyToward = radiance(dirFromAltAz(2, 262), s, 2.5);
+    const hazyAway = radiance(dirFromAltAz(2, 82), s, 2.5);
+    expect(hazyToward[0]).toBeGreaterThanOrEqual(hazyAway[0]);
+    expect(hazyToward[0] / hazyAway[0]).toBeLessThan(toward[0] / away[0]);
+  });
+  it("霞が多いほど空は白っぽく（青と赤の差が小さく）、遠くの太陽は暗い", () => {
+    const s = dirFromAltAz(55, 180);
+    const clear = skyColor(dirFromAltAz(24, 262), s, 55, { aero: 0.15, glow: 1 });
+    const hazy = skyColor(dirFromAltAz(24, 262), s, 55, { aero: 3, glow: 1 });
+    expect(hazy[2] - hazy[0]).toBeLessThan((clear[2] - clear[0]) * 0.6);
+    expect(sunTransmittance(dirFromAltAz(5, 262), 3)[0]).toBeLessThan(sunTransmittance(dirFromAltAz(5, 262), 0.15)[0] * 0.6);
   });
   it("太陽が沈むほど空は暗くなり、−18° より下では散乱の光がほぼ無い", () => {
     let prev = Infinity;

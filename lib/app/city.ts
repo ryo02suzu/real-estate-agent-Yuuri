@@ -2,14 +2,13 @@
 //  窓の明かり：建物の用途（PLATEAU の属性）ごとに、曜日・祝日・時刻で点いている割合を決める（オフィスは平日の夜に階ごとに消え、
 //  土日祝と年末年始は暗い。住宅は夜に増えて深夜に減る）。見通し（遠くの霞・富士山が見えるか）は湿度と天気から。
 //  富士山の雪線は月ごと、木は季節（桜・新緑・紅葉・冬枯れ）で色を変える。どれも演出のためのおおまかな値
+import { airFrom } from "./air";
+import { ATMOS } from "./atmosphere";
+import { jstDate } from "./city-date";
 import type { Weather } from "./weather";
 import { jstHours } from "./weather";
 
-/** 日本時間の年月日（0 時から） */
-export function jstDate(at: Date): { y: number; m: number; d: number; dow: number } {
-  const t = new Date(at.getTime() + 9 * 3600e3);
-  return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate(), dow: t.getUTCDay() };
-}
+export { jstDate };
 
 const nthMonday = (y: number, m: number, n: number) => {
   const first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
@@ -106,15 +105,9 @@ export function windowOccupancy(at: Date): number[] {
   return [0, 1, 2, 3, 4, 5, 6].map((k) => (k === 0 ? 0 : Math.round(lerpCurve(c[k], h) * 1000) / 1000));
 }
 
-/** 見通し（km）。乾いた冬の晴れた日は富士山（約 100km）が見える。湿度が高い・雨・雪・霧で短くなる */
+/** 見通し（km。コシュミーダーの式）。空の霞と同じ量（lib/app/air.ts）から。乾いた冬の晴れた日は富士山（約 100km）が見え、雨・雪・霧で短くなる */
 export function visibilityKm(w: Weather, at: Date): number {
-  const { m } = jstDate(at);
-  // 湿度が分からないときは季節の目安（冬は乾いて遠くまで、夏は霞む）
-  const seasonal = [0, 75, 70, 50, 40, 32, 24, 22, 22, 30, 50, 60, 70][m];
-  // 夏は同じ湿度でも霞が濃い（もや・汚れ）ので季節の係数をかける
-  const haze = [0, 1, 1, 0.95, 0.85, 0.75, 0.65, 0.55, 0.55, 0.6, 0.75, 0.9, 1][m];
-  let v = w.humidity === null ? seasonal : 320 * Math.exp(-0.034 * (Math.max(20, w.humidity) - 20)) * haze;
-  v = Math.min(v, m >= 5 && m <= 9 ? 60 : 200);
+  let v = 3.912 / (ATMOS.betaM * ATMOS.mieExt * airFrom(w, at).aero + 0.0115);
   if (w.precip > 0) v = Math.min(v, (w.kind === "snow" ? 4.5 : 8) * (1 - 0.5 * w.precip) + 1.5);
   if (w.fog > 0) v = Math.min(v, Math.max(0.6, 12 * (1 - w.fog) ** 2));
   if (w.cloud > 0.9 && w.precip === 0) v = Math.min(v, 35);

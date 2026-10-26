@@ -1,7 +1,7 @@
 // 空をコードで描くための大気の計算（太陽の光が空気で散らばる様子＝単一散乱）。時間連動ヘッダーの空（components/app/sky-canvas.tsx の
 // シェーダー）と、CSS の色（lib/app/sky-vars.ts）の両方がこの式を使う。写真は使わない。
 //  - 地球を半径 6371km の球、大気を 80km の厚さとして、見る方向の光線に沿って 12 点で「太陽の光がそこまで届く量 × 散らばって目に向かう量」を足す
-//  - レイリー散乱（空の青・夕焼けの赤）、ミー散乱（太陽のまわりの白いにじみ、霞）、オゾンの吸収（薄明の深い青紫）
+//  - レイリー散乱（空の青・夕焼けの赤）、ミー散乱（太陽のまわりの白いにじみ、霞。量は湿度と季節で変わる。lib/app/air.ts）、オゾンの吸収（薄明の深い青紫）
 //  - 日没後も、高い所の空気にはまだ日が当たるので、薄明の光が自然に出る。夜は街の明かりの照り返しと星・月（コードで描く）
 // 値は km。色は線形 RGB（露出とガンマは tone() で）
 export type Vec3 = [number, number, number];
@@ -14,9 +14,14 @@ export const ATMOS = {
   /** レイリー散乱の係数（R,G,B。/km）とスケールハイト（km） */
   betaR: [5.8e-3, 13.5e-3, 33.1e-3] as Vec3,
   HR: 8,
-  /** ミー散乱（霞）。都市の空気なので少し濃い。g は前方への偏り */
-  betaM: 4.0e-3,
+  /**
+   * ミー散乱（霞）。地表近くの層（スケールハイト HM。量は湿度と季節＝ air.aero を掛ける。lib/app/air.ts。1 で見通し約 20km、
+   * 乾いた冬の 0.15 で約 100km、湿った夏の 2〜3 で 6〜10km）と、湿度によらない上空の薄い霞（bgMie、空気と同じ分布。
+   * 日没後の西の空の赤みのもと）。g は前方への偏り
+   */
+  betaM: 0.17,
   HM: 1.2,
+  bgMie: 0.025,
   g: 0.76,
   mieExt: 1.1,
   /** オゾンの吸収（R,G,B。/km。高さ 25km を中心に ±15km の山形） */
@@ -83,13 +88,17 @@ function hitNear(o: Vec3, d: Vec3, r: number): number {
   return t > 0 ? t : -1;
 }
 
-/** 高さ h（km）での空気・霞・オゾンの密度（地上を 1 とする） */
-function densities(h: number): Vec3 {
-  return [Math.exp(-h / ATMOS.HR), Math.exp(-h / ATMOS.HM), Math.max(0, 1 - Math.abs(h - 25) / 15)];
+/** 高さ h（km）での空気・霞・オゾンの密度（地上を 1 とする）。霞は地表近くの層（× aero）と上空の薄い霞 */
+function densities(h: number, aero = 1): Vec3 {
+  return [Math.exp(-h / ATMOS.HR), aero * Math.exp(-h / ATMOS.HM) + ATMOS.bgMie * Math.exp(-h / ATMOS.HR), Math.max(0, 1 - Math.abs(h - 25) / 15)];
 }
 
+/** 空気のにごり（air.aero。霞の係数に掛ける）と夜の空の地の倍率（air.glow） */
+export type AirParams = { aero: number; glow: number };
+export const CLEAN_AIR: AirParams = { aero: 1, glow: 1 };
+
 /** 点 p から太陽の向き s へ、大気の上端までの光学的厚さ（R,G,B の吸収・散乱の合計）。地面にさえぎられたら null */
-function depthToSun(p: Vec3, s: Vec3): Vec3 | null {
+function depthToSun(p: Vec3, s: Vec3, aero = 1): Vec3 | null {
   if (hitNear(p, s, ATMOS.Re) > 0) return null;
   const t = hitFar(p, s, ATMOS.Ra);
   const n = ATMOS.lightSamples;
@@ -101,7 +110,7 @@ function depthToSun(p: Vec3, s: Vec3): Vec3 | null {
     const k = (i + 0.5) * step;
     const q: Vec3 = [p[0] + s[0] * k, p[1] + s[1] * k, p[2] + s[2] * k];
     const h = Math.sqrt(dot(q, q)) - ATMOS.Re;
-    const [a, b, c] = densities(h);
+    const [a, b, c] = densities(h, aero);
     dR += a * step;
     dM += b * step;
     dO += c * step;
@@ -113,7 +122,8 @@ function depthToSun(p: Vec3, s: Vec3): Vec3 | null {
  * 見る向き v（単位ベクトル）の空の放射輝度（線形 RGB。太陽本体・月・星は含まない）。
  * 太陽の向き s。地面に向かう光線は、地面までの空気の散乱だけ
  */
-export function radiance(v: Vec3, s: Vec3): Vec3 {
+export function radiance(v: Vec3, s: Vec3, aero = 1): Vec3 {
+  const bM = ATMOS.betaM;
   const o: Vec3 = [0, 0, ATMOS.Re + ATMOS.h0];
   const ground = hitNear(o, v, ATMOS.Re);
   const far = ground > 0 ? ground : hitFar(o, v, ATMOS.Ra);
@@ -131,22 +141,22 @@ export function radiance(v: Vec3, s: Vec3): Vec3 {
     const k = (i + 0.5) * step;
     const p: Vec3 = [o[0] + v[0] * k, o[1] + v[1] * k, o[2] + v[2] * k];
     const h = Math.sqrt(dot(p, p)) - ATMOS.Re;
-    const [a, b, c] = densities(h);
+    const [a, b, c] = densities(h, aero);
     tR += a * step;
     tM += b * step;
     tO += c * step;
-    const ds = depthToSun(p, s);
+    const ds = depthToSun(p, s, aero);
     if (!ds) continue;
     for (let j = 0; j < 3; j++) {
-      const tau = ds[j] + ATMOS.betaR[j] * tR + ATMOS.betaM * ATMOS.mieExt * tM + ATMOS.betaO[j] * tO;
+      const tau = ds[j] + ATMOS.betaR[j] * tR + bM * ATMOS.mieExt * tM + ATMOS.betaO[j] * tO;
       const tr = Math.exp(-tau);
-      out[j] += tr * (ATMOS.betaR[j] * a * pR + ATMOS.betaM * b * pM) * step;
+      out[j] += tr * (ATMOS.betaR[j] * a * pR + bM * b * pM) * step;
     }
   }
   // 何度も散らばった光の近似：見る方向の空気の厚さに応じて、空の平均の色で光る。色は低い層と高い層に届く太陽の光
-  const lit = msLight(s);
+  const lit = msLight(s, aero);
   for (let j = 0; j < 3; j++) {
-    const thick = 1 - Math.exp(-ATMOS.betaR[j] * tR - ATMOS.betaM * ATMOS.mieExt * tM);
+    const thick = 1 - Math.exp(-ATMOS.betaR[j] * tR - bM * ATMOS.mieExt * tM);
     out[j] += ATMOS.msStrength * ATMOS.msColor[j] * thick * lit[j];
   }
   return out.map((x) => x * ATMOS.sun) as Vec3;
@@ -168,24 +178,24 @@ export function exposureFor(sunAltitude: number): number {
 }
 
 /** 何度も散らばった光の色のもと：低い層（msLow）と高い層（msHigh）に届く太陽の光（0〜1） */
-function msLight(s: Vec3): Vec3 {
-  const lo = depthToSun([0, 0, ATMOS.Re + ATMOS.msLow], s);
-  const hi = depthToSun([0, 0, ATMOS.Re + ATMOS.msHigh], s);
+function msLight(s: Vec3, aero = 1): Vec3 {
+  const lo = depthToSun([0, 0, ATMOS.Re + ATMOS.msLow], s, aero);
+  const hi = depthToSun([0, 0, ATMOS.Re + ATMOS.msHigh], s, aero);
   const w = ATMOS.msLowWeight;
   return [0, 1, 2].map((j) => w * (lo ? Math.exp(-lo[j]) : 0) + (1 - w) * (hi ? Math.exp(-hi[j]) : 0)) as Vec3;
 }
 
 /** 太陽の光が、見る人の所までどれだけ届くか（0〜1。R,G,B）。太陽本体の色と、街に当たる光の色に */
-export function sunTransmittance(s: Vec3): Vec3 {
+export function sunTransmittance(s: Vec3, aero = 1): Vec3 {
   const o: Vec3 = [0, 0, ATMOS.Re + ATMOS.h0];
-  const d = depthToSun(o, s);
+  const d = depthToSun(o, s, aero);
   return d ? (d.map((x) => Math.exp(-x)) as Vec3) : [0, 0, 0];
 }
 
-/** 夜の空の地（街の明かりの照り返しは地平線の近くで強い）。線形の放射輝度 */
-export function nightBase(elevationDeg: number): Vec3 {
+/** 夜の空の地（街の明かりの照り返しは地平線の近くで強い。霞が多いと明るい＝glow）。線形の放射輝度 */
+export function nightBase(elevationDeg: number, glow = 1): Vec3 {
   const f = Math.exp(-Math.max(0, elevationDeg) / ATMOS.nightHorizonFalloff);
-  return [0, 1, 2].map((i) => ATMOS.nightZenith[i] + ATMOS.nightHorizon[i] * f) as Vec3;
+  return [0, 1, 2].map((i) => (ATMOS.nightZenith[i] + ATMOS.nightHorizon[i] * f) * glow) as Vec3;
 }
 
 /** 露出をかけた後の線形の明るさ → 画面の 0〜255（ガンマ 2.2） */
@@ -194,17 +204,17 @@ export function tone(c: Vec3): Vec3 {
 }
 
 /** 露出をかけた後の線形の明るさ（太陽本体・月・星は含まない）。見る向き・太陽の向き・太陽の高度（露出の決定に） */
-export function skyLinear(v: Vec3, s: Vec3, sunAltitude: number): Vec3 {
-  const L = radiance(v, s);
+export function skyLinear(v: Vec3, s: Vec3, sunAltitude: number, air: AirParams = CLEAN_AIR): Vec3 {
+  const L = radiance(v, s, air.aero);
   const e = exposureFor(sunAltitude);
   const elev = Math.asin(Math.max(-1, Math.min(1, v[2]))) / R;
-  const nb = nightBase(elev);
+  const nb = nightBase(elev, air.glow);
   return [L[0] * e + nb[0], L[1] * e + nb[1], L[2] * e + nb[2]];
 }
 
 /** 空の色（太陽本体・月・星は含まない）。画面の 0〜255 */
-export function skyColor(v: Vec3, s: Vec3, sunAltitude: number): Vec3 {
-  return tone(skyLinear(v, s, sunAltitude));
+export function skyColor(v: Vec3, s: Vec3, sunAltitude: number, air: AirParams = CLEAN_AIR): Vec3 {
+  return tone(skyLinear(v, s, sunAltitude, air));
 }
 
 /** 画面に描く光（0〜1。露出・ガンマ前）の相対輝度 */

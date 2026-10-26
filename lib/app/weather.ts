@@ -99,7 +99,7 @@ export function parseWeatherOverride(hash: string): Weather | null {
     case "snow":
       return { ...base, kind: "snow", cloud: 0.95, precip: amount, fog: 0.3, temp: 0 };
     case "fog":
-      return { ...base, kind: "cloudy", cloud: 0.9, fog: Number.isFinite(n) ? amount : 0.7, humidity: 99 };
+      return { ...base, kind: "cloudy", cloud: 0.9, fog: Number.isFinite(n) ? amount : 0.7, humidity: base.humidity ?? 99 };
     default:
       return null;
   }
