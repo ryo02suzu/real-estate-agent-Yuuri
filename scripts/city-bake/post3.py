@@ -1,6 +1,7 @@
 # 1 倍に縮めて詰める：色・法線と空の見え方・距離と種類・窓・塔と道路。影用の高さ地図（真上）と航空障害灯の位置
 import os, numpy as np, json, math, sys, os
 from PIL import Image
+from scipy import ndimage
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from load_bake import load
 from geo import CAM, GEOID
@@ -69,6 +70,9 @@ def pack(k, tag):
         while m.ndim < b.ndim: m = m[..., None]
         return (b * m).sum(2) / np.maximum(m.sum(2), 1e-6)
     alb1 = gmean(A)
+    # 色を少しだけ研ぐ（縮めて柔らかくなった分を戻す。カメラの輪郭強調と同じ程度。街の画素だけ）
+    blur = np.stack([ndimage.gaussian_filter(alb1[..., c], 0.8) for c in range(3)], -1)
+    alb1 = np.where((cov > 0.5)[..., None], np.clip(alb1 + 0.55 * (alb1 - blur), 0, 1), alb1)
     n1 = gmean(N); n1 /= np.maximum(np.linalg.norm(n1, axis=-1, keepdims=True), 1e-6)
     svf1 = np.where(cov > 0, gmean(svf), 1.0)
     ld = np.log(np.clip(dist, 100, 200000) / 100) / math.log(2000)

@@ -219,8 +219,9 @@ export function skyLinear(v: Vec3, s: Vec3, sunAltitude: number, air: AirParams 
 }
 
 /** 空の色（太陽本体・月・星は含まない）。画面の 0〜255 */
-export function skyColor(v: Vec3, s: Vec3, sunAltitude: number, air: AirParams = CLEAN_AIR): Vec3 {
-  return tone(skyLinear(v, s, sunAltitude, air));
+export function skyColor(v: Vec3, s: Vec3, sunAltitude: number, air: AirParams = CLEAN_AIR, adjust = 1): Vec3 {
+  const L = skyLinear(v, s, sunAltitude, air);
+  return tone([L[0] * adjust, L[1] * adjust, L[2] * adjust]);
 }
 
 /** 画面に描く光（0〜1。露出・ガンマ前）の相対輝度 */

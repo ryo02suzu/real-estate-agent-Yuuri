@@ -16,13 +16,14 @@
 import * as SunCalc from "suncalc";
 import { useEffect, useRef, type CSSProperties } from "react";
 import { ATMOS, dirFromAltAz, exposureFor, sunTransmittance, sunTransmittanceAt } from "@/lib/app/atmosphere";
-import { airFrom } from "@/lib/app/air";
+import { airFrom, type Air } from "@/lib/app/air";
 import { snowlineM, treeSeason, visibilityKm, windowOccupancy } from "@/lib/app/city";
 import { artificialVisibility, cityAmbient, skyIrradianceSH, sunIrradiance } from "@/lib/app/city-light";
 import { CAM_LL, cloudDrift, currentSky, flashAt, parseTime, sunVisibility, type LiveSky } from "@/lib/app/satellite";
 import { BASE, HOME_CAMERA, overrideTime, smoothstep, solar, type Camera } from "@/lib/app/sun";
 import { towerLight } from "@/lib/app/tower";
 import { currentWeather } from "@/lib/app/weather";
+import { meterExposure } from "@/lib/app/sky-vars";
 import { SKY_EVENT } from "./sky-event";
 
 const VERT = `attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}`;
@@ -87,7 +88,8 @@ float d=decodeDist(g);vec3 v=viewDir(uv);vec3 P=v*d;
 vec3 n=normalize(texture2D(u_nrm,iuv).rgb*2.0-1.0);
 float lit=max(dot(n,u_sun),0.0);
 /* 影：今の太陽の向きへ高さ地図をたどり、途中の建物・地形が光線より高ければ影 */
-if(lit>0.0){float hs=length(u_sun.xy);
+/* 東京タワーは格子：どの向きから見ても日の当たる部材が透けて見えるので、面の向きによらず昼はおおむね照る（高さ地図では自分の影にしない） */
+if(typ==4.0)lit=(0.35+0.5*lit)*step(0.0,u_sun.z);else if(lit>0.0){float hs=length(u_sun.xy);
 if(hs>1e-4&&d<9000.0){vec2 sd=u_sun.xy/hs;float ta=u_sun.z/hs;vec2 q0=P.xy+n.xy*2.5;float z0=P.z+0.7+max(n.z,0.0)*0.6;
 float s=4.0;float oc=0.0;
 for(int i=0;i<30;i++){float h=dsmH(q0+sd*s);float ray=z0+s*ta;oc=max(oc,clamp((h-ray)/(1.5+s*0.015),0.0,1.0));s*=1.2;}
@@ -184,10 +186,10 @@ if(u_moonOn>0.5){vec3 m=u_moon;vec3 mu_=normalize(cross(m,vec3(0.0,0.0,1.0)));ve
 float vis=clamp(1.0-skyLum*3.0,0.08,1.0)*(1.0-u_cloud*0.85);float tm=acos(clamp(dot(v,m),-1.0,1.0));
 if(rr<1.0){float nz=sqrt(1.0-rr);vec3 n=-m*nz+mu_*dx+mv*dy;float l=max(0.0,dot(n,u_sun));float edge=1.0-smoothstep(0.9,1.0,rr);sky+=vec3(1.0,0.97,0.9)*(l*0.85+0.03)*edge*vis;}
 sky+=vec3(0.9,0.92,1.0)*0.09*exp(-tm/(0.04*u_haze))*vis;}
-/* 星（暗いときだけ。雲の後ろ。街明かりで地平線の近くは見えない） */
+/* 星（暗いときだけ。雲の後ろ。東京の空は街明かりで明るく、見えるのは明るい星だけ＝帯に十数個。地平線の近くは見えない） */
 if(u_stars>0.0){float az=atan(v.x,v.y);vec2 cell=vec2(az,asin(clamp(v.z,-1.0,1.0)))/0.0061;vec2 id=floor(cell);float h1=hash21(id);
-if(h1<0.013){vec2 cen=id+0.5+vec2(hash21(id+1.3),hash21(id+7.1))*0.6-0.3;float dd=length(cell-cen);float b=pow(hash21(id+3.7),3.0)*0.9+0.08;
-sky+=vec3(0.85,0.9,1.0)*b*exp(-dd*dd*9.0)*u_stars*clamp(1.0-skyLum*6.0,0.0,1.0)*smoothstep(0.03,0.3,v.z);}}
+if(h1<0.0014){vec2 cen=id+0.5+vec2(hash21(id+1.3),hash21(id+7.1))*0.6-0.3;float dd=length(cell-cen);float b=pow(hash21(id+3.7),2.0)*0.85+0.15;
+sky+=vec3(0.85,0.9,1.0)*b*exp(-dd*dd*9.0)*u_stars*clamp(1.0-skyLum*6.0,0.0,1.0)*smoothstep(0.08,0.45,v.z);}}
 sky=mix(sky,cloudColH,dH*0.93);sky=mix(sky,cloudColL,dL*0.95);
 /* 稲光：発雷域の向きの雲と空が一瞬明るくなる */
 if(u_flash>0.0){float ang=acos(clamp(dot(normalize(v.xy+vec2(1e-5,0.0)),u_flashDir),-1.0,1.0));float k=u_flash*exp(-ang*ang/0.22)*smoothstep(-0.02,0.08,v.z);sky+=vec3(0.85,0.88,1.0)*k*(0.25+1.2*max(dL,dH));}
@@ -218,9 +220,17 @@ a*=1.0-0.38*u_wet*up*(1.0-u_snowCover);
 /* 雲の影：太陽の向きにたどって雲の層に当たる所の雲の濃さ（本物の雲の影） */
 float cs=cloudShadow(P.xy/1000.0,P.z/1000.0);
 vec3 E=max(u_sh0+u_sh1*n.x+u_sh2*n.y+u_sh3*n.z,vec3(0.0));
-vec3 L=a*(u_sunE*pre.r*cs+E*ao*0.8)/3.14159265+a*u_amb*(0.35+0.65*ao);
+/* 空からの光は建物どうしの照り返しで青みが薄まる。建物の間（空の見え方が小さい所）は暗い */
+E=mix(E,vec3(dot(E,vec3(0.2126,0.7152,0.0722))),0.45);
+vec3 L=a*(u_sunE*pre.r*cs+E*ao*(0.45+0.45*ao))/3.14159265+a*u_amb*(0.35+0.65*ao);
 /* 濡れた屋根・道は空を映す（夜は街灯も） */
 L+=haze*0.10*u_wet*up*(1.0-u_snowCover);
+/* ガラス：窓は空を映す（斜めから見るほど強く＝フレネル。オフィスの熱線反射ガラスは正面でも 12% ほど映す）。太陽の映り込みはきらりと光る */
+if(typ<2.5){float glass=texture2D(u_win,iuv).r*(aux<1.5?1.0:0.7)*(1.0-u_snowCover);
+if(glass>0.01){float nv=max(dot(n,-v),0.0);float f0=aux<1.5?0.12:0.05;float F=f0+(1.0-f0)*pow(1.0-nv,5.0);vec3 rv=reflect(v,n);
+vec3 refl=rv.z>0.0?mix(hz*0.9,zen,smoothstep(0.0,0.5,rv.z)):L*0.8;
+float glint=pow(max(dot(rv,u_sun),0.0),180.0)*step(0.0,u_sun.z)*sunVis*min(pre.r*4.0,1.0);
+L+=glass*(F*refl+glint*u_sunE*0.12);}}
 /* 窓（用途で色が違う：オフィスは白、住宅は暖色が多い） */
 if(pre.g>0.0){vec3 w=texture2D(u_win,iuv).rgb;
 vec3 wc=aux<1.5?mix(vec3(0.86,0.92,1.0),vec3(1.0,0.9,0.74),step(0.6,fract(w.b*5.1))):(aux<2.5?vec3(1.0,0.84,0.62):(aux<3.5?vec3(1.0,0.76,0.5):(aux<4.5?mix(vec3(1.0,0.7,0.4),vec3(0.9,0.94,1.0),step(0.75,fract(w.g*7.3))):vec3(0.96,0.9,0.8))));
@@ -249,7 +259,7 @@ outc=mix(outc,haze*0.78,1.0-exp(-od));}
 vec3 col=tone(outc*u_expAdj);
 /* 霧・雨・雪のときは、空も地平線の近くが白っぽく */
 float fogC=clamp(u_fog+u_precip*0.35+u_snow*0.3,0.0,1.0);
-col=mix(col,tone(haze),clamp(fogC*0.55*smoothstep(0.2,u_horizon,iuv.y)*(1.0-cov),0.0,0.85));
+col=mix(col,tone(haze*u_expAdj),clamp(fogC*0.55*smoothstep(0.2,u_horizon,iuv.y)*(1.0-cov),0.0,0.85));
 /* 雨・雪 */
 if(u_precip>0.0){if(u_snow>0.5){float s=snow(uv,26.0,0.075,1.0)+0.6*snow(uv,52.0,0.13,5.0);col=mix(col,vec3(0.96,0.97,1.0),clamp(s,0.0,1.0)*0.9);}
 else{float r=rain(uv,vec2(62.0,7.0),1.4,1.0)+0.6*rain(uv,vec2(115.0,12.0),2.1,7.0);col+=vec3(0.72,0.78,0.88)*r*0.34*(0.5+0.5*u_precip);}}
@@ -512,6 +522,12 @@ function lightValues(at: Date, sun: [number, number, number], altitude: number) 
   return lightCache.v;
 }
 
+let meterCache: { key: string; v: number } | null = null;
+function meterCached(altitude: number, azimuth: number, cam: Camera, air: Air): number {
+  const key = `${altitude.toFixed(2)}|${azimuth.toFixed(2)}|${cam.bearing}|${cam.horizon}|${air.aero}`;
+  if (!meterCache || meterCache.key !== key) meterCache = { key, v: meterExposure(altitude, azimuth, cam, air) };
+  return meterCache.v;
+}
 function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, still: boolean) {
   const { gl } = g;
   const s = solar(at);
@@ -666,10 +682,8 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
   gl.uniform1f(m.u_time, seconds);
   // 雲の流れ：風は西寄り（画面の左から右へゆっくり）
   gl.uniform2f(m.u_wind, 0.004 + (w.wind ?? 2) * 0.0012, 0.0015);
-  // 太陽が画面の近くにある逆光のときは、カメラのように露出を絞る（明るい空に合わせて街は暗く）
-  const facing = sun[0] * b.f[0] + sun[1] * b.f[1] + sun[2] * b.f[2];
-  const backlit = smoothstep(Math.cos(50 * R), Math.cos(6 * R), facing) * smoothstep(22, 1, s.altitude) * smoothstep(-5, -0.5, s.altitude);
-  gl.uniform1f(m.u_expAdj, showCity ? 1 - 0.42 * backlit : 1);
+  // カメラの自動露出：帯に入る空が明るすぎる（逆光の午後）ときは絞る。CSS の空の色（lib/app/sky-vars.ts）と同じ値
+  gl.uniform1f(m.u_expAdj, meterCached(s.altitude, s.azimuth, cam, air));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   // 3 枚目：航空障害灯（足し合わせ）
   if (showCity && lv && g.lights && g.pts && lv.lightsVis > 0.01 && !lightsOff()) {

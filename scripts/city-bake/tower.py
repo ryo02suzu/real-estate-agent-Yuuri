@@ -1,4 +1,5 @@
 # 東京タワーの格子の模型（寸法は公開の値と PLATEAU の外形から）。カメラの ENU で出力する
+#  部材の太さは実寸より少し太め：約 1.7km 先では画素に満たない部材が縮小で薄れるので、遠目に見える格子の密度（下半分で 5〜6 割）に合わせる
 #  高さ 333m、大展望台（メインデッキ）145〜150m、特別展望台（トップデッキ）250m、脚の間隔 約 88m
 #  塗り分け：大展望台より下はインターナショナルオレンジ、大展望台は白、その上は白とオレンジの 7 等分（最上部と最下部はオレンジ）
 #  属性：色（rgb）、部位（0 格子 1 大展望台のガラス 2 特別展望台のガラス 3 アンテナ 4 フットタウン 5 チョーカー 6 ティアラ）、照明の当たり（0〜1）、段（ダイヤモンドヴェールの 17 段）
@@ -70,10 +71,10 @@ for sx, sy in SIGNS:
         if z1 > 262: break
         lw = legw(z0)
         a = corner(z0, sx, sy); b = corner(z1, sx, sy)
-        box(a, b, max(lw * 0.45, 1.1), 0)
+        box(a, b, max(lw * 0.6, 1.5), 0)
         ai = corner(z0, sx, sy, inset=lw * 0.9); bi = corner(z1, sx, sy, inset=legw(z1) * 0.9)
-        box(ai, bi, max(lw * 0.3, 0.8), 0)
-        box(a, bi, 0.7, 0); box(ai, b, 0.7, 0)
+        box(ai, bi, max(lw * 0.42, 1.1), 0)
+        box(a, bi, 0.95, 0); box(ai, b, 0.95, 0)
 # 各面：横材とバツ印の斜材、下はアーチ
 faces = [((-1, -1), (1, -1)), ((1, -1), (1, 1)), ((1, 1), (-1, 1)), ((-1, 1), (-1, -1))]
 for (ax, ay), (bx, by) in faces:
@@ -88,23 +89,23 @@ for (ax, ay), (bx, by) in faces:
         if ay == by: y = ay * w(z)
         if ax == bx: x = ax * w(z)
         pts.append((x, y, z))
-    for p, q in zip(pts, pts[1:]): box(p, q, 1.6, 0)
+    for p, q in zip(pts, pts[1:]): box(p, q, 2.1, 0)
     for z0, z1 in zip(levels, levels[1:]):
         if z0 < 45 or z1 > 262: continue
         a0, b0 = corner(z0, ax, ay), corner(z0, bx, by)
         a1, b1 = corner(z1, ax, ay), corner(z1, bx, by)
-        box(a0, b0, 0.9, 0)
+        box(a0, b0, 1.25, 0)
         if 140 <= z0 < 158: continue  # 大展望台の中
-        box(a0, b1, 0.6, 0); box(b0, a1, 0.6, 0)
+        box(a0, b1, 0.85, 0); box(b0, a1, 0.85, 0)
         if z1 <= 140:
             m0 = tuple((np.array(a0) + np.array(b0)) / 2); m1 = tuple((np.array(a1) + np.array(b1)) / 2)
-            box(m0, m1, 0.7, 0)
+            box(m0, m1, 0.95, 0)
 # 大展望台（2 層）とトップデッキ、チョーカーとティアラ
 slab(140, 141.3, 16.6, 0, WHITE); slab(141.3, 149.4, 16.4, 1, GLASS); slab(149.4, 151.0, 16.6, 0, WHITE); slab(151.0, 155.6, 15.6, 1, GLASS); slab(155.6, 158.5, 15.9, 5, WHITE)
 slab(246.0, 246.9, 7.4, 0, WHITE); slab(246.9, 251.0, 7.2, 2, GLASS); slab(251.0, 253.6, 7.5, 6, WHITE)
 # 上の格子からアンテナ
 for z0, z1 in ((253, 262),):
-    for sx, sy in SIGNS: box(corner(z0, sx, sy), corner(z1, sx, sy), 0.9, 0)
+    for sx, sy in SIGNS: box(corner(z0, sx, sy), corner(z1, sx, sy), 1.2, 0)
 seg = [(262, 1.9), (275, 1.6), (296, 1.3), (313, 1.0), (333, 0.5)]
 for (z0, r0), (z1, r1) in zip(seg, seg[1:]):
     n = 10

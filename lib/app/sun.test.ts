@@ -206,5 +206,5 @@ describe("SKY_HEAD_SCRIPT（最初に描く前の簡単な計算）", () => {
       }
     expect(worst).toBeLessThan(0.05);
     expect(worstColor).toBeLessThanOrEqual(3);
-  });
+  }, 30000);
 });

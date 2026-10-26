@@ -6,6 +6,9 @@ import { smoothstep } from "./sun";
 
 export type SH = [Vec3, Vec3, Vec3, Vec3];
 
+/** 街の地面と建物の照り返しの反射率（アスファルト・コンクリート・タイル。少し暖かい灰色） */
+const GROUND: Vec3 = [0.17, 0.16, 0.145];
+
 /** 球の上にほぼ均等に置いた向き（フィボナッチ格子） */
 function sphere(n: number): Vec3[] {
   const out: Vec3[] = [];
@@ -21,7 +24,7 @@ const DIRS = sphere(64);
 
 /**
  * 面の向き n が受ける空からの光（露出をかけた放射照度）を E(n) = c0 + c1·n.x + c2·n.y + c3·n.z で近似した係数。
- * 地面からの照り返し（反射率 0.12）も含む。cloud（0〜1）が大きいほど灰色の一様な光に寄せる
+ * 地面からの照り返し（反射率 0.16 ほどの暖かい灰色）も含む。cloud（0〜1）が大きいほど灰色の一様な光に寄せる
  */
 export function skyIrradianceSH(sun: Vec3, sunAltitude: number, cloud: number, air: AirParams = CLEAN_AIR): SH {
   const e = exposureFor(sunAltitude);
@@ -42,7 +45,7 @@ export function skyIrradianceSH(sun: Vec3, sunAltitude: number, cloud: number, a
   const Eup: Vec3 = upSum.map((x) => (x / Math.max(upN, 1e-6)) * Math.PI) as Vec3;
   const T = sunTransmittance(sun, air.aero);
   const Esun: Vec3 = T.map((t) => t * ATMOS.sun * e * Math.max(0, sun[2])) as Vec3;
-  const ground: Vec3 = [0, 1, 2].map((j) => (0.12 * (Eup[j] + Esun[j])) / Math.PI) as Vec3;
+  const ground: Vec3 = [0, 1, 2].map((j) => (GROUND[j] * (Eup[j] + Esun[j])) / Math.PI) as Vec3;
   // 曇り：上からの灰色の光（晴れの日の上向きの光の 4 割ほど）
   const ocLum = 0.42 * (0.2126 * (Eup[0] + Esun[0]) + 0.7152 * (Eup[1] + Esun[1]) + 0.0722 * (Eup[2] + Esun[2])) / Math.PI;
   const c = Math.pow(Math.max(0, Math.min(1, cloud)), 1.3);

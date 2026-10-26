@@ -4,7 +4,7 @@
 // 1分ごと・復帰時・日時の固定（#t=）の変化で入れ直す。React は変数の値を描かないので、サーバーで作った HTML と食い違わず
 // （Hydration の問題が出ない）、夜に開いても昼の空が一瞬出ない
 import { AERO_SEASON, airFrom, RH_NORMAL, type Air } from "./air";
-import { ATMOS, dirFromAltAz, skyColor, type Vec3 } from "./atmosphere";
+import { ATMOS, CLEAN_AIR, dirFromAltAz, exposureFor, radiance, skyColor, type AirParams, type Vec3 } from "./atmosphere";
 import { blend, HOME_CAMERA, layerOpacity, light, lightX, overrideTime, PHOTO_ORDER, projectSun, solar, type Camera, type Light } from "./sun";
 import { currentWeather, lightsLevel, type Weather } from "./weather";
 
@@ -69,6 +69,31 @@ export function viewDir(cam: Camera, sx: number, sy: number): Vec3 {
   return [d[0] / n, d[1] / n, d[2] / n];
 }
 
+/**
+ * カメラの自動露出：帯の地平線より上の空の明るさ（横 5 × 縦 3 で測った平均。露出込みの線形の輝度。太陽のすぐそばの極端な値は
+ * knee で丸める）が target を超えたら、その分だけ絞る（min〜1）。逆光の午後に空全体が白く飛ばず、太陽の近くだけが白くなる。
+ * 太陽がカメラの後ろにある昼と、沈んでからは 1（測らない）。<head> の最初の計算（SKY_HEAD_SCRIPT の meter）と、帯のシェーダー（u_expAdj）も同じ値
+ */
+export const METER = { target: 1.85, min: 0.4, nx: 5, ny: 3, knee: 10 } as const;
+export function meterExposure(altitude: number, azimuth: number, cam: Camera = HOME_CAMERA, air: AirParams = CLEAN_AIR): number {
+  const s = dirFromAltAz(altitude, azimuth);
+  const fwd = viewDir(cam, 0, 0);
+  if (altitude < -6 || s[0] * fwd[0] + s[1] * fwd[1] + s[2] * fwd[2] < 0) return 1;
+  const e = exposureFor(altitude);
+  const hy = 1 - 2 * cam.horizon;
+  let sum = 0;
+  for (let j = 0; j < METER.ny; j++) {
+    const sy = hy + (1 - hy) * ((j + 0.5) / METER.ny);
+    for (let i = 0; i < METER.nx; i++) {
+      const L = radiance(viewDir(cam, -1 + 2 * ((i + 0.5) / METER.nx), sy), s, air.aero);
+      const y = (0.2126 * L[0] + 0.7152 * L[1] + 0.0722 * L[2]) * e;
+      sum += METER.knee * (1 - Math.exp(-y / METER.knee));
+    }
+  }
+  const mean = sum / (METER.nx * METER.ny);
+  return Math.round(Math.min(1, Math.max(METER.min, METER.target / Math.max(mean, 1e-6))) * 1000) / 1000;
+}
+
 /** 雲で灰色に寄せる（雲量が多いほど彩度を落とし、少し暗く） */
 export function cloudy(c: Vec3, cloud: number): Vec3 {
   const g = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
@@ -81,10 +106,11 @@ export function bandColors(altitude: number, azimuth: number, cam: Camera = HOME
   const s = dirFromAltAz(altitude, azimuth);
   const hy = 1 - 2 * cam.horizon;
   const c = weather.cloud;
+  const x = meterExposure(altitude, azimuth, cam, air);
   return {
-    top: cloudy(skyColor(viewDir(cam, 0, 1), s, altitude, air), c),
-    mid: cloudy(skyColor(viewDir(cam, 0, (1 + hy) / 2), s, altitude, air), c),
-    horizon: cloudy(skyColor(viewDir(cam, 0, hy + 0.04), s, altitude, air), c),
+    top: cloudy(skyColor(viewDir(cam, 0, 1), s, altitude, air, x), c),
+    mid: cloudy(skyColor(viewDir(cam, 0, (1 + hy) / 2), s, altitude, air, x), c),
+    horizon: cloudy(skyColor(viewDir(cam, 0, hy + 0.04), s, altitude, air, x), c),
   };
 }
 
@@ -153,14 +179,15 @@ var lo=d2s([0,0,A.Re+A.msL],s),hi=d2s([0,0,A.Re+A.msH],s);
 for(j=0;j<3;j++){var lit=A.msW*(lo?Math.exp(-lo[j]):0)+(1-A.msW)*(hi?Math.exp(-hi[j]):0),th=1-Math.exp(-A.bR[j]*tR-bm*A.mE*tM);out[j]=(out[j]+A.msS*A.msC[j]*th*lit)*A.sun}
 return out}
 function expo(a){var k=A.ek;if(a>=k[0][0])return k[0][1];for(var i=0;i<k.length-1;i++){if(a<=k[i][0]&&a>=k[i+1][0]){var t=(k[i][0]-a)/(k[i][0]-k[i+1][0]);return Math.exp(Math.log(k[i][1])*(1-t)+Math.log(k[i+1][1])*t)}}return k[k.length-1][1]}
-function skyc(v,s,alt){var L=rad(v,s),e=expo(alt),el=Math.asin(Math.max(-1,Math.min(1,v[2])))/P,f=Math.exp(-Math.max(0,el)/A.nF),o=[0,0,0];for(var j=0;j<3;j++)o[j]=Math.round(255*Math.pow(1-Math.exp(-Math.max(0,L[j]*e+(A.nZ[j]+A.nH[j]*f)*GL)),1/2.2));return o}
+function skyc(v,s,alt,x){var L=rad(v,s),e=expo(alt),el=Math.asin(Math.max(-1,Math.min(1,v[2])))/P,f=Math.exp(-Math.max(0,el)/A.nF),o=[0,0,0];for(var j=0;j<3;j++)o[j]=Math.round(255*Math.pow(1-Math.exp(-Math.max(0,(L[j]*e+(A.nZ[j]+A.nH[j]*f)*GL)*x)),1/2.2));return o}
+function meter(s,alt){if(alt<-6||dt(s,vdir(0,0))<0)return 1;var e=expo(alt),hy=1-2*CAM.horizon,sum=0,K=${METER.knee};for(var j=0;j<${METER.ny};j++){var sy=hy+(1-hy)*((j+0.5)/${METER.ny});for(var i=0;i<${METER.nx};i++){var L=rad(vdir(-1+2*((i+0.5)/${METER.nx}),sy),s),y=(0.2126*L[0]+0.7152*L[1]+0.0722*L[2])*e;sum+=K*(1-Math.exp(-y/K))}}var m=sum/${METER.nx * METER.ny};return Math.round(Math.min(1,Math.max(${METER.min},${METER.target}/Math.max(m,1e-6)))*1000)/1000}
 function vdir(sx,sy){var tH=Math.tan(CAM.hfov/2*P),tV=tH/CAM.aspect,pi=Math.atan((2*CAM.horizon-1)*tV),y0=CAM.bearing*P,f=[Math.sin(y0)*Math.cos(pi),Math.cos(y0)*Math.cos(pi),Math.sin(pi)],r=[Math.cos(y0),-Math.sin(y0),0],u=[-Math.sin(y0)*Math.sin(pi),-Math.cos(y0)*Math.sin(pi),Math.cos(pi)],d=[0,1,2].map(function(i){return f[i]+r[i]*sx*tH+u[i]*sy*tV}),n=Math.sqrt(dt(d,d));return[d[0]/n,d[1]/n,d[2]/n]}
 function sdir(alt,az){return[Math.cos(alt*P)*Math.sin(az*P),Math.cos(alt*P)*Math.cos(az*P),Math.sin(alt*P)]}
 function weather(){try{var hs=location.hash.replace(/^#/,""),m=hs.match(/(?:^|&)w=([^&]+)/),hm=hs.match(/(?:^|&)h=(\d{1,3})/),rh=hm?Math.min(100,Number(hm[1])):null;if(m){var kd=decodeURIComponent(m[1]).split(":")[0],n=Number(decodeURIComponent(m[1]).split(":")[1]),a=isNaN(n)?0.5:Math.min(1,Math.max(0,n));
 if(kd==="clear")return{cloud:0.05,precip:0,fog:0,humidity:rh};if(kd==="partly")return{cloud:isNaN(n)?0.5:a,precip:0,fog:0,humidity:rh};if(kd==="cloudy")return{cloud:isNaN(n)?0.97:Math.max(0.85,a),precip:0,fog:0,humidity:rh};
 if(kd==="rain")return{cloud:0.97,precip:a,fog:0.25,humidity:rh};if(kd==="snow")return{cloud:0.95,precip:a,fog:0.3,humidity:rh};if(kd==="fog")return{cloud:0.9,precip:0,fog:isNaN(n)?0.7:a,humidity:rh===null?99:rh}}
 var raw=localStorage.getItem("michilu:weather");if(raw){var v=JSON.parse(raw);if(v&&v.w&&typeof v.t==="number"&&Date.now()-v.t<=${30 * 60e3})return v.w}}catch(e){}return{cloud:0.08,precip:0,fog:0,humidity:null}}
-function air(W,d){var mo=new Date(d.getTime()+32400000).getUTCMonth()+1,rh=W.humidity===null||W.humidity===undefined?RHN[mo]:Math.min(100,Math.max(0,W.humidity)),r=Math.min(97,Math.max(10,rh))/100,ae=Math.round(Math.min(4,Math.max(0.1,Math.pow(0.5/(1-r),0.8)*AS[mo]))*1000)/1000;AR=ae;GL=Math.round(Math.min(1.9,Math.max(0.85,0.65+0.35*ae))*1000)/1000}
+function air(W,d){var mo=new Date(d.getTime()+32400000).getUTCMonth()+1,rh=W.humidity===null||W.humidity===undefined?RHN[mo]:Math.min(100,Math.max(0,W.humidity)),r=Math.min(97,Math.max(10,rh))/100,ae=Math.round(Math.min(2.5,Math.max(0.1,Math.pow(0.5/(1-r),0.8)*AS[mo]))*1000)/1000;AR=ae;GL=Math.round(Math.min(1.9,Math.max(0.85,0.65+0.35*ae))*1000)/1000}
 function cloudy(c,cl){var gy=0.2126*c[0]+0.7152*c[1]+0.0722*c[2],k=cl*0.85,m=[0.97,0.98,1],o=[0,0,0];for(var i=0;i<3;i++)o[i]=Math.round((c[i]*(1-k)+gy*k*m[i])*(1-cl*0.1));return o}
 var OCC=${JSON.stringify([[0, 0.55], [1, 0.42], [2, 0.32], [3, 0.28], [4, 0.28], [5, 0.36], [6, 0.5], [7, 0.62], [8, 0.75], [9, 0.8], [16, 0.8], [17, 0.9], [18, 1], [21, 1], [22, 0.92], [23, 0.75], [24, 0.55]])};
 function occ(h){h=((h%24)+24)%24;for(var i=0;i<OCC.length-1;i++){if(h>=OCC[i][0]&&h<=OCC[i+1][0])return OCC[i][1]+(OCC[i+1][1]-OCC[i][1])*(h-OCC[i][0])/(OCC[i+1][0]-OCC[i][0])}return 0.55}
@@ -181,7 +208,7 @@ if(!up){if(a>=0){b.day=ss(0,10,a);b.golden=1-b.day}else if(a>=-6){b.golden=ss(-6
 else if(a>=0){b.day=ss(0,10,a);b.dawn=1-b.day}else if(a>=-6){b.dawn=ss(-6,0,a);b.night=1-b.dawn}else b.night=1;return b}
 function hex(c){var s="#";for(var i=0;i<3;i++){var v=Math.round(Math.min(255,Math.max(0,c[i]))).toString(16);s+=(v.length<2?"0":"")+v}return s}
 function at(){var m=location.hash.replace(/^#/,"").match(/(?:^|&)t=([^&]+)/);if(m){var v=decodeURIComponent(m[1]),d=new Date(/[zZ]|[+-]\\d\\d:?\\d\\d$/.test(v)?v:v+(v.length<=10?"T12:00":"")+"+09:00");if(!isNaN(d.getTime()))return d}return new Date()}
-var d0=at(),s=sun(d0),a=s[0],up=s[1],az=s[2],b=blend(a,up),sd=sdir(a,az),hy=1-2*CAM.horizon,W=weather();air(W,d0);var top=cloudy(skyc(vdir(0,1),sd,a),W.cloud),md=cloudy(skyc(vdir(0,(1+hy)/2),sd,a),W.cloud),hz=cloudy(skyc(vdir(0,hy+0.04),sd,a),W.cloud);
+var d0=at(),s=sun(d0),a=s[0],up=s[1],az=s[2],b=blend(a,up),sd=sdir(a,az),hy=1-2*CAM.horizon,W=weather();air(W,d0);var X=meter(sd,a),top=cloudy(skyc(vdir(0,1),sd,a,X),W.cloud),md=cloudy(skyc(vdir(0,(1+hy)/2),sd,a,X),W.cloud),hz=cloudy(skyc(vdir(0,hy+0.04),sd,a,X),W.cloud);
 var jh=(((d0.getTime()+32400000)%86400000)+86400000)%86400000/3600000,lightsV=ss(4,-6,a)*occ(jh);
 var lum=(0.2126*top[0]+0.7152*top[1]+0.0722*top[2])/255,dark=lum<0.42;
 var near=Math.exp(-((a+1)*(a+1))/(2*4.5*4.5)),warm=a<8&&a>-8?ss(8,0,a)*(1-ss(-2,-8,a)):0,n=b.night+0.5*(b.twilight+b.dawn);
