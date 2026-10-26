@@ -192,6 +192,12 @@ export function sunTransmittance(s: Vec3, aero = 1): Vec3 {
   return d ? (d.map((x) => Math.exp(-x)) as Vec3) : [0, 0, 0];
 }
 
+/** 高さ h（km）の所に届く太陽の光（0〜1。高い雲は日没後もしばらく日が当たり、赤みも少ない） */
+export function sunTransmittanceAt(h: number, s: Vec3, aero = 1): Vec3 {
+  const d = depthToSun([0, 0, ATMOS.Re + h], s, aero);
+  return d ? (d.map((x) => Math.exp(-x)) as Vec3) : [0, 0, 0];
+}
+
 /** 夜の空の地（街の明かりの照り返しは地平線の近くで強い。霞が多いと明るい＝glow）。線形の放射輝度 */
 export function nightBase(elevationDeg: number, glow = 1): Vec3 {
   const f = Math.exp(-Math.max(0, elevationDeg) / ATMOS.nightHorizonFalloff);

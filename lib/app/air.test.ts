@@ -15,11 +15,11 @@ describe("空気のにごり（湿度）", () => {
     const winter = airFrom({ ...NO_WEATHER, humidity: 30 }, jst("2027-01-15"));
     const summer = airFrom({ ...NO_WEATHER, humidity: 85 }, jst("2026-07-20"));
     expect(winter.aero).toBeLessThan(0.2);
-    expect(summer.aero).toBeGreaterThan(2.5);
+    expect(summer.aero).toBeGreaterThan(2.2);
     expect(winter.stars).toBeGreaterThan(0.95);
     expect(summer.stars).toBeLessThan(0.5);
     expect(summer.glow).toBeGreaterThan(winter.glow);
-    expect(airFrom({ ...NO_WEATHER, humidity: 99 }, jst("2026-07-20")).aero).toBe(4);
+    expect(airFrom({ ...NO_WEATHER, humidity: 99 }, jst("2026-07-20")).aero).toBe(2.5);
   });
   it("湿度が分からないときは月ごとの平年の湿度", () => {
     expect(airFrom(NO_WEATHER, jst("2027-01-15")).rh).toBe(51);

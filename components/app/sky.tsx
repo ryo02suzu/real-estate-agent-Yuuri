@@ -4,7 +4,8 @@
 // ここは描く側：写真4枚（昼・夕方・薄暮・夜）の重ね、地平線の光、各ページの帯の空の色、スクロールで縮む帯の仕組み。
 // 太陽本体は、写真のカメラの向き・画角が設定されるまで描かない（--sun-in が 1 のときだけ）
 import { HOME_CAMERA, overrideTime, PHOTO_ORDER, solar, type Camera } from "@/lib/app/sun";
-import { fetchWeather, setLiveWeather } from "@/lib/app/weather";
+import { fetchCloudField, fetchRainField, fetchThunder, mergeCloud, setLiveSky } from "@/lib/app/satellite";
+import { currentWeather, fetchWeather, setLiveWeather } from "@/lib/app/weather";
 import { useEffect, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { applySky } from "@/lib/app/sky-vars";
 import { PhoneImg } from "./frame";
@@ -38,14 +39,34 @@ export function useSkyClock() {
         tick();
       }
     };
+    /** 本物の雲（ひまわり）・雨（レーダー）・雷：読めたら雲量と雨の強さも観測に合わせる */
+    let lastSky = 0;
+    const sky = async (thunderToo: boolean) => {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+      if (Date.now() - lastSky < 2.5 * 60e3) return;
+      lastSky = Date.now();
+      const alt = solar(new Date()).altitude;
+      const [cloud, rain, thunder] = await Promise.all([fetchCloudField(new Date(), alt), fetchRainField(), thunderToo ? fetchThunder() : Promise.resolve(null)]);
+      setLiveSky({ cloud, rain, thunder });
+      const w = currentWeather();
+      if (w.source !== "override" && (cloud || rain)) {
+        const c = mergeCloud(w.cloud, cloud);
+        const p = Math.max(w.precip, rain ? Math.min(1, rain.mmhAtCamera / 15) : 0);
+        const kind = w.kind === "snow" ? "snow" : p > 0 ? "rain" : c >= 0.85 ? "cloudy" : c >= 0.4 ? "partly" : "clear";
+        setLiveWeather({ ...w, cloud: c, precip: Math.round(p * 100) / 100, kind, source: w.source === "none" ? "jma" : w.source });
+      }
+      tick();
+    };
     tick();
-    void weather();
+    void weather().then(() => sky(true));
     let timer = 0;
     const schedule = () => {
       timer = window.setTimeout(
         () => {
           tick();
-          if (new Date().getMinutes() % 10 === 3) void weather();
+          const min = new Date().getMinutes();
+          if (min % 10 === 3) void weather();
+          if (min % 5 === 4) void sky(min % 10 === 4);
           schedule();
         },
         60_000 - (Date.now() % 60_000) + 50,
@@ -55,7 +76,7 @@ export function useSkyClock() {
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       tick();
-      void weather();
+      void weather().then(() => sky(true));
     };
     document.addEventListener("visibilitychange", onVisible);
     addEventListener("hashchange", tick);

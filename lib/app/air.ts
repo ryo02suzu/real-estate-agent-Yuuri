@@ -8,7 +8,7 @@ import { jstDate } from "./city-date";
 import type { Weather } from "./weather";
 
 export type Air = {
-  /** 霞の量（地表近くの霞の係数に掛ける。1 で見通し約 20km。0.1〜4） */
+  /** 霞の量（地表近くの霞の係数に掛ける。1 で見通し約 20km。0.1〜2.5） */
   aero: number;
   /** 使った湿度（%） */
   rh: number;
@@ -35,7 +35,8 @@ export function growth(rh: number): number {
 export function airFrom(w: Weather, at: Date): Air {
   const { m } = jstDate(at);
   const rh = w.humidity === null ? RH_NORMAL[m] : Math.min(100, Math.max(0, w.humidity));
-  const aero = Math.round(Math.min(4, Math.max(0.1, growth(rh) * AERO_SEASON[m])) * 1000) / 1000;
+  // 上限 2.5（見通し約 8km）。それより濃いのは霧・雨で、そちらで描く
+  const aero = Math.round(Math.min(2.5, Math.max(0.1, growth(rh) * AERO_SEASON[m])) * 1000) / 1000;
   return {
     aero,
     rh,

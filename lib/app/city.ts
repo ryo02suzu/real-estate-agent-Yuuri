@@ -106,9 +106,10 @@ export function windowOccupancy(at: Date): number[] {
 }
 
 /** 見通し（km。コシュミーダーの式）。空の霞と同じ量（lib/app/air.ts）から。乾いた冬の晴れた日は富士山（約 100km）が見え、雨・雪・霧で短くなる */
-export function visibilityKm(w: Weather, at: Date): number {
+export function visibilityKm(w: Weather, at: Date, rainByRadar = false): number {
   let v = 3.912 / (ATMOS.betaM * ATMOS.mieExt * airFrom(w, at).aero + 0.0115);
-  if (w.precip > 0) v = Math.min(v, (w.kind === "snow" ? 4.5 : 8) * (1 - 0.5 * w.precip) + 1.5);
+  // 雨の幕をレーダーの場で描くときは、雨の分はそちらで数える（二重にしない）
+  if (w.precip > 0 && !rainByRadar) v = Math.min(v, (w.kind === "snow" ? 4.5 : 8) * (1 - 0.5 * w.precip) + 1.5);
   if (w.fog > 0) v = Math.min(v, Math.max(0.6, 12 * (1 - w.fog) ** 2));
   if (w.cloud > 0.9 && w.precip === 0) v = Math.min(v, 35);
   return Math.round(v * 10) / 10;

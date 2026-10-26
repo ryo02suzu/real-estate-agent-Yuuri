@@ -1,7 +1,8 @@
 "use client";
 
 // 帯をコードで描く（WebGL）。写真は使わない。
-//  空：今の太陽の位置（lib/app/sun.ts）から大気の散乱（lib/app/atmosphere.ts と同じ式。霞の量は湿度と季節から。lib/app/air.ts）。雲（雲量は気象庁の観測から。lib/app/weather.ts）、
+//  空：今の太陽の位置（lib/app/sun.ts）から大気の散乱（lib/app/atmosphere.ts と同じ式。霞の量は湿度と季節から。lib/app/air.ts）。
+//      雲は本物（ひまわりの雲の場。低い雲と高い雲の 2 層。lib/app/satellite.ts。読めないときは雲量だけの模様）、雨の幕は雨雲レーダー、稲光は雷ナウキャスト、
 //      太陽本体とにじみ、月（満ち欠けは太陽の向きから）、星。
 //  街（ホームだけ）：PLATEAU（国土交通省の 3D 都市モデル）の実在の建物と、地理院の空中写真・標高から、汐留の上空 260m の視点で
 //      焼き込んだ層（public/home/city。色・面の向き・距離と種類・窓・塔と道路・影用の高さ地図）を、今の光で照らす。
@@ -14,10 +15,11 @@
 //  WebGL が使えない端末では何も描かず、下の CSS の層（同じ街を焼いた代わりの絵）が見える
 import * as SunCalc from "suncalc";
 import { useEffect, useRef, type CSSProperties } from "react";
-import { ATMOS, dirFromAltAz, exposureFor, sunTransmittance } from "@/lib/app/atmosphere";
+import { ATMOS, dirFromAltAz, exposureFor, sunTransmittance, sunTransmittanceAt } from "@/lib/app/atmosphere";
 import { airFrom } from "@/lib/app/air";
 import { snowlineM, treeSeason, visibilityKm, windowOccupancy } from "@/lib/app/city";
 import { artificialVisibility, cityAmbient, skyIrradianceSH, sunIrradiance } from "@/lib/app/city-light";
+import { CAM_LL, cloudDrift, currentSky, flashAt, parseTime, sunVisibility, type LiveSky } from "@/lib/app/satellite";
 import { BASE, HOME_CAMERA, overrideTime, smoothstep, solar, type Camera } from "@/lib/app/sun";
 import { towerLight } from "@/lib/app/tower";
 import { currentWeather } from "@/lib/app/weather";
@@ -110,6 +112,8 @@ uniform vec3 u_sunE;uniform vec3 u_sh0;uniform vec3 u_sh1;uniform vec3 u_sh2;uni
 uniform vec4 u_season;uniform float u_snowline;uniform float u_snowCover;uniform float u_wet;
 uniform float u_towerOn;uniform float u_towerMode;uniform float u_towerWhite;uniform vec3 u_towerCol;uniform float u_sparkle;uniform float u_decks;
 uniform float u_cloud;uniform float u_precip;uniform float u_snow;uniform float u_fog;uniform float u_time;uniform vec2 u_wind;uniform float u_expAdj;uniform float u_haze;
+uniform sampler2D u_sat;uniform float u_satOn;uniform vec2 u_satLon;uniform vec2 u_satMerc;uniform vec3 u_camLL;uniform vec2 u_cloudH;uniform float u_cloudExtra;uniform vec2 u_drift;
+uniform sampler2D u_rain;uniform float u_rainOn;uniform vec2 u_rainLon;uniform vec2 u_rainMerc;uniform float u_flash;uniform vec2 u_flashDir;uniform vec3 u_sunTH;uniform float u_litH;uniform float u_sunVis;
 const float sunRad=${((ATMOS.sunRadius * Math.PI) / 180).toFixed(6)},moonRad=${((ATMOS.moonRadius * Math.PI) / 180).toFixed(6)};
 ${CITY_GLSL}
 float hash21(vec2 p){vec3 q=fract(vec3(p.xyx)*vec3(0.1031,0.1030,0.0973));q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
@@ -120,12 +124,34 @@ vec3 skyAt(vec2 uv){vec3 e=texture2D(u_sky,uv).rgb;return e*e*4.0;}
 vec3 tone(vec3 c){return pow(1.0-exp(-max(c,0.0)),vec3(1.0/2.2));}
 vec3 lin(vec3 c){return pow(c,vec3(2.2));}
 vec3 viewDir(vec2 uv){float sx=uv.x*2.0-1.0;float sy=uv.y*2.0-1.0;return normalize(u_f+u_r*(sx*u_tan.x)+u_u*(sy*u_tan.y));}
-/* 雲：高さ 1.5km の層を見上げた座標。濃さと陰影（太陽の側が明るい） */
-vec2 cloudUV(vec3 v){float z=max(v.z,0.02);return v.xy/z*1.5;}
+/* 雲：本物の雲（ひまわりの雲の場。R 低い雲・G 高い雲・B 明るさ）を、高さ u_cloudH（km）の 2 つの層として地球の丸みに沿って置く。
+   衛星が読めないときは、雲量だけの模様（noiseCloud）。細かい模様（cloudNoise）は衛星の 2km の画素の中を埋める */
+const float RE=6371.0,H0=0.26;
 float cloudNoise(vec2 p){return fbm(p)*0.72+fbm(p*2.9+vec2(3.1,7.7))*0.28;}
-float cloudDensity(vec3 v,out float shade){shade=0.6;if(v.z<0.012||u_cloud<=0.0)return 0.0;
-vec2 p=cloudUV(v)*0.36+u_wind*u_time;float n=cloudNoise(p);float t=1.0-u_cloud*1.06;float d=smoothstep(t,t+0.3,n)*smoothstep(0.012,0.1,v.z);
+/* 見る向き v が高さ h（km）の層に当たるまでの距離（km） */
+float layerDist(vec3 v,float h){vec3 o=vec3(0.0,0.0,RE+H0);float b=dot(o,v);float c=dot(o,o)-(RE+h)*(RE+h);float q=b*b-c;if(q<0.0)return 1e5;return -b+sqrt(q);}
+/* カメラからの東・北の距離（km）→ 画像の uv（メルカトル） */
+vec2 geoUV(vec2 xy,vec2 lonP,vec2 mercP){float lat=u_camLL.x+xy.y/111.32*0.0174533;float lon=u_camLL.y+xy.x/(111.32*u_camLL.z)*0.0174533;float my=log(tan(0.7853982+lat*0.5));return vec2((lon-lonP.x)*lonP.y,(my-mercP.x)*mercP.y);}
+vec4 satAt(vec2 xy){return texture2D(u_sat,geoUV(xy-u_drift,u_satLon,u_satMerc));}
+float rainAt(vec2 xy){vec2 uv=geoUV(xy,u_rainLon,u_rainMerc);if(uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0)return 0.0;return texture2D(u_rain,uv).r*100.0;}
+/* 層の上の点 xy（km）の雲の濃さ：衛星の値 × 細かい模様。shade は太陽の側が明るい陰影 */
+float cloudAt(vec2 xy,float satv,float scale,out float shade){vec2 p=xy*scale+u_wind*u_time;float n=cloudNoise(p);float d=smoothstep(0.1,0.55,satv*(0.5+n));
 vec2 sd=normalize(u_sun.xy+vec2(1e-4,0.0));float n2=cloudNoise(p+sd*0.1);shade=clamp(0.55+(n-n2)*5.0,0.0,1.0);return d;}
+float noiseCloud(vec2 xy,out float shade){vec2 p=xy*0.36+u_wind*u_time;float n=cloudNoise(p);float t=1.0-u_cloud*1.06;float d=smoothstep(t,t+0.3,n);
+vec2 sd=normalize(u_sun.xy+vec2(1e-4,0.0));float n2=cloudNoise(p+sd*0.1);shade=clamp(0.55+(n-n2)*5.0,0.0,1.0);return d;}
+/* 向き v の低い雲・高い雲の濃さと陰影、明るさ（衛星と模様を u_satOn で混ぜる＝読めたときに滑らかに切り替える） */
+void clouds(vec3 v,out float dL,out float dH,out float shL,out float shH,out float bright,out float thick){dL=0.0;dH=0.0;shL=0.6;shH=0.6;bright=0.75;thick=u_cloud;
+if(v.z<0.004)return;vec2 pL=v.xy*layerDist(v,u_cloudH.x);vec2 pH=v.xy*layerDist(v,u_cloudH.y);
+float n0=0.6;float f=(u_cloud>0.0&&u_satOn<0.999)?noiseCloud(pL,n0):0.0;
+if(u_satOn>0.001){vec4 sL=satAt(pL);vec4 sH=satAt(pH);float a=cloudAt(pL,sL.r+u_cloudExtra,0.36,shL);float b=cloudAt(pH,sH.g,0.14,shH);
+bright=mix(0.75,max(sL.b,sH.b),u_satOn);dL=mix(f,a,u_satOn);dH=b*u_satOn;shL=mix(n0,shL,u_satOn);thick=mix(u_cloud,sL.r+u_cloudExtra,u_satOn);}
+else{dL=f;shL=n0;}
+dL*=smoothstep(0.004,0.06,v.z);dH*=smoothstep(0.004,0.025,v.z);}
+/* 地面の点 Pk（km）に落ちる雲の影（太陽の向きへたどって層に当たる所の雲の濃さ） */
+float cloudShadow(vec2 Pk,float Pz){if(u_sun.z<=0.0)return 1.0;float sh;float iz=1.0/max(u_sun.z,0.06);vec2 QL=Pk+u_sun.xy*((u_cloudH.x-Pz)*iz);
+float f=(u_cloud>0.0&&u_satOn<0.999)?noiseCloud(QL,sh):0.0;if(u_satOn<=0.001)return 1.0-0.9*f;
+vec2 QH=Pk+u_sun.xy*((u_cloudH.y-Pz)*iz);float a=cloudAt(QL,satAt(QL).r+u_cloudExtra,0.36,sh);float b=cloudAt(QH,satAt(QH).g,0.14,sh);
+return (1.0-0.9*mix(f,a,u_satOn))*(1.0-0.75*b*u_satOn);}
 /* 雨：細長い枠の中を落ちる筋 */
 float rain(vec2 uv,vec2 scale,float speed,float seed){vec2 q=vec2(uv.x*1.43+uv.y*0.1,uv.y)*scale;vec2 c=floor(q);vec2 f=fract(q);float h=hash21(c+seed);
 if(h>u_precip*0.9+0.03)return 0.0;float x=0.15+0.7*fract(h*7.3);float y=fract(f.y+u_time*speed+h*3.0);
@@ -139,13 +165,16 @@ vec2 uv=gl_FragCoord.xy/u_res;vec2 iuv=vec2(uv.x,1.0-uv.y);
 vec3 v=viewDir(uv);
 vec3 sky=skyAt(uv);
 float skyLum=dot(sky,vec3(0.2126,0.7152,0.0722));
-/* 雲 */
-float shade;float d=cloudDensity(v,shade);float sh2;float dSun=cloudDensity(u_sun,sh2);float sunVis=(1.0-dSun)*(1.0-u_cloud*0.5);
+/* 雲（低い層と高い層。高い雲は日没後もしばらく日が当たり、桃色に残る） */
+float dL,dH,shL,shH,bright,thick;clouds(v,dL,dH,shL,shH,bright,thick);float sunVis=u_sunVis;
 vec3 zen=skyAt(vec2(0.5,0.96));
-vec3 litCol=u_sunT*(1.05+0.25*u_day);vec3 amb=zen*0.8+vec3(0.06);
-vec3 dayCol=mix(amb,litCol,(shade*0.75+0.1)*(1.0-0.55*u_cloud));
+vec3 amb=zen*0.8+vec3(0.06);
+vec3 litL=u_sunT*(1.05+0.25*u_day);vec3 litH=u_sunTH*(1.1+0.2*u_litH);
+/* 低い雲は下から見る：厚い雲ほど底が暗い（太陽が高いとき。低い太陽は横から当たって明るい） */
+vec3 dayColL=mix(amb,litL,(shL*0.75+0.1)*(1.0-0.55*u_cloud))*(0.7+0.4*bright)*(1.0-0.45*smoothstep(0.45,1.0,thick)*clamp(u_sun.z*2.0,0.0,1.0));
+vec3 dayColH=mix(amb*1.1,litH,shH*0.6+0.3)*(0.8+0.3*bright);
 vec3 nightCol=sky*0.55+vec3(0.075,0.052,0.036)*(0.7+0.5*(1.0-clamp(v.z*4.0,0.0,1.0)))+vec3(0.006,0.007,0.012);
-vec3 cloudCol=mix(nightCol,dayCol,u_day);
+vec3 cloudColL=mix(nightCol,dayColL,u_day);vec3 cloudColH=mix(nightCol*0.8,dayColH,u_litH);
 /* 太陽：本体とにじみ（雲でさえぎられる） */
 float th=acos(clamp(dot(v,u_sun),-1.0,1.0));
 float disc=1.0-smoothstep(sunRad*0.85,sunRad,th);
@@ -159,16 +188,18 @@ sky+=vec3(0.9,0.92,1.0)*0.09*exp(-tm/(0.04*u_haze))*vis;}
 if(u_stars>0.0){float az=atan(v.x,v.y);vec2 cell=vec2(az,asin(clamp(v.z,-1.0,1.0)))/0.0061;vec2 id=floor(cell);float h1=hash21(id);
 if(h1<0.013){vec2 cen=id+0.5+vec2(hash21(id+1.3),hash21(id+7.1))*0.6-0.3;float dd=length(cell-cen);float b=pow(hash21(id+3.7),3.0)*0.9+0.08;
 sky+=vec3(0.85,0.9,1.0)*b*exp(-dd*dd*9.0)*u_stars*clamp(1.0-skyLum*6.0,0.0,1.0)*smoothstep(0.03,0.3,v.z);}}
-sky=mix(sky,cloudCol,d*0.93);
+sky=mix(sky,cloudColH,dH*0.93);sky=mix(sky,cloudColL,dL*0.95);
+/* 稲光：発雷域の向きの雲と空が一瞬明るくなる */
+if(u_flash>0.0){float ang=acos(clamp(dot(normalize(v.xy+vec2(1e-5,0.0)),u_flashDir),-1.0,1.0));float k=u_flash*exp(-ang*ang/0.22)*smoothstep(-0.02,0.08,v.z);sky+=vec3(0.85,0.88,1.0)*k*(0.25+1.2*max(dL,dH));}
 vec3 hz=skyAt(vec2(uv.x,1.0-u_horizon+0.03))*0.8;
 vec3 haze=mix(hz,vec3(dot(hz,vec3(0.3,0.5,0.2))),u_cloud*0.6)+u_amb*1.6;
-vec3 outc=sky;
+vec3 outc=sky;float distKm=1e5;
 /* 街：焼き込んだ色・向き・距離を、今の光で照らす */
 vec4 al=texture2D(u_alb,iuv);float cov=al.a*u_city;
 if(cov>0.002){
 vec3 a=lin(al.rgb)*0.9;
 vec3 g=texture2D(u_geo,iuv).rgb;float aux;float typ=typeOf(g,aux);float dd=decodeDist(g);vec3 P=v*dd;
-vec4 nn=texture2D(u_nrm,iuv);vec3 n=normalize(nn.rgb*2.0-1.0);float ao=nn.a;
+distKm=dd/1000.0;vec4 nn=texture2D(u_nrm,iuv);vec3 n=normalize(nn.rgb*2.0-1.0);float ao=nn.a;
 vec4 pre=texture2D(u_pre,uv);vec3 e=texture2D(u_emis,iuv).rgb;
 float up=smoothstep(0.55,0.85,n.z);
 /* 季節：木（桜・新緑・紅葉・冬枯れ）と、地面の緑（公園・芝）は控えめに */
@@ -184,9 +215,8 @@ if(typ==6.0){float el=e.r*255.0*16.0;a=mix(a,vec3(0.78,0.8,0.86),smoothstep(u_sn
 /* 雪が積もる（上を向いた面）・雨で濡れる */
 if(typ!=4.0&&typ!=6.0)a=mix(a,vec3(0.8,0.82,0.86),u_snowCover*up*(typ==5.0?0.6:1.0));
 a*=1.0-0.38*u_wet*up*(1.0-u_snowCover);
-/* 雲の影：太陽の向きにたどって雲の層（1.5km）に当たる所の雲の濃さ */
-float cs=1.0;
-if(u_cloud>0.0&&u_sun.z>0.0){vec3 Q=P+u_sun*((1500.0-P.z)/max(u_sun.z,0.06));float cn=cloudNoise(Q.xy/1000.0*0.36+u_wind*u_time);float t=1.0-u_cloud*1.06;cs=1.0-0.9*smoothstep(t,t+0.3,cn);}
+/* 雲の影：太陽の向きにたどって雲の層に当たる所の雲の濃さ（本物の雲の影） */
+float cs=cloudShadow(P.xy/1000.0,P.z/1000.0);
 vec3 E=max(u_sh0+u_sh1*n.x+u_sh2*n.y+u_sh3*n.z,vec3(0.0));
 vec3 L=a*(u_sunE*pre.r*cs+E*ao*0.8)/3.14159265+a*u_amb*(0.35+0.65*ao);
 /* 濡れた屋根・道は空を映す（夜は街灯も） */
@@ -212,6 +242,10 @@ if(u_sparkle>0.0&&part>4.5)L+=vec3(1.0)*step(0.78,hash21(floor(gl_FragCoord.xy*0
 float T=exp(-dd*u_sigma);
 L=L*T+haze*(1.0-T);
 outc=mix(sky,L,cov);}
+/* 雨の幕：レーダーの雨の下を通る視線の分だけ灰色に溶ける（遠くの雨柱、近くの雨。雨の強さで見通しが決まる） */
+if(u_rainOn>0.5){float tmax=cov>0.002?min(distKm,80.0):(v.z>0.001?min((u_cloudH.x-H0)/v.z,80.0):80.0);float od=0.0;float dt=tmax/8.0;
+for(int i=0;i<8;i++){float t=(float(i)+0.5)*dt;float z=H0+v.z*t;if(z>u_cloudH.x||z<-0.3)continue;float mm=rainAt(v.xy*t);if(mm>0.2)od+=0.2*pow(mm,0.63)*dt;}
+outc=mix(outc,haze*0.78,1.0-exp(-od));}
 vec3 col=tone(outc*u_expAdj);
 /* 霧・雨・雪のときは、空も地平線の近くが白っぽく */
 float fogC=clamp(u_fog+u_precip*0.35+u_snow*0.3,0.0,1.0);
@@ -249,13 +283,17 @@ type Gl = {
   cityReady: boolean;
   /** 下ごしらえを最後に描いた条件（分・天気） */
   preKey: string;
+  /** 入れてある衛星の雲・レーダーの雨の時刻と、雲が読めた時刻（滑らかに切り替えるため） */
+  satTime: string;
+  rainTime: string;
+  satSince: number;
   dsmGrid: [number, number, number, number];
   dsmZ: [number, number];
 };
 
 const SKY_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_exposure", "u_aero", "u_glow"];
 const PRE_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_geo", "u_nrm", "u_win", "u_emis", "u_dsm", "u_dsmGrid", "u_dsmZ", "u_occA", "u_occB", "u_lightsVis"];
-const MAIN_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_sunT", "u_moon", "u_moonOn", "u_stars", "u_day", "u_sky", "u_alb", "u_nrm", "u_geo", "u_win", "u_emis", "u_pre", "u_city", "u_horizon", "u_sunE", "u_sh0", "u_sh1", "u_sh2", "u_sh3", "u_amb", "u_lightsVis", "u_sigma", "u_season", "u_snowline", "u_snowCover", "u_wet", "u_towerOn", "u_towerMode", "u_towerWhite", "u_towerCol", "u_sparkle", "u_decks", "u_cloud", "u_precip", "u_snow", "u_fog", "u_time", "u_wind", "u_expAdj", "u_haze"];
+const MAIN_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_sunT", "u_moon", "u_moonOn", "u_stars", "u_day", "u_sky", "u_alb", "u_nrm", "u_geo", "u_win", "u_emis", "u_pre", "u_city", "u_horizon", "u_sunE", "u_sh0", "u_sh1", "u_sh2", "u_sh3", "u_amb", "u_lightsVis", "u_sigma", "u_season", "u_snowline", "u_snowCover", "u_wet", "u_towerOn", "u_towerMode", "u_towerWhite", "u_towerCol", "u_sparkle", "u_decks", "u_cloud", "u_precip", "u_snow", "u_fog", "u_time", "u_wind", "u_expAdj", "u_haze", "u_sat", "u_satOn", "u_satLon", "u_satMerc", "u_camLL", "u_cloudH", "u_cloudExtra", "u_drift", "u_rain", "u_rainOn", "u_rainLon", "u_rainMerc", "u_flash", "u_flashDir", "u_sunTH", "u_litH", "u_sunVis"];
 const LIGHT_UNIFORMS = ["u_px", "u_time", "u_vis", "u_sigma", "u_still"];
 
 function compile(gl: WebGLRenderingContext, frag: string, names: string[], vert = VERT): Prog | null {
@@ -321,6 +359,8 @@ const CITY_DIR = "/home/city";
 const DSM_GRID: [number, number, number, number] = [-7700, 3080, 9000, 2048];
 const DSM_Z: [number, number] = [-300, 1.6];
 const CITY_LAYERS: [string, boolean][] = [["alb", false], ["nrm", false], ["geo", true], ["win", true], ["emis", true]];
+/** 雲の層の高さ（km）：低い雲（層雲・積雲）と高い雲（巻雲・積乱雲の頂） */
+const CLOUD_H: [number, number] = [1.4, 7.5];
 
 function init(canvas: HTMLCanvasElement, city: boolean): Gl | null {
   const gl = canvas.getContext("webgl", { alpha: false, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: false, powerPreference: "low-power" });
@@ -340,7 +380,9 @@ function init(canvas: HTMLCanvasElement, city: boolean): Gl | null {
   const tex: Record<string, WebGLTexture> = {};
   for (const [k] of CITY_LAYERS) tex[k] = blankTexture(gl, [0, 0, 0, 0]);
   tex.dsm = blankTexture(gl, [0, 0, 0, 255]);
-  return { gl, sky, pre, main, lights, quad, skyT, preT, tex, pts: null, cityReady: false, preKey: "", dsmGrid: DSM_GRID, dsmZ: DSM_Z };
+  tex.sat = blankTexture(gl, [0, 0, 191, 255]);
+  tex.rain = blankTexture(gl, [0, 0, 0, 255]);
+  return { gl, sky, pre, main, lights, quad, skyT, preT, tex, pts: null, cityReady: false, preKey: "", satTime: "", rainTime: "", satSince: 0, dsmGrid: DSM_GRID, dsmZ: DSM_Z };
 }
 
 /** 街の層（倍率ごと）・影用の高さ地図・航空障害灯を読む。全部そろったら知らせる */
@@ -434,7 +476,8 @@ function cityLightValues(at: Date, sun: [number, number, number], altitude: numb
   const air = airFrom(w, at);
   const sh = skyIrradianceSH(sun, altitude, w.cloud, air);
   const occ = windowOccupancy(at);
-  const vis = visibilityKm(w, at);
+  const rainLive = w.source !== "override" && !!currentSky().rain?.any;
+  const vis = visibilityKm(w, at, rainLive);
   const season = treeSeason(at);
   const tower = towerLight(at, altitude);
   return {
@@ -456,7 +499,7 @@ const lightsOff = () => /(?:^#|&)l=0(?:&|$)/.test(location.hash);
 function lightValues(at: Date, sun: [number, number, number], altitude: number) {
   const w = currentWeather();
   const off = lightsOff();
-  const key = `${Math.floor(at.getTime() / 60e3)}|${w.kind}|${w.cloud}|${w.precip}|${w.fog}|${w.humidity}|${off}`;
+  const key = `${Math.floor(at.getTime() / 60e3)}|${w.kind}|${w.cloud}|${w.precip}|${w.fog}|${w.humidity}|${off}|${currentSky().rain?.time ?? ""}`;
   if (!lightCache || lightCache.key !== key) {
     const v = cityLightValues(at, sun, altitude);
     if (off) {
@@ -479,7 +522,27 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
   const w = currentWeather();
   const air = airFrom(w, at);
   const T = sunTransmittance(sun, air.aero);
+  const TH = sunTransmittanceAt(CLOUD_H[1], sun, air.aero);
   const showCity = city && g.cityReady && !!g.pre && !!g.preT;
+  // 本物の雲・雨・雷（#w= で天気を固定しているときは使わない）
+  const live: LiveSky = w.source === "override" ? { cloud: null, rain: null, thunder: null } : currentSky(Date.now());
+  const upload = (tex: WebGLTexture, data: Uint8ClampedArray, size: number) => {
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+    texParams(gl, false);
+  };
+  if (live.cloud && live.cloud.time !== g.satTime) {
+    upload(g.tex.sat, live.cloud.data, live.cloud.size);
+    g.satTime = live.cloud.time;
+    if (!g.satSince) g.satSince = performance.now();
+  }
+  if (live.rain && live.rain.time !== g.rainTime) {
+    upload(g.tex.rain, live.rain.data, live.rain.size);
+    g.rainTime = live.rain.time;
+  }
+  const satOn = live.cloud && g.satTime ? Math.min(1, (performance.now() - g.satSince) / 1500) : 0;
   const lv = showCity ? lightValues(at, sun, s.altitude) : null;
   const setCam = (p: Prog, width: number, height: number) => {
     gl.uniform2f(p.loc.u_res, width, height);
@@ -539,7 +602,40 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
   gl.uniform1f(m.u_stars, smoothstep(-8, -16, s.altitude) * air.stars);
   gl.uniform1f(m.u_haze, Math.min(2.2, Math.max(0.7, air.aero)));
   gl.uniform1f(m.u_day, smoothstep(-6, 4, s.altitude));
-  bindTex(g.main, [["u_sky", g.skyT.tex], ["u_alb", g.tex.alb], ["u_nrm", g.tex.nrm], ["u_geo", g.tex.geo], ["u_win", g.tex.win], ["u_emis", g.tex.emis], ["u_pre", g.preT ? g.preT.tex : g.tex.dsm]]);
+  bindTex(g.main, [["u_sky", g.skyT.tex], ["u_alb", g.tex.alb], ["u_nrm", g.tex.nrm], ["u_geo", g.tex.geo], ["u_win", g.tex.win], ["u_emis", g.tex.emis], ["u_pre", g.preT ? g.preT.tex : g.tex.dsm], ["u_sat", g.tex.sat], ["u_rain", g.tex.rain]]);
+  // 衛星の雲・レーダーの雨・雷
+  gl.uniform3f(m.u_camLL, CAM_LL.lat * R, CAM_LL.lon * R, Math.cos(CAM_LL.lat * R));
+  gl.uniform2f(m.u_cloudH, CLOUD_H[0], CLOUD_H[1]);
+  gl.uniform1f(m.u_satOn, satOn);
+  if (live.cloud) {
+    const b = live.cloud.bounds;
+    gl.uniform2f(m.u_satLon, b.lonW * R, 1 / ((b.lonE - b.lonW) * R));
+    gl.uniform2f(m.u_satMerc, b.mercN, 1 / (b.mercS - b.mercN));
+    gl.uniform1f(m.u_cloudExtra, live.cloud.night ? Math.max(0, w.cloud - live.cloud.fraction) : 0);
+    const elapsed = Math.min(1200, Math.max(0, (Date.now() - parseTime(live.cloud.time).getTime()) / 1000));
+    const drift = cloudDrift(w, elapsed);
+    gl.uniform2f(m.u_drift, drift[0], drift[1]);
+  } else {
+    gl.uniform1f(m.u_cloudExtra, 0);
+    gl.uniform2f(m.u_drift, 0, 0);
+  }
+  gl.uniform1f(m.u_rainOn, live.rain && live.rain.any ? 1 : 0);
+  if (live.rain) {
+    const b = live.rain.bounds;
+    gl.uniform2f(m.u_rainLon, b.lonW * R, 1 / ((b.lonE - b.lonW) * R));
+    gl.uniform2f(m.u_rainMerc, b.mercN, 1 / (b.mercS - b.mercN));
+  }
+  {
+    const drift = live.cloud ? cloudDrift(w, Math.min(1200, Math.max(0, (Date.now() - parseTime(live.cloud.time).getTime()) / 1000))) : ([0, 0] as [number, number]);
+    const extra = live.cloud && live.cloud.night ? Math.max(0, w.cloud - live.cloud.fraction) : 0;
+    const vis = sunVisibility(satOn >= 0.999 ? live.cloud : null, sun, w.cloud, CLOUD_H, drift, extra);
+    gl.uniform1f(m.u_sunVis, vis);
+  }
+  const fl = flashAt(seconds, still ? null : live.thunder);
+  gl.uniform1f(m.u_flash, fl.k);
+  gl.uniform2f(m.u_flashDir, fl.dir[0], fl.dir[1]);
+  gl.uniform3f(m.u_sunTH, TH[0], TH[1], TH[2]);
+  gl.uniform1f(m.u_litH, smoothstep(-4.5, -1, s.altitude));
   gl.uniform1f(m.u_city, showCity ? 1 : 0);
   gl.uniform1f(m.u_horizon, cam.horizon);
   if (lv) {
@@ -625,10 +721,16 @@ export function SkyCanvas({ camera = HOME_CAMERA, city = false, className = "", 
     let loop = 0;
     const t0 = performance.now();
     const seconds = () => ((performance.now() - t0) / 1000) % 3600;
+    let fade = 0;
     const render = (at: Date) => {
       if (!g) return;
       draw(g, camera, at, city, seconds(), reduced());
       last = at;
+      // 衛星の雲が読めた直後は 1.5 秒かけて切り替える
+      if (g.satSince && performance.now() - g.satSince < 1600) {
+        cancelAnimationFrame(fade);
+        fade = requestAnimationFrame(() => render(now()));
+      }
       // ホームは街がそろってから見せる（それまでは下の CSS の層）
       if (!shown && (!city || g.cityReady)) {
         shown = true;
@@ -641,7 +743,8 @@ export function SkyCanvas({ camera = HOME_CAMERA, city = false, className = "", 
       const w = currentWeather();
       const at = now();
       const alt = solar(at).altitude;
-      const weatherMoving = (w.cloud > 0.05 && w.cloud < 0.985) || w.precip > 0;
+      const live = currentSky();
+      const weatherMoving = (w.cloud > 0.05 && w.cloud < 0.985) || w.precip > 0 || !!live.thunder?.on;
       const nightMoving = city && artificialVisibility(alt) > 0.05;
       if ((!weatherMoving && !nightMoving) || reduced() || document.visibilityState !== "visible" || !onScreen) return;
       // 夜の点滅だけなら 6 コマ/秒で足りる（電池のため）
@@ -716,6 +819,7 @@ export function SkyCanvas({ camera = HOME_CAMERA, city = false, className = "", 
       stopReload();
       cancelAnimationFrame(frame);
       cancelAnimationFrame(loop);
+      cancelAnimationFrame(fade);
       removeEventListener(SKY_EVENT, go);
       document.removeEventListener("visibilitychange", onVisible);
       io?.disconnect();

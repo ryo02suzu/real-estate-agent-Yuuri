@@ -17,14 +17,15 @@ export type Weather = {
   fog: number;
   temp: number | null;
   humidity: number | null;
-  /** 風速 m/s */
+  /** 風速 m/s と風向（16 方位の番号。1 北北東 … 16 北。0 は静穏） */
   wind: number | null;
+  windDir: number | null;
   /** 観測の時刻（ISO）。固定・不明なら空 */
   at: string;
   source: "jma" | "override" | "none";
 };
 
-export const NO_WEATHER: Weather = { kind: "clear", cloud: 0.08, precip: 0, fog: 0, temp: null, humidity: null, wind: null, at: "", source: "none" };
+export const NO_WEATHER: Weather = { kind: "clear", cloud: 0.08, precip: 0, fog: 0, temp: null, humidity: null, wind: null, windDir: null, at: "", source: "none" };
 
 /** アメダス 東京（大手町）と、天気予報の東京都（最初の区域が東京地方） */
 export const JMA = {
@@ -34,7 +35,7 @@ export const JMA = {
 } as const;
 
 /** アメダスの 10 分値（使う項目だけ。[値, 品質] の形） */
-export type JmaPoint = Partial<Record<"temp" | "humidity" | "sun10m" | "precipitation10m" | "wind", [number, number]>>;
+export type JmaPoint = Partial<Record<"temp" | "humidity" | "sun10m" | "precipitation10m" | "wind" | "windDirection", [number, number]>>;
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 
@@ -57,6 +58,7 @@ export function fromJma(obs: JmaPoint | null, forecastCode: string | null, at: D
   const temp = obs?.temp?.[0] ?? null;
   const humidity = obs?.humidity?.[0] ?? null;
   const wind = obs?.wind?.[0] ?? null;
+  const windDir = obs?.windDirection?.[0] ?? null;
   const mm = obs?.precipitation10m?.[0] ?? 0;
   const sun10 = obs?.sun10m?.[0];
   const precip = clamp01(mm / 3);
@@ -69,7 +71,7 @@ export function fromJma(obs: JmaPoint | null, forecastCode: string | null, at: D
   const snow = precip > 0 && ((temp !== null && temp <= 1.5) || forecastCode?.[0] === "4");
   const fog = humidity === null ? 0 : clamp01((humidity - 92) / 10) * 0.7 * (precip > 0 ? 0.6 : 1);
   const kind: WeatherKind = precip > 0 ? (snow ? "snow" : "rain") : cloud >= 0.85 ? "cloudy" : cloud >= 0.4 ? "partly" : "clear";
-  return { kind, cloud: Math.round(cloud * 100) / 100, precip: Math.round(precip * 100) / 100, fog: Math.round(fog * 100) / 100, temp, humidity, wind, at: at.toISOString(), source: obs || forecastCode ? "jma" : "none" };
+  return { kind, cloud: Math.round(cloud * 100) / 100, precip: Math.round(precip * 100) / 100, fog: Math.round(fog * 100) / 100, temp, humidity, wind, windDir, at: at.toISOString(), source: obs || forecastCode ? "jma" : "none" };
 }
 
 /** 日本時間の時（小数） */
