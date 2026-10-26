@@ -124,9 +124,9 @@ const PHOTOS = PHOTO_ORDER;
 const SKY_GRADIENT = "linear-gradient(180deg, var(--sky-top, #7bb9e8) 0%, var(--sky-mid, #b0d7ef) 32%, var(--sky-horizon, #bfccda) 56%, var(--sky-horizon, #bfccda) 100%)";
 
 /**
- * ホームの帯（幅393×高さ275pt）。空はコードで描く（SkyCanvas。太陽の実位置から大気の散乱・太陽本体・月・星）。
- * 街は写真（public/home/sky。街のマスクで空の部分は見せない）で、昼・夕焼け・薄暮・夜明け・夜を太陽の高度で混ぜる。
- * その上に窓の明かりの層（薄暮の写真から抜き出した光。暗さに応じて点く）
+ * ホームの帯（幅393×高さ275pt）。空も街もコードで描く（SkyCanvas。太陽の実位置から大気の散乱、PLATEAU の実在の街を今の光で照らす）。
+ * 下の CSS の層は、キャンバスが描けるまで・描けない端末のための代わりの絵（public/home/sky。同じ街を昼・夕焼け・薄暮・夜明け・夜に
+ * 焼いたもの。街のマスクで空の部分は見せず、空は CSS のグラデーション）。太陽の高度で混ぜ、夜は窓の明かりの層を重ねる
  */
 export function SkyPhotos() {
   return (

@@ -217,10 +217,11 @@ export type Camera = {
 };
 
 /**
- * ホームの帯のカメラ。地平線は上から 55%（帯の切り抜きで決めた）。向きは西（方位 262°。生成画像なので実測の向きは無く、
- * 一年を通して夕日が画面の中に沈むように決めた。6月の日の入（方位 300°）だけ右の端のすぐ外）。画角は 62°
+ * ホームの帯のカメラ。汐留の上空 約 260m（PLATEAU の実在の街を焼き込んだ視点）から西南西（方位 246°）を、ほぼ水平に見る（+0.25°。
+ * 地平線は上から 50.5%。富士山が見出しの下の文字に隠れない高さ）。画角は 62°。東京タワーが中央のやや右、その右奥に富士山。夕日は 8 月下旬〜4 月は画面の中に沈み、
+ * 5〜7 月は右の端の外
  */
-export const HOME_CAMERA: Camera = { calibrated: true, bearing: 262, hfov: 62, horizon: 0.55, aspect: 393 / 275 };
+export const HOME_CAMERA: Camera = { calibrated: true, bearing: 246, hfov: 62, horizon: 0.505189, aspect: 393 / 275 };
 
 const R = Math.PI / 180;
 

@@ -133,13 +133,15 @@ describe("projectSun（画面の位置）", () => {
   it("カメラが未設定なら描かない", () => {
     expect(projectSun({ altitude: 10, azimuth: 270 }, { ...HOME_CAMERA, calibrated: false })).toBeNull();
   });
-  it("ホームのカメラは西向き：冬至と春分の日の入は画面の中、夏至の日の入は右の端のすぐ外", () => {
+  it("ホームのカメラは西南西：冬至と春分の日の入は画面の中、夏至の日の入は右の端の外。地平線は上から 50.5%", () => {
     expect(projectSun({ altitude: 0, azimuth: 241.4 }, HOME_CAMERA)!.inside).toBe(true);
     expect(projectSun({ altitude: 0, azimuth: 270.5 }, HOME_CAMERA)!.inside).toBe(true);
     const june = projectSun({ altitude: 0, azimuth: 300 }, HOME_CAMERA)!;
     expect(june.inside).toBe(false);
     expect(june.x).toBeGreaterThan(1);
-    expect(june.x).toBeLessThan(1.5);
+    expect(june.x).toBeLessThan(2);
+    const ahead = projectSun({ altitude: 0, azimuth: 246 }, HOME_CAMERA)!;
+    expect(Math.abs(ahead.y - 0.505189)).toBeLessThan(0.001);
     // 午後の高い太陽は画面の上の外
     expect(projectSun({ altitude: 40, azimuth: 262 }, HOME_CAMERA)!.inside).toBe(false);
   });

@@ -53,3 +53,6 @@ __pycache__/
 
 # 作業用（npm run legends などの中間ファイル）
 /work/
+
+# ホームの街の焼き込みの作業場所（約 2GB）
+scripts/city-bake/work/

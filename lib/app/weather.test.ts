@@ -52,6 +52,8 @@ describe("天気（気象庁の観測と予報から）", () => {
     expect(parseWeatherOverride("#w=fog:0.4")?.fog).toBeCloseTo(0.4, 2);
     expect(parseWeatherOverride("#w=xyz")).toBeNull();
     expect(parseWeatherOverride("#q=abc")).toBeNull();
+    expect(parseWeatherOverride("#w=clear&h=30")?.humidity).toBe(30);
+    expect(parseWeatherOverride("#w=clear")?.humidity).toBeNull();
   });
   it("窓の明かりは 19 時ごろはほぼ全部、深夜は 3 割ほど。昼は点いていても見えない", () => {
     expect(occupancy(19)).toBe(1);

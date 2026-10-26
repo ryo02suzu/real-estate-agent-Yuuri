@@ -2,7 +2,7 @@
 // 天気予報（東京地方）を、ブラウザから直接読む（JSON は access-control-allow-origin: * で公開されている）。
 // 送るのは観測所の番号と地域の番号だけで、物件や端末の情報は送らない。読めなければ前回の値（端末に 30 分だけ覚える）か「晴れ」。
 // 判定は演出のためのおおまかなもの（雨量・日照・気温・湿度から雲量・降水・雪・霧を決める）で、天気の案内には使わない。
-// プレビューは #w=rain / #w=snow:0.7 / #w=cloudy / #w=partly / #w=clear / #w=fog で固定できる
+// プレビューは #w=rain / #w=snow:0.7 / #w=cloudy / #w=partly / #w=clear / #w=fog で固定できる（&h=30 で湿度も）
 import { smoothstep } from "./sun";
 
 export type WeatherKind = "clear" | "partly" | "cloudy" | "rain" | "snow";
@@ -84,7 +84,9 @@ export function parseWeatherOverride(hash: string): Weather | null {
   const [kind, numRaw] = decodeURIComponent(m[1]).split(":");
   const n = numRaw === undefined ? NaN : Number(numRaw);
   const amount = Number.isFinite(n) ? clamp01(n) : 0.5;
-  const base = { ...NO_WEATHER, source: "override" as const, at: "" };
+  // 湿度も固定できる（#w=clear&h=30。見通し・富士山の見え方の確認用）
+  const hm = hash.replace(/^#/, "").match(/(?:^|&)h=(\d{1,3})/);
+  const base = { ...NO_WEATHER, source: "override" as const, at: "", humidity: hm ? Math.min(100, Number(hm[1])) : null };
   switch (kind) {
     case "clear":
       return { ...base, kind: "clear", cloud: 0.05 };
