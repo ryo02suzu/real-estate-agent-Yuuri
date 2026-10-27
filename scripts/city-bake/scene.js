@@ -20,7 +20,7 @@ export function makeMaterial(pass, mesh, extra = {}) {
     u_map: { value: u.map || null }, u_hasMap: { value: u.map ? 1 : 0 }, u_color: { value: new THREE.Color(u.color ?? 0xb0aca6) },
     u_type: { value: u.type }, u_lift: { value: 1 }, u_sun: { value: extra.sun || new THREE.Vector3(0, 0, 1) },
     u_lightVP: { value: extra.lightVP || new THREE.Matrix4() }, u_shadow: { value: extra.shadowTex || null }, u_texel: { value: extra.texel || 1 / 4096 },
-    u_base: { value: u.baseTex || null },
+    u_base: { value: u.baseTex || null }, u_vcol: { value: u.vcol ? 1 : 0 },
   };
   const FS = {
     preview: `uniform sampler2D u_map; uniform float u_hasMap; uniform vec3 u_color; uniform vec3 u_sun; uniform float u_type;
@@ -30,8 +30,8 @@ export function makeMaterial(pass, mesh, extra = {}) {
         float l = 0.42 + 0.58 * max(dot(n, normalize(u_sun)), 0.0) + 0.12 * n.z;
         float d = length(vW); vec3 c = a * l; c = mix(c, vec3(0.62, 0.72, 0.84), 1.0 - exp(-d / 26000.0));
         gl_FragColor = vec4(c, 1.0); }`,
-    albedo: `uniform sampler2D u_map; uniform float u_hasMap; uniform vec3 u_color; uniform float u_type; varying vec2 vUv; varying vec3 vW; varying vec3 vTcol;
-      void main(){ vec3 a = u_type == 4.0 ? vTcol : (u_hasMap > 0.5 ? texture2D(u_map, vUv).rgb : u_color); gl_FragColor = vec4(a, 1.0); }`,
+    albedo: `uniform sampler2D u_map; uniform float u_hasMap; uniform vec3 u_color; uniform float u_type; uniform float u_vcol; varying vec2 vUv; varying vec3 vW; varying vec3 vTcol;
+      void main(){ vec3 a = (u_type == 4.0 || u_vcol > 0.5) ? vTcol : (u_hasMap > 0.5 ? texture2D(u_map, vUv).rgb : u_color); gl_FragColor = vec4(a, 1.0); }`,
     tower: `uniform float u_type; varying vec3 vTattr;
       void main(){ if (u_type != 4.0) { gl_FragColor = vec4(0.0); return; } gl_FragColor = vec4((vTattr.x + 1.0) / 255.0, vTattr.y, vTattr.z / 255.0, 1.0); }`,
     normal: `uniform float u_type; varying vec3 vW;
@@ -65,6 +65,10 @@ export async function loadScene(man, opts = {}) {
   const Renu = new THREE.Matrix4().set(R[0][0],R[0][1],R[0][2],0, R[1][0],R[1][1],R[1][2],0, R[2][0],R[2][1],R[2][2],0, 0,0,0,1);
   const meshes = []; let tris = 0, texBytes = 0, loadedTiles = 0;
   const limit = opts.limit ?? 1e9;
+  // 形を作り直した高層ビル（landmarks.py）：PLATEAU の同じ建物は抜く
+  let LM = null;
+  try { const r = await fetch('landmarks.json'); if (r.ok) LM = await r.json(); } catch (e) { LM = null; }
+  const EXCL = new Set(LM ? LM.exclude : []);
   const tiles = man.tiles.slice(0, limit);
   let i = 0;
   async function worker() {
@@ -93,6 +97,7 @@ export async function loadScene(man, opts = {}) {
           const tri = idx ? [idx[k], idx[k + 1], idx[k + 2]] : [k, k + 1, k + 2];
           const gids = tri.map((v) => (bid ? (t.gmap[Math.round(bid.getX(v))] || 0) : 0));
           if (!(gids[0] > 0 && gids[1] > 0 && gids[2] > 0)) continue;
+          if (EXCL.has(gids[0])) continue;
           for (let q = 0; q < 3; q++) {
             const v = tri[q];
             if (remap[v] < 0) {
@@ -173,6 +178,20 @@ export async function loadScene(man, opts = {}) {
     geo.setIndex(new THREE.BufferAttribute(I, 1));
     const mesh = new THREE.Mesh(geo); mesh.matrixAutoUpdate = false; mesh.frustumCulled = false;
     mesh.userData = { type: TYPE.tower };
+    scene.add(mesh); meshes.push(mesh); tris += ni / 3;
+  }
+  if (LM) {
+    // 頂点・色・gid（建物の番号。窓と属性は PLATEAU の表のまま）
+    const ab = await (await fetch(LM.path)).arrayBuffer();
+    const [nv, ni] = new Uint32Array(ab, 0, 2);
+    const Pp = new Float32Array(ab, 8, nv * 3), col = new Float32Array(ab, 8 + nv * 12, nv * 3), gidA = new Float32Array(ab, 8 + nv * 24, nv), I = new Uint32Array(ab, 8 + nv * 28, ni);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(Pp, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(nv * 2), 2));
+    geo.setAttribute('gid', new THREE.BufferAttribute(gidA, 1)); geo.setAttribute('tcol', new THREE.BufferAttribute(col, 3));
+    geo.setAttribute('tattr', new THREE.BufferAttribute(new Float32Array(nv * 3), 3));
+    geo.setIndex(new THREE.BufferAttribute(I, 1));
+    const mesh = new THREE.Mesh(geo); mesh.matrixAutoUpdate = false; mesh.frustumCulled = false;
+    mesh.userData = { type: TYPE.building2, vcol: true };
     scene.add(mesh); meshes.push(mesh); tris += ni / 3;
   }
   return { scene, meshes, tris, texMB: Math.round(texBytes / 1048576) };

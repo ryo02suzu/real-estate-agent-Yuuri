@@ -6,6 +6,8 @@
 - 建物：港区・渋谷区・目黒区・品川区・世田谷区・大田区・杉並区・狛江市・調布市・川崎市（`sets.json`）。10km までは質感付きの LOD2、その先は LOD1。遠くの低い建物（6km 先で 9m 未満、10km 先で 22m 未満）は画面で 1 画素に満たないので地面の写真に任せる。PLATEAU の東京タワーは外し、`tower.py` の格子の模型に替える。
 - 地面と山：地理院のシームレス空中写真と標高（DEM5A・DEM10）。近くは 1m、遠くは富士山（約 100km）まで。地球の丸みと大気の屈折（k=0.13）を含む。
 - 夜の街灯：地理院の道路中心線（experimental_rdcl）。
+- 東京タワー：`tower.py` が本物の寸法と写真で測った外形・梁の高さ・塗り分けから格子の模型を作る。街の層は塔を抜いて描き（`renderPass(..., { hide: [4] })`）、塔だけを画面の一部（`tower-region.json`、1pt あたり 24 画素）で描いて `post5.py` が縮める（`twa.webp` 色と被覆、`twd.webp` 面の向きの割合と照明の属性）。描く側の `TOWER`（`components/app/sky-canvas.tsx`）に `layers/tower.json` の距離と向きを入れる。
+- 形を作り直す高層ビル：`landmarks.py`（麻布台ヒルズ森JPタワー）。PLATEAU の同じ建物を抜き（`landmarks.json` の exclude）、頂点の色で外装を描く。
 
 ## 実行
 

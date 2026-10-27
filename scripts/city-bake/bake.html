@@ -18,15 +18,21 @@ const loadSec = (performance.now() - t0) / 1000;
 const store = {};
 function toB64(u8) { let s = ''; const CH = 0x8000; for (let i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH)); return btoa(s); }
 // 1 回の描画：pass 名と大きさ。float=true なら 32bit 浮動小数で読み出す
-function renderPass(name, { w = 1179, h = 825, float = false, extra, bg = [0, 0, 0, 0], camera } = {}) {
+// hide：描かない種類（例 [4] で塔を抜く）、only：その種類だけ描く、view：[全体の幅, 高さ, x, y, 幅, 高さ] で画面の一部だけを高い倍率で描く
+function renderPass(name, { w = 1179, h = 825, float = false, extra, bg = [0, 0, 0, 0], camera, hide = [], only = null, view = null } = {}) {
   const t = performance.now();
   const rt = new THREE.WebGLRenderTarget(w, h, { type: float ? THREE.FloatType : THREE.UnsignedByteType, format: THREE.RGBAFormat, depthBuffer: true, samples: 0 });
   setPass(meshes, name, extra);
+  const vis = meshes.map((m) => m.visible);
+  meshes.forEach((m) => { const ty = m.userData.type; m.visible = only != null ? ty === only : !hide.includes(ty); });
+  let cam = camera || makeCamera(man, view ? view[0] : w, view ? view[1] : h);
+  if (view) { cam.setViewOffset(view[0], view[1], view[2], view[3], view[4], view[5]); cam.updateProjectionMatrix(); }
   scene.background = null;
   renderer.setRenderTarget(rt);
   renderer.setClearColor(new THREE.Color(bg[0], bg[1], bg[2]), bg[3]);
   renderer.clear(true, true, true);
-  renderer.render(scene, camera || makeCamera(man, w, h));
+  renderer.render(scene, cam);
+  meshes.forEach((m, i) => { m.visible = vis[i]; });
   const buf = float ? new Float32Array(w * h * 4) : new Uint8Array(w * h * 4);
   renderer.readRenderTargetPixels(rt, 0, 0, w, h, buf);
   renderer.setRenderTarget(null); rt.dispose();
@@ -34,11 +40,11 @@ function renderPass(name, { w = 1179, h = 825, float = false, extra, bg = [0, 0,
   return { name, w, h, bytes: store[name].length, sec: (performance.now() - t) / 1000 };
 }
 function chunk(name, i, size = 8 << 20) { const u = store[name]; return toB64(u.subarray(i * size, Math.min(u.length, (i + 1) * size))); }
-function topdown({ size = 4096, half = 4500, cx = 0, cy = 0 } = {}) {
+function topdown({ size = 4096, half = 4500, cx = 0, cy = 0, hide = [] } = {}) {
   // 真上からの高さ（DSM）：正射影で見下ろし、各画素のいちばん高い面の z
   const cam = new THREE.OrthographicCamera(-half, half, half, -half, 1, 20000);
   cam.up.set(0, 1, 0); cam.position.set(cx, cy, 9000); cam.lookAt(cx, cy, 0); cam.updateMatrixWorld(true);
-  return renderPass('geo', { w: size, h: size, float: true, camera: cam });
+  return renderPass('geo', { w: size, h: size, float: true, camera: cam, hide });
 }
 window.bake = { renderPass, chunk, topdown, THREE, scene, meshes, man, makeCamera, setPass, renderer };
 window.__ready = { meshes: meshes.length, tris, texMB, loadSec };

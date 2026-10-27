@@ -110,6 +110,7 @@ uniform vec2 u_res;uniform vec3 u_f,u_r,u_u;uniform vec2 u_tan;
 uniform vec3 u_sun;uniform vec3 u_sunT;uniform vec3 u_moon;uniform float u_moonOn;uniform float u_stars;uniform float u_day;
 uniform sampler2D u_sky;uniform sampler2D u_alb;uniform sampler2D u_nrm;uniform sampler2D u_geo;uniform sampler2D u_win;uniform sampler2D u_emis;uniform sampler2D u_pre;
 uniform float u_city;uniform float u_horizon;
+uniform sampler2D u_twA;uniform sampler2D u_twD;uniform vec4 u_twRect;uniform vec3 u_twX;uniform vec3 u_twY;uniform float u_twDist;uniform float u_twOn;
 uniform vec3 u_sunE;uniform vec3 u_sh0;uniform vec3 u_sh1;uniform vec3 u_sh2;uniform vec3 u_sh3;uniform vec3 u_amb;uniform float u_lightsVis;uniform float u_sigma;
 uniform vec4 u_season;uniform float u_snowline;uniform float u_snowCover;uniform float u_wet;
 uniform float u_towerOn;uniform float u_towerMode;uniform float u_towerWhite;uniform vec3 u_towerCol;uniform float u_sparkle;uniform float u_decks;
@@ -154,6 +155,9 @@ float cloudShadow(vec2 Pk,float Pz){if(u_sun.z<=0.0)return 1.0;float sh;float iz
 float f=(u_cloud>0.0&&u_satOn<0.999)?noiseCloud(QL,sh):0.0;if(u_satOn<=0.001)return 1.0-0.9*f;
 vec2 QH=Pk+u_sun.xy*((u_cloudH.y-Pz)*iz);float a=cloudAt(QL,satAt(QL).r+u_cloudExtra,0.36,sh);float b=cloudAt(QH,satAt(QH).g,0.14,sh);
 return (1.0-0.9*mix(f,a,u_satOn))*(1.0-0.75*b*u_satOn);}
+/* 霞の濁りの係数（近いほど弱める。距離×係数が単調に増えるように）と、近い霞の色（青みを抜く） */
+float hazeK(float d){return 0.22+0.78*smoothstep(2000.0,30000.0,d);}
+vec3 hazeAt(vec3 hz0,float d){return mix(vec3(dot(hz0,vec3(0.2126,0.7152,0.0722))),hz0,smoothstep(2500.0,20000.0,d));}
 /* 雨：細長い枠の中を落ちる筋 */
 float rain(vec2 uv,vec2 scale,float speed,float seed){vec2 q=vec2(uv.x*1.43+uv.y*0.1,uv.y)*scale;vec2 c=floor(q);vec2 f=fract(q);float h=hash21(c+seed);
 if(h>u_precip*0.9+0.03)return 0.0;float x=0.15+0.7*fract(h*7.3);float y=fract(f.y+u_time*speed+h*3.0);
@@ -195,7 +199,7 @@ sky=mix(sky,cloudColH,dH*0.93);sky=mix(sky,cloudColL,dL*0.95);
 if(u_flash>0.0){float ang=acos(clamp(dot(normalize(v.xy+vec2(1e-5,0.0)),u_flashDir),-1.0,1.0));float k=u_flash*exp(-ang*ang/0.22)*smoothstep(-0.02,0.08,v.z);sky+=vec3(0.85,0.88,1.0)*k*(0.25+1.2*max(dL,dH));}
 vec3 hz=skyAt(vec2(uv.x,1.0-u_horizon+0.03))*0.8;
 vec3 haze=mix(hz,vec3(dot(hz,vec3(0.3,0.5,0.2))),u_cloud*0.6)+u_amb*1.6;
-vec3 outc=sky;float distKm=1e5;
+vec3 outc=sky;float distKm=1e5;float twW=0.0;
 /* 街：焼き込んだ色・向き・距離を、今の光で照らす */
 vec4 al=texture2D(u_alb,iuv);float cov=al.a*u_city;
 if(cov>0.002){
@@ -240,38 +244,63 @@ L+=wc*pre.g*(0.3+0.8*fract(w.g*13.7))*wk*u_lightsVis;}
 if(typ==3.0&&pre.b>0.0){vec3 sc=aux>1.5?vec3(1.0,0.74,0.45):vec3(0.86,0.92,1.0);L+=sc*pre.b*1.2*u_lightsVis*(1.0+0.8*u_wet);
 if(aux>1.5){float uu=e.b*255.0;float hh=hash21(floor(gl_FragCoord.xy*0.5));float dir=hh>0.5?1.0:-1.0;
 float car=smoothstep(0.84,0.98,fract((uu+dir*u_time*13.0)/21.0+hh*7.0));L+=(dir>0.0?vec3(1.0,0.95,0.85):vec3(1.0,0.12,0.06))*car*e.r*2.4*u_lightsVis;}}
-/* 東京タワー：ランドマークライト（夏は白・冬はオレンジ）、ダイヤモンドヴェール、展望台の窓、毎正時の純白の煌めき */
-if(typ==4.0&&u_towerOn>0.0){float code2=floor(e.r*255.0+0.5);float part=floor(code2/32.0);float tier=code2-part*32.0;float te=e.g;
+/* 遠くの霞：距離と見通しで空の地平線の色に溶ける（夜は街明かりの照り返しの色）。
+   カメラ（スマートフォン）の処理と同じく、近い所は霞を弱めて明暗と色を残す（濁りの係数を近いほど下げる。30km より遠くはそのまま）。
+   近い霞は空の青ではなく中立の色（地表近くの霞の粒は色を選ばずに散らす） */
+float T=exp(-dd*u_sigma*hazeK(dd));
+L=L*T+hazeAt(haze,dd)*(1.0-T);
+outc=mix(sky,L,cov);}
+/* 東京タワー：塔だけを高い倍率で焼いた層（色と透け具合・面の向きの割合・照明の属性）を街の上に重ねる。透けた格子の向こうに街が見える */
+if(u_twOn>0.5){vec2 tq=(iuv-u_twRect.xy)/(u_twRect.zw-u_twRect.xy);
+if(tq.x>0.0&&tq.x<1.0&&tq.y>0.0&&tq.y<1.0){vec4 ta=texture2D(u_twA,tq);
+/* 塔より手前の建物（汐留〜芝の建物）が塔の足元を隠す */
+ta.a*=1.0-cov*step(distKm*1000.0,u_twDist-40.0);
+if(ta.a>0.004){vec3 tn=texture2D(u_twD,vec2(tq.x,tq.y*0.5)).rgb;vec3 te=texture2D(u_twD,vec2(tq.x,0.5+tq.y*0.5)).rgb;
+tn/=max(tn.x+tn.y+tn.z,0.001);vec3 nzt=vec3(0.0,0.0,v.z<0.0?1.0:-1.0);vec3 ab=lin(ta.rgb)*0.9;
+/* 日：見えている面の向きごとの当たり（格子の向こう側の部材は手前の部材の影に入る分を引く） */
+float sunF=tn.x*max(dot(u_twX,u_sun),0.0)+tn.y*max(dot(u_twY,u_sun),0.0)+tn.z*max(dot(nzt,u_sun),0.0);
+vec3 Et=tn.x*max(u_sh0+u_sh1*u_twX.x+u_sh2*u_twX.y+u_sh3*u_twX.z,vec3(0.0))+tn.y*max(u_sh0+u_sh1*u_twY.x+u_sh2*u_twY.y+u_sh3*u_twY.z,vec3(0.0))+tn.z*max(u_sh0+u_sh3*nzt.z,vec3(0.0));
+Et=mix(Et,vec3(dot(Et,vec3(0.2126,0.7152,0.0722))),0.45);
+vec3 Pt=v*u_twDist;float cst=cloudShadow(Pt.xy/1000.0,Pt.z/1000.0);
+vec3 Lt=ab*(u_sunE*sunF*0.8*cst+Et*0.85)/3.14159265+ab*u_amb*0.5;
+/* 展望台のガラス：空を映す */
+float gf=te.b;if(gf>0.0){vec3 rv=reflect(v,normalize(u_twX*tn.x+u_twY*tn.y+vec3(0.0,0.0,0.001)));vec3 refl=rv.z>0.0?mix(hz*0.9,zen,smoothstep(0.0,0.5,rv.z)):Lt*0.8;Lt+=gf*0.14*refl;}
+/* 夜：ランドマークライト（夏は白・冬はオレンジ）、ダイヤモンドヴェール、展望台の窓、毎正時の純白の煌めき（大展望台とトップデッキの上部） */
+if(u_towerOn>0.0){float code2=floor(te.r*255.0+0.5);float part=floor(code2/32.0);float tier=code2-part*32.0;float tem=te.g;
 vec3 tc=u_towerCol;if(u_towerMode>1.5)tc*=0.55+0.45*sin(tier*0.85+u_time*0.6);
 tc=mix(tc,vec3(1.0),u_towerWhite);
-float k=part<0.5?1.0:(part<2.5?0.0:(part<3.5?0.55:0.9));
-L+=tc*te*k*2.8;
-if(part>0.5&&part<2.5)L+=vec3(1.0,0.95,0.86)*1.7*u_decks;
-if(u_sparkle>0.0&&part>4.5)L+=vec3(1.0)*step(0.78,hash21(floor(gl_FragCoord.xy*0.7)+floor(u_time*9.0)))*3.0;}
-/* 遠くの霞：距離と見通しで空の地平線の色に溶ける（夜は街明かりの照り返しの色） */
-float T=exp(-dd*u_sigma);
-L=L*T+haze*(1.0-T);
-outc=mix(sky,L,cov);}
+float k=part<0.5?1.0:(part<2.5?0.0:(part<3.5?0.55:(part<4.5?0.0:0.9)));
+Lt+=tc*tem*k*2.8;
+Lt+=vec3(1.0,0.95,0.86)*1.7*u_decks*gf;
+if(u_sparkle>0.0&&part>4.5)Lt+=vec3(1.0)*step(0.78,hash21(floor(gl_FragCoord.xy*0.7)+floor(u_time*9.0)))*3.0;}
+float Tt=exp(-u_twDist*u_sigma*hazeK(u_twDist));Lt=Lt*Tt+hazeAt(haze,u_twDist)*(1.0-Tt);
+outc=mix(outc,Lt,ta.a);distKm=mix(distKm,u_twDist/1000.0,ta.a);twW=ta.a;}}}
 /* 雨の幕：レーダーの雨の下を通る視線の分だけ灰色に溶ける（遠くの雨柱、近くの雨。雨の強さで見通しが決まる） */
 if(u_rainOn>0.5){float tmax=cov>0.002?min(distKm,80.0):(v.z>0.001?min((u_cloudH.x-H0)/v.z,80.0):80.0);float od=0.0;float dt=tmax/8.0;
 for(int i=0;i<8;i++){float t=(float(i)+0.5)*dt;float z=H0+v.z*t;if(z>u_cloudH.x||z<-0.3)continue;float mm=rainAt(v.xy*t);if(mm>0.2)od+=0.2*pow(mm,0.63)*dt;}
 outc=mix(outc,haze*0.78,1.0-exp(-od));}
 vec3 col=tone(outc*u_expAdj);
+/* 街と塔：カメラの色の処理（彩度を少し上げ、中間の明るさの差を広げる）。空は CSS の色とそろえるため変えない。昼ほど強く */
+float cw=max(cov,twW)*(0.35+0.65*u_day);
+if(cw>0.0){float yl=dot(col,vec3(0.2126,0.7152,0.0722));vec3 g2=clamp(vec3(yl)+(col-vec3(yl))*1.2,0.0,1.0);
+g2=mix(g2,g2*g2*(3.0-2.0*g2),0.24);col=mix(col,g2,cw);}
 /* 霧・雨・雪のときは、空も地平線の近くが白っぽく */
 float fogC=clamp(u_fog+u_precip*0.35+u_snow*0.3,0.0,1.0);
 col=mix(col,tone(haze*u_expAdj),clamp(fogC*0.55*smoothstep(0.2,u_horizon,iuv.y)*(1.0-cov),0.0,0.85));
 /* 雨・雪 */
 if(u_precip>0.0){if(u_snow>0.5){float s=snow(uv,26.0,0.075,1.0)+0.6*snow(uv,52.0,0.13,5.0);col=mix(col,vec3(0.96,0.97,1.0),clamp(s,0.0,1.0)*0.9);}
 else{float r=rain(uv,vec2(62.0,7.0),1.4,1.0)+0.6*rain(uv,vec2(115.0,12.0),2.1,7.0);col+=vec3(0.72,0.78,0.88)*r*0.34*(0.5+0.5*u_precip);}}
-col+=(hash21(gl_FragCoord.xy)-0.5)/255.0;
+/* 撮像の細かい粒（暗い所ほど。動かない） */
+float yl2=dot(col,vec3(0.2126,0.7152,0.0722));
+col+=(hash21(gl_FragCoord.xy)-0.5)/255.0*(1.0+2.5*(1.0-smoothstep(0.05,0.45,yl2))*max(cov,0.3));
 gl_FragColor=vec4(col,1.0);}`;
 
 /** 3 枚目：航空障害灯（画面の点。60m 以上の屋上と東京タワー。赤く、高い建物は点滅） */
 const VERT_LIGHTS = `attribute vec2 a_p;attribute vec4 a_i;uniform float u_px;uniform float u_time;uniform float u_vis;uniform float u_sigma;uniform float u_still;varying float vB;
 void main(){gl_Position=vec4(a_p.x*2.0-1.0,1.0-a_p.y*2.0,0.0,1.0);
 float kind=a_i.y;float blink=kind==1.0&&u_still<0.5?step(fract(u_time/a_i.w+a_i.z),0.32):1.0;
-vB=blink*u_vis*exp(-a_i.x*u_sigma)*(kind>=2.0?1.15:(kind==1.0?1.0:0.6));
-gl_PointSize=u_px*(kind>=2.0?1.3:1.0)*clamp(2400.0/a_i.x,0.5,1.5);}`;
+vB=blink*u_vis*exp(-a_i.x*u_sigma)*(kind==2.0?1.1:(kind==3.0?0.75:(kind==1.0?1.0:0.6)));
+gl_PointSize=u_px*(kind==2.0?1.1:(kind==3.0?0.8:1.0))*clamp(2400.0/a_i.x,0.5,1.3);}`;
 const FRAG_LIGHTS = `precision mediump float;varying float vB;
 void main(){vec2 q=gl_PointCoord*2.0-1.0;float a=exp(-dot(q,q)*3.0)*vB;gl_FragColor=vec4(vec3(1.0,0.16,0.07)*a,1.0);}`;
 
@@ -303,7 +332,7 @@ type Gl = {
 
 const SKY_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_exposure", "u_aero", "u_glow"];
 const PRE_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_geo", "u_nrm", "u_win", "u_emis", "u_dsm", "u_dsmGrid", "u_dsmZ", "u_occA", "u_occB", "u_lightsVis"];
-const MAIN_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_sunT", "u_moon", "u_moonOn", "u_stars", "u_day", "u_sky", "u_alb", "u_nrm", "u_geo", "u_win", "u_emis", "u_pre", "u_city", "u_horizon", "u_sunE", "u_sh0", "u_sh1", "u_sh2", "u_sh3", "u_amb", "u_lightsVis", "u_sigma", "u_season", "u_snowline", "u_snowCover", "u_wet", "u_towerOn", "u_towerMode", "u_towerWhite", "u_towerCol", "u_sparkle", "u_decks", "u_cloud", "u_precip", "u_snow", "u_fog", "u_time", "u_wind", "u_expAdj", "u_haze", "u_sat", "u_satOn", "u_satLon", "u_satMerc", "u_camLL", "u_cloudH", "u_cloudExtra", "u_drift", "u_rain", "u_rainOn", "u_rainLon", "u_rainMerc", "u_flash", "u_flashDir", "u_sunTH", "u_litH", "u_sunVis"];
+const MAIN_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_sunT", "u_moon", "u_moonOn", "u_stars", "u_day", "u_sky", "u_alb", "u_nrm", "u_geo", "u_win", "u_emis", "u_pre", "u_city", "u_horizon", "u_sunE", "u_sh0", "u_sh1", "u_sh2", "u_sh3", "u_amb", "u_lightsVis", "u_sigma", "u_season", "u_snowline", "u_snowCover", "u_wet", "u_towerOn", "u_towerMode", "u_towerWhite", "u_towerCol", "u_sparkle", "u_decks", "u_cloud", "u_precip", "u_snow", "u_fog", "u_time", "u_wind", "u_expAdj", "u_haze", "u_sat", "u_satOn", "u_satLon", "u_satMerc", "u_camLL", "u_cloudH", "u_cloudExtra", "u_drift", "u_rain", "u_rainOn", "u_rainLon", "u_rainMerc", "u_flash", "u_flashDir", "u_sunTH", "u_litH", "u_sunVis", "u_twA", "u_twD", "u_twRect", "u_twX", "u_twY", "u_twDist", "u_twOn"];
 const LIGHT_UNIFORMS = ["u_px", "u_time", "u_vis", "u_sigma", "u_still"];
 
 function compile(gl: WebGLRenderingContext, frag: string, names: string[], vert = VERT): Prog | null {
@@ -368,7 +397,12 @@ const CITY_DIR = "/home/city";
 /** 焼き込みのときの影用の高さ地図の範囲（カメラの ENU。西端・北端・幅）と高さの符号（z = 値×1.6 − 300） */
 const DSM_GRID: [number, number, number, number] = [-7700, 3080, 9000, 2048];
 const DSM_Z: [number, number] = [-300, 1.6];
-const CITY_LAYERS: [string, boolean][] = [["alb", false], ["nrm", false], ["geo", true], ["win", true], ["emis", true]];
+const CITY_LAYERS: [string, boolean][] = [["alb", false], ["nrm", false], ["geo", true], ["win", true], ["emis", true], ["twa", false], ["twd", true]];
+/**
+ * 東京タワーの層（塔だけを 1pt あたり 24 画素で焼いて縮めたもの）の場所：画面 393×275pt の中の [x, y, 幅, 高さ]、塔までの平均の距離（m）、
+ * 塔の向き（カメラの ENU。ローカルの x・y 軸）。焼き込み（scripts/city-bake の post5.py）が layers/tower.json に書く値
+ */
+const TOWER = { pt: [184, 112, 48, 84], dist: 1581.4, at: [-1460.6, -602.2], ax: [0.55933, 0.82895, 0.0002], ay: [-0.82895, 0.55933, -0.00014] } as const;
 /** 雲の層の高さ（km）：低い雲（層雲・積雲）と高い雲（巻雲・積乱雲の頂） */
 const CLOUD_H: [number, number] = [1.4, 7.5];
 
@@ -405,6 +439,8 @@ function loadCity(g: Gl, dpr: number, onLoaded: () => void): () => void {
     ["geo", `${CITY_DIR}/${set}/geo.webp`, true],
     ["win", `${CITY_DIR}/${set}/win.webp`, true],
     ["emis", `${CITY_DIR}/${set}/emis.webp`, true],
+    ["twa", `${CITY_DIR}/${set}/twa.webp`, false],
+    ["twd", `${CITY_DIR}/${set}/twd.webp`, true],
     ["dsm", `${CITY_DIR}/dsm.webp`, false],
   ];
   let pending = files.length + 1;
@@ -618,7 +654,7 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
   gl.uniform1f(m.u_stars, smoothstep(-8, -16, s.altitude) * air.stars);
   gl.uniform1f(m.u_haze, Math.min(2.2, Math.max(0.7, air.aero)));
   gl.uniform1f(m.u_day, smoothstep(-6, 4, s.altitude));
-  bindTex(g.main, [["u_sky", g.skyT.tex], ["u_alb", g.tex.alb], ["u_nrm", g.tex.nrm], ["u_geo", g.tex.geo], ["u_win", g.tex.win], ["u_emis", g.tex.emis], ["u_pre", g.preT ? g.preT.tex : g.tex.dsm], ["u_sat", g.tex.sat], ["u_rain", g.tex.rain]]);
+  bindTex(g.main, [["u_sky", g.skyT.tex], ["u_alb", g.tex.alb], ["u_nrm", g.tex.nrm], ["u_geo", g.tex.geo], ["u_win", g.tex.win], ["u_emis", g.tex.emis], ["u_pre", g.preT ? g.preT.tex : g.tex.dsm], ["u_sat", g.tex.sat], ["u_rain", g.tex.rain], ["u_twA", g.tex.twa], ["u_twD", g.tex.twd]]);
   // 衛星の雲・レーダーの雨・雷
   gl.uniform3f(m.u_camLL, CAM_LL.lat * R, CAM_LL.lon * R, Math.cos(CAM_LL.lat * R));
   gl.uniform2f(m.u_cloudH, CLOUD_H[0], CLOUD_H[1]);
@@ -653,6 +689,18 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
   gl.uniform3f(m.u_sunTH, TH[0], TH[1], TH[2]);
   gl.uniform1f(m.u_litH, smoothstep(-4.5, -1, s.altitude));
   gl.uniform1f(m.u_city, showCity ? 1 : 0);
+  // 東京タワーの層：画面の中の場所と、見えている面の向き（カメラの側を向く軸）
+  {
+    const [tx, ty, tw, th] = TOWER.pt;
+    gl.uniform4f(m.u_twRect, tx / 393, ty / 275, (tx + tw) / 393, (ty + th) / 275);
+    // 塔からカメラへの向きに表が向いている側の軸（その向きの面が見えている）
+    const side = (a: readonly number[]) => (a[0] * -TOWER.at[0] + a[1] * -TOWER.at[1] > 0 ? 1 : -1);
+    const sx = side(TOWER.ax), sy = side(TOWER.ay);
+    gl.uniform3f(m.u_twX, sx * TOWER.ax[0], sx * TOWER.ax[1], sx * TOWER.ax[2]);
+    gl.uniform3f(m.u_twY, sy * TOWER.ay[0], sy * TOWER.ay[1], sy * TOWER.ay[2]);
+    gl.uniform1f(m.u_twDist, TOWER.dist);
+    gl.uniform1f(m.u_twOn, showCity ? 1 : 0);
+  }
   gl.uniform1f(m.u_horizon, cam.horizon);
   if (lv) {
     gl.uniform3f(m.u_sunE, lv.sunE[0], lv.sunE[1], lv.sunE[2]);
