@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dirFromAltAz } from "./atmosphere";
-import { artificialVisibility, cityAmbient, irradiance, skyIrradianceSH, sunIrradiance } from "./city-light";
+import { artificialExposure, artificialLevel, artificialVisibility, cityAmbient, irradiance, skyIrradianceSH, sunIrradiance } from "./city-light";
 
 describe("街を照らす光（空の式から）", () => {
   it("昼は屋根（上向き）が壁より明るく、地面向きは暗い", () => {
@@ -29,5 +29,14 @@ describe("街を照らす光（空の式から）", () => {
     expect(sunIrradiance(dirFromAltAz(-20, 300), -20)).toEqual([0, 0, 0]);
     expect(cityAmbient(-20)[0]).toBeGreaterThan(0.04);
     expect(artificialVisibility(30)).toBe(0);
+  });
+  it("人工の明かりは露出の比で浮かび上がる（日没のころは目立たず、薄明の終わりから夜に向けて強く）", () => {
+    expect(artificialExposure(-20)).toBe(1);
+    expect(artificialExposure(0)).toBeLessThan(0.05);
+    expect(artificialExposure(-6)).toBeCloseTo(1 / 3, 2);
+    expect(artificialLevel(30)).toBe(0);
+    expect(artificialLevel(0)).toBeLessThan(0.1);
+    expect(artificialLevel(-6)).toBeGreaterThan(artificialLevel(-3));
+    expect(artificialLevel(-15)).toBe(1);
   });
 });

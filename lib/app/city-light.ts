@@ -1,7 +1,7 @@
 // ホームの街を照らす光（WebGL のシェーダーに渡す値）。空の色と同じ大気の式（lib/app/atmosphere.ts）から：
 //  太陽の直射（届く光の色 × 露出）と、空からの光（向きごとの強さを 1 次の球面調和で近似。夕方は西を向いた壁が橙に、昼は屋根が明るい）。
 //  曇りは空からの光を灰色の一様な光に寄せる（直射は雲の影でさえぎる）。夜は街明かりの照り返し（ほのかな橙）を足す
-import { ATMOS, CLEAN_AIR, exposureFor, nightBase, radiance, sunTransmittance, type AirParams, type Vec3 } from "./atmosphere";
+import { ATMOS, CLEAN_AIR, exposureFor, nightBase, nightExposureRatio, radiance, sunTransmittance, twilightTint, type AirParams, type Vec3 } from "./atmosphere";
 import { smoothstep } from "./sun";
 
 export type SH = [Vec3, Vec3, Vec3, Vec3];
@@ -28,14 +28,17 @@ const DIRS = sphere(64);
  */
 export function skyIrradianceSH(sun: Vec3, sunAltitude: number, cloud: number, air: AirParams = CLEAN_AIR): SH {
   const e = exposureFor(sunAltitude);
+  const glow = air.glow * nightExposureRatio(sunAltitude);
   const L: Vec3[] = [];
   let upSum: Vec3 = [0, 0, 0];
   let upN = 0;
   for (const d of DIRS) {
     if (d[2] > 0.02) {
       const r = radiance(d, sun, air.aero);
-      const nb = nightBase((Math.asin(d[2]) * 180) / Math.PI, air.glow);
-      const v: Vec3 = [r[0] * e + nb[0], r[1] * e + nb[1], r[2] * e + nb[2]];
+      const el = (Math.asin(d[2]) * 180) / Math.PI;
+      const t = twilightTint([r[0] * e, r[1] * e, r[2] * e], el, sunAltitude);
+      const nb = nightBase(el, glow);
+      const v: Vec3 = [t[0] + nb[0], t[1] + nb[1], t[2] + nb[2]];
       L.push(v);
       upSum = [upSum[0] + v[0] * d[2], upSum[1] + v[1] * d[2], upSum[2] + v[2] * d[2]];
       upN += d[2];
@@ -79,8 +82,14 @@ export function sunIrradiance(sun: Vec3, sunAltitude: number, aero = 1): Vec3 {
 /** 窓・街灯・タワーの明かりが見える度合い（日没前から、朝は日の出の後に消える） */
 export const artificialVisibility = (sunAltitude: number) => smoothstep(6, -4, sunAltitude);
 
+/** 人工の明かりの露出の比（夜を 1。lib/app/atmosphere.ts の nightExposureRatio と同じ） */
+export const artificialExposure = nightExposureRatio;
+
+/** 窓・街灯の明かりの強さ（点いている度合い × 露出の比） */
+export const artificialLevel = (sunAltitude: number) => artificialVisibility(sunAltitude) * artificialExposure(sunAltitude);
+
 /** 夜の街の照り返し（露出をかけた放射照度。建物の壁や地面をほのかに照らす橙） */
 export function cityAmbient(sunAltitude: number): Vec3 {
-  const k = artificialVisibility(sunAltitude);
+  const k = artificialLevel(sunAltitude);
   return [0.05 * k, 0.038 * k, 0.026 * k];
 }

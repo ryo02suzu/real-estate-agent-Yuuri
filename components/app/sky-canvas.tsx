@@ -15,10 +15,10 @@
 //  WebGL が使えない端末では何も描かず、下の CSS の層（同じ街を焼いた代わりの絵）が見える
 import * as SunCalc from "suncalc";
 import { useEffect, useRef, type CSSProperties } from "react";
-import { ATMOS, dirFromAltAz, exposureFor, sunTransmittance, sunTransmittanceAt } from "@/lib/app/atmosphere";
+import { ATMOS, dirFromAltAz, exposureFor, nightExposureRatio, sunTransmittance, sunTransmittanceAt } from "@/lib/app/atmosphere";
 import { airFrom, type Air } from "@/lib/app/air";
 import { snowlineM, treeSeason, visibilityKm, windowOccupancy } from "@/lib/app/city";
-import { artificialVisibility, cityAmbient, skyIrradianceSH, sunIrradiance } from "@/lib/app/city-light";
+import { artificialExposure, artificialLevel, artificialVisibility, cityAmbient, skyIrradianceSH, sunIrradiance } from "@/lib/app/city-light";
 import { CAM_LL, cloudDrift, currentSky, flashAt, parseTime, sunVisibility, type LiveSky } from "@/lib/app/satellite";
 import { BASE, HOME_CAMERA, overrideTime, smoothstep, solar, type Camera } from "@/lib/app/sun";
 import { towerLight } from "@/lib/app/tower";
@@ -61,7 +61,10 @@ uniform vec2 u_res;uniform vec3 u_f,u_r,u_u;uniform vec2 u_tan;uniform vec3 u_su
 ${ATMOS_GLSL}
 void main(){AERO=u_aero;vec2 uv=gl_FragCoord.xy/u_res;vec3 v=viewDir(uv,u_f,u_r,u_u,u_tan);
 float elev=degrees(asin(clamp(v.z,-1.0,1.0)));
-vec3 c=radiance(v,u_sun)*u_exposure+(nightZenith+nightHorizon*exp(-max(0.0,elev)/nightFall))*u_glow;
+/* 薄明の空の色の補正（lib/app/atmosphere.ts の twilightTint と同じ式）：輝度はそのままに、高い所ほどブルーアワーの青へ */
+vec3 c=radiance(v,u_sun)*u_exposure;float tw=${ATMOS.twilightStrength.toFixed(3)}*(1.0-smoothstep(-3.0,1.0,degrees(asin(clamp(u_sun.z,-1.0,1.0)))))*smoothstep(4.0,25.0,elev);
+c=mix(c,dot(c,vec3(0.2126,0.7152,0.0722))*vec3(${ATMOS.twilightBlue.join(",")}),tw);
+c+=(nightZenith+nightHorizon*exp(-max(0.0,elev)/nightFall))*u_glow;
 gl_FragColor=vec4(sqrt(clamp(c/4.0,0.0,1.0)),1.0);}`;
 
 /** 距離（2 バイト、対数）・種類の復元と、視線の向き */
@@ -149,14 +152,16 @@ float n0=0.6;float f=(u_cloud>0.0&&u_satOn<0.999)?noiseCloud(pL,n0):0.0;
 if(u_satOn>0.001){vec4 sL=satAt(pL);vec4 sH=satAt(pH);float a=cloudAt(pL,sL.r+u_cloudExtra,0.36,shL);float b=cloudAt(pH,sH.g,0.14,shH);
 bright=mix(0.75,max(sL.b,sH.b),u_satOn);dL=mix(f,a,u_satOn);dH=b*u_satOn;shL=mix(n0,shL,u_satOn);thick=mix(u_cloud,sL.r+u_cloudExtra,u_satOn);}
 else{dL=f;shL=n0;}
-dL*=smoothstep(0.004,0.06,v.z);dH*=smoothstep(0.004,0.025,v.z);}
+/* 厚い雲（ほぼ全天の曇り）は地平線まで覆う（地平線の近くだけ晴れの空が見えると不自然） */
+float ovc=smoothstep(0.75,0.95,max(u_cloud,thick));dL*=mix(smoothstep(0.004,0.06,v.z),1.0,ovc);dH*=smoothstep(0.004,0.025,v.z);}
 /* 地面の点 Pk（km）に落ちる雲の影（太陽の向きへたどって層に当たる所の雲の濃さ） */
 float cloudShadow(vec2 Pk,float Pz){if(u_sun.z<=0.0)return 1.0;float sh;float iz=1.0/max(u_sun.z,0.06);vec2 QL=Pk+u_sun.xy*((u_cloudH.x-Pz)*iz);
 float f=(u_cloud>0.0&&u_satOn<0.999)?noiseCloud(QL,sh):0.0;if(u_satOn<=0.001)return 1.0-0.9*f;
 vec2 QH=Pk+u_sun.xy*((u_cloudH.y-Pz)*iz);float a=cloudAt(QL,satAt(QL).r+u_cloudExtra,0.36,sh);float b=cloudAt(QH,satAt(QH).g,0.14,sh);
 return (1.0-0.9*mix(f,a,u_satOn))*(1.0-0.75*b*u_satOn);}
-/* 霞の濁りの係数（近いほど弱める。距離×係数が単調に増えるように）と、近い霞の色（青みを抜く） */
-float hazeK(float d){return 0.22+0.78*smoothstep(2000.0,30000.0,d);}
+/* 霞の濁りの係数（近いほど弱める。距離×係数が単調に増えるように）と、近い霞の色（青みを抜く）。
+   本物の写真（スマートフォン）は 1〜3km の建物の日陰もほぼ黒く締まる（霞の明るさは日陰の明るさより小さい）。2km 以内は 5〜7%、20km より遠くはそのまま */
+float hazeK(float d){return 0.05+0.95*smoothstep(1500.0,20000.0,d);}
 vec3 hazeAt(vec3 hz0,float d){return mix(vec3(dot(hz0,vec3(0.2126,0.7152,0.0722))),hz0,smoothstep(2500.0,20000.0,d));}
 /* 雨：細長い枠の中を落ちる筋 */
 float rain(vec2 uv,vec2 scale,float speed,float seed){vec2 q=vec2(uv.x*1.43+uv.y*0.1,uv.y)*scale;vec2 c=floor(q);vec2 f=fract(q);float h=hash21(c+seed);
@@ -172,14 +177,16 @@ vec3 v=viewDir(uv);
 vec3 sky=skyAt(uv);
 float skyLum=dot(sky,vec3(0.2126,0.7152,0.0722));
 /* 雲（低い層と高い層。高い雲は日没後もしばらく日が当たり、桃色に残る） */
-float dL,dH,shL,shH,bright,thick;clouds(v,dL,dH,shL,shH,bright,thick);float sunVis=u_sunVis;
+float dL,dH,shL,shH,bright,thick;clouds(v,dL,dH,shL,shH,bright,thick);dL=max(dL,smoothstep(0.85,0.97,thick));float sunVis=u_sunVis;
 vec3 zen=skyAt(vec2(0.5,0.96));
-vec3 amb=zen*0.8+vec3(0.06);
+/* 雲の底を照らす空の光：曇るほど青みが抜けて灰色（本物の曇り空は灰色一色） */
+float ovc0=smoothstep(0.5,0.95,u_cloud);vec3 zg=mix(zen,vec3(dot(zen,vec3(0.2126,0.7152,0.0722))),0.35+0.55*ovc0);vec3 amb=zg*0.8+vec3(0.06);
 vec3 litL=u_sunT*(1.05+0.25*u_day);vec3 litH=u_sunTH*(1.1+0.2*u_litH);
 /* 低い雲は下から見る：厚い雲ほど底が暗い（太陽が高いとき。低い太陽は横から当たって明るい） */
 vec3 dayColL=mix(amb,litL,(shL*0.75+0.1)*(1.0-0.55*u_cloud))*(0.7+0.4*bright)*(1.0-0.45*smoothstep(0.45,1.0,thick)*clamp(u_sun.z*2.0,0.0,1.0));
 vec3 dayColH=mix(amb*1.1,litH,shH*0.6+0.3)*(0.8+0.3*bright);
-vec3 nightCol=sky*0.55+vec3(0.075,0.052,0.036)*(0.7+0.5*(1.0-clamp(v.z*4.0,0.0,1.0)))+vec3(0.006,0.007,0.012);
+/* 夜・薄明の雲：薄い雲は後ろの空の色で光るが、厚い雲は夕焼けを通さず灰色（明るさは空に合わせる）。下から街明かりで茶灰色に */
+vec3 nightCol=mix(sky*0.55,vec3(dot(sky,vec3(0.2126,0.7152,0.0722)))*0.45,ovc0)+vec3(0.075,0.052,0.036)*(0.7+0.5*(1.0-clamp(v.z*4.0,0.0,1.0)))+vec3(0.006,0.007,0.012);
 vec3 cloudColL=mix(nightCol,dayColL,u_day);vec3 cloudColH=mix(nightCol*0.8,dayColH,u_litH);
 /* 太陽：本体とにじみ（雲でさえぎられる） */
 float th=acos(clamp(dot(v,u_sun),-1.0,1.0));
@@ -194,11 +201,13 @@ sky+=vec3(0.9,0.92,1.0)*0.09*exp(-tm/(0.04*u_haze))*vis;}
 if(u_stars>0.0){float az=atan(v.x,v.y);vec2 cell=vec2(az,asin(clamp(v.z,-1.0,1.0)))/0.0061;vec2 id=floor(cell);float h1=hash21(id);
 if(h1<0.0014){vec2 cen=id+0.5+vec2(hash21(id+1.3),hash21(id+7.1))*0.6-0.3;float dd=length(cell-cen);float b=pow(hash21(id+3.7),2.0)*0.85+0.15;
 sky+=vec3(0.85,0.9,1.0)*b*exp(-dd*dd*9.0)*u_stars*clamp(1.0-skyLum*6.0,0.0,1.0)*smoothstep(0.08,0.45,v.z);}}
-sky=mix(sky,cloudColH,dH*0.93);sky=mix(sky,cloudColL,dL*0.95);
+sky=mix(sky,cloudColH,dH*0.93);sky=mix(sky,cloudColL,dL*mix(0.95,1.0,smoothstep(0.8,0.97,thick)));
 /* 稲光：発雷域の向きの雲と空が一瞬明るくなる */
 if(u_flash>0.0){float ang=acos(clamp(dot(normalize(v.xy+vec2(1e-5,0.0)),u_flashDir),-1.0,1.0));float k=u_flash*exp(-ang*ang/0.22)*smoothstep(-0.02,0.08,v.z);sky+=vec3(0.85,0.88,1.0)*k*(0.25+1.2*max(dL,dH));}
 vec3 hz=skyAt(vec2(uv.x,1.0-u_horizon+0.03))*0.8;
-vec3 haze=mix(hz,vec3(dot(hz,vec3(0.3,0.5,0.2))),u_cloud*0.6)+u_amb*1.6;
+/* 夜の街明かりが霞を照らす分（u_amb）は街の上の空気だけ。街より遠くの山は地平線の空より暗いシルエット。
+   曇りの日の霞は雲の底の色（遠くの街は灰色の空に溶ける。晴れの地平線の白さは使わない） */
+vec3 hazeB=mix(mix(hz,vec3(dot(hz,vec3(0.3,0.5,0.2))),u_cloud*0.6),cloudColL*0.97,smoothstep(0.55,0.9,u_cloud));vec3 haze=hazeB+u_amb*1.6;
 vec3 outc=sky;float distKm=1e5;float twW=0.0;
 /* 街：焼き込んだ色・向き・距離を、今の光で照らす */
 vec4 al=texture2D(u_alb,iuv);float cov=al.a*u_city;
@@ -229,17 +238,20 @@ E=mix(E,vec3(dot(E,vec3(0.2126,0.7152,0.0722))),0.45);
 vec3 L=a*(u_sunE*pre.r*cs+E*ao*(0.45+0.45*ao))/3.14159265+a*u_amb*(0.35+0.65*ao);
 /* 濡れた屋根・道は空を映す（夜は街灯も） */
 L+=haze*0.10*u_wet*up*(1.0-u_snowCover);
-/* ガラス：窓は空を映す（斜めから見るほど強く＝フレネル。オフィスの熱線反射ガラスは正面でも 12% ほど映す）。太陽の映り込みはきらりと光る */
-if(typ<2.5){float glass=texture2D(u_win,iuv).r*(aux<1.5?1.0:0.7)*(1.0-u_snowCover);
+/* ガラス：窓は空を映す（斜めから見るほど強く＝フレネル。オフィスの熱線反射ガラスは正面でも 12% ほど映す）。太陽の映り込みはきらりと光る。
+   写真の質感のある建物（typ 1）は質感に窓が写っているので、窓の型（格子の決め打ち）ではなく用途ごとの一様なガラスの割合で映す（型がずれてざらつかない） */
+if(typ<2.5){float glass=(typ<1.5?(aux<1.5?0.32:(aux<2.5?0.22:(aux<3.5?0.18:0.1))):texture2D(u_win,iuv).r*(aux<1.5?1.0:0.7))*(1.0-u_snowCover);
 if(glass>0.01){float nv=max(dot(n,-v),0.0);float f0=aux<1.5?0.12:0.05;float F=f0+(1.0-f0)*pow(1.0-nv,5.0);vec3 rv=reflect(v,n);
 vec3 refl=rv.z>0.0?mix(hz*0.9,zen,smoothstep(0.0,0.5,rv.z)):L*0.8;
 float glint=pow(max(dot(rv,u_sun),0.0),180.0)*step(0.0,u_sun.z)*sunVis*min(pre.r*4.0,1.0);
 L+=glass*(F*refl+glint*u_sunE*0.12);}}
-/* 窓（用途で色が違う：オフィスは白、住宅は暖色が多い） */
+/* 窓（用途で色が違う：オフィスは白、住宅は暖色が多い）。明るさは窓ごとに大きく違う（明るい事務所の階は白く飛ぶ）。
+   遠くは 1 画素に窓がいくつも入るが、光は一様に広がらず点の集まり：画素ごとの明るさを裾の重い乱数で散らす（平均は同じ） */
 if(pre.g>0.0){vec3 w=texture2D(u_win,iuv).rgb;
 vec3 wc=aux<1.5?mix(vec3(0.86,0.92,1.0),vec3(1.0,0.9,0.74),step(0.6,fract(w.b*5.1))):(aux<2.5?vec3(1.0,0.84,0.62):(aux<3.5?vec3(1.0,0.76,0.5):(aux<4.5?mix(vec3(1.0,0.7,0.4),vec3(0.9,0.94,1.0),step(0.75,fract(w.g*7.3))):vec3(0.96,0.9,0.8))));
 float wk=aux<1.5?0.95:(aux<2.5?1.2:(aux<3.5?0.85:(aux<4.5?0.8:0.7)));
-L+=wc*pre.g*(0.3+0.8*fract(w.g*13.7))*wk*u_lightsVis;}
+float hx=-log(max(hash21(gl_FragCoord.xy+vec2(17.0,3.0)),0.002));float wv=fract(w.g*13.7);
+L+=wc*pre.g*(0.35+1.9*wv*wv)*wk*u_lightsVis*mix(1.0,hx*hx*0.5,smoothstep(1500.0,5000.0,dd));}
 /* 街灯と車（国道・都道・高速は車の光が流れる） */
 if(typ==3.0&&pre.b>0.0){vec3 sc=aux>1.5?vec3(1.0,0.74,0.45):vec3(0.86,0.92,1.0);L+=sc*pre.b*1.2*u_lightsVis*(1.0+0.8*u_wet);
 if(aux>1.5){float uu=e.b*255.0;float hh=hash21(floor(gl_FragCoord.xy*0.5));float dir=hh>0.5?1.0:-1.0;
@@ -248,7 +260,7 @@ float car=smoothstep(0.84,0.98,fract((uu+dir*u_time*13.0)/21.0+hh*7.0));L+=(dir>
    カメラ（スマートフォン）の処理と同じく、近い所は霞を弱めて明暗と色を残す（濁りの係数を近いほど下げる。30km より遠くはそのまま）。
    近い霞は空の青ではなく中立の色（地表近くの霞の粒は色を選ばずに散らす） */
 float T=exp(-dd*u_sigma*hazeK(dd));
-L=L*T+hazeAt(haze,dd)*(1.0-T);
+L=L*T+(hazeAt(hazeB,dd)+u_amb*1.6*(1.0-smoothstep(12000.0,40000.0,dd)))*(1.0-T);
 outc=mix(sky,L,cov);}
 /* 東京タワー：塔だけを高い倍率で焼いた層（色と透け具合・面の向きの割合・照明の属性）を街の上に重ねる。透けた格子の向こうに街が見える */
 if(u_twOn>0.5){vec2 tq=(iuv-u_twRect.xy)/(u_twRect.zw-u_twRect.xy);
@@ -265,20 +277,25 @@ vec3 Pt=v*u_twDist;float cst=cloudShadow(Pt.xy/1000.0,Pt.z/1000.0);
 vec3 Lt=ab*(u_sunE*sunF*0.8*cst+Et*0.85)/3.14159265+ab*u_amb*0.5;
 /* 展望台のガラス：空を映す */
 float gf=te.b;if(gf>0.0){vec3 rv=reflect(v,normalize(u_twX*tn.x+u_twY*tn.y+vec3(0.0,0.0,0.001)));vec3 refl=rv.z>0.0?mix(hz*0.9,zen,smoothstep(0.0,0.5,rv.z)):Lt*0.8;Lt+=gf*0.14*refl;}
-/* 夜：ランドマークライト（夏は白・冬はオレンジ）、ダイヤモンドヴェール、展望台の窓、毎正時の純白の煌めき（大展望台とトップデッキの上部） */
+/* 夜：ランドマークライト（夏は白・冬はオレンジ）、ダイヤモンドヴェール、展望台の窓、毎正時の純白の煌めき（大展望台とトップデッキの上部）。
+   色は画面の色（sRGB）で決めてあるので線形に直す（直さないと橙が薄い桃色になる） */
 if(u_towerOn>0.0){float code2=floor(te.r*255.0+0.5);float part=floor(code2/32.0);float tier=code2-part*32.0;float tem=te.g;
-vec3 tc=u_towerCol;if(u_towerMode>1.5)tc*=0.55+0.45*sin(tier*0.85+u_time*0.6);
+vec3 tc=pow(u_towerCol,vec3(2.2));if(u_towerMode>1.5)tc*=0.55+0.45*sin(tier*0.85+u_time*0.6);
 tc=mix(tc,vec3(1.0),u_towerWhite);
 float k=part<0.5?1.0:(part<2.5?0.0:(part<3.5?0.55:(part<4.5?0.0:0.9)));
-Lt+=tc*tem*k*2.8;
-Lt+=vec3(1.0,0.95,0.86)*1.7*u_decks*gf;
-if(u_sparkle>0.0&&part>4.5)Lt+=vec3(1.0)*step(0.78,hash21(floor(gl_FragCoord.xy*0.7)+floor(u_time*9.0)))*3.0;}
+Lt+=tc*tem*k*2.8*u_towerOn;
+Lt+=vec3(1.0,0.95,0.86)*1.7*u_decks*gf*u_towerOn;
+if(u_sparkle>0.0&&part>4.5)Lt+=vec3(1.0)*step(0.78,hash21(floor(gl_FragCoord.xy*0.7)+floor(u_time*9.0)))*3.0*u_towerOn;}
 float Tt=exp(-u_twDist*u_sigma*hazeK(u_twDist));Lt=Lt*Tt+hazeAt(haze,u_twDist)*(1.0-Tt);
 outc=mix(outc,Lt,ta.a);distKm=mix(distKm,u_twDist/1000.0,ta.a);twW=ta.a;}}}
 /* 雨の幕：レーダーの雨の下を通る視線の分だけ灰色に溶ける（遠くの雨柱、近くの雨。雨の強さで見通しが決まる） */
 if(u_rainOn>0.5){float tmax=cov>0.002?min(distKm,80.0):(v.z>0.001?min((u_cloudH.x-H0)/v.z,80.0):80.0);float od=0.0;float dt=tmax/8.0;
 for(int i=0;i<8;i++){float t=(float(i)+0.5)*dt;float z=H0+v.z*t;if(z>u_cloudH.x||z<-0.3)continue;float mm=rainAt(v.xy*t);if(mm>0.2)od+=0.2*pow(mm,0.63)*dt;}
 outc=mix(outc,haze*0.78,1.0-exp(-od));}
+/* 夜の光のにじみ（レンズと空気）：周りの窓と街灯の明かりを 2 つの輪で拾って足す */
+if(u_lightsVis>0.0){vec3 gs=vec3(0.0);for(int i=0;i<8;i++){float an=float(i)*0.785398+0.39;vec2 o=vec2(cos(an),sin(an))/u_res;
+vec4 p1=texture2D(u_pre,uv+o*2.5);vec4 p2=texture2D(u_pre,uv+o*6.0);gs+=vec3(0.95,0.9,0.8)*(p1.g*0.6+p2.g*0.3)+vec3(1.0,0.75,0.45)*(p1.b*0.6+p2.b*0.3);}
+outc+=gs/8.0*0.12*u_lightsVis;}
 vec3 col=tone(outc*u_expAdj);
 /* 街と塔：カメラの色の処理（彩度を少し上げ、中間の明るさの差を広げる）。空は CSS の色とそろえるため変えない。昼ほど強く */
 float cw=max(cov,twW)*(0.35+0.65*u_day);
@@ -530,7 +547,9 @@ function cityLightValues(at: Date, sun: [number, number, number], altitude: numb
     sh,
     sunE: sunIrradiance(sun, altitude, air.aero),
     amb: cityAmbient(altitude),
-    lightsVis: artificialVisibility(altitude),
+    lightsVis: artificialLevel(altitude),
+    /** タワーの明かりの露出の比（点灯は日没から。日没のころは目立たない） */
+    artExp: artificialExposure(altitude),
     occ,
     sigma: 3.912 / (vis * 1000),
     season: [season.blossom, season.fresh, season.autumn, season.bare] as [number, number, number, number],
@@ -619,7 +638,7 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
   setCam(g.sky, g.skyT.w, g.skyT.h);
   gl.uniform1f(g.sky.loc.u_exposure, exposureFor(s.altitude));
   gl.uniform1f(g.sky.loc.u_aero, air.aero);
-  gl.uniform1f(g.sky.loc.u_glow, air.glow);
+  gl.uniform1f(g.sky.loc.u_glow, air.glow * nightExposureRatio(s.altitude));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   // 街の下ごしらえ（分・天気が変わったときだけ）
   if (showCity && lv) {
@@ -713,7 +732,7 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
     gl.uniform1f(m.u_snowCover, lv.snowCover);
     gl.uniform1f(m.u_wet, lv.wet);
     const t = lv.tower;
-    gl.uniform1f(m.u_towerOn, t.on ? 1 : 0);
+    gl.uniform1f(m.u_towerOn, t.on ? lv.artExp : 0);
     gl.uniform1f(m.u_towerMode, t.mode);
     gl.uniform1f(m.u_towerWhite, t.white);
     gl.uniform3f(m.u_towerCol, t.color[0], t.color[1], t.color[2]);

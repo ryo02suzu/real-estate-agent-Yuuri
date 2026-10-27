@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dirFromAltAz, exposureFor, radiance, skyColor, sunTransmittance } from "./atmosphere";
+import { dirFromAltAz, exposureFor, nightExposureRatio, radiance, skyColor, skyLinear, sunTransmittance, twilightTint } from "./atmosphere";
 
 describe("大気の計算（空をコードで描く式）", () => {
   it("昼の空は上が青く、地平線は白っぽい", () => {
@@ -56,6 +56,26 @@ describe("大気の計算（空をコードで描く式）", () => {
       expect(e).toBeGreaterThanOrEqual(prev - 1e-9);
       prev = e;
     }
+  });
+  it("薄明の空は高い所ほど青い（輝度はそのまま）。昼と地平線の近くは変えない", () => {
+    const c: [number, number, number] = [0.06, 0.04, 0.05];
+    expect(twilightTint(c, 40, 10)).toEqual(c);
+    expect(twilightTint(c, 2, -5)).toEqual(c);
+    const t = twilightTint(c, 40, -5);
+    const Y = (v: number[]) => 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+    expect(Y(t)).toBeCloseTo(Y(c), 4);
+    expect(t[2]).toBeGreaterThan(t[0] * 1.5);
+    // 日没 20 分後（-4°）の西の空：地平線の近くは橙、上（20°）は青
+    const s = dirFromAltAz(-4, 250);
+    const low = skyLinear(dirFromAltAz(6, 248), s, -4);
+    const high = skyLinear(dirFromAltAz(22, 248), s, -4);
+    expect(low[0]).toBeGreaterThan(low[2]);
+    expect(high[2]).toBeGreaterThan(high[0]);
+  });
+  it("明るさが一定の光（街の明かり・夜空の照り返し）は、露出の比で夜に向けて強くなる", () => {
+    expect(nightExposureRatio(10)).toBeLessThan(0.02);
+    expect(nightExposureRatio(-6)).toBeGreaterThan(nightExposureRatio(-3));
+    expect(nightExposureRatio(-20)).toBe(1);
   });
   it("夜の空にも地（街の明かりの照り返し）があり、地平線の方が明るい", () => {
     const s = dirFromAltAz(-25, 300);

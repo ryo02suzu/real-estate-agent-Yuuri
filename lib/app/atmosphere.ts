@@ -30,13 +30,16 @@ export const ATMOS = {
   sun: 20,
   /**
    * 露出（カメラの自動露出・目の順応に相当）。太陽の高度ごとの節で、間は対数で補間する。
-   * 昼は空が飛ばないように低く、薄明・夜は暗い空が見えるように高く
+   * 昼は空が飛ばないように低く、薄明・夜は暗い空が見えるように高く。薄明の空の明るさは昼の千分の一ほどまで下がるが、
+   * スマートフォンは露出を大きく上げて写す（日没 30 分後のブルーアワーの空が青く明るく写る）ので、-6° で昼の約 30 倍
    */
   exposureKnots: [
     [10, 1.1],
-    [0, 2.4],
-    [-6, 8],
-    [-12, 24],
+    [0, 2.6],
+    [-3, 7],
+    [-6, 30],
+    [-9, 70],
+    [-12, 90],
   ] as [number, number][],
   /**
    * 何度も散らばった光（単一散乱では足りない分）の近似：見る方向の空気が厚いほど、空の平均の色で薄く光る。
@@ -53,9 +56,17 @@ export const ATMOS = {
   /** 太陽と月の見かけの半径（度）。月は小さすぎて点になるので少し大きく描く */
   sunRadius: 0.27,
   moonRadius: 0.26 * 3.0,
-  /** 夜の空の地（空気の微かな光と街の明かりの照り返し。露出をかけた後の線形の明るさ） */
-  nightZenith: [0.012, 0.018, 0.045] as Vec3,
-  nightHorizon: [0.095, 0.052, 0.028] as Vec3,
+  /**
+   * 薄明の空の色の補正（twilightTint）：寄せる青（輝度 1 の線形 RGB）と、いちばん高い所での強さ。
+   * 単一散乱だけでは薄明の空が紫がかった灰色になる（実際はオゾンの吸収と何度も散らばった光で青い）
+   */
+  twilightBlue: [0.72, 1.02, 1.63] as Vec3,
+  twilightStrength: 0.85,
+  /** 夜の空の地（空気の微かな光と街の明かりの照り返し。露出をかけた後の線形の明るさ）。
+   *  東京の夜空は街明かり（白い LED と橙の灯り）の照り返しで、上は灰色がかった紺、地平線の近くは茶色がかった灰色
+   *  （照り返しの光は緑も含む幅の広い色なので、紺と混ざっても紫にならない） */
+  nightZenith: [0.009, 0.012, 0.024] as Vec3,
+  nightHorizon: [0.088, 0.066, 0.044] as Vec3,
   nightHorizonFalloff: 6,
 } as const;
 
@@ -198,6 +209,32 @@ export function sunTransmittanceAt(h: number, s: Vec3, aero = 1): Vec3 {
   return d ? (d.map((x) => Math.exp(-x)) as Vec3) : [0, 0, 0];
 }
 
+/**
+ * 明るさが一定の光（街の明かり・その照り返しの夜空）の露出の比（夜＝太陽が -12° より下を 1）。
+ * カメラの露出は暗くなるほど上がるので、日没のころ（0.1）はまだ目立たず、薄明の終わり（-6° で 0.33）に向けて浮かび上がる。
+ * 薄明の空は街の照り返しに埋もれず青い（ブルーアワー）
+ */
+export function nightExposureRatio(sunAltitude: number): number {
+  return Math.min(1, exposureFor(sunAltitude) / ATMOS.exposureKnots[ATMOS.exposureKnots.length - 1][1]);
+}
+
+const smooth = (a: number, b: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * 薄明（日没後・日の出前）の空の色の補正。明るさ（輝度）はそのままに、地平線から高い所ほどブルーアワーの青へ寄せる
+ * （太陽の側の地平線の近くの橙と、反対側の低い所の桃色は残す）。c は露出をかけた散乱光（線形）。
+ * シェーダー（components/app/sky-canvas.tsx の FRAG_SKY）と <head> の最初の計算（lib/app/sky-vars.ts）も同じ式
+ */
+export function twilightTint(c: Vec3, elevationDeg: number, sunAltitude: number): Vec3 {
+  const w = ATMOS.twilightStrength * (1 - smooth(-3, 1, sunAltitude)) * smooth(4, 25, elevationDeg);
+  if (w <= 0) return c;
+  const Y = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  return [0, 1, 2].map((j) => c[j] + (Y * ATMOS.twilightBlue[j] - c[j]) * w) as Vec3;
+}
+
 /** 夜の空の地（街の明かりの照り返しは地平線の近くで強い。霞が多いと明るい＝glow）。線形の放射輝度 */
 export function nightBase(elevationDeg: number, glow = 1): Vec3 {
   const f = Math.exp(-Math.max(0, elevationDeg) / ATMOS.nightHorizonFalloff);
@@ -214,8 +251,9 @@ export function skyLinear(v: Vec3, s: Vec3, sunAltitude: number, air: AirParams 
   const L = radiance(v, s, air.aero);
   const e = exposureFor(sunAltitude);
   const elev = Math.asin(Math.max(-1, Math.min(1, v[2]))) / R;
-  const nb = nightBase(elev, air.glow);
-  return [L[0] * e + nb[0], L[1] * e + nb[1], L[2] * e + nb[2]];
+  const c = twilightTint([L[0] * e, L[1] * e, L[2] * e], elev, sunAltitude);
+  const nb = nightBase(elev, air.glow * nightExposureRatio(sunAltitude));
+  return [c[0] + nb[0], c[1] + nb[1], c[2] + nb[2]];
 }
 
 /** 空の色（太陽本体・月・星は含まない）。画面の 0〜255 */
