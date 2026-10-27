@@ -1,9 +1,9 @@
 "use client";
 
-// 時間連動の空（ホームの帯・各ページの帯）。天体の計算は lib/app/sun.ts、CSS 変数は lib/app/sky-vars.ts。
-// ここは描く側：写真4枚（昼・夕方・薄暮・夜）の重ね、地平線の光、各ページの帯の空の色、スクロールで縮む帯の仕組み。
+// 時間連動の空と街（ホームの帯・各ページの帯。どのページも同じ絵）。天体の計算は lib/app/sun.ts、CSS 変数は lib/app/sky-vars.ts。
+// ここは描く側：代わりの絵（昼・夕焼け・薄暮・夜明け・夜）の重ね、街を描くキャンバス、スクロールで縮む帯の仕組み。
 // 太陽本体は、写真のカメラの向き・画角が設定されるまで描かない（--sun-in が 1 のときだけ）
-import { HOME_CAMERA, overrideTime, PHOTO_ORDER, solar, type Camera } from "@/lib/app/sun";
+import { overrideTime, PHOTO_ORDER, solar } from "@/lib/app/sun";
 import { fetchCloudField, fetchRainField, fetchThunder, mergeCloud, setLiveSky } from "@/lib/app/satellite";
 import { currentWeather, fetchWeather, setLiveWeather } from "@/lib/app/weather";
 import { useEffect, type CSSProperties, type ReactNode, type RefObject } from "react";
@@ -145,7 +145,7 @@ const PHOTOS = PHOTO_ORDER;
 const SKY_GRADIENT = "linear-gradient(180deg, var(--sky-top, #7bb9e8) 0%, var(--sky-mid, #b0d7ef) 32%, var(--sky-horizon, #bfccda) 56%, var(--sky-horizon, #bfccda) 100%)";
 
 /**
- * ホームの帯（幅393×高さ275pt）。空も街もコードで描く（SkyCanvas。太陽の実位置から大気の散乱、PLATEAU の実在の街を今の光で照らす）。
+ * 街の帯（幅393×高さ275pt。ホームと、履歴・お気に入り・書類・出力・その他で同じ）。空も街もコードで描く（SkyCanvas。太陽の実位置から大気の散乱、PLATEAU の実在の街を今の光で照らす）。
  * 下の CSS の層は、キャンバスが描けるまで・描けない端末のための代わりの絵（public/home/sky。同じ街を昼・夕焼け・薄暮・夜明け・夜に
  * 焼いたもの。街のマスクで空の部分は見せず、空は CSS のグラデーション）。太陽の高度で混ぜ、夜は窓の明かりの層を重ねる
  */
@@ -182,64 +182,6 @@ const CITY_MASK: CSSProperties = {
   maskSize: "100% 100%",
   WebkitMaskSize: "100% 100%",
 };
-
-export type WashVariant = "sky" | "warm" | "paper" | "blue";
-
-/**
- * 各ページの帯の背景（写真が届くまで）。空の色（上端→中ほど→地平線）は時間とともに変わる。
- * sky：履歴（東京のスカイラインの影つき）、warm：お気に入り（少し暖かく）、paper：書類・出力（図面風の格子と差し込む光）、
- * blue：その他（ブルーのグラデーション）。下は見出しが読めるよう少し暗くする
- */
-/** 各ページの帯（幅393×高さ124pt）のカメラ：ホームと同じ向きで、地平線を下端の近くに */
-const WASH_CAMERA: Camera = { ...HOME_CAMERA, aspect: 393 / 124, horizon: 0.95 };
-
-export function SkyWash({ variant }: { variant: WashVariant }) {
-  const sky = "linear-gradient(180deg, var(--sky-top, #7bb9e8) 0%, var(--sky-mid, #b0d7ef) 55%, var(--sky-horizon, #bfccda) 100%)";
-  const skyline = (
-    <div
-      aria-hidden
-      className="absolute inset-x-0 bottom-0"
-      style={{
-        height: 70,
-        background: "rgba(15, 35, 70, calc(0.16 + var(--sky-nightness, 0) * 0.5))",
-        maskImage: "url(/home/sky/skyline.png)",
-        WebkitMaskImage: "url(/home/sky/skyline.png)",
-        maskSize: "100% 100%",
-        WebkitMaskSize: "100% 100%",
-      }}
-    />
-  );
-  return (
-    <div className="absolute inset-0 overflow-hidden" aria-hidden>
-      <div className="sky-layer absolute inset-0" style={{ background: sky }} />
-      {variant === "sky" && <SkyCanvas camera={WASH_CAMERA} className="absolute inset-0" />}
-      {variant === "warm" && <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(255,214,170,0.18) 0%, rgba(255,200,150,0.28) 100%)" }} />}
-      {variant === "paper" && (
-        <>
-          <div className="absolute inset-0" style={{ background: "rgba(236, 242, 249, calc(0.55 - var(--sky-nightness, 0) * 0.35))" }} />
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: "linear-gradient(rgba(19,54,100,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(19,54,100,0.12) 1px, transparent 1px)",
-              backgroundSize: "24px 24px",
-              opacity: "calc(1 - var(--sky-nightness, 0) * 0.5)",
-            }}
-          />
-          <div className="sky-layer absolute inset-0" style={{ background: "radial-gradient(70% 90% at calc(var(--sky-light-x, 30) * 1%) 0%, var(--sky-hl, #fff) 0%, rgba(255,255,255,0) 70%)", opacity: 0.6 }} />
-        </>
-      )}
-      {variant === "blue" && (
-        <>
-          <div className="absolute inset-0" style={{ background: "linear-gradient(160deg, rgba(19,54,100,0.35) 0%, rgba(19,54,100,0) 50%, rgba(61,123,255,0.25) 100%)" }} />
-          <div className="absolute inset-0" style={{ background: "radial-gradient(55% 70% at 85% 20%, rgba(34,193,238,0.35) 0%, rgba(34,193,238,0) 70%), radial-gradient(60% 60% at 10% 100%, rgba(110,140,255,0.35) 0%, rgba(110,140,255,0) 70%)" }} />
-        </>
-      )}
-      {(variant === "sky" || variant === "warm") && skyline}
-      {/* 見出しが読めるよう、下を少し暗く */}
-      <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(10,25,50,0.06) 0%, rgba(10,25,50,0) 30%, rgba(10,25,50,0.16) 55%, rgba(10,25,50,0.62) 100%)" }} />
-    </div>
-  );
-}
 
 /** 帯の下端を、ページの地の色へ溶かす */
 export function BottomFade({ height = 40 }: { height?: number }) {

@@ -1,7 +1,7 @@
 "use client";
 
-// スマホの下のメニューのページ（履歴・お気に入り・書類・出力・その他）。ホームと同じ系統：上に街の写真の帯（写真はまだ無いので
-// NO IMAGE の札）、その帯に重ねるすりガラスのカード（そのページでいちばん使う操作）、白い角丸の一覧。
+// スマホの下のメニューのページ（履歴・お気に入り・書類・出力・その他）。ホームと同じ系統：上にホームと同じ街の帯（時間連動の空と
+// PLATEAU の街。components/app/sky.tsx の SkyPhotos）、その帯に重ねるすりガラスのカード（そのページでいちばん使う操作）、白い角丸の一覧。
 // 字は端末の標準の字（app/globals.css の .theme-navy）。大きさは iPhone の段階：帯の見出し28pt太字、章の見出し17pt太字、
 // 行の名前15.5pt中太字、説明12.5pt、押せる所は44pt以上。寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）
 import {
@@ -35,24 +35,29 @@ import { historyKey, type HistoryItem } from "@/lib/history";
 import { allRecords, recordsSummary, type PropertyRecords } from "@/lib/records";
 import { MUNICIPALITIES } from "@/lib/roadmap";
 import { PhoneImg, ScaledInput } from "./frame";
-import { AURORA, PAGE } from "./home";
+import { AURORA, GLOW, PAGE } from "./home";
 import { ClockBack } from "./icons";
 import { FavStar } from "./star";
 import { NEWS } from "./news";
 import { CARD, GLASS, Head, HEAD, LIGHT, Note, Row, TEXT } from "./r-ui";
-import { BottomFade, CompactBar, SkyWash, useShrink, type WashVariant } from "./sky";
+import { BottomFade, CompactBar, SkyPhotos, useShrink } from "./sky";
 import { STATUS } from "./tokens";
 import { NAVY } from "./ui";
 
-/** 写真の帯の高さと、ガラスのカードを重ねる量 */
-const BAND_H = 124;
-const OVERLAP = 28;
+/**
+ * 街の帯の高さ（ホームは 275pt。街の絵は 393×275pt で、空は 0〜147pt、街並みは 147pt から下）と、ガラスのカードを重ねる量。
+ * 帯の下の 25pt（いちばん手前の街）は切れる。カードは街並みに重なり、見出しは空の部分（ホームと同じ上端 44pt）
+ */
+const BAND_H = 250;
+const OVERLAP = 72;
+const PHOTO_H = 275;
 
 /**
- * ページの枠：時間連動の空の帯（見出し・副題。右上に小さなボタン）、重ねるガラスのカード、その下の中身。
- * スクロールが出ると帯が縮み（写真は半分の速さで上へ、見出しは薄れる）、56pt のバーに見出しが残る
+ * ページの枠：ホームと同じ街の帯（見出し・副題は空の部分に。字の色は空の明るさで紺↔白、建物に重なっても読めるよう光彩。
+ * 右上に小さなボタン）、街並みに重ねるガラスのカード、その下の中身。
+ * スクロールが出ると帯が縮み（絵は半分の速さで上へ、見出しは薄れる）、56pt のバーに見出しが残る
  */
-function TabScreen({ title, sub, action, hero, banner, variant, children }: { title: string; sub?: string; action?: ReactNode; hero?: ReactNode; banner?: ReactNode; variant: WashVariant; children: ReactNode }) {
+function TabScreen({ title, sub, action, hero, banner, children }: { title: string; sub?: string; action?: ReactNode; hero?: ReactNode; banner?: ReactNode; children: ReactNode }) {
   const root = useRef<HTMLDivElement>(null);
   useShrink(root, BAND_H - 56);
   return (
@@ -65,21 +70,21 @@ function TabScreen({ title, sub, action, hero, banner, variant, children }: { ti
       </CompactBar>
       <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0" style={{ top: BAND_H, background: AURORA }} />
       <div className="relative overflow-hidden" style={{ height: BAND_H }}>
-        <div className="shrink-photo absolute inset-0">
-          <SkyWash variant={variant} />
+        <div className="shrink-photo absolute inset-x-0 top-0" style={{ height: PHOTO_H }}>
+          <SkyPhotos />
         </div>
-        <BottomFade height={18} />
+        <BottomFade />
         {action && (
-          <div className="absolute" style={{ right: 8, top: 6 }}>
+          <div className="absolute" style={{ right: 8, top: 3 }}>
             {action}
           </div>
         )}
-        <div className="shrink-title absolute left-[20px] right-[20px]" style={{ bottom: OVERLAP + 10 }}>
-          <h1 className="truncate font-bold leading-[1.15] text-white" style={{ fontSize: 27, textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>
+        <div className="shrink-title absolute left-[16px] right-[16px]" style={{ top: 44 }}>
+          <h1 className="sky-ink truncate font-bold" style={{ fontSize: 26, lineHeight: "34px", letterSpacing: 0.2, textShadow: GLOW }}>
             {title}
           </h1>
           {sub && (
-            <p className="mt-[4px] truncate leading-none" style={{ fontSize: 13, color: "rgba(255,255,255,0.88)", textShadow: "0 1px 4px rgba(0,0,0,0.4)" }}>
+            <p className="sky-ink-soft mt-[3px] truncate leading-none" style={{ fontSize: 13, letterSpacing: 0.2, textShadow: GLOW }}>
               {sub}
             </p>
           )}
@@ -87,7 +92,8 @@ function TabScreen({ title, sub, action, hero, banner, variant, children }: { ti
       </div>
       {hero && (
         <div className="relative mx-[16px] rounded-[22px] p-[9px] shadow-[0_14px_34px_rgba(20,48,95,0.13)]" style={{ ...GLASS, marginTop: -OVERLAP }}>
-          {hero}
+          <div aria-hidden className="sky-layer pointer-events-none absolute inset-0 rounded-[22px]" style={{ background: "radial-gradient(120% 70% at 14% 0%, var(--sky-hl, #fff) 0%, rgba(255,255,255,0) 60%)", opacity: 0.55, boxShadow: "inset 0 1px 0 var(--sky-hl, #fff)" }} />
+          <div className="relative">{hero}</div>
         </div>
       )}
       {banner && <div className="relative mt-[8px] px-[16px]">{banner}</div>}
@@ -345,7 +351,6 @@ export function HistoryPage({
 
   return (
     <TabScreen
-      variant="sky"
       title="履歴"
       sub={history.length ? `${history.length}件・この端末だけに保存（最大30件）` : "調べた物件がここに残ります"}
       hero={
@@ -463,7 +468,6 @@ export function FavoritesPage({
 
   return (
     <TabScreen
-      variant="warm"
       title="お気に入り"
       sub={favorites.length ? `${favorites.length}件・この端末だけに保存（最大50件）` : "案内の前の下調べや、見返したい物件を"}
       hero={
@@ -568,7 +572,6 @@ export function DocsPage({
   const now = useNow();
   return (
     <TabScreen
-      variant="paper"
       title="書類・出力"
       sub={current ? `${placeParts(current).town || placeParts(current).full} の書類を作れます` : "調べた物件から、参考の資料をすぐ作れます"}
       hero={
@@ -665,13 +668,14 @@ export function AccountPage({
   );
   return (
     <TabScreen
-      variant="blue"
       title="その他"
       sub="MICHILU（ミチル）・不動産の現場に、すぐ使える情報を。"
       action={
-        <button onClick={onNews} aria-label={unread ? "お知らせ（新しいお知らせがあります）" : "お知らせ"} className="press relative flex size-[36px] items-center justify-center rounded-full bg-white/90 shadow-[0_2px_8px_rgba(10,30,60,0.18)] active:bg-white">
-          <Bell size={18} strokeWidth={1.8} absoluteStrokeWidth color={HEAD} />
-          {unread && <span className="absolute rounded-full border-2 border-white bg-[#f0263a]" style={{ right: 4, top: 4, width: 11, height: 11 }} />}
+        <button onClick={onNews} aria-label={unread ? "お知らせ（新しいお知らせがあります）" : "お知らせ"} className="press relative flex items-center justify-center" style={{ width: 44, height: 44 }}>
+          <span className="flex items-center justify-center rounded-full shadow-[0_4px_14px_rgba(15,47,95,0.14)]" style={{ ...GLASS, width: 38, height: 38 }}>
+            <Bell size={19} strokeWidth={1.7} absoluteStrokeWidth color={HEAD} />
+          </span>
+          {unread && <span className="absolute rounded-full border-2 border-white bg-[#f0263a]" style={{ right: 6, top: 6, width: 11, height: 11 }} />}
         </button>
       }
       hero={

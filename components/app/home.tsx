@@ -41,7 +41,7 @@ const ACCENT = "linear-gradient(180deg,#3d7bff 0%,#22c1ee 100%)";
 const PHOTO_H = 275;
 
 /** 写真の上の字が建物に重なっても読めるよう、にじませる（昼は白、夜は紺。空の変数 --sky-halo） */
-const GLOW = "0 0 10px rgba(var(--sky-halo, 255,255,255),0.95), 0 0 3px rgba(var(--sky-halo, 255,255,255),0.95)";
+export const GLOW = "0 0 10px rgba(var(--sky-halo, 255,255,255),0.95), 0 0 3px rgba(var(--sky-halo, 255,255,255),0.95)";
 /** 地の奥の淡い光（最近の検索のあたり。下の端に届く前に消える）。下のメニューのページでも使う */
 export const AURORA =
   "radial-gradient(60% 42% at 0% 45%, rgba(110,140,255,0.13) 0%, rgba(110,140,255,0) 100%), radial-gradient(55% 38% at 100% 58%, rgba(40,190,255,0.12) 0%, rgba(40,190,255,0) 100%)";

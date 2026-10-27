@@ -3,14 +3,14 @@
 // 帯をコードで描く（WebGL）。写真は使わない。
 //  空：今の太陽の位置（lib/app/sun.ts）から大気の散乱（lib/app/atmosphere.ts と同じ式。霞の量は湿度と季節から。lib/app/air.ts）。
 //      雲は本物（ひまわりの雲の場。低い雲と高い雲の 2 層。lib/app/satellite.ts。読めないときは雲量だけの模様）、雨の幕は雨雲レーダー、稲光は雷ナウキャスト、
-//      太陽本体とにじみ、月（満ち欠けは太陽の向きから）、星。
+//      太陽本体とにじみ、月（満ち欠けは太陽の向きから）、星と惑星（明るい恒星の実際の位置と金星・木星・火星・土星・水星。lib/app/stars.ts）。
 //  街（ホームだけ）：PLATEAU（国土交通省の 3D 都市モデル）の実在の建物と、地理院の空中写真・標高から、汐留の上空 260m の視点で
 //      焼き込んだ層（public/home/city。色・面の向き・距離と種類・窓・塔と道路・影用の高さ地図）を、今の光で照らす。
 //      太陽の直射（建物の影は高さ地図をたどって、今の太陽の向きから計算）、空からの光（向きごと）、雲の影、遠くの霞（見通し）、
 //      雨で濡れる・雪が積もる、季節の木の色、富士山の雪線。夜は窓（建物の用途・曜日・時刻で 1 枚ずつ）、街灯と車、東京タワー
 //      （公式の点灯の決まり。lib/app/tower.ts）、60m 以上の屋上の航空障害灯（点滅）。
 //  1 枚目：空の散乱を小さな絵（1/4 の解像度）に。街の下ごしらえ（直射と影・窓の点灯・街灯）を 1 分ごとに別の絵に。
-//  2 枚目：それらを引き伸ばして、太陽・雲・街・霞・天気を画素ごとに合成。3 枚目：航空障害灯（点）。
+//  2 枚目：それらを引き伸ばして、太陽・雲・街・霞・天気を画素ごとに合成（α に空の見える度合い）。3 枚目：星と惑星・航空障害灯（点）。
 //  1 分ごと（SKY_EVENT）と #t= / #w= の変更で描き直し、雲が流れる・雨や雪・夜の点滅があるときだけ動かす（動きを減らす設定では止める）。
 //  WebGL が使えない端末では何も描かず、下の CSS の層（同じ街を焼いた代わりの絵）が見える
 import * as SunCalc from "suncalc";
@@ -24,6 +24,7 @@ import { BASE, HOME_CAMERA, overrideTime, smoothstep, solar, type Camera } from 
 import { towerLight } from "@/lib/app/tower";
 import { currentWeather } from "@/lib/app/weather";
 import { meterExposure } from "@/lib/app/sky-vars";
+import { skyObjects, starColor, starLook, starVisibility } from "@/lib/app/stars";
 import { SKY_EVENT } from "./sky-event";
 
 const VERT = `attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}`;
@@ -110,7 +111,7 @@ gl_FragColor=vec4(lit,wl,rl,1.0);}`;
 /** 2 枚目：合成（空・太陽・月・星・雲、街・霞、雨・雪） */
 const FRAG_MAIN = `precision highp float;
 uniform vec2 u_res;uniform vec3 u_f,u_r,u_u;uniform vec2 u_tan;
-uniform vec3 u_sun;uniform vec3 u_sunT;uniform vec3 u_moon;uniform float u_moonOn;uniform float u_stars;uniform float u_day;
+uniform vec3 u_sun;uniform vec3 u_sunT;uniform vec3 u_moon;uniform float u_moonOn;uniform float u_day;
 uniform sampler2D u_sky;uniform sampler2D u_alb;uniform sampler2D u_nrm;uniform sampler2D u_geo;uniform sampler2D u_win;uniform sampler2D u_emis;uniform sampler2D u_pre;
 uniform float u_city;uniform float u_horizon;
 uniform sampler2D u_twA;uniform sampler2D u_twD;uniform vec4 u_twRect;uniform vec3 u_twX;uniform vec3 u_twY;uniform float u_twDist;uniform float u_twOn;
@@ -201,11 +202,11 @@ if(u_moonOn>0.5){vec3 m=u_moon;vec3 mu_=normalize(cross(m,vec3(0.0,0.0,1.0)));ve
 float vis=clamp(1.0-skyLum*3.0,0.08,1.0)*(1.0-u_cloud*0.85);float tm=acos(clamp(dot(v,m),-1.0,1.0));
 if(rr<1.0){float nz=sqrt(1.0-rr);vec3 n=-m*nz+mu_*dx+mv*dy;float l=max(0.0,dot(n,u_sun));float edge=1.0-smoothstep(0.9,1.0,rr);sky+=vec3(1.0,0.97,0.9)*(l*0.85+0.03)*edge*vis;}
 sky+=vec3(0.9,0.92,1.0)*0.09*exp(-tm/(0.04*u_haze))*vis;}
-/* 星（暗いときだけ。雲の後ろ。東京の空は街明かりで明るく、見えるのは明るい星だけ＝帯に十数個。地平線の近くは見えない） */
-if(u_stars>0.0){float az=atan(v.x,v.y);vec2 cell=vec2(az,asin(clamp(v.z,-1.0,1.0)))/0.0061;vec2 id=floor(cell);float h1=hash21(id);
-if(h1<0.0014){vec2 cen=id+0.5+vec2(hash21(id+1.3),hash21(id+7.1))*0.6-0.3;float dd=length(cell-cen);float b=pow(hash21(id+3.7),2.0)*0.85+0.15;
-sky+=vec3(0.85,0.9,1.0)*b*exp(-dd*dd*9.0)*u_stars*clamp(1.0-skyLum*6.0,0.0,1.0)*smoothstep(0.08,0.45,v.z);}}
+/* 星の見える度合い（出力の α に入れ、星と惑星の点を描くときに掛ける。lib/app/stars.ts と present()）：空が明るい（薄明・街明かりの照り返し・
+   太陽と月のにじみ）ほど消え、地平線の近く（15° 以下）は街明かりで空が明るく見えない。雲・街・塔・雨の幕・霧の後ろも見えない */
+float skyA=clamp(1.0-dot(sky,vec3(0.2126,0.7152,0.0722))*6.0,0.0,1.0)*smoothstep(0.02,0.25,v.z);
 sky=mix(sky,cloudColH,dH*0.93);sky=mix(sky,cloudColL,dL*mix(0.95,1.0,smoothstep(0.8,0.97,thick)));
+skyA*=(1.0-dH*0.93)*(1.0-dL);
 sky+=sunDisc*pow(1.0-dL,3.0)*(1.0-0.9*dH);
 /* 稲光：発雷域の向きの雲と空が一瞬明るくなる */
 if(u_flash>0.0){float ang=acos(clamp(dot(normalize(v.xy+vec2(1e-5,0.0)),u_flashDir),-1.0,1.0));float k=u_flash*exp(-ang*ang/0.22)*smoothstep(-0.02,0.08,v.z);sky+=vec3(0.85,0.88,1.0)*k*(0.25+1.2*max(dL,dH));}
@@ -266,7 +267,7 @@ float car=smoothstep(0.84,0.98,fract((uu+dir*u_time*13.0)/21.0+hh*7.0));L+=(dir>
    近い霞は空の青ではなく中立の色（地表近くの霞の粒は色を選ばずに散らす） */
 float T=exp(-dd*u_sigma*hazeK(dd));
 L=L*T+(hazeAt(hazeB,dd)+u_amb*1.6*(1.0-smoothstep(12000.0,40000.0,dd)))*(1.0-T);
-outc=mix(sky,L,cov);}
+outc=mix(sky,L,cov);skyA*=1.0-cov;}
 /* 東京タワー：塔だけを高い倍率で焼いた層（色と透け具合・面の向きの割合・照明の属性）を街の上に重ねる。透けた格子の向こうに街が見える */
 if(u_twOn>0.5){vec2 tq=(iuv-u_twRect.xy)/(u_twRect.zw-u_twRect.xy);
 if(tq.x>0.0&&tq.x<1.0&&tq.y>0.0&&tq.y<1.0){vec4 ta=texture2D(u_twA,tq);
@@ -292,11 +293,11 @@ Lt+=tc*tem*k*2.8*u_towerOn;
 Lt+=vec3(1.0,0.95,0.86)*1.7*u_decks*gf*u_towerOn;
 if(u_sparkle>0.0&&part>4.5)Lt+=vec3(1.0)*step(0.78,hash21(floor(gl_FragCoord.xy*0.7)+floor(u_time*9.0)))*3.0*u_towerOn;}
 float Tt=exp(-u_twDist*u_sigma*hazeK(u_twDist));Lt=Lt*Tt+hazeAt(haze,u_twDist)*(1.0-Tt);
-outc=mix(outc,Lt,ta.a);distKm=mix(distKm,u_twDist/1000.0,ta.a);twW=ta.a;}}}
+outc=mix(outc,Lt,ta.a);distKm=mix(distKm,u_twDist/1000.0,ta.a);twW=ta.a;skyA*=1.0-ta.a;}}}
 /* 雨の幕：レーダーの雨の下を通る視線の分だけ灰色に溶ける（遠くの雨柱、近くの雨。雨の強さで見通しが決まる） */
 if(u_rainOn>0.5){float tmax=cov>0.002?min(distKm,80.0):(v.z>0.001?min((u_cloudH.x-H0)/v.z,80.0):80.0);float od=0.0;float dt=tmax/8.0;
 for(int i=0;i<8;i++){float t=(float(i)+0.5)*dt;float z=H0+v.z*t;if(z>u_cloudH.x||z<-0.3)continue;float mm=rainAt(v.xy*t);if(mm>0.2)od+=0.2*pow(mm,0.63)*dt;}
-outc=mix(outc,haze*0.78,1.0-exp(-od));}
+outc=mix(outc,haze*0.78,1.0-exp(-od));skyA*=exp(-od);}
 /* 夜の光のにじみ（レンズと空気）：周りの窓と街灯の明かりを 2 つの輪で拾って足す */
 if(u_lightsVis>0.0){vec3 gs=vec3(0.0);for(int i=0;i<8;i++){float an=float(i)*0.785398+0.39;vec2 o=vec2(cos(an),sin(an))/u_res;
 vec4 p1=texture2D(u_pre,uv+o*2.5);vec4 p2=texture2D(u_pre,uv+o*6.0);gs+=vec3(0.95,0.9,0.8)*(p1.g*0.6+p2.g*0.3)+vec3(1.0,0.75,0.45)*(p1.b*0.6+p2.b*0.3);}
@@ -308,14 +309,14 @@ if(cw>0.0){float yl=dot(col,vec3(0.2126,0.7152,0.0722));vec3 g2=clamp(vec3(yl)+(
 g2=mix(g2,g2*g2*(3.0-2.0*g2),0.24);col=mix(col,g2,cw);}
 /* 霧・雨・雪のときは、空も地平線の近くが白っぽく */
 float fogC=clamp(u_fog+u_precip*0.35+u_snow*0.3,0.0,1.0);
-col=mix(col,tone(haze*u_expAdj),clamp(fogC*0.55*smoothstep(0.2,u_horizon,iuv.y)*(1.0-cov),0.0,0.85));
+col=mix(col,tone(haze*u_expAdj),clamp(fogC*0.55*smoothstep(0.2,u_horizon,iuv.y)*(1.0-cov),0.0,0.85));skyA*=1.0-fogC;
 /* 雨・雪 */
 if(u_precip>0.0){if(u_snow>0.5){float s=snow(uv,26.0,0.075,1.0)+0.6*snow(uv,52.0,0.13,5.0);col=mix(col,vec3(0.96,0.97,1.0),clamp(s,0.0,1.0)*0.9);}
 else{float r=rain(uv,vec2(62.0,7.0),1.4,1.0)+0.6*rain(uv,vec2(115.0,12.0),2.1,7.0);col+=vec3(0.72,0.78,0.88)*r*0.34*(0.5+0.5*u_precip);}}
 /* 撮像の細かい粒（暗い所ほど。動かない） */
 float yl2=dot(col,vec3(0.2126,0.7152,0.0722));
 col+=(hash21(gl_FragCoord.xy)-0.5)/255.0*(1.0+2.5*(1.0-smoothstep(0.05,0.45,yl2))*max(cov,0.3));
-gl_FragColor=vec4(col,1.0);}`;
+gl_FragColor=vec4(col,skyA);}`;
 
 /** 3 枚目：航空障害灯（画面の点。航空法の決まり：60m 以上の屋上に赤、90m 以上は明滅、150m 以上と東京タワーの頂は昼は白い閃光。
  *  種類 a_i.y：0 不動の赤、1 赤の明滅、2 東京タワーの頂、3 東京タワーの展望台、4 150m 以上。u_white=1 のときは昼の白い閃光を描く */
@@ -333,6 +334,16 @@ const FRAG_LIGHTS = `precision mediump float;varying float vB;varying vec3 vC;
 void main(){vec2 q=gl_PointCoord*2.0-1.0;float a=exp(-dot(q,q)*3.0)*vB;gl_FragColor=vec4(vC*a,1.0);}`;
 /** 合成した絵（frameT）を画面に写す（点滅だけのコマで使い回す） */
 const FRAG_COPY = `precision mediump float;uniform vec2 u_res;uniform sampler2D u_tex;void main(){gl_FragColor=texture2D(u_tex,gl_FragCoord.xy/u_res);}`;
+/** 星と惑星（画面の点。位置・明るさ・色は lib/app/stars.ts）。合成した絵の α（空の見える度合い）を掛けて足すので、雲・街・塔の後ろと明るい空では消える。
+ *  a_c：色×明るさ、a_s：点の大きさ（pt）、a_t：またたき（大きさ・種）。またたきは 5 回/秒の乱数をなめらかにつないだもの（低い星ほど大きい。動きを減らす設定では止める） */
+const VERT_STARS = `attribute vec2 a_p;attribute vec3 a_c;attribute float a_s;attribute vec2 a_t;uniform float u_px;uniform float u_time;uniform float u_still;varying vec3 vC;
+float h1(float x){return fract(sin(x*127.1+311.7)*43758.5453);}
+void main(){gl_Position=vec4(a_p.x*2.0-1.0,1.0-a_p.y*2.0,0.0,1.0);
+float t=mod(u_time*5.0,1024.0)+a_t.y*97.0;float f=fract(t);float tw=mix(h1(floor(t)),h1(floor(t)+1.0),f*f*(3.0-2.0*f));
+vC=a_c*(u_still>0.5?1.0:1.0+a_t.x*(tw*2.0-1.0));gl_PointSize=a_s*u_px;}`;
+const FRAG_STARS = `precision mediump float;uniform sampler2D u_tex;uniform vec2 u_res;varying vec3 vC;
+void main(){vec2 q=gl_PointCoord*2.0-1.0;float r2=dot(q,q);if(r2>1.0)discard;float a=texture2D(u_tex,gl_FragCoord.xy/u_res).a;
+gl_FragColor=vec4(vC*(exp(-r2*7.0)+0.05*exp(-r2*1.5))*a,1.0);}`;
 
 type Prog = { prog: WebGLProgram; loc: Record<string, WebGLUniformLocation | null> };
 type Target = { fbo: WebGLFramebuffer; tex: WebGLTexture; w: number; h: number };
@@ -342,6 +353,8 @@ type Gl = {
   pre: Prog | null;
   main: Prog;
   lights: Prog | null;
+  /** 星と惑星（点） */
+  stars: Prog | null;
   copy: Prog;
   quad: WebGLBuffer;
   skyT: Target;
@@ -353,6 +366,9 @@ type Gl = {
   tex: Record<string, WebGLTexture>;
   /** 航空障害灯（点の数と、位置・属性のバッファ） */
   pts: { buf: WebGLBuffer; n: number } | null;
+  /** 星と惑星の点（位置・色×明るさ・大きさ・またたき。描くたびに入れ直す）と、その数 */
+  starBuf: WebGLBuffer;
+  starN: number;
   /** 街の層を読み終えたか */
   cityReady: boolean;
   /** 下ごしらえを最後に描いた条件（分・天気） */
@@ -367,9 +383,10 @@ type Gl = {
 
 const SKY_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_exposure", "u_aero", "u_glow"];
 const PRE_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_geo", "u_nrm", "u_win", "u_emis", "u_dsm", "u_dsmGrid", "u_dsmZ", "u_occA", "u_occB", "u_lightsVis"];
-const MAIN_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_sunT", "u_moon", "u_moonOn", "u_stars", "u_day", "u_sky", "u_alb", "u_nrm", "u_geo", "u_win", "u_emis", "u_pre", "u_city", "u_horizon", "u_sunE", "u_sh0", "u_sh1", "u_sh2", "u_sh3", "u_amb", "u_lightsVis", "u_sigma", "u_season", "u_snowline", "u_snowCover", "u_wet", "u_towerOn", "u_towerMode", "u_towerWhite", "u_towerCol", "u_sparkle", "u_decks", "u_cloud", "u_precip", "u_snow", "u_fog", "u_time", "u_wind", "u_expAdj", "u_haze", "u_sat", "u_satOn", "u_satLon", "u_satMerc", "u_camLL", "u_cloudH", "u_cloudExtra", "u_drift", "u_rain", "u_rainOn", "u_rainLon", "u_rainMerc", "u_flash", "u_flashDir", "u_sunTH", "u_litH", "u_sunVis", "u_twA", "u_twD", "u_twRect", "u_twX", "u_twY", "u_twDist", "u_twOn"];
+const MAIN_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_sunT", "u_moon", "u_moonOn", "u_day", "u_sky", "u_alb", "u_nrm", "u_geo", "u_win", "u_emis", "u_pre", "u_city", "u_horizon", "u_sunE", "u_sh0", "u_sh1", "u_sh2", "u_sh3", "u_amb", "u_lightsVis", "u_sigma", "u_season", "u_snowline", "u_snowCover", "u_wet", "u_towerOn", "u_towerMode", "u_towerWhite", "u_towerCol", "u_sparkle", "u_decks", "u_cloud", "u_precip", "u_snow", "u_fog", "u_time", "u_wind", "u_expAdj", "u_haze", "u_sat", "u_satOn", "u_satLon", "u_satMerc", "u_camLL", "u_cloudH", "u_cloudExtra", "u_drift", "u_rain", "u_rainOn", "u_rainLon", "u_rainMerc", "u_flash", "u_flashDir", "u_sunTH", "u_litH", "u_sunVis", "u_twA", "u_twD", "u_twRect", "u_twX", "u_twY", "u_twDist", "u_twOn"];
 const LIGHT_UNIFORMS = ["u_px", "u_time", "u_vis", "u_sigma", "u_still", "u_white"];
 const COPY_UNIFORMS = ["u_res", "u_tex"];
+const STAR_UNIFORMS = ["u_px", "u_time", "u_still", "u_tex", "u_res"];
 
 function compile(gl: WebGLRenderingContext, frag: string, names: string[], vert = VERT): Prog | null {
   const sh = (type: number, src: string) => {
@@ -451,6 +468,8 @@ function init(canvas: HTMLCanvasElement, city: boolean): Gl | null {
   // 街の下ごしらえと航空障害灯（ホームだけ。作れなくても空は描く）
   const pre = city ? compile(gl, FRAG_PRE, PRE_UNIFORMS) : null;
   const lights = city ? compile(gl, FRAG_LIGHTS, LIGHT_UNIFORMS, VERT_LIGHTS) : null;
+  // 星と惑星（作れなくても空は描く）
+  const stars = compile(gl, FRAG_STARS, STAR_UNIFORMS, VERT_STARS);
   const copy = compile(gl, FRAG_COPY, COPY_UNIFORMS);
   if (!copy) return null;
   const quad = gl.createBuffer()!;
@@ -465,7 +484,7 @@ function init(canvas: HTMLCanvasElement, city: boolean): Gl | null {
   tex.dsm = blankTexture(gl, [0, 0, 0, 255]);
   tex.sat = blankTexture(gl, [0, 0, 191, 255]);
   tex.rain = blankTexture(gl, [0, 0, 0, 255]);
-  return { gl, sky, pre, main, lights, copy, quad, skyT, preT, frameT, lightsState: null, tex, pts: null, cityReady: false, preKey: "", satTime: "", rainTime: "", satSince: 0, dsmGrid: DSM_GRID, dsmZ: DSM_Z };
+  return { gl, sky, pre, main, lights, stars, copy, quad, skyT, preT, frameT, lightsState: null, tex, pts: null, starBuf: gl.createBuffer()!, starN: 0, cityReady: false, preKey: "", satTime: "", rainTime: "", satSince: 0, dsmGrid: DSM_GRID, dsmZ: DSM_Z };
 }
 
 /** キャンバスの大きさを変える（ピンチで拡大したとき高い解像度で描き直す）。描く先の絵も作り直す */
@@ -484,7 +503,7 @@ function resizeTargets(g: Gl, canvas: HTMLCanvasElement, w: number, h: number) {
   g.preKey = "";
 }
 
-/** 合成した絵を画面に写し、航空障害灯（夜の赤・昼の白い閃光）を足す。点滅だけのコマはこれだけを描く */
+/** 合成した絵を画面に写し、星と惑星、航空障害灯（夜の赤・昼の白い閃光）を足す。またたき・点滅だけのコマはこれだけを描く */
 function present(g: Gl, seconds: number, still: boolean) {
   const { gl } = g;
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -497,6 +516,29 @@ function present(g: Gl, seconds: number, still: boolean) {
   gl.bindTexture(gl.TEXTURE_2D, g.frameT.tex);
   gl.uniform1i(g.copy.loc.u_tex, 0);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
+  // 星と惑星（合成した絵の α＝空の見える度合いを掛けて足す。合成した絵は 0 番の単位に入ったまま）
+  if (g.stars && g.starN > 0) {
+    const p = g.stars;
+    gl.useProgram(p.prog);
+    gl.bindBuffer(gl.ARRAY_BUFFER, g.starBuf);
+    const attrs: [string, number, number][] = [["a_p", 2, 0], ["a_c", 3, 8], ["a_s", 1, 20], ["a_t", 2, 24]];
+    const locs = attrs.map(([name, size, off]) => {
+      const a = gl.getAttribLocation(p.prog, name);
+      gl.enableVertexAttribArray(a);
+      gl.vertexAttribPointer(a, size, gl.FLOAT, false, 32, off);
+      return a;
+    });
+    gl.uniform1f(p.loc.u_px, gl.drawingBufferWidth / 393);
+    gl.uniform1f(p.loc.u_time, seconds);
+    gl.uniform1f(p.loc.u_still, still ? 1 : 0);
+    gl.uniform2f(p.loc.u_res, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    gl.uniform1i(p.loc.u_tex, 0);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    gl.drawArrays(gl.POINTS, 0, g.starN);
+    gl.disable(gl.BLEND);
+    locs.forEach((a) => gl.disableVertexAttribArray(a));
+  }
   const L = g.lightsState;
   if (!L || !g.lights || !g.pts) return;
   const p = g.lights;
@@ -667,6 +709,30 @@ function meterCached(altitude: number, azimuth: number, cam: Camera, air: Air): 
   if (!meterCache || meterCache.key !== key) meterCache = { key, v: meterExposure(altitude, azimuth, cam, air) };
   return meterCache.v;
 }
+/**
+ * 星と惑星の点の頂点（画面の位置、色×明るさ、大きさ pt、またたきの大きさと種。8 つの数で 1 点）。
+ * 見える度合いは太陽の高度（明るいものほど早く見える）と霞（lib/app/air.ts）。帯の外のものは入れない
+ */
+function starVertices(at: Date, sunAlt: number, b: ReturnType<typeof basis>, air: Air): Float32Array {
+  if (sunAlt > -0.5) return new Float32Array(0);
+  const out: number[] = [];
+  skyObjects(at, BASE.lat, BASE.lng).forEach((o, i) => {
+    const vis = starVisibility(o.mag, sunAlt) * air.stars;
+    if (vis < 0.02) return;
+    const d = dirFromAltAz(o.alt, o.az);
+    const df = d[0] * b.f[0] + d[1] * b.f[1] + d[2] * b.f[2];
+    if (df < 0.1) return;
+    const x = 0.5 + (d[0] * b.r[0] + d[1] * b.r[1] + d[2] * b.r[2]) / df / b.tanH / 2;
+    const y = 0.5 - (d[0] * b.u[0] + d[1] * b.u[1] + d[2] * b.u[2]) / df / b.tanV / 2;
+    if (x < -0.03 || x > 1.03 || y < -0.03 || y > 1.03) return;
+    const { intensity, size, twinkle } = starLook(o);
+    const c = starColor(o.bv);
+    const k = intensity * vis;
+    out.push(x, y, c[0] * k, c[1] * k, c[2] * k, size, twinkle, (i % 89) / 89);
+  });
+  return new Float32Array(out);
+}
+
 function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, still: boolean) {
   const { gl } = g;
   const s = solar(at);
@@ -699,6 +765,11 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
   }
   const satOn = live.cloud && g.satTime ? Math.min(1, (performance.now() - g.satSince) / 1500) : 0;
   const lv = showCity ? lightValues(at, sun, s.altitude) : null;
+  // 星と惑星の点（描くたびに位置を出し直す。数十個なので軽い）
+  const starData = starVertices(at, s.altitude, b, air);
+  gl.bindBuffer(gl.ARRAY_BUFFER, g.starBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, starData, gl.DYNAMIC_DRAW);
+  g.starN = starData.length / 8;
   const setCam = (p: Prog, width: number, height: number) => {
     gl.uniform2f(p.loc.u_res, width, height);
     gl.uniform3f(p.loc.u_f, b.f[0], b.f[1], b.f[2]);
@@ -754,7 +825,6 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
   gl.uniform3f(m.u_sunT, T[0], T[1], T[2]);
   gl.uniform3f(m.u_moon, moon[0], moon[1], moon[2]);
   gl.uniform1f(m.u_moonOn, mp.altitude > -0.5 ? 1 : 0);
-  gl.uniform1f(m.u_stars, smoothstep(-8, -16, s.altitude) * air.stars);
   gl.uniform1f(m.u_haze, Math.min(2.2, Math.max(0.7, air.aero)));
   gl.uniform1f(m.u_day, smoothstep(-6, 4, s.altitude));
   bindTex(g.main, [["u_sky", g.skyT.tex], ["u_alb", g.tex.alb], ["u_nrm", g.tex.nrm], ["u_geo", g.tex.geo], ["u_win", g.tex.win], ["u_emis", g.tex.emis], ["u_pre", g.preT ? g.preT.tex : g.tex.dsm], ["u_sat", g.tex.sat], ["u_rain", g.tex.rain], ["u_twA", g.tex.twa], ["u_twD", g.tex.twd]]);
