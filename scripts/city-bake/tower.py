@@ -21,7 +21,7 @@ PROFILE = [(0, 94.0), (6, 88.6), (14, 79.5), (20, 74.0), (28, 66.0), (36, 57.5),
            (66.5, 35.6), (72, 32.6), (78.2, 30.0), (84, 28.0), (89, 26.4), (94, 25.0), (98.8, 24.0), (104, 22.8), (109.5, 21.6), (115, 20.8),
            (120, 20.3), (130, 18.6), (141, 17.3), (150, 16.2), (159, 15.0), (170, 13.9), (181, 12.8), (189, 12.0), (200, 10.9), (210, 10.1),
            (217, 9.6), (224, 9.2), (239, 8.6)]
-LEGW = [(0, 6.5), (20, 5.0), (41.5, 3.6), (80, 2.8), (120, 2.2), (130, 2.0), (160, 1.6), (200, 1.3), (239, 1.1)]
+LEGW = [(0, 6.5), (20, 5.0), (41.5, 3.6), (80, 2.8), (120, 2.2), (130, 2.5), (160, 2.1), (200, 1.7), (239, 1.4)]
 LOWER = [41.5, 54.3, 66.5, 78.2, 89.0, 98.8, 109.5, 120.0]
 UPPER = list(np.linspace(130.0, 239.0, 20))
 def interp(K, z):
@@ -32,7 +32,7 @@ def interp(K, z):
 def h(z): return interp(PROFILE, z) / 2
 def wl(z): return interp(LEGW, z)
 
-ORANGE = (0.85, 0.28, 0.12); WHITE = (0.90, 0.90, 0.88); GLASS = (0.30, 0.33, 0.36); DECKW = (0.88, 0.88, 0.86)
+ORANGE = (0.86, 0.26, 0.09); WHITE = (0.90, 0.90, 0.88); GLASS = (0.30, 0.33, 0.36); DECKW = (0.88, 0.88, 0.86)
 ROOF = (0.70, 0.70, 0.68); CORE = (0.60, 0.58, 0.55); FOOT = (0.44, 0.31, 0.27); DISH = (0.93, 0.93, 0.91)
 BAND0, TOP = 130.0, 333.0
 BOUNDS = [BAND0 + k * (TOP - BAND0) / 7 for k in range(1, 7)]
@@ -162,14 +162,14 @@ for axis, sign in FACES:
     # 上の段：横の梁と X
     for i, (z0, z1) in enumerate(zip(UPPER, UPPER[1:])):
         e = lambda z: h(z) - wl(z) / 2
-        beam(fp(axis, sign, -e(z1), z1, wl(z1) / 2), fp(axis, sign, e(z1), z1, wl(z1) / 2), 0.55, 0.5, face=fn)
+        beam(fp(axis, sign, -e(z1), z1, wl(z1) / 2), fp(axis, sign, e(z1), z1, wl(z1) / 2), 0.85, 0.7, face=fn)
         if i % 2 == 1 and z1 < 236:
             hh = h(z1) + 0.6
             p0 = (sign * hh, -hh, z1) if axis == 0 else (-hh, sign * hh, z1); p1 = (sign * hh, hh, z1) if axis == 0 else (hh, sign * hh, z1)
             beam(p0, p1, 0.3, 0.3, face=fn)
         BL, TR = fp(axis, sign, -e(z0), z0, wl(z0) / 2), fp(axis, sign, e(z1), z1, wl(z1) / 2)
         BR, TL = fp(axis, sign, e(z0), z0, wl(z0) / 2), fp(axis, sign, -e(z1), z1, wl(z1) / 2)
-        beam(BL, TR, 0.5, 0.45, face=fn); beam(BR, TL, 0.5, 0.45, face=fn)
+        beam(BL, TR, 1.0, 0.7, face=fn); beam(BR, TL, 1.0, 0.7, face=fn)
     # 大展望台の下の梁（120m）と、上（130m）から最初の段
     s = h(119.2) - wl(119.2); beam(fp(axis, sign, -s, 119.2, wl(119.2) / 2), fp(axis, sign, s, 119.2, wl(119.2) / 2), 0.7, 0.7, face=fn)
     # アーチ（各面。脚の内側から立ち上がり、41.5m の梁の下で頂点）
@@ -195,13 +195,21 @@ for zk in LOWER[:-1] + UPPER[1::2]:
 for z0, z1 in zip(UPPER, UPPER[1:]):
     if z0 < 159: continue
     q0, q1 = 0.55 * h(z0), 0.55 * h(z1)
-    for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1)): beam((sx * q0, sy * q0, z0), (sx * q1, sy * q1, z1), 0.35)
+    for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1)): beam((sx * q0, sy * q0, z0), (sx * q1, sy * q1, z1), 0.5)
     for (ax, ay), (bx, by) in (((-1, -1), (1, -1)), ((1, -1), (1, 1)), ((1, 1), (-1, 1)), ((-1, 1), (-1, -1))):
         beam((ax * q0, ay * q0, z0), (bx * q1, by * q1, z1), 0.25)
         beam((ax * q1, ay * q1, z1), (bx * q1, by * q1, z1), 0.25)
 
 # ---- 中央の芯（エレベーターと階段。フットタウンの屋上から大展望台まで）とフットタウン ----
 ring([(5, -4), (5, 4), (-5, 4), (-5, -4)], 20.4, 120.0, CORE, 4)
+# ---- 大展望台からトップデッキへのエレベーターの軸（中央の密な格子の筒、約 6m 角）。前後の面の部材と重なって、上の段が詰まって見える ----
+SH = 3.0
+for z0, z1 in zip(zsteps(130.0, 223.5, 2.9), zsteps(130.0, 223.5, 2.9)[1:]):
+    for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1)): beam((sx * SH, sy * SH, z0), (sx * SH, sy * SH, z1), 0.8, part=0, col=CORE)
+    for (ax, ay), (bx, by) in (((-1, -1), (1, -1)), ((1, -1), (1, 1)), ((1, 1), (-1, 1)), ((-1, 1), (-1, -1))):
+        beam((ax * SH, ay * SH, z0), (bx * SH, by * SH, z1), 0.3, part=0, col=CORE)
+        beam((bx * SH, by * SH, z0), (ax * SH, ay * SH, z1), 0.3, part=0, col=CORE)
+        beam((ax * SH, ay * SH, z1), (bx * SH, by * SH, z1), 0.3, part=0, col=CORE)
 ring([(25, -28), (25, 28), (-25, 28), (-25, -28)], 0.0, 20.4, FOOT, 4, caps=True, capcol=(0.52, 0.5, 0.47))
 
 # ---- 大展望台（120〜130m、2 階建て。角を落とした四角、白い枠と 2 段の窓）----

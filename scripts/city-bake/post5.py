@@ -28,8 +28,9 @@ os.makedirs('layers', exist_ok=True)
 def pack(k, tag):
     h, w = H // k, W // k
     def blk(a): return a[:h * k, :w * k].reshape(h, k, w, k, *a.shape[2:]).swapaxes(1, 2).reshape(h, w, k * k, *a.shape[2:])
-    # 縮小はカメラと同じ形（ガウス＋画素の箱。合わせて標準偏差 0.55 画素）。被覆（透け具合）も同じ形で散らす
-    SIG = k * math.sqrt(0.55 ** 2 - 1 / 12)
+    # 縮小はカメラと同じ形（ガウス＋画素の箱）。塔は細くて明暗の差が大きいので、カメラの輪郭強調の分を見込んで街（0.55 画素）より
+    # 小さい標準偏差 0.35 画素（0.55 だと幅 11 画素の塔の半分近くが半透明の縁になり、向こうの街が透けて見える）
+    SIG = k * math.sqrt(0.35 ** 2 - 1 / 12)
     def smooth(a):
         a = a.astype(np.float32)
         if a.ndim == 3: return np.stack([ndimage.gaussian_filter(a[..., i], SIG, mode='nearest') for i in range(a.shape[2])], -1)
