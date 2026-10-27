@@ -191,7 +191,11 @@ vec3 cloudColL=mix(nightCol,dayColL,u_day);vec3 cloudColH=mix(nightCol*0.8,dayCo
 /* 太陽：本体とにじみ（雲でさえぎられる） */
 float th=acos(clamp(dot(v,u_sun),-1.0,1.0));
 float disc=1.0-smoothstep(sunRad*0.85,sunRad,th);
-sky+=u_sunT*(disc*8.0*sunVis*sunVis+(4.0*exp(-th*th/(2.0*0.028*0.028))+(0.9*exp(-th/0.052)+0.2*exp(-th/0.157))*u_haze)*sunVis);
+/* 本体は空よりずっと明るい（地平線の近くで大気に弱められても空に溶けない。カメラでは白〜黄に飽和し、ごく低いと橙）。
+   本体は雲を重ねた後で、雲のすき間からだけ見せる。にじみは届く光の色で、低い太陽でも金〜橙に光る（明るさは届く光の 0.4 乗） */
+vec3 sunDisc=u_sunT*disc*3000.0*sunVis*sunVis;
+vec3 sunG=u_sunT/max(max(u_sunT.r,u_sunT.g),max(u_sunT.b,1e-6))*pow(dot(u_sunT,vec3(0.2126,0.7152,0.0722)),0.4);
+sky+=sunG*(4.0*exp(-th*th/(2.0*0.028*0.028))+(0.9*exp(-th/0.052)+0.2*exp(-th/0.157))*u_haze)*sunVis;
 /* 月 */
 if(u_moonOn>0.5){vec3 m=u_moon;vec3 mu_=normalize(cross(m,vec3(0.0,0.0,1.0)));vec3 mv=cross(mu_,m);vec3 dl=v-m;float dx=dot(dl,mu_)/moonRad;float dy=dot(dl,mv)/moonRad;float rr=dx*dx+dy*dy;
 float vis=clamp(1.0-skyLum*3.0,0.08,1.0)*(1.0-u_cloud*0.85);float tm=acos(clamp(dot(v,m),-1.0,1.0));
@@ -202,6 +206,7 @@ if(u_stars>0.0){float az=atan(v.x,v.y);vec2 cell=vec2(az,asin(clamp(v.z,-1.0,1.0
 if(h1<0.0014){vec2 cen=id+0.5+vec2(hash21(id+1.3),hash21(id+7.1))*0.6-0.3;float dd=length(cell-cen);float b=pow(hash21(id+3.7),2.0)*0.85+0.15;
 sky+=vec3(0.85,0.9,1.0)*b*exp(-dd*dd*9.0)*u_stars*clamp(1.0-skyLum*6.0,0.0,1.0)*smoothstep(0.08,0.45,v.z);}}
 sky=mix(sky,cloudColH,dH*0.93);sky=mix(sky,cloudColL,dL*mix(0.95,1.0,smoothstep(0.8,0.97,thick)));
+sky+=sunDisc*pow(1.0-dL,3.0)*(1.0-0.9*dH);
 /* 稲光：発雷域の向きの雲と空が一瞬明るくなる */
 if(u_flash>0.0){float ang=acos(clamp(dot(normalize(v.xy+vec2(1e-5,0.0)),u_flashDir),-1.0,1.0));float k=u_flash*exp(-ang*ang/0.22)*smoothstep(-0.02,0.08,v.z);sky+=vec3(0.85,0.88,1.0)*k*(0.25+1.2*max(dL,dH));}
 vec3 hz=skyAt(vec2(uv.x,1.0-u_horizon+0.03))*0.8;
