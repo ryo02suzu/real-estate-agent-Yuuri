@@ -10,6 +10,10 @@ typ = nrm[..., 3].astype(np.int32)
 N = nrm[..., :3].astype(np.float32) / 255 * 2 - 1
 N /= np.maximum(np.linalg.norm(N, axis=-1, keepdims=True), 1e-6)
 dist = geo[..., 0]; gid = np.rint(geo[..., 1]).astype(np.int64); wz = geo[..., 2]; wallU = geo[..., 3]
+# 外装を作り直す高層ビル（facades.json）は質感の無い建物として扱う（post2 で階ごとの外装を描く）
+FAC = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'facades.json')))
+for gs in FAC:
+    if gs.isdigit(): typ[gid == int(gs)] = 2
 # 視線の向き → 世界座標
 h, p = math.radians(CAM['heading']), math.radians(CAM['pitch'])
 f = np.array([math.sin(h) * math.cos(p), math.cos(h) * math.cos(p), math.sin(p)])

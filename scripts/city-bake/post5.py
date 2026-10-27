@@ -6,6 +6,7 @@
 import os, json, math, sys
 import numpy as np
 from PIL import Image
+from scipy import ndimage
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from load_bake import load
 REG = json.load(open('tower-region.json'))   # {'pt': [x, y, w, h]（画面 393×275 の座標）, 'ss': 1pt あたりの画素}
@@ -27,11 +28,16 @@ os.makedirs('layers', exist_ok=True)
 def pack(k, tag):
     h, w = H // k, W // k
     def blk(a): return a[:h * k, :w * k].reshape(h, k, w, k, *a.shape[2:]).swapaxes(1, 2).reshape(h, w, k * k, *a.shape[2:])
-    c = blk(cov.astype(np.float32)); cm = c.mean(2); m = np.maximum(c.sum(2), 1e-6)
+    # 縮小はカメラと同じ形（ガウス＋画素の箱。合わせて標準偏差 0.55 画素）。被覆（透け具合）も同じ形で散らす
+    SIG = k * math.sqrt(0.55 ** 2 - 1 / 12)
+    def smooth(a):
+        a = a.astype(np.float32)
+        if a.ndim == 3: return np.stack([ndimage.gaussian_filter(a[..., i], SIG, mode='nearest') for i in range(a.shape[2])], -1)
+        return ndimage.gaussian_filter(a, SIG, mode='nearest')
+    c0 = cov.astype(np.float32); c = blk(c0); cm = blk(smooth(c0)).mean(2); m = np.maximum(c.sum(2), 1e-6)
     def cmean(a):
-        b = blk(a.astype(np.float32))
-        if b.ndim == 4: return (b * c[..., None]).sum(2) / m[..., None]
-        return (b * c).sum(2) / m
+        b = blk(smooth(a.astype(np.float32) * (c0[..., None] if a.ndim == 3 else c0))).mean(2)
+        return b / np.maximum(cm[..., None] if b.ndim == 3 else cm, 1e-6)
     al = cmean(lin) ** (1 / 2.2)
     cls = np.stack([cmean(wx), cmean(wy), cmean(wz)], -1)
     pb = blk(part)

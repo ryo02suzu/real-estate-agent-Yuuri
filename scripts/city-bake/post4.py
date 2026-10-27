@@ -1,4 +1,7 @@
-# 航空障害灯（60m 以上の建物の、画面に見えている屋上の両端）と東京タワーの灯。画面の座標（0〜1）で
+# 航空障害灯（航空法の決まり）と東京タワーの灯。画面の座標（0〜1）で
+#  60m 以上の建物の屋上の両端に赤い灯。90m 以上は明滅（中光度赤色、毎分 20〜60 回）、150m 以上は昼は白い閃光（中光度白色）で夜は赤の明滅。
+#  105m を超える建物は中間の高さ（52.5m 以下の等間隔）にも不動の赤い灯。同じ建物の灯は同期し、建物どうしは位相がずれる
+#  種類：0 不動の赤、1 赤の明滅、2 東京タワーの頂（昼は白い閃光・夜は赤の明滅）、3 東京タワーの展望台（不動の赤）、4 150m 以上（昼は白い閃光・夜は赤の明滅）
 import os, numpy as np, json, math, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from geo import CAM
@@ -23,10 +26,22 @@ for b in tall:
     ys, xs = np.divmod(roof, W2)
     d = float(np.median(dist.ravel()[roof]))
     pts = [(xs.min(), ys[np.argmin(xs)]), (xs.max(), ys[np.argmax(xs)])] if xs.max() - xs.min() >= 5 else [(int(np.median(xs)), ys.min())]
-    flash = Hh[b] >= 100
+    Hb = float(Hh[b])
+    kind = 4 if Hb >= 150 else (1 if Hb >= 90 else 0)
     ph = float(rng.random()); per = float(rng.uniform(1.4, 2.6))
     for x, y in pts:
-        lights.append([round((x + 0.5) / W2, 5), round((y - 1.5) / H2, 5), round(d), 1 if flash else 0, round(ph, 3), round(per, 2)])
+        lights.append([round((x + 0.5) / W2, 5), round((y - 1.5) / H2, 5), round(d), kind, round(ph, 3), round(per, 2)])
+    # 中間の高さの灯（105m を超える建物。52.5m 以下の等間隔。その高さの輪郭の両端）
+    if Hb > 105:
+        n = int(math.ceil(Hb / 52.5)) - 1
+        for i in range(1, n + 1):
+            zk = top - i * Hb / (n + 1)
+            lv = pix[np.abs(zz - zk) < 2.0]
+            if len(lv) < 3: continue
+            ys2, xs2 = np.divmod(lv, W2)
+            pts2 = [(xs2.min(), ys2[np.argmin(xs2)]), (xs2.max(), ys2[np.argmax(xs2)])] if xs2.max() - xs2.min() >= 5 else [(int(np.median(xs2)), int(np.median(ys2)))]
+            for x, y in pts2:
+                lights.append([round((x + 0.5) / W2, 5), round(y / H2, 5), round(d), 0, round(ph, 3), round(per, 2)])
 # 東京タワー：アンテナの先と展望台の角（ENU → 画面）
 h, p = math.radians(CAM['heading']), math.radians(CAM['pitch'])
 f = np.array([math.sin(h) * math.cos(p), math.cos(h) * math.cos(p), math.sin(p)])

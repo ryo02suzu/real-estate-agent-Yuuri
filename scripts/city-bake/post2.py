@@ -33,10 +33,14 @@ wall = isb & (np.abs(N[..., 2]) < 0.35)
 roof = isb & (N[..., 2] >= 0.6)
 g = np.where(isb, gid, 0)
 cls = CL[g]; f_h = fh[g]
+# 外装を作り直す高層ビル（facades.json）は用途を指定どおりに（点灯のまとまりと階の鍵がその用途で決まる）
+FAC = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'facades.json')))
+for gs, spec in FAC.items():
+    if gs.isdigit(): cls[gid == int(gs)] = spec.get('cls', 1)
 fl = np.floor(np.maximum(hab, 0) / f_h).astype(np.int32)
 v = np.maximum(hab, 0) / f_h - fl
-sp = np.vectorize(lambda k: SP[k][0])(cls).astype(np.float32); ww = np.vectorize(lambda k: SP[k][1])(cls).astype(np.float32)
-v0 = np.vectorize(lambda k: VB[k][0])(cls).astype(np.float32); v1 = np.vectorize(lambda k: VB[k][1])(cls).astype(np.float32)
+tab = lambda T, i: np.array([0] + [T[k][i] for k in range(1, 7)], np.float32)[cls]
+sp = tab(SP, 0); ww = tab(SP, 1); v0 = tab(VB, 0); v1 = tab(VB, 1)
 col = np.floor(wallU / sp).astype(np.int64); uu = wallU / sp - np.floor(wallU / sp)
 # 1 階の店舗・ロビーは大きな窓
 gnd = fl == 0
@@ -84,6 +88,32 @@ noise = (np.random.default_rng(3).random((H2, W2)) - 0.5)[..., None] * 0.04
 wallc = base * (0.92 + 0.08 * (gkey[..., None] / 255)) + noise
 A[uw] = wallc[uw]
 A[uw & inwin] = (glass + (base * 0.15))[uw & inwin]
+# ---- 目立つ高層ビルの外装（facades.json）：実際の階数で各階の帯・ガラス・方立を描く。ガラスは窓として扱う（夜の点灯・空の映り込み）----
+def facade(spec, h, u):
+    fh = spec['H'] / spec['floors']
+    f = h / fh; fl = np.floor(f); v = f - fl
+    bh = spec.get('bandH', 0.8) / fh
+    gcol = np.array(spec['glass'], np.float32); bcol = np.array(spec['band'], np.float32); mcol = np.array(spec.get('mullion', spec['band']), np.float32)
+    inb = v < bh
+    ms, mw = spec.get('mullSp', 1.6), spec.get('mullW', 0.1)
+    uu = u / ms - np.floor(u / ms)
+    onm = (np.abs(uu - 0.5) > 0.5 - mw / ms / 2) & ~inb
+    col = np.where(inb[:, None], bcol, np.where(onm[:, None], mcol, gcol))
+    # 帯の上の庇の影（バルコニー）
+    led = spec.get('ledge', 0.0)
+    if led > 0: col = col * np.where(inb, 1.0, 1 - led * np.exp(-np.clip(v - bh, 0, None) * fh / 0.6))[:, None]
+    # 階・列ごとのブラインドの開きのばらつき
+    key = (h32((fl.astype(np.int64) * 7919 + np.floor(u / ms).astype(np.int64) * 104729) & 0xffffffff) & 255) / 255
+    col = col * (1 + (key - 0.5) * spec.get('var', 0.1))[:, None]
+    return np.clip(col, 0, 1).astype(np.float32), ~inb & ~onm
+for gs, spec in FAC.items():
+    if not gs.isdigit(): continue
+    gi = int(gs); m = (gid == gi) & un & ~roof
+    if not m.any(): continue
+    col, gm = facade(spec, hab[m], wallU[m])
+    A[m] = col
+    inwin[m] = gm & (hab[m] < spec['H'] - 1.0)
+    print('facade', gs, spec['name'], 'px', int(m.sum()))
 # 斜めの屋根や庇など（|n.z| が中間）も壁色に
 # ---- 木 ----
 tree = typ == 5

@@ -1,4 +1,5 @@
 # 1 倍に縮めて詰める：色・法線と空の見え方・距離と種類・窓・塔と道路。影用の高さ地図（真上）と航空障害灯の位置
+#  縮小はカメラと同じ形：ガウス（レンズのぼけ）＋画素の箱で、合わせて標準偏差 0.55 画素。箱だけ（平均）だと輪郭が階段状に残る
 import os, numpy as np, json, math, sys, os
 from PIL import Image
 from scipy import ndimage
@@ -63,16 +64,23 @@ ru = (WP[..., 0] * np.cos(ang) + WP[..., 1] * np.sin(ang))  # 道に沿った座
 def pack(k, tag):
     H, W = H2 // k, W2 // k
     def blk(a): return a[:H * k, :W * k].reshape(H, k, W, k, *a.shape[2:]).swapaxes(1, 2).reshape(H, W, k * k, *a.shape[2:])
-    cov = blk((typ > 0).astype(np.float32)).mean(2)
+    # ガウスで散らしてから箱で縮める（合わせて出力 0.55 画素の標準偏差。箱の分 k/√12 を引く）
+    SIG = k * math.sqrt(0.55 ** 2 - 1 / 12)
+    def smooth(a):
+        a = a.astype(np.float32)
+        if a.ndim == 3: return np.stack([ndimage.gaussian_filter(a[..., c], SIG, mode='nearest') for c in range(a.shape[2])], -1)
+        return ndimage.gaussian_filter(a, SIG, mode='nearest')
+    m0 = (typ > 0).astype(np.float32); ms = blk(smooth(m0)).mean(2)
+    cov = ms
     geom = blk(typ > 0)
     def gmean(a):
-        b = blk(a.astype(np.float32)); m = geom.astype(np.float32)
-        while m.ndim < b.ndim: m = m[..., None]
-        return (b * m).sum(2) / np.maximum(m.sum(2), 1e-6)
+        a = a.astype(np.float32)
+        b = blk(smooth(a * (m0[..., None] if a.ndim == 3 else m0))).mean(2)
+        return b / np.maximum(ms[..., None] if b.ndim == 3 else ms, 1e-6)
     alb1 = gmean(A)
     # 色を少しだけ研ぐ（縮めて柔らかくなった分を戻す。カメラの輪郭強調と同じ程度。街の画素だけ）
     blur = np.stack([ndimage.gaussian_filter(alb1[..., c], 0.8) for c in range(3)], -1)
-    alb1 = np.where((cov > 0.5)[..., None], np.clip(alb1 + 0.55 * (alb1 - blur), 0, 1), alb1)
+    alb1 = np.where((cov > 0.5)[..., None], np.clip(alb1 + 0.45 * (alb1 - blur), 0, 1), alb1)
     n1 = gmean(N); n1 /= np.maximum(np.linalg.norm(n1, axis=-1, keepdims=True), 1e-6)
     svf1 = np.where(cov > 0, gmean(svf), 1.0)
     ld = np.log(np.clip(dist, 100, 200000) / 100) / math.log(2000)
@@ -84,7 +92,7 @@ def pack(k, tag):
     for t in (6, 3, 5, 2, 1, 4):
         cnt = (tb == t).sum(2); sc = cnt * 10 + pri[t]
         m = (cnt > 0) & (sc > best_s); best_t[m] = t; best_s[m] = sc[m]
-    win1 = blk(inwin.astype(np.float32)).mean(2)
+    win1 = blk(smooth(inwin)).mean(2)
     iw = blk(inwin); first = np.argmax(iw, axis=2)[..., None]
     pk = lambda a: np.take_along_axis(blk(a), first, 2)[..., 0]
     wk1 = pk(wkey); fk1 = pk(fkey); cl1 = pk(cls)
@@ -113,7 +121,8 @@ def pack(k, tag):
         elif name == 'normal': im.save(f'layers/{tag}/{name}.webp', lossless=True, method=6)
         else: im.save(f'layers/{tag}/{name}.webp', lossless=True, method=6)
     np.savez_compressed(f'bake/l{tag}.npz', **{k: v for k, v in out.items()})
-pack(2, '3x'); pack(3, '2x')
+# 焼き込みは 4 倍（4716×3300）：k=4 → 1179×825（3 倍の端末）、k=6 → 786×550（2 倍の端末）
+pack(W2 // 1179, '3x'); pack(W2 // 786, '2x')
 dmax = dz.reshape(2048, 2, 2048, 2).max(axis=(1, 3))
 # 視界に入る地面（焼き込みの画素の世界座標）から 600m の範囲だけ残す
 from scipy import ndimage

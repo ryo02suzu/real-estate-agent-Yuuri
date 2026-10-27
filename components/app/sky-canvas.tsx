@@ -255,7 +255,7 @@ L+=glass*(F*refl+glint*u_sunE*0.12);}}
 if(pre.g>0.0){vec3 w=texture2D(u_win,iuv).rgb;
 vec3 wc=aux<1.5?mix(vec3(0.86,0.92,1.0),vec3(1.0,0.9,0.74),step(0.6,fract(w.b*5.1))):(aux<2.5?vec3(1.0,0.84,0.62):(aux<3.5?vec3(1.0,0.76,0.5):(aux<4.5?mix(vec3(1.0,0.7,0.4),vec3(0.9,0.94,1.0),step(0.75,fract(w.g*7.3))):vec3(0.96,0.9,0.8))));
 float wk=aux<1.5?0.95:(aux<2.5?1.2:(aux<3.5?0.85:(aux<4.5?0.8:0.7)));
-float hx=-log(max(hash21(gl_FragCoord.xy+vec2(17.0,3.0)),0.002));float wv=fract(w.g*13.7);
+float hx=-log(max(hash21(vec2(w.g,w.b)*255.0+vec2(17.0,3.0)),0.002));float wv=fract(w.g*13.7);
 L+=wc*pre.g*(0.35+1.9*wv*wv)*wk*u_lightsVis*mix(1.0,hx*hx*0.5,smoothstep(1500.0,5000.0,dd));}
 /* 街灯と車（国道・都道・高速は車の光が流れる） */
 if(typ==3.0&&pre.b>0.0){vec3 sc=aux>1.5?vec3(1.0,0.74,0.45):vec3(0.86,0.92,1.0);L+=sc*pre.b*1.2*u_lightsVis*(1.0+0.8*u_wet);
@@ -317,14 +317,22 @@ float yl2=dot(col,vec3(0.2126,0.7152,0.0722));
 col+=(hash21(gl_FragCoord.xy)-0.5)/255.0*(1.0+2.5*(1.0-smoothstep(0.05,0.45,yl2))*max(cov,0.3));
 gl_FragColor=vec4(col,1.0);}`;
 
-/** 3 枚目：航空障害灯（画面の点。60m 以上の屋上と東京タワー。赤く、高い建物は点滅） */
-const VERT_LIGHTS = `attribute vec2 a_p;attribute vec4 a_i;uniform float u_px;uniform float u_time;uniform float u_vis;uniform float u_sigma;uniform float u_still;varying float vB;
+/** 3 枚目：航空障害灯（画面の点。航空法の決まり：60m 以上の屋上に赤、90m 以上は明滅、150m 以上と東京タワーの頂は昼は白い閃光。
+ *  種類 a_i.y：0 不動の赤、1 赤の明滅、2 東京タワーの頂、3 東京タワーの展望台、4 150m 以上。u_white=1 のときは昼の白い閃光を描く */
+const VERT_LIGHTS = `attribute vec2 a_p;attribute vec4 a_i;uniform float u_px;uniform float u_time;uniform float u_vis;uniform float u_sigma;uniform float u_still;uniform float u_white;varying float vB;varying vec3 vC;
 void main(){gl_Position=vec4(a_p.x*2.0-1.0,1.0-a_p.y*2.0,0.0,1.0);
-float kind=a_i.y;float blink=kind==1.0&&u_still<0.5?step(fract(u_time/a_i.w+a_i.z),0.32):1.0;
-vB=blink*u_vis*exp(-a_i.x*u_sigma)*(kind==2.0?1.1:(kind==3.0?0.75:(kind==1.0?1.0:0.6)));
-gl_PointSize=u_px*(kind==2.0?1.1:(kind==3.0?0.8:1.0))*clamp(2400.0/a_i.x,0.5,1.3);}`;
-const FRAG_LIGHTS = `precision mediump float;varying float vB;
-void main(){vec2 q=gl_PointCoord*2.0-1.0;float a=exp(-dot(q,q)*3.0)*vB;gl_FragColor=vec4(vec3(1.0,0.16,0.07)*a,1.0);}`;
+float kind=a_i.y;float t=fract(u_time/a_i.w+a_i.z);float att=u_vis*exp(-a_i.x*u_sigma);bool hi=kind==1.0||kind==2.0||kind==4.0;
+if(u_white>0.5){
+/* 昼：150m 以上の建物と東京タワーの頂の白い閃光（周期の 12%。動きを減らす設定では出さない） */
+float on=(kind==4.0||kind==2.0)&&u_still<0.5?step(t,0.12):0.0;vB=on*att*1.5;vC=vec3(1.0,0.98,0.95);gl_PointSize=u_px*0.8*clamp(2400.0/a_i.x,0.5,1.3);}
+else{
+/* 夜：赤。90m 以上は明滅（周期の 45%）、60〜90m と中間の高さ・展望台は不動 */
+float blink=hi&&u_still<0.5?step(t,0.45):1.0;vB=blink*att*(kind==2.0?1.1:(kind==3.0?0.75:(hi?1.0:0.6)));vC=vec3(1.0,0.16,0.07);
+gl_PointSize=u_px*(kind==2.0?1.1:(kind==3.0?0.8:1.0))*clamp(2400.0/a_i.x,0.5,1.3);}}`;
+const FRAG_LIGHTS = `precision mediump float;varying float vB;varying vec3 vC;
+void main(){vec2 q=gl_PointCoord*2.0-1.0;float a=exp(-dot(q,q)*3.0)*vB;gl_FragColor=vec4(vC*a,1.0);}`;
+/** 合成した絵（frameT）を画面に写す（点滅だけのコマで使い回す） */
+const FRAG_COPY = `precision mediump float;uniform vec2 u_res;uniform sampler2D u_tex;void main(){gl_FragColor=texture2D(u_tex,gl_FragCoord.xy/u_res);}`;
 
 type Prog = { prog: WebGLProgram; loc: Record<string, WebGLUniformLocation | null> };
 type Target = { fbo: WebGLFramebuffer; tex: WebGLTexture; w: number; h: number };
@@ -334,9 +342,14 @@ type Gl = {
   pre: Prog | null;
   main: Prog;
   lights: Prog | null;
+  copy: Prog;
   quad: WebGLBuffer;
   skyT: Target;
   preT: Target | null;
+  /** 合成した絵（画面と同じ大きさ）。航空障害灯はこの上に描く */
+  frameT: Target;
+  /** 航空障害灯の見え方（夜の赤・昼の白い閃光・霞の係数）。最後の合成で決める */
+  lightsState: { red: number; white: number; sigma: number } | null;
   tex: Record<string, WebGLTexture>;
   /** 航空障害灯（点の数と、位置・属性のバッファ） */
   pts: { buf: WebGLBuffer; n: number } | null;
@@ -355,7 +368,8 @@ type Gl = {
 const SKY_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_exposure", "u_aero", "u_glow"];
 const PRE_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_geo", "u_nrm", "u_win", "u_emis", "u_dsm", "u_dsmGrid", "u_dsmZ", "u_occA", "u_occB", "u_lightsVis"];
 const MAIN_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_sunT", "u_moon", "u_moonOn", "u_stars", "u_day", "u_sky", "u_alb", "u_nrm", "u_geo", "u_win", "u_emis", "u_pre", "u_city", "u_horizon", "u_sunE", "u_sh0", "u_sh1", "u_sh2", "u_sh3", "u_amb", "u_lightsVis", "u_sigma", "u_season", "u_snowline", "u_snowCover", "u_wet", "u_towerOn", "u_towerMode", "u_towerWhite", "u_towerCol", "u_sparkle", "u_decks", "u_cloud", "u_precip", "u_snow", "u_fog", "u_time", "u_wind", "u_expAdj", "u_haze", "u_sat", "u_satOn", "u_satLon", "u_satMerc", "u_camLL", "u_cloudH", "u_cloudExtra", "u_drift", "u_rain", "u_rainOn", "u_rainLon", "u_rainMerc", "u_flash", "u_flashDir", "u_sunTH", "u_litH", "u_sunVis", "u_twA", "u_twD", "u_twRect", "u_twX", "u_twY", "u_twDist", "u_twOn"];
-const LIGHT_UNIFORMS = ["u_px", "u_time", "u_vis", "u_sigma", "u_still"];
+const LIGHT_UNIFORMS = ["u_px", "u_time", "u_vis", "u_sigma", "u_still", "u_white"];
+const COPY_UNIFORMS = ["u_res", "u_tex"];
 
 function compile(gl: WebGLRenderingContext, frag: string, names: string[], vert = VERT): Prog | null {
   const sh = (type: number, src: string) => {
@@ -437,18 +451,83 @@ function init(canvas: HTMLCanvasElement, city: boolean): Gl | null {
   // 街の下ごしらえと航空障害灯（ホームだけ。作れなくても空は描く）
   const pre = city ? compile(gl, FRAG_PRE, PRE_UNIFORMS) : null;
   const lights = city ? compile(gl, FRAG_LIGHTS, LIGHT_UNIFORMS, VERT_LIGHTS) : null;
+  const copy = compile(gl, FRAG_COPY, COPY_UNIFORMS);
+  if (!copy) return null;
   const quad = gl.createBuffer()!;
   gl.bindBuffer(gl.ARRAY_BUFFER, quad);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   // 1 枚目の絵（1/4 の解像度）と、街の下ごしらえ（画面と同じ大きさ）
   const skyT = target(gl, Math.max(64, Math.round(canvas.width / 4)), Math.max(48, Math.round(canvas.height / 4)));
   const preT = city && pre ? target(gl, canvas.width, canvas.height) : null;
+  const frameT = target(gl, canvas.width, canvas.height);
   const tex: Record<string, WebGLTexture> = {};
   for (const [k] of CITY_LAYERS) tex[k] = blankTexture(gl, [0, 0, 0, 0]);
   tex.dsm = blankTexture(gl, [0, 0, 0, 255]);
   tex.sat = blankTexture(gl, [0, 0, 191, 255]);
   tex.rain = blankTexture(gl, [0, 0, 0, 255]);
-  return { gl, sky, pre, main, lights, quad, skyT, preT, tex, pts: null, cityReady: false, preKey: "", satTime: "", rainTime: "", satSince: 0, dsmGrid: DSM_GRID, dsmZ: DSM_Z };
+  return { gl, sky, pre, main, lights, copy, quad, skyT, preT, frameT, lightsState: null, tex, pts: null, cityReady: false, preKey: "", satTime: "", rainTime: "", satSince: 0, dsmGrid: DSM_GRID, dsmZ: DSM_Z };
+}
+
+/** キャンバスの大きさを変える（ピンチで拡大したとき高い解像度で描き直す）。描く先の絵も作り直す */
+function resizeTargets(g: Gl, canvas: HTMLCanvasElement, w: number, h: number) {
+  const { gl } = g;
+  canvas.width = w;
+  canvas.height = h;
+  for (const t of [g.skyT, g.preT, g.frameT]) {
+    if (!t) continue;
+    gl.deleteFramebuffer(t.fbo);
+    gl.deleteTexture(t.tex);
+  }
+  g.skyT = target(gl, Math.max(64, Math.round(w / 4)), Math.max(48, Math.round(h / 4)));
+  g.preT = g.preT ? target(gl, w, h) : null;
+  g.frameT = target(gl, w, h);
+  g.preKey = "";
+}
+
+/** 合成した絵を画面に写し、航空障害灯（夜の赤・昼の白い閃光）を足す。点滅だけのコマはこれだけを描く */
+function present(g: Gl, seconds: number, still: boolean) {
+  const { gl } = g;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+  gl.disable(gl.BLEND);
+  gl.useProgram(g.copy.prog);
+  bindQuad(g, g.copy);
+  gl.uniform2f(g.copy.loc.u_res, gl.drawingBufferWidth, gl.drawingBufferHeight);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, g.frameT.tex);
+  gl.uniform1i(g.copy.loc.u_tex, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  const L = g.lightsState;
+  if (!L || !g.lights || !g.pts) return;
+  const p = g.lights;
+  gl.useProgram(p.prog);
+  gl.bindBuffer(gl.ARRAY_BUFFER, g.pts.buf);
+  const ap = gl.getAttribLocation(p.prog, "a_p");
+  const ai = gl.getAttribLocation(p.prog, "a_i");
+  gl.enableVertexAttribArray(ap);
+  gl.vertexAttribPointer(ap, 2, gl.FLOAT, false, 24, 0);
+  gl.enableVertexAttribArray(ai);
+  gl.vertexAttribPointer(ai, 4, gl.FLOAT, false, 24, 8);
+  // 点の大きさ：1.6pt（本物の灯は小さな点で、まわりに少しにじむ）
+  gl.uniform1f(p.loc.u_px, (gl.drawingBufferWidth / 393) * 1.6);
+  gl.uniform1f(p.loc.u_time, seconds);
+  gl.uniform1f(p.loc.u_sigma, L.sigma);
+  gl.uniform1f(p.loc.u_still, still ? 1 : 0);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE);
+  if (L.red > 0.01) {
+    gl.uniform1f(p.loc.u_vis, L.red);
+    gl.uniform1f(p.loc.u_white, 0);
+    gl.drawArrays(gl.POINTS, 0, g.pts.n);
+  }
+  if (L.white > 0.01 && !still) {
+    gl.uniform1f(p.loc.u_vis, L.white);
+    gl.uniform1f(p.loc.u_white, 1);
+    gl.drawArrays(gl.POINTS, 0, g.pts.n);
+  }
+  gl.disable(gl.BLEND);
+  gl.disableVertexAttribArray(ai);
+  gl.disableVertexAttribArray(ap);
 }
 
 /** 街の層（倍率ごと）・影用の高さ地図・航空障害灯を読む。全部そろったら知らせる */
@@ -665,12 +744,12 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
       g.preKey = key;
     }
   }
-  // 2 枚目：合成
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+  // 2 枚目：合成（画面と同じ大きさの絵に。航空障害灯の点滅だけのコマはこの絵を使い回す）
+  gl.bindFramebuffer(gl.FRAMEBUFFER, g.frameT.fbo);
+  gl.viewport(0, 0, g.frameT.w, g.frameT.h);
   gl.useProgram(g.main.prog);
   bindQuad(g, g.main);
-  setCam(g.main, gl.drawingBufferWidth, gl.drawingBufferHeight);
+  setCam(g.main, g.frameT.w, g.frameT.h);
   const m = g.main.loc;
   gl.uniform3f(m.u_sunT, T[0], T[1], T[2]);
   gl.uniform3f(m.u_moon, moon[0], moon[1], moon[2]);
@@ -757,29 +836,12 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
   // カメラの自動露出：帯に入る空が明るすぎる（逆光の午後）ときは絞る。CSS の空の色（lib/app/sky-vars.ts）と同じ値
   gl.uniform1f(m.u_expAdj, meterCached(s.altitude, s.azimuth, cam, air));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
-  // 3 枚目：航空障害灯（足し合わせ）
-  if (showCity && lv && g.lights && g.pts && lv.lightsVis > 0.01 && !lightsOff()) {
-    const p = g.lights;
-    gl.useProgram(p.prog);
-    gl.bindBuffer(gl.ARRAY_BUFFER, g.pts.buf);
-    const ap = gl.getAttribLocation(p.prog, "a_p");
-    const ai = gl.getAttribLocation(p.prog, "a_i");
-    gl.enableVertexAttribArray(ap);
-    gl.vertexAttribPointer(ap, 2, gl.FLOAT, false, 24, 0);
-    gl.enableVertexAttribArray(ai);
-    gl.vertexAttribPointer(ai, 4, gl.FLOAT, false, 24, 8);
-    gl.uniform1f(p.loc.u_px, (gl.drawingBufferWidth / 393) * 2.5);
-    gl.uniform1f(p.loc.u_time, seconds);
-    gl.uniform1f(p.loc.u_vis, smoothstep(0, -6, s.altitude) * (1 - 0.6 * w.fog));
-    gl.uniform1f(p.loc.u_sigma, lv.sigma);
-    gl.uniform1f(p.loc.u_still, still ? 1 : 0);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE);
-    gl.drawArrays(gl.POINTS, 0, g.pts.n);
-    gl.disable(gl.BLEND);
-    gl.disableVertexAttribArray(ai);
-    gl.disableVertexAttribArray(ap);
-  }
+  // 3 枚目：画面に写し、航空障害灯を足す（夜の赤は日没から、昼の白い閃光は日の出の少し前から。霧で弱まる）
+  g.lightsState =
+    showCity && lv && g.lights && g.pts && !lightsOff()
+      ? { red: smoothstep(0, -6, s.altitude) * (1 - 0.6 * w.fog), white: smoothstep(-3, 1, s.altitude) * (1 - 0.6 * w.fog), sigma: lv.sigma }
+      : null;
+  present(g, seconds, still);
 }
 
 /** 今の日時（#t= で固定していればそれ） */
@@ -823,7 +885,7 @@ export function SkyCanvas({ camera = HOME_CAMERA, city = false, className = "", 
         canvas.style.opacity = "1";
       }
     };
-    /** 雲が流れる・雨や雪・夜の点滅（航空障害灯・タワーの煌めき）があるときだけ、見えている間動かす */
+    /** 雲が流れる・雨や雪・夜の点滅（航空障害灯・タワーの煌めき）・昼の白い閃光があるときだけ、見えている間動かす */
     const animate = () => {
       cancelAnimationFrame(loop);
       const w = currentWeather();
@@ -832,18 +894,41 @@ export function SkyCanvas({ camera = HOME_CAMERA, city = false, className = "", 
       const live = currentSky();
       const weatherMoving = (w.cloud > 0.05 && w.cloud < 0.985) || w.precip > 0 || !!live.thunder?.on;
       const nightMoving = city && artificialVisibility(alt) > 0.05;
-      if ((!weatherMoving && !nightMoving) || reduced() || document.visibilityState !== "visible" || !onScreen) return;
-      // 夜の点滅だけなら 6 コマ/秒で足りる（電池のため）
+      const dayStrobe = city && !!g?.pts && alt > -3;
+      if ((!weatherMoving && !nightMoving && !dayStrobe) || reduced() || document.visibilityState !== "visible" || !onScreen) return;
+      // 点滅だけなら 6 コマ/秒で足りる（電池のため）。昼の閃光だけのときは合成した絵を使い回し、分が変わったら描き直す
       const fps = weatherMoving ? 24 : 6;
       let prev = 0;
+      let minute = Math.floor(at.getTime() / 60e3);
       const tick = (t: number) => {
         loop = requestAnimationFrame(tick);
         if (t - prev < 1000 / fps) return;
         prev = t;
-        render(now());
+        const at2 = now();
+        const m = Math.floor(at2.getTime() / 60e3);
+        if (weatherMoving || nightMoving || m !== minute || !g) {
+          minute = m;
+          render(at2);
+        } else present(g, seconds(), false);
       };
       loop = requestAnimationFrame(tick);
     };
+    /** ピンチで拡大しているときは、その倍率（2 倍まで）で描き直す（引き伸ばしで四角くならない） */
+    const vv = typeof visualViewport === "undefined" ? null : visualViewport;
+    let zoomTimer = 0;
+    const onZoom = () => {
+      clearTimeout(zoomTimer);
+      zoomTimer = window.setTimeout(() => {
+        if (!g || !vv) return;
+        const sc = vv.scale > 1.05 ? Math.min(2, vv.scale) : 1;
+        const w = Math.round(393 * dpr * sc);
+        if (w === canvas.width) return;
+        resizeTargets(g, canvas, w, Math.round((393 / camera.aspect) * dpr * sc));
+        render(now());
+        animate();
+      }, 150);
+    };
+    vv?.addEventListener("resize", onZoom);
     /** 時刻が飛んだとき（#t= の変更など）は、前の時刻から 1.2 秒かけて動かす */
     const go = () => {
       const target = now();
@@ -906,6 +991,8 @@ export function SkyCanvas({ camera = HOME_CAMERA, city = false, className = "", 
       cancelAnimationFrame(frame);
       cancelAnimationFrame(loop);
       cancelAnimationFrame(fade);
+      clearTimeout(zoomTimer);
+      vv?.removeEventListener("resize", onZoom);
       removeEventListener(SKY_EVENT, go);
       document.removeEventListener("visibilitychange", onVisible);
       io?.disconnect();
