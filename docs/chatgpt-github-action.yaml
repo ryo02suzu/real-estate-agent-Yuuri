@@ -1,0 +1,162 @@
+openapi: 3.1.0
+info:
+  title: MICHILU の開発の依頼（GitHub の Issue で Claude へ）
+  description: >-
+    ChatGPT の GPT から、ryo02suzu/real-estate-agent-Yuuri の Issue を作り、コメントを読み書きする。
+    Issue やコメントの本文に「@claude」と書くと、GitHub 上の Claude（.github/workflows/claude.yml）が作業して返事をする。
+    このリポジトリは公開されているので、鍵・個人の情報は送らない。使い方は docs/chatgpt-to-claude.md。
+  version: "1.0.0"
+servers:
+  - url: https://api.github.com
+paths:
+  /repos/ryo02suzu/real-estate-agent-Yuuri/issues:
+    post:
+      operationId: createIssue
+      summary: Claude への依頼を Issue として作る（本文の先頭の行に @claude）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, body]
+              properties:
+                title:
+                  type: string
+                  description: 依頼の短い題名
+                body:
+                  type: string
+                  description: 依頼の本文。先頭の行は「@claude」。鍵・パスワード・個人の情報は書かない
+      responses:
+        "201":
+          description: 作った Issue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Issue"
+    get:
+      operationId: listIssues
+      summary: 最近の Issue の一覧（依頼の番号を探す）
+      parameters:
+        - name: state
+          in: query
+          schema:
+            type: string
+            enum: [open, closed, all]
+            default: open
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 30
+      responses:
+        "200":
+          description: Issue の一覧
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Issue"
+  /repos/ryo02suzu/real-estate-agent-Yuuri/issues/{issue_number}:
+    get:
+      operationId: getIssue
+      summary: Issue を 1 つ読む
+      parameters:
+        - $ref: "#/components/parameters/IssueNumber"
+      responses:
+        "200":
+          description: Issue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Issue"
+  /repos/ryo02suzu/real-estate-agent-Yuuri/issues/{issue_number}/comments:
+    get:
+      operationId: listIssueComments
+      summary: Issue のコメント（Claude の返事・進み具合）を読む
+      parameters:
+        - $ref: "#/components/parameters/IssueNumber"
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: コメントの一覧（古い順）
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Comment"
+    post:
+      operationId: addIssueComment
+      summary: Issue に追加の指示や返事を書く（Claude に頼むときは先頭の行に @claude）
+      parameters:
+        - $ref: "#/components/parameters/IssueNumber"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  description: コメントの本文。鍵・パスワード・個人の情報は書かない
+      responses:
+        "201":
+          description: 書いたコメント
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+components:
+  parameters:
+    IssueNumber:
+      name: issue_number
+      in: path
+      required: true
+      schema:
+        type: integer
+  schemas:
+    Issue:
+      type: object
+      properties:
+        number:
+          type: integer
+        title:
+          type: string
+        state:
+          type: string
+        html_url:
+          type: string
+        body:
+          type: string
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+        html_url:
+          type: string
+        body:
+          type: string
+        created_at:
+          type: string
+        user:
+          type: object
+          properties:
+            login:
+              type: string
+  securitySchemes:
+    githubToken:
+      type: http
+      scheme: bearer
+security:
+  - githubToken: []
