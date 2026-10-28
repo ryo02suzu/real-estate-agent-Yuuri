@@ -71,7 +71,7 @@ function TabScreen({ title, sub, action, hero, banner, children }: { title: stri
       <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0" style={{ top: BAND_H, background: AURORA }} />
       <div className="relative overflow-hidden" style={{ height: BAND_H }}>
         <div className="shrink-photo absolute inset-x-0 top-0" style={{ height: PHOTO_H }}>
-          <SkyPhotos />
+          <SkyPhotos creditBottom={BAND_H - OVERLAP} />
         </div>
         <BottomFade />
         {action && (

@@ -19,6 +19,7 @@ import { CoverageBadge } from "../coverage";
 import { Sheet } from "../sheet";
 import { HEAD, LIGHT, TEXT } from "./r-ui";
 import { NAVY } from "./ui";
+import { GOOGLE_CITY_CONFIGURED } from "./city-3d";
 
 /** 番号つきの手順（紺の丸） */
 function Steps({ steps }: { steps: [string, string][] }) {
@@ -143,7 +144,7 @@ export function AppSourcesSheet({ open, onClose }: { open: boolean; onClose: () 
     ["地図・航空写真・道のり", "地理院タイル・地理院地図Vector（国土地理院）"],
     ["天気（ホームの空）", "気象庁のアメダス（東京・大手町）の10分ごとの観測（雨量・日照・気温・湿度・風）と天気予報（東京地方）を、開いている間 10 分ごとに直接読む。雲・雨・雪・霧・霞（湿度）の見た目に使うだけで、天気の案内ではない。住所や端末の情報は送らない"],
     ["雲・雨・雷（ホームの空）", "気象庁のひまわり画像（可視・赤外。日本域、2.5 分ごと）から雲の濃さと高さ、高解像度降水ナウキャスト（5 分ごと）から雨の強さ、雷ナウキャスト（10 分ごと）から発雷の向きを、開いている間 5〜10 分ごとに直接読む。見た目に使うだけで、気象の案内ではない"],
-    ["街並み（ホームの帯）", "3D都市モデル PLATEAU（国土交通省。港区・渋谷区・目黒区・品川区・世田谷区・大田区・杉並区・狛江市・調布市・川崎市）の建物と植生、地理院タイル（シームレス空中写真・標高・道路中心線。国土地理院）を加工して作成。東京タワーは公開の寸法から作った模型、点灯は東京タワー公式の決まり。富士山・丹沢などの山並みは地理院の標高から"],
+    ["街並み（ホームの帯）", (GOOGLE_CITY_CONFIGURED ? "Google の実写 3D（Google Maps。撮影から作った街の立体。開いたときに 1 回読み、端末には残さない。帯の右下にロゴと出典）。空・雲・天気・窓の明かり・東京タワー（模型と照明）・航空障害灯は MICHILU が描いたもの。Google を読めないときの街は、" : "") + "3D都市モデル PLATEAU（国土交通省。港区・渋谷区・目黒区・品川区・世田谷区・大田区・杉並区・狛江市・調布市・川崎市）の建物と植生、地理院タイル（シームレス空中写真・標高・道路中心線。国土地理院）を加工して作成。東京タワーは公開の寸法から作った模型、点灯は東京タワー公式の決まり。富士山・丹沢などの山並みは地理院の標高から"],
   ];
   return (
     <Sheet title="データの出典と時点" open={open} onClose={onClose}>
@@ -155,6 +156,19 @@ export function AppSourcesSheet({ open, onClose }: { open: boolean; onClose: () 
           </div>
         ))}
       </dl>
+      {GOOGLE_CITY_CONFIGURED && (
+        <p className="mt-2 text-[11.5px] leading-[1.6] text-muted">
+          ホームの帯の街並み（Google Maps）は、
+          <a href="https://maps.google.com/help/terms_maps/" target="_blank" rel="noreferrer" className="underline">
+            Google マップ／Google Earth 追加利用規約
+          </a>
+          と
+          <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer" className="underline">
+            Google プライバシーポリシー
+          </a>
+          に従って表示しています。
+        </p>
+      )}
       <p className="mt-2 text-[11.5px] leading-[1.6] text-muted">国・自治体の公開データを加工して表示しています。データは参考情報で、最新の状況や法的な判断は、役所の窓口・公的な資料で確認してください。</p>
     </Sheet>
   );

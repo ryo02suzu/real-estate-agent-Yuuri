@@ -12,6 +12,7 @@
 //  1 枚目：空の散乱を小さな絵（1/4 の解像度）に。街の下ごしらえ（直射と影・窓の点灯・街灯）を 1 分ごとに別の絵に。
 //  2 枚目：それらを引き伸ばして、太陽・雲・街・霞・天気を画素ごとに合成（α に空の見える度合い）。3 枚目：星と惑星・航空障害灯（点）。
 //  1 分ごと（SKY_EVENT）と #t= / #w= の変更で描き直し、雲が流れる・雨や雪・夜の点滅があるときだけ動かす（動きを減らす設定では止める）。
+//  撮影から作った本物の 3D の街（Google の実写 3D タイル。components/app/city-3d.ts）が読めたら、焼いた街から 0.8 秒で切り替える。
 //  WebGL が使えない端末では何も描かず、下の CSS の層（同じ街を焼いた代わりの絵）が見える
 import * as SunCalc from "suncalc";
 import { useEffect, useRef, type CSSProperties } from "react";
@@ -25,6 +26,8 @@ import { towerLight } from "@/lib/app/tower";
 import { currentWeather } from "@/lib/app/weather";
 import { meterExposure } from "@/lib/app/sky-vars";
 import { skyObjects, starColor, starLook, starVisibility } from "@/lib/app/stars";
+import { DIST_MAX } from "@/lib/app/geo3d";
+import { CITY3D_EVENT, city3dSource, city3dState, requestCity3D } from "./city-3d";
 import { SKY_EVENT } from "./sky-event";
 
 const VERT = `attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}`;
@@ -120,6 +123,8 @@ uniform vec4 u_season;uniform float u_snowline;uniform float u_snowCover;uniform
 uniform float u_towerOn;uniform float u_towerMode;uniform float u_towerWhite;uniform vec3 u_towerCol;uniform float u_sparkle;uniform float u_decks;
 uniform float u_cloud;uniform float u_precip;uniform float u_snow;uniform float u_fog;uniform float u_time;uniform vec2 u_wind;uniform float u_expAdj;uniform float u_haze;
 uniform sampler2D u_sat;uniform float u_satOn;uniform vec2 u_satLon;uniform vec2 u_satMerc;uniform vec3 u_camLL;uniform vec2 u_cloudH;uniform float u_cloudExtra;uniform vec2 u_drift;
+uniform sampler2D u_c3Col;uniform sampler2D u_c3Dist;uniform sampler2D u_c3Nrm;uniform float u_c3On;uniform vec3 u_c3Gain;uniform float u_c3Relight;uniform vec3 u_c3SunRef;uniform vec3 u_c3SRef;
+uniform vec3 u_c3Sh0;uniform vec3 u_c3Sh1;uniform vec3 u_c3Sh2;uniform vec3 u_c3Sh3;uniform float u_c3Tower;uniform float u_c3Shadow;
 uniform sampler2D u_rain;uniform float u_rainOn;uniform vec2 u_rainLon;uniform vec2 u_rainMerc;uniform float u_flash;uniform vec2 u_flashDir;uniform vec3 u_sunTH;uniform float u_litH;uniform float u_sunVis;
 const float sunRad=${((ATMOS.sunRadius * Math.PI) / 180).toFixed(6)},moonRad=${((ATMOS.moonRadius * Math.PI) / 180).toFixed(6)};
 ${CITY_GLSL}
@@ -215,13 +220,15 @@ vec3 hz=skyAt(vec2(uv.x,1.0-u_horizon+0.03))*0.8;
    曇りの日の霞は雲の底の色（遠くの街は灰色の空に溶ける。晴れの地平線の白さは使わない） */
 vec3 hazeB=mix(mix(hz,vec3(dot(hz,vec3(0.3,0.5,0.2))),u_cloud*0.6),cloudColL*0.97,smoothstep(0.55,0.9,u_cloud));vec3 haze=hazeB+u_amb*1.6;
 vec3 outc=sky;float distKm=1e5;float twW=0.0;
+/* 3D の街で使う：街の前の空の見え方、窓・街灯・車の明かり、東京タワーの色と被覆（隠される前）、直射の当たり */
+float skyA0=skyA;vec3 emi=vec3(0.0);vec3 twL=vec3(0.0);float twRaw=0.0;float preR=1.0;
 /* 街：焼き込んだ色・向き・距離を、今の光で照らす */
 vec4 al=texture2D(u_alb,iuv);float cov=al.a*u_city;
 if(cov>0.002){
 vec3 a=lin(al.rgb)*0.9;
 vec3 g=texture2D(u_geo,iuv).rgb;float aux;float typ=typeOf(g,aux);float dd=decodeDist(g);vec3 P=v*dd;
 distKm=dd/1000.0;vec4 nn=texture2D(u_nrm,iuv);vec3 n=normalize(nn.rgb*2.0-1.0);float ao=nn.a;
-vec4 pre=texture2D(u_pre,uv);vec3 e=texture2D(u_emis,iuv).rgb;
+vec4 pre=texture2D(u_pre,uv);vec3 e=texture2D(u_emis,iuv).rgb;preR=pre.r;
 float up=smoothstep(0.55,0.85,n.z);
 /* 季節：木（桜・新緑・紅葉・冬枯れ）と、地面の緑（公園・芝）は控えめに */
 float green=typ==5.0?1.0:(typ==3.0?smoothstep(0.012,0.05,a.g-(a.r+a.b)*0.5)*0.6:0.0);
@@ -257,11 +264,12 @@ if(pre.g>0.0){vec3 w=texture2D(u_win,iuv).rgb;
 vec3 wc=aux<1.5?mix(vec3(0.86,0.92,1.0),vec3(1.0,0.9,0.74),step(0.6,fract(w.b*5.1))):(aux<2.5?vec3(1.0,0.84,0.62):(aux<3.5?vec3(1.0,0.76,0.5):(aux<4.5?mix(vec3(1.0,0.7,0.4),vec3(0.9,0.94,1.0),step(0.75,fract(w.g*7.3))):vec3(0.96,0.9,0.8))));
 float wk=aux<1.5?0.95:(aux<2.5?1.2:(aux<3.5?0.85:(aux<4.5?0.8:0.7)));
 float hx=-log(max(hash21(vec2(w.g,w.b)*255.0+vec2(17.0,3.0)),0.002));float wv=fract(w.g*13.7);
-L+=wc*pre.g*(0.35+1.9*wv*wv)*wk*u_lightsVis*mix(1.0,hx*hx*0.5,smoothstep(1500.0,5000.0,dd));}
+emi+=wc*pre.g*(0.35+1.9*wv*wv)*wk*u_lightsVis*mix(1.0,hx*hx*0.5,smoothstep(1500.0,5000.0,dd));}
 /* 街灯と車（国道・都道・高速は車の光が流れる） */
-if(typ==3.0&&pre.b>0.0){vec3 sc=aux>1.5?vec3(1.0,0.74,0.45):vec3(0.86,0.92,1.0);L+=sc*pre.b*1.2*u_lightsVis*(1.0+0.8*u_wet);
+if(typ==3.0&&pre.b>0.0){vec3 sc=aux>1.5?vec3(1.0,0.74,0.45):vec3(0.86,0.92,1.0);emi+=sc*pre.b*1.2*u_lightsVis*(1.0+0.8*u_wet);
 if(aux>1.5){float uu=e.b*255.0;float hh=hash21(floor(gl_FragCoord.xy*0.5));float dir=hh>0.5?1.0:-1.0;
-float car=smoothstep(0.84,0.98,fract((uu+dir*u_time*13.0)/21.0+hh*7.0));L+=(dir>0.0?vec3(1.0,0.95,0.85):vec3(1.0,0.12,0.06))*car*e.r*2.4*u_lightsVis;}}
+float car=smoothstep(0.84,0.98,fract((uu+dir*u_time*13.0)/21.0+hh*7.0));emi+=(dir>0.0?vec3(1.0,0.95,0.85):vec3(1.0,0.12,0.06))*car*e.r*2.4*u_lightsVis;}}
+L+=emi;
 /* 遠くの霞：距離と見通しで空の地平線の色に溶ける（夜は街明かりの照り返しの色）。
    カメラ（スマートフォン）の処理と同じく、近い所は霞を弱めて明暗と色を残す（濁りの係数を近いほど下げる。30km より遠くはそのまま）。
    近い霞は空の青ではなく中立の色（地表近くの霞の粒は色を選ばずに散らす） */
@@ -272,8 +280,8 @@ outc=mix(sky,L,cov);skyA*=1.0-cov;}
 if(u_twOn>0.5){vec2 tq=(iuv-u_twRect.xy)/(u_twRect.zw-u_twRect.xy);
 if(tq.x>0.0&&tq.x<1.0&&tq.y>0.0&&tq.y<1.0){vec4 ta=texture2D(u_twA,tq);
 /* 塔より手前の建物（汐留〜芝の建物）が塔の足元を隠す */
-ta.a*=1.0-cov*step(distKm*1000.0,u_twDist-40.0);
-if(ta.a>0.004){vec3 tn=texture2D(u_twD,vec2(tq.x,tq.y*0.5)).rgb;vec3 te=texture2D(u_twD,vec2(tq.x,0.5+tq.y*0.5)).rgb;
+twRaw=ta.a;ta.a*=1.0-cov*step(distKm*1000.0,u_twDist-40.0);
+if(twRaw>0.004){vec3 tn=texture2D(u_twD,vec2(tq.x,tq.y*0.5)).rgb;vec3 te=texture2D(u_twD,vec2(tq.x,0.5+tq.y*0.5)).rgb;
 tn/=max(tn.x+tn.y+tn.z,0.001);vec3 nzt=vec3(0.0,0.0,v.z<0.0?1.0:-1.0);vec3 ab=lin(ta.rgb)*0.9;
 /* 日：見えている面の向きごとの当たり（格子の向こう側の部材は手前の部材の影に入る分を引く） */
 float sunF=tn.x*max(dot(u_twX,u_sun),0.0)+tn.y*max(dot(u_twY,u_sun),0.0)+tn.z*max(dot(nzt,u_sun),0.0);
@@ -293,9 +301,34 @@ Lt+=tc*tem*k*2.8*u_towerOn;
 Lt+=vec3(1.0,0.95,0.86)*1.7*u_decks*gf*u_towerOn;
 if(u_sparkle>0.0&&part>4.5)Lt+=vec3(1.0)*step(0.78,hash21(floor(gl_FragCoord.xy*0.7)+floor(u_time*9.0)))*3.0*u_towerOn;}
 float Tt=exp(-u_twDist*u_sigma*hazeK(u_twDist));Lt=Lt*Tt+hazeAt(haze,u_twDist)*(1.0-Tt);
-outc=mix(outc,Lt,ta.a);distKm=mix(distKm,u_twDist/1000.0,ta.a);twW=ta.a;skyA*=1.0-ta.a;}}}
+twL=Lt;outc=mix(outc,Lt,ta.a);distKm=mix(distKm,u_twDist/1000.0,ta.a);twW=ta.a;skyA*=1.0-ta.a;}}}
+/* 撮影から作った 3D の街（Google の実写 3D タイル。components/app/city-3d.ts）：読めたら焼いた街から切り替える（u_c3On）。
+   写真の色を明るさに戻し（tone の逆）、撮影したときの光（昼の高い太陽）と今の光の比で、時刻の明るさと色にする（面の向きごと）。
+   夜は焼いた街の窓・街灯・車の明かりを重ね、東京タワーは MICHILU の模型（照明つき）を上に。遠くは同じ霞に溶かす */
+float cityCov=cov;
+if(u_c3On>0.0){vec4 gc=texture2D(u_c3Col,iuv);float gcov=gc.a;
+vec3 gq=floor(texture2D(u_c3Dist,iuv).rgb*255.0+0.5);float gd=(gq.r*65536.0+gq.g*256.0+gq.b)*${(DIST_MAX / 16777215).toFixed(9)};
+vec3 gOut=sky;
+if(gcov>0.002){if(gd<1.0)gd=distKm<1e4?distKm*1000.0:3000.0;
+vec3 c=lin(clamp(gc.rgb/gcov,0.0,1.0));vec3 Rg=-log(max(vec3(1.0)-min(c,vec3(0.985)),vec3(0.015)));
+vec3 gn=normalize(texture2D(u_c3Nrm,iuv).rgb*2.0-1.0);
+vec3 Pg=v*gd;float csg=cloudShadow(Pg.xy/1000.0,Pg.z/1000.0);
+vec3 eNow=u_sunE*max(dot(gn,u_sun),0.0)*csg*mix(1.0,preR,u_c3Shadow)+max(u_sh0+u_sh1*gn.x+u_sh2*gn.y+u_sh3*gn.z,vec3(0.0));
+vec3 eRef=u_c3SunRef*max(dot(gn,u_c3SRef),0.0)+max(u_c3Sh0+u_c3Sh1*gn.x+u_c3Sh2*gn.y+u_c3Sh3*gn.z,vec3(0.0));
+vec3 ratio=clamp((eNow+vec3(1e-4))/(eRef+vec3(1e-4)),vec3(0.0),vec3(2.5));
+vec3 Lg=Rg*mix(u_c3Gain,ratio,u_c3Relight)+Rg*u_amb*(2.2/max(dot(eRef,vec3(0.2126,0.7152,0.0722)),0.05))+emi*step(0.5,cov);
+float Tg=exp(-gd*u_sigma*hazeK(gd));
+Lg=Lg*Tg+(hazeAt(hazeB,gd)+u_amb*1.6*(1.0-smoothstep(12000.0,40000.0,gd)))*(1.0-Tg);
+gOut=mix(sky,Lg,gcov);}
+/* 東京タワー：MICHILU の模型を上に（手前の 3D の建物が足元を隠す） */
+float tA=twRaw*u_c3Tower*(1.0-gcov*step(gd,u_twDist-40.0));
+gOut=mix(gOut,twL,tA);
+outc=mix(outc,gOut,u_c3On);
+skyA=mix(skyA,skyA0*(1.0-gcov)*(1.0-tA),u_c3On);
+distKm=mix(distKm,gcov>0.5?gd/1000.0:(tA>0.5?u_twDist/1000.0:1e5),u_c3On);
+cityCov=mix(cov,gcov,u_c3On);twW=mix(twW,tA,u_c3On);}
 /* 雨の幕：レーダーの雨の下を通る視線の分だけ灰色に溶ける（遠くの雨柱、近くの雨。雨の強さで見通しが決まる） */
-if(u_rainOn>0.5){float tmax=cov>0.002?min(distKm,80.0):(v.z>0.001?min((u_cloudH.x-H0)/v.z,80.0):80.0);float od=0.0;float dt=tmax/8.0;
+if(u_rainOn>0.5){float tmax=cityCov>0.002?min(distKm,80.0):(v.z>0.001?min((u_cloudH.x-H0)/v.z,80.0):80.0);float od=0.0;float dt=tmax/8.0;
 for(int i=0;i<8;i++){float t=(float(i)+0.5)*dt;float z=H0+v.z*t;if(z>u_cloudH.x||z<-0.3)continue;float mm=rainAt(v.xy*t);if(mm>0.2)od+=0.2*pow(mm,0.63)*dt;}
 outc=mix(outc,haze*0.78,1.0-exp(-od));skyA*=exp(-od);}
 /* 夜の光のにじみ（レンズと空気）：周りの窓と街灯の明かりを 2 つの輪で拾って足す */
@@ -304,18 +337,18 @@ vec4 p1=texture2D(u_pre,uv+o*2.5);vec4 p2=texture2D(u_pre,uv+o*6.0);gs+=vec3(0.9
 outc+=gs/8.0*0.12*u_lightsVis;}
 vec3 col=tone(outc*u_expAdj);
 /* 街と塔：カメラの色の処理（彩度を少し上げ、中間の明るさの差を広げる）。空は CSS の色とそろえるため変えない。昼ほど強く */
-float cw=max(cov,twW)*(0.35+0.65*u_day);
+float cw=max(cityCov,twW)*(0.35+0.65*u_day)*mix(1.0,0.4,u_c3On);
 if(cw>0.0){float yl=dot(col,vec3(0.2126,0.7152,0.0722));vec3 g2=clamp(vec3(yl)+(col-vec3(yl))*1.2,0.0,1.0);
 g2=mix(g2,g2*g2*(3.0-2.0*g2),0.24);col=mix(col,g2,cw);}
 /* 霧・雨・雪のときは、空も地平線の近くが白っぽく */
 float fogC=clamp(u_fog+u_precip*0.35+u_snow*0.3,0.0,1.0);
-col=mix(col,tone(haze*u_expAdj),clamp(fogC*0.55*smoothstep(0.2,u_horizon,iuv.y)*(1.0-cov),0.0,0.85));skyA*=1.0-fogC;
+col=mix(col,tone(haze*u_expAdj),clamp(fogC*0.55*smoothstep(0.2,u_horizon,iuv.y)*(1.0-cityCov),0.0,0.85));skyA*=1.0-fogC;
 /* 雨・雪 */
 if(u_precip>0.0){if(u_snow>0.5){float s=snow(uv,26.0,0.075,1.0)+0.6*snow(uv,52.0,0.13,5.0);col=mix(col,vec3(0.96,0.97,1.0),clamp(s,0.0,1.0)*0.9);}
 else{float r=rain(uv,vec2(62.0,7.0),1.4,1.0)+0.6*rain(uv,vec2(115.0,12.0),2.1,7.0);col+=vec3(0.72,0.78,0.88)*r*0.34*(0.5+0.5*u_precip);}}
 /* 撮像の細かい粒（暗い所ほど。動かない） */
 float yl2=dot(col,vec3(0.2126,0.7152,0.0722));
-col+=(hash21(gl_FragCoord.xy)-0.5)/255.0*(1.0+2.5*(1.0-smoothstep(0.05,0.45,yl2))*max(cov,0.3));
+col+=(hash21(gl_FragCoord.xy)-0.5)/255.0*(1.0+2.5*(1.0-smoothstep(0.05,0.45,yl2))*max(cityCov,0.3));
 gl_FragColor=vec4(col,skyA);}`;
 
 /** 3 枚目：航空障害灯（画面の点。航空法の決まり：60m 以上の屋上に赤、90m 以上は明滅、150m 以上と東京タワーの頂は昼は白い閃光。
@@ -379,11 +412,14 @@ type Gl = {
   satSince: number;
   dsmGrid: [number, number, number, number];
   dsmZ: [number, number];
+  /** 入れてある 3D の街の絵（components/app/city-3d.ts の状態の key）と、入れた時刻（0.8 秒かけて切り替える） */
+  c3Key: string;
+  c3Since: number;
 };
 
 const SKY_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_exposure", "u_aero", "u_glow"];
 const PRE_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_geo", "u_nrm", "u_win", "u_emis", "u_dsm", "u_dsmGrid", "u_dsmZ", "u_occA", "u_occB", "u_lightsVis"];
-const MAIN_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_sunT", "u_moon", "u_moonOn", "u_day", "u_sky", "u_alb", "u_nrm", "u_geo", "u_win", "u_emis", "u_pre", "u_city", "u_horizon", "u_sunE", "u_sh0", "u_sh1", "u_sh2", "u_sh3", "u_amb", "u_lightsVis", "u_sigma", "u_season", "u_snowline", "u_snowCover", "u_wet", "u_towerOn", "u_towerMode", "u_towerWhite", "u_towerCol", "u_sparkle", "u_decks", "u_cloud", "u_precip", "u_snow", "u_fog", "u_time", "u_wind", "u_expAdj", "u_haze", "u_sat", "u_satOn", "u_satLon", "u_satMerc", "u_camLL", "u_cloudH", "u_cloudExtra", "u_drift", "u_rain", "u_rainOn", "u_rainLon", "u_rainMerc", "u_flash", "u_flashDir", "u_sunTH", "u_litH", "u_sunVis", "u_twA", "u_twD", "u_twRect", "u_twX", "u_twY", "u_twDist", "u_twOn"];
+const MAIN_UNIFORMS = ["u_res", "u_f", "u_r", "u_u", "u_tan", "u_sun", "u_sunT", "u_moon", "u_moonOn", "u_day", "u_sky", "u_alb", "u_nrm", "u_geo", "u_win", "u_emis", "u_pre", "u_city", "u_horizon", "u_sunE", "u_sh0", "u_sh1", "u_sh2", "u_sh3", "u_amb", "u_lightsVis", "u_sigma", "u_season", "u_snowline", "u_snowCover", "u_wet", "u_towerOn", "u_towerMode", "u_towerWhite", "u_towerCol", "u_sparkle", "u_decks", "u_cloud", "u_precip", "u_snow", "u_fog", "u_time", "u_wind", "u_expAdj", "u_haze", "u_sat", "u_satOn", "u_satLon", "u_satMerc", "u_camLL", "u_cloudH", "u_cloudExtra", "u_drift", "u_rain", "u_rainOn", "u_rainLon", "u_rainMerc", "u_flash", "u_flashDir", "u_sunTH", "u_litH", "u_sunVis", "u_twA", "u_twD", "u_twRect", "u_twX", "u_twY", "u_twDist", "u_twOn", "u_c3Col", "u_c3Dist", "u_c3Nrm", "u_c3On", "u_c3Gain", "u_c3Relight", "u_c3SunRef", "u_c3SRef", "u_c3Sh0", "u_c3Sh1", "u_c3Sh2", "u_c3Sh3", "u_c3Tower", "u_c3Shadow"];
 const LIGHT_UNIFORMS = ["u_px", "u_time", "u_vis", "u_sigma", "u_still", "u_white"];
 const COPY_UNIFORMS = ["u_res", "u_tex"];
 const STAR_UNIFORMS = ["u_px", "u_time", "u_still", "u_tex", "u_res"];
@@ -484,7 +520,8 @@ function init(canvas: HTMLCanvasElement, city: boolean): Gl | null {
   tex.dsm = blankTexture(gl, [0, 0, 0, 255]);
   tex.sat = blankTexture(gl, [0, 0, 191, 255]);
   tex.rain = blankTexture(gl, [0, 0, 0, 255]);
-  return { gl, sky, pre, main, lights, stars, copy, quad, skyT, preT, frameT, lightsState: null, tex, pts: null, starBuf: gl.createBuffer()!, starN: 0, cityReady: false, preKey: "", satTime: "", rainTime: "", satSince: 0, dsmGrid: DSM_GRID, dsmZ: DSM_Z };
+  for (const k of ["c3c", "c3d", "c3n"]) tex[k] = blankTexture(gl, [0, 0, 0, 0]);
+  return { gl, sky, pre, main, lights, stars, copy, quad, skyT, preT, frameT, lightsState: null, tex, pts: null, starBuf: gl.createBuffer()!, starN: 0, cityReady: false, preKey: "", satTime: "", rainTime: "", satSince: 0, dsmGrid: DSM_GRID, dsmZ: DSM_Z, c3Key: "", c3Since: 0 };
 }
 
 /** キャンバスの大きさを変える（ピンチで拡大したとき高い解像度で描き直す）。描く先の絵も作り直す */
@@ -703,6 +740,34 @@ function lightValues(at: Date, sun: [number, number, number], altitude: number) 
   return lightCache.v;
 }
 
+/**
+ * 3D の街の写真が撮られたときの光（晴れた昼、南の空の高い太陽 55°）。今の光との比で、時刻の明るさと色にする。
+ * gain は面ごとの向きを使わないときの比（カメラを向いた壁と屋根の平均）
+ */
+let c3Ref: { sunE: [number, number, number]; s: [number, number, number]; sh: [number, number, number][] } | null = null;
+function city3dReference() {
+  if (!c3Ref) {
+    const s = dirFromAltAz(55, 180);
+    c3Ref = { sunE: sunIrradiance(s, 55, 1), s, sh: skyIrradianceSH(s, 55, 0.15) as [number, number, number][] };
+  }
+  return c3Ref;
+}
+/** カメラを向いた壁（方位 66°）と屋根 */
+const C3_FACES: { n: [number, number, number]; w: number }[] = [
+  { n: [Math.sin(66 * (Math.PI / 180)), Math.cos(66 * (Math.PI / 180)), 0], w: 0.6 },
+  { n: [0, 0, 1], w: 0.4 },
+];
+function city3dGain(sunE: [number, number, number], sun: [number, number, number], sh: [number, number, number][]): [number, number, number] {
+  const ref = city3dReference();
+  const e = (sE: number[], s: number[], h: number[][], j: number) =>
+    C3_FACES.reduce((acc, { n, w }) => acc + w * (sE[j] * Math.max(0, n[0] * s[0] + n[1] * s[1] + n[2] * s[2]) + Math.max(0, h[0][j] + h[1][j] * n[0] + h[2][j] * n[1] + h[3][j] * n[2])), 0);
+  return [0, 1, 2].map((j) => Math.min(3, (e(sunE, sun, sh, j) + 1e-4) / (e(ref.sunE, ref.s, ref.sh, j) + 1e-4))) as [number, number, number];
+}
+/** 3D の街の光の当て直しの強さ（0：全体の比だけ、1：面の向きごと）、MICHILU の東京タワーを上に重ねる強さ、焼いた街の影を使う強さ */
+const C3_RELIGHT = 0.75;
+const C3_TOWER = 1;
+const C3_SHADOW = 0;
+
 let meterCache: { key: string; v: number } | null = null;
 function meterCached(altitude: number, azimuth: number, cam: Camera, air: Air): number {
   const key = `${altitude.toFixed(2)}|${azimuth.toFixed(2)}|${cam.bearing}|${cam.horizon}|${air.aero}`;
@@ -765,6 +830,24 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
   }
   const satOn = live.cloud && g.satTime ? Math.min(1, (performance.now() - g.satSince) / 1500) : 0;
   const lv = showCity ? lightValues(at, sun, s.altitude) : null;
+  // 3D の街：読めた絵を入れ（1 回）、0.8 秒かけて切り替える
+  const c3 = city3dState();
+  if (c3.status === "ready" && c3.result && g.c3Key !== c3.key) {
+    const r = c3.result;
+    const put = (tex: WebGLTexture, data: Uint8Array, nearest: boolean) => {
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, r.w, r.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+      texParams(gl, nearest);
+    };
+    put(g.tex.c3c, r.color, false);
+    put(g.tex.c3d, r.dist, true);
+    put(g.tex.c3n, r.normal, true);
+    g.c3Key = c3.key;
+    g.c3Since = performance.now();
+  }
+  const c3On = showCity && g.c3Key && city3dSource() ? smoothstep(0, 800, performance.now() - g.c3Since) : 0;
   // 星と惑星の点（描くたびに位置を出し直す。数十個なので軽い）
   const starData = starVertices(at, s.altitude, b, air);
   gl.bindBuffer(gl.ARRAY_BUFFER, g.starBuf);
@@ -827,7 +910,7 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
   gl.uniform1f(m.u_moonOn, mp.altitude > -0.5 ? 1 : 0);
   gl.uniform1f(m.u_haze, Math.min(2.2, Math.max(0.7, air.aero)));
   gl.uniform1f(m.u_day, smoothstep(-6, 4, s.altitude));
-  bindTex(g.main, [["u_sky", g.skyT.tex], ["u_alb", g.tex.alb], ["u_nrm", g.tex.nrm], ["u_geo", g.tex.geo], ["u_win", g.tex.win], ["u_emis", g.tex.emis], ["u_pre", g.preT ? g.preT.tex : g.tex.dsm], ["u_sat", g.tex.sat], ["u_rain", g.tex.rain], ["u_twA", g.tex.twa], ["u_twD", g.tex.twd]]);
+  bindTex(g.main, [["u_sky", g.skyT.tex], ["u_alb", g.tex.alb], ["u_nrm", g.tex.nrm], ["u_geo", g.tex.geo], ["u_win", g.tex.win], ["u_emis", g.tex.emis], ["u_pre", g.preT ? g.preT.tex : g.tex.dsm], ["u_sat", g.tex.sat], ["u_rain", g.tex.rain], ["u_twA", g.tex.twa], ["u_twD", g.tex.twd], ["u_c3Col", g.tex.c3c], ["u_c3Dist", g.tex.c3d], ["u_c3Nrm", g.tex.c3n]]);
   // 衛星の雲・レーダーの雨・雷
   gl.uniform3f(m.u_camLL, CAM_LL.lat * R, CAM_LL.lon * R, Math.cos(CAM_LL.lat * R));
   gl.uniform2f(m.u_cloudH, CLOUD_H[0], CLOUD_H[1]);
@@ -862,6 +945,7 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
   gl.uniform3f(m.u_sunTH, TH[0], TH[1], TH[2]);
   gl.uniform1f(m.u_litH, smoothstep(-4.5, -1, s.altitude));
   gl.uniform1f(m.u_city, showCity ? 1 : 0);
+  gl.uniform1f(m.u_c3On, lv ? c3On : 0);
   // 東京タワーの層：画面の中の場所と、見えている面の向き（カメラの側を向く軸）
   {
     const [tx, ty, tw, th] = TOWER.pt;
@@ -892,6 +976,17 @@ function draw(g: Gl, cam: Camera, at: Date, city: boolean, seconds: number, stil
     gl.uniform3f(m.u_towerCol, t.color[0], t.color[1], t.color[2]);
     gl.uniform1f(m.u_sparkle, t.sparkle && !still ? 1 : 0);
     gl.uniform1f(m.u_decks, t.decks ? 1 : 0);
+    if (c3On > 0) {
+      const ref = city3dReference();
+      const gain = city3dGain(lv.sunE as [number, number, number], sun, lv.sh as [number, number, number][]);
+      gl.uniform3f(m.u_c3Gain, gain[0], gain[1], gain[2]);
+      gl.uniform1f(m.u_c3Relight, C3_RELIGHT);
+      gl.uniform3f(m.u_c3SunRef, ref.sunE[0], ref.sunE[1], ref.sunE[2]);
+      gl.uniform3f(m.u_c3SRef, ref.s[0], ref.s[1], ref.s[2]);
+      ref.sh.forEach((c, i) => gl.uniform3f(m[`u_c3Sh${i}`], c[0], c[1], c[2]));
+      gl.uniform1f(m.u_c3Tower, C3_TOWER);
+      gl.uniform1f(m.u_c3Shadow, C3_SHADOW);
+    }
   } else {
     gl.uniform3f(m.u_amb, 0, 0, 0);
     gl.uniform1f(m.u_sigma, 0);
@@ -940,15 +1035,19 @@ export function SkyCanvas({ camera = HOME_CAMERA, city = false, className = "", 
     const t0 = performance.now();
     const seconds = () => ((performance.now() - t0) / 1000) % 3600;
     let fade = 0;
+    /** 3D の街を頼む大きさ（拡大していないときのキャンバス。拡大で描き直しても読み直さない） */
+    const base = { w: canvas.width, h: canvas.height };
     const render = (at: Date) => {
       if (!g) return;
       draw(g, camera, at, city, seconds(), reduced());
       last = at;
-      // 衛星の雲が読めた直後は 1.5 秒かけて切り替える
-      if (g.satSince && performance.now() - g.satSince < 1600) {
+      // 衛星の雲が読めた直後は 1.5 秒、3D の街が読めた直後は 0.8 秒かけて切り替える
+      if ((g.satSince && performance.now() - g.satSince < 1600) || (g.c3Since && performance.now() - g.c3Since < 900)) {
         cancelAnimationFrame(fade);
         fade = requestAnimationFrame(() => render(now()));
       }
+      // ホームの街がそろい、帯が見えていたら、3D の街を頼む（ページで 1 回）
+      if (city && g.cityReady && onScreen && document.visibilityState === "visible") requestCity3D(base.w, base.h);
       // ホームは街がそろってから見せる（それまでは下の CSS の層）
       if (!shown && (!city || g.cityReady)) {
         shown = true;
@@ -1028,6 +1127,8 @@ export function SkyCanvas({ camera = HOME_CAMERA, city = false, className = "", 
     render(now());
     animate();
     addEventListener(SKY_EVENT, go);
+    const on3D = () => render(now());
+    addEventListener(CITY3D_EVENT, on3D);
     const onVisible = () => (document.visibilityState === "visible" ? animate() : cancelAnimationFrame(loop));
     document.addEventListener("visibilitychange", onVisible);
     // 帯が画面の外（下へスクロールした）なら動かさない
@@ -1064,6 +1165,7 @@ export function SkyCanvas({ camera = HOME_CAMERA, city = false, className = "", 
       clearTimeout(zoomTimer);
       vv?.removeEventListener("resize", onZoom);
       removeEventListener(SKY_EVENT, go);
+      removeEventListener(CITY3D_EVENT, on3D);
       document.removeEventListener("visibilitychange", onVisible);
       io?.disconnect();
       canvas.removeEventListener("webglcontextlost", onLost);

@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // node_modules から置いた MapLibre のワーカー（scripts/copy-maplibre-worker.mjs）
     "public/maplibre/**",
+    // node_modules から置いた Draco の部品（scripts/copy-draco.mjs。3D の街の形をほどく）
+    "public/draco/**",
     // ホームの街の焼き込み（ヘッドレスの Chromium で動かす道具。アプリには入らない）
     "scripts/city-bake/**",
   ]),

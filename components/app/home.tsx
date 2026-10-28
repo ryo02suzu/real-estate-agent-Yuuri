@@ -136,7 +136,7 @@ export function HomeScreen({
       {/* 街の写真の部分：時間連動の空（components/app/sky.tsx）。上端は時刻・電池の帯の色（--sky-top）と同じ */}
       <div className="relative overflow-hidden" style={{ height: PHOTO_H }}>
         <div className="shrink-photo absolute inset-0">
-          <SkyPhotos />
+          <SkyPhotos creditBottom={PHOTO_H - 85} />
         </div>
         <BottomFade />
         <button onClick={onLogo} aria-label="MICHILU ホーム" className="press absolute flex items-center" style={{ left: 16, top: 4, height: 40 }}>

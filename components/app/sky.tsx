@@ -6,12 +6,13 @@
 import { overrideTime, PHOTO_ORDER, solar } from "@/lib/app/sun";
 import { fetchCloudField, fetchRainField, fetchThunder, mergeCloud, setLiveSky } from "@/lib/app/satellite";
 import { currentWeather, fetchWeather, setLiveWeather } from "@/lib/app/weather";
-import { useEffect, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { applySky } from "@/lib/app/sky-vars";
 import { PhoneImg } from "./frame";
 import { PAGE } from "./tokens";
 
 import { SkyCanvas } from "./sky-canvas";
+import { CITY3D_EVENT, city3dSource, city3dState, type City3DSource } from "./city-3d";
 import { SKY_EVENT } from "./sky-event";
 export { SKY_EVENT };
 
@@ -147,9 +148,11 @@ const SKY_GRADIENT = "linear-gradient(180deg, var(--sky-top, #7bb9e8) 0%, var(--
 /**
  * 街の帯（幅393×高さ275pt。ホームと、履歴・お気に入り・書類・出力・その他で同じ）。空も街もコードで描く（SkyCanvas。太陽の実位置から大気の散乱、PLATEAU の実在の街を今の光で照らす）。
  * 下の CSS の層は、キャンバスが描けるまで・描けない端末のための代わりの絵（public/home/sky。同じ街を昼・夕焼け・薄暮・夜明け・夜に
- * 焼いたもの。街のマスクで空の部分は見せず、空は CSS のグラデーション）。太陽の高度で混ぜ、夜は窓の明かりの層を重ねる
+ * 焼いたもの。街のマスクで空の部分は見せず、空は CSS のグラデーション）。太陽の高度で混ぜ、夜は窓の明かりの層を重ねる。
+ * 撮影から作った 3D の街（Google の実写 3D タイル）に切り替わったら、その出典を帯の見えている所の下の端に出す（creditBottom は、
+ * 帯に重なるカードの上端の高さ。帯の上からの pt）
  */
-export function SkyPhotos() {
+export function SkyPhotos({ creditBottom }: { creditBottom: number }) {
   return (
     <div className="absolute inset-0 overflow-hidden" aria-hidden>
       <div className="sky-layer absolute inset-0" style={{ background: SKY_GRADIENT }} />
@@ -171,6 +174,45 @@ export function SkyPhotos() {
       <PhoneImg src="/home/sky/lights@2x.webp" srcSet="/home/sky/lights@2x.webp 2x, /home/sky/lights@3x.webp 3x" alt="" width={786} height={550} draggable={false} className="sky-layer absolute inset-0 h-full w-full object-cover" style={{ opacity: "var(--sky-lights, 0)" }} />
       {/* コードで描く帯（空・太陽・月・星・雲・街・明かり・天気）。描けたら上に現れ、下の層は見えなくなる */}
       <SkyCanvas city className="absolute inset-0" />
+      <CityCredit bottom={creditBottom} />
+    </div>
+  );
+}
+
+/**
+ * 3D の街の出典。表示している間は必ず出す（Google の決まり：Google Maps のロゴ（高さ 16pt。まわりに上・左右 10pt、下 5pt の余白）と、
+ * いま見えているタイルの出典を 1 行で、描いた絵の下の方に。どこが Google のデータかも分かるように「街並み」と添える。
+ * 空・天気・明かり・東京タワーの照明は MICHILU が描いたもの（「その他」のデータの出典に書く））
+ */
+function CityCredit({ bottom }: { bottom: number }) {
+  const [credit, setCredit] = useState<{ source: City3DSource; text: string } | null>(null);
+  useEffect(() => {
+    const read = () => {
+      const s = city3dState();
+      setCredit(s.status === "ready" && s.result && city3dSource() === s.result.source ? { source: s.result.source, text: s.result.credit } : null);
+    };
+    read();
+    addEventListener(CITY3D_EVENT, read);
+    addEventListener("hashchange", read);
+    return () => {
+      removeEventListener(CITY3D_EVENT, read);
+      removeEventListener("hashchange", read);
+    };
+  }, []);
+  if (!credit) return null;
+  const shadow = "0 0 2px rgba(0,0,0,0.75), 0 0 6px rgba(0,0,0,0.45)";
+  return (
+    <div className="credit-in pointer-events-none absolute right-0 flex max-w-full items-end justify-end px-[10px] pt-[10px]" style={{ bottom: `calc(100% - ${bottom - 5}px)` }}>
+      <span className="mr-[10px] shrink-0 leading-none text-white" style={{ fontSize: 9.5, textShadow: shadow, paddingBottom: 2 }}>
+        街並み
+      </span>
+      {credit.source === "google" ? (
+        // eslint-disable-next-line @next/next/no-img-element -- Google の決まりのロゴ（形を変えずにそのまま出す）
+        <img src="/home/google/google-maps-logo.svg" alt="Google Maps" width={76} height={16} className="block shrink-0" style={{ width: 76, height: 16 }} />
+      ) : null}
+      <span className="ml-[10px] min-w-0 text-right leading-[1.25] text-white" style={{ fontSize: 8.5, textShadow: shadow, paddingBottom: 1 }}>
+        {credit.text}
+      </span>
     </div>
   );
 }

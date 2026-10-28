@@ -47,6 +47,7 @@ discover.json
 
 # MapLibre のワーカー（npm run dev / build の前に node_modules から置く）
 /public/maplibre/
+/public/draco/
 
 # Python のキャッシュ（scripts/ の作業用スクリプト）
 __pycache__/

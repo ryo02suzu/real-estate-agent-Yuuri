@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/copy-maplibre-worker.mjs && next dev",
-    "build": "node scripts/copy-maplibre-worker.mjs && next build",
+    "dev": "node scripts/copy-maplibre-worker.mjs && node scripts/copy-draco.mjs && next dev",
+    "build": "node scripts/copy-maplibre-worker.mjs && node scripts/copy-draco.mjs && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@mapbox/vector-tile": "3.0.0",
+    "3d-tiles-renderer": "0.5.3",
     "lucide-react": "1.61.0",
     "maplibre-gl": "6.10.0",
     "next": "16.3.8",
@@ -23,13 +24,15 @@
     "pmtiles": "4.5.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "suncalc": "2.1.1"
+    "suncalc": "2.1.1",
+    "three": "0.186.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22.20.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "0.186.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "tailwindcss": "^4",

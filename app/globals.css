@@ -376,6 +376,15 @@ body {
     transform: none;
   }
 }
+/* 3D の街の出典（components/app/sky.tsx の CityCredit）：街が切り替わるのと同じ 0.8 秒で現れる */
+.credit-in {
+  animation: page-fade 800ms ease both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .credit-in {
+    animation: none;
+  }
+}
 @keyframes page-fade {
   from {
     opacity: 0;
