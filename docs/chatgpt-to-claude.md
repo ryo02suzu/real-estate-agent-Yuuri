@@ -11,6 +11,12 @@ GitHub 上の Claude は、この会話（Claude Code のセッション）の�
 2. **認証の秘密**を、リポジトリの Settings → Secrets and variables → Actions に登録する。会話やコードには貼らない。
    - `CLAUDE_CODE_OAUTH_TOKEN`（今の設定）：Claude のサブスクリプション（Pro・Max など）の枠で動く。パソコンに Claude Code を入れて、
      ターミナルで `claude setup-token` を実行すると出る。
+     - **パソコンが無いとき（iPad の Safari など）**：GitHub の Codespaces（ブラウザーの中のパソコン）を
+       このブランチで作り（https://codespaces.new/ryo02suzu/real-estate-agent-Yuuri/tree/claude/system-feedback-eggn72 ）、
+       ターミナルで `bash scripts/claude-token.sh` を動かす。トークンを作って確かめ、Secrets に登録するところまで進む。
+       Claude のログイン画面は、戻り先を「コードを表示するページ」にして開く（そのままだと戻り先が Codespace の中になり、iPad からは開けない）。
+       Codespaces の標準の権限では Secrets を書けないので、途中で GitHub に一度ログインし、登録したらすぐログアウトする。
+       終わったら https://github.com/codespaces で Codespace を消す。
    - `ANTHROPIC_API_KEY`：Claude Console（https://platform.claude.com）の API キー。使った分だけ料金がかかる。使うときは
      `.github/workflows/claude.yml` の `claude_code_oauth_token` の行を `anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}` に替える。
 3. `.github/workflows/claude.yml` を **main に入れる**。Issue やコメントで動く仕組みは、main にあるファイルだけが使われる。
