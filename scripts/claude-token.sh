@@ -4,7 +4,7 @@
 #  1. Claude Code を入れて `claude setup-token` を動かす。ログイン画面は、戻り先を「コードを表示するページ」にして開く
 #     （そのままだと戻り先がこの機械の localhost になり、iPad からは開けない）。出たコードは、ターミナルではなく
 #     Safari で開く小さなページの入力欄に貼る（iPad の Safari ではターミナルに貼り付けられない）
-#  2. 画面に出たトークンを記録から読み取り、Claude Code で一度使って確かめる
+#  2. 出てきたトークンを（画面には出さずに）読み取り、Claude Code で一度使って確かめる
 #  3. Secrets の CLAUDE_CODE_OAUTH_TOKEN に登録する。Codespaces の標準の権限では書けないので、
 #     そのときは GitHub に一度ログインして登録し、すぐログアウトする
 # トークンを含む作業用のファイルは最後に消す。終わったら Codespace ごと消す。手順は docs/chatgpt-to-claude.md
@@ -47,13 +47,15 @@ PY
 chmod +x "$WORK/open"
 
 # claude setup-token を動かしながら、「コードを渡すページ」を出す係。iPad の Safari ではターミナルに貼り付けられないので、
-# ページの普通の入力欄（長押しでペーストできる）に貼ったコードを、ターミナルに打ったのと同じように Claude Code に渡す
+# ページの普通の入力欄（長押しでペーストできる）に貼ったコードを、ターミナルに打ったのと同じように Claude Code に渡す。
+# Claude Code の画面は見せずに（進み具合だけ日本語で出す）、横幅をとても広くして動かす。トークンが折り返されずに
+# 1 続きの文字で出るので、そのまま読み取って作業用のファイルに書く（画面には出さない）
 cat > "$WORK/drive" <<'PY'
 #!/usr/bin/env python3
-import errno, fcntl, html, http.server, os, re, secrets, select, signal, sys, termios, threading, tty, urllib.parse
+import errno, fcntl, html, http.server, os, re, secrets, select, signal, struct, sys, termios, threading, time, urllib.parse
 
-log_path, url_file = sys.argv[1], sys.argv[2]
-cmd = sys.argv[3:]
+log_path, url_file, token_file = sys.argv[1], sys.argv[2], sys.argv[3]
+cmd = sys.argv[4:]
 form_key = secrets.token_urlsafe(16)  # ほかのページから勝手に送られないように、ページに埋めた合言葉を確かめる
 master, slave = os.openpty()
 
@@ -107,7 +109,12 @@ class Page(http.server.BaseHTTPRequestHandler):
             return self.send("<p>コードの形が違います。「Copy Code」でコピーし直して、"
                              "<a href='/'>前のページ</a>からもう一度貼ってください。</p>")
         os.write(master, code.encode() + b"\r")
+        say("コードを受け取りました。確かめています…")
         self.send("<h1>送りました</h1><p>元のタブ（「[プレビュー] README.md …」）に戻って、続きの案内を見てください。</p>")
+
+
+def say(text):
+    os.write(1, (text + "\r\n").encode())
 
 
 server = None
@@ -122,14 +129,8 @@ if server is None:
 threading.Thread(target=server.serve_forever, daemon=True).start()
 
 
-def resize(*_):
-    try:
-        fcntl.ioctl(master, termios.TIOCSWINSZ, fcntl.ioctl(0, termios.TIOCGWINSZ, b"\0" * 8))
-    except OSError:
-        pass
-
-
-resize()
+# 横 500 字・縦 60 行の画面として動かす（トークンが折り返されない）
+fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", 60, 500, 0, 0))
 pid = os.fork()
 if pid == 0:
     os.setsid()
@@ -141,38 +142,49 @@ if pid == 0:
     os.environ["CODE_PAGE_PORT"] = str(port)
     os.execvp(cmd[0], cmd)
 os.close(slave)
-signal.signal(signal.SIGWINCH, resize)
 
-saved = termios.tcgetattr(0) if os.isatty(0) else None
+say("Claude Code を動かしています。「Claude のコードを渡す」のページで進めてください。")
 log = open(log_path, "ab", buffering=0)
+raw = b""
+failed = False
+started = time.time()
 try:
-    if saved:
-        tty.setraw(0)
     while True:
-        try:
-            r, _, _ = select.select([0, master], [], [])
-        except InterruptedError:
+        if time.time() - started > 20 * 60:
+            say("20 分たったので止めました。")
+            failed = True
+            break
+        r, _, _ = select.select([master], [], [], 1)
+        if not r:
             continue
-        if master in r:
-            try:
-                data = os.read(master, 65536)
-            except OSError as e:
-                if e.errno == errno.EIO:
-                    break
-                raise
-            if not data:
+        try:
+            data = os.read(master, 65536)
+        except OSError as e:
+            if e.errno == errno.EIO:
                 break
-            os.write(1, data)
-            log.write(data)
-        if 0 in r:
-            data = os.read(0, 65536)
-            if data:
-                os.write(master, data)
+            raise
+        if not data:
+            break
+        log.write(data)
+        raw += data
+        if b"OAuth error" in raw or b"wasn't accepted" in raw:
+            say("Claude がコードを受け付けませんでした（古いコード・コピーの途中切れなど）。")
+            failed = True
+            break
 finally:
-    if saved:
-        termios.tcsetattr(0, termios.TCSAFLUSH, saved)
     server.shutdown()
+if failed:
+    os.kill(pid, signal.SIGTERM)
+    os.waitpid(pid, 0)
+    sys.exit(1)
 _, status = os.waitpid(pid, 0)
+tokens = re.findall(rb"sk-ant-oat\d\d-[A-Za-z0-9_-]{40,}", raw)
+if not tokens:
+    say("Claude Code の画面にトークンが見つかりませんでした。")
+    sys.exit(1)
+fd = os.open(token_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+os.write(fd, max(tokens, key=len))
+os.close(fd)
 sys.exit(os.waitstatus_to_exitcode(status))
 PY
 chmod +x "$WORK/drive"
@@ -183,7 +195,7 @@ cat <<'MSG'
   このあと画面に「Open」（開く）が出たら押してください。「Claude のコードを渡す」ページが新しいタブで開きます。
   そのページの「Claude のページを開く」→「Authorize」（承認）→「Copy Code」でコピー →
   「Claude のコードを渡す」のタブに戻り、入力欄を長押しして「ペースト」→「送る」を押してください。
-  ※ ターミナルには貼らなくて大丈夫です。
+  ※ ターミナルには貼らなくて大丈夫です。Claude Code の画面は出さず、進み具合だけここに出ます。
   ※ ページが開かないときは、下の「ポート」タブを開き、8765 の行の地球のマークを押してください。
 
 MSG
@@ -191,35 +203,12 @@ read -r -p "準備ができたら改行キーを押してください " _
 
 : > "$WORK/log"
 if ! REAL_BROWSER="$BROWSER" BROWSER="$WORK/open" LOGIN_URL_FILE="$WORK/login-url" \
-  python3 "$WORK/drive" "$WORK/log" "$WORK/login-url" "$CLAUDE" setup-token; then
+  python3 "$WORK/drive" "$WORK/log" "$WORK/login-url" "$WORK/token" "$CLAUDE" setup-token; then
   echo "トークンを作れませんでした。もう一度 bash scripts/claude-token.sh を動かしてください。"
   exit 1
 fi
+TOKEN=$(cat "$WORK/token")
 
-# 画面の記録からトークンを読む。画面の幅で折り返されて何行かに分かれているので、続きの行をつなぐ
-TOKEN=$(python3 - "$WORK/log" <<'PY'
-import re, sys
-
-# newline="" で、行の区切り（\r\r\n）を勝手に改行に替えない
-raw = open(sys.argv[1], encoding="utf-8", errors="replace", newline="").read()
-i = raw.rfind("sk-ant-oat")
-if i < 0:
-    sys.exit(1)
-plain = re.sub(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-?]*[ -/]*[@-~]|\x1b[()][0-9A-Za-z]|\x1b[=>78]|[\x00-\x09\x0b-\x1f\x7f]", "", raw[i:])
-token = ""
-for row in plain.split("\n"):
-    row = row.strip()
-    if not re.fullmatch(r"[A-Za-z0-9_-]+", row):
-        break
-    token += row
-if not re.fullmatch(r"sk-ant-oat\d\d-[A-Za-z0-9_-]{40,}", token):
-    sys.exit(1)
-print(token)
-PY
-) || { echo "画面からトークンを読み取れませんでした。もう一度動かしてください。"; exit 1; }
-
-# 画面とさかのぼりの表示からトークンを消す
-printf '\033[3J\033[H\033[2J'
 echo "✓ トークンを作りました。使えるか確かめています…"
 if ! (cd "$WORK" && CLAUDE_CODE_OAUTH_TOKEN="$TOKEN" "$CLAUDE" -p "OK とだけ返してください" --model haiku > /dev/null 2>&1); then
   echo "作ったトークンで Claude を動かせませんでした。もう一度動かしてください。"
