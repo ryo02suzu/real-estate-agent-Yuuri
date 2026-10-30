@@ -38,7 +38,7 @@ jobs:
       id-token: write
       actions: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
       # Claude が lint・型・テスト・ビルドで確かめられるように、部品を入れておく
