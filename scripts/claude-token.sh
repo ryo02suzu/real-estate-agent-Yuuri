@@ -88,50 +88,63 @@ os.close(slave)
 say("Claude Code を動かしています。Claude のページでコードをコピーしたら、ここに貼り付けて改行してください。")
 log = open(log_path, "ab", buffering=0)
 raw = b""
-failed = False
+pending = None  # 入力欄が出る前に貼られたコードは、出てから渡す
+token = None
+token_seen = None
+exited = False
 started = time.time()
+
+
+def stop(message):
+    say(message)
+    if not exited:
+        os.kill(pid, signal.SIGTERM)
+    sys.exit(1)
+
+
 while True:
     if time.time() - started > 20 * 60:
-        say("20 分たったので止めました。")
-        failed = True
+        stop("20 分たったので止めました。")
+    # 終わったかは、画面が閉じるのを待たずに確かめる（裏の処理が画面をつかんだままのことがある）
+    if not exited and os.waitpid(pid, os.WNOHANG)[0]:
+        exited = True
+    found = re.findall(rb"sk-ant-oat\d\d-[A-Za-z0-9_-]{40,}", raw)
+    if found:
+        token = max(found, key=len)
+        token_seen = token_seen or time.time()
+    # トークンが出たら、Claude Code が終わるのを少しだけ待って先へ進む
+    if token and (exited or time.time() - token_seen > 3):
         break
-    r, _, _ = select.select([master, 0], [], [], 1)
+    if exited:
+        stop("Claude Code が途中で終わりました。")
+    if pending and b"Paste" in raw:
+        os.write(master, pending.encode() + b"\r")
+        pending = None
+    r, _, _ = select.select([master, 0], [], [], 0.5)
     if 0 in r:
         line = os.read(0, 4096).decode(errors="replace").strip()
         if line and CODE.fullmatch(line):
-            os.write(master, line.encode() + b"\r")
+            pending = line
             say("コードを受け取りました。確かめています…")
         elif line:  # 空の改行は何もしない
             say("コードの形が違います。「Copy Code」でコピーしたものを、そのまま貼ってください。")
-    if master not in r:
-        continue
-    try:
-        data = os.read(master, 65536)
-    except OSError as e:
-        if e.errno == errno.EIO:
-            break
-        raise
-    if not data:
-        break
-    log.write(data)
-    raw += data
-    if b"OAuth error" in raw or b"wasn't accepted" in raw:
-        say("Claude がコードを受け付けませんでした（古いコード・コピーの途中切れなど）。")
-        failed = True
-        break
-if failed:
+    if master in r:
+        try:
+            data = os.read(master, 65536)
+        except OSError as e:
+            if e.errno != errno.EIO:
+                raise
+            data = b""
+            time.sleep(0.2)
+        log.write(data)
+        raw += data
+        if b"OAuth error" in raw or b"wasn't accepted" in raw:
+            stop("Claude がコードを受け付けませんでした（古いコード・コピーの途中切れなど）。")
+if not exited:
     os.kill(pid, signal.SIGTERM)
-    os.waitpid(pid, 0)
-    sys.exit(1)
-_, status = os.waitpid(pid, 0)
-tokens = re.findall(rb"sk-ant-oat\d\d-[A-Za-z0-9_-]{40,}", raw)
-if not tokens:
-    say("Claude Code の画面にトークンが見つかりませんでした。")
-    sys.exit(1)
 fd = os.open(token_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-os.write(fd, max(tokens, key=len))
+os.write(fd, token)
 os.close(fd)
-sys.exit(os.waitstatus_to_exitcode(status))
 PY
 chmod +x "$WORK/drive"
 
