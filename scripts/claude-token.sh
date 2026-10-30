@@ -78,6 +78,8 @@ STYLE = ("body{font:18px -apple-system,sans-serif;margin:24px auto;max-width:640
 
 
 class Page(http.server.BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
     def log_message(self, *a):
         pass
 
@@ -87,8 +89,13 @@ class Page(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(data)))
         self.end_headers()
-        self.wfile.write(data)
+        if self.command != "HEAD":
+            self.wfile.write(data)
+
+    def do_HEAD(self):
+        self.do_GET()
 
     def do_GET(self):
         url = login_url()
@@ -105,16 +112,23 @@ class Page(http.server.BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         form = urllib.parse.parse_qs(self.rfile.read(min(n, 10000)).decode())
         code = "".join(form.get("code", [""])).strip()
-        if form.get("k") != [form_key] or not re.fullmatch(r"[A-Za-z0-9._~-]+#[A-Za-z0-9._~-]+", code):
+        if form.get("k") != [form_key] or not CODE.fullmatch(code):
             return self.send("<p>コードの形が違います。「Copy Code」でコピーし直して、"
                              "<a href='/'>前のページ</a>からもう一度貼ってください。</p>")
-        os.write(master, code.encode() + b"\r")
-        say("コードを受け取りました。確かめています…")
+        hand_over(code)
         self.send("<h1>送りました</h1><p>元のタブ（「[プレビュー] README.md …」）に戻って、続きの案内を見てください。</p>")
 
 
 def say(text):
     os.write(1, (text + "\r\n").encode())
+
+
+CODE = re.compile(r"[A-Za-z0-9._~-]+#[A-Za-z0-9._~-]+")
+
+
+def hand_over(code):
+    os.write(master, code.encode() + b"\r")
+    say("コードを受け取りました。確かめています…")
 
 
 server = None
@@ -144,6 +158,8 @@ if pid == 0:
 os.close(slave)
 
 say("Claude Code を動かしています。「Claude のコードを渡す」のページで進めてください。")
+say("（コードは、ここに貼り付けて改行しても渡せます）")
+use_stdin = os.isatty(0)
 log = open(log_path, "ab", buffering=0)
 raw = b""
 failed = False
@@ -154,8 +170,14 @@ try:
             say("20 分たったので止めました。")
             failed = True
             break
-        r, _, _ = select.select([master], [], [], 1)
-        if not r:
+        r, _, _ = select.select([master, 0] if use_stdin else [master], [], [], 1)
+        if 0 in r:
+            line = os.read(0, 4096).decode(errors="replace").strip()
+            if line and CODE.fullmatch(line):
+                hand_over(line)
+            elif line:  # 空の改行は何もしない
+                say("コードの形が違います。「Copy Code」でコピーしたものを、そのまま貼ってください。")
+        if master not in r:
             continue
         try:
             data = os.read(master, 65536)
@@ -195,7 +217,8 @@ cat <<'MSG'
   このあと画面に「Open」（開く）が出たら押してください。「Claude のコードを渡す」ページが新しいタブで開きます。
   そのページの「Claude のページを開く」→「Authorize」（承認）→「Copy Code」でコピー →
   「Claude のコードを渡す」のタブに戻り、入力欄を長押しして「ペースト」→「送る」を押してください。
-  ※ ターミナルには貼らなくて大丈夫です。Claude Code の画面は出さず、進み具合だけここに出ます。
+  ※ ページが開かないときは、コードをこのターミナルに貼り付けて改行しても渡せます。
+  ※ Claude Code の画面は出さず、進み具合だけここに出ます。
   ※ ページが開かないときは、下の「ポート」タブを開き、8765 の行の地球のマークを押してください。
 
 MSG
