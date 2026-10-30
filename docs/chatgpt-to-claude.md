@@ -15,7 +15,7 @@ GitHub 上の Claude は、この会話（Claude Code のセッション）の�
        このブランチで作り（https://codespaces.new/ryo02suzu/real-estate-agent-Yuuri/tree/claude/system-feedback-eggn72 ）、
        ターミナルで `bash scripts/claude-token.sh` を動かす。トークンを作って確かめ、Secrets に登録するところまで進む。
        Claude のログイン画面は、戻り先を「コードを表示するページ」にして開く（そのままだと戻り先が Codespace の中になり、iPad からは開けない）。
-       出たコードは、ターミナルではなく Safari で開く「Claude のコードを渡す」ページの入力欄に貼る（iPad の Safari ではターミナルに貼り付けられない）。
+       出たコードはターミナルに貼って改行する。iPad では、ターミナルを長押ししても貼り付けが出ないことがあるので、キーボードの貼り付けのボタンか、コマンド パレットの「貼り付け」を使う。トークンは画面に出さずに読み取る。
        Codespaces の標準の権限では Secrets を書けないので、途中で GitHub に一度ログインし、登録したらすぐログアウトする。
        終わったら https://github.com/codespaces で Codespace を消す。
    - `ANTHROPIC_API_KEY`：Claude Console（https://platform.claude.com）の API キー。使った分だけ料金がかかる。使うときは
