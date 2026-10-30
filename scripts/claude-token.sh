@@ -118,7 +118,10 @@ while True:
     if exited:
         stop("Claude Code が途中で終わりました。")
     if pending and b"Paste" in raw:
-        os.write(master, pending.encode() + b"\r")
+        # まとめて送ると Claude Code は「貼り付け」とみなし、中の改行で確定しない。コードを入れてから、間をおいて改行を送る
+        os.write(master, pending.encode())
+        time.sleep(0.5)
+        os.write(master, b"\r")
         pending = None
     r, _, _ = select.select([master, 0], [], [], 0.5)
     if 0 in r:
@@ -126,8 +129,10 @@ while True:
         if line and CODE.fullmatch(line):
             pending = line
             say("コードを受け取りました。確かめています…")
-        elif line:  # 空の改行は何もしない
+        elif line:
             say("コードの形が違います。「Copy Code」でコピーしたものを、そのまま貼ってください。")
+        else:  # 空の改行は、そのまま Claude Code に送る（確定の押し直し）
+            os.write(master, b"\r")
     if master in r:
         try:
             data = os.read(master, 65536)
