@@ -1,6 +1,6 @@
 "use client";
 
-// スマホのホーム（検索する前の画面）。届いたデザインのとおり、画面いっぱいの夕焼けの街の写真（public/home/sunset.webp。届いた背景の絵。
+// スマホのホーム（検索する前の画面）。届いたデザインのとおり、画面いっぱいの夕焼けの街の写真（public/home/sunset-*.webp。届いた背景の絵。
 // 下のメニューの後ろまで敷くので、写真は components/app/mobile-app.tsx が HomeBackdrop で画面の一番奥に置く）の上に、上から：
 // ロゴ（今までのマークと MICHILU の白い版）と右上のメニュー（≡。お知らせ・使い方・データ・アプリ・アカウント。HomeMenu）、
 // 「不動産の現場に、／すぐ使える情報を。」、住所・地番の検索欄（すりガラス。キーボードの「検索」か、字を入れると出る → で調べる）、
@@ -67,11 +67,23 @@ const rise = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
 /** 浮き上がる動きは開いた最初の1回だけ（下のメニューで戻ったときは短いフェード） */
 let risen = false;
 
-/** 画面いっぱいの写真（下のメニューの後ろまで敷く）。上と下を少し暗くして、白い字とメニューを読みやすくする */
+/**
+ * 画面いっぱいの写真（下のメニューの後ろまで敷く）。上と下を少し暗くして、白い字とメニューを読みやすくする。
+ * 写真は届いた絵（3764×6684）を幅 900・1260・1620 に縮めた 3 枚から、画面に合う大きさを端末が選ぶ（1620 で Pro Max の画面と同じ細かさ）。
+ * 縦長の画面では高さに合わせて左右を切るので、写真の幅は画面の高さの 56.3%（絵の縦横比）
+ */
 export function HomeBackdrop() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden" style={{ background: "#2a3a55" }}>
-      <PhoneImg src="/home/sunset.webp" alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "62% 50%" }} />
+      <PhoneImg
+        src="/home/sunset-1260.webp"
+        srcSet="/home/sunset-900.webp 900w, /home/sunset-1260.webp 1260w, /home/sunset-1620.webp 1620w"
+        sizes="(min-aspect-ratio: 9/16) 100vw, 56.3vh"
+        alt=""
+        draggable={false}
+        className="absolute inset-0 h-full w-full object-cover"
+        style={{ objectPosition: "62% 50%" }}
+      />
       <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(8,18,40,0.30) 0%, rgba(8,18,40,0) 26%, rgba(0,0,0,0) 52%, rgba(0,0,0,0.30) 100%)" }} />
     </div>
   );
