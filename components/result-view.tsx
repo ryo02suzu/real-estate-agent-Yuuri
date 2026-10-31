@@ -353,7 +353,7 @@ function PositionBar({ result, onFix, onExpand }: { result: Extract<LookupResult
   return (
     <div className="space-y-2">
       <p
-        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold ${a.warn ? "bg-[var(--mui-warn-bg)] text-[var(--mui-warn-ink)]" : "bg-[var(--mui-primary-soft)] text-[var(--mui-primary-ink)]"}`}
+        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-semibold ${a.warn ? "bg-[var(--mui-warn-bg)] text-[var(--mui-warn-ink)]" : "bg-[var(--mui-primary-soft)] text-[var(--mui-primary-ink)]"}`}
       >
         {a.warn ? <AlertIcon className="h-3.5 w-3.5" /> : <PinOutlineIcon className="h-3.5 w-3.5" />}
         位置の目安：{a.label}

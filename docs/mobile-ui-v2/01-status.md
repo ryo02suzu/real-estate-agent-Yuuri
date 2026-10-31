@@ -3,7 +3,16 @@
 Issue #22 / Draft PR #23（ブランチ `claude/issue-22-20261031-0155`）。**本番（main）には入れない。** 最新の Vercel Preview をユーザーが見て承認するまで Draft のまま。
 **このファイルは、コードを書いて型・lint・単体テスト・ビルドで確かめた範囲の記録で、実ブラウザでの見た目・操作の確認ではない。**
 
-## 0. 今回（2026-10-31 06:2x〜07:xx UTC、Actions run 41176315303）の要約
+## 0. 今回（2026-10-31 09:07〜 UTC、Actions run 41187312208。起点 `c12c55c`）の要約
+「設計の次の一段」への磨き込み（P0 → P1 の順）。
+- **P0 実ブラウザ：この環境では不可**。`google-chrome --version`・`chromium --version`・`npx --no-install playwright --version` はどれも承認待ち（このジョブで許可されているのは `npm run lint/typecheck/build`・`npm test`・`npx vitest run` だけ。権限は迂回しない。テストの中からブラウザを起こすこともしない）。`git fetch origin qa/michilu-ui-v2-review`・WebFetch（GitHub API）も承認待ちで、**c12c55c を対象にした QA の実行は番号が分からず読めていない**。
+  - 読めた QA：ec9252d の Range 対応済みの実行（run 41176739658、job 124465750117 のログ。静的 build を runner 内の Chromium 151・WebKit 26.5 で）。地図の箱は `position: relative`・高さ 0（上書きすると 390×844）＝c12c55c で直した原因と一致。390px で東京都庁の公開住所の検索 → 結果 → 都市計画の詳細 → 「一覧に戻る」は成功。PMTiles は 206 で読めている。「Map cannot fit within canvas」の警告は高さ0による。
+  - c12c55c の直しをコードで確かめた：body（`h-dvh flex-col`）→ ページの箱（`flex-1`）→ シェル（`relative flex-1`）で高さが決まり、外側の箱（`absolute inset-0`）がシェルの大きさ、地図の箱（`h-full w-full`）がその 100%。MapLibre が付ける `.maplibregl-map{position:relative}` は高さを変えない。出典の持ち上げ（`.mui-japan-map .maplibregl-ctrl-bottom-right`）は層の外の規則どうしで、詳しさで勝つ。**ただし実際の描画（canvas の大きさ・タイル・北海道〜沖縄・ピン）は、c12c55c 以降の QA の結果で確かめる必要がある**。
+- **P1-1 地図とパネルの一体感**：段階が替わったときに地図を合わせる動き（以前は 0.2 秒・MapLibre の標準の曲線で、パネルの 0.3 秒・`--mui-ease` とずれていた）を、パネルと同じ長さ・同じ減速カーブにした（`lib/motion.ts`。CSS の値との一致は `lib/motion.test.ts`）。ホーム⇄結果でパネルの高さが「内容の高さ」と「段階の高さ」の間で一瞬で替わっていた（CSS は auto との間を動かせない）のを、替わる前の高さから 0.3 秒で動かす（地図のカメラと同時に始まる。動きの間は React に高さを渡さない）。
+- **P1-2 iPhone の横向き**：横向きで高さ 500px 以下のときだけ、ロゴの帯とパネルを左の列（300〜380px）にし、右に地図（`lib/mobile-layout.ts`）。日本全体・ピンは左のパネルの右側に収める（`overviewPadding`・`pointPadding` の `left`。iPhone の横向き4サイズで、最小ズーム以上で日本全体が地図の側に入ることをテスト）。結果のパネルは列の高さいっぱい（段階のボタン・つまみ・ドラッグは使わない）。縦向き・PC は変えていない。
+- **P1-3 文字の大きさ（一部）**：スマホの新UIだけの部品で、10〜12px を 12〜16px に（詳しくは `docs/features.md` 項目43の「文字の大きさ」）。行の中の既存の部品（PC と共用）の小さい文字は、読み取りの担当の棚卸し（§5e）をもとに次の作業。
+
+## 0-前回. （2026-10-31 06:2x〜07:xx UTC、Actions run 41176315303）の要約
 定時レビューの7項目と、2担当の読み取りレビューで見つかった不具合を直した（§5c・§5d）。
 - 1 パネルの指追従：ヘッダーのドラッグで、パネルの高さを指に合わせて直接動かす（毎フレームの React の再描画はしない）。離したら、離した高さと指の速さで近い段階へ。pointercancel・捕捉が外れたときは元の段階に戻す。動いている途中で触れても跳ねない（触れた所で止める）。`lib/panel-snap.ts` の `dragHeight`・`snapAfterRelease`・`nextVelocity`。
   - ResizeObserver が段階の動き・ドラッグの間、毎フレーム MobileShell と結果全体を描き直していたのをやめた（出典の位置は CSS の値 `--mui-panel-h` に直接書く。React の値はホームだけ）。

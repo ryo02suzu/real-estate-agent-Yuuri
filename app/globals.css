@@ -202,10 +202,13 @@ body {
   transform: scale(var(--mui-press-scale));
 }
 
-/* 結果パネルの項目行（components/result-view.tsx）。既存の行ボタンを、1行1項目・折り返し可・タップしやすい高さにそろえる */
+/*
+ * 結果パネルの項目行（components/result-view.tsx）。既存の行ボタンを、1行1項目・折り返し可・タップしやすい高さにそろえる。
+ * 文字の階層：行の見出し・値は 14px、まとまりの見出しは 13px（補足・出典は 12px 以上）。情報は削らず、折り返して読む
+ */
 .mui-h3 {
   margin: 0 0 6px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--mui-muted);
 }
@@ -235,7 +238,7 @@ body {
   background: #f6fbfa;
   padding: 8px 12px;
   text-align: left;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   color: var(--mui-ink);
   transition: background-color var(--mui-dur-row) var(--mui-ease);
@@ -269,20 +272,23 @@ body {
 .mui-japan-map .maplibregl-ctrl-bottom-left {
   bottom: calc(var(--mui-panel-h, 0px) + var(--mui-kbd, 0px));
 }
-/* パネルが大きいときは、上の操作帯と地図の見える帯がせまいので、出典の文字を小さくする（消さない） */
+/* 出典は小さめでも読める大きさに（消さない・たたまない） */
 .mui-japan-map .maplibregl-ctrl-attrib {
-  font-size: 10px;
+  font-size: 11px;
 }
-/* 代わりの背景（北海道〜九州だけ）を使っているときの知らせ。左下・パネルの上（出典は右下） */
+/*
+ * 代わりの背景（北海道〜九州だけ）を使っているときの知らせ。左下・パネルの上（出典は右下）。
+ * 横向き（パネルを左の列に寄せる）では、パネルの右（--mui-map-left。components/mobile-shell.tsx が書く。縦向きは 0）
+ */
 .mui-map-notice {
   position: absolute;
-  left: 8px;
+  left: calc(var(--mui-map-left, 0px) + 8px);
   bottom: calc(var(--mui-panel-h, 0px) + var(--mui-kbd, 0px) + 6px);
-  max-width: calc(100% - 140px);
+  max-width: calc(100% - var(--mui-map-left, 0px) - 140px);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.92);
   padding: 3px 8px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--mui-muted);
   box-shadow: 0 1px 4px rgba(15, 60, 56, 0.18);
@@ -297,7 +303,7 @@ body {
   border-radius: 999px;
   background: #fff;
   padding: 0 7px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 20px;
   color: var(--mui-warn-ink);

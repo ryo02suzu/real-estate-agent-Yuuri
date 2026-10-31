@@ -19,28 +19,23 @@ import {
   JAPAN_MAIN_BOUNDS,
   MAIN_ONLY_MIN_ZOOM,
   MAP_MIN_ZOOM,
-  MAP_TOP,
   noticeFor,
   overviewPadding,
   planBase,
+  pointPadding,
   probeLowZoom,
   PROBE_ZOOM,
   TILE_MAX_ZOOM,
   type BasePlan,
   type Padding,
 } from "@/lib/japan-basemap";
+import { CAMERA_MS, easeOut, PANEL_MS } from "@/lib/motion";
 import type { PointView } from "@/lib/position-accuracy";
 
 setWorkerUrl(`/maplibre/${getVersion()}/maplibre-gl-worker.mjs`);
 
-/** 日本全体 → 地点のカメラの動き（仕様の目安 900〜1400ms） */
-const MOVE_MS = 1300;
-/** パネルの高さが変わったとき、地図の中心を追従させる動き */
-const SETTLE_MS = 200;
 /** 低ズームの下敷き（標準地図）を出すのは、淡色が z5 以上になる手前のズームまで */
 const LOW_ZOOM_LAYER_MAX = 4;
-/** 地点を見せるとき、パネルの上に最低限残す地図の高さ(px)（横向きなど背の低い画面でも、余白が画面より大きくならないように） */
-const MIN_VISIBLE = 48;
 
 const STYLE: StyleSpecification = {
   version: 8,
@@ -71,20 +66,24 @@ function lookPin(el: HTMLElement, v: PointView) {
   el.setAttribute("aria-label", v.title);
 }
 
-/** 地点を見せるときの余白：上は操作帯、下はパネルの高さの見込み（画面より大きくならないよう、地図を少しは残す） */
-function pointPadding(m: MapLibreMap, inset: number): Padding {
-  const h = m.getContainer().clientHeight;
-  return { top: MAP_TOP, bottom: Math.max(0, Math.min(inset, h - MAP_TOP - MIN_VISIBLE)), left: 0, right: 0 };
-}
+/** 地図の箱の大きさ */
+const viewOf = (m: MapLibreMap | HTMLElement) => {
+  const el = m instanceof HTMLElement ? m : m.getContainer();
+  return { w: el.clientWidth, h: el.clientHeight };
+};
 
 /** 日本全体（主な島だけのときはその範囲）と、必ず入る余白（lib/japan-basemap.ts の overviewPadding） */
-function overview(m: MapLibreMap | HTMLElement, inset: number, plan: BasePlan) {
-  const el = m instanceof HTMLElement ? m : m.getContainer();
-  const view = { w: el.clientWidth, h: el.clientHeight };
+function overview(m: MapLibreMap | HTMLElement, inset: Inset, plan: BasePlan) {
+  const view = viewOf(m);
   return plan === "main-only"
-    ? { bounds: JAPAN_MAIN_BOUNDS, padding: overviewPadding(view, inset, JAPAN_MAIN_BOUNDS, MAIN_ONLY_MIN_ZOOM) }
-    : { bounds: JAPAN_BOUNDS, padding: overviewPadding(view, inset) };
+    ? { bounds: JAPAN_MAIN_BOUNDS, padding: overviewPadding(view, inset.b, JAPAN_MAIN_BOUNDS, MAIN_ONLY_MIN_ZOOM, inset.l) }
+    : { bounds: JAPAN_BOUNDS, padding: overviewPadding(view, inset.b, JAPAN_BOUNDS, MAP_MIN_ZOOM, inset.l) };
 }
+
+/** パネルが地図を覆う量(px)。b：下から重なるパネルの高さ（縦向き）／l：左に寄せたパネルの右端（横向き。縦向きは 0） */
+type Inset = { b: number; l: number };
+/** パネルの覆う量の変化が、地図を動かすほどか（4px 以下の揺れでは動かさない） */
+const insetChanged = (a: Inset, b: Inset) => Math.abs(a.b - b.b) > 4 || Math.abs(a.l - b.l) > 4;
 
 export type JapanMapProps = {
   /** 確定した実地点と、位置の目安に合わせた寄り具合・ピン（lib/position-accuracy.ts の pointView）。null なら日本全体 */
@@ -93,12 +92,14 @@ export type JapanMapProps = {
   focus: number;
   /** 下から重なるパネルの高さ(px)の見込み。ピンがパネルに隠れないよう中心をずらす（カメラ用。上限あり） */
   bottomInset: number;
+  /** 横向き（パネルを左に寄せる）のときの、パネルの右端(px)。ピン・日本全体をその右に見せる。縦向きは 0 */
+  leftInset?: number;
   reducedMotion: boolean;
   onFail?: () => void;
 };
 
 // 出典（地理院タイル）は、下から重なるパネルの実際の高さ（CSS の --mui-panel-h。components/mobile-shell.tsx が書く）の上に出す（globals.css）
-export default function JapanMap({ point, focus, bottomInset, reducedMotion, onFail }: JapanMapProps) {
+export default function JapanMap({ point, focus, bottomInset, leftInset = 0, reducedMotion, onFail }: JapanMapProps) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const pin = useRef<Marker | null>(null);
@@ -110,18 +111,18 @@ export default function JapanMap({ point, focus, bottomInset, reducedMotion, onF
   const moving = useRef(false);
   /** 最初の実行か（最初に地点が無いときは、地図を作ったときの日本全体のまま） */
   const first = useRef(true);
-  /** 最後にカメラへ反映した、パネルの高さの見込み */
-  const applied = useRef(bottomInset);
-  const latest = useRef({ point, bottomInset, reducedMotion, onFail });
+  /** 最後にカメラへ反映した、パネルの覆う量 */
+  const applied = useRef<Inset>({ b: bottomInset, l: leftInset });
+  const latest = useRef({ point, inset: { b: bottomInset, l: leftInset } as Inset, reducedMotion, onFail });
   useEffect(() => {
-    latest.current = { point, bottomInset, reducedMotion, onFail };
+    latest.current = { point, inset: { b: bottomInset, l: leftInset }, reducedMotion, onFail };
   });
 
   useEffect(() => {
     if (!box.current) return;
     let m: MapLibreMap;
     try {
-      const start = overview(box.current, latest.current.bottomInset, "pale");
+      const start = overview(box.current, latest.current.inset, "pale");
       m = new MapLibreMap({
         container: box.current,
         style: STYLE,
@@ -162,8 +163,8 @@ export default function JapanMap({ point, focus, bottomInset, reducedMotion, onF
     });
     m.on("moveend", () => {
       moving.current = false;
-      const want = latest.current.bottomInset;
-      if (Math.abs(want - applied.current) <= 4) return;
+      const want = latest.current.inset;
+      if (!insetChanged(want, applied.current)) return;
       applied.current = want;
       settle(m, latest.current.point, want, latest.current.reducedMotion, base.current);
     });
@@ -192,7 +193,7 @@ export default function JapanMap({ point, focus, bottomInset, reducedMotion, onF
           if (disposed) return;
           m.setMinZoom(MAIN_ONLY_MIN_ZOOM);
           if (!latest.current.point) {
-            const o = overview(m, latest.current.bottomInset, "main-only");
+            const o = overview(m, latest.current.inset, "main-only");
             fitWith(m, o.bounds, o.padding, 0);
           }
         };
@@ -220,8 +221,8 @@ export default function JapanMap({ point, focus, bottomInset, reducedMotion, onF
       first.current = false;
       if (!point) return;
     }
-    const { bottomInset: inset, reducedMotion: rm } = latest.current;
-    const duration = rm ? 0 : MOVE_MS;
+    const { inset, reducedMotion: rm } = latest.current;
+    const duration = rm ? 0 : CAMERA_MS;
     applied.current = inset;
     m.stop();
     if (point) {
@@ -232,7 +233,7 @@ export default function JapanMap({ point, focus, bottomInset, reducedMotion, onF
       lookPin(pin.current.getElement(), point.view);
       const c = m.getCenter();
       // 寄り具合は位置の目安に合わせる（町の中心は引いて町の広がりを見せ、筆は少し寄る）
-      const options = { center: [point.lng, point.lat] as [number, number], zoom: point.view.zoom, padding: pointPadding(m, inset), duration, essential: false };
+      const options = { center: [point.lng, point.lat] as [number, number], zoom: point.view.zoom, padding: pointPadding(viewOf(m), inset.b, inset.l), duration, essential: false };
       // 遠い場所へは、いったん引いてから寄る（通り道のタイルを全部読まない）
       if (cameraMove(m.getZoom(), distanceM({ lat: c.lat, lng: c.lng }, point)) === "fly") m.flyTo(options);
       else m.easeTo(options);
@@ -244,14 +245,15 @@ export default function JapanMap({ point, focus, bottomInset, reducedMotion, onF
     }
   }, [point, focus]);
 
-  // パネルの高さの見込みが変わったとき（段階の切り替え・ホームの内容の変化）、ピンや日本全体が隠れないよう中心を追従させる。
+  // パネルの覆う量が変わったとき（段階の切り替え・ホームの内容の変化・画面の向き）、ピンや日本全体が隠れないよう中心を追従させる。
   // 長いカメラの動きの最中なら止めず、その動きが終わってから合わせる（上の moveend）
   useEffect(() => {
     const m = map.current;
-    if (!m || moving.current || Math.abs(bottomInset - applied.current) <= 4) return;
-    applied.current = bottomInset;
-    settle(m, latest.current.point, bottomInset, latest.current.reducedMotion, base.current);
-  }, [bottomInset]);
+    const want = { b: bottomInset, l: leftInset };
+    if (!m || moving.current || !insetChanged(want, applied.current)) return;
+    applied.current = want;
+    settle(m, latest.current.point, want, latest.current.reducedMotion, base.current);
+  }, [bottomInset, leftInset]);
 
   return (
     // MapLibre の CSS（層の外）が地図の箱を position: relative にし、Tailwind の absolute（層の中）より強いので、箱そのものを
@@ -272,21 +274,25 @@ export default function JapanMap({ point, focus, bottomInset, reducedMotion, onF
  * 範囲に合わせて動かす。fitBounds の余白は、地図がすでに持っている余白（easeTo の padding で付く）に足されるので、
  * 欲しい余白と今の余白の差で渡す（そのまま渡すと二重になり、余白が画面より大きいと何もせず警告だけ出して止まる）
  */
-function fitWith(m: MapLibreMap, bounds: [[number, number], [number, number]], want: Padding, duration: number) {
+function fitWith(m: MapLibreMap, bounds: [[number, number], [number, number]], want: Padding, duration: number, easing?: (t: number) => number) {
   const cur = m.getPadding();
   m.fitBounds(bounds, {
     padding: { top: want.top - (cur.top ?? 0), bottom: want.bottom - (cur.bottom ?? 0), left: want.left - (cur.left ?? 0), right: want.right - (cur.right ?? 0) },
     duration,
+    easing,
     essential: false,
   });
 }
 
-/** パネルの高さに合わせて、地点（または日本全体）の位置だけを短く追従させる */
-function settle(m: MapLibreMap, point: { lat: number; lng: number } | null, inset: number, reduced: boolean, plan: BasePlan) {
-  const duration = reduced ? 0 : SETTLE_MS;
-  if (point) m.easeTo({ padding: pointPadding(m, inset), duration, essential: false });
+/**
+ * パネルの高さ・位置に合わせて、地点（または日本全体）の位置だけを追従させる。パネル（CSS の transition）と同じ長さ・同じ減速
+ * （lib/motion.ts）で動かし、パネルの縁と地図の注目地点が別々の速さで動いて「ずれて見える」ことを無くす
+ */
+function settle(m: MapLibreMap, point: { lat: number; lng: number } | null, inset: Inset, reduced: boolean, plan: BasePlan) {
+  const duration = reduced ? 0 : PANEL_MS;
+  if (point) m.easeTo({ padding: pointPadding(viewOf(m), inset.b, inset.l), duration, easing: easeOut, essential: false });
   else {
     const o = overview(m, inset, plan);
-    fitWith(m, o.bounds, o.padding, duration);
+    fitWith(m, o.bounds, o.padding, duration, easeOut);
   }
 }

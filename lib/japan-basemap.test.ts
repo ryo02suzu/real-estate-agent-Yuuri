@@ -15,13 +15,17 @@ import {
   noticeFor,
   overviewPadding,
   planBase,
+  POINT_MIN_VISIBLE,
+  pointPadding,
   probeLowZoom,
   probeTile,
   PROBE_ZOOM,
+  SIDE_MAP_TOP,
   tileUrl,
   tileZoomAt,
   type TileProbe,
 } from "./japan-basemap";
+import { sidePanelWidth } from "./mobile-layout";
 
 describe("カメラの動かし方", () => {
   it("2点間の距離：同じ点は0、東京駅〜新宿駅は約6km", () => {
@@ -171,5 +175,68 @@ describe("日本全体の見せ方（余白とズーム）", () => {
     const s = boundsPx(JAPAN_BOUNDS, 3);
     expect(Math.round(s.w)).toBe(267);
     expect(Math.round(s.h)).toBe(306);
+  });
+});
+
+describe("横向き（パネルを左の列に寄せる）の地図の余白", () => {
+  /** iPhone の横向き（SE・13/14・16 Pro・Pro Max）。left は左のパネルの右端（左の余白 8px＋パネルの幅） */
+  const LANDSCAPE = [
+    [667, 375],
+    [844, 390],
+    [874, 402],
+    [932, 430],
+  ] as const;
+
+  it("日本全体は、左のパネルの右側に、最小ズーム以上で入る（北海道〜沖縄が地図の側に収まる）", () => {
+    for (const [w, h] of LANDSCAPE) {
+      const left = 8 + sidePanelWidth(w);
+      const pad = overviewPadding({ w, h }, 0, JAPAN_BOUNDS, MAP_MIN_ZOOM, left);
+      expect(pad.left).toBe(left + MAP_SIDE);
+      expect(pad.top).toBe(SIDE_MAP_TOP);
+      expect(pad.bottom).toBe(8);
+      const z = fitZoom({ w, h }, pad);
+      expect(z).toBeGreaterThanOrEqual(MAP_MIN_ZOOM);
+      // そのズームで、日本全体の幅・高さが余白の内側に入る
+      const s = boundsPx(JAPAN_BOUNDS, z);
+      expect(s.w).toBeLessThanOrEqual(w - pad.left - pad.right + 1e-6);
+      expect(s.h).toBeLessThanOrEqual(h - pad.top - pad.bottom + 1e-6);
+    }
+  });
+
+  it("縦向き（left=0）の余白は今までと同じ", () => {
+    expect(overviewPadding({ w: 390, h: 844 }, 300)).toEqual(overviewPadding({ w: 390, h: 844 }, 300, JAPAN_BOUNDS, MAP_MIN_ZOOM, 0));
+    expect(overviewPadding({ w: 390, h: 844 }, 300)).toEqual({ top: MAP_TOP, bottom: 308, left: MAP_SIDE, right: MAP_SIDE });
+  });
+
+  it("パネルの右端が地図の幅を食いすぎても、最小ズームで日本全体が入る幅は残す", () => {
+    const pad = overviewPadding({ w: 600, h: 360 }, 0, JAPAN_BOUNDS, MAP_MIN_ZOOM, 500);
+    expect(600 - pad.left - pad.right).toBeGreaterThanOrEqual(boundsPx(JAPAN_BOUNDS, MAP_MIN_ZOOM).w);
+    expect(fitZoom({ w: 600, h: 360 }, pad)).toBeGreaterThanOrEqual(MAP_MIN_ZOOM - 1e-9);
+  });
+
+  it("主な島だけのときも、左のパネルの右側に入る", () => {
+    const pad = overviewPadding({ w: 667, h: 375 }, 0, JAPAN_MAIN_BOUNDS, MAIN_ONLY_MIN_ZOOM, 8 + sidePanelWidth(667));
+    expect(fitZoom({ w: 667, h: 375 }, pad, JAPAN_MAIN_BOUNDS)).toBeGreaterThanOrEqual(MAIN_ONLY_MIN_ZOOM - 1e-9);
+  });
+});
+
+describe("地点を見せるときの余白（pointPadding）", () => {
+  it("縦向き：上は操作帯、下はパネルの高さ。左右は 0", () => {
+    expect(pointPadding({ w: 390, h: 844 }, 456)).toEqual({ top: MAP_TOP, bottom: 456, left: 0, right: 0 });
+  });
+
+  it("縦向き：パネルが大きくても、パネルの上に地図を最低限残す", () => {
+    const p = pointPadding({ w: 667, h: 375 }, 520);
+    expect(375 - p.top - p.bottom).toBe(POINT_MIN_VISIBLE);
+  });
+
+  it("横向き：ピンは左のパネルの右側の中央に（上の余白は少しだけ、下は 0）", () => {
+    const left = 8 + sidePanelWidth(844);
+    expect(pointPadding({ w: 844, h: 390 }, 0, left)).toEqual({ top: SIDE_MAP_TOP, bottom: 0, left: left + MAP_SIDE, right: 0 });
+  });
+
+  it("横向き：パネルが幅を食いすぎても、地図を最低限残す", () => {
+    const p = pointPadding({ w: 400, h: 300 }, 0, 390);
+    expect(400 - p.left - p.right).toBe(POINT_MIN_VISIBLE);
   });
 });

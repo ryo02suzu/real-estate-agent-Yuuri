@@ -42,6 +42,13 @@ export const MAIN_ONLY_MIN_ZOOM = 3.5;
 export const MAP_TOP = 70;
 /** 左右の余白(px) */
 export const MAP_SIDE = 10;
+/**
+ * 横向きの背の低い画面（パネルを左に寄せる。lib/mobile-layout.ts）で、地図の側の上の余白(px)。
+ * ロゴ・メニューは左の列（パネルの上）にあるので、地図の側は少しだけ空ける
+ */
+export const SIDE_MAP_TOP = 12;
+/** 地点を見せるとき、パネルの外に最低限残す地図の大きさ(px)（余白が画面より大きくならないように） */
+export const POINT_MIN_VISIBLE = 48;
 
 /** 読むタイルの段（MapLibre の 256px ラスタと同じ計算） */
 export const tileZoomAt = (mapZoom: number) => Math.round(mapZoom + 1);
@@ -57,13 +64,31 @@ export type Padding = { top: number; bottom: number; left: number; right: number
 
 /**
  * 日本全体（または主な島）を見せるときの余白。下は、下から重なるパネルの高さ（inset）＋8px。
- * ただし、最小ズームで範囲が入る高さを必ず残す（横向きのホームなど、パネルが画面の高さのほとんどを覆うときは、下の余白を減らす）。
- * 入らない余白を渡すと MapLibre は動かず（警告だけ）、地図が [0,0] や画面の外に残るため
+ * ただし、最小ズームで範囲が入る高さを必ず残す（パネルが画面の高さのほとんどを覆うときは、下の余白を減らす）。
+ * 入らない余白を渡すと MapLibre は動かず（警告だけ）、地図が [0,0] や画面の外に残るため。
+ * left は、横向きで左に寄せたパネルの右端(px。0 なら縦向き＝下のパネル)。そのときは地図の側（右）に収め、上の余白は少しだけ。
+ * 横も、最小ズームで範囲が入る幅は必ず残す
  */
-export function overviewPadding(view: { w: number; h: number }, inset: number, bounds: Bounds = JAPAN_BOUNDS, minZoom = MAP_MIN_ZOOM): Padding {
-  const need = Math.ceil(boundsPx(bounds, minZoom).h) + 1;
-  const bottom = Math.max(0, Math.min(inset + 8, view.h - MAP_TOP - need));
-  return { top: MAP_TOP, bottom, left: MAP_SIDE, right: MAP_SIDE };
+export function overviewPadding(view: { w: number; h: number }, inset: number, bounds: Bounds = JAPAN_BOUNDS, minZoom = MAP_MIN_ZOOM, left = 0): Padding {
+  const need = boundsPx(bounds, minZoom);
+  const top = left > 0 ? SIDE_MAP_TOP : MAP_TOP;
+  const bottom = Math.max(0, Math.min(inset + 8, view.h - top - Math.ceil(need.h) - 1));
+  const l = left > 0 ? Math.max(MAP_SIDE, Math.min(left + MAP_SIDE, view.w - MAP_SIDE - Math.ceil(need.w) - 1)) : MAP_SIDE;
+  return { top, bottom, left: l, right: MAP_SIDE };
+}
+
+/**
+ * 地点を見せるときの余白。上は操作帯、下はパネルの高さの見込み（inset）。横向き（left>0）は左のパネルの右端より右に寄せる。
+ * どちらも、パネルの外に地図を最低 POINT_MIN_VISIBLE(px) は残す（余白が画面より大きいと MapLibre が動かないため）
+ */
+export function pointPadding(view: { w: number; h: number }, inset: number, left = 0): Padding {
+  const top = left > 0 ? SIDE_MAP_TOP : MAP_TOP;
+  return {
+    top,
+    bottom: Math.max(0, Math.min(inset, view.h - top - POINT_MIN_VISIBLE)),
+    left: left > 0 ? Math.max(0, Math.min(left + MAP_SIDE, view.w - POINT_MIN_VISIBLE)) : 0,
+    right: 0,
+  };
 }
 
 /** fitBounds が選ぶズーム（余白の内側に範囲が入る一番大きいズーム。最小ズーム未満なら最小ズームに切り上げられる） */

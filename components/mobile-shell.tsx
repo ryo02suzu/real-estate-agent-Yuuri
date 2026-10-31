@@ -7,6 +7,8 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { LookupResult } from "@/lib/roadmap";
 import type { HistoryItem } from "@/lib/history";
+import { SIDE_LEFT, SIDE_PANEL_TOP, SIDE_QUERY, sidePanelWidth } from "@/lib/mobile-layout";
+import { PANEL_MS } from "@/lib/motion";
 import { down, DRAG_SLOP, dragHeight, nextVelocity, SNAP_HEIGHT, snapAfterRelease, snapForDetail, snapPx, up, type Snap, type SnapHeights } from "@/lib/panel-snap";
 import { nextCamera, type CameraTarget } from "@/lib/position-accuracy";
 import { Header } from "./header";
@@ -40,6 +42,20 @@ const resizeSubscribe = (cb: () => void) => {
 /** 画面の高さ(px)。パネルの段階（中は画面の54%など）から、地図の中心をずらす量を決めるのに使う */
 function useViewportHeight(): number {
   return useSyncExternalStore(resizeSubscribe, () => window.innerHeight, () => 800);
+}
+/** 画面の幅(px)。横向きのときの左のパネルの幅を決めるのに使う */
+function useViewportWidth(): number {
+  return useSyncExternalStore(resizeSubscribe, () => window.innerWidth, () => 390);
+}
+
+const sideSubscribe = (cb: () => void) => {
+  const mq = window.matchMedia(SIDE_QUERY);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+};
+/** 横向きの背の低い画面（iPhone の横向きなど）か。パネルを左に寄せ、地図を右に見せる（lib/mobile-layout.ts） */
+function useSideLayout(): boolean {
+  return useSyncExternalStore(sideSubscribe, () => window.matchMedia(SIDE_QUERY).matches, () => false);
 }
 
 /** iPhone のキーボードで隠れる分(px)。パネルをその上に持ち上げる（Android などレイアウトが縮む端末では 0） */
@@ -114,6 +130,10 @@ export function MobileShell({
   const reduced = useReducedMotion();
   const kbd = useKeyboardInset();
   const vh = useViewportHeight();
+  const vw = useViewportWidth();
+  // 横向きの背の低い画面：パネルを左の列に（段階・ドラッグは使わず、列の高さいっぱいでスクロール）、地図は右に
+  const side = useSideLayout();
+  const sideW = sidePanelWidth(vw);
   const [mapOk, setMapOk] = useState(true);
   // シート・メニューなどポータルを青緑にそろえる目印（CSS 側でスマホ幅のときだけ効く）
   useEffect(() => {
@@ -159,6 +179,10 @@ export function MobileShell({
   const shell = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLElement>(null);
   const [panelH, setPanelH] = useState(176);
+  /** 横向き（左のパネル）のときの、パネルの右端(px)。地図のピン・日本全体をその右に見せる */
+  const [sideRight, setSideRight] = useState(0);
+  /** パネルの最後に測った高さ(px)。ホーム⇄結果で高さを動かすときの出発点 */
+  const lastH = useRef(0);
   const homeRef = useRef(!shown);
   useLayoutEffect(() => {
     homeRef.current = !shown;
@@ -167,13 +191,18 @@ export function MobileShell({
     const el = panel.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
-      const h = Math.round(el.getBoundingClientRect().height);
-      shell.current?.style.setProperty("--mui-panel-h", `${h}px`);
-      if (homeRef.current) setPanelH(h);
+      const rect = el.getBoundingClientRect();
+      const h = Math.round(rect.height);
+      lastH.current = h;
+      // 横向き（左のパネル）では、パネルは右下の出典に重ならない（左下の知らせはパネルの右へ出す。--mui-map-left）
+      shell.current?.style.setProperty("--mui-panel-h", side ? "0px" : `${h}px`);
+      if (side) setSideRight(Math.round(rect.right));
+      // ホーム⇄結果の高さの動きの途中は React に渡さない（毎フレームの再描画をしない。動き終わりに1回だけ渡す）
+      else if (homeRef.current && !el.dataset.anim) setPanelH(h);
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [side]);
 
   // ---- 一覧 ⇄ 詳細 ----
   const listRef = useRef<HTMLDivElement>(null);
@@ -245,8 +274,47 @@ export function MobileShell({
 
   // 地図の中心をずらす量。結果は段階の見込みの高さ（パネルが動き終わる前から正しい位置へ）、ホームは測った高さ。
   // 詳細を開いている間は、詳細を開く前の段階のまま（詳細を開いても地図は動かさない）
+  // 横向き（左のパネル）は下を覆わないので 0。代わりに左のパネルの右端より右に見せる（測る前は幅からの見込み）
   const hasResult = !!shown;
-  const mapInset = Math.min(hasResult ? snapPx(saved ?? snap, vh) : panelH, MAX_MAP_INSET);
+  const mapInset = side ? 0 : Math.min(hasResult ? snapPx(saved ?? snap, vh) : panelH, MAX_MAP_INSET);
+  const mapLeft = side ? sideRight || sideW + 8 : 0;
+
+  // ホーム（内容の高さ）⇄ 結果（段階の高さ）で、パネルの高さを動かす。CSS は内容の高さ（auto）との間を動かせず、
+  // 一瞬で替わってしまうので、替わる前の高さ(px)から目標の高さへ、パネルの動き（--mui-dur-panel）で動かす。
+  // 地図のカメラの動きと同時に始まり、検索の確定 → 地点へのカメラ → 結果がひと続きに見える（待たせない。動いている間も操作できる）。
+  // 横向き（左のパネル）は高さが列で決まるので動かさない。reduced-motion では動かさない
+  const animTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wasResult = useRef(hasResult);
+  useLayoutEffect(() => {
+    if (wasResult.current === hasResult) return;
+    wasResult.current = hasResult;
+    const el = panel.current;
+    const from = lastH.current;
+    if (!el || side || reduced || !from) return;
+    if (animTimer.current) clearTimeout(animTimer.current);
+    // 目標：結果は段階の高さ（React が style に付けた値）、ホームは内容の高さ（いま測る）
+    const target = hasResult ? el.style.height : `${Math.round(el.getBoundingClientRect().height)}px`;
+    if (!target) return;
+    el.dataset.anim = "1";
+    el.style.height = `${from}px`;
+    // ここまでの高さを確定させてから目標へ（そうしないと transition が効かない）
+    el.getBoundingClientRect();
+    el.style.height = target;
+    animTimer.current = setTimeout(() => {
+      animTimer.current = null;
+      delete el.dataset.anim;
+      if (!homeRef.current) return;
+      // ホームは内容の高さ（auto）に戻す（履歴の増減に合わせて伸び縮みする）。地図の中心をずらす量も1回だけ渡す
+      el.style.height = "";
+      setPanelH(Math.round(el.getBoundingClientRect().height));
+    }, PANEL_MS + 50);
+  });
+  useEffect(
+    () => () => {
+      if (animTimer.current) clearTimeout(animTimer.current);
+    },
+    [],
+  );
 
   // ヘッダー限定のドラッグ（本文のスクロールとは分ける）。指に合わせてパネルの高さを直接動かし（毎フレームの React の再描画はしない）、
   // 離したら、離した高さと指の速さで近い段階へ（lib/panel-snap.ts）。取り消された（pointercancel など）ら元の段階に戻す。
@@ -256,7 +324,8 @@ export function MobileShell({
   const probeMedium = useRef<HTMLDivElement>(null);
   const probeLarge = useRef<HTMLDivElement>(null);
   const onDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
+    // 横向き（左のパネル）は段階が無い（列の高さいっぱいで、中をスクロール）
+    if (side || !e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
     const el = panel.current;
     if (!el) return;
     const now = el.getBoundingClientRect().height;
@@ -328,21 +397,26 @@ export function MobileShell({
       <div
         ref={shell}
         className="relative min-h-0 flex-1 overflow-hidden bg-[var(--mui-primary-soft)] text-[var(--mui-ink)]"
-        style={{ "--mui-kbd": `${kbd}px` } as React.CSSProperties}
+        style={{ "--mui-kbd": `${kbd}px`, "--mui-map-left": `${mapLeft}px` } as React.CSSProperties}
+        data-side={side ? "1" : undefined}
       >
         {/* 中・大の段階の実際の高さを測る（ドラッグの始めだけ読む。見えない・場所を取らない） */}
         <div ref={probeMedium} aria-hidden className="pointer-events-none invisible absolute left-0 top-0 w-0" style={{ height: SNAP_HEIGHT.medium }} />
         <div ref={probeLarge} aria-hidden className="pointer-events-none invisible absolute left-0 top-0 w-0" style={{ height: SNAP_HEIGHT.large }} />
         {/* 地図が失敗しても、住所入力（下のパネル）は使える */}
-        {mapOk && <JapanMap point={camera.cam} focus={camera.key} bottomInset={mapInset} reducedMotion={reduced} onFail={() => setMapOk(false)} />}
+        {mapOk && <JapanMap point={camera.cam} focus={camera.key} bottomInset={mapInset} leftInset={mapLeft} reducedMotion={reduced} onFail={() => setMapOk(false)} />}
         {!mapOk && (
-          <p role="status" className="absolute inset-x-4 top-24 rounded-xl bg-white/90 p-3 text-[12px] text-[var(--mui-muted)]">
+          <p role="status" className="absolute inset-x-4 top-24 rounded-xl bg-white/90 p-3 text-[13px] text-[var(--mui-muted)]" style={side ? { left: mapLeft + 8, top: 16 } : undefined}>
             地図を表示できませんでした。住所を入力して調べられます。
           </p>
         )}
 
-        <div className="pointer-events-none absolute inset-x-0 top-0 px-3 pt-[max(8px,env(safe-area-inset-top))]">
-          <div className="pointer-events-auto mx-auto max-w-md rounded-2xl bg-white/90 px-3 py-1.5 shadow-[0_2px_12px_rgba(15,118,110,0.15)] backdrop-blur">
+        {/* ロゴ・メニューの帯。縦向きは上の中央、横向きは左の列（パネルの上）。地図の側を空ける */}
+        <div
+          className={`pointer-events-none absolute top-0 pt-[max(8px,env(safe-area-inset-top))] ${side ? "" : "inset-x-0 px-3"}`}
+          style={side ? { left: SIDE_LEFT, width: sideW } : undefined}
+        >
+          <div className={`pointer-events-auto rounded-2xl bg-white/90 px-3 py-1.5 shadow-[0_2px_12px_rgba(15,118,110,0.15)] backdrop-blur ${side ? "" : "mx-auto max-w-md"}`}>
             <Header compact onMenu={onMenu} onHome={hasResult ? onHome : undefined} />
           </div>
         </div>
@@ -350,8 +424,20 @@ export function MobileShell({
         <section
           ref={panel}
           aria-label={hasResult ? "調査結果" : "住所を調べる"}
-          style={{ height: hasResult ? SNAP_HEIGHT[snap] : undefined, bottom: kbd, maxHeight: `calc(100% - ${kbd}px - 8px)` }}
-          className="mui-panel absolute inset-x-0 mx-auto flex max-w-md flex-col rounded-t-3xl bg-white shadow-[0_-6px_24px_rgba(15,60,56,0.18)]"
+          style={
+            side
+              ? // 横向き：左の列。結果は列の高さいっぱい（中をスクロール）、ホームは内容の高さ（列の高さまで）。キーボードの分は下を上げる
+                {
+                  left: SIDE_LEFT,
+                  top: SIDE_PANEL_TOP,
+                  width: sideW,
+                  ...(hasResult ? { bottom: kbd + 8 } : { maxHeight: `calc(100% - ${SIDE_PANEL_TOP} - ${kbd}px - 8px)` }),
+                }
+              : { height: hasResult ? SNAP_HEIGHT[snap] : undefined, bottom: kbd, maxHeight: `calc(100% - ${kbd}px - 8px)` }
+          }
+          className={`mui-panel absolute flex flex-col bg-white ${
+            side ? "rounded-3xl shadow-[0_6px_24px_rgba(15,60,56,0.2)]" : "inset-x-0 mx-auto max-w-md rounded-t-3xl shadow-[0_-6px_24px_rgba(15,60,56,0.18)]"
+          }`}
         >
           {hasResult && (
             <div
@@ -360,11 +446,12 @@ export function MobileShell({
               onPointerUp={(e) => finish(e, false)}
               onPointerCancel={(e) => finish(e, true)}
               onLostPointerCapture={(e) => finish(e, true)}
-              className="shrink-0 cursor-grab touch-none select-none px-4 pb-1 pt-2"
+              className={side ? "shrink-0 px-4 pb-1 pt-3" : "shrink-0 cursor-grab touch-none select-none px-4 pb-1 pt-2"}
               data-testid="panel-header"
             >
-              <div className="mx-auto h-1 w-10 rounded-full bg-[var(--mui-line)]" aria-hidden />
-              <div className="mt-1.5 flex items-center gap-2">
+              {/* つまみ（ドラッグの印）は、段階のある縦向きだけ */}
+              {!side && <div className="mx-auto h-1 w-10 rounded-full bg-[var(--mui-line)]" aria-hidden />}
+              <div className={`flex items-center gap-2 ${side ? "" : "mt-1.5"}`}>
                 {detail && (
                   <button
                     type="button"
@@ -378,20 +465,20 @@ export function MobileShell({
                   </button>
                 )}
                 <div className="min-w-0 flex-1">
-                  <h2 ref={titleRef} tabIndex={-1} className="truncate text-[14px] font-semibold outline-none">
+                  <h2 ref={titleRef} tabIndex={-1} className="truncate text-[15px] font-semibold outline-none">
                     {detail ? detail.title : title}
                   </h2>
                   {/* 詳細を開いている間も、どの物件の詳細かを見せる */}
-                  {detail && <p className="truncate text-[11px] text-[var(--mui-muted)]">{title}</p>}
+                  {detail && <p className="truncate text-[12px] text-[var(--mui-muted)]">{title}</p>}
                   {/* 詳細の間は入力欄と一覧（回る印・エラーの箱）が隠れるので、調べている・失敗したことをここに出す
                       （全画面の地図の「ここで調べる」など、詳細の上から調べ直したとき） */}
                   {detail && loading && (
-                    <p role="status" aria-live="polite" className="truncate text-[11px] font-semibold text-[var(--mui-primary)]">
+                    <p role="status" aria-live="polite" className="truncate text-[12px] font-semibold text-[var(--mui-primary)]">
                       調べています…
                     </p>
                   )}
                   {detail && !loading && error && (
-                    <p role="alert" className="flex items-center gap-1.5 text-[11px] text-[var(--mui-warn-ink)]">
+                    <p role="alert" className="flex items-center gap-1.5 text-[12px] text-[var(--mui-warn-ink)]">
                       <span className="min-w-0 truncate">{error}</span>
                       <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={onRetry} className="mui-hit shrink-0 font-semibold text-[var(--mui-primary)] underline">
                         もう一度
@@ -399,12 +486,17 @@ export function MobileShell({
                     </p>
                   )}
                 </div>
-                <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={() => setSnap(up(snap))} disabled={snap === "large"} aria-label="パネルを広げる" className={snapBtn}>
-                  <ChevronRightIcon className="h-4 w-4 -rotate-90" />
-                </button>
-                <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={() => setSnap(down(snap))} disabled={snap === "small"} aria-label="パネルを狭める" className={snapBtn}>
-                  <ChevronRightIcon className="h-4 w-4 rotate-90" />
-                </button>
+                {/* 段階のボタンは縦向きだけ（横向きの左のパネルは列の高さいっぱい） */}
+                {!side && (
+                  <>
+                    <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={() => setSnap(up(snap))} disabled={snap === "large"} aria-label="パネルを広げる" className={snapBtn}>
+                      <ChevronRightIcon className="h-4 w-4 -rotate-90" />
+                    </button>
+                    <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={() => setSnap(down(snap))} disabled={snap === "small"} aria-label="パネルを狭める" className={snapBtn}>
+                      <ChevronRightIcon className="h-4 w-4 rotate-90" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -413,8 +505,8 @@ export function MobileShell({
           <div hidden={inDetail} className={`shrink-0 px-4 ${hasResult ? "pb-2" : "pt-4 pb-2"}`}>
             {!hasResult && (
               <div className="mb-3">
-                <h1 className="text-[15px] font-semibold leading-snug">不動産の現場に、すぐ使える情報を。</h1>
-                <p className="mt-0.5 text-[11px] text-[var(--mui-muted)]">調査対応：{areaText}</p>
+                <h1 className="text-[16px] font-semibold leading-snug">不動産の現場に、すぐ使える情報を。</h1>
+                <p className="mt-0.5 text-[13px] text-[var(--mui-muted)]">調査対応：{areaText}</p>
               </div>
             )}
             {/* 主入力。ホーム⇄結果で同じ位置・同じ部品のまま（フォーカス中に差し替えない。キャンセルは横に足すだけ） */}
@@ -444,7 +536,7 @@ export function MobileShell({
               <div role="alert" className="mb-2 flex items-start gap-2 rounded-2xl bg-[var(--mui-warn-bg)] p-3 text-sm text-[var(--mui-warn-ink)]">
                 <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
                 <span className="min-w-0 flex-1">{error}</span>
-                <button type="button" onClick={onRetry} className="mui-press mui-hit shrink-0 rounded-full bg-white px-3 py-1 text-[12px] font-semibold">
+                <button type="button" onClick={onRetry} className="mui-press mui-hit shrink-0 rounded-full bg-white px-3 py-1 text-[13px] font-semibold">
                   もう一度
                 </button>
               </div>
@@ -455,7 +547,7 @@ export function MobileShell({
             ) : (
               <div className="space-y-3">
                 <HistoryChips items={history.slice(0, 3)} onSelect={onPickHistory} onShowAll={onShowHistory} />
-                <div className="flex gap-2 text-[12px]">
+                <div className="flex gap-2 text-[13px]">
                   <button type="button" onClick={onOpenHelp} className="mui-press mui-hit rounded-full bg-[var(--mui-primary-soft)] px-3 py-1.5 font-semibold text-[var(--mui-primary-ink)]">
                     使い方
                   </button>
@@ -466,7 +558,7 @@ export function MobileShell({
               </div>
             )}
 
-            <p className="mt-3 flex items-start gap-2 text-[10.5px] leading-[1.7] text-[var(--mui-muted)]">
+            <p className="mt-3 flex items-start gap-2 text-[12px] leading-[1.7] text-[var(--mui-muted)]">
               <InfoIcon className="mt-0.5 h-4 w-4 shrink-0" />
               表示される地図は参考情報です。重要事項説明などの最終確認は、必ず役所の窓口で行ってください。
             </p>
