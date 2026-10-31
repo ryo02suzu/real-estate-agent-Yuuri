@@ -53,6 +53,9 @@ jobs:
           # 開発の指定モデルはOpus 5.5/Fable 5.1のみ。Sonnet/Haikuへ切り替えない。
           # メインはOpus 5.5、許可する唯一の代替はFable 5.1。
           # subagentとeffortにも同じ制限を適用する。利用できなければ他モデルで続行しない。
+          # Ultracodeはモデルのeffortではなく動的ワークフロー。maxは維持して併用する。
+          # 初期検証はsmall（5未満を目安。厳密な上限ではない）で並列過多を防ぐ。
+          # 非対話GitHub ActionsではWorkflowの実行許可が必要。
           settings: |
             {
               "model": "claude-opus-5-5",
@@ -60,6 +63,12 @@ jobs:
               "enforceAvailableModels": true,
               "fallbackModel": ["claude-fable-5-1"],
               "switchModelsOnFlag": false,
+              "ultracode": true,
+              "enableWorkflows": true,
+              "workflowSizeGuideline": "small",
+              "permissions": {
+                "allow": ["Workflow"]
+              },
               "env": {
                 "CLAUDE_CODE_SUBAGENT_MODEL": "claude-opus-5-5",
                 "CLAUDE_CODE_EFFORT_LEVEL": "max"
