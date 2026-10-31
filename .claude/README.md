@@ -7,7 +7,7 @@
 | Skill | 使いどころ |
 | --- | --- |
 | `michilu-ui` | ホーム、検索、カード、iPhone/PC、アニメーション |
-| `michilu-map` | 地球、地図ズーム、MapLibre、PMTiles、3D、レイヤー |
+| `michilu-map` | 既存の地点移動、MapLibre、PMTiles、地図レイヤー（地球演出は明示依頼時のみ） |
 | `michilu-property-data` | 道路、都市計画、ハザード、地番、建物、地価等 |
 | `michilu-privacy` | 住所情報、localStorage、公開API、Secrets、ライセンス |
 | `michilu-regression` | リグレッション、コードレビュー、テスト、ビルド |
@@ -22,7 +22,7 @@
 
 ## 境界と注意点
 
-- `CLAUDE.md` / `AGENTS.md` は従来どおり有効。Skillsは追加の専門手順であり、アプリ本体の機能や外部APIを導入するものではありません。
+- `CLAUDE.md` / `AGENTS.md` は従来どおり有効。Skillsは追加の専門手順であり、アプリ本体の機能や外部APIを導入するものではありません。地球から物件への連続ズームは未実装の構想であり、別のIssue等で明示的に依頼されるまで既存UI・地図の作業範囲には含めません。
 - Skillsは品質・手順の一貫性を助けますが、実行環境のツール権限やテスト機能は増えません。
 - リポジトリの `.claude/skills/` はAIへの指示として読み込まれるため、外部からのPRで編集されたときはコードと同様にレビューしてください。
 - 導入後の動作確認：Claude Codeで「MICHILUの使用可能なSkillsを列挙し、michilu-uiのルールを要約して」と指示してください。利用可能な環境では `/skills` で確認できます。
