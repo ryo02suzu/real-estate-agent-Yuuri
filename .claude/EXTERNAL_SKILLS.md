@@ -37,3 +37,11 @@
 ## 更新
 
 外部Skillは自動更新しません。更新はGitHubで差分を監査してから別のPRで行ってください。
+
+## 自動選択を15個に制限
+
+外部Skillsを含む39個のうち、普段使う15個（MICHILU専用6 / Vercel 3 / Addy Osmani 2 / Superpowersのsystematic-debugging、test-driven-development、verification-before-completion、requesting-code-review）は自動選択可能にしています。
+
+残り24個（Google Cloud 4 / Stitch 16 / Superpowersのbrainstorming、writing-plans、executing-plans、finishing-a-development-branch）は `.claude/settings.json` の `skillOverrides` で `user-invocable-only` に設定しています。インストール済みのままなので、必要なときにClaude Code環境で `/stitch-generate-design` のように明示して利用できます。Web/Remoteでスラッシュコマンドが使えない場合は、対応するインターフェースと設定の制約を確認してください。
+
+この制限は、不要なスキル説明のコンテキスト占有と無関係な自動発動を抑えるためのものです。スクリプトの安全性を保証したり、MCPの設定を代替するものではありません。Claude Codeの `/doctor` や `/skills` で認識・利用状況を検証してください。
