@@ -174,7 +174,7 @@ You MUST complete each phase before proceeding to the next.
    - Automated test if possible
    - One-off test script if no framework
    - MUST have before fixing
-   - Use the `superpowers:test-driven-development` skill for writing proper failing tests
+   - Use an appropriate regression test or reliable reproduction for the bug. Invoke `test-driven-development` only when the user explicitly requests TDD; otherwise do not impose its delete-and-rewrite rule on UI/CSS changes. Keep the project's required checks.
 
 2. **Implement Single Fix**
    - Address the root cause identified
