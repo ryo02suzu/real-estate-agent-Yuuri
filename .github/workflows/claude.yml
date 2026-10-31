@@ -50,7 +50,23 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          # Claude Codeの最大effortを各GitHub Actionsセッションで指定する
+          # 開発の指定モデルはOpus 5.5/Fable 5.1のみ。Sonnet/Haikuへ切り替えない。
+          # メインはOpus 5.5、許可する唯一の代替はFable 5.1。
+          # subagentとeffortにも同じ制限を適用する。利用できなければ他モデルで続行しない。
+          settings: |
+            {
+              "model": "claude-opus-5-5",
+              "availableModels": ["claude-opus-5-5", "claude-fable-5-1"],
+              "enforceAvailableModels": true,
+              "fallbackModel": ["claude-fable-5-1"],
+              "switchModelsOnFlag": false,
+              "env": {
+                "CLAUDE_CODE_SUBAGENT_MODEL": "claude-opus-5-5",
+                "CLAUDE_CODE_EFFORT_LEVEL": "max"
+              }
+            }
           claude_args: |
+            --model claude-opus-5-5
+            --fallback-model claude-fable-5-1
             --effort max
             --allowedTools "Bash(npm run lint:*),Bash(npm run typecheck:*),Bash(npm test:*),Bash(npm run build:*),Bash(npx vitest run:*)"
