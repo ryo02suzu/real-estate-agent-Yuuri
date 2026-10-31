@@ -51,4 +51,6 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
+            # 各GitHub Actions実行で最大effort。Claude Code公式 --effort max（セッション単位）
+            --effort max
             --allowedTools "Bash(npm run lint:*),Bash(npm run typecheck:*),Bash(npm test:*),Bash(npm run build:*),Bash(npx vitest run:*)"
