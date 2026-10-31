@@ -30,7 +30,7 @@ jobs:
                   raw=(m.group(1) or m.group(2)).strip()
                   val=raw.split(' "')[0].split(" '")[0].strip('<>')
                   if val == 'value': continue # a prose/code example `{ [type]: value }`, not a path
-        if not val or val.startswith(('#','https:','http:','mailto:','data:','//','file:','javascript:')): continue
+                  if not val or val.startswith(('#','https:','http:','mailto:','data:','//','file:','javascript:')): continue
                   if any(x in val for x in ['{','}','<','>','*','$','`']): continue
                   pathpart=unquote(urlsplit(val).path)
                   if not pathpart: continue
