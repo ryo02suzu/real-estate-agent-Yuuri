@@ -14,9 +14,9 @@ jobs:
     timeout-minutes: 20
     env:
       REVIEW_URL: http://127.0.0.1:3000
-      PREVIEW_URL: https://michilu-ix64e6cot-sourirettes-projects.vercel.app
+      PREVIEW_URL: https://michilu-dbqcxx8b5-sourirettes-projects.vercel.app
       REVIEW_SHA: d331a25e728b03e75b18664555a9fcfd1db609b1
-      REVIEW_PHASE: mobile-ui-v2-latest-d331a25
+      REVIEW_PHASE: mobile-ui-v2-core-flow-d331a25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -120,7 +120,18 @@ jobs:
                 horizontalOverflow:document.documentElement.scrollWidth>innerWidth+1,
                 maps:[...document.querySelectorAll('.maplibregl-map')].map(e=>({class:e.className,box:e.getBoundingClientRect().toJSON(),position:getComputedStyle(e).position,height:getComputedStyle(e).height,canvases:[...e.querySelectorAll('canvas')].map(c=>({box:c.getBoundingClientRect().toJSON(),width:c.width,height:c.height}))})),
                 inputs:[...document.querySelectorAll('input')].filter(e=>e.getBoundingClientRect().width).map(e=>({name:e.getAttribute('aria-label')||e.id,fontSize:getComputedStyle(e).fontSize,box:e.getBoundingClientRect().toJSON()})),
-                controls:[...document.querySelectorAll('button,a')].filter(e=>e.getBoundingClientRect().width).map(e=>({text:e.getAttribute('aria-label')||e.innerText,box:e.getBoundingClientRect().toJSON()}))
+                controls:[...document.querySelectorAll('button,a')].filter(e=>e.getBoundingClientRect().width).map(e=>{
+                  const b=e.getBoundingClientRect(),p=getComputedStyle(e,'::after');
+                  const extended=e.matches('.mui-hit,.mui-hit-y,[role="tab"]') && p.content!=='none' && p.content!=='normal';
+                  const w=Math.max(b.width,extended?(parseFloat(p.width)||0):0),h=Math.max(b.height,extended?(parseFloat(p.height)||0):0);
+                  const cx=b.x+b.width/2,cy=b.y+b.height/2;
+                  return {text:e.getAttribute('aria-label')||e.innerText,box:b.toJSON(),hit_size:{width:w,height:h},
+                    hit_samples:[[-1,-1],[1,-1],[-1,1],[1,1],[0,0]].map(([dx,dy])=>{
+                      const x=cx+dx*(w/2-2),y=cy+dy*(h/2-2),inside=x>=0&&x<innerWidth&&y>=0&&y<innerHeight;
+                      const hit=inside?document.elementFromPoint(x,y):null;
+                      return {x,y,insideViewport:inside,receives:!!hit&&(hit===e||e.contains(hit))};
+                    })};
+                })
               })""")
           async def run():
               async with async_playwright() as pw:
@@ -149,6 +160,7 @@ jobs:
                               await page.evaluate("document.fonts.ready")
                               await page.wait_for_timeout(1800)
                               await snapshot(page,name+"-home",record)
+                              record["home_layout"]=record["layout"]
                               # Failure gate: blank MapLibre canvases passed the old screenshot-only QA.
                               # This checks the app's real layout; never apply an artificial CSS override.
                               if width < 1024 and urlparse(page.url).netloc == urlparse(report["url"]).netloc:
@@ -165,37 +177,27 @@ jobs:
                                   assert record["canvas_geometry"]["width"] > 200 and record["canvas_geometry"]["height"] > 150, "Mobile MapLibre canvas is empty or collapsed"
                               record["status"]="app_home_captured"
                               if width==390:
-                                  # Separate diagnostic override; restore before ordinary interaction checks.
-                                  map_box=page.locator(".mui-japan-map")
-                                  if await map_box.count():
-                                      record["diagnostic_map_before"]=await map_box.evaluate("(e)=>({box:e.getBoundingClientRect().toJSON(),position:getComputedStyle(e).position,height:getComputedStyle(e).height})")
-                                      await map_box.evaluate("(e)=>{e.dataset.oldStyle=e.getAttribute('style')||'';e.style.position='absolute';e.style.height='100%';window.dispatchEvent(new Event('resize'));}")
-                                      await page.wait_for_timeout(2000)
-                                      await snapshot(page,name+"-diagnostic-map-layout-override",{})
-                                      record["diagnostic_map_after"]=await map_box.evaluate("(e)=>({box:e.getBoundingClientRect().toJSON(),position:getComputedStyle(e).position,height:getComputedStyle(e).height})")
-                                      await map_box.evaluate("(e)=>{e.setAttribute('style',e.dataset.oldStyle);delete e.dataset.oldStyle;window.dispatchEvent(new Event('resize'));}")
                                   await page.get_by_role("textbox",name=re.compile("住所")).first.fill("東京都新宿区西新宿2丁目8番1号")
                                   await snapshot(page,name+"-input",{})
                                   await page.get_by_role("button",name="検索",exact=True).first.click()
-                                  try:
-                                      await page.wait_for_function("location.search.includes('q=')",timeout=35000)
-                                  except Exception as e: record["search_wait_error"]=str(e)[:600]
+                                  await page.wait_for_function("location.search.includes('q=')",timeout=35000)
                                   await page.wait_for_timeout(6000)
                                   await snapshot(page,name+"-result",record)
                                   record["result_url"]=page.url
                                   record["result_text"]=(await page.locator("body").inner_text())[:12000]
                                   detail=page.get_by_role("button",name=re.compile("^都市計画")).first
-                                  if await detail.count() and await detail.is_visible() and await detail.is_enabled():
-                                      await detail.click()
-                                      await page.wait_for_timeout(600)
-                                      await snapshot(page,name+"-detail",{})
-                                      record["detail_clicked"]=True
-                                      back=page.get_by_role("button",name="一覧に戻る",exact=True).first
-                                      if await back.count() and await back.is_visible():
-                                          await back.click()
-                                          await page.wait_for_timeout(400)
-                                          await snapshot(page,name+"-returned",{})
-                                          record["detail_returned"]=True
+                                  # Core flow is mandatory, not a screenshot-only success.
+                                  await detail.wait_for(state="visible",timeout=30000)
+                                  await detail.click(timeout=30000)
+                                  await page.wait_for_timeout(600)
+                                  await snapshot(page,name+"-detail",{})
+                                  record["detail_clicked"]=True
+                                  back=page.get_by_role("button",name="一覧に戻る",exact=True).first
+                                  await back.click(timeout=15000)
+                                  await detail.wait_for(state="visible",timeout=15000)
+                                  await page.wait_for_timeout(400)
+                                  await snapshot(page,name+"-returned",{})
+                                  record["detail_returned"]=True
                                   # Explicit browser simulations; not physical iPhone keyboard or OS text size.
                                   if width==390:
                                       await page.locator("#address").focus()
@@ -216,7 +218,7 @@ jobs:
                           await ctx.close()
                           (out/"report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
                       await browser.close()
-              print(json.dumps({"phase":report["phase"],"sha":report["sha"],"checks":[{k:v for k,v in r.items() if k not in ["layout","failed_requests"]} for r in report["checks"]]},ensure_ascii=False))
+              print(json.dumps({"phase":report["phase"],"sha":report["sha"],"checks":[{k:v for k,v in r.items() if k not in ["layout","home_layout","failed_requests"]} for r in report["checks"]]},ensure_ascii=False))
           asyncio.run(run())
           if any(r.get('status') == 'blocked' for r in report['checks']):
               raise SystemExit('Browser review contains blocked cases; see report.json')
