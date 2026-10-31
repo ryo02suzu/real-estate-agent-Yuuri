@@ -85,6 +85,13 @@ export function MobileShell({
   const reduced = useReducedMotion();
   const kbd = useKeyboardInset();
   const [mapOk, setMapOk] = useState(true);
+  // シート・メニューなどポータルを青緑にそろえる目印（CSS 側でスマホ幅のときだけ効く）
+  useEffect(() => {
+    document.body.dataset.mui = "1";
+    return () => {
+      delete document.body.dataset.mui;
+    };
+  }, []);
 
   // 確定した実地点（住所・ピン・地図カメラは同じ結果から決める）。候補待ち・見つからないときはカメラを動かさない
   const confirmed = useMemo(() => {

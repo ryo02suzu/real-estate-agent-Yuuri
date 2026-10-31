@@ -40,7 +40,7 @@ import { SchoolButton, SchoolCard, useSchools, type SchoolState } from "./school
 import { PoiCard, usePois, type PoiState } from "./poi-card";
 import { StationCard, StationLine, useStations, type StationState } from "./station-card";
 import { useCopy } from "./use-copy";
-import { useZoning, ZoningCard, ZoningLine, type ZoningState } from "./zoning-card";
+import { UtilityLine, useZoning, ZoningCard, ZoningLine, type ZoningState } from "./zoning-card";
 
 const CARD = "shadow-soft rounded-2xl border border-white bg-white";
 
@@ -218,6 +218,87 @@ function Found({
     window.addEventListener(DRAFT_EVENT, open);
     return () => window.removeEventListener(DRAFT_EVENT, open);
   }, []);
+
+  if (panel) {
+    // スマホの新しい結果パネル：1行1項目（F01〜F12の入口）。縮めず、パネルの中でスクロールして読む
+    const onMapRoads = onExpand && (() => onExpand({ roads: true }));
+    return (
+      <div className="mui-scope flex flex-col gap-3 pb-2" data-testid="result-panel">
+        <Place
+          result={result}
+          fixable={!!onFix}
+          onPick={onPick}
+          actions={
+            <>
+              <CopyButton text={copyText(result)} />
+              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} />
+            </>
+          }
+        />
+        <CityLine municipality={m} />
+        {(primary.length > 0 || secondary.length > 0) && (
+          <section aria-label="道路の公式図">
+            <h3 className="mui-h3">道路の公式図</h3>
+            <div className="space-y-2">
+              {primary.map((l) => (
+                <MapButton key={l.url} link={l} primary />
+              ))}
+              {secondary.map((l) => (
+                <MapButton key={l.url} link={l} />
+              ))}
+            </div>
+            <NearbyRoadsLine state={roads} onShowMap={onMapRoads} />
+            {hint}
+          </section>
+        )}
+        <section aria-label="調べた項目">
+          <h3 className="mui-h3">調べた項目（参考）</h3>
+          <div className="mui-rows">
+            <div>
+              <ZoningLine state={zoning} city={m.name} />
+            </div>
+            <div>
+              <HazardLine state={hazard} city={m.name} onShowMap={onExpand && ((k) => onExpand({ hazard: k }))} />
+            </div>
+            <div>
+              <ParcelButton
+                info={parcels}
+                extra={building.status !== "none" && <BuildingDetail state={building} />}
+                withBuilding={building.status !== "none"}
+                chibanzu={chibanzuFor(m, result.lat, result.lng)}
+              />
+            </div>
+            <div>
+              <UtilityLine state={zoning} city={m.name} />
+            </div>
+            <div>
+              <LandPriceLine state={landPrice} onShowMap={onExpand && ((p) => onExpand({ landPrice: p }))} />
+            </div>
+            <div>
+              <StationLine state={stations} pois={pois} />
+            </div>
+            <div>
+              <SchoolButton state={schools} />
+            </div>
+          </div>
+        </section>
+        {contact}
+        {offline && result.links.length > 0 && (
+          <section className={`${CARD} p-4`}>
+            <h3 className="mb-2 text-[13px] text-ink">参考：公道（市道）かどうかの地図</h3>
+            <div className="space-y-2">
+              {result.links.map((l) => (
+                <MapButton key={l.url} link={l} />
+              ))}
+            </div>
+            {hint}
+          </section>
+        )}
+        {print}
+        <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations, pois })} open={draft} onClose={() => setDraft(false)} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5 [&>*]:shrink-0">

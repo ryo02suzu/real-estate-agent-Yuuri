@@ -128,6 +128,27 @@ export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: 
   );
 }
 
+/** スマホの結果パネル：「上下水道・ガス」の行。同じ詳細シートを「上下水道・ガス」のタブで開く（F07） */
+export function UtilityLine({ state, city }: { state: ZoningState; city: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button onClick={() => setOpen(true)} disabled={state.status !== "ok"} className="mui-row-btn">
+        <span className="mui-row-label">上下水道・ガス</span>
+        <span className="min-w-0 flex-1 truncate text-[var(--mui-muted)]">
+          {state.status === "loading" ? "確認中…" : state.status === "error" ? "データを読み込めませんでした" : "照会先・台帳の地図を見る"}
+        </span>
+        {state.status === "ok" && <ChevronRightIcon className="ml-auto h-4 w-4 shrink-0 text-[var(--mui-muted)]" />}
+      </button>
+      {state.status === "ok" && (
+        <Sheet title="上下水道・ガス（参考）" open={open} onClose={() => setOpen(false)}>
+          <ZoningDetail state={state} city={city} tabs initialTab={2} />
+        </Sheet>
+      )}
+    </>
+  );
+}
+
 /** PC：地図の左のパネルのカード */
 export function ZoningCard({ state, city }: { state: ZoningState; city: string }) {
   return (
@@ -151,8 +172,8 @@ const SUB = "mt-0.5 block text-[11.5px] leading-[1.55] text-muted dense:mt-0 den
 const TABS = ["都市計画", "その他の法令", "上下水道・ガス"];
 
 /** 都市計画と、その他の法令の下調べ。tabs：スマホのシート（タブで分ける） */
-function ZoningDetail({ state, city, tabs }: { state: Extract<ZoningState, { status: "ok" }>; city: string; tabs?: boolean }) {
-  const [tab, setTab] = useState(0);
+function ZoningDetail({ state, city, tabs, initialTab = 0 }: { state: Extract<ZoningState, { status: "ok" }>; city: string; tabs?: boolean; initialTab?: number }) {
+  const [tab, setTab] = useState(initialTab);
   const warn = !!state.hourei?.hits.length || tochiChips(state.tochi).length > 0 || !!state.tochi?.forest;
   if (!tabs)
     return (

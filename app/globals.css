@@ -205,3 +205,82 @@ body {
 .mui-press:active {
   transform: scale(0.96);
 }
+
+/* 結果パネルの項目行（components/result-view.tsx の panel）。既存の行ボタンを、1行1項目・折り返し可・タップしやすい高さにそろえる */
+.mui-h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mui-muted);
+}
+.mui-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mui-rows > div {
+  display: flex;
+}
+.mui-rows button,
+.mui-row-btn {
+  display: flex;
+  min-height: 48px;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--mui-line);
+  border-radius: 14px;
+  background: #fff;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--mui-ink);
+  transition: background-color var(--mui-dur-row) var(--mui-ease), transform var(--mui-dur-press) var(--mui-ease);
+}
+.mui-rows button:active:not(:disabled) {
+  background: var(--mui-primary-soft);
+  transform: scale(0.99);
+}
+.mui-rows button:disabled {
+  opacity: 0.8;
+}
+/* 印（チップ）は隠さず折り返す。背の低い画面で見出しを消すルールも、このパネルでは効かせない */
+.mui-rows button span.flex-wrap {
+  height: auto;
+  overflow: visible;
+  row-gap: 4px;
+}
+.mui-rows .short\:hidden {
+  display: inline !important;
+}
+.mui-row-label {
+  flex-shrink: 0;
+  color: var(--mui-muted);
+}
+
+/*
+ * スマホ（1024px 未満）で新UIを使っている間（body[data-mui]）、シート・メニューなどポータルの金色を青緑にそろえる。
+ * PC（1024px 以上）は対象外。印刷も対象外
+ */
+@media screen and (max-width: 1023.98px) {
+  body[data-mui] .bg-gold,
+  body[data-mui] .bg-brand {
+    background: var(--mui-primary) !important;
+  }
+  body[data-mui] .text-brand,
+  body[data-mui] .text-brand-light {
+    color: var(--mui-primary) !important;
+  }
+  body[data-mui] .border-brand {
+    border-color: var(--mui-primary) !important;
+  }
+  body[data-mui] .bg-mint {
+    background-color: var(--mui-primary-soft) !important;
+  }
+  body[data-mui] .border-line,
+  body[data-mui] .border-line\/70 {
+    border-color: var(--mui-line) !important;
+  }
+}
