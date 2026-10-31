@@ -1,0 +1,297 @@
+name: MICHILU flight review evidence
+on:
+  push:
+    branches: [qa/michilu-ui-v2-review]
+    paths: [.github/workflows/michilu-flight-review.yml]
+permissions:
+  contents: read
+concurrency:
+  group: michilu-flight-review
+  cancel-in-progress: false
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      REVIEW_URL: http://127.0.0.1:3000
+      PREVIEW_URL: https://michilu-fmbus8qro-sourirettes-projects.vercel.app
+      REVIEW_SHA: bc3efa3dd25778d06969a11a4d96226c6c77f63c
+      REVIEW_PHASE: flight-bc3efa3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ env.REVIEW_SHA }}
+          path: app-source
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app-source/package-lock.json
+      - name: Build the exact review commit
+        working-directory: app-source
+        run: |
+          test "$(git rev-parse HEAD)" = "$REVIEW_SHA"
+          npm ci
+          npm run build
+      - name: Serve the static build on the runner
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          Path("/tmp/michilu-range-server.py").write_text("""
+          import http.server, os, re
+          class RangeHandler(http.server.SimpleHTTPRequestHandler):
+              def send_head(self):
+                  self.request_range = None
+                  raw = self.headers.get('Range')
+                  path = self.translate_path(self.path)
+                  if not raw or not os.path.isfile(path):
+                      return super().send_head()
+                  match = re.fullmatch(r'bytes=(\\d+)-(\\d*)', raw)
+                  size = os.path.getsize(path)
+                  if not match:
+                      self.send_error(416)
+                      return None
+                  start = int(match[1])
+                  end = min(int(match[2]) if match[2] else size - 1, size - 1)
+                  if start > end or start >= size:
+                      self.send_response(416)
+                      self.send_header('Content-Range', f'bytes */{size}')
+                      self.end_headers()
+                      return None
+                  stream = open(path, 'rb')
+                  stream.seek(start)
+                  self.request_range = (start, end)
+                  self.send_response(206)
+                  self.send_header('Content-Type', self.guess_type(path))
+                  self.send_header('Accept-Ranges', 'bytes')
+                  self.send_header('Content-Range', f'bytes {start}-{end}/{size}')
+                  self.send_header('Content-Length', str(end - start + 1))
+                  self.end_headers()
+                  return stream
+              def copyfile(self, source, outputfile):
+                  if self.request_range is None:
+                      return super().copyfile(source, outputfile)
+                  remaining = self.request_range[1] - self.request_range[0] + 1
+                  while remaining:
+                      chunk = source.read(min(remaining, 65536))
+                      if not chunk:
+                          break
+                      outputfile.write(chunk)
+                      remaining -= len(chunk)
+          os.chdir('app-source/out')
+          http.server.ThreadingHTTPServer(('127.0.0.1', 3000), RangeHandler).serve_forever()
+          """.lstrip())
+          PY
+          python3 /tmp/michilu-range-server.py > "$RUNNER_TEMP/michilu-static-server.log" 2>&1 &
+          python3 - <<'PY'
+          import time, urllib.request
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen("http://127.0.0.1:3000", timeout=2) as response:
+                      assert response.status == 200
+                  break
+              except Exception:
+                  if attempt == 29:
+                      raise
+                  time.sleep(1)
+          PY
+      - name: Install isolated browser tools
+        run: |
+          python3 -m venv "$RUNNER_TEMP/michilu-browser"
+          "$RUNNER_TEMP/michilu-browser/bin/pip" install playwright==1.62.0
+          "$RUNNER_TEMP/michilu-browser/bin/playwright" install --with-deps chromium webkit
+      - name: Exercise flight UI on runner (not Vercel Preview)
+        shell: bash
+        run: |
+          "$RUNNER_TEMP/michilu-browser/bin/python" - <<'PY'
+          import asyncio
+          import json
+          import os
+          import platform
+          import re
+          import time
+          from pathlib import Path
+          
+          from playwright.async_api import async_playwright
+          
+          OUT = Path("flight-review")
+          OUT.mkdir(exist_ok=True)
+          URL = os.environ["REVIEW_URL"]
+          ADDRESS = "東京都新宿区西新宿2丁目8番1号"  # 東京都庁（公開施設）
+          FLIGHT = '[role="dialog"].app-touch'
+          REPORT = {"sha": os.environ["REVIEW_SHA"], "url": URL,
+                    "preview_url": os.environ["PREVIEW_URL"], "deployment_tested": False,
+                    "real_iphone": False, "os": platform.platform(), "checks": []}
+          
+          
+          async def capture(page, name, record):
+              await page.screenshot(path=str(OUT / f"{name}.png"), full_page=True)
+              record["text"] = (await page.locator("body").inner_text())[:16000]
+              record["layout"] = await page.evaluate("""() => ({
+                width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,
+                horizontalOverflow:document.documentElement.scrollWidth>innerWidth+1,
+                maps:[...document.querySelectorAll('.maplibregl-map')].map(e=>({box:e.getBoundingClientRect().toJSON(),canvases:[...e.querySelectorAll('canvas')].map(c=>({box:c.getBoundingClientRect().toJSON(),width:c.width,height:c.height}))})),
+                controls:[...document.querySelectorAll('button,a,input')].filter(e=>e.getBoundingClientRect().width>0).map(e=>({name:e.getAttribute('aria-label')||e.innerText||e.id,box:e.getBoundingClientRect().toJSON(),fontSize:getComputedStyle(e).fontSize})),
+                focus:{tag:document.activeElement?.tagName,name:document.activeElement?.getAttribute('aria-label'),inFlight:!!document.activeElement?.closest('[role="dialog"].app-touch')}
+              })""")
+          
+          
+          async def observe(context, page, record):
+              record["page_errors"] = []
+              record["failed_requests"] = []
+              page.on("pageerror", lambda e: record["page_errors"].append(str(e)[:1500]))
+              page.on("requestfailed", lambda r: record["failed_requests"].append({"url": r.url, "failure": r.failure}))
+              await context.add_init_script("""(() => {
+                window.__flightSeen=false;
+                new MutationObserver(()=>{if(document.querySelector('[role="dialog"].app-touch'))window.__flightSeen=true}).observe(document,{subtree:true,childList:true});
+              })()""")
+          
+          
+          async def home(page, width):
+              response = await page.goto(URL, wait_until="domcontentloaded", timeout=40000)
+              assert response and response.status == 200
+              field = page.get_by_role("textbox", name="住所・地番", exact=True) if width < 1024 else page.locator("input#address")
+              await field.wait_for(state="visible", timeout=20000)
+              await page.evaluate("document.fonts.ready")
+              return field
+          
+          
+          async def submit(page, field):
+              await field.fill(ADDRESS)
+              await page.get_by_role("button", name="調べる", exact=True).click()
+          
+          
+          async def case(browser, engine, name, width=390, height=844, mode="home"):
+              record = {"name": name, "browser": engine, "browser_version": browser.version, "mode": mode}
+              REPORT["checks"].append(record)
+              options = {"viewport": {"width": width, "height": height}, "locale": "ja-JP",
+                         "device_scale_factor": 1, "is_mobile": width < 1024, "has_touch": width < 1024}
+              if mode == "reduced_initial":
+                  options["reduced_motion"] = "reduce"
+              ctx = await browser.new_context(**options)
+              if mode == "motion_off":
+                  await ctx.add_init_script("localStorage.setItem('michilu:motion','off')")
+              page = await ctx.new_page()
+              await observe(ctx, page, record)
+              if mode == "tile_failure":
+                  await page.route("https://gibs.earthdata.nasa.gov/**", lambda route: route.abort())
+                  await page.route("https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/**", lambda route: route.abort())
+              try:
+                  field = await home(page, width)
+                  await page.wait_for_timeout(1400)
+                  await capture(page, name + "-home", record)
+                  record["home_layout"] = record["layout"]
+                  assert not record["layout"]["horizontalOverflow"], "Horizontal overflow on home"
+                  if mode == "home":
+                      record["status"] = "passed"
+                      return
+                  if mode == "text200":
+                      # Computed-font simulation only; this is NOT iOS Dynamic Type / browser zoom.
+                      await page.evaluate("""() => {const e=[...document.querySelectorAll('body *')];const s=e.map(x=>parseFloat(getComputedStyle(x).fontSize));e.forEach((x,i)=>x.style.setProperty('font-size',(s[i]*2)+'px','important'))}""")
+                      await capture(page, name + "-text200-simulation", record)
+                      assert not record["layout"]["horizontalOverflow"], "Horizontal overflow with 200% text simulation"
+                      record["status"] = "captured_text_simulation"
+                      return
+                  if mode == "keyboard":
+                      await field.focus()
+                      await page.set_viewport_size({"width": 390, "height": 430})
+                      await field.fill(ADDRESS)
+                      await capture(page, name + "-keyboard-viewport-simulation", record)
+                      assert await page.get_by_role("button", name="調べる", exact=True).is_visible()
+                      record["status"] = "captured_viewport_simulation"
+                      return
+          
+                  started = time.monotonic()
+                  await submit(page, field)
+                  flight = page.locator(FLIGHT)
+                  if mode in ["reduced_initial", "motion_off"]:
+                      await page.wait_for_timeout(8000)
+                      record["flight_seen"] = await page.evaluate("window.__flightSeen")
+                      await capture(page, name + "-result", record)
+                      assert not record["flight_seen"], "Flight ran despite motion preference"
+                      record["status"] = "passed"
+                      return
+          
+                  await flight.wait_for(state="visible", timeout=10000)
+                  record["flight_seen"] = True
+                  if mode in ["escape", "reduced_during"]:
+                      record["skip_buttons"] = await flight.get_by_role("button").count()
+                      await page.keyboard.press("Tab")
+                      record["focus_in_flight"] = await page.evaluate("!!document.activeElement?.closest('[role=dialog].app-touch')")
+                      if mode == "escape":
+                          await page.keyboard.press("Escape")
+                      else:
+                          await page.emulate_media(reduced_motion="reduce")
+                      await page.wait_for_timeout(750)
+                      record["still_visible"] = await flight.is_visible()
+                      await capture(page, name + "-after-action", record)
+                      assert not record["still_visible"], "Flight cannot be dismissed with Escape" if mode == "escape" else "Flight continues after reduced motion is enabled"
+                  elif mode == "touch_skip":
+                      await page.touchscreen.tap(width / 2, height / 2)
+                      await flight.wait_for(state="hidden", timeout=2000)
+                      record["dismissed_seconds"] = round(time.monotonic() - started, 3)
+                      await capture(page, name + "-skipped", record)
+                  else:
+                      record["frames"] = []
+                      for index, delay in enumerate([400, 1200, 1600, 1800]):
+                          await page.wait_for_timeout(delay)
+                          frame = {}
+                          await capture(page, name + f"-flight-{index}", frame)
+                          frame["elapsed_seconds"] = round(time.monotonic() - started, 3)
+                          frame["dialog_visible"] = await flight.is_visible()
+                          record["frames"].append(frame)
+                      await flight.wait_for(state="hidden", timeout=17000)
+                      record["finished_seconds"] = round(time.monotonic() - started, 3)
+                      if mode == "normal":
+                          canvases = [c for f in record["frames"] if f["dialog_visible"] for m in f["layout"]["maps"] for c in m["canvases"]]
+                          assert canvases, "Flight rendered no canvas"
+                          assert all(c["box"]["width"] > 200 and c["box"]["height"] > 150 for c in canvases), "Flight MapLibre canvas collapsed"
+                      await page.wait_for_timeout(3000)
+                      await capture(page, name + "-result", record)
+                      record["result_url"] = page.url
+                      record["result_has_public_address"] = "西新宿" in record["text"]
+                      if mode == "normal":
+                          assert record["result_has_public_address"], "No public address result after flight"
+                  record["status"] = "passed"
+              except Exception as error:
+                  record["status"] = "failed"
+                  record["error"] = str(error)[:3000]
+                  try:
+                      await capture(page, name + "-failure", record)
+                  except Exception as capture_error:
+                      record["capture_error"] = str(capture_error)[:500]
+              finally:
+                  await ctx.close()
+                  (OUT / "report.json").write_text(json.dumps(REPORT, ensure_ascii=False, indent=2), encoding="utf-8")
+                  print(json.dumps({"case": name, "status": record.get("status"), "error": record.get("error")}, ensure_ascii=False), flush=True)
+          
+          
+          async def main():
+              async with async_playwright() as pw:
+                  for engine in ["chromium", "webkit"]:
+                      browser = await getattr(pw, engine).launch(args=["--enable-unsafe-swiftshader"] if engine == "chromium" else [])
+                      sizes = [(375,667),(390,844),(402,874),(430,932),(844,390),(1024,768),(1440,900)] if engine == "chromium" else [(390,844)]
+                      for width, height in sizes:
+                          await case(browser, engine, f"{engine}-{width}x{height}", width, height)
+                      modes = ["normal", "touch_skip", "escape", "reduced_initial", "reduced_during", "motion_off", "tile_failure", "text200", "keyboard"] if engine == "chromium" else ["normal", "reduced_initial"]
+                      for mode in modes:
+                          await case(browser, engine, f"{engine}-{mode}", mode=mode)
+                      await browser.close()
+              failed = [x["name"] for x in REPORT["checks"] if x["status"] == "failed"]
+              REPORT["failed_cases"] = failed
+              (OUT / "report.json").write_text(json.dumps(REPORT, ensure_ascii=False, indent=2), encoding="utf-8")
+              if failed:
+                  raise SystemExit("QA failures: " + ", ".join(failed))
+          
+          
+          asyncio.run(main())
+          PY
+      - name: Upload screenshots and diagnostics even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: michilu-flight-bc3efa3-${{ github.run_id }}
+          path: flight-review/
+          if-no-files-found: warn
+          retention-days: 14
