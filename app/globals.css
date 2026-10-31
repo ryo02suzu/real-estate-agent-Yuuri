@@ -7,6 +7,59 @@
   --foreground: #242e37;
 }
 
+/* スマホUIの動きの共通ルール（lib/motion.ts と同じ値）：押下 100ms／選択 180ms／パネル 300ms。バウンドさせない */
+:root {
+  --dur-press: 100ms;
+  --dur-select: 180ms;
+  --dur-panel: 300ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 押せるもの（スマホだけ。PC の見た目は変えない）：押すとわずかに縮み、色は選択の速さで変わる。見えるフォーカスも共通 */
+@media (max-width: 1023px) {
+  .press {
+    transition:
+      transform var(--dur-press) var(--ease-out),
+      background-color var(--dur-select) var(--ease-out),
+      opacity var(--dur-select) var(--ease-out);
+  }
+  .press:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .press:focus-visible {
+    outline: 2px solid var(--color-brand-light);
+    outline-offset: 2px;
+  }
+}
+
+/* 結果のパネル：地図の上へ下から重なる */
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.panel-in {
+  animation: panel-in var(--dur-panel) var(--ease-out) both;
+}
+
+/* 動きを減らす設定：縮みも滑りも止め、色の変化だけ残す */
+@media (prefers-reduced-motion: reduce) {
+  .panel-in {
+    animation: none;
+  }
+  .press {
+    transition: background-color var(--dur-select) linear;
+  }
+  .press:active:not(:disabled) {
+    transform: none;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

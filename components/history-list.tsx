@@ -12,7 +12,7 @@ export function HistoryChips({ items, onSelect, onShowAll }: { items: HistoryIte
           <ClockIcon className="h-[18px] w-[18px] text-brand-light" />
           直近の検索履歴
         </h2>
-        <button onClick={onShowAll} className="flex items-center gap-0.5 text-[11px] tracking-[0.08em] text-muted hover:text-ink">
+        <button onClick={onShowAll} className="press relative flex items-center gap-0.5 text-[11px] tracking-[0.08em] text-muted before:absolute before:-inset-x-2 before:-inset-y-3 before:content-[''] hover:text-ink">
           すべて見る
           <ChevronRightIcon className="h-3.5 w-3.5" />
         </button>
@@ -22,7 +22,7 @@ export function HistoryChips({ items, onSelect, onShowAll }: { items: HistoryIte
           <li key={historyKey(h)} className="shrink-0">
             <button
               onClick={() => onSelect(h)}
-              className="flex max-w-[13rem] items-center gap-1.5 rounded-full border border-line/60 bg-white px-3 py-1.5 text-[11.5px] text-ink shadow-soft hover:bg-mint/60"
+              className="press relative flex max-w-[13rem] items-center gap-1.5 rounded-full border border-line/60 bg-white px-3 py-1.5 text-[11.5px] text-ink shadow-soft before:absolute before:-inset-y-2 before:inset-x-0 before:content-[''] hover:bg-mint/60"
             >
               {/* 地図で選んだ地点は地図のアイコン */}
               {h.ll ? <MapIcon className="h-3.5 w-3.5 shrink-0 text-ink/70" /> : <PinIcon className="h-3.5 w-3.5 shrink-0 text-ink/70" />}
@@ -45,7 +45,7 @@ export function HistoryList({ items, onSelect, onClear }: { items: HistoryItem[]
           <li key={historyKey(h)}>
             <button
               onClick={() => onSelect(h)}
-              className="flex w-full items-center gap-3 rounded-2xl border border-line bg-white px-3 py-3 text-left hover:bg-mint/50"
+              className="press flex min-h-11 w-full items-center gap-3 rounded-2xl border border-line bg-white px-3 py-3 text-left hover:bg-mint/50"
             >
               {h.ll ? <MapIcon className="h-5 w-5 shrink-0 text-brand-light" /> : <PinIcon className="h-5 w-5 shrink-0 text-brand-light" />}
               <span className="min-w-0 flex-1">
@@ -66,7 +66,7 @@ export function HistoryList({ items, onSelect, onClear }: { items: HistoryItem[]
       </ul>
       <div className="mt-3 flex items-center justify-between px-1">
         <p className="text-[11px] text-muted">履歴はこの端末の中だけに保存されます。</p>
-        <button onClick={onClear} className="flex items-center gap-1 text-xs text-muted hover:text-ink">
+        <button onClick={onClear} className="press relative flex items-center gap-1 text-xs text-muted before:absolute before:-inset-x-2 before:-inset-y-3 before:content-[''] hover:text-ink">
           <TrashIcon className="h-3.5 w-3.5" />
           すべて消去
         </button>

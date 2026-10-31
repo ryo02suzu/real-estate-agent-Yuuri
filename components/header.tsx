@@ -24,7 +24,7 @@ export function Header({ onMenu, onHome, compact }: { onMenu: () => void; onHome
     <button
       onClick={onMenu}
       aria-label="メニュー"
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-ink shadow-soft hover:bg-mint"
+      className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-ink shadow-soft hover:bg-mint"
     >
       <MenuIcon className="h-5 w-5" />
     </button>
@@ -34,7 +34,7 @@ export function Header({ onMenu, onHome, compact }: { onMenu: () => void; onHome
     return (
       <header className="flex items-center">
         {/* ロゴを押すとホームへ戻る */}
-        <button onClick={onHome} aria-label="ホームへ戻る" className="flex items-center gap-2">
+        <button onClick={onHome} aria-label="ホームへ戻る" className="press flex min-h-11 items-center gap-2 rounded-full">
           <Image src={MARK.src} alt="" width={Math.round((42 * MARK.w) / MARK.h)} height={42} priority />
           <Wordmark className="text-[22px] leading-none" />
         </button>

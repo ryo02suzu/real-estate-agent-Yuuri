@@ -63,7 +63,7 @@ export function SearchCard({
             type="button"
             onClick={() => onChange("")}
             aria-label="入力を消す"
-            className="rounded-full p-1.5 text-muted hover:bg-mint"
+            className="press relative rounded-full p-1.5 text-muted before:absolute before:-inset-2 before:content-[''] hover:bg-mint"
           >
             <CloseIcon className="h-4 w-4" />
           </button>
@@ -72,7 +72,7 @@ export function SearchCard({
           type="submit"
           disabled={loading || !value.trim()}
           aria-label="検索"
-          className="bg-gold flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full text-white shadow-[0_6px_16px_rgba(138,102,50,0.35)] transition active:scale-95 disabled:opacity-60"
+          className="bg-gold flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full text-white shadow-[0_6px_16px_rgba(138,102,50,0.35)] disabled:opacity-60 max-lg:press max-lg:h-11 max-lg:w-11 lg:transition lg:active:scale-95"
         >
           {loading ? (
             <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -94,13 +94,13 @@ export function SearchCard({
           </span>
           <span className="flex shrink-0 gap-1.5">
             {onMap && (
-              <button type="button" onClick={onMap} className="flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 font-bold text-brand">
+              <button type="button" onClick={onMap} className="press relative flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 font-bold text-brand before:absolute before:-inset-y-2.5 before:inset-x-0 before:content-['']">
                 <MapIcon className="h-3.5 w-3.5" />
                 地図で選ぶ
               </button>
             )}
             {!value && (
-              <button type="button" onClick={paste} className="flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 font-bold text-brand">
+              <button type="button" onClick={paste} className="press relative flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 font-bold text-brand before:absolute before:-inset-y-2.5 before:inset-x-0 before:content-['']">
                 <PasteIcon className="h-3.5 w-3.5" />
                 貼り付け
               </button>
