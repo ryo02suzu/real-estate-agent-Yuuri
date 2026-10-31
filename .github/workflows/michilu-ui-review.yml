@@ -11,30 +11,60 @@ concurrency:
 jobs:
   browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
-      REVIEW_URL: https://michilu-ix64e6cot-sourirettes-projects.vercel.app
+      REVIEW_URL: http://127.0.0.1:3000
+      PREVIEW_URL: https://michilu-ix64e6cot-sourirettes-projects.vercel.app
       REVIEW_SHA: ec9252de54e8f456034e9db96e33f1f0556e51f2
-      REVIEW_PHASE: preview-ec9252d
+      REVIEW_PHASE: built-head-ec9252d
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: ${{ env.REVIEW_SHA }}
+          path: app-source
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app-source/package-lock.json
+      - name: Build the exact review commit
+        working-directory: app-source
+        run: |
+          test "$(git rev-parse HEAD)" = "$REVIEW_SHA"
+          npm ci
+          npm run build
+      - name: Serve the static build on the runner
+        run: |
+          python3 -m http.server 3000 --bind 127.0.0.1 --directory app-source/out > "$RUNNER_TEMP/michilu-static-server.log" 2>&1 &
+          python3 - <<'PY'
+          import time, urllib.request
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen("http://127.0.0.1:3000", timeout=2) as response:
+                      assert response.status == 200
+                  break
+              except Exception:
+                  if attempt == 29:
+                      raise
+                  time.sleep(1)
+          PY
       - name: Install isolated browser tools
         run: |
           python3 -m venv "$RUNNER_TEMP/michilu-browser"
           "$RUNNER_TEMP/michilu-browser/bin/pip" install playwright==1.62.0
           "$RUNNER_TEMP/michilu-browser/bin/playwright" install --with-deps chromium webkit
-      - name: Capture public test pages
+      - name: Exercise the built app (not Vercel Preview)
         shell: bash
         run: |
           "$RUNNER_TEMP/michilu-browser/bin/python" - <<'PY'
           import asyncio, json, os, re, platform
+          from urllib.parse import urlparse
           from pathlib import Path
           from playwright.async_api import async_playwright
           out = Path("ui-review")
           out.mkdir(exist_ok=True)
-          report = {"url": os.environ["REVIEW_URL"], "sha": os.environ["REVIEW_SHA"], "phase": os.environ["REVIEW_PHASE"], "os": platform.platform(), "real_iphone": False, "checks": []}
+          report = {"url": os.environ["REVIEW_URL"], "sha": os.environ["REVIEW_SHA"], "phase": os.environ["REVIEW_PHASE"], "deployment_tested": False, "preview_url": os.environ["PREVIEW_URL"], "os": platform.platform(), "real_iphone": False, "checks": []}
           async def snapshot(page, name, record):
               await page.screenshot(path=str(out / (name + ".png")), full_page=True)
               (out / (name + ".txt")).write_text(await page.locator("body").inner_text(), encoding="utf-8")
@@ -47,7 +77,7 @@ jobs:
           async def run():
               async with async_playwright() as pw:
                   for engine in ["chromium", "webkit"]:
-                      browser = await getattr(pw, engine).launch()
+                      browser = await getattr(pw, engine).launch(args=["--enable-unsafe-swiftshader"] if engine == "chromium" else [])
                       sizes = [(375,667),(390,844),(402,874),(430,932),(844,390),(1024,768),(1440,900)] if engine == "chromium" else [(390,844)]
                       for width,height in sizes:
                           name = f"{engine}-{width}x{height}"
@@ -60,11 +90,14 @@ jobs:
                           try:
                               response=await page.goto(report["url"],wait_until="domcontentloaded",timeout=40000)
                               record["http_status"]=response.status if response else None
-                              await page.locator("input").first.wait_for(state="visible",timeout=20000)
+                              if urlparse(page.url).netloc != urlparse(report["url"]).netloc:
+                                  raise AssertionError("App navigation left the review origin (authentication/redirect)")
+                              await page.locator("input#address").wait_for(state="visible",timeout=20000)
+                              assert "MICHILU" in await page.title(), "Expected the MICHILU app title"
                               await page.evaluate("document.fonts.ready")
                               await page.wait_for_timeout(1800)
                               await snapshot(page,name+"-home",record)
-                              record["status"]="captured"
+                              record["status"]="app_home_captured"
                               if width==390:
                                   await page.get_by_role("textbox",name=re.compile("住所")).first.fill("東京都新宿区西新宿2丁目8番1号")
                                   await snapshot(page,name+"-input",{})
@@ -75,12 +108,31 @@ jobs:
                                   await page.wait_for_timeout(6000)
                                   await snapshot(page,name+"-result",record)
                                   record["result_url"]=page.url
+                                  record["result_text"]=(await page.locator("body").inner_text())[:12000]
                                   detail=page.get_by_role("button",name=re.compile("^都市計画")).first
                                   if await detail.count() and await detail.is_visible():
                                       await detail.click()
                                       await page.wait_for_timeout(600)
                                       await snapshot(page,name+"-detail",{})
                                       record["detail_clicked"]=True
+                                      back=page.get_by_role("button",name="戻る",exact=True).first
+                                      if await back.count() and await back.is_visible():
+                                          await back.click()
+                                          await page.wait_for_timeout(400)
+                                          await snapshot(page,name+"-returned",{})
+                                          record["detail_returned"]=True
+                                  # Explicit browser simulations; not physical iPhone keyboard or OS text size.
+                                  if width==390:
+                                      await page.locator("#address").focus()
+                                      await page.set_viewport_size({"width":390,"height":430})
+                                      await page.wait_for_timeout(400)
+                                      await snapshot(page,name+"-keyboard-viewport-simulation",{})
+                                      await page.set_viewport_size({"width":390,"height":844})
+                                      await page.locator("#address").blur()
+                                      await page.evaluate("""() => [...document.querySelectorAll('body *')].map(e=>[e,parseFloat(getComputedStyle(e).fontSize)]).forEach(([e,size])=>{
+                                        if(size) e.style.fontSize=(size*2)+'px';
+                                      })""")
+                                      await snapshot(page,name+"-text-200pct-simulation",{})
                           except Exception as e:
                               record["status"]="blocked"
                               record["error"]=str(e)[:1200]
@@ -91,6 +143,8 @@ jobs:
                       await browser.close()
               print(json.dumps({"phase":report["phase"],"sha":report["sha"],"checks":[{k:v for k,v in r.items() if k not in ["layout","failed_requests"]} for r in report["checks"]]},ensure_ascii=False))
           asyncio.run(run())
+          if any(r.get('status') == 'blocked' for r in report['checks']):
+              raise SystemExit('Browser review contains blocked cases; see report.json')
           PY
       - uses: actions/upload-artifact@v4
         if: always()
