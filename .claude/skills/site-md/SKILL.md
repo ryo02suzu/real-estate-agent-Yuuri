@@ -1,10 +1,6 @@
 ---
 name: site-md
 description: Analyze a project description or site requirements and synthesize a project constitution into SITE.md for the Stitch Build Loop
-allowed-tools:
-  - "Read"
-  - "Write"
-  - "web_fetch"
 ---
 
 # Stitch SITE.md Skill

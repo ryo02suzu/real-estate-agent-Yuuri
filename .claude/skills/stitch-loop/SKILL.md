@@ -1,12 +1,6 @@
 ---
 name: stitch-loop
 description: Teaches agents to iteratively build websites using Stitch with an autonomous baton-passing loop pattern
-allowed-tools:
-  - "stitch*:*"
-  - "chrome*:*"
-  - "Read"
-  - "Write"
-  - "Bash"
 ---
 
 # Stitch Build Loop

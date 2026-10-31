@@ -1,12 +1,6 @@
 ---
 name: react-vite-dashboard
 description: Convert Stitch designs into production React + Vite dashboards with TanStack Query, accessible tokens from DESIGN.md, and Web3-ready patterns (ethers/viem).
-allowed-tools:
-  - "stitch*:*"
-  - "Read"
-  - "Write"
-  - "Bash"
-  - "web_fetch"
 ---
 
 # Stitch to React + Vite Dashboard
