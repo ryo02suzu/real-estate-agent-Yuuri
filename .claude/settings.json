@@ -1,0 +1,28 @@
+{
+  "skillOverrides": {
+    "google-cloud-solution-architecture": "user-invocable-only",
+    "google-cloud-waf-cost-optimization": "user-invocable-only",
+    "google-cloud-waf-performance-optimization": "user-invocable-only",
+    "google-cloud-waf-security": "user-invocable-only",
+    "design-md": "user-invocable-only",
+    "enhance-prompt": "user-invocable-only",
+    "react-vite-dashboard": "user-invocable-only",
+    "remotion": "user-invocable-only",
+    "shadcn-ui": "user-invocable-only",
+    "site-md": "user-invocable-only",
+    "stitch-code-to-design": "user-invocable-only",
+    "stitch-extract-design-md": "user-invocable-only",
+    "stitch-extract-static-html": "user-invocable-only",
+    "stitch-generate-design": "user-invocable-only",
+    "stitch-loop": "user-invocable-only",
+    "stitch-manage-design-system": "user-invocable-only",
+    "stitch-react-components": "user-invocable-only",
+    "stitch-react-native": "user-invocable-only",
+    "stitch-upload-to-stitch": "user-invocable-only",
+    "taste-design": "user-invocable-only",
+    "brainstorming": "user-invocable-only",
+    "writing-plans": "user-invocable-only",
+    "executing-plans": "user-invocable-only",
+    "finishing-a-development-branch": "user-invocable-only"
+  }
+}
