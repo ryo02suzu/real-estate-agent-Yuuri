@@ -1,0 +1,92 @@
+# MICHILU UI PR #23を15分ごとに確認。CI/Vercelの異常時と復旧時にのみPRへコメント。
+# 実装やClaude Codeを定期起動せず、mainへの自動マージも行わない。
+name: MICHILU UI 15-minute monitor
+
+on:
+  schedule:
+    # GitHub Actionsのスケジュールは遅延する場合がある。時刻はUTC。
+    - cron: '3,18,33,48 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  statuses: read
+  issues: write
+
+concurrency:
+  group: michilu-ui-15m-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check PR #23 CI and Vercel status
+        uses: actions/github-script@v7
+        env:
+          TARGET_PR: '23'
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = Number(process.env.TARGET_PR);
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+            if (pr.state !== 'open') {
+              await core.summary.addRaw('PR #' + prNumber + ' は閉じられているため監視を終了しました。').write();
+              return;
+            }
+            const sha = pr.head.sha;
+            const [checksResponse, statusResponse, commitResponse] = await Promise.all([
+              github.rest.checks.listForRef({ owner, repo, ref: sha, per_page: 100 }),
+              github.rest.repos.getCombinedStatusForRef({ owner, repo, ref: sha }),
+              github.rest.repos.getCommit({ owner, repo, ref: sha })
+            ]);
+            const checks = checksResponse.data.check_runs.filter(c => c.name === 'test' && c.app && c.app.slug === 'github-actions');
+            const ciFailure = checks.some(c => c.status === 'completed' && ['failure', 'cancelled', 'timed_out', 'action_required'].includes(c.conclusion));
+            const ciPassed = checks.length > 0 && checks.every(c => c.status === 'completed' && c.conclusion === 'success');
+            const vercel = statusResponse.data.statuses.find(s => s.context === 'Vercel');
+            const vercelPassed = !!vercel && vercel.state === 'success';
+            const vercelFailed = !!vercel && ['failure', 'error'].includes(vercel.state);
+            const lastCommitAt = commitResponse.data.commit.committer.date || commitResponse.data.commit.author.date;
+            const ageMinutes = Math.max(0, (Date.now() - new Date(lastCommitAt).getTime()) / 60000);
+            const failures = [];
+            const delayed = [];
+            if (ciFailure) failures.push('CI（型・lint・テスト・ビルドのいずれか）が失敗');
+            else if (!ciPassed && ageMinutes >= 60) delayed.push('CIが新コミットから60分以上未完了');
+            if (vercelFailed) failures.push('Vercel Previewのデプロイが失敗');
+            else if (!vercelPassed && ageMinutes >= 60) delayed.push('Vercel Previewが新コミットから60分以上未完了');
+            const state = failures.length ? 'failed' : delayed.length ? 'delayed' : 'healthy';
+            const issues = failures.concat(delayed);
+            const shaShort = sha.slice(0, 10);
+            const resultLines = [
+              '## MICHILU UI 15分監視',
+              '- PR: #' + prNumber + '（' + (pr.draft ? 'Draft' : 'Open') + '）',
+              '- SHA: ' + shaShort,
+              '- CI: ' + (ciPassed ? '成功' : ciFailure ? '失敗' : '実行中／未確認'),
+              '- Vercel: ' + (vercelPassed ? '成功' : vercelFailed ? '失敗' : '実行中／未確認'),
+              '- 状態: ' + state,
+              '- 新コミットからの経過: 約' + Math.floor(ageMinutes) + '分',
+              vercel && vercel.target_url ? '- Vercel結果: ' + vercel.target_url : '',
+              issues.length ? '- 問題: ' + issues.join('、') : '',
+              '※これはCIとデプロイの監視です。UIの実ブラウザ確認や機能完成の判定ではありません。'
+            ].filter(Boolean);
+            await core.summary.addRaw(resultLines.join('\n') + '\n').write();
+            // PRへのコメントは異常の初回・対象SHA変更時と、復旧時だけ。定期実行ごとには投稿しない。
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: prNumber, per_page: 100 });
+            const last = comments.slice().reverse().find(c => c.body && c.body.includes('<!-- michilu-ui-monitor state='));
+            const stateMatch = last && last.body.match(/<!-- michilu-ui-monitor state=(healthy|failed|delayed) sha=([0-9a-f]+) -->/);
+            const previousState = stateMatch ? stateMatch[1] : null;
+            const previousSha = stateMatch ? stateMatch[2] : null;
+            let notify = false;
+            if (state !== 'healthy') notify = previousState !== state || previousSha !== sha;
+            else notify = previousState !== null && previousState !== 'healthy';
+            if (notify) {
+              const marker = '<!-- michilu-ui-monitor state=' + state + ' sha=' + sha + ' -->';
+              const headline = state === 'healthy' ? '✅ 監視結果：CI・Vercelが復旧しました' : '⚠️ 監視結果：' + issues.join('／');
+              const body = [marker, headline, '', ...resultLines, '', '本PRの開発は継続可能です。`main` への自動マージや `@claude` の自動起動は行いません。'].join('\n');
+              await github.rest.issues.createComment({ owner, repo, issue_number: prNumber, body });
+              core.notice('監視状態の変化をPRに記録: ' + state);
+            }
