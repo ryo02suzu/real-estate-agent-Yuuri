@@ -1,0 +1,43 @@
+name: One-shot audit Agent Skills relative links
+on:
+  push:
+    branches:
+      - fix/agent-skills-relative-links-20261031
+    paths:
+      - .github/workflows/audit-agent-skills-links.yml
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit local Markdown links
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from urllib.parse import unquote, urlsplit
+          import re
+          root=Path.cwd().resolve()
+          pat=re.compile(r'!?\[[^\]\n]*\]\(([^)\n]+)\)|(?<!\!)\[[^\]\n]+\]:\s*(\S+)', re.MULTILINE)
+          issues=[]
+          nfiles=0
+          for md in sorted((root/'.claude/skills').rglob('*.md')):
+              nfiles += 1
+              body=md.read_text(encoding='utf8')
+              for m in pat.finditer(body):
+                  raw=(m.group(1) or m.group(2)).strip()
+                  val=raw.split(' "')[0].split(" '")[0].strip('<>')
+                  if not val or val.startswith(('#','https:','http:','mailto:','data:','//','file:','javascript:')): continue
+                  if any(x in val for x in ['{','}','<','>','*','$','`']): continue
+                  pathpart=unquote(urlsplit(val).path)
+                  if not pathpart: continue
+                  target=(root/pathpart.lstrip('/')) if pathpart.startswith('/') else (md.parent/pathpart)
+                  target=target.resolve()
+                  if not target.exists():
+                      ln=body.count('\n',0,m.start())+1
+                      issues.append((str(md.relative_to(root)),ln,raw,str(target.relative_to(root)) if target.is_relative_to(root) else '(outside repository)'))
+          print(f'AUDIT: {nfiles} markdown files, {len(issues)} broken relative links')
+          for src,ln,raw,dest in issues: print(f'BROKEN {src}:{ln}: {raw} -> {dest}')
+          PY
