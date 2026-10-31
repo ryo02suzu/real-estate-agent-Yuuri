@@ -14,9 +14,9 @@ jobs:
     timeout-minutes: 20
     env:
       REVIEW_URL: http://127.0.0.1:3000
-      PREVIEW_URL: https://michilu-fmbus8qro-sourirettes-projects.vercel.app
-      REVIEW_SHA: bc3efa3dd25778d06969a11a4d96226c6c77f63c
-      REVIEW_PHASE: flight-bc3efa3
+      PREVIEW_URL: ""
+      REVIEW_SHA: 0a347cebe93bb6566222e4878231dc6159007526
+      REVIEW_PHASE: flight-0a347ce
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,6 +33,13 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$REVIEW_SHA"
           npm ci
+          guide=$(rg --files node_modules/next/dist/docs | rg '/use-client.mdx$' | head -n 1)
+          test -n "$guide"
+          mkdir -p ../flight-review
+          cp "$guide" ../flight-review/next-use-client-installed.mdx
+          npm run typecheck
+          npm run lint
+          npm test
           npm run build
       - name: Serve the static build on the runner
         run: |
@@ -215,18 +222,32 @@ jobs:
           
                   await flight.wait_for(state="visible", timeout=10000)
                   record["flight_seen"] = True
-                  if mode in ["escape", "reduced_during"]:
+                  if mode in ["escape", "skip_enter", "skip_space", "reduced_during"]:
                       record["skip_buttons"] = await flight.get_by_role("button").count()
-                      await page.keyboard.press("Tab")
+                      skip = flight.get_by_role("button", name="スキップ", exact=True)
+                      assert await skip.count() == 1, "No accessible Skip button"
+                      record["skip_box"] = await skip.bounding_box()
+                      assert record["skip_box"]["width"] >= 44 and record["skip_box"]["height"] >= 44, "Skip target is smaller than 44px"
+                      for key in ["Tab", "Tab", "Shift+Tab"]:
+                          await page.keyboard.press(key)
+                          assert await page.evaluate("!!document.activeElement?.closest('[role=dialog].app-touch')"), "Focus escaped from flight"
+                      await page.locator("[data-scroller]").evaluate("e => e.focus()")
                       record["focus_in_flight"] = await page.evaluate("!!document.activeElement?.closest('[role=dialog].app-touch')")
+                      assert record["focus_in_flight"], "Background is not inert during flight"
                       if mode == "escape":
                           await page.keyboard.press("Escape")
+                      elif mode in ["skip_enter", "skip_space"]:
+                          await page.keyboard.press("Enter" if mode == "skip_enter" else "Space")
                       else:
                           await page.emulate_media(reduced_motion="reduce")
                       await page.wait_for_timeout(750)
                       record["still_visible"] = await flight.is_visible()
                       await capture(page, name + "-after-action", record)
-                      assert not record["still_visible"], "Flight cannot be dismissed with Escape" if mode == "escape" else "Flight continues after reduced motion is enabled"
+                      assert not record["still_visible"], f"Flight did not stop after {mode}"
+                      record["focus_restored"] = await page.evaluate("document.activeElement?.matches('[data-scroller]')")
+                      assert record["focus_restored"], "Focus was not returned to investigation content"
+                      if mode == "reduced_during":
+                          assert await page.locator(".flight-arrive").count() == 0, "Landing animation ran despite reduced motion"
                   elif mode == "touch_skip":
                       await page.touchscreen.tap(width / 2, height / 2)
                       await flight.wait_for(state="hidden", timeout=2000)
@@ -274,7 +295,7 @@ jobs:
                       sizes = [(375,667),(390,844),(402,874),(430,932),(844,390),(1024,768),(1440,900)] if engine == "chromium" else [(390,844)]
                       for width, height in sizes:
                           await case(browser, engine, f"{engine}-{width}x{height}", width, height)
-                      modes = ["normal", "touch_skip", "escape", "reduced_initial", "reduced_during", "motion_off", "tile_failure", "text200", "keyboard"] if engine == "chromium" else ["normal", "reduced_initial"]
+                      modes = ["normal", "touch_skip", "escape", "skip_enter", "skip_space", "reduced_initial", "reduced_during", "motion_off", "tile_failure", "text200", "keyboard"] if engine == "chromium" else ["normal", "escape", "skip_enter", "skip_space", "reduced_initial", "reduced_during"]
                       for mode in modes:
                           await case(browser, engine, f"{engine}-{mode}", mode=mode)
                       await browser.close()
@@ -291,7 +312,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: michilu-flight-bc3efa3-${{ github.run_id }}
+          name: michilu-flight-0a347ce-${{ github.run_id }}
           path: flight-review/
           if-no-files-found: warn
           retention-days: 14
