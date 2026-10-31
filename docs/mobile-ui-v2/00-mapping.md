@@ -19,7 +19,7 @@ Issue #22 の最初の成果物。**このファイルは現行コードを読�
 | F04 その他の法令 | `zoning-card.tsx` 内 | 「都市計画・法令」詳細の中 | 区域の参考情報と担当先 | 同上 |
 | F05 災害 | `HazardLine`、`hazard-card.tsx`、`useHazard` | 「災害リスク」行 | 種類別詳細→地図→自治体ハザードマップ | 「データなし≠安全」の文言 |
 | F06 地番・建物 | `ParcelButton`、`parcel-card.tsx`、`building-card.tsx` | 「地番・建物」行 | コピー・筆表示・自治体地番図 | 推定の印が残るか |
-| F07 上下水道・ガス | 台帳・照会先の所在は段階3でコードを再確認（`coverage.tsx`・`info-sheets.tsx` 周辺を候補とするが未確認） | 独立した項目行を新設 | 既存の詳細へ | 台帳51市町・照会先212の数字は最新コードの値で表示 |
+| F07 上下水道・ガス | `components/zoning-card.tsx` の「上下水道・ガス」タブ（`SuidoRow`・`utilities` の照会先。`components` 全体の検索で確認済み） | 独立した項目行を新設 | 既存の詳細へ | 台帳51市町・照会先212の数字は最新コードの値で表示 |
 | F08 地価 | `LandPriceLine`、`land-price-card.tsx` | 「地価」行 | 近隣地点の一覧・詳細・地図、路線価図 | 査定額に見えない表記 |
 | F09 駅・周辺・学区 | `StationLine`、`SchoolButton`、`station-card`/`poi-card`/`school-card` | 「駅・周辺施設・学区」行 | 既存カテゴリの詳細 | 直線距離等の注意 |
 | F10 窓口 | `ContactCard`、`lib/inquiry.ts` | 各詳細内＋結果下部 | 窓口情報・問い合わせ事項コピー | 電話不可・窓口のみの表示 |

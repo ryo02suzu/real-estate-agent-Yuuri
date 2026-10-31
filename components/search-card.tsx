@@ -12,6 +12,8 @@ type Props = {
   loading: boolean;
   /** 「地図で選ぶ」（住所の代わりに地図で場所を選ぶ） */
   onMap?: () => void;
+  /** 新しいモバイルUI（青緑・白）の見た目 */
+  teal?: boolean;
 };
 
 export function SearchCard({
@@ -21,6 +23,7 @@ export function SearchCard({
   onSearch,
   loading,
   onMap,
+  teal,
 }: Props) {
   const [pasteError, setPasteError] = useState(false);
 
@@ -47,7 +50,13 @@ export function SearchCard({
       <label htmlFor="address" className="sr-only">
         住所
       </label>
-      <div className="flex items-center gap-2 rounded-full border border-white bg-white py-1 pl-4 pr-1 shadow-soft focus-within:ring-2 focus-within:ring-brand-light/30">
+      <div
+        className={`flex items-center gap-2 rounded-full bg-white py-1 pl-4 pr-1 ${
+          teal
+            ? "border border-[var(--mui-line)] focus-within:ring-2 focus-within:ring-[var(--mui-primary)]/30"
+            : "border border-white shadow-soft focus-within:ring-2 focus-within:ring-brand-light/30"
+        }`}
+      >
         <PinIcon className="h-[18px] w-[18px] shrink-0 text-muted" />
         <input
           id="address"
@@ -72,7 +81,7 @@ export function SearchCard({
           type="submit"
           disabled={loading || !value.trim()}
           aria-label="検索"
-          className="bg-gold flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full text-white shadow-[0_6px_16px_rgba(138,102,50,0.35)] transition active:scale-95 disabled:opacity-60"
+          className={`${teal ? "mui-press bg-[var(--mui-primary)]" : "bg-gold shadow-[0_6px_16px_rgba(138,102,50,0.35)] transition active:scale-95"} flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full text-white disabled:opacity-60`}
         >
           {loading ? (
             <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />

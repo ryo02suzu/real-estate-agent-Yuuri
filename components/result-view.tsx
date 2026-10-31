@@ -54,7 +54,10 @@ export function ResultView({
   onFix,
   onExpand,
   desktop,
+  panel,
 }: {
+  /** スマホの新しい結果パネルの中に置く（useFit による縮小をしない） */
+  panel?: boolean;
   query: string;
   result: LookupResult;
   onPick: (address: string) => void;
@@ -68,7 +71,7 @@ export function ResultView({
   if (result.status === "not_found") return <NotFound query={query} />;
   if (result.status === "choose") return <Choose query={query} result={result} onPick={onPick} />;
   if (result.status === "unsupported") return <Unsupported result={result} onFix={onFix} />;
-  return desktop ? <DesktopFound result={result} onPick={onPick} /> : <Found result={result} onFix={onFix} onExpand={onExpand} onPick={onPick} />;
+  return desktop ? <DesktopFound result={result} onPick={onPick} /> : <Found result={result} onFix={onFix} onExpand={onExpand} onPick={onPick} panel={panel} />;
 }
 
 function NotFound({ query }: { query: string }) {
@@ -162,7 +165,9 @@ function Found({
   onFix,
   onExpand,
   onPick,
+  panel,
 }: {
+  panel?: boolean;
   result: Extract<LookupResult, { status: "ok" }>;
   onFix?: () => void;
   onExpand?: (opts?: MapOpen) => void;
@@ -180,7 +185,8 @@ function Found({
   const pois = usePois(result.lat, result.lng);
   const expand = onExpand && (() => onExpand());
   const body = useRef<HTMLDivElement>(null);
-  useFit(body);
+  // 新しいパネル（panel）ではスクロールで全部読めるので、文字や項目を縮めない
+  useFit(body, !panel);
   // ネットで分からない市は、地図ボタンを参考扱いにして問い合わせ先を先に見せる
   const offline = m.coverage === "none" || m.coverage === "outside";
   const primary = offline
@@ -320,10 +326,10 @@ function Found({
  * snug（「地図を開く」の見出しと地図ボタンの説明を外す）→ short（背の低い画面と同じ並びで、最寄り駅の行は残す）→ tight の順（app/globals.css）。
  * あとから届くデータで中身が変わるたび（描画のたび）と、文字の読み込み・画面の大きさが変わったときに測り直す
  */
-function useFit(ref: React.RefObject<HTMLDivElement | null>) {
+function useFit(ref: React.RefObject<HTMLDivElement | null>, enabled = true) {
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || !enabled) return;
     const data = document.body.dataset;
     // 中身の下端が、下の余白（padding）に食い込んでいないか
     const fits = () => {

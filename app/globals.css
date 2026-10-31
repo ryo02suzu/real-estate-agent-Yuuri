@@ -165,3 +165,43 @@ body {
     -webkit-print-color-adjust: exact;
   }
 }
+
+/*
+ * モバイルUI v2 の共通トークン（青緑・白）。新しい地図＋パネルの画面（components/mobile-shell.tsx）だけが使う。
+ * PC（1024px以上）の画面は使わないので見た目は変わらない
+ */
+:root {
+  --mui-primary: #0f766e;
+  --mui-primary-ink: #0b5a54;
+  --mui-primary-soft: #e6f4f2;
+  --mui-surface: #ffffff;
+  --mui-line: #d9e6e4;
+  --mui-ink: #16282b;
+  --mui-muted: #5b6d70;
+  --mui-warn-bg: #fdf1ec;
+  --mui-warn-ink: #8a3d28;
+  /* 動き：減速カーブと長さ（reduced-motion では下で 0 にする） */
+  --mui-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --mui-dur-press: 100ms;
+  --mui-dur-row: 140ms;
+  --mui-dur-panel: 300ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --mui-dur-press: 0ms;
+    --mui-dur-row: 0ms;
+    --mui-dur-panel: 0ms;
+  }
+}
+.mui-panel {
+  transition: height var(--mui-dur-panel) var(--mui-ease);
+}
+.mui-panel[data-dragging="1"] {
+  transition: none;
+}
+.mui-press {
+  transition: transform var(--mui-dur-press) var(--mui-ease), background-color var(--mui-dur-row) var(--mui-ease);
+}
+.mui-press:active {
+  transform: scale(0.96);
+}
