@@ -144,6 +144,76 @@ body {
     animation: home-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
   }
 }
+/*
+ * スマホのホームの写真がごくゆっくり寄って戻る（.home-drift。動きの演出がオンのとき）。検索欄に触れている間は写真を少し暗くし、
+ * 最近の検索を薄くする（.home-dim・.home-recent。:has で、触れている検索欄を見る）。components/app/home.tsx
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .home-drift {
+    animation: home-drift 48s ease-in-out infinite alternate;
+    transform-origin: 62% 55%;
+    will-change: transform;
+  }
+}
+@keyframes home-drift {
+  to {
+    transform: scale(1.07) translate(-1.2%, -0.8%);
+  }
+}
+.home-dim {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.home-recent {
+  transition: opacity 0.3s ease;
+}
+.theme-navy:has(.home-search input:focus) .home-dim {
+  opacity: 1;
+}
+.theme-navy:has(.home-search input:focus) .home-recent {
+  opacity: 0.45;
+}
+
+/*
+ * 検索したときの「地球から土地までズーム」（components/app/globe-flight.tsx）：現れる・消える・降りた所の光る輪。
+ * 降りたあと物件の画面がふわっと出る（.flight-arrive。終わったら動きを外す）
+ */
+.flight-in {
+  animation: flight-in 0.38s ease-out backwards;
+}
+@keyframes flight-in {
+  from {
+    opacity: 0;
+  }
+}
+.flight-out {
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+.flight-ring {
+  animation: flight-ring 1s cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
+  transform: translate(-50%, -50%);
+}
+@keyframes flight-ring {
+  from {
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 0.95;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(2.4);
+    opacity: 0;
+  }
+}
+.flight-arrive {
+  animation: flight-arrive 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+@keyframes flight-arrive {
+  from {
+    opacity: 0.25;
+    transform: scale(1.035);
+  }
+}
+
 @keyframes home-rise {
   from {
     opacity: 0;

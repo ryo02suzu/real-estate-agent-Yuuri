@@ -26,6 +26,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import dynamic from "next/dynamic";
 import { createPortal, flushSync } from "react-dom";
 import {
   favoriteKey,
@@ -34,6 +35,7 @@ import {
   type FavoriteItem,
 } from "@/lib/favorites";
 import type { HistoryItem } from "@/lib/history";
+import { webglAvailable } from "@/lib/map-style";
 import { propertyIdOf } from "@/lib/property-id";
 import {
   loadRecords,
@@ -75,7 +77,10 @@ import {
 } from "./app-sheets";
 import { DetailSheet } from "./detail-sheets";
 import { ART_W, BottomNav, ZOOM, type NavKey } from "./frame";
+import { prefetchFlight, SPACE_BACKGROUND } from "./flight-space";
+import type { FlightTarget } from "./globe-flight";
 import { HOME_TOP, HomeBackdrop, HomeMenu, HomeScreen, PAGE, SKY, type HomeMessage } from "./home";
+import { setMotionSetting, useMotionSetting } from "./motion";
 import {
   AppCitiesSheet,
   AppHelpSheet,
@@ -187,6 +192,16 @@ export function MobileApp(props: MobileAppProps) {
   const [news, setNews] = useState(false);
   // ホームの右上のメニュー（≡）
   const [menu, setMenu] = useState(false);
+  // 動きの演出（≡ の「動きの演出」。端末の「視差効果を減らす」がオンなら出さない）
+  const motionOn = useMotionSetting();
+  // 検索したときの「地球から土地までズーム」。flight は飛んでいる間だけ。降りる先は調べ終わった結果から（flightTarget）
+  const [flight, setFlight] = useState<{ key: number; label: string } | null>(null);
+  const [flightTarget, setFlightTarget] = useState<FlightTarget>(null);
+  const flightFrom = useRef<unknown>(undefined);
+  // 地球の演出が消え始めた（宇宙の背景も一緒に消す）
+  const [leaving, setLeaving] = useState(false);
+  // 降りたあと、物件の画面がふわっと出る間
+  const [arrive, setArrive] = useState(false);
   const unread = useUnreadNews();
   const offline = useOffline();
   const standalone = useStandalone();
@@ -254,6 +269,7 @@ export function MobileApp(props: MobileAppProps) {
     });
   };
   const pickRecent = (h: HistoryItem) => {
+    if (page === "home" && !shown) takeOff(h.address.replace(/^地番\s*/, ""));
     setPage("home");
     onPickHistory(h);
   };
@@ -262,7 +278,15 @@ export function MobileApp(props: MobileAppProps) {
     setPage("home");
     props.onHome();
   };
-  /** ホームの「調査を開始する」。住所も地番も同じ欄（地番かどうかは調べるときに見分ける。lib/roadmap の splitChiban） */
+  /** ホームから調べるとき、地球から飛ぶ（動きの演出がオンで、動きを減らす設定でなく、WebGL が使えるときだけ） */
+  const takeOff = (label: string) => {
+    if (!motionOn || reducedMotion() || !webglAvailable()) return;
+    flightFrom.current = shown;
+    setFlightTarget(null);
+    setLeaving(false);
+    setFlight({ key: Date.now(), label });
+  };
+  /** ホームの検索。住所も地番も同じ欄（地番かどうかは調べるときに見分ける。lib/roadmap の splitChiban） */
   const submitHome = () => {
     if (!input.replace(/^\s*地番\s*/, "").trim()) {
       setNotice(EMPTY);
@@ -270,6 +294,7 @@ export function MobileApp(props: MobileAppProps) {
       return;
     }
     setNotice(null);
+    takeOff(input.trim());
     onSearch();
   };
 
@@ -283,8 +308,9 @@ export function MobileApp(props: MobileAppProps) {
   useEffect(() => {
     if (showHome) queueMicrotask(() => setResume(latestResume()));
   }, [showHome, history]);
-  // 時刻・電池の帯の色をページに合わせる（ホームは写真のいちばん上の空の色、下のメニューのページは時間連動の空の上端の色、
-  // 物件の画面は写真の帯の上の色。PC の色は変えない）。空が変わるたびに合わせ直す
+  // 時刻・電池の帯の色をページに合わせる（地球の演出の間は宇宙の色、ホームは写真のいちばん上の空の色、下のメニューのページは
+  // 時間連動の空の上端の色、物件の画面は写真の帯の上の色。PC の色は変えない）。空が変わるたびに合わせ直す
+  const flying = !!flight;
   useEffect(() => {
     const meta = document.querySelector<HTMLMetaElement>(
       'meta[name="theme-color"][media="(max-width: 1023px)"]',
@@ -292,12 +318,32 @@ export function MobileApp(props: MobileAppProps) {
     const set = () =>
       meta?.setAttribute(
         "content",
-        showHome ? HOME_TOP : tabPage ? (skyTop() ?? SKY) : BAND_TOP,
+        flying ? FLIGHT_TOP : showHome ? HOME_TOP : tabPage ? (skyTop() ?? SKY) : BAND_TOP,
       );
     set();
     addEventListener(SKY_EVENT, set);
     return () => removeEventListener(SKY_EVENT, set);
-  }, [showHome, tabPage]);
+  }, [showHome, tabPage, flying]);
+  // 調べ終わったら、降りる先を地球の演出に渡す（見つからない・候補から選ぶ・調べられなかったときは降りない）
+  useEffect(() => {
+    if (!flight) return;
+    if (shown && shown !== flightFrom.current) {
+      const r = shown.result;
+      queueMicrotask(() =>
+        setFlightTarget(
+          r.status === "ok" || r.status === "unsupported"
+            ? { lat: r.lat, lng: r.lng }
+            : "none",
+        ),
+      );
+    } else if (error && !loading) queueMicrotask(() => setFlightTarget("none"));
+  }, [flight, shown, error, loading]);
+  // ホームを開いている間に、地球の演出の部品と、はじめに見える地球の絵を先に読んでおく（押してからの待ちを減らす）
+  useEffect(() => {
+    if (!showHome || !motionOn || reducedMotion()) return;
+    const t = window.setTimeout(prefetchFlight, 2500);
+    return () => clearTimeout(t);
+  }, [showHome, motionOn]);
   const failure = error ?? (offline ? OFFLINE : null);
   const homeMessage: HomeMessage = failure
     ? { text: failure }
@@ -462,7 +508,7 @@ export function MobileApp(props: MobileAppProps) {
       }}
     >
       {/* ホームは画面いっぱいの写真（下のメニューの後ろまで） */}
-      {showHome && <HomeBackdrop />}
+      {showHome && <HomeBackdrop drift={motionOn} />}
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div
           ref={scroller}
@@ -484,7 +530,10 @@ export function MobileApp(props: MobileAppProps) {
                 history={history}
                 onPickRecent={pickRecent}
                 onHistory={() => go("history")}
-                onTry={props.onPickAddress}
+                onTry={(a) => {
+                  takeOff(a);
+                  props.onPickAddress(a);
+                }}
                 onMenu={() => setMenu(true)}
                 unread={unread}
                 inputRef={inputRef}
@@ -493,7 +542,10 @@ export function MobileApp(props: MobileAppProps) {
             )}
             {/* 物件の画面は、検索履歴などのページを見ているあいだも残す（戻ったときに読み直さない・タブもそのまま） */}
             {ok && (
-              <div hidden={page !== "home"}>
+              <div
+                hidden={page !== "home"}
+                className={arrive ? "flight-arrive" : undefined}
+              >
                 <PropertyView
                   key={`${ok.lat},${ok.lng},${ok.matchedAddress}`}
                   report={report}
@@ -566,6 +618,30 @@ export function MobileApp(props: MobileAppProps) {
           onImported={props.onReloadStores}
         />
         <NewsSheet open={news} onClose={() => setNews(false)} />
+        {/* 宇宙の背景は押した瞬間に出す（地球の地図の部品を読んでいる間も） */}
+        {flight && (
+          <div
+            aria-hidden
+            className={`fixed inset-0 z-[79] ${leaving ? "flight-out" : "flight-in"}`}
+            style={{ backgroundImage: SPACE_BACKGROUND }}
+          />
+        )}
+        {flight && (
+          <GlobeFlight
+            key={flight.key}
+            label={flight.label}
+            target={flightTarget}
+            onLeave={(landed) => {
+              setLeaving(true);
+              // 地球の演出が消えていくのと同時に、物件の画面をふわっと出す（消えてから出すと、一度はっきり見えてから薄くなってちらつく）
+              if (landed) {
+                setArrive(true);
+                window.setTimeout(() => setArrive(false), ARRIVE_MS);
+              }
+            }}
+            onDone={() => setFlight(null)}
+          />
+        )}
         <HomeMenu
           open={menu}
           onClose={() => setMenu(false)}
@@ -582,6 +658,8 @@ export function MobileApp(props: MobileAppProps) {
           onInstall={() => setSheet("install")}
           standalone={standalone}
           onMore={() => go("account")}
+          motion={motionOn}
+          onMotion={setMotionSetting}
         />
         {picker && (
           <LocationPicker
@@ -599,6 +677,13 @@ export function MobileApp(props: MobileAppProps) {
     </div>
   );
 }
+
+/** 検索したときの「地球から土地までズーム」（地図の部品と一緒に、使うときだけ読む。components/app/globe-flight.tsx） */
+const GlobeFlight = dynamic(() => import("./globe-flight"), { ssr: false });
+/** 降りたあと、物件の画面がふわっと出る間（app/globals.css の .flight-arrive は 0.6 秒。少し長めに待ってから外す） */
+const ARRIVE_MS = 700;
+/** 地球の演出の間の、時刻・電池の帯の色（宇宙） */
+const FLIGHT_TOP = "#03060f";
 
 /** 空のまま調べようとしたときの一言 */
 const EMPTY =

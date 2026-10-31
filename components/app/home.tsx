@@ -8,7 +8,7 @@
 // まだ何も調べていないときは、最近の検索の代わりに「はじめての方へ」（住所と地番の例。押すとそのまま調べる）を出す。
 // 写真の上の字は白（読みやすいよう薄い影）。寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。
 // 縦は画面の高さに合わせ、検索欄と最近の検索のあいだの空きで伸び縮みする（背の低い画面でもスクロールせずに収まる）
-import { ArrowRight, Bell, ChevronRight, CircleHelp, Database, Download, LoaderCircle, Map as MapIcon, MapPin, MapPinned, Menu, Search, Smartphone, TriangleAlert, UserRound, X } from "lucide-react";
+import { ArrowRight, Bell, ChevronRight, CircleHelp, Database, Download, LoaderCircle, Map as MapIcon, MapPin, MapPinned, Menu, Search, Smartphone, Sparkles, TriangleAlert, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { monthDay, placeParts } from "@/lib/app/scene";
 import { MUNICIPALITIES } from "@/lib/roadmap";
@@ -72,19 +72,21 @@ let risen = false;
  * 写真は届いた絵（3764×6684）を幅 900・1260・1620 に縮めた 3 枚から、画面に合う大きさを端末が選ぶ（1620 で Pro Max の画面と同じ細かさ）。
  * 縦長の画面では高さに合わせて左右を切るので、写真の幅は画面の高さの 56.3%（絵の縦横比）
  */
-export function HomeBackdrop() {
+export function HomeBackdrop({ drift = false }: { drift?: boolean }) {
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden" style={{ background: "#2a3a55" }}>
+    <div aria-hidden className="home-backdrop pointer-events-none absolute inset-0 overflow-hidden" style={{ background: "#2a3a55" }}>
       <PhoneImg
         src="/home/sunset-1260.webp"
         srcSet="/home/sunset-900.webp 900w, /home/sunset-1260.webp 1260w, /home/sunset-1620.webp 1620w"
         sizes="(min-aspect-ratio: 9/16) 100vw, 56.3vh"
         alt=""
         draggable={false}
-        className="absolute inset-0 h-full w-full object-cover"
+        className={`absolute inset-0 h-full w-full object-cover ${drift ? "home-drift" : ""}`}
         style={{ objectPosition: "62% 50%" }}
       />
       <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(8,18,40,0.30) 0%, rgba(8,18,40,0) 26%, rgba(0,0,0,0) 52%, rgba(0,0,0,0.30) 100%)" }} />
+      {/* 検索欄に触れている間は、写真を少し暗くして検索欄を目立たせる（app/globals.css の .home-dim） */}
+      <div className="home-dim absolute inset-0" style={{ background: "rgba(4,10,24,0.42)" }} />
     </div>
   );
 }
@@ -185,7 +187,7 @@ export function HomeScreen({
       {/* 浮き上がる動きは、すりガラスの箱そのものに付ける（外の箱が動くと、後ろがぼけない） */}
       <form
         role="search"
-        className="relative"
+        className="home-search relative"
         style={{ margin: "74px 19px 0" }}
         onSubmit={(e) => {
           e.preventDefault();
@@ -229,7 +231,7 @@ export function HomeScreen({
       <div className="min-h-[28px] flex-1" />
 
       {/* 最近の検索（暗いすりガラスの一覧に3件）。まだ何も調べていないときは「はじめての方へ」 */}
-      <section className="relative" style={{ padding: "0 19px 22px" }}>
+      <section className="home-recent relative" style={{ padding: "0 19px 22px" }}>
         {recent.length ? (
           <>
             <SectionHead title="最近の検索" onMore={onHistory} className={riseClass} />
@@ -322,6 +324,8 @@ export function HomeMenu({
   onInstall,
   standalone,
   onMore,
+  motion,
+  onMotion,
 }: {
   open: boolean;
   onClose: () => void;
@@ -341,6 +345,9 @@ export function HomeMenu({
   standalone: boolean;
   /** アカウント・その他のページ */
   onMore: () => void;
+  /** 動きの演出（検索したときの地球からのズーム・ホームの写真の動き）がオンか */
+  motion: boolean;
+  onMotion: (on: boolean) => void;
 }) {
   if (!open) return null;
   const groups: { title: string; items: { Icon: typeof Search; title: string; sub: string; dot?: boolean; right?: string; run: () => void }[] }[] = [
@@ -371,6 +378,7 @@ export function HomeMenu({
       ],
     },
   ];
+  const switchId = "motion-switch";
   return (
     <div className="theme-navy">
       <Sheet title="メニュー" open onClose={onClose}>
@@ -403,6 +411,23 @@ export function HomeMenu({
             </ul>
           </section>
         ))}
+        {/* 動きの演出（押してもメニューは閉じない） */}
+        <section className="mt-3">
+          <h3 className="text-[12px] font-semibold text-muted">表示</h3>
+          <label htmlFor={switchId} className="flex w-full cursor-pointer items-center gap-3 py-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mint text-brand">
+              <Sparkles className="h-[18px] w-[18px]" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[14.5px] font-semibold text-ink">動きの演出</span>
+              <span className="mt-0.5 block text-[12px] leading-[1.5] text-muted">検索したときの地球からのズーム・ホームの写真の動き</span>
+            </span>
+            <input id={switchId} type="checkbox" role="switch" checked={motion} onChange={(e) => onMotion(e.target.checked)} className="peer sr-only" />
+            <span aria-hidden className="relative h-[30px] w-[50px] shrink-0 rounded-full bg-[#d5dbe5] transition-colors peer-checked:bg-[#2f7cf6] peer-focus-visible:ring-2 peer-focus-visible:ring-[#9db8e6]">
+              <span className={`absolute top-[2px] h-[26px] w-[26px] rounded-full bg-white shadow transition-[left] ${motion ? "left-[22px]" : "left-[2px]"}`} />
+            </span>
+          </label>
+        </section>
       </Sheet>
     </div>
   );
