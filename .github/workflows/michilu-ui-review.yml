@@ -151,7 +151,7 @@ jobs:
                               await snapshot(page,name+"-home",record)
                               # Failure gate: blank MapLibre canvases passed the old screenshot-only QA.
                               # This checks the app's real layout; never apply an artificial CSS override.
-                              if width < 1024 and urlparse(page.url).netloc == urlparse(REVIEW_URL).netloc:
+                              if width < 1024 and urlparse(page.url).netloc == urlparse(report["url"]).netloc:
                                   await page.locator(".mui-japan-map").wait_for(state="visible", timeout=20000)
                                   record["map_geometry"] = await page.locator(".mui-japan-map").first.evaluate(
                                       "(e)=>({width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height,position:getComputedStyle(e).position})"
