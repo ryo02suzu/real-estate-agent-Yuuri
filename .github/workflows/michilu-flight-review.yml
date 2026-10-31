@@ -33,7 +33,7 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$REVIEW_SHA"
           npm ci
-          guide=$(rg --files node_modules/next/dist/docs | rg '/use-client.mdx$' | head -n 1)
+          guide=$(find node_modules/next/dist/docs -type f -name '*use-client*' -print -quit)
           test -n "$guide"
           mkdir -p ../flight-review
           cp "$guide" ../flight-review/next-use-client-installed.mdx
