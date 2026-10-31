@@ -6,24 +6,28 @@ import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
 import type { ResolvedLink } from "@/lib/roadmap";
 import { readRoads, ROAD_RADIUS_M, type NearbyRoad, type RoadRead } from "@/lib/roadmap/road-read";
-import { ChevronRightIcon, MapIcon } from "./icons";
+import { ChevronRightIcon, MapIcon, RetryIcon } from "./icons";
 import { Notes } from "./notes";
+import { usePanelDetail } from "./panel-detail";
 import { Sheet } from "./sheet";
 
-export type RoadsState = { status: "none" } | { status: "loading" } | { status: "error" } | { status: "ok"; roads: NearbyRoad[]; label: string };
+/** error の retry：読み込み直す */
+export type RoadsState = { status: "none" } | { status: "loading" } | { status: "error"; retry?: () => void } | { status: "ok"; roads: NearbyRoad[]; label: string };
 
 /** 結果の地図のうち、道路の種別を読める地図があれば、物件のまわりの道路を読む */
 export function useNearbyRoads(links: ResolvedLink[], lat: number, lng: number): RoadsState {
   const link = links.find((l) => l.read);
   const read: RoadRead | undefined = link?.read;
-  const key = read ? `${lat},${lng},${read.layers.map((l) => l.url).join(",")}` : "";
+  // 読み込み直すたびに増やす（同じ地点でも読み直す）
+  const [attempt, setAttempt] = useState(0);
+  const key = read ? `${lat},${lng},${read.layers.map((l) => l.url).join(",")}#${attempt}` : "";
   const [state, setState] = useState<{ key: string; value: RoadsState }>();
   useEffect(() => {
     if (!read || !link) return;
     let alive = true;
     withRetry(() => readRoads(read, lat, lng))
       .then((roads) => alive && setState({ key, value: { status: "ok", roads, label: link.label } }))
-      .catch(() => alive && setState({ key, value: { status: "error" } }));
+      .catch(() => alive && setState({ key, value: { status: "error", retry: () => setAttempt((n) => n + 1) } }));
     return () => {
       alive = false;
     };
@@ -40,18 +44,28 @@ const where = (r: NearbyRoad) => (r.direction === "地点上" ? "地点の上" :
 /** スマホ：地図ボタンの下の1行。押すと一覧が下から出る。onShowMap があれば、一覧から MICHILU の地図に道路種別を描いて見られる */
 export function NearbyRoadsLine({ state, onShowMap }: { state: RoadsState; onShowMap?: () => void }) {
   const [open, setOpen] = useState(false);
+  // 結果パネルの中の詳細なら、地図の重ね表示へ移っても詳細は開いたまま（地図を閉じると同じ詳細に戻る）
+  const inPanel = !!usePanelDetail();
   if (state.status === "none") return null;
   const first = state.status === "ok" ? state.roads[0] : undefined;
+  // 読めなかったときは、押すと読み込み直す（上の公式図のボタンでも確かめられる）
+  const retry = state.status === "error" ? state.retry : undefined;
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
-        disabled={state.status !== "ok"}
-        className="mt-1.5 flex w-full items-center gap-1.5 rounded-lg bg-[#f7f3ec] px-2 py-1 text-left text-[12px] leading-[1.5] lg:py-1.5 lg:text-[13px] text-ink"
+        onClick={() => (retry ? retry() : setOpen(true))}
+        disabled={state.status !== "ok" && !retry}
+        className="mt-1.5 flex min-h-11 w-full items-center gap-1.5 rounded-lg bg-[#f7f3ec] px-2 py-1 text-left text-[12px] leading-[1.5] lg:py-1.5 lg:text-[13px] text-ink"
       >
         <span className="shrink-0 text-muted">近くの道路</span>
         {state.status === "loading" && <span className="truncate text-muted">地図のデータを読んでいます…</span>}
         {state.status === "error" && <span className="truncate text-muted">地図のデータを読めませんでした</span>}
+        {retry && (
+          <span className="ml-auto flex shrink-0 items-center gap-1 font-semibold text-brand">
+            <RetryIcon className="h-3.5 w-3.5" />
+            再読み込み
+          </span>
+        )}
         {state.status === "ok" && !first && <span className="truncate text-muted">{ROAD_RADIUS_M}m以内に色の付いた道路はありません</span>}
         {first && (
           <span className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden whitespace-nowrap">
@@ -64,11 +78,11 @@ export function NearbyRoadsLine({ state, onShowMap }: { state: RoadsState; onSho
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
       {state.status === "ok" && (
-        <Sheet title="物件のまわりの道路（地図データ）" open={open} onClose={() => setOpen(false)}>
+        <Sheet detail title="物件のまわりの道路（地図データ）" open={open} onClose={() => setOpen(false)}>
           {onShowMap && (
             <button
               onClick={() => {
-                setOpen(false);
+                if (!inPanel) setOpen(false);
                 onShowMap();
               }}
               className="bg-gold mb-2 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[14px] font-semibold text-white shadow-[0_6px_16px_rgba(138,102,50,0.28)]"

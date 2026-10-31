@@ -13,7 +13,7 @@ export function Notes({ lead, source, children }: { lead: React.ReactNode; sourc
     <button
       onClick={() => setOpen((v) => !v)}
       aria-expanded={open}
-      className="relative ml-2 inline-flex items-center gap-0.5 whitespace-nowrap text-[11.5px] text-brand after:absolute after:-inset-x-2 after:-inset-y-2.5 after:content-['']"
+      className="mui-hit relative ml-2 inline-flex items-center gap-0.5 whitespace-nowrap text-[11.5px] text-brand after:absolute after:-inset-x-2 after:-inset-y-2.5 after:content-['']"
     >
       くわしく
       <ChevronRightIcon className={`h-3 w-3 transition-transform ${open ? "-rotate-90" : "rotate-90"}`} />

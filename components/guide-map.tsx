@@ -65,7 +65,7 @@ function GuideMapBody({ result }: { result: Ok }) {
           </div>
         </div>
       </div>
-      <p className="mt-2.5 text-[10.5px] leading-[1.6] text-muted [@media(max-height:720px)]:mt-1.5">
+      <p className="mt-2.5 text-[10.5px] leading-[1.6] text-muted short:mt-1.5">
         社内や、特定のお客様に渡す説明資料には、出典の表示を残してそのまま使えます。チラシ・販売図面・ホームページなど不特定多数に配る広告に使うときは、
         <a href={GSI_TERMS_URL} target="_blank" rel="noreferrer" className="text-brand underline">
           国土地理院の承認
@@ -75,7 +75,7 @@ function GuideMapBody({ result }: { result: Ok }) {
       <button
         onClick={() => window.print()}
         disabled={!ready}
-        className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-light to-brand py-3 text-[15px] font-bold text-white shadow-soft disabled:opacity-60 [@media(max-height:720px)]:mt-1.5 [@media(max-height:720px)]:py-2.5"
+        className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-light to-brand py-3 text-[15px] font-bold text-white shadow-soft disabled:opacity-60 short:mt-1.5 short:py-2.5"
       >
         <PrintIcon className="h-4 w-4" />
         {ready ? "印刷・PDF保存" : "地図を読み込み中…"}

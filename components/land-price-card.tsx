@@ -23,6 +23,8 @@ import { pmtilesLandPriceSource } from "@/lib/roadmap/land-price-tiles";
 import { ROSENKA_CHECK, ROSENKA_NOTE, rosenkaLinks, type RosenkaLink } from "@/lib/roadmap/rosenka";
 import { ChevronRightIcon, ExternalIcon, LandPriceIcon, MapIcon } from "./icons";
 import { Notes } from "./notes";
+import { usePanelDetail } from "./panel-detail";
+import { RetryRow, RowLink } from "./panel-row";
 import { Sheet } from "./sheet";
 
 /** シート・カードに最初に出す地点の数（残りは「ほかの地点」で開く） */
@@ -30,18 +32,23 @@ const SHOWN = 3;
 
 export type LandPriceState =
   | { status: "loading" }
-  | { status: "error" }
+  | { status: "error"; /** 読み込み直す */ retry?: () => void; /** 読めなくても物件の場所で開ける路線価の地図 */ rosenka?: RosenkaLink[] }
   | { status: "ok"; hits: LandPriceHit[]; /** 物件の場所で開く路線価の地図（全国地価マップ） */ rosenka: RosenkaLink[] };
+
+/** 探す範囲（物件から） */
+const LAND_PRICE_MAX_M = 4000;
 
 /** 物件の近くの地点（5つまで・4km 以内）。関東の外や近くに地点が無ければ hits が空 */
 export function useLandPrices(lat: number, lng: number): LandPriceState {
-  const key = `${lat},${lng}`;
+  // 読み込み直すたびに増やす（同じ地点でも読み直す）
+  const [attempt, setAttempt] = useState(0);
+  const key = `${lat},${lng}#${attempt}`;
   const [state, setState] = useState<{ key: string; value: LandPriceState }>();
   useEffect(() => {
     let alive = true;
-    withRetry(() => nearestLandPrices(lat, lng, pmtilesLandPriceSource, { count: 5, maxM: 4000 }))
+    withRetry(() => nearestLandPrices(lat, lng, pmtilesLandPriceSource, { count: 5, maxM: LAND_PRICE_MAX_M }))
       .then((hits) => alive && setState({ key, value: { status: "ok", hits, rosenka: rosenkaLinks(lat, lng) } }))
-      .catch(() => alive && setState({ key, value: { status: "error" } }));
+      .catch(() => alive && setState({ key, value: { status: "error", retry: () => setAttempt((n) => n + 1), rosenka: rosenkaLinks(lat, lng) } }));
     return () => {
       alive = false;
     };
@@ -66,13 +73,29 @@ export function LandPriceLine({
   onOpen,
   onShowMap,
   compact,
+  panel,
 }: {
   state: LandPriceState;
   onOpen?: () => void;
   onShowMap?: (point: [number, number]) => void;
   compact?: boolean;
+  /** スマホの結果パネルの1行：行は消さない（読めなければ「再読み込み」、近くに地点が無ければ理由と路線価の地図） */
+  panel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // 結果パネルの中の詳細なら、地図の重ね表示へ移っても詳細は開いたまま（地図を閉じると同じ詳細に戻る）
+  const inPanel = !!usePanelDetail();
+  if (panel && state.status === "error" && state.retry)
+    return (
+      <RetryRow label="近くの地価" icon={<LandPriceIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />} onRetry={state.retry}>
+        {state.rosenka?.map((l) => (
+          <RowLink key={l.kind} href={l.url}>
+            {l.kind === "souzoku" ? "相続税路線価" : "固定資産税路線価"}
+          </RowLink>
+        ))}
+      </RetryRow>
+    );
+  if (panel && state.status === "ok" && state.hits.length === 0) return <NoLandPriceRow rosenka={state.rosenka} />;
   if (state.status === "ok" && state.hits.length === 0) return null;
   const top = state.status === "ok" ? state.hits[0] : undefined;
   return (
@@ -101,20 +124,44 @@ export function LandPriceLine({
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
       {state.status === "ok" && !onOpen && (
-        <Sheet title="近くの地価（参考）" open={open} onClose={() => setOpen(false)}>
+        <Sheet detail title="近くの地価（参考）" open={open} onClose={() => setOpen(false)}>
           <LandPriceDetail
             hits={state.hits}
             rosenka={state.rosenka}
             onShowMap={
               onShowMap &&
               ((p) => {
-                setOpen(false);
+                if (!inPanel) setOpen(false);
                 onShowMap(p);
               })
             }
           />
         </Sheet>
       )}
+    </>
+  );
+}
+
+/**
+ * スマホの結果パネル：物件から4km以内に地価公示・地価調査の地点が無いときの行。押すと理由と、物件の場所で開く路線価の地図
+ * （地点が無くても路線価の地図は物件の場所で開ける）
+ */
+function NoLandPriceRow({ rosenka }: { rosenka: RosenkaLink[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="mui-row-btn">
+        <LandPriceIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
+        <span className="mui-row-label">近くの地価</span>
+        <span className="min-w-0 flex-1 truncate text-[var(--mui-muted)]">{LAND_PRICE_MAX_M / 1000}km以内に地点なし・路線価を見る</span>
+        <ChevronRightIcon className="ml-auto h-4 w-4 shrink-0 text-[var(--mui-muted)]" />
+      </button>
+      <Sheet detail title="近くの地価（参考）" open={open} onClose={() => setOpen(false)}>
+        <p className="py-2 text-[14px] leading-[1.6] text-ink">
+          物件から{LAND_PRICE_MAX_M / 1000}km以内に、地価公示（標準地）・都道府県地価調査（基準地）の地点がありません。
+        </p>
+        <LandPriceDetail hits={[]} rosenka={rosenka} />
+      </Sheet>
     </>
   );
 }
@@ -153,7 +200,7 @@ function Item({ hit, onShowMap }: { hit: LandPriceHit; onShowMap?: (point: [numb
         {onShowMap && (
           <button
             onClick={() => onShowMap(hit.point)}
-            className="flex shrink-0 items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[12px] text-brand hover:bg-mint"
+            className="mui-hit flex shrink-0 items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[12px] text-brand hover:bg-mint"
             aria-label={`${kindText(hit.kind)} ${hit.no} を地図で見る`}
           >
             <MapIcon className="h-3.5 w-3.5" />

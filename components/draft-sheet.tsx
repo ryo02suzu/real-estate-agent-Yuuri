@@ -117,7 +117,7 @@ function DraftBody({ sections }: { sections: DraftSection[] }) {
         )}
       </section>
       {/* 同じ注意はコピーした文の最後にも入る。背の低い画面と、詰めるときは出さない */}
-      <p className="mt-2 text-[10px] leading-[1.5] text-muted dense:hidden [@media(max-height:720px)]:hidden">{DRAFT_NOTE}</p>
+      <p className="mt-2 text-[10px] leading-[1.5] text-muted dense:hidden short:hidden">{DRAFT_NOTE}</p>
     </div>
   );
 }
