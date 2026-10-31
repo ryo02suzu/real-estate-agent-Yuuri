@@ -15,8 +15,8 @@ jobs:
     env:
       REVIEW_URL: http://127.0.0.1:3000
       PREVIEW_URL: https://michilu-ix64e6cot-sourirettes-projects.vercel.app
-      REVIEW_SHA: c12c55cc130b8ae3b560b7f334c4137f82110e36
-      REVIEW_PHASE: mobile-ui-v2-new-map-layout-c12c55c
+      REVIEW_SHA: d331a25e728b03e75b18664555a9fcfd1db609b1
+      REVIEW_PHASE: mobile-ui-v2-latest-d331a25
     steps:
       - uses: actions/checkout@v4
         with:
