@@ -36,11 +36,11 @@ export function ContactCard({ contact, city, address }: { contact: Contact; city
         {contact.note && (
           <>
             <dt className="text-muted">備考</dt>
-            {/* スマホでは2行（背の低い画面・入りきらないときは1行）に省略し、タップで全文を出す（画面をスクロールさせない） */}
+            {/* スマホは省略せず全文を出す（パネルの中でスクロールして読む）。PC は背の低い窓だけ1行に省略し、タップで全文を出す */}
             <dd className="min-w-0">
               <button onClick={() => setNoteOpen(true)} className="flex w-full gap-1.5 text-left text-[#8a4f3a]">
                 <AlertIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span className="min-w-0 line-clamp-2 lg:line-clamp-none short:truncate">{contact.note}</span>
+                <span className="min-w-0 short:truncate">{contact.note}</span>
               </button>
             </dd>
           </>

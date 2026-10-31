@@ -234,12 +234,13 @@ function Found({
     <div className="mui-scope flex flex-col gap-3 pb-2" data-testid="result-panel">
       <Place
         result={result}
+        flush
         fixable={!!onFix}
         onPick={onPick}
         actions={
           <>
-            <CopyButton text={copyText(result)} />
-            <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} />
+            <CopyButton text={copyText(result)} tall />
+            <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} tall />
           </>
         }
       />
@@ -282,6 +283,7 @@ function Found({
               extra={building.status !== "none" && <BuildingDetail state={building} />}
               withBuilding={building.status !== "none"}
               chibanzu={chibanzuFor(m, result.lat, result.lng)}
+              panel
             />
           </div>
           <div>
@@ -291,10 +293,10 @@ function Found({
             <LandPriceLine state={landPrice} onShowMap={onExpand && ((p) => onExpand({ landPrice: p }))} />
           </div>
           <div>
-            <StationLine state={stations} pois={pois} />
+            <StationLine state={stations} pois={pois} panel />
           </div>
           <div>
-            <SchoolButton state={schools} />
+            <SchoolButton state={schools} panel />
           </div>
         </div>
       </section>
@@ -444,10 +446,13 @@ function Place({
   onPick,
   actions,
   desktop,
+  flush,
 }: {
   result: Extract<LookupResult, { status: "ok" }>;
   /** PC のパネル（出典を本文に書く。スマホは地図プレビューの上に書く） */
   desktop?: boolean;
+  /** スマホの結果パネル：枠（カード）の内側ではなく、パネルの本文にそのまま置く（左右の余白を足さない） */
+  flush?: boolean;
   /** 地図の「場所を直す」で選び直せる（その案内を添える） */
   fixable?: boolean;
   /** 近い地番を選んで探し直す */
@@ -459,7 +464,7 @@ function Place({
   const warn = "mt-1 flex gap-1 text-[10.5px] leading-[1.6] text-[#8a4f3a]";
   const town = approximate ? "町の中心を表示しています。" : "";
   return (
-    <div className="px-4 pb-3 pt-3 short:pb-2">
+    <div className={flush ? "pb-1 pt-1" : "px-4 pb-3 pt-3 short:pb-2"}>
       <PlaceHeader
         label={found ? "地番で探した筆" : picked ? "地図で選んだ地点" : "検索地点"}
         address={address}
@@ -535,12 +540,12 @@ function Place({
 }
 
 /** 物件の場所で開けない地図では、地図内の住所検索に貼り付けて使う */
-function CopyButton({ text }: { text: string }) {
+function CopyButton({ text, tall }: { text: string; /** スマホの結果パネル：押しやすい高さ */ tall?: boolean }) {
   const { done, copy } = useCopy();
   return (
     <button
       onClick={() => copy(text)}
-      className="flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[11px] text-brand"
+      className={`flex items-center gap-1 rounded-full border border-line text-brand ${tall ? "min-h-9 px-3 text-[12px]" : "px-2.5 py-1 text-[11px]"}`}
     >
       <CopyIcon className="h-3.5 w-3.5" />
       {done ? "コピー済" : "住所コピー"}
@@ -618,6 +623,7 @@ function ShareButton({
   stations,
   pois,
   desktop,
+  tall,
 }: {
   result: Extract<LookupResult, { status: "ok" }>;
   zoning: ZoningState;
@@ -631,6 +637,8 @@ function ShareButton({
   pois: PoiState;
   /** PC：共有の画面は出さず、メールやチャットに貼れるようコピーする */
   desktop?: boolean;
+  /** スマホの結果パネル：押しやすい高さ */
+  tall?: boolean;
 }) {
   const { done, copy } = useCopy();
   const onClick = async () => {
@@ -649,7 +657,7 @@ function ShareButton({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[11px] text-brand"
+      className={`flex items-center gap-1 rounded-full border border-line text-brand ${tall ? "min-h-9 px-3 text-[12px]" : "px-2.5 py-1 text-[11px]"}`}
     >
       {desktop ? <CopyIcon className="h-3.5 w-3.5" /> : <ShareIcon className="h-3.5 w-3.5" />}
       {done ? "コピー済" : desktop ? "結果をコピー" : "結果を共有"}

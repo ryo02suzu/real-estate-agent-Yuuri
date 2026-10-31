@@ -93,8 +93,9 @@ export function SchoolDetail({ schools }: { schools: Schools }) {
  * スマホ：都市計画の行の右の小さなボタン（「学区」）。押すと小学校区・中学校区が下から出る。
  * PC は onOpen（パネルの中の学区のカードまで動かす）を渡し、学校の名前も出す。データの無い所では出さない
  */
-export function SchoolButton({ state, onOpen }: { state: SchoolState; onOpen?: () => void }) {
+export function SchoolButton({ state, onOpen, panel }: { state: SchoolState; onOpen?: () => void; /** スマホの結果パネルの1行：学校の短い名前も出す（押すと同じパネルの中で詳細） */ panel?: boolean }) {
   const [open, setOpen] = useState(false);
+  const rich = !!onOpen || !!panel;
   if (state.status === "none" || state.status === "error") return null;
   const s = state.status === "ok" ? state.schools : undefined;
   return (
@@ -102,10 +103,10 @@ export function SchoolButton({ state, onOpen }: { state: SchoolState; onOpen?: (
       <button
         onClick={() => (onOpen ? onOpen() : setOpen(true))}
         disabled={state.status !== "ok"}
-        className={`flex items-center gap-1 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-left text-[12px] leading-[1.5] lg:py-1.5 lg:text-[13px] text-ink disabled:text-muted lg:hover:border-brand-light/60 ${onOpen ? "min-w-0 flex-1" : "shrink-0"}`}
+        className={`flex items-center gap-1 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-left text-[12px] leading-[1.5] lg:py-1.5 lg:text-[13px] text-ink disabled:text-muted lg:hover:border-brand-light/60 ${rich ? "min-w-0 flex-1" : "shrink-0"}`}
       >
         <SchoolIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
-        {onOpen ? (
+        {rich ? (
           <>
             <span className="shrink-0 text-muted">学区</span>
             <span className="truncate">

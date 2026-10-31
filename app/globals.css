@@ -334,4 +334,13 @@ body {
     outline: 2px solid var(--mui-primary);
     outline-offset: 2px;
   }
+  /* 押したときのハイライトは青緑に。ダブルタップ拡大の待ちを無くす（ピンチの拡大は残す） */
+  body[data-mui] {
+    -webkit-tap-highlight-color: rgba(15, 118, 110, 0.12);
+  }
+  body[data-mui] button,
+  body[data-mui] a,
+  body[data-mui] summary {
+    touch-action: manipulation;
+  }
 }

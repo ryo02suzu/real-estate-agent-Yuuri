@@ -44,8 +44,9 @@ const distText = (m: number) => (m >= 1000 ? `約${(m / 1000).toFixed(1)}km` : `
  * PC は onOpen（パネルの中のカードまで動かす）を渡す。
  * スマホは学区と並ぶ狭い行なので、駅名と分数を優先し、「最寄り駅」の見出しと「ほか2駅」は PC だけ出す。駅が無ければ出さない
  */
-export function StationLine({ state, pois, onOpen }: { state: StationState; pois?: PoiState; onOpen?: () => void }) {
+export function StationLine({ state, pois, onOpen, panel }: { state: StationState; pois?: PoiState; onOpen?: () => void; /** スマホの結果パネルの1行：見出し・「ほか○駅」も出す（押すと同じパネルの中で詳細） */ panel?: boolean }) {
   const [open, setOpen] = useState(false);
+  const rich = !!onOpen || !!panel;
   if (state.status === "ok" && state.stations.length === 0) return null;
   // 周辺施設のデータが無い（施設が1つも無い）ときは、駅だけのシート
   const withPois = pois && !(pois.status === "ok" && pois.pois.length === 0);
@@ -59,14 +60,14 @@ export function StationLine({ state, pois, onOpen }: { state: StationState; pois
         className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-line bg-[#fcfaf6] px-2 py-1 text-left text-[12px] leading-[1.5] lg:py-1.5 lg:text-[13px] text-ink lg:hover:border-brand-light/60"
       >
         <TrainIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
-        <span className={onOpen ? "shrink-0 text-muted" : "sr-only"}>最寄り駅</span>
-        {state.status === "loading" && <span className="truncate text-muted">{onOpen ? "確認中…" : "最寄り駅を確認中…"}</span>}
-        {state.status === "error" && <span className="truncate text-muted">{onOpen ? "道路のデータを読み込めませんでした" : "最寄り駅を出せませんでした"}</span>}
+        <span className={rich ? "shrink-0 text-muted" : "sr-only"}>最寄り駅</span>
+        {state.status === "loading" && <span className="truncate text-muted">{rich ? "確認中…" : "最寄り駅を確認中…"}</span>}
+        {state.status === "error" && <span className="truncate text-muted">{onOpen ? "道路のデータを読み込めませんでした" : panel ? "データを読み込めませんでした" : "最寄り駅を出せませんでした"}</span>}
         {top && (
           <span className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden whitespace-nowrap">
             <span className="truncate">{top.name}駅</span>
             <b className="shrink-0 font-semibold">{walkText(top)}</b>
-            {onOpen && more > 0 && <span className="truncate text-muted">ほか{more}駅</span>}
+            {rich && more > 0 && <span className="truncate text-muted">ほか{more}駅</span>}
           </span>
         )}
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}

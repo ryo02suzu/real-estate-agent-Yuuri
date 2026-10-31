@@ -214,6 +214,16 @@ export function MobileShell({
     window.addEventListener(DETAIL_CLOSE_EVENT, on);
     return () => window.removeEventListener(DETAIL_CLOSE_EVENT, on);
   }, []);
+  // Esc（キーボード）でも詳細を閉じる。全画面の地図・シートなど、上に重なる画面があれば、そちらの Esc を優先する
+  useEffect(() => {
+    if (!inDetail) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.isComposing || document.querySelector("[role=dialog]")) return;
+      detailRef.current?.close();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [inDetail]);
   useEffect(() => {
     onDetailChange?.(inDetail);
   }, [inDetail, onDetailChange]);

@@ -72,6 +72,7 @@ export function ParcelButton({
   extra,
   withBuilding,
   chibanzu,
+  panel,
 }: {
   info: ParcelInfo;
   onOpen?: () => void;
@@ -81,6 +82,8 @@ export function ParcelButton({
   withBuilding?: boolean;
   /** 市町村の地番図（物件の場所で開く） */
   chibanzu?: ChibanzuLink;
+  /** スマホの結果パネルの1行：見出しと、物件の筆の地番も出す（押すと同じパネルの中で詳細） */
+  panel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   if (info.status === "none") {
@@ -101,7 +104,7 @@ export function ParcelButton({
     );
   }
   const chiban =
-    onOpen && info.status === "ok" && info.kind !== "address" && /^\d/.test(info.parcel.chibanRaw) ? `${chibanLabel(info.parcel.chibanRaw)}${parcelMark(info.parcel)}` : undefined;
+    (onOpen || panel) && info.status === "ok" && info.kind !== "address" && /^\d/.test(info.parcel.chibanRaw) ? `${chibanLabel(info.parcel.chibanRaw)}${parcelMark(info.parcel)}` : undefined;
   return (
     <>
       <button
@@ -112,6 +115,12 @@ export function ParcelButton({
         <ParcelIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
         {info.status !== "ok" ? (
           "地番…"
+        ) : panel ? (
+          // 結果パネルの1行：見出しと、物件の筆の地番（地番で探した・地図で選んだ地点の筆）
+          <>
+            <span className="mui-row-label">{withBuilding ? "地番・建物" : "地番・隣地"}</span>
+            {chiban && <b className="min-w-0 flex-1 truncate font-semibold">{chiban}</b>}
+          </>
         ) : chiban ? (
           <>
             <b className="font-semibold">{chiban}</b>
@@ -121,7 +130,7 @@ export function ParcelButton({
             地番<span className="short:hidden">{withBuilding ? "・建物" : "・隣地"}</span>
           </>
         )}
-        {info.status === "ok" && <ChevronRightIcon className="h-3.5 w-3.5 shrink-0 text-muted" />}
+        {info.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
       {info.status === "ok" && !onOpen && (
         <Sheet detail title={withBuilding ? "地番・建物" : "謄本・公図を取るときの地番"} open={open} onClose={() => setOpen(false)}>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef } from "react";
-import { useDesktop } from "@/lib/use-desktop";
 import { CloseIcon } from "./icons";
 import { PanelDetail, usePanelDetail } from "./panel-detail";
 
@@ -14,6 +13,11 @@ function useDense(ref: React.RefObject<HTMLDivElement | null>, open: boolean) {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!open || !el) return;
+    // スマホ（1024px 未満）は詰めない（詰めた印が残っていれば外す）
+    if (!window.matchMedia("(min-width: 1024px)").matches) {
+      delete el.dataset.dense;
+      return;
+    }
     const fit = () => {
       for (const level of ["", "1", "2", "3"]) {
         if (level) el.dataset.dense = level;
@@ -60,8 +64,7 @@ export function Sheet({ title, open, onClose, children, detail }: { title: strin
 
 function ModalSheet({ title, open, onClose, children }: { title: string; open: boolean; onClose: () => void; children: React.ReactNode }) {
   const body = useRef<HTMLDivElement>(null);
-  const desktop = useDesktop();
-  useDense(body, open && desktop);
+  useDense(body, open);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
