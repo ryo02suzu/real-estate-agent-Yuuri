@@ -23,6 +23,7 @@
     "brainstorming": "user-invocable-only",
     "writing-plans": "user-invocable-only",
     "executing-plans": "user-invocable-only",
-    "finishing-a-development-branch": "user-invocable-only"
+    "finishing-a-development-branch": "user-invocable-only",
+    "test-driven-development": "user-invocable-only"
   }
 }
