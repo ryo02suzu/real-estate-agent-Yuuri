@@ -5,13 +5,15 @@ description: Use when you have a spec or requirements for a multi-step task, bef
 
 # Writing Plans
 
+> MICHILU adaptation of Jesse Vincent's Superpowers Skill (MIT license; upstream: https://github.com/obra/superpowers/tree/main/skills/writing-plans). Standalone: does not require uninstalled subagent or worktree Skills.
+
 ## Overview
 
-Write implementation plans for an engineer who has not seen this codebase or this spec. Assume they write idiomatic code in the project's language once they know the exact interface and the exact test, and that they will make a reasonable choice wherever the plan leaves one open. What they cannot know is what you decided: which files, which names and signatures, which values from the spec, which tests prove each task. Document those. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
+Write implementation plans for an engineer who has not seen this codebase or this spec. Assume they write idiomatic code in the project's language once they know the exact interface and the exact test, and that they will make a reasonable choice wherever the plan leaves one open. What they cannot know is what you decided: which files, which names and signatures, which values from the spec, which tests prove each task. Document those. Give them the whole plan as bite-sized tasks. DRY. YAGNI. Verify appropriately; strict TDD only if explicitly requested. Frequent commits.
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
-**Context:** If working in an isolated worktree, it should have been created via the `superpowers:using-git-worktrees` skill at execution time.
+**Context:** Use an existing dedicated feature branch as required by `CLAUDE.md`. No extra worktree or uninstalled worktree Skill is required.
 
 **Save plans to:** `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`
 - (User preferences for plan location override this default)
@@ -43,7 +45,7 @@ independently testable deliverable.
 ## Step Granularity
 
 **Each step is one action with a checkable result:**
-- "Write the failing test" - step
+- "Write the failing test" - step (for testable logic when strict TDD is explicitly requested; otherwise specify a relevant test or manual UI check)
 - "Run it to make sure it fails" - step
 - "Implement the minimal code to make the test pass" - step
 - "Run the tests and make sure they pass" - step
@@ -56,7 +58,7 @@ independently testable deliverable.
 ```markdown
 # [Feature Name] Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For implementation:** When the plan has been approved, use the installed `executing-plans` Skill for task-by-task implementation if requested; no subagent-only Skills are required. Track tasks with checkboxes (`- [ ]`).
 
 **Goal:** [One sentence describing what this builds]
 
@@ -105,7 +107,7 @@ owns the code, in that task's own step style.]
   and return types. A task's implementer sees only their own task; this
   block is how they learn the names and types neighboring tasks use.]
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Add an appropriate regression test or define UI acceptance checks**
 
 ```python
 def test_specific_behavior():
@@ -113,7 +115,7 @@ def test_specific_behavior():
     assert result == expected
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: If strict TDD was requested, run the test to verify it fails; otherwise capture the baseline**
 
 Run: `pytest tests/path/test.py::test_name -v`
 Expected: FAIL with "function not defined"
@@ -124,7 +126,7 @@ One line on the approach when the signature and the test leave a choice
 (which library call, which data structure); a code block only for an
 algorithm they do not determine.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 4: Run applicable tests and/or visual checks and record actual results**
 
 Run: `pytest tests/path/test.py::test_name -v`
 Expected: PASS
@@ -178,27 +180,8 @@ If you find issues, fix them inline. No need to re-review — just fix and move 
 
 ## Execution Handoff
 
-After saving and self-reviewing the plan, link it for your human partner
-to read. If they have already explicitly supplied an execution method, ask
-them to review the plan and confirm it captures what they want; wait for that
-review before implementation, then use the preserved method. Otherwise, ask
-them to review the plan and choose an execution method before implementation.
+After saving and reviewing the plan, share its path and acceptance checks. Respect the user's already-stated approval and execution preference; do not restart discovery or request choices already made.
 
-**When no execution method has already been supplied:**
+If the user asked only for a plan, stop with the plan. If implementation was also requested and authorized, proceed on a dedicated branch using the installed `executing-plans` Skill (only if the user requests that workflow), or the normal MICHILU development process.
 
-**"Plan complete and saved to `docs/superpowers/plans/<filename>.md`. Please review the plan. Which execution approach would you prefer?**
-
-- **Subagent-driven** - A fresh subagent implements each task and a fresh reviewer checks it before the next one starts, then a whole-branch review at the end. Most thorough; costs a fresh context per task and per review.
-- **Native** - I implement every task myself in this session, the way this harness runs work, then one fresh reviewer on the most capable model checks the whole branch. Cheapest and fastest; no independent review until the end. Runs well with a mid-tier session model, since the plan carries the design.
-
-**For this plan I recommend <one of the two>, because <one sentence from the plan: how much the tasks depend on each other's interfaces, how many there are, what a shipped mistake would cost>. Does the plan capture what you want, and which approach should we use?"**
-
-**When an execution method has already been supplied:**
-
-**"Plan complete and saved to `docs/superpowers/plans/<filename>.md`. Please review the plan. Does it capture what you want?"**
-
-**If Subagent-driven chosen:**
-- **REQUIRED SUB-SKILL:** Use superpowers:subagent-driven-development
-
-**If Native chosen:**
-- **REQUIRED SUB-SKILL:** Use superpowers:executing-plans
+Do not try to invoke `subagent-driven-development`, `using-git-worktrees` or any other Skill not actually installed in this repository. Strict TDD is opt-in; pure UI/CSS changes need appropriate visual and regression checks, not mandatory delete-and-rewrite.
