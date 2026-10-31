@@ -26,6 +26,7 @@ import {
   type HazardReport,
 } from "@/lib/roadmap/hazard";
 import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
+import { panelHazardChips, type PanelChip } from "@/lib/panel-status";
 import { AlertIcon, ChevronRightIcon, ExternalIcon, HazardIcon, MapIcon } from "./icons";
 import { Notes } from "./notes";
 import { usePanelDetail } from "./panel-detail";
@@ -113,7 +114,8 @@ export function HazardLine({
   const [open, setOpen] = useState(false);
   // 結果パネルの中の詳細なら、地図の重ね表示へ移っても詳細は開いたまま（地図を閉じると同じ詳細に戻る）
   const inPanel = !!usePanelDetail();
-  const chips = state.status === "ok" ? hazardChips(state.report) : [];
+  // スマホの結果パネル（onOpen が無い）は、読めなかった種類・データの無い内水を「区域外」と言い切らない（lib/panel-status.ts）。PC は従来どおり
+  const chips: PanelChip[] = state.status === "ok" ? (onOpen ? hazardChips(state.report) : panelHazardChips(state.report)) : [];
   // スマホの結果パネル（onOpen が無い）：読めなければ行を「再読み込み」にする（PC は従来どおり）
   if (!onOpen && state.status === "error" && state.retry)
     return (
@@ -138,7 +140,15 @@ export function HazardLine({
             {chips.map((c) => (
               <span
                 key={c.text}
-                className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-1 ${c.warn ? "bg-[#f8ece6] text-[#8a4f3a]" : "bg-[#f3f1ed] text-ink"}`}
+                className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-1 ${
+                  c.state === "fail"
+                    ? "bg-[var(--mui-warn-bg)] font-semibold text-[var(--mui-warn-ink)]"
+                    : c.state === "none"
+                      ? "text-muted"
+                      : c.warn
+                        ? "bg-[#f8ece6] text-[#8a4f3a]"
+                        : "bg-[#f3f1ed] text-ink"
+                }`}
               >
                 {c.color && <span className="h-2 w-2 shrink-0 rounded-[2px] border border-black/10" style={{ background: c.color }} />}
                 {compact ? (c.short ?? c.text) : c.text}
@@ -210,7 +220,7 @@ function HazardDetail({ state, city, onShowMap }: { state: Extract<HazardState, 
                 onClick={() => onShowMap(r.kind as HazardKind)}
                 aria-label={`${r.name}を地図に重ねる`}
                 title="地図に重ねる"
-                className="flex shrink-0 items-center gap-1 rounded-full border border-line px-2 py-1 text-[11.5px] text-brand lg:hover:bg-mint densest:py-0.5"
+                className="mui-hit flex shrink-0 items-center gap-1 rounded-full border border-line px-2 py-1 text-[11.5px] text-brand lg:hover:bg-mint densest:py-0.5"
               >
                 <MapIcon className="h-3 w-3" />
                 地図

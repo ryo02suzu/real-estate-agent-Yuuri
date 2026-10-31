@@ -19,6 +19,7 @@ import { TOCHI_YEAR, tochiAt, tochiCheck, tochiLine, type Tochi } from "@/lib/ro
 import { contactLinkText, contactName, noContactText, UTILITIES_CHECKED, utilitiesFor, type UtilityContact, type UtilityKind, type Utilities } from "@/lib/roadmap/utilities";
 import { pmtilesTochiSource } from "@/lib/roadmap/tochi-tiles";
 import { statusFor, zoningAt, zoningChips, zoningRows, type Zoning, type ZoningStatus } from "@/lib/roadmap/zoning";
+import { zoningNoData } from "@/lib/panel-status";
 import { ZONING_DATA } from "@/lib/roadmap/zoning-data";
 import { pmtilesZoningSource } from "@/lib/roadmap/zoning-tiles";
 import { AlertIcon, ChevronRightIcon, ZoningIcon } from "./icons";
@@ -96,7 +97,11 @@ function tochiChips(t?: Tochi): string[] {
 export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: string; onOpen?: () => void }) {
   const [open, setOpen] = useState(false);
   // 砂防指定地・急傾斜地などの区域に入っていれば、用途地域の次に注意の印を出す
-  const chips = state.status === "ok" ? zoningChips(state.zoning).flatMap((c, i) => (i === 0 ? [c, ...houreiChips(state.hourei), ...tochiChips(state.tochi)] : [c])) : [];
+  const base = state.status === "ok" ? zoningChips(state.zoning) : [];
+  // スマホの結果パネル（onOpen が無い）：先頭の「都市計画区域外」「用途地域なし」は、その市のデータがあるときだけ。
+  // 無ければ「都市計画データなし」などと言い直す（詳細と同じ判定。lib/panel-status.ts）。PC は従来どおり
+  const noData = state.status === "ok" && !onOpen ? zoningNoData(state.zoning, state.st, base[0]) : undefined;
+  const chips = state.status === "ok" ? base.flatMap((c, i) => (i === 0 ? [noData ?? c, ...houreiChips(state.hourei), ...tochiChips(state.tochi)] : [c])) : [];
   // スマホの結果パネル（onOpen が無い）：読めなければ行を「再読み込み」にする（PC は従来どおり）
   if (!onOpen && state.status === "error" && state.retry) return <RetryRow label="都市計画・法令" icon={<ZoningIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />} onRetry={state.retry} />;
   return (
@@ -116,7 +121,9 @@ export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: 
             {chips.map((c, i) => (
               <span
                 key={c}
-                className={`shrink-0 whitespace-nowrap rounded px-1 ${i === 0 ? "bg-mint font-semibold text-brand" : WARN_CHIP.test(c) ? "bg-[#f8ece6] text-[#8a4f3a]" : "bg-[#f3f1ed] text-ink"}`}
+                className={`shrink-0 whitespace-nowrap rounded px-1 ${
+                  i === 0 ? (noData ? "text-muted" : "bg-mint font-semibold text-brand") : WARN_CHIP.test(c) ? "bg-[#f8ece6] text-[#8a4f3a]" : "bg-[#f3f1ed] text-ink"
+                }`}
               >
                 {c}
               </span>

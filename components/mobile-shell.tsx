@@ -570,7 +570,7 @@ export function MobileShell({
             ref={setHostEl}
             hidden={!inDetail}
             data-testid="panel-detail"
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-1"
+            className="mui-detail min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-1"
           />
         </section>
       </div>

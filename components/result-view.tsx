@@ -257,7 +257,12 @@ function Found({
               <MapButton key={l.url} link={l} />
             ))}
           </div>
-          <NearbyRoadsLine state={roads} onShowMap={onMapRoads} />
+          {/* 近くの道路も、ほかの項目と同じ行の形（読みやすい大きさ・折り返し・押せる高さ）にそろえる */}
+          <div className="mui-rows mt-2">
+            <div>
+              <NearbyRoadsLine state={roads} onShowMap={onMapRoads} />
+            </div>
+          </div>
           {sheetRange && (
             <div className="mui-rows mt-2">
               <div>
@@ -410,7 +415,7 @@ function copyText(result: Extract<LookupResult, { status: "ok" }>): string {
 function PlaceHeader({ label, address, suffix, actions }: { label: string; address: string; suffix: React.ReactNode; actions?: React.ReactNode }) {
   return (
     <>
-      <div className="flex items-center justify-between gap-2">
+      <div className="mui-place-head flex items-center justify-between gap-2">
         <p className="flex min-w-0 items-center gap-1 text-[11px] text-muted">
           <PinOutlineIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
           <span className="whitespace-nowrap">{label}</span>

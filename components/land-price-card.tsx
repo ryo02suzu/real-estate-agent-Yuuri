@@ -200,7 +200,7 @@ function Item({ hit, onShowMap }: { hit: LandPriceHit; onShowMap?: (point: [numb
         {onShowMap && (
           <button
             onClick={() => onShowMap(hit.point)}
-            className="flex shrink-0 items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[12px] text-brand hover:bg-mint"
+            className="mui-hit flex shrink-0 items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[12px] text-brand hover:bg-mint"
             aria-label={`${kindText(hit.kind)} ${hit.no} を地図で見る`}
           >
             <MapIcon className="h-3.5 w-3.5" />

@@ -68,6 +68,32 @@ describe("押せる範囲（44px 以上。見た目は変えない）", () => {
   });
 });
 
+describe("文字の大きさ（スマホの新UIの結果パネル・詳細だけ。PC・印刷は変えない）", () => {
+  const SELECTOR_SMALL = "body[data-mui] :is(.mui-scope, .mui-detail) :is(.text-\\[9px\\]";
+  const SELECTOR_12 = "body[data-mui] :is(.mui-scope, .mui-detail) :is(.text-\\[12px\\], .text-\\[12\\.5px\\]):not(.absolute)";
+
+  it("11px 以下は 12px、12〜12.5px は 13px に。どちらもスマホの新UIの中だけ", () => {
+    const phone = phoneBlock();
+    expect(rule(SELECTOR_SMALL, phone)).toMatch(/font-size:\s*12px/);
+    expect(rule(SELECTOR_12, phone)).toMatch(/font-size:\s*13px/);
+    // スマホの外（PC・印刷）には書かない
+    expect(css.replace(phone, "")).not.toContain(":is(.mui-scope, .mui-detail)");
+  });
+
+  it("地図の上に重ねた小さな札（absolute）は大きくしない", () => {
+    const phone = phoneBlock();
+    const i = phone.indexOf(SELECTOR_SMALL);
+    expect(phone.slice(i, phone.indexOf("{", i))).toContain(":not(.absolute)");
+  });
+
+  it("詳細の置き場所に .mui-detail が付いている（結果パネルの .mui-scope と同じ扱い）", () => {
+    const shell = readFileSync(join(root, "components/mobile-shell.tsx"), "utf8");
+    expect(shell).toMatch(/data-testid="panel-detail"\s+className="mui-detail /);
+    const view = readFileSync(join(root, "components/result-view.tsx"), "utf8");
+    expect(view).toContain('className="mui-scope ');
+  });
+});
+
 /** 地図の箱（ref={box} の要素）の開きタグ。地図の箱そのものを absolute にしていないか（外側の箱で広げているか） */
 function mapBoxOk(src: string): boolean {
   const box = src.match(/<div\s+ref=\{box\}[^>]*>/)?.[0] ?? "";

@@ -272,9 +272,9 @@ body {
 .mui-japan-map .maplibregl-ctrl-bottom-left {
   bottom: calc(var(--mui-panel-h, 0px) + var(--mui-kbd, 0px));
 }
-/* 出典は小さめでも読める大きさに（消さない・たたまない） */
+/* 出典は読める大きさに（消さない・たたまない。「地理院タイル」の1行なので、パネルが大きいときの細い地図の帯にも入る） */
 .mui-japan-map .maplibregl-ctrl-attrib {
-  font-size: 11px;
+  font-size: 12px;
 }
 /*
  * 代わりの背景（北海道〜九州だけ）を使っているときの知らせ。左下・パネルの上（出典は右下）。
@@ -302,10 +302,11 @@ body {
   white-space: nowrap;
   border-radius: 999px;
   background: #fff;
-  padding: 0 7px;
+  /* 文字の拡大でもはみ出さないよう、行の高さは文字に合わせる */
+  padding: 1px 8px;
   font-size: 12px;
   font-weight: 600;
-  line-height: 20px;
+  line-height: 1.5;
   color: var(--mui-warn-ink);
   box-shadow: 0 1px 4px rgba(15, 60, 56, 0.25);
   pointer-events: none;
@@ -443,6 +444,46 @@ body {
   body[data-mui] .mui-similar > button {
     min-height: 36px;
     padding-inline: 10px;
+  }
+  /*
+   * 文字の大きさ：結果パネル（.mui-scope）とパネルの中の詳細（.mui-detail）では、既存の部品（PC と共用）の小さい文字を
+   * 読める大きさに引き上げる。補足・出典・時点は 12px 以上、本文・値は 13px 以上（情報は削らず、折り返して読む）。
+   * 地図の上に重ねた小さな札（absolute。地図の大きさに合わせてある）は除く。PC・印刷（@media print）は変えない
+   */
+  body[data-mui] :is(.mui-scope, .mui-detail) :is(.text-\[9px\], .text-\[9\.5px\], .text-\[10px\], .text-\[10\.5px\], .text-\[11px\], .text-\[11\.5px\]):not(.absolute) {
+    font-size: 12px;
+  }
+  body[data-mui] :is(.mui-scope, .mui-detail) :is(.text-\[12px\], .text-\[12\.5px\]):not(.absolute) {
+    font-size: 13px;
+  }
+  /*
+   * 結果の行の値は、狭い画面・文字の拡大（200%）でも切らずに折り返す（既存の部品は PC の1行に収める作りで、truncate・nowrap を使う）。
+   * 行の見出し（都市計画など）も縮められるようにし、値の幅を奪わない
+   */
+  body[data-mui] .mui-scope .mui-rows .truncate,
+  body[data-mui] .mui-scope .mui-row-btn .truncate {
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+  body[data-mui] .mui-scope .mui-rows button span.overflow-hidden.whitespace-nowrap {
+    overflow: visible;
+    white-space: normal;
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  body[data-mui] .mui-scope .mui-rows button span.flex-wrap > span {
+    white-space: normal;
+  }
+  body[data-mui] .mui-scope .mui-row-label {
+    flex-shrink: 1;
+    min-width: 4em;
+  }
+  /* 住所の見出しの行（「検索地点」と、住所コピー・共有）：狭い画面・文字の拡大では2行に折り返す */
+  body[data-mui] .mui-scope .mui-place-head {
+    flex-wrap: wrap;
+    row-gap: 4px;
   }
   /* 横に流れる履歴の札：上下に広げた押せる範囲が、流れる枠で切れないよう余白を足す（見た目の位置は同じ） */
   body[data-mui] .mui-chips {
