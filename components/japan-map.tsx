@@ -61,20 +61,24 @@ export type JapanMapProps = {
   point: { lat: number; lng: number } | null;
   /** 同じ地点を調べ直したときに増える（カメラを寄せ直す） */
   focus: number;
-  /** 下から重なるパネルの高さ(px)の見込み。ピンがパネルに隠れないよう中心をずらす */
+  /** 下から重なるパネルの高さ(px)の見込み。ピンがパネルに隠れないよう中心をずらす（カメラ用。上限あり） */
   bottomInset: number;
+  /** 下から重なるパネルの、いまの実際の高さ(px)。出典（地理院タイル）をパネルの上に出すのに使う */
+  panelHeight: number;
   reducedMotion: boolean;
   onFail?: () => void;
 };
 
-export default function JapanMap({ point, focus, bottomInset, reducedMotion, onFail }: JapanMapProps) {
+export default function JapanMap({ point, focus, bottomInset, panelHeight, reducedMotion, onFail }: JapanMapProps) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const pin = useRef<Marker | null>(null);
   /** 背景の決め方（低ズームのタイルの確認結果） */
   const base = useRef<BasePlan>("pale");
-  /** 日本全体 → 地点などの長いカメラの動きの最中か（その間は、パネルの高さの追従で動きを止めない） */
+  /** カメラが動いている最中か（movestart〜moveend。その間は、パネルの高さの追従で動きを止めない） */
   const moving = useRef(false);
+  /** 最初の実行か（最初に地点が無いときは、地図を作ったときの日本全体のまま） */
+  const first = useRef(true);
   /** 最後にカメラへ反映した、パネルの高さの見込み */
   const applied = useRef(bottomInset);
   const latest = useRef({ point, bottomInset, reducedMotion, onFail });
@@ -119,7 +123,11 @@ export default function JapanMap({ point, focus, bottomInset, reducedMotion, onF
       if (!loaded && ++errors === 8) latest.current.onFail?.();
     });
 
-    // 長いカメラの動きが終わったら、動いている間に変わったパネルの高さへ中心を合わせる
+    // カメラが動いている間（自動の動きも、指で動かしているときも）は、パネルの高さの追従で動きを止めない。動きが終わったら、
+    // 動いている間に変わったパネルの高さへ中心を合わせる
+    m.on("movestart", () => {
+      moving.current = true;
+    });
     m.on("moveend", () => {
       moving.current = false;
       const want = latest.current.bottomInset;
@@ -129,9 +137,10 @@ export default function JapanMap({ point, focus, bottomInset, reducedMotion, onF
     });
 
     // 低ズームの背景が配信されているかを確かめ、無ければ代わりを使う
+    // （地図の読み込みやタイルの取得の途中でも、スタイルが読めていれば足せる）
     const whenStyleReady = (fn: () => void) => {
-      if (m.isStyleLoaded()) fn();
-      else m.once("load", fn);
+      if (m.getSource("pale")) fn();
+      else m.once("styledata", fn);
     };
     void probeLowZoom((url) => imageLoads(url)).then((available) => {
       if (disposed) return;
@@ -145,9 +154,14 @@ export default function JapanMap({ point, focus, bottomInset, reducedMotion, onF
           m.addLayer({ id: "std-low", type: "raster", source: "std-low", maxzoom: LOW_ZOOM_LAYER_MAX }, "pale");
         });
       } else {
-        // どちらも無い：読むタイルが z5 以上になる範囲（北海道〜九州）だけを見せる
-        m.setMinZoom(MAIN_ONLY_MIN_ZOOM);
-        if (!latest.current.point) m.fitBounds(JAPAN_MAIN_BOUNDS, { padding: pad(latest.current.bottomInset + 8, SIDE), duration: 0 });
+        // どちらも無い：読むタイルが z5 以上になる範囲（北海道〜九州）だけを見せる。カメラが動いている最中なら、終わってから
+        const mainOnly = () => {
+          if (disposed) return;
+          m.setMinZoom(MAIN_ONLY_MIN_ZOOM);
+          if (!latest.current.point) fitWith(m, JAPAN_MAIN_BOUNDS, pad(latest.current.bottomInset + 8, SIDE), 0);
+        };
+        if (moving.current) m.once("moveend", mainOnly);
+        else mainOnly();
       }
     });
 
@@ -165,11 +179,15 @@ export default function JapanMap({ point, focus, bottomInset, reducedMotion, onF
   useEffect(() => {
     const m = map.current;
     if (!m) return;
+    // 最初の表示で地点が無いときは、地図を作ったときの日本全体のまま（もう一度合わせ直さない）
+    if (first.current) {
+      first.current = false;
+      if (!point) return;
+    }
     const { bottomInset: inset, reducedMotion: rm } = latest.current;
     const duration = rm ? 0 : MOVE_MS;
     applied.current = inset;
     m.stop();
-    moving.current = !rm;
     if (point) {
       if (!pin.current) {
         const el = document.createElement("div");
@@ -185,7 +203,7 @@ export default function JapanMap({ point, focus, bottomInset, reducedMotion, onF
     } else {
       pin.current?.remove();
       pin.current = null;
-      m.fitBounds(base.current === "main-only" ? JAPAN_MAIN_BOUNDS : JAPAN_BOUNDS, { padding: pad(inset + 8, SIDE), duration, essential: false });
+      fitWith(m, base.current === "main-only" ? JAPAN_MAIN_BOUNDS : JAPAN_BOUNDS, pad(inset + 8, SIDE), duration);
     }
   }, [point, focus]);
 
@@ -202,16 +220,29 @@ export default function JapanMap({ point, focus, bottomInset, reducedMotion, onF
     <div
       ref={box}
       className="mui-japan-map absolute inset-0"
-      style={{ "--mui-map-bottom": `${bottomInset}px` } as React.CSSProperties}
+      style={{ "--mui-map-bottom": `${panelHeight}px` } as React.CSSProperties}
       role="group"
       aria-label="日本地図"
     />
   );
 }
 
+/**
+ * 範囲に合わせて動かす。fitBounds の余白は、地図がすでに持っている余白（easeTo の padding で付く）に足されるので、
+ * 欲しい余白と今の余白の差で渡す（そのまま渡すと二重になり、余白が画面より大きいと何もせず警告だけ出して止まる）
+ */
+function fitWith(m: MapLibreMap, bounds: [[number, number], [number, number]], want: { top: number; bottom: number; left: number; right: number }, duration: number) {
+  const cur = m.getPadding();
+  m.fitBounds(bounds, {
+    padding: { top: want.top - (cur.top ?? 0), bottom: want.bottom - (cur.bottom ?? 0), left: want.left - (cur.left ?? 0), right: want.right - (cur.right ?? 0) },
+    duration,
+    essential: false,
+  });
+}
+
 /** パネルの高さに合わせて、地点（または日本全体）の位置だけを短く追従させる */
 function settle(m: MapLibreMap, point: { lat: number; lng: number } | null, inset: number, reduced: boolean, plan: BasePlan) {
   const duration = reduced ? 0 : SETTLE_MS;
   if (point) m.easeTo({ padding: pad(inset), duration, essential: false });
-  else m.fitBounds(plan === "main-only" ? JAPAN_MAIN_BOUNDS : JAPAN_BOUNDS, { padding: pad(inset + 8, SIDE), duration, essential: false });
+  else fitWith(m, plan === "main-only" ? JAPAN_MAIN_BOUNDS : JAPAN_BOUNDS, pad(inset + 8, SIDE), duration);
 }

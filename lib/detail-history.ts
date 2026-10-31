@@ -21,6 +21,15 @@ export const resultState = (cur: NavState, push: boolean): Record<string, unknow
 export const withoutDetail = (cur: NavState): Record<string, unknown> => ({ ...(cur ?? {}), detail: false });
 
 /**
+ * ホームへ戻るとき、履歴をいくつ戻すか。0 なら履歴は戻さず、いまの画面をホームに置き換える
+ * （最初の画面が結果で、戻る先のホームの履歴が無いとき。詳細の履歴が積まれていても、その分は数えずに判断する）
+ */
+export function stepsToHome(depth: number, detailOpen: boolean): number {
+  const resultDepth = detailOpen ? depth - 1 : depth;
+  return resultDepth > 0 ? depth : 0;
+}
+
+/**
  * popstate（戻る・進む）の扱い。
  * - skip：画面の「戻る」ボタンで自分が history.back() した分。何もしない
  * - close-detail：詳細を出している最中の端末の「戻る」。詳細（と、その上の地図）だけ閉じる。検索し直さない

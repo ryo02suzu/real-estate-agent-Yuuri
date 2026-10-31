@@ -264,6 +264,10 @@ body {
   bottom: var(--mui-map-bottom, 0px);
   transition: bottom var(--mui-dur-panel) var(--mui-ease);
 }
+/* パネルが大きいときは、上の操作帯と地図の見える帯がせまいので、出典の文字を小さくする（消さない） */
+.mui-japan-map .maplibregl-ctrl-attrib {
+  font-size: 10px;
+}
 
 /*
  * スマホ（1024px 未満）で新UIを使っている間（body[data-mui]）、シート・メニューなどポータルの金色を青緑にそろえる。

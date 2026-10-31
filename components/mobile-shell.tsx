@@ -265,7 +265,7 @@ export function MobileShell({
     <PanelDetailContext.Provider value={api}>
       <div className="relative min-h-0 flex-1 overflow-hidden bg-[var(--mui-primary-soft)] text-[var(--mui-ink)]">
         {/* 地図が失敗しても、住所入力（下のパネル）は使える */}
-        {mapOk && <JapanMap point={cam} focus={focus} bottomInset={mapInset} reducedMotion={reduced} onFail={() => setMapOk(false)} />}
+        {mapOk && <JapanMap point={cam} focus={focus} bottomInset={mapInset} panelHeight={panelH} reducedMotion={reduced} onFail={() => setMapOk(false)} />}
         {!mapOk && (
           <p role="status" className="absolute inset-x-4 top-24 rounded-xl bg-white/90 p-3 text-[12px] text-[var(--mui-muted)]">
             地図を表示できませんでした。住所を入力して調べられます。

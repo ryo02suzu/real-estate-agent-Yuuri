@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decidePop, depthOf, detailState, resultState, withoutDetail } from "./detail-history";
+import { decidePop, depthOf, detailState, resultState, stepsToHome, withoutDetail } from "./detail-history";
 
 describe("詳細と端末の「戻る」", () => {
   it("深さ：印が無ければ0、あればその数", () => {
@@ -24,6 +24,15 @@ describe("詳細と端末の「戻る」", () => {
 
   it("印だけ外す", () => {
     expect(withoutDetail({ depth: 3, detail: true })).toEqual({ depth: 3, detail: false });
+  });
+
+  it("ホームへ戻る歩数：結果を積んだ分（詳細の分を含めて）戻る。最初の画面が結果なら戻さず置き換える", () => {
+    expect(stepsToHome(2, false)).toBe(2);
+    expect(stepsToHome(3, true)).toBe(3); // ホーム→結果→結果→詳細：詳細の分も含めて3つ戻る
+    expect(stepsToHome(0, false)).toBe(0);
+    // ?q= で直接開いた結果（深さ0）で詳細を開いている（深さ1）：戻る先のホームの履歴は無いので、戻さずにホームに置き換える
+    expect(stepsToHome(1, true)).toBe(0);
+    expect(stepsToHome(0, true)).toBe(0);
   });
 
   it("画面の「戻る」で自分が戻した分は何もしない（詳細が開いていても、印があっても）", () => {

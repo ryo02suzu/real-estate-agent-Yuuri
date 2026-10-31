@@ -13,7 +13,7 @@ import { MobileShell } from "@/components/mobile-shell";
 import { DETAIL_CLOSE_EVENT } from "@/components/panel-detail";
 import type { MapOpen } from "@/components/result-view";
 import { Sheet } from "@/components/sheet";
-import { decidePop, depthOf, detailState, resultState, withoutDetail, type NavState } from "@/lib/detail-history";
+import { decidePop, depthOf, detailState, resultState, stepsToHome, withoutDetail, type NavState } from "@/lib/detail-history";
 import { addHistory, clearHistory, loadHistory, type HistoryItem } from "@/lib/history";
 import { createGeneration, runGuarded } from "@/lib/search-gen";
 import { lookup, lookupPoint, MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
@@ -170,17 +170,27 @@ export default function Home() {
     }
   }, []);
 
+  // 画面が PC 用に替わったとき（iPad の横向きなど）、スマホの詳細の履歴の印が残っていれば、詳細は閉じたものとして印を外す
+  // （残すと、PC で次の「戻る」が詳細を閉じる扱いになって、1回効かなくなる）
+  useEffect(() => {
+    if (!desktop || !detailHist.current) return;
+    detailHist.current = false;
+    window.history.replaceState(withoutDetail(window.history.state as NavState), "");
+  }, [desktop]);
+
   // ホームへ。結果画面を積んできた分だけ戻る（地図で選び直した画面も含めて一度に）
   function backHome() {
     gen.current.cancel();
     // 詳細の履歴も含めて一度に戻るので、詳細だけ閉じる扱いにしない
+    const detailOpen = detailHist.current;
     detailHist.current = false;
     setLoading(false);
     setError(null);
-    const depth = historyDepth();
-    if (depth > 0) window.history.go(-depth);
+    const steps = stepsToHome(historyDepth(), detailOpen);
+    if (steps > 0) window.history.go(-steps);
     else {
-      window.history.replaceState(window.history.state, "", window.location.pathname);
+      // 戻る先のホームの履歴が無い（?q= で直接開いた）ときは、履歴は戻さず、いまの画面（詳細の履歴があればそれ）をホームに置き換える
+      window.history.replaceState({ ...((window.history.state as object | null) ?? {}), depth: 0, detail: false }, "", window.location.pathname);
       setShown(null);
     }
   }
