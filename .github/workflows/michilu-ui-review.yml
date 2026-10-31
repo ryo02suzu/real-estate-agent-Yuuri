@@ -13,9 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      REVIEW_URL: https://michilu.vercel.app
-      REVIEW_SHA: 817d037f0a014b22f507ffb40a295a9353877980
-      REVIEW_PHASE: baseline
+      REVIEW_URL: https://michilu-ix64e6cot-sourirettes-projects.vercel.app
+      REVIEW_SHA: ec9252de54e8f456034e9db96e33f1f0556e51f2
+      REVIEW_PHASE: preview-ec9252d
     steps:
       - uses: actions/checkout@v4
         with:
