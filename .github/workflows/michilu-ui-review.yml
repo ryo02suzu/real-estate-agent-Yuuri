@@ -1,0 +1,100 @@
+name: MICHILU UI review evidence
+on:
+  push:
+    branches: [qa/michilu-ui-v2-review]
+    paths: [.github/workflows/michilu-ui-review.yml]
+permissions:
+  contents: read
+concurrency:
+  group: michilu-ui-review
+  cancel-in-progress: false
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      REVIEW_URL: https://michilu.vercel.app
+      REVIEW_SHA: 817d037f0a014b22f507ffb40a295a9353877980
+      REVIEW_PHASE: baseline
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install isolated browser tools
+        run: |
+          python3 -m venv "$RUNNER_TEMP/michilu-browser"
+          "$RUNNER_TEMP/michilu-browser/bin/pip" install playwright==1.62.0
+          "$RUNNER_TEMP/michilu-browser/bin/playwright" install --with-deps chromium webkit
+      - name: Capture public test pages
+        shell: bash
+        run: |
+          "$RUNNER_TEMP/michilu-browser/bin/python" - <<'PY'
+          import asyncio, json, os, re, platform
+          from pathlib import Path
+          from playwright.async_api import async_playwright
+          out = Path("ui-review")
+          out.mkdir(exist_ok=True)
+          report = {"url": os.environ["REVIEW_URL"], "sha": os.environ["REVIEW_SHA"], "phase": os.environ["REVIEW_PHASE"], "os": platform.platform(), "real_iphone": False, "checks": []}
+          async def snapshot(page, name, record):
+              await page.screenshot(path=str(out / (name + ".png")), full_page=True)
+              (out / (name + ".txt")).write_text(await page.locator("body").inner_text(), encoding="utf-8")
+              record["layout"] = await page.evaluate("""() => ({
+                width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,
+                horizontalOverflow:document.documentElement.scrollWidth>innerWidth+1,
+                inputs:[...document.querySelectorAll('input')].filter(e=>e.getBoundingClientRect().width).map(e=>({name:e.getAttribute('aria-label')||e.id,fontSize:getComputedStyle(e).fontSize,box:e.getBoundingClientRect().toJSON()})),
+                controls:[...document.querySelectorAll('button,a')].filter(e=>e.getBoundingClientRect().width).map(e=>({text:e.getAttribute('aria-label')||e.innerText,box:e.getBoundingClientRect().toJSON()}))
+              })""")
+          async def run():
+              async with async_playwright() as pw:
+                  for engine in ["chromium", "webkit"]:
+                      browser = await getattr(pw, engine).launch()
+                      sizes = [(375,667),(390,844),(402,874),(430,932),(844,390),(1024,768),(1440,900)] if engine == "chromium" else [(390,844)]
+                      for width,height in sizes:
+                          name = f"{engine}-{width}x{height}"
+                          record = {"name":name,"browser_version":browser.version,"console_errors":[],"failed_requests":[]}
+                          report["checks"].append(record)
+                          ctx = await browser.new_context(viewport={"width":width,"height":height},device_scale_factor=1,locale="ja-JP",is_mobile=width<1024,has_touch=width<1024)
+                          page = await ctx.new_page()
+                          page.on("pageerror", lambda error,r=record:r["console_errors"].append(str(error)))
+                          page.on("requestfailed", lambda req,r=record:r["failed_requests"].append({"url":req.url,"failure":req.failure}))
+                          try:
+                              response=await page.goto(report["url"],wait_until="domcontentloaded",timeout=40000)
+                              record["http_status"]=response.status if response else None
+                              await page.locator("input").first.wait_for(state="visible",timeout=20000)
+                              await page.evaluate("document.fonts.ready")
+                              await page.wait_for_timeout(1800)
+                              await snapshot(page,name+"-home",record)
+                              record["status"]="captured"
+                              if width==390:
+                                  await page.get_by_role("textbox",name=re.compile("住所")).first.fill("東京都新宿区西新宿2丁目8番1号")
+                                  await snapshot(page,name+"-input",{})
+                                  await page.get_by_role("button",name="検索",exact=True).first.click()
+                                  try:
+                                      await page.wait_for_function("location.search.includes('q=')",timeout=35000)
+                                  except Exception as e: record["search_wait_error"]=str(e)[:600]
+                                  await page.wait_for_timeout(6000)
+                                  await snapshot(page,name+"-result",record)
+                                  record["result_url"]=page.url
+                                  detail=page.get_by_role("button",name=re.compile("^都市計画")).first
+                                  if await detail.count() and await detail.is_visible():
+                                      await detail.click()
+                                      await page.wait_for_timeout(600)
+                                      await snapshot(page,name+"-detail",{})
+                                      record["detail_clicked"]=True
+                          except Exception as e:
+                              record["status"]="blocked"
+                              record["error"]=str(e)[:1200]
+                              try: await snapshot(page,name+"-blocked",{})
+                              except Exception: pass
+                          await ctx.close()
+                          (out/"report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
+                      await browser.close()
+              print(json.dumps({"phase":report["phase"],"sha":report["sha"],"checks":[{k:v for k,v in r.items() if k not in ["layout","failed_requests"]} for r in report["checks"]]},ensure_ascii=False))
+          asyncio.run(run())
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: michilu-ui-review-evidence
+          path: ui-review/
+          retention-days: 14
