@@ -8,20 +8,24 @@ import { withRetry } from "@/lib/retry";
 import { lineLabel, nearestStations, STATION_CREDIT, type StationWalk } from "@/lib/roadmap/walk";
 import { ChevronRightIcon, TrainIcon } from "./icons";
 import { Notes } from "./notes";
+import { RetryRow, RowAction } from "./panel-row";
 import { PoiList, type PoiState } from "./poi-card";
 import { Sheet } from "./sheet";
 import { Tabs } from "./tabs";
 
-export type StationState = { status: "loading" } | { status: "error" } | { status: "ok"; stations: StationWalk[] };
+/** error の retry：読み込み直す */
+export type StationState = { status: "loading" } | { status: "error"; retry?: () => void } | { status: "ok"; stations: StationWalk[] };
 
 export function useStations(lat: number, lng: number): StationState {
-  const key = `${lat},${lng}`;
+  // 読み込み直すたびに増やす（同じ地点でも読み直す）
+  const [attempt, setAttempt] = useState(0);
+  const key = `${lat},${lng}#${attempt}`;
   const [state, setState] = useState<{ key: string; value: StationState }>();
   useEffect(() => {
     let alive = true;
     withRetry(() => nearestStations(lat, lng))
       .then((stations) => alive && setState({ key, value: { status: "ok", stations } }))
-      .catch(() => alive && setState({ key, value: { status: "error" } }));
+      .catch(() => alive && setState({ key, value: { status: "error", retry: () => setAttempt((n) => n + 1) } }));
     return () => {
       alive = false;
     };
@@ -47,9 +51,17 @@ const distText = (m: number) => (m >= 1000 ? `約${(m / 1000).toFixed(1)}km` : `
 export function StationLine({ state, pois, onOpen, panel }: { state: StationState; pois?: PoiState; onOpen?: () => void; /** スマホの結果パネルの1行：見出し・「ほか○駅」も出す（押すと同じパネルの中で詳細） */ panel?: boolean }) {
   const [open, setOpen] = useState(false);
   const rich = !!onOpen || !!panel;
-  if (state.status === "ok" && state.stations.length === 0) return null;
   // 周辺施設のデータが無い（施設が1つも無い）ときは、駅だけのシート
   const withPois = pois && !(pois.status === "ok" && pois.pois.length === 0);
+  // スマホの結果パネル：行は消さない。読めなければ「再読み込み」、駅が読めない・近くに駅が無くても周辺施設の入口は残す
+  if (panel && state.status === "error" && state.retry)
+    return (
+      <RetryRow label="最寄り駅" icon={<TrainIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />} onRetry={state.retry}>
+        {withPois && pois && <PoiEntry pois={pois} />}
+      </RetryRow>
+    );
+  if (panel && state.status === "ok" && state.stations.length === 0) return <NoStationRow pois={withPois ? pois : undefined} />;
+  if (state.status === "ok" && state.stations.length === 0) return null;
   const top = state.status === "ok" ? state.stations[0] : undefined;
   const more = state.status === "ok" ? state.stations.length - 1 : 0;
   return (
@@ -81,6 +93,47 @@ export function StationLine({ state, pois, onOpen, panel }: { state: StationStat
           )}
         </Sheet>
       )}
+    </>
+  );
+}
+
+/**
+ * スマホの結果パネル：近く（20km以内）に駅のデータが無い地点の行（島など）。押すと理由と、周辺施設があればそのタブ（同じパネルの中の詳細）
+ */
+function NoStationRow({ pois }: { pois?: PoiState }) {
+  const [open, setOpen] = useState(false);
+  const none = (
+    <div>
+      <p className="py-2 text-[14px] leading-[1.6] text-ink">物件から20km以内に、国のデータ（国土数値情報の鉄道データ）にある駅がありません。</p>
+      <Notes lead="バスなどほかの交通は載っていません。" source="国土数値情報（鉄道データ）（国土交通省）">
+        <p>{STATION_CREDIT}</p>
+      </Notes>
+    </div>
+  );
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="mui-row-btn">
+        <TrainIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
+        <span className="mui-row-label">最寄り駅</span>
+        <span className="min-w-0 flex-1 truncate text-[var(--mui-muted)]">{pois ? "近くに駅なし・周辺施設を見る" : "近く（20km以内）に駅のデータなし"}</span>
+        <ChevronRightIcon className="ml-auto h-4 w-4 shrink-0 text-[var(--mui-muted)]" />
+      </button>
+      <Sheet detail title={pois ? "最寄り駅・周辺施設（徒歩の目安）" : "最寄り駅"} open={open} onClose={() => setOpen(false)}>
+        {pois ? <Tabs names={["最寄り駅", "周辺施設"]} panels={[<div key="s">{none}</div>, <PoiList key="p" state={pois} />]} /> : none}
+      </Sheet>
+    </>
+  );
+}
+
+/** スマホの結果パネル：駅が読めなかった行の下の「周辺施設」（同じパネルの中の詳細で開く） */
+function PoiEntry({ pois }: { pois: PoiState }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <RowAction onClick={() => setOpen(true)}>周辺施設を見る</RowAction>
+      <Sheet detail title="周辺施設（徒歩の目安）" open={open} onClose={() => setOpen(false)}>
+        <PoiList state={pois} />
+      </Sheet>
     </>
   );
 }

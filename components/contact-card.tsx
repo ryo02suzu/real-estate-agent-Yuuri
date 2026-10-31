@@ -19,7 +19,7 @@ export function ContactCard({ contact, city, address }: { contact: Contact; city
       <h3 className="flex items-center gap-2 border-b border-line/70 pb-2 text-[13px] font-semibold text-ink">
         <PhoneIcon className="h-4 w-4 text-brand-light" />
         お問い合わせ先
-        <button onClick={() => setMemo(true)} className="ml-auto flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 text-[11px] font-normal text-brand">
+        <button onClick={() => setMemo(true)} className="mui-hit ml-auto flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 text-[11px] font-normal text-brand">
           <NoteIcon className="h-3.5 w-3.5" />
           窓口で聞くこと
         </button>

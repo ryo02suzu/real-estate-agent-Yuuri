@@ -29,11 +29,12 @@ import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
 import { AlertIcon, ChevronRightIcon, ExternalIcon, HazardIcon, MapIcon } from "./icons";
 import { Notes } from "./notes";
 import { usePanelDetail } from "./panel-detail";
+import { RetryRow, RowLink } from "./panel-row";
 import { Sheet } from "./sheet";
 
 export type HazardState =
   | { status: "loading" }
-  | { status: "error" }
+  | { status: "error"; /** 読み込み直す */ retry?: () => void; /** 読めなくても開ける、市区町村のハザードマップ（わがまちハザードマップ）の市区町村コード */ muniCd?: string }
   | {
       status: "ok";
       report: HazardReport;
@@ -61,11 +62,14 @@ async function readHazard(lat: number, lng: number): Promise<HazardReport> {
 /** 地点の災害リスクと地面の高さ、市区町村のハザードマップのページを読む */
 export function useHazard(lat: number, lng: number, municipality: Municipality): HazardState {
   const codes = municipality.codes.join(",");
-  const key = `${lat},${lng},${codes}`;
+  // 読み込み直すたびに増やす（同じ地点でも読み直す）
+  const [attempt, setAttempt] = useState(0);
+  const key = `${lat},${lng},${codes}#${attempt}`;
   const [state, setState] = useState<{ key: string; value: HazardState }>();
   useEffect(() => {
     let alive = true;
     const list = codes.split(",");
+    const failed: HazardState = { status: "error", retry: () => setAttempt((n) => n + 1), muniCd: list[0] };
     Promise.all([
       readHazard(lat, lng),
       elevationAt(lat, lng, browserTileFetcher).catch(() => null),
@@ -75,10 +79,10 @@ export function useHazard(lat: number, lng: number, municipality: Municipality):
         if (!alive) return;
         const read = HAZARD_KINDS.filter((k) => report[k]);
         // どの種類も読めなかったときは「読み込めませんでした」
-        if (read.length > 0 && read.every((k) => report[k]?.status === "error")) return setState({ key, value: { status: "error" } });
+        if (read.length > 0 && read.every((k) => report[k]?.status === "error")) return setState({ key, value: failed });
         setState({ key, value: { status: "ok", report, elevation, maps: index ? hazardMapsFor(list, index) : {}, muniCd: list[0], ground: groundMaps(lat, lng) } });
       })
-      .catch(() => alive && setState({ key, value: { status: "error" } }));
+      .catch(() => alive && setState({ key, value: failed }));
     return () => {
       alive = false;
     };
@@ -110,6 +114,13 @@ export function HazardLine({
   // 結果パネルの中の詳細なら、地図の重ね表示へ移っても詳細は開いたまま（地図を閉じると同じ詳細に戻る）
   const inPanel = !!usePanelDetail();
   const chips = state.status === "ok" ? hazardChips(state.report) : [];
+  // スマホの結果パネル（onOpen が無い）：読めなければ行を「再読み込み」にする（PC は従来どおり）
+  if (!onOpen && state.status === "error" && state.retry)
+    return (
+      <RetryRow label="災害リスク" icon={<HazardIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />} onRetry={state.retry}>
+        {state.muniCd && <RowLink href={wagamachiUrl(state.muniCd)}>{city}のハザードマップ</RowLink>}
+      </RetryRow>
+    );
   return (
     <>
       <button

@@ -235,3 +235,11 @@ export const ShopIcon = ({ className }: P) => (
     <path d="M9 11V6a3 3 0 0 1 6 0v5" />
   </svg>
 );
+
+/** 読み込み直す（丸い矢印） */
+export const RetryIcon = ({ className }: P) => (
+  <svg {...base} className={className}>
+    <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+    <path d="M20 4v4.5h-4.5" />
+  </svg>
+);

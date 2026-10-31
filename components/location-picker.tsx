@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { muniName, reverseGeocode } from "@/lib/roadmap";
 import { CloseIcon, PinIcon } from "./icons";
 import { MapPanel } from "./map-panel";
+import { useModal } from "./use-modal";
 
 /** 町名まで読める程度に拡大してから選んでもらう */
 const MIN_ZOOM = 14;
@@ -19,8 +20,8 @@ export function LocationPicker({
   onClose,
   onPick,
 }: {
-  /** 最初に表示する地点（無ければ関東全体） */
-  start?: { lat: number; lng: number };
+  /** 最初に表示する地点（無ければ関東全体）と、そのズーム（位置の目安に合わせる。町の中心なら引いて開く。無ければ 17） */
+  start?: { lat: number; lng: number; zoom?: number };
   onClose: () => void;
   onPick: (lat: number, lng: number) => void;
 }) {
@@ -47,19 +48,17 @@ export function LocationPicker({
     };
   }, [key]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  // 一時的に重なる画面：開いたらこの画面にフォーカス、Tab は中だけ、背景は触れない、Esc・端末の「戻る」で閉じ、閉じたら開いた元へフォーカスを戻す
+  const root = useRef<HTMLDivElement>(null);
+  useModal(root, true, onClose);
 
   const zoomedIn = !!center && center.zoom >= MIN_ZOOM;
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white" role="dialog" aria-modal="true" aria-label="地図で物件の場所を選ぶ">
+    <div ref={root} tabIndex={-1} className="fixed inset-0 z-50 flex flex-col bg-white outline-none" role="dialog" aria-modal="true" aria-label="地図で物件の場所を選ぶ">
       <header className="flex items-center gap-2 px-4 pb-2 pt-[max(10px,env(safe-area-inset-top))]">
         <PinIcon className="h-5 w-5 text-brand" />
         <h2 className="flex-1 text-[15px] font-semibold text-ink">地図で物件の場所を選ぶ</h2>
-        <button onClick={onClose} aria-label="閉じる" className="rounded-full p-2 text-muted hover:bg-mint">
+        <button onClick={onClose} aria-label="閉じる" className="mui-hit rounded-full p-2 text-muted hover:bg-mint">
           <CloseIcon className="h-5 w-5" />
         </button>
       </header>
@@ -67,6 +66,7 @@ export function LocationPicker({
         <MapPanel
           mode="crosshair"
           point={start}
+          startZoom={start?.zoom}
           onCenter={(lat, lng, zoom, parcel) => setCenter({ lat, lng, zoom, parcel })}
           fallback={<p className="p-6 text-center text-sm text-muted">この端末では地図を表示できません。住所で検索してください。</p>}
         />

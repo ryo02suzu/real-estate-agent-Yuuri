@@ -16,13 +16,14 @@ import { MORIDO_DATA, moridoAt, moridoDetail, moridoNote, moridoNotice, moridoVa
 import { pmtilesMoridoSource } from "@/lib/roadmap/morido-tiles";
 import { suidoFor, type SuidoLink } from "@/lib/roadmap/suido";
 import { TOCHI_YEAR, tochiAt, tochiCheck, tochiLine, type Tochi } from "@/lib/roadmap/tochi";
-import { contactLinkText, contactName, noContactText, utilitiesFor, type UtilityContact, type UtilityKind, type Utilities } from "@/lib/roadmap/utilities";
+import { contactLinkText, contactName, noContactText, UTILITIES_CHECKED, utilitiesFor, type UtilityContact, type UtilityKind, type Utilities } from "@/lib/roadmap/utilities";
 import { pmtilesTochiSource } from "@/lib/roadmap/tochi-tiles";
 import { statusFor, zoningAt, zoningChips, zoningRows, type Zoning, type ZoningStatus } from "@/lib/roadmap/zoning";
 import { ZONING_DATA } from "@/lib/roadmap/zoning-data";
 import { pmtilesZoningSource } from "@/lib/roadmap/zoning-tiles";
 import { AlertIcon, ChevronRightIcon, ZoningIcon } from "./icons";
 import { Notes } from "./notes";
+import { RetryRow } from "./panel-row";
 import { Sheet } from "./sheet";
 
 /**
@@ -31,16 +32,19 @@ import { Sheet } from "./sheet";
  */
 export type ZoningState =
   | { status: "loading" }
-  | { status: "error" }
+  | { status: "error"; /** 読み込み直す */ retry?: () => void }
   | { status: "ok"; zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi; iseki?: Iseki; suido?: SuidoLink[]; utilities?: Utilities };
 
 /** 地点の都市計画を読む（市区町村のデータの有無と時点も） */
 export function useZoning(lat: number, lng: number, municipality: Municipality): ZoningState {
   const codes = municipality.codes.join(",");
-  const key = `${lat},${lng},${codes}`;
+  // 読み込み直すたびに増やす（同じ地点でも読み直す）
+  const [attempt, setAttempt] = useState(0);
+  const key = `${lat},${lng},${codes}#${attempt}`;
   const [state, setState] = useState<{ key: string; value: ZoningState }>();
   useEffect(() => {
     let alive = true;
+    const failed: ZoningState = { status: "error", retry: () => setAttempt((n) => n + 1) };
     Promise.all([
       withRetry(() => zoningAt(lat, lng, pmtilesZoningSource)),
       import("@/lib/roadmap/data/zoning-status.json"),
@@ -59,10 +63,10 @@ export function useZoning(lat: number, lng: number, municipality: Municipality):
           key,
           value: zoning
             ? { status: "ok", zoning, st, morido: morido ?? undefined, hourei: hourei ?? undefined, tochi: tochi ?? undefined, iseki, suido, utilities }
-            : { status: "error" },
+            : failed,
         });
       })
-      .catch(() => alive && setState({ key, value: { status: "error" } }));
+      .catch(() => alive && setState({ key, value: failed }));
     return () => {
       alive = false;
     };
@@ -93,6 +97,8 @@ export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: 
   const [open, setOpen] = useState(false);
   // 砂防指定地・急傾斜地などの区域に入っていれば、用途地域の次に注意の印を出す
   const chips = state.status === "ok" ? zoningChips(state.zoning).flatMap((c, i) => (i === 0 ? [c, ...houreiChips(state.hourei), ...tochiChips(state.tochi)] : [c])) : [];
+  // スマホの結果パネル（onOpen が無い）：読めなければ行を「再読み込み」にする（PC は従来どおり）
+  if (!onOpen && state.status === "error" && state.retry) return <RetryRow label="都市計画・法令" icon={<ZoningIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />} onRetry={state.retry} />;
   return (
     <>
       <button
@@ -128,23 +134,32 @@ export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: 
   );
 }
 
-/** スマホの結果パネル：「上下水道・ガス」の行。同じ詳細シートを「上下水道・ガス」のタブで開く（F07） */
-export function UtilityLine({ state, city }: { state: ZoningState; city: string }) {
-  const [open, setOpen] = useState(false);
+/**
+ * スマホの結果パネル：「上下水道・ガス」の行（F07）。都市計画が読めていれば、同じ詳細を「上下水道・ガス」のタブで開く。
+ * 照会先・台帳の地図は市区町村と地点だけで決まる（lib/roadmap/utilities.ts・suido.ts）ので、都市計画のタイルを読み込み中・
+ * 読めなかったときも、この分だけの詳細を開ける（失敗の行にしない）
+ */
+export function UtilityLine({ state, city, municipality, lat, lng }: { state: ZoningState; city: string; municipality: Municipality; lat: number; lng: number }) {
+  const [open, setOpen] = useState<"tabs" | "only" | null>(null);
   return (
     <>
-      <button onClick={() => setOpen(true)} disabled={state.status !== "ok"} className="mui-row-btn">
+      <button onClick={() => setOpen(state.status === "ok" ? "tabs" : "only")} className="mui-row-btn">
         <span className="mui-row-label">上下水道・ガス</span>
-        <span className="min-w-0 flex-1 truncate text-[var(--mui-muted)]">
-          {state.status === "loading" ? "確認中…" : state.status === "error" ? "データを読み込めませんでした" : "照会先・台帳の地図を見る"}
-        </span>
-        {state.status === "ok" && <ChevronRightIcon className="ml-auto h-4 w-4 shrink-0 text-[var(--mui-muted)]" />}
+        <span className="min-w-0 flex-1 truncate text-[var(--mui-muted)]">照会先・台帳の地図を見る</span>
+        <ChevronRightIcon className="ml-auto h-4 w-4 shrink-0 text-[var(--mui-muted)]" />
       </button>
-      {state.status === "ok" && (
-        <Sheet detail title="上下水道・ガス（参考）" open={open} onClose={() => setOpen(false)}>
+      <Sheet detail title="上下水道・ガス（参考）" open={!!open} onClose={() => setOpen(null)}>
+        {open === "tabs" && state.status === "ok" ? (
           <ZoningDetail state={state} city={city} tabs initialTab={2} />
-        </Sheet>
-      )}
+        ) : (
+          <>
+            <UtilityPart utilities={utilitiesFor(municipality)} suido={suidoFor(municipality, lat, lng)} city={city} />
+            <Notes lead="前面道路の本管・口径・引込みの有無は、照会先・窓口で確かめてください。">
+              <p>照会先は、事業者・市区町村・都県の公式のページで調べたものです（{UTILITIES_CHECKED}）。</p>
+            </Notes>
+          </>
+        )}
+      </Sheet>
     </>
   );
 }
@@ -182,7 +197,7 @@ function ZoningDetail({ state, city, tabs, initialTab = 0 }: { state: Extract<Zo
         <h4 className="mb-0.5 mt-3 border-t border-line/70 pt-2.5 text-[13px] font-semibold text-ink">その他の法令（重説の下調べ）</h4>
         <OtherPart state={state} city={city} />
         <h4 className="mb-0.5 mt-3 border-t border-line/70 pt-2.5 text-[13px] font-semibold text-ink">上下水道・ガス</h4>
-        <UtilityPart state={state} city={city} />
+        <UtilityPart utilities={state.utilities} suido={state.suido} city={city} />
       </div>
     );
   return (
@@ -203,7 +218,7 @@ function ZoningDetail({ state, city, tabs, initialTab = 0 }: { state: Extract<Zo
       </div>
       {tab === 0 && <ZoningPart state={state} city={city} />}
       {tab === 1 && <OtherPart state={state} city={city} />}
-      {tab === 2 && <UtilityPart state={state} city={city} />}
+      {tab === 2 && <UtilityPart utilities={state.utilities} suido={state.suido} city={city} />}
     </div>
   );
 }
@@ -414,9 +429,8 @@ function IsekiRow({ iseki }: { iseki: Iseki }) {
 
 /** 上下水道・ガス。照会先（水道・下水道）が分かる市区町村は照会先を出し、分からなければ市区町村の担当を出す。ガスはまだ照会先を
  * 調べていないので、確かめることだけを出す（タブの名前にガスがあるのに何も無いと、探してしまうため） */
-function UtilityPart({ state, city }: { state: Extract<ZoningState, { status: "ok" }>; city: string }) {
-  const u = state.utilities;
-  const links = state.suido ?? [];
+function UtilityPart({ utilities: u, suido, city }: { utilities?: Utilities; suido?: SuidoLink[]; city: string }) {
+  const links = suido ?? [];
   return (
     <>
       {u && <p className="mb-0.5 text-[12px] leading-[1.6] text-muted densest:leading-[1.45]">前面道路の本管・口径・引込みの有無は、次の照会先で確認</p>}

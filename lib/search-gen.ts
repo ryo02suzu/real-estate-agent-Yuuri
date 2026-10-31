@@ -20,6 +20,14 @@ export function createGeneration(): Generation {
 }
 
 /**
+ * 検索の応答が届いたときの入力欄の文字。検索を始めたときの入力（startedWith）のままなら、結果の住所（query）にそろえる。
+ * 待っている間に打ち直していたら、その文字を残す（日本語の変換中の文字や、次に調べる住所を消さない）
+ */
+export function inputAfterResult(current: string, startedWith: string, query: string): string {
+  return current.trim() === startedWith.trim() ? query : current;
+}
+
+/**
  * 1回の検索を世代つきで実行する。応答が古ければ onResult / onError / onSettled のどれも呼ばない
  * （古い finally が新しい検索の読み込み表示を消さないため）。onStart は常に呼ぶ。
  * 戻り値は「この応答を画面に反映したか」。

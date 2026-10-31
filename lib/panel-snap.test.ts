@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { down, SNAP_HEIGHT, snapAfterDrag, snapForDetail, snapPx, up } from "./panel-snap";
+import { down, dragHeight, FLICK_WINDOW_MS, nextVelocity, SNAP_HEIGHT, snapAfterRelease, snapForDetail, snapPx, up, type SnapHeights } from "./panel-snap";
+
+/** 390×844 の画面の段階の高さ（小176・中54%・大は上の操作帯を残す） */
+const H: SnapHeights = { small: 176, medium: 456, large: 772 };
 
 describe("パネルの段階", () => {
   it("ボタンは端で止まる", () => {
@@ -8,12 +11,42 @@ describe("パネルの段階", () => {
     expect(up("small")).toBe("medium");
     expect(down("large")).toBe("medium");
   });
-  it("ドラッグは閾値を超えたときだけ動く", () => {
-    expect(snapAfterDrag("medium", -80)).toBe("large");
-    expect(snapAfterDrag("medium", 80)).toBe("small");
-    expect(snapAfterDrag("medium", -10)).toBe("medium");
-    expect(snapAfterDrag("large", -200)).toBe("large");
+});
+
+describe("ヘッダーのドラッグ（指に追従して、離したら近い段階へ）", () => {
+  it("ドラッグ中の高さは指の動きのとおり。小より低く・大より高くはしない", () => {
+    expect(dragHeight(456, -100, H)).toBe(556); // 上へ100px
+    expect(dragHeight(456, 120, H)).toBe(336); // 下へ120px
+    expect(dragHeight(456, -900, H)).toBe(772);
+    expect(dragHeight(456, 900, H)).toBe(176);
   });
+
+  it("ゆっくり離したら、離した高さに一番近い段階", () => {
+    expect(snapAfterRelease(600, 0, 0, H)).toBe("medium"); // 中(456)と大(772)の間で中に近い
+    expect(snapAfterRelease(650, 0, 0, H)).toBe("large");
+    expect(snapAfterRelease(300, 0, 0, H)).toBe("small");
+    expect(snapAfterRelease(456, 0, 0, H)).toBe("medium");
+  });
+
+  it("速くはじいたら、その向きで次の段階（少ししか動いていなくても）", () => {
+    expect(snapAfterRelease(470, -0.8, 10, H)).toBe("large"); // 中から少し上へはじく
+    expect(snapAfterRelease(440, 0.8, 10, H)).toBe("small"); // 中から少し下へはじく
+    expect(snapAfterRelease(772, -1.2, 10, H)).toBe("large"); // 大より上は無い
+    expect(snapAfterRelease(176, 1.2, 10, H)).toBe("small"); // 小より下は無い
+  });
+
+  it("指を止めてから離したら、はじいたことにしない（離した高さで決める）", () => {
+    expect(snapAfterRelease(470, -0.8, FLICK_WINDOW_MS + 10, H)).toBe("medium");
+  });
+
+  it("指の速さは直近の動きを重く見る。時間が進んでいなければ前の値のまま", () => {
+    expect(nextVelocity(0, -20, 10)).toBeCloseTo(-1.6);
+    expect(nextVelocity(-1, 0, 16)).toBeCloseTo(-0.2);
+    expect(nextVelocity(0.5, 10, 0)).toBe(0.5);
+  });
+});
+
+describe("パネルの段階の高さ", () => {
   it("段階の高さの見込み(px)は、CSSの高さと同じ規則（小176px・中54%・大は上の操作帯を残す）", () => {
     expect(SNAP_HEIGHT.small).toBe("176px");
     expect(SNAP_HEIGHT.medium).toBe("54dvh");

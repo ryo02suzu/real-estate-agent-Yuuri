@@ -9,12 +9,18 @@ const LAYERS = [
   ["標準", GSI_STD_URL],
 ] as const;
 
+/**
+ * ブラウザの地図（別のサイトからの読み込み）と同じく Origin を付けて取得する。付けないと配信元は CORS の許可（Access-Control-Allow-Origin）を
+ * 返さないことがあり、「CORS なし」と誤って出る。値は架空のサイト名（住所や座標は送らない）
+ */
+const ORIGIN = "https://michilu.example";
+
 describe.skipIf(!process.env.TILE_CHECK)("地理院タイルの低ズーム（本物のタイル）", () => {
   for (const [name, template] of LAYERS) {
     for (const z of [2, 3, 4, 5]) {
       it(`${name} z${z}（東京駅付近のタイル）`, { timeout: 30_000 }, async () => {
         const url = tileUrl(template, probeTile(z));
-        const res = await fetch(url);
+        const res = await fetch(url, { headers: { Origin: ORIGIN } });
         const type = res.headers.get("content-type");
         const cors = res.headers.get("access-control-allow-origin");
         console.log(`${name} z${z}: ${res.status} ${type} CORS=${cors} ${url}`);

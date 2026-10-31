@@ -117,7 +117,7 @@ function Choose({
           <li key={c.matchedAddress}>
             <button
               onClick={() => onPick(c.matchedAddress)}
-              className="flex w-full items-center gap-2 py-2.5 text-left text-[13px] text-ink"
+              className="mui-cand flex w-full items-center gap-2 py-2.5 text-left text-[13px] text-ink"
             >
               <PinOutlineIcon className="h-4 w-4 shrink-0 text-brand-light" />
               <span className="flex-1">{c.matchedAddress}</span>
@@ -287,10 +287,10 @@ function Found({
             />
           </div>
           <div>
-            <UtilityLine state={zoning} city={m.name} />
+            <UtilityLine state={zoning} city={m.name} municipality={m} lat={result.lat} lng={result.lng} />
           </div>
           <div>
-            <LandPriceLine state={landPrice} onShowMap={onExpand && ((p) => onExpand({ landPrice: p }))} />
+            <LandPriceLine state={landPrice} onShowMap={onExpand && ((p) => onExpand({ landPrice: p }))} panel />
           </div>
           <div>
             <StationLine state={stations} pois={pois} panel />
@@ -502,10 +502,10 @@ function Place({
                 ? `この地域は地番の地図データがありません。${town}`
                 : `地番の地図データを読み込めませんでした。${town}`}
             {parcelMiss.similar.length > 0 && (
-              <span className="mt-0.5 flex flex-wrap items-center gap-1">
+              <span className="mui-similar mt-0.5 flex flex-wrap items-center gap-1">
                 近い地番：
                 {parcelMiss.similar.slice(0, 4).map((c) => (
-                  <button key={c} onClick={() => onPick(`地番 ${address}${c}`)} className="rounded-full bg-mint px-2 py-px font-semibold text-brand">
+                  <button key={c} onClick={() => onPick(`地番 ${address}${c}`)} className="mui-hit rounded-full bg-mint px-2 py-px font-semibold text-brand">
                     {c}
                   </button>
                 ))}
@@ -545,7 +545,7 @@ function CopyButton({ text, tall }: { text: string; /** スマホの結果パネ
   return (
     <button
       onClick={() => copy(text)}
-      className={`flex items-center gap-1 rounded-full border border-line text-brand ${tall ? "min-h-9 px-3 text-[12px]" : "px-2.5 py-1 text-[11px]"}`}
+      className={`flex items-center gap-1 rounded-full border border-line text-brand ${tall ? "mui-hit min-h-9 px-3 text-[12px]" : "px-2.5 py-1 text-[11px]"}`}
     >
       <CopyIcon className="h-3.5 w-3.5" />
       {done ? "コピー済" : "住所コピー"}
@@ -657,7 +657,7 @@ function ShareButton({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1 rounded-full border border-line text-brand ${tall ? "min-h-9 px-3 text-[12px]" : "px-2.5 py-1 text-[11px]"}`}
+      className={`flex items-center gap-1 rounded-full border border-line text-brand ${tall ? "mui-hit min-h-9 px-3 text-[12px]" : "px-2.5 py-1 text-[11px]"}`}
     >
       {desktop ? <CopyIcon className="h-3.5 w-3.5" /> : <ShareIcon className="h-3.5 w-3.5" />}
       {done ? "コピー済" : desktop ? "結果をコピー" : "結果を共有"}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decidePop, depthOf, detailState, resultState, stepsToHome, withoutDetail } from "./detail-history";
+import { decidePop, depthOf, detailState, overlayAction, resultState, stepsToHome, withoutDetail } from "./detail-history";
 
 describe("詳細と端末の「戻る」", () => {
   it("深さ：印が無ければ0、あればその数", () => {
@@ -51,5 +51,22 @@ describe("詳細と端末の「戻る」", () => {
   it("ふつうの戻る・進むは、従来どおり調べ直す・ホームへ", () => {
     expect(decidePop({ skip: false, detailOpen: false, state: { depth: 1 } })).toBe("navigate");
     expect(decidePop({ skip: false, detailOpen: false, state: null })).toBe("navigate");
+  });
+});
+
+describe("重なった画面（詳細・シート・全画面の地図）の履歴は、いくつ重なってもひとつ", () => {
+  it("開いたら積み、全部閉じたら自分で戻す。積んだまま重ねても増やさない", () => {
+    expect(overlayAction(true, false)).toBe("push");
+    expect(overlayAction(true, true)).toBeNull();
+    expect(overlayAction(false, true)).toBe("back");
+    expect(overlayAction(false, false)).toBeNull();
+  });
+
+  it("端末の「戻る」でいちばん上だけ閉じ、まだ下に残っていれば積み直す（次の「戻る」で次の画面を閉じる）", () => {
+    // 詳細の上に全画面の地図：戻る → popstate で履歴は消費済み（has=false）、地図を閉じても詳細が残る（want=true）→ 積み直す
+    expect(decidePop({ skip: false, detailOpen: true, state: { depth: 1 } })).toBe("close-detail");
+    expect(overlayAction(true, false)).toBe("push");
+    // 次の戻る：詳細も閉じる → もう何も残っていない → 何もしない
+    expect(overlayAction(false, false)).toBeNull();
   });
 });

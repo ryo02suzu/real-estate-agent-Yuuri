@@ -15,6 +15,7 @@ import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
 import { SANKO_CITIES, sankoSource } from "@/lib/roadmap/sanko-data";
 import { ChevronRightIcon, CopyIcon, ExternalIcon, ParcelIcon } from "./icons";
 import { Notes } from "./notes";
+import { RetryRow, RowAction, RowLink } from "./panel-row";
 import { Sheet } from "./sheet";
 import { Tabs } from "./tabs";
 import { useCopy } from "./use-copy";
@@ -24,26 +25,29 @@ type Ok = Extract<LookupResult, { status: "ok" }>;
 /** どうやって決めた筆か：地番で探した・地図で選んだ地点・住所の地点（参考） */
 export type ParcelKind = "chiban" | "picked" | "address";
 
+/** none の retry：筆が無いのではなく、読み込めなかった（押すと読み込み直す。PC は従来どおり「筆なし」と同じ扱い） */
 export type ParcelInfo =
   | { status: "loading" }
-  | { status: "none" }
+  | { status: "none"; retry?: () => void }
   | { status: "ok"; parcel: Parcel; kind: ParcelKind; neighbors: Neighbor[] };
 
 /** 物件の筆と隣の筆を読む（筆が分かっていればそれを、無ければ地点の筆を探す） */
 export function useParcelInfo(result: Ok): ParcelInfo {
   const { lat, lng, parcel, picked } = result;
-  const key = `${lat},${lng},${parcel ? `${parcel.kuiki}|${parcel.chibanRaw}` : ""}`;
+  // 読み込み直すたびに増やす（同じ地点でも読み直す）
+  const [attempt, setAttempt] = useState(0);
+  const key = `${lat},${lng},${parcel ? `${parcel.kuiki}|${parcel.chibanRaw}` : ""}#${attempt}`;
   const [state, setState] = useState<{ key: string; value: ParcelInfo }>();
   useEffect(() => {
     let alive = true;
-    withRetry(async () => {
+    withRetry(async (): Promise<ParcelInfo> => {
       const p = parcel ?? (await parcelAt(lat, lng, pmtilesParcelSource));
-      if (!p) return { status: "none" } as const;
+      if (!p) return { status: "none" };
       const kind: ParcelKind = picked ? "picked" : parcel ? "chiban" : "address";
       const neighbors = await adjacentParcels(p, pmtilesParcelSource);
-      return { status: "ok", parcel: p, kind, neighbors } as const;
+      return { status: "ok", parcel: p, kind, neighbors };
     })
-      .catch(() => ({ status: "none" }) as const)
+      .catch((): ParcelInfo => ({ status: "none", retry: () => setAttempt((n) => n + 1) }))
       .then((value) => alive && setState({ key, value }));
     return () => {
       alive = false;
@@ -87,6 +91,21 @@ export function ParcelButton({
 }) {
   const [open, setOpen] = useState(false);
   if (info.status === "none") {
+    // スマホの結果パネル：行は消さない。読めなければ「再読み込み」、筆が無ければ理由と確認先（市町村の地番図・登記情報提供サービス）。
+    // 建物が分かれば、同じ詳細の「建物」のタブに出す
+    if (panel) {
+      const label = withBuilding ? "地番・建物" : "地番・隣地";
+      // 読めなかったときも、市町村の地番図・登記情報提供サービス（通信と関係なく開ける）と、読めた建物には行けるようにする
+      if (info.retry)
+        return (
+          <RetryRow label={label} icon={<ParcelIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />} onRetry={info.retry}>
+            {chibanzu && <RowLink href={chibanzu.url}>地番図</RowLink>}
+            <RowLink href={TOUKI.href}>登記情報提供サービス</RowLink>
+            {withBuilding && extra && <BuildingEntry extra={extra} />}
+          </RetryRow>
+        );
+      return <ParcelNoneRow label={label} chibanzu={chibanzu} extra={withBuilding ? extra : undefined} />;
+    }
     // 登記所の地図データに筆が無い地点：市町村の地番図があれば、それを直接開く
     if (!chibanzu) return null;
     return (
@@ -114,7 +133,15 @@ export function ParcelButton({
       >
         <ParcelIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
         {info.status !== "ok" ? (
-          "地番…"
+          panel ? (
+            // 結果パネルの1行：読み込み中も見出しを出す
+            <>
+              <span className="mui-row-label">{withBuilding ? "地番・建物" : "地番・隣地"}</span>
+              <span className="min-w-0 flex-1 truncate text-muted">確認中…</span>
+            </>
+          ) : (
+            "地番…"
+          )
         ) : panel ? (
           // 結果パネルの1行：見出しと、物件の筆の地番（地番で探した・地図で選んだ地点の筆）
           <>
@@ -145,7 +172,52 @@ export function ParcelButton({
   );
 }
 
-/** シートのタブ（それぞれ1画面に収める） */
+/** スマホの結果パネル：筆が読めなかった行の下の「建物」（同じパネルの中の詳細で開く） */
+function BuildingEntry({ extra }: { extra: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <RowAction onClick={() => setOpen(true)}>建物を見る</RowAction>
+      <Sheet detail title="建物（参考）" open={open} onClose={() => setOpen(false)}>
+        {extra}
+      </Sheet>
+    </>
+  );
+}
+
+/** スマホの結果パネル：登記所の地図データに筆が無い地点の行。押すと理由と確認先（同じパネルの中の詳細）。建物が分かればそのタブも */
+function ParcelNoneRow({ label, chibanzu, extra }: { label: string; chibanzu?: ChibanzuLink; extra?: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const none = (
+    <div>
+      <p className="py-2 text-[14px] leading-[1.6] text-ink">この地点の筆は、登記所の地図データ（登記所備付地図データ）にありません。</p>
+      <p className="text-[12.5px] leading-[1.6] text-muted">
+        地番は、{chibanzu ? "市町村の地番図か、" : ""}公図・登記（法務局・登記情報提供サービス）で確かめてください。住居表示の住所と地番は別のものです。
+      </p>
+      <div className="mt-3 flex flex-col gap-2">
+        {chibanzu && <ChibanzuButton link={chibanzu} />}
+        <LinkButton {...TOUKI} />
+      </div>
+      <Notes lead="地番と筆の形は、謄本・公図で確かめてください。" source="登記所備付地図データ（法務省）">
+        <p>筆は「登記所備付地図データ」（法務省）を加工して作成（{PARCEL_DATA.edition}）。この地図データに無い所（公図しか無い地域の一部など）は、筆を出せません。</p>
+      </Notes>
+    </div>
+  );
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="mui-row-btn">
+        <ParcelIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
+        <span className="mui-row-label">{label}</span>
+        <span className="min-w-0 flex-1 truncate text-[var(--mui-muted)]">地図データに筆なし・{chibanzu ? "地番図を見る" : "確認先"}</span>
+        <ChevronRightIcon className="ml-auto h-4 w-4 shrink-0 text-[var(--mui-muted)]" />
+      </button>
+      <Sheet detail title={extra ? "地番・建物" : "謄本・公図を取るときの地番"} open={open} onClose={() => setOpen(false)}>
+        {extra ? <Tabs names={["謄本・公図用の地番", "建物"]} panels={[<div key="p">{none}</div>, extra]} /> : none}
+      </Sheet>
+    </>
+  );
+}
+
 /** PC：地図の左のパネルのカード */
 export function ParcelCard({ info, chibanzu }: { info: ParcelInfo; chibanzu?: ChibanzuLink }) {
   if (info.status === "none" && !chibanzu) return null;

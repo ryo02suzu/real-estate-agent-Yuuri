@@ -44,3 +44,14 @@ export function decidePop(i: { skip: boolean; detailOpen: boolean; state: NavSta
   if (i.state?.detail) return "normalize";
   return "navigate";
 }
+
+/**
+ * スマホで、重なった画面（結果パネルの詳細・下から出るシート・全画面の地図・地図で選ぶ画面）のための履歴をそろえる。
+ * 重なった画面がいくつあっても、積む履歴はひとつ（端末の「戻る」は、いちばん上の画面をひとつ閉じ、まだ残っていれば積み直す）。
+ * want：重なった画面が開いているか、has：その履歴を積んであるか。push：積む／back：自分で戻す（その popstate は skip）／null：何もしない
+ */
+export function overlayAction(want: boolean, has: boolean): "push" | "back" | null {
+  if (want && !has) return "push";
+  if (!want && has) return "back";
+  return null;
+}

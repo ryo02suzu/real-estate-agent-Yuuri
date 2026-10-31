@@ -1,18 +1,26 @@
 import { describe, expect, it } from "vitest";
 import {
+  boundsPx,
   cameraMove,
   distanceM,
+  fitZoom,
   GSI_PALE_URL,
   GSI_STD_URL,
   JAPAN_BOUNDS,
   JAPAN_MAIN_BOUNDS,
   MAIN_ONLY_MIN_ZOOM,
   MAP_MIN_ZOOM,
+  MAP_SIDE,
+  MAP_TOP,
+  noticeFor,
+  overviewPadding,
   planBase,
   probeLowZoom,
   probeTile,
   PROBE_ZOOM,
   tileUrl,
+  tileZoomAt,
+  type TileProbe,
 } from "./japan-basemap";
 
 describe("カメラの動かし方", () => {
@@ -47,44 +55,121 @@ describe("日本地図の背景タイル", () => {
     expect(tileUrl(GSI_STD_URL, probeTile(4))).toBe("https://cyberjapandata.gsi.go.jp/xyz/std/4/14/6.png");
   });
 
-  it("最小ズームで読むタイルの段は、確かめる段と同じ（確かめていない段のタイルを読まない）", () => {
-    // MapLibre の 256px ラスタタイルは floor(ズーム + 1) の段を読む
-    expect(Math.floor(MAP_MIN_ZOOM + 1)).toBe(PROBE_ZOOM);
+  it("最小ズームで読むタイルの段は、確かめる段と同じ（MapLibre の 256px ラスタは round(ズーム+1) の段。確かめていない段は読まない）", () => {
+    expect(tileZoomAt(MAP_MIN_ZOOM)).toBe(PROBE_ZOOM);
+    // 2.5〜3.49 は z4、3.5 からは z5（四捨五入）
+    expect(tileZoomAt(2.5)).toBe(4);
+    expect(tileZoomAt(3.49)).toBe(4);
+    expect(tileZoomAt(3.5)).toBe(5);
   });
 
-  it("日本の主な島の範囲は、日本全体の範囲の内側にあり、z5 以上だけで見せられる大きさ", () => {
+  it("日本の主な島の範囲は、日本全体の範囲の内側にあり、z5 以上だけで見せられる。375px 幅の画面にも入る", () => {
     const [[w, s], [e, n]] = JAPAN_BOUNDS;
     const [[mw, ms], [me, mn]] = JAPAN_MAIN_BOUNDS;
     expect(mw).toBeGreaterThanOrEqual(w);
     expect(ms).toBeGreaterThanOrEqual(s);
     expect(me).toBeLessThanOrEqual(e);
     expect(mn).toBeLessThanOrEqual(n);
-    // 最小ズーム4（読むタイルは z5 以上）
-    expect(Math.floor(MAIN_ONLY_MIN_ZOOM + 1)).toBeGreaterThanOrEqual(5);
+    expect(tileZoomAt(MAIN_ONLY_MIN_ZOOM)).toBe(5);
+    expect(boundsPx(JAPAN_MAIN_BOUNDS, MAIN_ONLY_MIN_ZOOM).w).toBeLessThanOrEqual(375 - 2 * MAP_SIDE);
   });
 
   it("背景の決め方：淡色が使えればそのまま、無ければ標準、どちらも無ければ主な島だけ", () => {
-    expect(planBase({ pale: true, std: true })).toBe("pale");
-    expect(planBase({ pale: true, std: false })).toBe("pale");
-    expect(planBase({ pale: false, std: true })).toBe("std");
-    expect(planBase({ pale: false, std: false })).toBe("main-only");
+    expect(planBase({ pale: "ok" })).toBe("pale");
+    expect(planBase({ pale: "missing", std: "ok" })).toBe("std");
+    expect(planBase({ pale: "missing", std: "missing" })).toBe("main-only");
+    expect(planBase({ pale: "missing", std: "unknown" })).toBe("main-only");
   });
 
-  it("確認は固定の東京付近のタイルだけを淡色・標準の2か所に問い合わせる（住所や座標は使わない）", async () => {
+  it("遅くて返事が無い（unknown）だけなら、無いと決めつけず淡色のまま（遅い回線で表示を落とさない）", () => {
+    expect(planBase({ pale: "unknown" })).toBe("pale");
+  });
+
+  it("日本全体を見せられないときだけ、そのことを画面に書く", () => {
+    expect(noticeFor("main-only")).toContain("北海道〜九州");
+    expect(noticeFor("pale")).toBeNull();
+    expect(noticeFor("std")).toBeNull();
+  });
+
+  it("確認は固定の東京付近のタイルだけ（住所や座標は使わない）。淡色が読めたら標準には問い合わせない", async () => {
     const asked: string[] = [];
     const r = await probeLowZoom(async (url) => {
       asked.push(url);
-      return url.includes("/std/");
+      return "ok";
     });
-    expect(asked.sort()).toEqual(["https://cyberjapandata.gsi.go.jp/xyz/pale/4/14/6.png", "https://cyberjapandata.gsi.go.jp/xyz/std/4/14/6.png"]);
-    expect(r).toEqual({ pale: false, std: true });
+    expect(asked).toEqual(["https://cyberjapandata.gsi.go.jp/xyz/pale/4/14/6.png"]);
+    expect(r).toEqual({ pale: "ok" });
+  });
+
+  it("淡色が読めないと分かったときだけ、標準地図を問い合わせる", async () => {
+    const asked: string[] = [];
+    const r = await probeLowZoom(async (url): Promise<TileProbe> => {
+      asked.push(url);
+      return url.includes("/std/") ? "ok" : "missing";
+    });
+    expect(asked).toEqual(["https://cyberjapandata.gsi.go.jp/xyz/pale/4/14/6.png", "https://cyberjapandata.gsi.go.jp/xyz/std/4/14/6.png"]);
+    expect(r).toEqual({ pale: "missing", std: "ok" });
+    expect(planBase(r)).toBe("std");
   });
 
   it("確認中の通信エラー（例外）は「読めない」として扱い、止まらない", async () => {
     const r = await probeLowZoom(async () => {
       throw new Error("offline");
     });
-    expect(r).toEqual({ pale: false, std: false });
+    expect(r).toEqual({ pale: "missing", std: "missing" });
     expect(planBase(r)).toBe("main-only");
+  });
+});
+
+describe("日本全体の見せ方（余白とズーム）", () => {
+  /** ホームのパネルの高さ（推定。履歴なし・3件）。レビューでの見積もり：縦 247/324、横向き 247/324 */
+  const PANEL = { none: 247, three: 324 };
+
+  it("縦の画面（375×667〜430×932）では、下の余白はパネルの高さ＋8px のまま、日本全体が最小ズーム以上で入る", () => {
+    for (const [w, h] of [
+      [375, 667],
+      [390, 844],
+      [402, 874],
+      [430, 932],
+    ]) {
+      for (const p of [PANEL.none, PANEL.three]) {
+        const pad = overviewPadding({ w, h }, p);
+        expect(pad.bottom).toBe(p + 8);
+        expect(pad.top).toBe(MAP_TOP);
+        expect(fitZoom({ w, h }, pad)).toBeGreaterThanOrEqual(MAP_MIN_ZOOM);
+      }
+    }
+  });
+
+  it("375×667・履歴3件でも、最小ズームに切り上げられない（以前の最小ズーム3では北海道の北が上の帯に隠れた）", () => {
+    const pad = overviewPadding({ w: 375, h: 667 }, PANEL.three);
+    const z = fitZoom({ w: 375, h: 667 }, pad);
+    expect(z).toBeGreaterThanOrEqual(MAP_MIN_ZOOM);
+    expect(z).toBeLessThan(3);
+  });
+
+  it("横向き（667×375・844×390）でパネルが高さのほとんどを覆っても、余白を減らして必ず入る（[0,0] のまま・画面の外へ飛ばない）", () => {
+    for (const [w, h] of [
+      [667, 375],
+      [844, 390],
+    ]) {
+      for (const p of [PANEL.none, PANEL.three]) {
+        const pad = overviewPadding({ w, h }, p);
+        expect(pad.bottom).toBeGreaterThanOrEqual(0);
+        expect(h - pad.top - pad.bottom).toBeGreaterThanOrEqual(boundsPx(JAPAN_BOUNDS, MAP_MIN_ZOOM).h);
+        expect(fitZoom({ w, h }, pad)).toBeGreaterThanOrEqual(MAP_MIN_ZOOM - 1e-9);
+      }
+    }
+  });
+
+  it("主な島だけのときも、その範囲が最小ズームで入る余白にする", () => {
+    const pad = overviewPadding({ w: 375, h: 667 }, PANEL.three, JAPAN_MAIN_BOUNDS, MAIN_ONLY_MIN_ZOOM);
+    expect(fitZoom({ w: 375, h: 667 }, pad, JAPAN_MAIN_BOUNDS)).toBeGreaterThanOrEqual(MAIN_ONLY_MIN_ZOOM - 1e-9);
+  });
+
+  it("範囲の大きさ（512px 基準のメルカトル）：日本全体は z3 で約267×306px", () => {
+    const s = boundsPx(JAPAN_BOUNDS, 3);
+    expect(Math.round(s.w)).toBe(267);
+    expect(Math.round(s.h)).toBe(306);
   });
 });

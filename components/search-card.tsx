@@ -14,6 +14,8 @@ type Props = {
   onMap?: () => void;
   /** 新しいモバイルUI（青緑・白）の見た目 */
   teal?: boolean;
+  /** 入力欄で Esc（日本語入力の変換中は除く）：スマホの結果の画面の「キャンセル」と同じ */
+  onEscape?: () => void;
 };
 
 export function SearchCard({
@@ -24,6 +26,7 @@ export function SearchCard({
   loading,
   onMap,
   teal,
+  onEscape,
 }: Props) {
   const [pasteError, setPasteError] = useState(false);
 
@@ -62,6 +65,14 @@ export function SearchCard({
           id="address"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onKeyDown={
+            onEscape &&
+            ((e) => {
+              if (e.key !== "Escape" || e.nativeEvent.isComposing) return;
+              e.preventDefault();
+              onEscape();
+            })
+          }
           placeholder="住所・地番を入力（例：東京都渋谷区神南1-1-1）"
           autoComplete="off"
           enterKeyHint="search"
@@ -72,7 +83,7 @@ export function SearchCard({
             type="button"
             onClick={() => onChange("")}
             aria-label="入力を消す"
-            className="rounded-full p-1.5 text-muted hover:bg-mint"
+            className={`rounded-full p-1.5 text-muted hover:bg-mint ${teal ? "mui-hit-y" : ""}`}
           >
             <CloseIcon className="h-4 w-4" />
           </button>
@@ -81,7 +92,7 @@ export function SearchCard({
           type="submit"
           disabled={loading || !value.trim()}
           aria-label="検索"
-          className={`${teal ? "mui-press bg-[var(--mui-primary)]" : "bg-gold shadow-[0_6px_16px_rgba(138,102,50,0.35)] transition active:scale-95"} flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full text-white disabled:opacity-60`}
+          className={`${teal ? "mui-press mui-hit bg-[var(--mui-primary)]" : "bg-gold shadow-[0_6px_16px_rgba(138,102,50,0.35)] transition active:scale-95"} flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full text-white disabled:opacity-60`}
         >
           {loading ? (
             <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -103,13 +114,13 @@ export function SearchCard({
           </span>
           <span className="flex shrink-0 gap-1.5">
             {onMap && (
-              <button type="button" onClick={onMap} className="flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 font-bold text-brand">
+              <button type="button" onClick={onMap} className={`flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 font-bold text-brand ${teal ? "mui-hit" : ""}`}>
                 <MapIcon className="h-3.5 w-3.5" />
                 地図で選ぶ
               </button>
             )}
             {!value && (
-              <button type="button" onClick={paste} className="flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 font-bold text-brand">
+              <button type="button" onClick={paste} className={`flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 font-bold text-brand ${teal ? "mui-hit" : ""}`}>
                 <PasteIcon className="h-3.5 w-3.5" />
                 貼り付け
               </button>

@@ -11,27 +11,37 @@ import { SCHOOL_DATA } from "@/lib/roadmap/school-data";
 import { pmtilesSchoolSource } from "@/lib/roadmap/school-tiles";
 import { ChevronRightIcon, SchoolIcon } from "./icons";
 import { Notes } from "./notes";
+import { RetryRow } from "./panel-row";
 import { Sheet } from "./sheet";
 
-/** none：データの無い市区町村（国のデータに入っていないか、利用条件で入れていない） */
-export type SchoolState = { status: "loading" } | { status: "none" } | { status: "error" } | { status: "ok"; schools: Schools };
+/**
+ * none：学区が分からない。reason の no-data はデータの無い市区町村（国のデータに入っていないか、利用条件で入れていない）、
+ * outside はデータはあるが、地点がどの区域にも入らない（区域の境目・川の上など）。error の retry：読み込み直す
+ */
+export type SchoolState =
+  | { status: "loading" }
+  | { status: "none"; reason?: "no-data" | "outside" }
+  | { status: "error"; retry?: () => void }
+  | { status: "ok"; schools: Schools };
 
 export function useSchools(lat: number, lng: number): SchoolState {
-  const key = `${lat},${lng}`;
+  // 読み込み直すたびに増やす（同じ地点でも読み直す）
+  const [attempt, setAttempt] = useState(0);
+  const key = `${lat},${lng}#${attempt}`;
   const [state, setState] = useState<{ key: string; value: SchoolState }>();
   useEffect(() => {
     let alive = true;
     withRetry(() => schoolsAt(lat, lng, pmtilesSchoolSource))
       .then((s) => {
         if (!alive) return;
-        if (!s || !(s.elementary || s.junior)) return setState({ key, value: { status: "none" } });
+        if (!s || !(s.elementary || s.junior)) return setState({ key, value: { status: "none", reason: s ? "outside" : "no-data" } });
         setState({ key, value: { status: "ok", schools: s } });
         // 学校までの道のり（駅と同じ道路のタイル。読めたら直線の距離から差し替える）
         withSchoolWalks(lat, lng, s)
           .then((w) => alive && w !== s && setState({ key, value: { status: "ok", schools: w } }))
           .catch(() => {});
       })
-      .catch(() => alive && setState({ key, value: { status: "error" } }));
+      .catch(() => alive && setState({ key, value: { status: "error", retry: () => setAttempt((n) => n + 1) } }));
     return () => {
       alive = false;
     };
@@ -91,11 +101,14 @@ export function SchoolDetail({ schools }: { schools: Schools }) {
 
 /**
  * スマホ：都市計画の行の右の小さなボタン（「学区」）。押すと小学校区・中学校区が下から出る。
- * PC は onOpen（パネルの中の学区のカードまで動かす）を渡し、学校の名前も出す。データの無い所では出さない
+ * PC は onOpen（パネルの中の学区のカードまで動かす）を渡し、学校の名前も出す。データの無い所では出さない。
+ * スマホの結果パネル（panel）は行を消さない：読めなければ「再読み込み」、データが無ければ理由と確認先（教育委員会）を出す
  */
 export function SchoolButton({ state, onOpen, panel }: { state: SchoolState; onOpen?: () => void; /** スマホの結果パネルの1行：学校の短い名前も出す（押すと同じパネルの中で詳細） */ panel?: boolean }) {
   const [open, setOpen] = useState(false);
   const rich = !!onOpen || !!panel;
+  if (panel && state.status === "error" && state.retry) return <RetryRow label="学区" icon={<SchoolIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />} onRetry={state.retry} />;
+  if (panel && state.status === "none") return <SchoolNoneRow reason={state.reason} />;
   if (state.status === "none" || state.status === "error") return null;
   const s = state.status === "ok" ? state.schools : undefined;
   return (
@@ -123,6 +136,42 @@ export function SchoolButton({ state, onOpen, panel }: { state: SchoolState; onO
           <SchoolDetail schools={s} />
         </Sheet>
       )}
+    </>
+  );
+}
+
+/** スマホの結果パネル：学区のデータが無い地点の行。押すと理由と確認先（同じパネルの中の詳細） */
+function SchoolNoneRow({ reason }: { reason?: "no-data" | "outside" }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="mui-row-btn">
+        <SchoolIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />
+        <span className="mui-row-label">学区</span>
+        <span className="min-w-0 flex-1 truncate text-[var(--mui-muted)]">{reason === "outside" ? "区域外（教育委員会で確認）" : "データなし（教育委員会で確認）"}</span>
+        <ChevronRightIcon className="ml-auto h-4 w-4 shrink-0 text-[var(--mui-muted)]" />
+      </button>
+      <Sheet detail title="学区（参考）" open={open} onClose={() => setOpen(false)}>
+        {reason === "outside" ? (
+          <p className="text-[14px] leading-[1.6] text-ink">この地点は、国のデータ（国土数値情報の学校区）の小学校区・中学校区のどれにも入っていません（区域の境目・川や道路の上などで起きます）。</p>
+        ) : (
+          <p className="text-[14px] leading-[1.6] text-ink">この市区町村の学区は、国のデータ（国土数値情報の学校区）にありません。</p>
+        )}
+        <p className="mt-1.5 text-[12.5px] leading-[1.6] text-muted">
+          {reason === "outside" ? "" : "データの無い市区町村か、利用条件のためにデータに入れていない市区町村です（「学区が無い」という意味ではありません）。"}
+          指定校は、市区町村の教育委員会で確かめてください。
+        </p>
+        <Notes
+          lead="学区は見直されることがあり、学校選択制の市区町村もあります。"
+          source={
+            <a href="https://nlftp.mlit.go.jp/ksj/" target="_blank" rel="noreferrer" className="underline">
+              国土数値情報（国土交通省）
+            </a>
+          }
+        >
+          <p>{SCHOOL_DATA.edition}の市区町村の資料をもとにした通学区域のデータで探しています。</p>
+        </Notes>
+      </Sheet>
     </>
   );
 }

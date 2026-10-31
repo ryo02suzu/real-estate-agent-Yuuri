@@ -149,6 +149,10 @@ body {
   --mui-dur-row: 140ms;
   --mui-dur-panel: 300ms;
   --mui-dur-detail: 240ms;
+  /* 押した反応：丸いボタンは最大2%だけ縮める。行（文字の並ぶ面）は縮めず、面の色だけ変える */
+  --mui-press-scale: 0.98;
+  /* 押せる範囲の最小（見た目の大きさは変えず、まわりに広げる） */
+  --mui-hit: 44px;
 }
 @media (prefers-reduced-motion: reduce) {
   :root {
@@ -156,6 +160,8 @@ body {
     --mui-dur-row: 0ms;
     --mui-dur-panel: 0ms;
     --mui-dur-detail: 0ms;
+    /* 押したときも縮めない（面の色の変化だけ） */
+    --mui-press-scale: 1;
   }
 }
 .mui-panel {
@@ -192,8 +198,8 @@ body {
 .mui-press {
   transition: transform var(--mui-dur-press) var(--mui-ease), background-color var(--mui-dur-row) var(--mui-ease);
 }
-.mui-press:active {
-  transform: scale(0.96);
+.mui-press:active:not(:disabled) {
+  transform: scale(var(--mui-press-scale));
 }
 
 /* 結果パネルの項目行（components/result-view.tsx）。既存の行ボタンを、1行1項目・折り返し可・タップしやすい高さにそろえる */
@@ -215,7 +221,7 @@ body {
 .mui-rows > div:empty {
   display: none;
 }
-.mui-rows button,
+.mui-rows button:not(.mui-row-link),
 .mui-rows > div > a,
 .mui-row-btn {
   display: flex;
@@ -232,14 +238,13 @@ body {
   font-size: 13px;
   line-height: 1.5;
   color: var(--mui-ink);
-  transition: background-color var(--mui-dur-row) var(--mui-ease), transform var(--mui-dur-press) var(--mui-ease);
+  transition: background-color var(--mui-dur-row) var(--mui-ease);
 }
-.mui-rows button:active:not(:disabled),
+.mui-rows button:not(.mui-row-link):active:not(:disabled),
 .mui-rows > div > a:active,
-.mui-row-btn:active {
-  /* 既存の行の薄い面（青緑がかった白に上書きしているもの）より優先して、押した反応を見せる */
+.mui-row-btn:active:not(:disabled) {
+  /* 既存の行の薄い面（青緑がかった白に上書きしているもの）より優先して、押した反応を見せる。行は縮めない（文字が縮むため） */
   background: var(--mui-primary-soft) !important;
-  transform: scale(0.99);
 }
 .mui-rows button:disabled {
   opacity: 0.8;
@@ -257,16 +262,47 @@ body {
 
 /*
  * スマホの日本地図（components/japan-map.tsx）：出典（地理院タイル）を、下から重なるパネルの上に出す。
- * パネルの下に隠れないよう、地図の下の操作欄（出典）をパネルの高さの分だけ持ち上げる（パネルの動きと同じ長さ・カーブ）
+ * パネルの下に隠れないよう、地図の下の操作欄（出典）を、パネルの実際の高さ（--mui-panel-h。パネルの動き・ドラッグの間も毎フレーム
+ * components/mobile-shell.tsx が書く）と、キーボードで持ち上げた分（--mui-kbd）だけ持ち上げる
  */
 .mui-japan-map .maplibregl-ctrl-bottom-right,
 .mui-japan-map .maplibregl-ctrl-bottom-left {
-  bottom: var(--mui-map-bottom, 0px);
-  transition: bottom var(--mui-dur-panel) var(--mui-ease);
+  bottom: calc(var(--mui-panel-h, 0px) + var(--mui-kbd, 0px));
 }
 /* パネルが大きいときは、上の操作帯と地図の見える帯がせまいので、出典の文字を小さくする（消さない） */
 .mui-japan-map .maplibregl-ctrl-attrib {
   font-size: 10px;
+}
+/* 代わりの背景（北海道〜九州だけ）を使っているときの知らせ。左下・パネルの上（出典は右下） */
+.mui-map-notice {
+  position: absolute;
+  left: 8px;
+  bottom: calc(var(--mui-panel-h, 0px) + var(--mui-kbd, 0px) + 6px);
+  max-width: calc(100% - 140px);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 3px 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--mui-muted);
+  box-shadow: 0 1px 4px rgba(15, 60, 56, 0.18);
+  pointer-events: none;
+}
+/* 目安の位置（町の中心・推定）のピンの横の小さな札。ピンの位置（下の先端）は変えない（マーカーの要素は MapLibre が absolute にする） */
+.mui-japan-map .mui-pin-tag {
+  position: absolute;
+  left: calc(100% + 2px);
+  top: 3px;
+  white-space: nowrap;
+  border-radius: 999px;
+  background: #fff;
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--mui-warn-ink);
+  box-shadow: 0 1px 4px rgba(15, 60, 56, 0.25);
+  pointer-events: none;
 }
 
 /*
@@ -351,5 +387,62 @@ body {
   body[data-mui] a,
   body[data-mui] summary {
     touch-action: manipulation;
+  }
+  /*
+   * 既存の部品（地図を開くボタン・電話のボタン・外のサイトのボタンなど）の押したときの縮み（active:scale-[0.99]。Tailwind v4 は scale を使う）は、
+   * スマホの新UIでは使わない（文字が縮むため）。代わりに面を少し暗くする。PC はそのまま
+   */
+  body[data-mui] [class*="active:scale"]:active {
+    scale: none;
+    filter: brightness(0.95);
+  }
+  /*
+   * 押せる範囲を 44px 以上に（見た目の大きさ・位置は変えず、まわりの透明な面に広げる）。.mui-hit を付けた小さい操作と、
+   * 1行に並ぶタブ（折り返すタブ（重説の下書き）は、上下の行の範囲が重なるので除く）。
+   * 隣の操作とは、間の余白の半分ずつまでに収まる大きさ（ボタンの間は 8px 以上）
+   */
+  body[data-mui] .mui-hit,
+  body[data-mui] .mui-hit-y,
+  body[data-mui] [role="tablist"]:not(.flex-wrap) > [role="tab"] {
+    position: relative;
+  }
+  body[data-mui] .mui-hit::after,
+  body[data-mui] [role="tablist"]:not(.flex-wrap) > [role="tab"]::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, var(--mui-hit));
+    height: max(100%, var(--mui-hit));
+    transform: translate(-50%, -50%);
+  }
+  /* 縦だけ広げる（入力欄の「消す」：横に広げると、入力欄の右端を押したつもりで消してしまうため） */
+  body[data-mui] .mui-hit-y::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: max(100%, var(--mui-hit));
+    transform: translateY(-50%);
+  }
+  /* 候補の住所の行は、行の高さそのものを 44px 以上に（隣の行と押せる範囲が重ならないように） */
+  body[data-mui] .mui-cand {
+    min-height: var(--mui-hit);
+  }
+  /* 近い地番の札：折り返しても上下の札の押せる範囲が重ならないよう、札を 36px にし、行の間を 8px あける */
+  body[data-mui] .mui-similar {
+    row-gap: 8px;
+  }
+  body[data-mui] .mui-similar > button {
+    min-height: 36px;
+    padding-inline: 10px;
+  }
+  /* 横に流れる履歴の札：上下に広げた押せる範囲が、流れる枠で切れないよう余白を足す（見た目の位置は同じ） */
+  body[data-mui] .mui-chips {
+    padding-top: 8px;
+    margin-top: -8px;
+    padding-bottom: 8px;
+    margin-bottom: -2px;
   }
 }

@@ -223,6 +223,8 @@ export type LiveMapProps = {
   initialHazard?: HazardKind;
   /** 最初に見せる地価の地点（[経度, 緯度]。スマホの地価の一覧から「地図」で開いたとき）。物件と両方が見える範囲にする */
   initialLandPrice?: [number, number];
+  /** 物件の位置があるとき、最初のズーム（無ければ 17。スマホの「場所を直す」は位置の目安に合わせる：町の中心は引いて開く） */
+  startZoom?: number;
 };
 
 /** 地価の地点と物件が両方見える範囲へ（物件が無ければ地点へ寄る） */
@@ -259,6 +261,7 @@ export default function LiveMap({
   legendTarget,
   initialHazard,
   initialLandPrice,
+  startZoom = 17,
 }: LiveMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -314,7 +317,7 @@ export default function LiveMap({
       map = new MapLibreMap({
         container: container.current,
         style: gsiStyle(),
-        ...(point ? { center: [point.lng, point.lat] as [number, number], zoom: 17 } : { bounds: KANTO_BOUNDS, fitBoundsOptions: { padding: pad } }),
+        ...(point ? { center: [point.lng, point.lat] as [number, number], zoom: startZoom } : { bounds: KANTO_BOUNDS, fitBoundsOptions: { padding: pad } }),
         minZoom: 5,
         maxZoom: 19.5,
         // 道路図と見比べるので、いつも北が上（回転・傾きなし）
