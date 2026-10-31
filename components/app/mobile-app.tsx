@@ -513,6 +513,7 @@ export function MobileApp(props: MobileAppProps) {
         <div
           ref={scroller}
           data-scroller
+          tabIndex={-1}
           className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain"
         >
           <div
@@ -639,7 +640,11 @@ export function MobileApp(props: MobileAppProps) {
                 window.setTimeout(() => setArrive(false), ARRIVE_MS);
               }
             }}
-            onDone={() => setFlight(null)}
+            onDone={() => {
+              setFlight(null);
+              // モーダルを閉じた後、調査内容へ戻す。住所欄に戻してキーボードを再表示しない。
+              scroller.current?.focus({ preventScroll: true });
+            }}
           />
         )}
         <HomeMenu

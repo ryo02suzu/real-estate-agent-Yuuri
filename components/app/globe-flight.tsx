@@ -9,7 +9,8 @@
 // 流れ：地球が現れる（絵がそろうまで最大 1 秒待ち、そろったらふわっと出す）→ 日本へ回る（1.6 秒）→ 調べている間は日本の上空でゆっくり近づく
 // → 場所が分かったら斜めから降りる（2.6 秒）→ 写真がそろうのを最大 1.2 秒待つ → 印が光る（1 秒。ゆっくり回り込む）
 // → ふわっと消えて物件の画面。見つからない・候補から選ぶ・調べられなかったときは、すぐ消える。
-// 画面に触れると飛ばす。14 秒たっても場所が分からないときも消える（結果の画面がそのまま出る）
+// 画面に触れる・スキップボタン・Esc で飛ばす。途中で動きを減らす設定にしたときも止める。
+// 14 秒たっても場所が分からないときも消える（結果の画面がそのまま出る）
 import "maplibre-gl/dist/maplibre-gl.css";
 import { getVersion, Map as MapLibreMap, setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 import { LoaderCircle } from "lucide-react";
@@ -70,6 +71,8 @@ export default function GlobeFlight({
   /** 消え終わった */
   onDone: () => void;
 }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const skip = useRef<HTMLButtonElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const timers = useRef<number[]>([]);
@@ -94,12 +97,39 @@ export default function GlobeFlight({
     (landed: boolean) => {
       if (done.current) return;
       done.current = true;
+      timers.current.splice(0).forEach(clearTimeout);
+      // stop() が moveend を発火しても、done の確認で次の演出へ進まない。
+      map.current?.stop();
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       setStage("out");
-      calls.current.onLeave(landed);
-      later(T.fade, () => calls.current.onDone());
+      calls.current.onLeave(landed && !reduce);
+      later(reduce ? 0 : T.fade, () => {
+        dialog.current?.close();
+        calls.current.onDone();
+      });
     },
     [later],
   );
+
+  // ネイティブのモーダルで背後の操作を止め、演出中もスキップをキーボードで選べるようにする。
+  useEffect(() => {
+    const el = dialog.current;
+    if (!el) return;
+    el.showModal();
+    skip.current?.focus({ preventScroll: true });
+    return () => el.close();
+  }, []);
+
+  // 開始時だけでなく、演出中に端末の設定が変わった場合も直ちに止める。
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const stopForPreference = () => {
+      if (media.matches) finish(false);
+    };
+    if (media.matches) queueMicrotask(stopForPreference);
+    media.addEventListener("change", stopForPreference);
+    return () => media.removeEventListener("change", stopForPreference);
+  }, [finish]);
 
   // 地球を出して、絵がそろったら日本へ回る
   useEffect(() => {
@@ -153,7 +183,7 @@ export default function GlobeFlight({
   // 調べている間は、日本の上空でゆっくり近づく
   useEffect(() => {
     const m = map.current;
-    if (!m || !overJapan || target !== null || stage !== "space") return;
+    if (!m || done.current || !overJapan || target !== null || stage !== "space") return;
     m.easeTo({ zoom: 4.4, bearing: -8, duration: 8000, easing: (t) => t });
   }, [overJapan, target, stage]);
 
@@ -164,7 +194,7 @@ export default function GlobeFlight({
       queueMicrotask(() => finish(false));
       return;
     }
-    if (!m || !target || !overJapan || descending.current) return;
+    if (!m || done.current || !target || !overJapan || descending.current) return;
     descending.current = true;
     queueMicrotask(() => setStage("descend"));
     m.flyTo({ center: [target.lng, target.lat], zoom: 16.4, pitch: 50, bearing: -20, duration: T.descend, curve: 1.6, essential: true });
@@ -189,11 +219,24 @@ export default function GlobeFlight({
 
   const known = !!target && target !== "none";
   return (
-    <div
-      className={`app-touch fixed inset-0 z-[80] overflow-hidden ${stage === "out" ? "flight-out" : ""}`}
+    <dialog
+      ref={dialog}
+      className={`app-touch fixed inset-0 m-0 h-dvh w-screen max-h-none max-w-none overflow-hidden border-0 bg-transparent p-0 backdrop:bg-transparent ${stage === "out" ? "flight-out" : ""}`}
       role="dialog"
+      aria-modal="true"
       aria-label={known ? `${label}へ移動しています` : "調べています"}
       onPointerDown={() => finish(known)}
+      onCancel={(event) => {
+        event.preventDefault();
+        finish(known);
+      }}
+      onKeyDown={(event) => {
+        // 操作はスキップだけ。Tab / Shift+Tab で背後やブラウザのツールバーへ移らないようにする。
+        if (event.key === "Tab") {
+          event.preventDefault();
+          skip.current?.focus({ preventScroll: true });
+        }
+      }}
     >
       {/* 地図の部品は自分の箱を position: relative にするので、画面いっぱいの箱の中に置く。後ろは宇宙の背景（透けて見える） */}
       <div className={`absolute inset-0 transition-opacity duration-500 ${visible ? "opacity-100" : "opacity-0"}`}>
@@ -220,13 +263,18 @@ export default function GlobeFlight({
             </>
           )}
         </div>
-        <p className="mt-[8px] text-white/60" style={{ fontSize: 11.5 }}>
-          画面に触れると飛ばせます
-        </p>
+        <button
+          ref={skip}
+          type="button"
+          onClick={() => finish(known)}
+          className="pointer-events-auto mt-[8px] min-h-[44px] min-w-[88px] rounded-full border border-white/40 bg-black/60 px-[20px] text-[14px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+        >
+          スキップ
+        </button>
         <p className="mt-[6px] text-white/45" style={{ fontSize: 9.5 }}>
           画像：NASA GIBS（Blue Marble）・地理院タイル
         </p>
       </div>
-    </div>
+    </dialog>
   );
 }
