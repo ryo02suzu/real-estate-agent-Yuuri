@@ -386,7 +386,7 @@ function SheetRangeLine({ lat, lng, sheet }: { lat: number; lng: number; sheet: 
       <button type="button" onClick={() => setOpen(true)} className="mui-row-btn">
         <FrameIcon className="h-4 w-4 shrink-0 text-[var(--mui-primary)]" />
         <span className="mui-row-label">図の範囲</span>
-        <span className="min-w-0 flex-1 truncate text-[var(--mui-muted)]">{sheetName(sheet)}と同じ範囲（北が上）</span>
+        <span className="min-w-0 flex-1 text-[var(--mui-muted)]">{sheetName(sheet)}と同じ範囲（北が上）</span>
         <ChevronRightIcon className="ml-auto h-4 w-4 shrink-0 text-[var(--mui-muted)]" />
       </button>
       <Sheet detail title={`${sheetName(sheet)}と同じ範囲`} open={open} onClose={() => setOpen(false)}>

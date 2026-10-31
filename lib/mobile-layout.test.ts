@@ -40,6 +40,10 @@ describe("横向きの背の低い画面（パネルを左、地図を右）", (
     expect(shell).toMatch(/\{!side && <div className="mx-auto h-1 w-10/);
   });
 
+  it("横向きでキーボードが出ている間は、パネルをロゴの帯の上まで上げる（入力欄が隠れない）", () => {
+    expect(shell).toContain("top: kbd > 0 ? SIDE_TOP : SIDE_PANEL_TOP");
+  });
+
   it("横向きでは、出典の持ち上げ（--mui-panel-h）を 0 にし、地図の左端（--mui-map-left）をパネルの右に", () => {
     expect(shell).toContain('side ? "0px" : `${h}px`');
     expect(shell).toContain('"--mui-map-left": `${mapLeft}px`');

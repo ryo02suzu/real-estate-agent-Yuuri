@@ -12,8 +12,9 @@ export function RetryRow({ label, icon, onRetry, children }: { label: string; ic
     <button type="button" onClick={onRetry} aria-label={`${label}：読み込めませんでした。押すと読み込み直します`} className="mui-row-btn">
       {icon}
       <span className="mui-row-label">{label}</span>
-      <span className="min-w-0 flex-1 truncate text-[var(--mui-warn-ink)]">読み込めませんでした</span>
-      <span className="flex shrink-0 items-center gap-1 text-[12px] font-semibold text-[var(--mui-primary)]">
+      {/* 狭い画面・文字の拡大でも切らずに折り返す */}
+      <span className="min-w-0 flex-1 text-[var(--mui-warn-ink)]">読み込めませんでした</span>
+      <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold text-[var(--mui-primary)]">
         <RetryIcon className="h-4 w-4" />
         再読み込み
       </span>
@@ -23,7 +24,7 @@ export function RetryRow({ label, icon, onRetry, children }: { label: string; ic
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       {row}
-      <p className="flex flex-wrap items-center gap-x-3 px-2 text-[12px] text-[var(--mui-muted)]">
+      <p className="flex flex-wrap items-center gap-x-3 px-2 text-[13px] text-[var(--mui-muted)]">
         <span className="shrink-0">確認先：</span>
         {children}
       </p>

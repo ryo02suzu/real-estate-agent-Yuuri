@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { LookupResult } from "@/lib/roadmap";
 import type { HistoryItem } from "@/lib/history";
-import { SIDE_LEFT, SIDE_PANEL_TOP, SIDE_QUERY, sidePanelWidth } from "@/lib/mobile-layout";
+import { SIDE_LEFT, SIDE_PANEL_TOP, SIDE_QUERY, SIDE_TOP, sidePanelWidth } from "@/lib/mobile-layout";
 import { PANEL_MS } from "@/lib/motion";
 import { down, DRAG_SLOP, dragHeight, nextVelocity, SNAP_HEIGHT, snapAfterRelease, snapForDetail, snapPx, up, type Snap, type SnapHeights } from "@/lib/panel-snap";
 import { nextCamera, type CameraTarget } from "@/lib/position-accuracy";
@@ -426,12 +426,13 @@ export function MobileShell({
           aria-label={hasResult ? "調査結果" : "住所を調べる"}
           style={
             side
-              ? // 横向き：左の列。結果は列の高さいっぱい（中をスクロール）、ホームは内容の高さ（列の高さまで）。キーボードの分は下を上げる
+              ? // 横向き：左の列。結果は列の高さいっぱい（中をスクロール）、ホームは内容の高さ（列の高さまで）。キーボードの分は下を上げる。
+                // 横向きのキーボードは高さの半分以上を覆うので、入力中はパネルをロゴの帯の上まで上げて、入力欄が隠れないようにする
                 {
                   left: SIDE_LEFT,
-                  top: SIDE_PANEL_TOP,
+                  top: kbd > 0 ? SIDE_TOP : SIDE_PANEL_TOP,
                   width: sideW,
-                  ...(hasResult ? { bottom: kbd + 8 } : { maxHeight: `calc(100% - ${SIDE_PANEL_TOP} - ${kbd}px - 8px)` }),
+                  ...(hasResult ? { bottom: kbd + 8 } : { maxHeight: `calc(100% - ${kbd > 0 ? SIDE_TOP : SIDE_PANEL_TOP} - ${kbd}px - 8px)` }),
                 }
               : { height: hasResult ? SNAP_HEIGHT[snap] : undefined, bottom: kbd, maxHeight: `calc(100% - ${kbd}px - 8px)` }
           }

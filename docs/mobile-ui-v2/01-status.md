@@ -58,10 +58,10 @@ Issue #22 / Draft PR #23（ブランチ `claude/issue-22-20261031-0155`）。**�
 | --- | --- |
 | `npm run typecheck` | 通った（今回の最終の変更のあと） |
 | `npm run lint` | 通った |
-| `npm test` | 通った（702件成功・39件スキップ。前回は657件）。新規：`lib/modal-stack.test.ts`・`lib/mobile-ui-static.test.ts`（CSS の決まりと地図の箱の形をソースで確かめる）・`lib/webgl-check.test.ts`。更新：`panel-snap`・`position-accuracy`（カメラの合図）・`search-gen`（キャンセル・もう一度・入力の保護）・`detail-history`（重なった画面の履歴）・`japan-basemap`（余白・ズーム・確認の状態） |
-| `npm run build` | この環境で通った（今回は Google Fonts の取得も成功） |
+| `npm test` | 通った（今回 724件成功・39件スキップ。前回は702件）。今回の新規：`lib/motion.test.ts`（CSS の動きのトークンと地図の動きの一致・減速カーブ）・`lib/mobile-layout.test.ts`（横向きの条件・左のパネルの幅・段階を使わない・キーボード中の位置）。更新：`lib/japan-basemap.test.ts`（横向きの日本全体・ピンの余白、iPhone の横向き4サイズ） |
+| `npm run build` | この環境で通った |
 | 赤→緑の確認 | 地図の箱のテストは、以前の形（箱に `absolute inset-0`）を与えると失敗することをテストの中で確かめている。`git stash` で前の版に戻して走らせる確認は、承認待ちで実行できなかった |
-| 画面幅 375×667・390×844・402×874・430×932・1024×768・1440×900 | **未確認**（この環境にブラウザが無い。DevTools の MCP も無い） |
+| 画面幅 375×667・390×844・402×874・430×932・844×390・1024×768・1440×900 | **未確認**（この環境ではブラウザの起動が承認待ち。DevTools の MCP も無い）。ec9252d の QA（run 41176739658）の記録は §0 |
 | iPhone の実機（ドラッグ・キーボード・端末の「戻る」・Safari 相当・200%文字） | **未確認** |
 | WebGL 不可・通信失敗・reduced-motion の実画面 | **未確認**（コードは対応） |
 | PC 1024px 以上が従来と同じか | PC で効く見た目のクラス・規則は変えていない（スマホだけの規則は `body[data-mui]` と `@media screen and (max-width: 1023.98px)` の中。共有の部品に足したクラスは PC で効く規則が無い）。PC の操作の変化：シートを開くとシートにフォーカスが移る・Esc は上の1枚だけ・閉じると元へフォーカス・候補を選ぶと URL が選んだ住所になる。**画素の一致は未確認** |
