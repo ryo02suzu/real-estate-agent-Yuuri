@@ -2,13 +2,13 @@
 
 // スマホのホーム（検索する前の画面）。届いたデザインのとおり、画面いっぱいの夕焼けの街の写真（public/home/sunset-*.webp。届いた背景の絵。
 // 下のメニューの後ろまで敷くので、写真は components/app/mobile-app.tsx が HomeBackdrop で画面の一番奥に置く）の上に、上から：
-// ロゴ（今までのマークと MICHILU の白い版）と右上のメニュー（≡。お知らせ・使い方・データ・アプリ・アカウント。HomeMenu）、
+// ロゴ（今までのマークと MICHILU の白い版）と右上のメニュー（≡。地図で選ぶ・お知らせ・使い方・データ・アプリ・アカウント。HomeMenu）、
 // 「不動産の現場に、／すぐ使える情報を。」、住所・地番の検索欄（すりガラス。キーボードの「検索」か、字を入れると出る → で調べる）、
 // 写真の街並みを見せる空き、最近の検索（暗いすりガラスの一覧に3件。続きは履歴のページ）。
 // まだ何も調べていないときは、最近の検索の代わりに「はじめての方へ」（住所と地番の例。押すとそのまま調べる）を出す。
 // 写真の上の字は白（読みやすいよう薄い影）。寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。
 // 縦は画面の高さに合わせ、検索欄と最近の検索のあいだの空きで伸び縮みする（背の低い画面でもスクロールせずに収まる）
-import { ArrowRight, Bell, ChevronRight, CircleHelp, Database, Download, LoaderCircle, MapPin, MapPinned, Menu, Search, Smartphone, TriangleAlert, UserRound, X } from "lucide-react";
+import { ArrowRight, Bell, ChevronRight, CircleHelp, Database, Download, LoaderCircle, Map as MapIcon, MapPin, MapPinned, Menu, Search, Smartphone, TriangleAlert, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { monthDay, placeParts } from "@/lib/app/scene";
 import { MUNICIPALITIES } from "@/lib/roadmap";
@@ -308,10 +308,11 @@ function SectionHead({ title, onMore, className = "" }: { title: string; onMore?
   );
 }
 
-/** ホームの右上のメニュー（≡）。下のメニューに入れていない、ときどき使うもの（お知らせ・使い方・データ・アプリ・アカウント） */
+/** ホームの右上のメニュー（≡）。下のメニューに入れていない、ときどき使うもの（地図で選ぶ・お知らせ・使い方・データ・アプリ・アカウント） */
 export function HomeMenu({
   open,
   onClose,
+  onMap,
   onNews,
   unread,
   onHelp,
@@ -324,6 +325,8 @@ export function HomeMenu({
 }: {
   open: boolean;
   onClose: () => void;
+  /** 地図で場所を選ぶ（住所の無い土地も選べる） */
+  onMap: () => void;
   onNews: () => void;
   unread: boolean;
   onHelp: () => void;
@@ -341,6 +344,10 @@ export function HomeMenu({
 }) {
   if (!open) return null;
   const groups: { title: string; items: { Icon: typeof Search; title: string; sub: string; dot?: boolean; right?: string; run: () => void }[] }[] = [
+    {
+      title: "調べる",
+      items: [{ Icon: MapIcon, title: "地図で場所を選ぶ", sub: "住所の無い土地も、地図の上で選んで調べられます", run: onMap }],
+    },
     {
       title: "お知らせ・使い方",
       items: [
