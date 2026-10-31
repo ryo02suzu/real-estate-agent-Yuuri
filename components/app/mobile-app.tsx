@@ -75,7 +75,7 @@ import {
 } from "./app-sheets";
 import { DetailSheet } from "./detail-sheets";
 import { ART_W, BottomNav, ZOOM, type NavKey } from "./frame";
-import { HomeScreen, PAGE, SKY, type HomeMessage } from "./home";
+import { HOME_TOP, HomeBackdrop, HomeMenu, HomeScreen, PAGE, SKY, type HomeMessage } from "./home";
 import {
   AppCitiesSheet,
   AppHelpSheet,
@@ -185,6 +185,8 @@ export function MobileApp(props: MobileAppProps) {
   // 物件の「レポートを作成」（書類・出力）。下のメニューの「書類・出力」からも開く
   const [report, setReport] = useState(false);
   const [news, setNews] = useState(false);
+  // ホームの右上のメニュー（≡）
+  const [menu, setMenu] = useState(false);
   const unread = useUnreadNews();
   const offline = useOffline();
   const standalone = useStandalone();
@@ -281,8 +283,8 @@ export function MobileApp(props: MobileAppProps) {
   useEffect(() => {
     if (showHome) queueMicrotask(() => setResume(latestResume()));
   }, [showHome, history]);
-  // 時刻・電池の帯の色をページに合わせる（ホームと下のメニューのページは時間連動の空の上端の色、物件の画面は写真の帯の上の色。
-  // PC の色は変えない）。空が変わるたびに合わせ直す
+  // 時刻・電池の帯の色をページに合わせる（ホームは写真のいちばん上の空の色、下のメニューのページは時間連動の空の上端の色、
+  // 物件の画面は写真の帯の上の色。PC の色は変えない）。空が変わるたびに合わせ直す
   useEffect(() => {
     const meta = document.querySelector<HTMLMetaElement>(
       'meta[name="theme-color"][media="(max-width: 1023px)"]',
@@ -290,7 +292,7 @@ export function MobileApp(props: MobileAppProps) {
     const set = () =>
       meta?.setAttribute(
         "content",
-        showHome || tabPage ? (skyTop() ?? SKY) : BAND_TOP,
+        showHome ? HOME_TOP : tabPage ? (skyTop() ?? SKY) : BAND_TOP,
       );
     set();
     addEventListener(SKY_EVENT, set);
@@ -452,13 +454,15 @@ export function MobileApp(props: MobileAppProps) {
 
   return (
     <div
-      className="theme-navy app-touch flex min-h-0 w-full flex-1 flex-col overflow-hidden"
+      className="theme-navy app-touch relative flex min-h-0 w-full flex-1 flex-col overflow-hidden"
       style={{
         fontFeatureSettings: "normal",
         letterSpacing: 0,
         background: PAGE,
       }}
     >
+      {/* ホームは画面いっぱいの写真（下のメニューの後ろまで） */}
+      {showHome && <HomeBackdrop />}
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div
           ref={scroller}
@@ -480,17 +484,9 @@ export function MobileApp(props: MobileAppProps) {
                 history={history}
                 onPickRecent={pickRecent}
                 onHistory={() => go("history")}
-                onMap={openMap}
                 onTry={props.onPickAddress}
-                onHelp={() => setSheet("help")}
-                onBell={() => {
-                  setNews(true);
-                  markNewsSeen();
-                }}
+                onMenu={() => setMenu(true)}
                 unread={unread}
-                onLogo={() =>
-                  scroller.current?.scrollTo({ top: 0, behavior: "smooth" })
-                }
                 inputRef={inputRef}
                 resume={resume}
               />
@@ -539,6 +535,7 @@ export function MobileApp(props: MobileAppProps) {
         />
       </div>
       <BottomNav
+        dark={showHome}
         active={page}
         onSelect={(k) => {
           if (k === "home" && page === "home") {
@@ -569,6 +566,19 @@ export function MobileApp(props: MobileAppProps) {
           onImported={props.onReloadStores}
         />
         <NewsSheet open={news} onClose={() => setNews(false)} />
+        <HomeMenu
+          open={menu}
+          onClose={() => setMenu(false)}
+          onMap={openMap}
+          onDocs={() => go("docs")}
+          onNews={() => {
+            setNews(true);
+            markNewsSeen();
+          }}
+          unread={unread}
+          onHelp={() => setSheet("help")}
+          onMore={() => go("account")}
+        />
         {picker && (
           <LocationPicker
             start={picker.start}

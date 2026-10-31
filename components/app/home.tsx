@@ -1,70 +1,108 @@
 "use client";
 
-// スマホの新しいホーム（検索する前の画面）。届いた絵をそのまま使い、iPhone 16 Pro などの画面でスクロールせずに1画面に収まるように組んだもの。
-// 上から：街の写真（届いた絵の構図のまま。見出し「調べる時間を、商談の時間に。」と副題は絵の字を消して、絵と同じ位置・大きさに
-// アプリの字で描く。写真の街並みが見出しの下に見えるよう、調べるカードは街並みの途中に重ねる）の上にロゴ・お知らせ、調べるカード
-// （住所も地番も1つの欄に入れる。地図で選ぶボタンつき。写真入りの「調査を開始する」）、最近の検索（写真の小さな札つきの一覧に4件まで。
-// 続きは履歴のページ）。調べた物件がまだ少ないうちは、その下に「使い方」（住所・地番・地図の3つの入口。例を押すとそのまま調べる）を
-// 出して、画面の下が空かないようにする。調査メニューと書類のバナーは置かない（調べれば全部のタブが出る。書類は下のメニューの「書類・出力」から）。
-// 字は端末の標準の字（app/globals.css の .theme-navy）。大きさと太さは iPhone の標準の段階：見出し26pt太字、章の見出し18pt太字、
-// 入力・ボタン17pt、行の名前16pt中太字、説明・副題13pt、下のメニュー10.5pt。字の間は詰めない（palt を使わない）
-// 調べるカードはすりガラス（後ろの街の写真を少しぼかして透かす）。現れるときの動きとボタンの光は app/globals.css の .home-rise・.home-shine。
-// 寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。幅に対して背の低い画面（iPhone SE など）では、
-// low:（app/globals.css）でカードを少し詰める
-import { ArrowRight, Bell, ChevronRight, LoaderCircle, Map as MapIcon, MapPinned, Search, TriangleAlert, X } from "lucide-react";
+// スマホのホーム（検索する前の画面）。届いたデザインのとおり、画面いっぱいの夕焼けの街の写真（public/home/sunset.webp。届いた背景の絵。
+// 下のメニューの後ろまで敷くので、写真は components/app/mobile-app.tsx が HomeBackdrop で画面の一番奥に置く）の上に、上から：
+// ロゴ（マークと MICHILU の白い版）と右上のメニュー（≡。書類・出力・お知らせ・使い方・その他を開く。HomeMenu）、
+// 「不動産の現場に、／すぐ使える情報を。」、住所・地番の検索欄（すりガラス。キーボードの「検索」か、字を入れると出る → で調べる）、
+// 写真の街並みを見せる空き、最近の検索（暗いすりガラスの一覧に3件。続きは履歴のページ）。
+// まだ何も調べていないときは、最近の検索の代わりに「はじめての方へ」（住所と地番の例。押すとそのまま調べる）を出す。
+// 写真の上の字は白（読みやすいよう薄い影）。寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。
+// 縦は画面の高さに合わせ、検索欄と最近の検索のあいだの空きで伸び縮みする（背の低い画面でもスクロールせずに収まる）
+import { ArrowRight, ChevronRight, FileText, LoaderCircle, Map as MapIcon, Megaphone, Menu, MapPinned, Search, Settings, TriangleAlert, X, CircleHelp } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
-import { monthDay, placeholderScenes, placeParts, SCENES, sceneSrc, type SceneKey } from "@/lib/app/scene";
+import { monthDay, placeParts } from "@/lib/app/scene";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import type { Resume } from "@/lib/resume";
-import { LogoLockup, PhoneImg, ScaledInput } from "./frame";
+import { Sheet } from "../sheet";
+import { PhoneImg, ScaledInput } from "./frame";
 import { TABS } from "./result-head";
-import { GLASS } from "./r-ui";
-import { BottomFade, CompactBar, SkyPhotos, useShrink } from "./sky";
 import { PAGE } from "./tokens";
-import { NAVY } from "./ui";
 
-/** 時刻・電池の帯の色（空の変数 --sky-top が入る前の値。app/layout.tsx の themeColor と同じ） */
+/** 時刻・電池の帯の色（下のメニューのページで、空の変数 --sky-top が入る前の値。app/layout.tsx の themeColor と同じ） */
 export const SKY = "#e6eff9";
+/** ホームの時刻・電池の帯の色（写真のいちばん上の空の色） */
+export const HOME_TOP = "#386fab";
 export { PAGE };
-const HEAD = "#0f1b33";
-const TEXT = "#162033";
-const LIGHT = "#66728a";
-const LINK = "#1f5fbf";
-/** 見出しの左の印（近未来の青） */
-const ACCENT = "linear-gradient(180deg,#3d7bff 0%,#22c1ee 100%)";
 
-/**
- * 写真の部分の高さ。写真（public/home/hero.webp）は届いた絵の 1672×941 から字を消して x125〜1380・y62〜941（下端まで）を切り抜いた
- * もので、幅393pt・高さ275pt にぴったり合う。見出しは絵と同じ位置（上端44pt・字は25pt）に描く。街並みは147pt から下。
- * 調べるカードは街並みが見えるよう 190pt から重ねる（カードの -mt）。写真の下端は地の色に溶かす
- */
-const PHOTO_H = 275;
-
-/** 写真の上の字が建物に重なっても読めるよう、にじませる（昼は白、夜は紺。空の変数 --sky-halo） */
+/** 写真の上の字が明るい空や建物に重なっても読めるよう、薄い影を付ける */
+const SHADOW = "0 1px 3px rgba(0,0,0,0.35), 0 0 12px rgba(0,0,0,0.18)";
+/** 写真の上の字が建物に重なっても読めるよう、にじませる（下のメニューのページの帯。昼は白、夜は紺。空の変数 --sky-halo） */
 export const GLOW = "0 0 10px rgba(var(--sky-halo, 255,255,255),0.95), 0 0 3px rgba(var(--sky-halo, 255,255,255),0.95)";
-/** 地の奥の淡い光（最近の検索のあたり。下の端に届く前に消える）。下のメニューのページでも使う */
+/** 地の奥の淡い光（下のメニューのページで使う） */
 export const AURORA =
   "radial-gradient(60% 42% at 0% 45%, rgba(110,140,255,0.13) 0%, rgba(110,140,255,0) 100%), radial-gradient(55% 38% at 100% 58%, rgba(40,190,255,0.12) 0%, rgba(40,190,255,0) 100%)";
 
-/** 最近の検索がまだ無いときに見せる写真（丸く重ねて3枚） */
-const SAMPLE: SceneKey[] = ["suburb", "newtown", "urban"];
+/** 明るいすりガラス（検索欄・右上のメニュー） */
+const LIGHT_GLASS: CSSProperties = {
+  background: "linear-gradient(180deg, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0.14) 100%)",
+  border: "1px solid rgba(255,255,255,0.42)",
+  boxShadow: "0 10px 30px rgba(10,20,40,0.22), inset 0 1px 0 rgba(255,255,255,0.35)",
+  backdropFilter: "blur(18px) saturate(140%)",
+  WebkitBackdropFilter: "blur(18px) saturate(140%)",
+};
+/** 暗いすりガラス（最近の検索の一覧・注意） */
+const DARK_GLASS: CSSProperties = {
+  background: "linear-gradient(180deg, rgba(40,44,54,0.52) 0%, rgba(28,32,42,0.58) 100%)",
+  border: "1px solid rgba(255,255,255,0.16)",
+  boxShadow: "0 14px 34px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)",
+  backdropFilter: "blur(22px) saturate(140%)",
+  WebkitBackdropFilter: "blur(22px) saturate(140%)",
+};
+const SUB = "rgba(255,255,255,0.72)";
 
-/** 「使い方」の3つの入口（例を押すと、そのまま調べる） */
-const TRY: { key: "address" | "chiban" | "map"; Icon: typeof Search; title: string; sub: string; example?: string }[] = [
-  { key: "address", Icon: Search, title: "住所で調べる", sub: "例：渋谷区神南1-19-11", example: "渋谷区神南1-19-11" },
-  { key: "chiban", Icon: MapPinned, title: "地番で調べる", sub: "例：松戸市古ヶ崎四丁目3556-1", example: "松戸市古ヶ崎四丁目3556-1" },
-  { key: "map", Icon: MapIcon, title: "地図で選ぶ", sub: "住所の無い土地も選べます" },
+/** 最近の検索に出す数 */
+const RECENT = 3;
+/** まだ何も調べていないときの例（押すとそのまま調べる） */
+const EXAMPLES: { Icon: typeof Search; title: string; sub: string; query: string }[] = [
+  { Icon: Search, title: "住所で調べる", sub: "例：渋谷区神南1-19-11", query: "渋谷区神南1-19-11" },
+  { Icon: MapPinned, title: "地番で調べる", sub: "例：松戸市古ヶ崎四丁目3556-1", query: "松戸市古ヶ崎四丁目3556-1" },
 ];
-/** 調べた物件がこの数より少ないうちは「使い方」を出す */
-const TRY_UNTIL = 3;
 
-/** 調べるカードの下に出す注意（空のまま調べた・通信できない） */
+/** 検索欄の下に出す注意（空のまま調べた・通信できない） */
 export type HomeMessage = { text: string } | null;
 
 /** 現れるときの動きの遅れ（上から順に） */
 const rise = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
 /** 浮き上がる動きは開いた最初の1回だけ（下のメニューで戻ったときは短いフェード） */
 let risen = false;
+
+/** 画面いっぱいの写真（下のメニューの後ろまで敷く）。上と下を少し暗くして、白い字とメニューを読みやすくする */
+export function HomeBackdrop() {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden" style={{ background: "#2a3a55" }}>
+      <PhoneImg src="/home/sunset.webp" alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "62% 50%" }} />
+      <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(8,18,40,0.30) 0%, rgba(8,18,40,0) 26%, rgba(0,0,0,0) 52%, rgba(0,0,0,0.30) 100%)" }} />
+    </div>
+  );
+}
+
+/** 画面の高さ（pt。拡大・縮小の前の値）。スクロールする箱の高さを拡大率で割る */
+function useScreenHeight(root: RefObject<HTMLElement | null>): number | undefined {
+  const [h, setH] = useState<number>();
+  useEffect(() => {
+    const box = root.current?.closest<HTMLElement>("[data-scroller]");
+    if (!box) return;
+    const measure = () => {
+      const zoom = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--app-zoom")) || 1;
+      setH(box.clientHeight / zoom);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [root]);
+  return h;
+}
+
+/** 最近の検索の2行目（「地番：3556-1」「番地：1-19-11」）。番地や地番が無いものは調べた日 */
+function secondLine(h: HistoryItem): string {
+  const { city, town, full, chiban } = placeParts(h);
+  if (h.ll) return `地図で選んだ場所・${monthDay(h.at)}`;
+  const tail = city && full.startsWith(city) ? full.slice(city.length).trim() : full;
+  const num = town && tail.startsWith(town) ? tail.slice(town.length).trim() : "";
+  if (num) return `${chiban ? "地番" : "番地"}：${num}`;
+  return `${monthDay(h.at)}に調べました`;
+}
 
 export function HomeScreen({
   input,
@@ -76,18 +114,15 @@ export function HomeScreen({
   history,
   onPickRecent,
   onHistory,
-  onMap,
   onTry,
-  onHelp,
-  onBell,
+  onMenu,
   unread,
-  onLogo,
   inputRef,
   resume,
 }: {
   input: string;
   setInput: (v: string) => void;
-  /** 「調査を開始する」 */
+  /** 調べる（キーボードの「検索」か、検索欄の →） */
   onSubmit: () => void;
   loading: boolean;
   message: HomeMessage;
@@ -95,24 +130,19 @@ export function HomeScreen({
   history: HistoryItem[];
   onPickRecent: (h: HistoryItem) => void;
   onHistory: () => void;
-  /** 地図で場所を選ぶ（住所の無い土地も選べる） */
-  onMap: () => void;
-  /** 「使い方」の例をそのまま調べる */
+  /** 「はじめての方へ」の例をそのまま調べる */
   onTry: (address: string) => void;
-  /** 使い方のシート */
-  onHelp: () => void;
-  onBell: () => void;
+  /** 右上のメニュー（≡） */
+  onMenu: () => void;
+  /** まだ見ていないお知らせがある（≡ に印） */
   unread: boolean;
-  onLogo: () => void;
   inputRef: RefObject<HTMLInputElement | null>;
   /** 直近7日に見ていた物件（最近の検索のその行に「続きから」と、見ていたタブを添える。開くとそのタブから） */
   resume?: Resume;
 }) {
-  const recent = history.slice(0, 4);
-  const scenes = placeholderScenes(recent);
-  // スクロールすると写真が半分の速さで上へ動き、見出しが薄れ、230pt を越えると上に小さなバーが残る
+  const recent = history.slice(0, RECENT);
   const root = useRef<HTMLDivElement>(null);
-  useShrink(root, 230);
+  const screen = useScreenHeight(root);
   // 最初の1回かは、このマウントの間は変えない（履歴の読み込みなどで描き直しても、動きの途中で切り替わらない）
   const [first] = useState(() => !risen);
   useEffect(() => {
@@ -121,195 +151,143 @@ export function HomeScreen({
   const riseClass = first ? "home-rise" : "";
 
   return (
-    <div ref={root} className={`app-touch relative overflow-hidden ${first ? "" : "page-in"}`} style={{ background: PAGE }}>
-      <CompactBar>
-        <button onClick={onLogo} aria-label="MICHILU ホーム" className="press flex h-[40px] shrink-0 items-center">
-          <LogoLockup style={{ height: 22 }} />
+    <div ref={root} className={`app-touch relative flex flex-col text-white ${first ? "" : "page-in"}`} style={{ minHeight: screen }}>
+      {/* ロゴと右上のメニュー */}
+      <div className="relative flex items-start justify-between" style={{ padding: "16px 18px 0 20px" }}>
+        <PhoneImg src="/home/logo-mark-white.webp" alt="MICHILU" width={802} height={159} draggable={false} className={`${riseClass} block`} style={{ height: 30, width: "auto", marginTop: 6, filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.3))" }} />
+        <button onClick={onMenu} aria-label={unread ? "メニュー（新しいお知らせがあります）" : "メニュー"} className="press relative flex items-center justify-center rounded-full" style={{ ...LIGHT_GLASS, width: 46, height: 46 }}>
+          <Menu size={22} strokeWidth={1.8} absoluteStrokeWidth color="#fff" />
+          {unread && <span className="absolute rounded-full border-2 border-white bg-[#f0263a]" style={{ right: 2, top: 2, width: 11, height: 11 }} />}
         </button>
-        <button onClick={() => inputRef.current?.focus()} className="press flex h-[38px] min-w-0 flex-1 items-center gap-[8px] rounded-full border border-[#d8e0eb] bg-white pl-[12px] pr-[12px] text-left shadow-[inset_0_1px_2px_rgba(20,45,85,0.05)]" style={{ fontSize: 14, color: input ? TEXT : "#8d97a8" }}>
-          <Search size={15} strokeWidth={1.9} absoluteStrokeWidth color="#7c8aa3" className="shrink-0" />
-          <span className="truncate">{input || "住所・地番を入力"}</span>
-        </button>
-      </CompactBar>
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0" style={{ top: 280, background: AURORA }} />
-
-      {/* 街の写真の部分：時間連動の空（components/app/sky.tsx）。上端は時刻・電池の帯の色（--sky-top）と同じ */}
-      <div className="relative overflow-hidden" style={{ height: PHOTO_H }}>
-        <div className="shrink-photo absolute inset-0">
-          <SkyPhotos creditBottom={PHOTO_H - 85} />
-        </div>
-        <BottomFade />
-        <button onClick={onLogo} aria-label="MICHILU ホーム" className="press absolute flex items-center" style={{ left: 16, top: 4, height: 40 }}>
-          <LogoLockup style={{ height: 28 }} sky />
-        </button>
-        <button onClick={onBell} aria-label={unread ? "お知らせ（新しいお知らせがあります）" : "お知らせ"} className="press absolute flex items-center justify-center" style={{ right: 8, top: 3, width: 44, height: 44 }}>
-          <span className="flex items-center justify-center rounded-full shadow-[0_4px_14px_rgba(15,47,95,0.14)]" style={{ ...GLASS, width: 38, height: 38 }}>
-            <Bell size={19} strokeWidth={1.7} absoluteStrokeWidth color={HEAD} />
-          </span>
-          {unread && <span className="absolute rounded-full border-2 border-white bg-[#f0263a]" style={{ right: 6, top: 6, width: 11, height: 11 }} />}
-        </button>
-
-        {/* 見出しと副題。字の色は空の明るさで紺↔白（.sky-ink）。スクロールで薄れる（.shrink-title） */}
-        <div className="shrink-title absolute" style={{ left: 16, top: 44 }}>
-          <h1 className={`${riseClass} sky-ink whitespace-nowrap font-bold`} style={{ fontSize: 26, lineHeight: "34px", letterSpacing: 0.2, textShadow: GLOW }}>
-            調べる時間を、
-            <br />
-            商談の時間に。
-          </h1>
-          <p className={`${riseClass} sky-ink-soft mt-[3px] whitespace-nowrap leading-none`} style={{ fontSize: 13, letterSpacing: 0.2, textShadow: GLOW, ...rise(60) }}>
-            不動産調査を、もっと早く、もっとシンプルに。
-          </p>
-        </div>
       </div>
 
-      {/* 調べる（すりガラスのカード。住所も地番もこの欄に入れる。縁に空の光のハイライト） */}
-      <div className={`${riseClass} relative mx-[16px] -mt-[85px] rounded-[22px] p-[9px] shadow-[0_14px_34px_rgba(20,48,95,0.13)] low:p-[8px]`} style={{ ...GLASS, ...rise(100) }}>
-        <div aria-hidden className="sky-layer pointer-events-none absolute inset-0 rounded-[22px]" style={{ background: "radial-gradient(120% 70% at 14% 0%, var(--sky-hl, #fff) 0%, rgba(255,255,255,0) 60%)", opacity: 0.55, boxShadow: "inset 0 1px 0 var(--sky-hl, #fff)" }} />
-        <form
-          role="search"
-          onSubmit={(e) => {
-            e.preventDefault();
-            // スマホは調べたらキーボードを閉じる（開いたままだと結果の下半分が隠れる）
-            inputRef.current?.blur();
-            onSubmit();
-          }}
-        >
-          <div className="flex h-[44px] items-center rounded-full border border-[#d8e0eb] bg-white shadow-[inset_0_1px_2px_rgba(20,45,85,0.05)] transition-[border-color,box-shadow] focus-within:border-[#9db8e6] focus-within:shadow-[0_0_0_3px_rgba(61,123,255,0.12)]">
-            <Search size={17} strokeWidth={1.8} absoluteStrokeWidth color="#7c8aa3" className="ml-[15px] shrink-0" />
-            <ScaledInput value={input} onChange={setInput} inputRef={inputRef} size={17} className="ml-[9px] mr-[2px]" label="住所・地番" autoComplete="off" placeholder="住所・地番を入力" />
-            {input && (
-              <button type="button" onClick={() => setInput("")} aria-label="入力を消す" className="flex h-[40px] w-[32px] shrink-0 items-center justify-center">
-                <span className="flex items-center justify-center rounded-full bg-[#e3e8f0]" style={{ width: 20, height: 20 }}>
-                  <X size={12} strokeWidth={2.2} absoluteStrokeWidth color="#4d586d" />
-                </span>
-              </button>
-            )}
-            <span aria-hidden className="mx-[2px] h-[20px] w-px shrink-0 bg-[#e3e9f1]" />
-            <button
-              type="button"
-              onClick={onMap}
-              aria-label="地図で場所を選ぶ"
-              className="press mr-[3px] flex h-[38px] shrink-0 items-center gap-[4px] rounded-full px-[11px] font-semibold leading-none active:bg-[#eef3fa]"
-              style={{ fontSize: 14, color: NAVY }}
-            >
-              <MapIcon size={15} strokeWidth={1.8} absoluteStrokeWidth />
-              地図
-            </button>
-          </div>
+      {/* ひとこと */}
+      <p className={`${riseClass} relative font-medium`} style={{ margin: "14px 0 0 20px", fontSize: 15.5, lineHeight: "25px", letterSpacing: 1.6, textShadow: SHADOW, ...rise(60) }}>
+        不動産の現場に、
+        <br />
+        すぐ使える情報を。
+      </p>
 
-          {/* 届いた写真入りのボタン（文字はアプリで描く） */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="home-shine press relative mt-[8px] block h-[48px] w-full overflow-hidden rounded-[14px] text-white shadow-[0_8px_20px_rgba(15,47,95,0.22)] disabled:opacity-95 low:h-[44px]"
-          >
-            <PhoneImg src="/home/cta.webp" alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 45%" }} />
-            <span className="absolute inset-y-0 left-0 flex items-center justify-center gap-[7px] whitespace-nowrap font-semibold" style={{ width: "62%", fontSize: 17, letterSpacing: 0.4 }}>
-              {loading ? (
-                <>
-                  <LoaderCircle size={18} strokeWidth={2} absoluteStrokeWidth className="animate-spin" />
-                  調べています…
-                </>
-              ) : (
-                <>
-                  調査を開始する
-                  <ArrowRight size={18} strokeWidth={2} absoluteStrokeWidth />
-                </>
-              )}
+      {/* 住所・地番の検索欄（すりガラス） */}
+      {/* 浮き上がる動きは、すりガラスの箱そのものに付ける（外の箱が動くと、後ろがぼけない） */}
+      <form
+        role="search"
+        className="relative"
+        style={{ margin: "74px 19px 0" }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          // スマホは調べたらキーボードを閉じる（開いたままだと結果の下半分が隠れる）
+          inputRef.current?.blur();
+          onSubmit();
+        }}
+      >
+        <div className={`${riseClass} flex items-center rounded-full transition-[box-shadow] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.28)]`} style={{ ...LIGHT_GLASS, height: 56, ...rise(100) }}>
+          <Search size={22} strokeWidth={1.9} absoluteStrokeWidth color="#fff" className="ml-[20px] shrink-0" />
+          <ScaledInput value={input} onChange={setInput} inputRef={inputRef} size={17} className="ml-[13px] mr-[4px]" label="住所・地番" autoComplete="off" placeholder="住所・地番で検索" onPhoto />
+          {loading ? (
+            <span className="mr-[16px] flex shrink-0 items-center gap-[6px]" style={{ fontSize: 13 }}>
+              <LoaderCircle size={18} strokeWidth={2} absoluteStrokeWidth className="animate-spin" />
+              調べています
             </span>
-          </button>
-        </form>
-
+          ) : (
+            input && (
+              <>
+                <button type="button" onClick={() => setInput("")} aria-label="入力を消す" className="flex h-[44px] w-[34px] shrink-0 items-center justify-center">
+                  <span className="flex items-center justify-center rounded-full bg-white/25" style={{ width: 20, height: 20 }}>
+                    <X size={12} strokeWidth={2.4} absoluteStrokeWidth color="#fff" />
+                  </span>
+                </button>
+                <button type="submit" aria-label="調べる" className="press mr-[7px] flex shrink-0 items-center justify-center rounded-full bg-white" style={{ width: 42, height: 42 }}>
+                  <ArrowRight size={20} strokeWidth={2.2} absoluteStrokeWidth color="#1b3f73" />
+                </button>
+              </>
+            )
+          )}
+        </div>
         {message && (
-          <button type="button" onClick={onDismiss} className="mt-[8px] flex w-full items-start gap-[7px] rounded-[12px] bg-[#fdf1ec] px-[12px] py-[9px] text-left leading-[1.5]" style={{ fontSize: 13, color: "#8a4f3a" }}>
-            <TriangleAlert size={15} strokeWidth={1.8} absoluteStrokeWidth className="mt-[2px] shrink-0" />
+          <button type="button" onClick={onDismiss} className="mt-[10px] flex w-full items-start gap-[8px] rounded-[16px] px-[14px] py-[10px] text-left leading-[1.55]" style={{ ...DARK_GLASS, fontSize: 13 }}>
+            <TriangleAlert size={15} strokeWidth={1.9} absoluteStrokeWidth color="#ffcf8a" className="mt-[2px] shrink-0" />
             {message.text}
           </button>
         )}
-      </div>
+      </form>
 
-      {/* 最近の検索（写真の小さな札つきの一覧に4件まで） */}
-      <section className={`${riseClass} relative mt-[8px] low:mt-[6px]`} style={rise(160)}>
-        <SectionHead title="最近の検索" onMore={history.length ? onHistory : undefined} />
+      {/* 写真の街並みを見せる空き（画面の高さに合わせて伸び縮み） */}
+      <div className="min-h-[28px] flex-1" />
+
+      {/* 最近の検索（暗いすりガラスの一覧に3件）。まだ何も調べていないときは「はじめての方へ」 */}
+      <section className="relative" style={{ padding: "0 19px 22px" }}>
         {recent.length ? (
-          <ul className="mx-[16px] mt-[2px] overflow-hidden rounded-[18px] bg-white shadow-[0_4px_14px_rgba(20,45,85,0.08)]">
-            {recent.map((h, i) => {
-              const { city, town, full, chiban } = placeParts(h);
-              const scene = scenes[i];
-              const kind = chiban ? "・地番" : h.ll ? "・地図" : "";
-              return (
-                <li key={historyKey(h)} className="border-t border-[#eef2f6] first:border-t-0">
-                  <button onClick={() => onPickRecent(h)} aria-label={`${full}（${monthDay(h.at)}${kind}）を開く`} className="flex min-h-[72px] w-full items-center gap-[12px] py-[8px] pl-[10px] pr-[10px] text-left active:bg-[#f5f8fc] low:min-h-[64px]">
-                    <PhoneImg src={sceneSrc(scene)} alt="" loading="lazy" draggable={false} className="block size-[56px] shrink-0 rounded-[14px] object-cover low:size-[48px]" style={{ objectPosition: `50% ${SCENES[scene].y}%` }} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold leading-[1.3]" style={{ fontSize: 16, color: TEXT }}>
-                        {town || full}
-                      </span>
-                      <span className="mt-[2px] block truncate leading-[1.35]" style={{ fontSize: 13, color: LIGHT }}>
-                        {city || "対応エリアの外"}・{monthDay(h.at)}
-                        {kind}
-                        {resume && historyKey(h) === resume.historyKey && (
-                          <span className="ml-[6px] font-semibold" style={{ color: LINK }}>
-                            続きから：{TABS.find((t) => t.key === resume.tab)?.long ?? "基本情報"}
-                          </span>
-                        )}
-                      </span>
-                    </span>
-                    <ChevronRight size={18} strokeWidth={1.8} absoluteStrokeWidth color="#a3adbd" className="shrink-0" />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <>
+            <SectionHead title="最近の検索" onMore={onHistory} className={riseClass} />
+            <ul className={`${riseClass} overflow-hidden rounded-[22px]`} style={{ ...DARK_GLASS, ...rise(160) }}>
+              {recent.map((h) => {
+                const { city, town, full } = placeParts(h);
+                const resumed = resume && historyKey(h) === resume.historyKey;
+                return (
+                  <li key={historyKey(h)} className="border-t border-white/[0.12] first:border-t-0">
+                    <Row
+                      Icon={Search}
+                      title={city && town ? `${city}${town}` : full}
+                      sub={
+                        <>
+                          {secondLine(h)}
+                          {resumed && <span className="ml-[6px] font-semibold text-[#8cc8ff]">続きから：{TABS.find((t) => t.key === resume.tab)?.long ?? "基本情報"}</span>}
+                        </>
+                      }
+                      label={`${full}を開く`}
+                      onClick={() => onPickRecent(h)}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         ) : (
-          <FirstRun />
+          <>
+            <SectionHead title="はじめての方へ" className={riseClass} />
+            <ul className={`${riseClass} overflow-hidden rounded-[22px]`} style={{ ...DARK_GLASS, ...rise(160) }}>
+              {EXAMPLES.map((x) => (
+                <li key={x.query} className="border-t border-white/[0.12] first:border-t-0">
+                  <Row Icon={x.Icon} title={x.title} sub={x.sub} label={`${x.title}（${x.sub}）`} onClick={() => onTry(x.query)} />
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </section>
-
-      {/* 使い方（調べた物件がまだ少ないうちだけ。例を押すとそのまま調べる） */}
-      {history.length < TRY_UNTIL && (
-        <section className={`${riseClass} relative mt-[10px] low:mt-[8px]`} style={rise(220)}>
-          <SectionHead title="使い方" more="くわしく" onMore={onHelp} />
-          <ul className="mx-[16px] mt-[2px] overflow-hidden rounded-[18px] bg-white shadow-[0_4px_14px_rgba(20,45,85,0.08)]">
-            {TRY.map((t) => (
-              <li key={t.key} className="border-t border-[#eef2f6] first:border-t-0">
-                <button onClick={() => (t.example ? onTry(t.example) : onMap())} className="flex min-h-[56px] w-full items-center gap-[12px] py-[8px] pl-[12px] pr-[10px] text-left active:bg-[#f5f8fc] low:min-h-[52px]">
-                  <span className="flex shrink-0 items-center justify-center rounded-full bg-[#eef3fa]" style={{ width: 38, height: 38 }}>
-                    <t.Icon size={18} strokeWidth={1.8} absoluteStrokeWidth color={NAVY} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold leading-[1.3]" style={{ fontSize: 16, color: TEXT }}>
-                      {t.title}
-                    </span>
-                    <span className="mt-[1px] block truncate leading-[1.35]" style={{ fontSize: 13, color: LIGHT }}>
-                      {t.sub}
-                    </span>
-                  </span>
-                  <ChevronRight size={18} strokeWidth={1.8} absoluteStrokeWidth color="#a3adbd" className="shrink-0" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      <div style={{ height: 6 }} />
     </div>
   );
 }
 
-/** 章の見出し（左に青い印）と「すべて見る ›」（押せる高さは44pt） */
-function SectionHead({ title, more = "すべて見る", onMore }: { title: string; more?: ReactNode; onMore?: () => void }) {
+/** 一覧の1行（左に虫めがね、2行の字、右に ›） */
+function Row({ Icon, title, sub, label, onClick }: { Icon: typeof Search; title: string; sub: ReactNode; label: string; onClick: () => void }) {
   return (
-    <div className="flex h-[28px] items-center justify-between px-[16px]">
-      <div className="flex min-w-0 items-center gap-[8px]">
-        <span aria-hidden className="shrink-0 rounded-full" style={{ width: 3.5, height: 16, background: ACCENT }} />
-        <h2 className="whitespace-nowrap font-bold leading-none" style={{ fontSize: 18, color: HEAD }}>
+    <button onClick={onClick} aria-label={label} className="flex min-h-[57px] w-full items-center gap-[14px] py-[9px] pl-[20px] pr-[16px] text-left active:bg-white/10">
+      <Icon size={21} strokeWidth={1.8} absoluteStrokeWidth color="rgba(255,255,255,0.9)" className="shrink-0" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-semibold leading-[1.3]" style={{ fontSize: 16 }}>
           {title}
-        </h2>
-      </div>
+        </span>
+        <span className="mt-[3px] block truncate leading-[1.3]" style={{ fontSize: 13.5, color: SUB }}>
+          {sub}
+        </span>
+      </span>
+      <ChevronRight size={20} strokeWidth={2} absoluteStrokeWidth color="rgba(255,255,255,0.85)" className="shrink-0" />
+    </button>
+  );
+}
+
+/** 章の見出し（白い太字）と「すべて見る ›」（押せる高さは44pt） */
+function SectionHead({ title, onMore, className = "" }: { title: string; onMore?: () => void; className?: string }) {
+  return (
+    <div className={`${className} flex h-[36px] items-center justify-between`} style={{ marginBottom: 6, ...rise(140) }}>
+      <h2 className="whitespace-nowrap font-bold leading-none" style={{ fontSize: 18.5, letterSpacing: 0.5, textShadow: SHADOW }}>
+        {title}
+      </h2>
       {onMore && (
-        <button onClick={onMore} className="-mr-[8px] flex h-[44px] shrink-0 items-center px-[8px] active:opacity-60" style={{ fontSize: 15, color: LINK }}>
-          {more}
+        <button onClick={onMore} className="-mr-[8px] flex h-[44px] shrink-0 items-center gap-[2px] px-[8px] active:opacity-60" style={{ fontSize: 14, color: "rgba(255,255,255,0.9)", textShadow: SHADOW }}>
+          すべて見る
           <ChevronRight size={15} strokeWidth={2} absoluteStrokeWidth />
         </button>
       )}
@@ -317,23 +295,61 @@ function SectionHead({ title, more = "すべて見る", onMore }: { title: strin
   );
 }
 
-/** 最近の検索がまだ無いとき（初めて開いたとき）。1行の高さに収める（Safari でも1画面に入るように） */
-function FirstRun() {
+/** ホームの右上のメニュー（≡）。下のメニューに無いページと、地図で選ぶ・お知らせ・使い方 */
+export function HomeMenu({
+  open,
+  onClose,
+  onMap,
+  onDocs,
+  onNews,
+  unread,
+  onHelp,
+  onMore,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onMap: () => void;
+  onDocs: () => void;
+  onNews: () => void;
+  unread: boolean;
+  onHelp: () => void;
+  onMore: () => void;
+}) {
+  if (!open) return null;
+  const items: { Icon: typeof Search; title: string; sub: string; dot?: boolean; run: () => void }[] = [
+    { Icon: MapIcon, title: "地図で場所を選ぶ", sub: "住所の無い土地も選べます", run: onMap },
+    { Icon: FileText, title: "書類・出力", sub: "調査メモ・重説の下書き・案内図・要注意点", run: onDocs },
+    { Icon: Megaphone, title: "お知らせ", sub: "新しい機能・データの更新", dot: unread, run: onNews },
+    { Icon: CircleHelp, title: "使い方", sub: "調べ方と、画面の見方", run: onHelp },
+    { Icon: Settings, title: "その他", sub: "ホーム画面に追加・調査記録の保存・対応エリア・出典", run: onMore },
+  ];
   return (
-    <div className="mx-[16px] mt-[2px] flex items-center gap-[12px] rounded-[18px] bg-white py-[8px] pl-[10px] pr-[12px] shadow-[0_4px_14px_rgba(20,45,85,0.08)]" style={{ minHeight: 56 }}>
-      <div className="flex shrink-0 -space-x-[10px]">
-        {SAMPLE.map((k, i) => (
-          <PhoneImg key={k} src={sceneSrc(k)} alt="" loading="lazy" draggable={false} className="relative block size-[40px] rounded-full border-2 border-white object-cover" style={{ objectPosition: `50% ${SCENES[k].y}%`, zIndex: SAMPLE.length - i }} />
-        ))}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-semibold leading-[1.3]" style={{ fontSize: 15, color: TEXT }}>
-          まだ調べた物件はありません
-        </p>
-        <p className="mt-[1px] truncate leading-[1.35]" style={{ fontSize: 12.5, color: LIGHT }}>
-          調べた物件が、ここに並びます
-        </p>
-      </div>
+    <div className="theme-navy">
+      <Sheet title="メニュー" open onClose={onClose}>
+        <ul className="divide-y divide-line">
+          {items.map((it) => (
+            <li key={it.title}>
+              <button
+                onClick={() => {
+                  onClose();
+                  it.run();
+                }}
+                className="flex w-full items-center gap-3 py-3 text-left active:bg-mint/50"
+              >
+                <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mint text-brand">
+                  <it.Icon className="h-[18px] w-[18px]" />
+                  {it.dot && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#f0263a]" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[14.5px] font-semibold text-ink">{it.title}</span>
+                  <span className="mt-0.5 block text-[12px] leading-[1.5] text-muted">{it.sub}</span>
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Sheet>
     </div>
   );
 }

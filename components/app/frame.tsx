@@ -3,9 +3,9 @@
 // スマホの新しい見た目（紺）の枠：絵の幅（393pt。画面の幅に合わせて拡大・縮小する。CSS の zoom。値は app/layout.tsx の <head> で決める。
 // components/app/zoom.ts）、スマホの画面だけで読む画像、ロゴ、検索窓の入力欄、いちばん下のメニュー。
 // 検索する前のホームは components/app/home.tsx、物件の画面は components/app/mobile-app.tsx
-import { Ellipsis, FileText, Star } from "lucide-react";
+import { Search, Star } from "lucide-react";
 import type { CSSProperties, ImgHTMLAttributes, ReactNode, RefObject } from "react";
-import { ClockBack, HouseFill } from "./icons";
+import { ClockBack } from "./icons";
 
 /** 絵の幅（pt）。この幅で描いて、画面の幅に合わせて拡大・縮小する */
 export const ART_W = 393;
@@ -55,6 +55,7 @@ export function ScaledInput({
   size = 10.06,
   autoComplete = "street-address",
   className = "ml-[10.3px] mr-[4px]",
+  onPhoto = false,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -65,6 +66,8 @@ export function ScaledInput({
   size?: number;
   autoComplete?: string;
   className?: string;
+  /** 写真の上のすりガラスの欄（字を白く） */
+  onPhoto?: boolean;
 }) {
   const k = `calc(${size} * var(--app-zoom, 1) / 16)`;
   return (
@@ -78,47 +81,60 @@ export function ScaledInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={label}
-        className="absolute left-0 top-1/2 bg-transparent font-medium text-[#121a2b] outline-none placeholder:font-normal placeholder:text-[#8d97a8] [&::-webkit-search-cancel-button]:hidden"
+        className={`absolute left-0 top-1/2 bg-transparent font-medium outline-none placeholder:font-normal [&::-webkit-search-cancel-button]:hidden ${onPhoto ? "text-white placeholder:text-white/85" : "text-[#121a2b] placeholder:text-[#8d97a8]"}`}
         style={{ width: `calc(100% / ${k})`, fontSize: "calc(16px / var(--app-zoom, 1))", transform: `translateY(-50%) scale(${k})`, transformOrigin: "left center" }}
       />
     </div>
   );
 }
 
+/** 下のメニューの 3 つ（検索・お気に入り・履歴）と、ホームの右上のメニュー（≡）から開くページ（書類・出力・その他） */
 export type NavKey = "home" | "history" | "favorites" | "docs" | "account";
 
+/** 白いメニュー（物件・下のメニューのページ）の色 */
 const ON = "#133664";
 const OFF = "#68738a";
-/** 5つを同じ幅で並べる（幅393pt ÷ 5） */
-const NAV_W = ART_W / 5;
-/** iPhone のアプリの下のメニューと同じくらいの大きさ（アイコン約24pt・名前10.5pt） */
-const NAV: { key: NavKey; label: string; icon: (on: boolean) => ReactNode }[] = [
-  { key: "home", label: "ホーム", icon: (on) => <HouseFill size={24} color={on ? ON : OFF} /> },
-  { key: "history", label: "履歴", icon: (on) => <ClockBack size={24} stroke={on ? 2 : 1.6} color={on ? ON : OFF} /> },
-  { key: "favorites", label: "お気に入り", icon: (on) => <Star size={23} strokeWidth={on ? 2 : 1.6} absoluteStrokeWidth color={on ? ON : OFF} fill={on ? ON : "none"} /> },
-  { key: "docs", label: "書類・出力", icon: (on) => <FileText size={23} strokeWidth={on ? 2 : 1.6} absoluteStrokeWidth color={on ? ON : OFF} /> },
-  { key: "account", label: "その他", icon: (on) => <Ellipsis size={24} strokeWidth={on ? 2.6 : 2.2} absoluteStrokeWidth color={on ? ON : OFF} /> },
+/** ホームの写真の上のメニュー（暗いすりガラス）の色 */
+const ON_DARK = "#5aaeff";
+const OFF_DARK = "rgba(255,255,255,0.78)";
+/** 3つを同じ幅で並べる（幅393pt ÷ 3） */
+const NAV_W = ART_W / 3;
+/** iPhone のアプリの下のメニューと同じくらいの大きさ（アイコン約24pt・名前11pt） */
+const NAV: { key: NavKey; label: string; icon: (color: string, on: boolean) => ReactNode }[] = [
+  { key: "home", label: "検索", icon: (c, on) => <Search size={24} strokeWidth={on ? 2.1 : 1.7} absoluteStrokeWidth color={c} /> },
+  { key: "favorites", label: "お気に入り", icon: (c, on) => <Star size={24} strokeWidth={on ? 2 : 1.6} absoluteStrokeWidth color={c} fill={on ? c : "none"} /> },
+  { key: "history", label: "履歴", icon: (c, on) => <ClockBack size={24} stroke={on ? 2 : 1.6} color={c} /> },
 ];
 
-/** いちばん下のメニュー（ホーム・履歴・お気に入り・書類・出力・その他） */
-export function BottomNav({ active, onSelect }: { active: NavKey; onSelect: (key: NavKey) => void }) {
+/**
+ * いちばん下のメニュー（検索・お気に入り・履歴）。dark はホームの写真の上（暗いすりガラス。上の角を丸め、選んでいる所の下に線）。
+ * 書類・出力とその他は、ホームの右上のメニュー（≡）から開く
+ */
+export function BottomNav({ active, onSelect, dark = false }: { active: NavKey; onSelect: (key: NavKey) => void; dark?: boolean }) {
+  const on = dark ? ON_DARK : ON;
+  const off = dark ? OFF_DARK : OFF;
   return (
-    <nav aria-label="画面の切り替え" className="app-touch shrink-0 overflow-hidden border-t border-[#e6ebf2] bg-white/95 pb-[max(0px,calc(env(safe-area-inset-bottom)-12px))] backdrop-blur">
-      <div className="relative mx-auto" style={{ width: ART_W, height: 54, zoom: ZOOM }}>
+    <nav
+      aria-label="画面の切り替え"
+      className={`app-touch relative shrink-0 overflow-hidden pb-[max(0px,calc(env(safe-area-inset-bottom)-12px))] ${dark ? "rounded-t-[calc(26px*var(--app-zoom,1))] border-t border-white/15 backdrop-blur-xl backdrop-saturate-150" : "border-t border-[#e6ebf2] bg-white/95 backdrop-blur"}`}
+      style={dark ? { background: "rgba(22,26,34,0.58)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)" } : undefined}
+    >
+      <div className="relative mx-auto" style={{ width: ART_W, height: 58, zoom: ZOOM }}>
         {NAV.map((n, i) => {
-          const on = n.key === active;
+          const sel = n.key === active;
           return (
             <button
               key={n.key}
               onClick={() => onSelect(n.key)}
-              aria-current={on ? "page" : undefined}
+              aria-current={sel ? "page" : undefined}
               className="nav-item absolute flex flex-col items-center justify-center gap-[4px] active:opacity-60"
-              style={{ left: i * NAV_W, top: 0, width: NAV_W, height: 54 }}
+              style={{ left: i * NAV_W, top: 0, width: NAV_W, height: 58 }}
             >
-              {n.icon(on)}
-              <span className="whitespace-nowrap leading-none" style={{ fontSize: 10.5, color: on ? ON : OFF, fontWeight: on ? 600 : 500 }}>
+              {n.icon(sel ? on : off, sel)}
+              <span className="whitespace-nowrap leading-none" style={{ fontSize: 11, color: sel ? on : off, fontWeight: sel ? 600 : 500 }}>
                 {n.label}
               </span>
+              {dark && sel && <span aria-hidden className="absolute rounded-full" style={{ bottom: 2, width: 34, height: 2.5, background: on }} />}
             </button>
           );
         })}

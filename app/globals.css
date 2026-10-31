@@ -135,21 +135,13 @@ body {
 }
 
 /*
- * スマホの新しいホームの動き（components/app/home.tsx）。上から順に浮き上がって現れる（.home-rise。遅れは style の animation-delay）と、
- * 「調査を開始する」の上を光が流れる（.home-shine）。動きを減らす設定の端末と PC の幅では動かさない
+ * スマホのホームの動き（components/app/home.tsx）。上から順に浮き上がって現れる（.home-rise。遅れは style の animation-delay）。
+ * 動きを減らす設定の端末と PC の幅では動かさない。
+ * 終わったあとは動きを外す（backwards。終わりの形は元の見た目と同じ）：動きが残ったままの箱の中では、すりガラスの後ろがぼけない
  */
 @media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
   .home-rise {
-    animation: home-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  }
-  .home-shine::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(105deg, rgba(255, 255, 255, 0) 38%, rgba(255, 255, 255, 0.32) 50%, rgba(255, 255, 255, 0) 62%);
-    transform: translateX(-110%);
-    animation: home-shine 5s ease-in-out 1.4s infinite;
-    pointer-events: none;
+    animation: home-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
   }
 }
 @keyframes home-rise {
@@ -160,15 +152,6 @@ body {
   to {
     opacity: 1;
     transform: none;
-  }
-}
-@keyframes home-shine {
-  0% {
-    transform: translateX(-110%);
-  }
-  30%,
-  100% {
-    transform: translateX(110%);
   }
 }
 
@@ -355,14 +338,15 @@ body {
   }
 }
 
-/* スマホのページの切り替え（下のメニュー）：8pt 下から浮き上がりながら現れる（180ms）。動きを減らす設定ではフェードだけ */
+/* スマホのページの切り替え（下のメニュー）：8pt 下から浮き上がりながら現れる（180ms）。動きを減らす設定ではフェードだけ。
+ * 終わったあとは動きを外す（backwards）：動きが残ったままの箱の中では、すりガラスの後ろがぼけない */
 @media (max-width: 1023px) {
   .page-in {
-    animation: page-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation: page-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
   }
   @media (prefers-reduced-motion: reduce) {
     .page-in {
-      animation: page-fade 120ms ease both;
+      animation: page-fade 120ms ease backwards;
     }
   }
 }
