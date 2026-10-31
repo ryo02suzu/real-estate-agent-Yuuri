@@ -16,7 +16,7 @@ jobs:
       REVIEW_URL: http://127.0.0.1:3000
       PREVIEW_URL: https://michilu-ix64e6cot-sourirettes-projects.vercel.app
       REVIEW_SHA: ec9252de54e8f456034e9db96e33f1f0556e51f2
-      REVIEW_PHASE: built-head-ec9252d
+      REVIEW_PHASE: built-head-range-ec9252d
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,7 +36,54 @@ jobs:
           npm run build
       - name: Serve the static build on the runner
         run: |
-          python3 -m http.server 3000 --bind 127.0.0.1 --directory app-source/out > "$RUNNER_TEMP/michilu-static-server.log" 2>&1 &
+          python3 - <<'PY'
+          from pathlib import Path
+          Path("/tmp/michilu-range-server.py").write_text("""
+          import http.server, os, re
+          class RangeHandler(http.server.SimpleHTTPRequestHandler):
+              def send_head(self):
+                  self.request_range = None
+                  raw = self.headers.get('Range')
+                  path = self.translate_path(self.path)
+                  if not raw or not os.path.isfile(path):
+                      return super().send_head()
+                  match = re.fullmatch(r'bytes=(\\d+)-(\\d*)', raw)
+                  size = os.path.getsize(path)
+                  if not match:
+                      self.send_error(416)
+                      return None
+                  start = int(match[1])
+                  end = min(int(match[2]) if match[2] else size - 1, size - 1)
+                  if start > end or start >= size:
+                      self.send_response(416)
+                      self.send_header('Content-Range', f'bytes */{size}')
+                      self.end_headers()
+                      return None
+                  stream = open(path, 'rb')
+                  stream.seek(start)
+                  self.request_range = (start, end)
+                  self.send_response(206)
+                  self.send_header('Content-Type', self.guess_type(path))
+                  self.send_header('Accept-Ranges', 'bytes')
+                  self.send_header('Content-Range', f'bytes {start}-{end}/{size}')
+                  self.send_header('Content-Length', str(end - start + 1))
+                  self.end_headers()
+                  return stream
+              def copyfile(self, source, outputfile):
+                  if self.request_range is None:
+                      return super().copyfile(source, outputfile)
+                  remaining = self.request_range[1] - self.request_range[0] + 1
+                  while remaining:
+                      chunk = source.read(min(remaining, 65536))
+                      if not chunk:
+                          break
+                      outputfile.write(chunk)
+                      remaining -= len(chunk)
+          os.chdir('app-source/out')
+          http.server.ThreadingHTTPServer(('127.0.0.1', 3000), RangeHandler).serve_forever()
+          """.lstrip())
+          PY
+          python3 /tmp/michilu-range-server.py > "$RUNNER_TEMP/michilu-static-server.log" 2>&1 &
           python3 - <<'PY'
           import time, urllib.request
           for attempt in range(30):
@@ -71,6 +118,7 @@ jobs:
               record["layout"] = await page.evaluate("""() => ({
                 width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,
                 horizontalOverflow:document.documentElement.scrollWidth>innerWidth+1,
+                maps:[...document.querySelectorAll('.maplibregl-map')].map(e=>({class:e.className,box:e.getBoundingClientRect().toJSON(),position:getComputedStyle(e).position,height:getComputedStyle(e).height,canvases:[...e.querySelectorAll('canvas')].map(c=>({box:c.getBoundingClientRect().toJSON(),width:c.width,height:c.height}))})),
                 inputs:[...document.querySelectorAll('input')].filter(e=>e.getBoundingClientRect().width).map(e=>({name:e.getAttribute('aria-label')||e.id,fontSize:getComputedStyle(e).fontSize,box:e.getBoundingClientRect().toJSON()})),
                 controls:[...document.querySelectorAll('button,a')].filter(e=>e.getBoundingClientRect().width).map(e=>({text:e.getAttribute('aria-label')||e.innerText,box:e.getBoundingClientRect().toJSON()}))
               })""")
@@ -83,8 +131,12 @@ jobs:
                           name = f"{engine}-{width}x{height}"
                           record = {"name":name,"browser_version":browser.version,"console_errors":[],"failed_requests":[]}
                           report["checks"].append(record)
+                          record["console_messages"]=[]
+                          record["range_responses"]=[]
                           ctx = await browser.new_context(viewport={"width":width,"height":height},device_scale_factor=1,locale="ja-JP",is_mobile=width<1024,has_touch=width<1024)
                           page = await ctx.new_page()
+                          page.on("console",lambda msg,r=record:r["console_messages"].append({"type":msg.type,"text":msg.text[:600]}) if msg.type in ["warning","error"] else None)
+                          page.on("response",lambda res,r=record:r["range_responses"].append({"url":res.url,"status":res.status,"range":res.headers.get("content-range")}) if ".pmtiles" in res.url else None)
                           page.on("pageerror", lambda error,r=record:r["console_errors"].append(str(error)))
                           page.on("requestfailed", lambda req,r=record:r["failed_requests"].append({"url":req.url,"failure":req.failure}))
                           try:
@@ -99,6 +151,15 @@ jobs:
                               await snapshot(page,name+"-home",record)
                               record["status"]="app_home_captured"
                               if width==390:
+                                  # Separate diagnostic override; restore before ordinary interaction checks.
+                                  map_box=page.locator(".mui-japan-map")
+                                  if await map_box.count():
+                                      record["diagnostic_map_before"]=await map_box.evaluate("(e)=>({box:e.getBoundingClientRect().toJSON(),position:getComputedStyle(e).position,height:getComputedStyle(e).height})")
+                                      await map_box.evaluate("(e)=>{e.dataset.oldStyle=e.getAttribute('style')||'';e.style.position='absolute';e.style.height='100%';window.dispatchEvent(new Event('resize'));}")
+                                      await page.wait_for_timeout(2000)
+                                      await snapshot(page,name+"-diagnostic-map-layout-override",{})
+                                      record["diagnostic_map_after"]=await map_box.evaluate("(e)=>({box:e.getBoundingClientRect().toJSON(),position:getComputedStyle(e).position,height:getComputedStyle(e).height})")
+                                      await map_box.evaluate("(e)=>{e.setAttribute('style',e.dataset.oldStyle);delete e.dataset.oldStyle;window.dispatchEvent(new Event('resize'));}")
                                   await page.get_by_role("textbox",name=re.compile("住所")).first.fill("東京都新宿区西新宿2丁目8番1号")
                                   await snapshot(page,name+"-input",{})
                                   await page.get_by_role("button",name="検索",exact=True).first.click()
@@ -110,12 +171,12 @@ jobs:
                                   record["result_url"]=page.url
                                   record["result_text"]=(await page.locator("body").inner_text())[:12000]
                                   detail=page.get_by_role("button",name=re.compile("^都市計画")).first
-                                  if await detail.count() and await detail.is_visible():
+                                  if await detail.count() and await detail.is_visible() and await detail.is_enabled():
                                       await detail.click()
                                       await page.wait_for_timeout(600)
                                       await snapshot(page,name+"-detail",{})
                                       record["detail_clicked"]=True
-                                      back=page.get_by_role("button",name="戻る",exact=True).first
+                                      back=page.get_by_role("button",name="一覧に戻る",exact=True).first
                                       if await back.count() and await back.is_visible():
                                           await back.click()
                                           await page.wait_for_timeout(400)
