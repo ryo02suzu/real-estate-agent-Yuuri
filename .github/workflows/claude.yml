@@ -50,5 +50,7 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Claude Codeの最大effortを各GitHub Actionsセッションで指定する
           claude_args: |
+            --effort max
             --allowedTools "Bash(npm run lint:*),Bash(npm run typecheck:*),Bash(npm test:*),Bash(npm run build:*),Bash(npx vitest run:*)"
