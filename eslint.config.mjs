@@ -14,6 +14,9 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // node_modules から置いた MapLibre のワーカー（scripts/copy-maplibre-worker.mjs）
     "public/maplibre/**",
+    // 外部 Agent Skills のサンプル/補助スクリプトはアプリのlint対象外
+    ".claude/skills/**",
+    ".agents/skills/**",
   ]),
 ]);
 
