@@ -538,7 +538,8 @@ export function MobileApp(props: MobileAppProps) {
         dark={showHome}
         active={page}
         onSelect={(k) => {
-          if (k === "home" && page === "home") {
+          if (k === "map") openMap();
+          else if (k === "home" && page === "home") {
             if (shown) props.onHome();
             else scroller.current?.scrollTo({ top: 0, behavior: "smooth" });
           } else go(k);
@@ -569,14 +570,17 @@ export function MobileApp(props: MobileAppProps) {
         <HomeMenu
           open={menu}
           onClose={() => setMenu(false)}
-          onMap={openMap}
-          onDocs={() => go("docs")}
           onNews={() => {
             setNews(true);
             markNewsSeen();
           }}
           unread={unread}
           onHelp={() => setSheet("help")}
+          onCities={() => setSheet("cities")}
+          onSources={() => setSheet("sources")}
+          onStorage={() => setSheet("storage")}
+          onInstall={() => setSheet("install")}
+          standalone={standalone}
           onMore={() => go("account")}
         />
         {picker && (

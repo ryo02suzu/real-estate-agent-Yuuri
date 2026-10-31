@@ -2,15 +2,16 @@
 
 // スマホのホーム（検索する前の画面）。届いたデザインのとおり、画面いっぱいの夕焼けの街の写真（public/home/sunset.webp。届いた背景の絵。
 // 下のメニューの後ろまで敷くので、写真は components/app/mobile-app.tsx が HomeBackdrop で画面の一番奥に置く）の上に、上から：
-// ロゴ（マークと MICHILU の白い版）と右上のメニュー（≡。書類・出力・お知らせ・使い方・その他を開く。HomeMenu）、
+// ロゴ（今までのマークと MICHILU の白い版）と右上のメニュー（≡。お知らせ・使い方・データ・アプリ・アカウント。HomeMenu）、
 // 「不動産の現場に、／すぐ使える情報を。」、住所・地番の検索欄（すりガラス。キーボードの「検索」か、字を入れると出る → で調べる）、
 // 写真の街並みを見せる空き、最近の検索（暗いすりガラスの一覧に3件。続きは履歴のページ）。
 // まだ何も調べていないときは、最近の検索の代わりに「はじめての方へ」（住所と地番の例。押すとそのまま調べる）を出す。
 // 写真の上の字は白（読みやすいよう薄い影）。寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。
 // 縦は画面の高さに合わせ、検索欄と最近の検索のあいだの空きで伸び縮みする（背の低い画面でもスクロールせずに収まる）
-import { ArrowRight, ChevronRight, FileText, LoaderCircle, Map as MapIcon, Megaphone, Menu, MapPinned, Search, Settings, TriangleAlert, X, CircleHelp } from "lucide-react";
+import { ArrowRight, Bell, ChevronRight, CircleHelp, Database, Download, LoaderCircle, MapPin, MapPinned, Menu, Search, Smartphone, TriangleAlert, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { monthDay, placeParts } from "@/lib/app/scene";
+import { MUNICIPALITIES } from "@/lib/roadmap";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import type { Resume } from "@/lib/resume";
 import { Sheet } from "../sheet";
@@ -295,60 +296,94 @@ function SectionHead({ title, onMore, className = "" }: { title: string; onMore?
   );
 }
 
-/** ホームの右上のメニュー（≡）。下のメニューに無いページと、地図で選ぶ・お知らせ・使い方 */
+/** ホームの右上のメニュー（≡）。下のメニューに入れていない、ときどき使うもの（お知らせ・使い方・データ・アプリ・アカウント） */
 export function HomeMenu({
   open,
   onClose,
-  onMap,
-  onDocs,
   onNews,
   unread,
   onHelp,
+  onCities,
+  onSources,
+  onStorage,
+  onInstall,
+  standalone,
   onMore,
 }: {
   open: boolean;
   onClose: () => void;
-  onMap: () => void;
-  onDocs: () => void;
   onNews: () => void;
   unread: boolean;
   onHelp: () => void;
+  /** 対応している市区町村 */
+  onCities: () => void;
+  /** データの出典と時点 */
+  onSources: () => void;
+  /** 調査記録の書き出し・読み込み */
+  onStorage: () => void;
+  /** ホーム画面に追加 */
+  onInstall: () => void;
+  standalone: boolean;
+  /** アカウント・その他のページ */
   onMore: () => void;
 }) {
   if (!open) return null;
-  const items: { Icon: typeof Search; title: string; sub: string; dot?: boolean; run: () => void }[] = [
-    { Icon: MapIcon, title: "地図で場所を選ぶ", sub: "住所の無い土地も選べます", run: onMap },
-    { Icon: FileText, title: "書類・出力", sub: "調査メモ・重説の下書き・案内図・要注意点", run: onDocs },
-    { Icon: Megaphone, title: "お知らせ", sub: "新しい機能・データの更新", dot: unread, run: onNews },
-    { Icon: CircleHelp, title: "使い方", sub: "調べ方と、画面の見方", run: onHelp },
-    { Icon: Settings, title: "その他", sub: "ホーム画面に追加・調査記録の保存・対応エリア・出典", run: onMore },
+  const groups: { title: string; items: { Icon: typeof Search; title: string; sub: string; dot?: boolean; right?: string; run: () => void }[] }[] = [
+    {
+      title: "お知らせ・使い方",
+      items: [
+        { Icon: Bell, title: "お知らせ", sub: "新しい機能・データの更新", dot: unread, right: unread ? "新着" : undefined, run: onNews },
+        { Icon: CircleHelp, title: "使い方", sub: "住所・地番・地図で調べて、市の地図を開くまで", run: onHelp },
+      ],
+    },
+    {
+      title: "データ",
+      items: [
+        { Icon: MapPin, title: "対応している市区町村", sub: "関東1都6県", right: String(MUNICIPALITIES.length), run: onCities },
+        { Icon: Database, title: "データの出典と時点", sub: "国・自治体の公開データ", run: onSources },
+        { Icon: Download, title: "調査記録の書き出し・読み込み", sub: "機種変更・データ消失への備え", run: onStorage },
+      ],
+    },
+    {
+      title: "アプリ",
+      items: [
+        { Icon: Smartphone, title: "ホーム画面に追加", sub: standalone ? "追加したアプリで開いています" : "ブラウザの枠なしで、アプリのように使う", right: standalone ? "追加済み" : undefined, run: onInstall },
+        { Icon: UserRound, title: "アカウント・その他", sub: "ログイン・会社での共有（準備中）、件数", run: onMore },
+      ],
+    },
   ];
   return (
     <div className="theme-navy">
       <Sheet title="メニュー" open onClose={onClose}>
-        <ul className="divide-y divide-line">
-          {items.map((it) => (
-            <li key={it.title}>
-              <button
-                onClick={() => {
-                  onClose();
-                  it.run();
-                }}
-                className="flex w-full items-center gap-3 py-3 text-left active:bg-mint/50"
-              >
-                <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mint text-brand">
-                  <it.Icon className="h-[18px] w-[18px]" />
-                  {it.dot && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#f0263a]" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[14.5px] font-semibold text-ink">{it.title}</span>
-                  <span className="mt-0.5 block text-[12px] leading-[1.5] text-muted">{it.sub}</span>
-                </span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted" />
-              </button>
-            </li>
-          ))}
-        </ul>
+        {groups.map((g, gi) => (
+          <section key={g.title} className={gi ? "mt-3" : ""}>
+            <h3 className="text-[12px] font-semibold text-muted">{g.title}</h3>
+            <ul className="divide-y divide-line">
+              {g.items.map((it) => (
+                <li key={it.title}>
+                  <button
+                    onClick={() => {
+                      onClose();
+                      it.run();
+                    }}
+                    className="flex w-full items-center gap-3 py-3 text-left active:bg-mint/50"
+                  >
+                    <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mint text-brand">
+                      <it.Icon className="h-[18px] w-[18px]" />
+                      {it.dot && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#f0263a]" />}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14.5px] font-semibold text-ink">{it.title}</span>
+                      <span className="mt-0.5 block text-[12px] leading-[1.5] text-muted">{it.sub}</span>
+                    </span>
+                    {it.right && <span className={`shrink-0 text-[12px] font-semibold ${it.dot ? "text-[#c0391b]" : "text-muted"}`}>{it.right}</span>}
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
       </Sheet>
     </div>
   );

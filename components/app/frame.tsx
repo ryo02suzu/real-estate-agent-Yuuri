@@ -3,7 +3,7 @@
 // スマホの新しい見た目（紺）の枠：絵の幅（393pt。画面の幅に合わせて拡大・縮小する。CSS の zoom。値は app/layout.tsx の <head> で決める。
 // components/app/zoom.ts）、スマホの画面だけで読む画像、ロゴ、検索窓の入力欄、いちばん下のメニュー。
 // 検索する前のホームは components/app/home.tsx、物件の画面は components/app/mobile-app.tsx
-import { Search, Star } from "lucide-react";
+import { FileText, Map as MapIcon, Search, Star } from "lucide-react";
 import type { CSSProperties, ImgHTMLAttributes, ReactNode, RefObject } from "react";
 import { ClockBack } from "./icons";
 
@@ -88,8 +88,10 @@ export function ScaledInput({
   );
 }
 
-/** 下のメニューの 3 つ（検索・お気に入り・履歴）と、ホームの右上のメニュー（≡）から開くページ（書類・出力・その他） */
+/** ページ（検索＝ホーム・お気に入り・履歴・書類・出力と、ホームの右上のメニュー（≡）から開くその他） */
 export type NavKey = "home" | "history" | "favorites" | "docs" | "account";
+/** 下のメニューの項目（ページと、地図で場所を選ぶ） */
+export type NavAction = NavKey | "map";
 
 /** 白いメニュー（物件・下のメニューのページ）の色 */
 const ON = "#133664";
@@ -97,20 +99,22 @@ const OFF = "#68738a";
 /** ホームの写真の上のメニュー（暗いすりガラス）の色 */
 const ON_DARK = "#5aaeff";
 const OFF_DARK = "rgba(255,255,255,0.78)";
-/** 3つを同じ幅で並べる（幅393pt ÷ 3） */
-const NAV_W = ART_W / 3;
+/** 5つを同じ幅で並べる（幅393pt ÷ 5） */
+const NAV_W = ART_W / 5;
 /** iPhone のアプリの下のメニューと同じくらいの大きさ（アイコン約24pt・名前11pt） */
-const NAV: { key: NavKey; label: string; icon: (color: string, on: boolean) => ReactNode }[] = [
+const NAV: { key: NavAction; label: string; icon: (color: string, on: boolean) => ReactNode }[] = [
   { key: "home", label: "検索", icon: (c, on) => <Search size={24} strokeWidth={on ? 2.1 : 1.7} absoluteStrokeWidth color={c} /> },
+  { key: "map", label: "地図", icon: (c) => <MapIcon size={24} strokeWidth={1.7} absoluteStrokeWidth color={c} /> },
   { key: "favorites", label: "お気に入り", icon: (c, on) => <Star size={24} strokeWidth={on ? 2 : 1.6} absoluteStrokeWidth color={c} fill={on ? c : "none"} /> },
   { key: "history", label: "履歴", icon: (c, on) => <ClockBack size={24} stroke={on ? 2 : 1.6} color={c} /> },
+  { key: "docs", label: "書類・出力", icon: (c, on) => <FileText size={24} strokeWidth={on ? 2 : 1.6} absoluteStrokeWidth color={c} /> },
 ];
 
 /**
- * いちばん下のメニュー（検索・お気に入り・履歴）。dark はホームの写真の上（暗いすりガラス。上の角を丸め、選んでいる所の下に線）。
- * 書類・出力とその他は、ホームの右上のメニュー（≡）から開く
+ * いちばん下のメニュー（検索・地図・お気に入り・履歴・書類・出力）。地図は地図で場所を選ぶ画面を開く（ページではない）。
+ * dark はホームの写真の上（暗いすりガラス。上の角を丸め、選んでいる所の下に線）。お知らせ・使い方・設定などは、ホームの右上のメニュー（≡）
  */
-export function BottomNav({ active, onSelect, dark = false }: { active: NavKey; onSelect: (key: NavKey) => void; dark?: boolean }) {
+export function BottomNav({ active, onSelect, dark = false }: { active: NavKey; onSelect: (key: NavAction) => void; dark?: boolean }) {
   const on = dark ? ON_DARK : ON;
   const off = dark ? OFF_DARK : OFF;
   return (
