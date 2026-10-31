@@ -40,7 +40,7 @@ Issue #22 / Draft PR #23（ブランチ `claude/issue-22-20261031-0155`）。**�
 | `npm run typecheck` | 通った |
 | `npm run lint` | 通った（`.claude-pr/` を除外したあと） |
 | `npm test` | 通った（新規：`japan-basemap`・`detail-history`・`position-accuracy`・`panel-snap`） |
-| `npm run build` | この環境では `next/font/google`（`app/layout.tsx` の Noto Sans JP）の取得で失敗（フォント以外のエラーは無し。変更していない箇所）。CI／Vercel の結果で確認する |
+| `npm run build` | この環境では `next/font/google`（`app/layout.tsx` の Noto Sans JP）の取得で失敗（496件すべて同じフォントのエラー。フォント以外のエラーは無し。変更していない箇所）。GitHub Actions の CI（型・lint・テスト・ビルド）は、コミット `528911c`（run 41172671036・41172666926）と `8b72ddd`（run 41173185889・41173182093）で成功 |
 | 画面幅 375×667・390×844・402×874・430×932・1024×768・1440×900 | **未確認**（この環境にブラウザが無い） |
 | iPhone の実機（ジェスチャー・キーボード・端末の「戻る」・Safari 相当） | **未確認** |
 | 200% 文字・WebGL 不可・通信失敗・reduced-motion の実画面 | **未確認**（コードは対応） |

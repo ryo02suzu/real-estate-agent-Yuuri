@@ -211,6 +211,10 @@ body {
 .mui-rows > div {
   display: flex;
 }
+/* データの無い行（近くに地価・駅・学区が無いとき）は何も出さないので、空の枠が行の間を空けないようにする */
+.mui-rows > div:empty {
+  display: none;
+}
 .mui-rows button,
 .mui-rows > div > a,
 .mui-row-btn {
@@ -222,7 +226,7 @@ body {
   gap: 8px;
   border: 1px solid var(--mui-line);
   border-radius: 14px;
-  background: #fff;
+  background: #f6fbfa;
   padding: 8px 12px;
   text-align: left;
   font-size: 13px;
@@ -233,7 +237,8 @@ body {
 .mui-rows button:active:not(:disabled),
 .mui-rows > div > a:active,
 .mui-row-btn:active {
-  background: var(--mui-primary-soft);
+  /* 既存の行の薄い面（青緑がかった白に上書きしているもの）より優先して、押した反応を見せる */
+  background: var(--mui-primary-soft) !important;
   transform: scale(0.99);
 }
 .mui-rows button:disabled {
