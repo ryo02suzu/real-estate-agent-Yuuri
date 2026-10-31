@@ -8,6 +8,7 @@ import type { ResolvedLink } from "@/lib/roadmap";
 import { readRoads, ROAD_RADIUS_M, type NearbyRoad, type RoadRead } from "@/lib/roadmap/road-read";
 import { ChevronRightIcon, MapIcon } from "./icons";
 import { Notes } from "./notes";
+import { usePanelDetail } from "./panel-detail";
 import { Sheet } from "./sheet";
 
 export type RoadsState = { status: "none" } | { status: "loading" } | { status: "error" } | { status: "ok"; roads: NearbyRoad[]; label: string };
@@ -40,6 +41,8 @@ const where = (r: NearbyRoad) => (r.direction === "地点上" ? "地点の上" :
 /** スマホ：地図ボタンの下の1行。押すと一覧が下から出る。onShowMap があれば、一覧から MICHILU の地図に道路種別を描いて見られる */
 export function NearbyRoadsLine({ state, onShowMap }: { state: RoadsState; onShowMap?: () => void }) {
   const [open, setOpen] = useState(false);
+  // 結果パネルの中の詳細なら、地図の重ね表示へ移っても詳細は開いたまま（地図を閉じると同じ詳細に戻る）
+  const inPanel = !!usePanelDetail();
   if (state.status === "none") return null;
   const first = state.status === "ok" ? state.roads[0] : undefined;
   return (
@@ -64,11 +67,11 @@ export function NearbyRoadsLine({ state, onShowMap }: { state: RoadsState; onSho
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
       {state.status === "ok" && (
-        <Sheet title="物件のまわりの道路（地図データ）" open={open} onClose={() => setOpen(false)}>
+        <Sheet detail title="物件のまわりの道路（地図データ）" open={open} onClose={() => setOpen(false)}>
           {onShowMap && (
             <button
               onClick={() => {
-                setOpen(false);
+                if (!inPanel) setOpen(false);
                 onShowMap();
               }}
               className="bg-gold mb-2 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[14px] font-semibold text-white shadow-[0_6px_16px_rgba(138,102,50,0.28)]"

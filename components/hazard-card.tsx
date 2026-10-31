@@ -28,6 +28,7 @@ import {
 import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
 import { AlertIcon, ChevronRightIcon, ExternalIcon, HazardIcon, MapIcon } from "./icons";
 import { Notes } from "./notes";
+import { usePanelDetail } from "./panel-detail";
 import { Sheet } from "./sheet";
 
 export type HazardState =
@@ -106,6 +107,8 @@ export function HazardLine({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // 結果パネルの中の詳細なら、地図の重ね表示へ移っても詳細は開いたまま（地図を閉じると同じ詳細に戻る）
+  const inPanel = !!usePanelDetail();
   const chips = state.status === "ok" ? hazardChips(state.report) : [];
   return (
     <>
@@ -135,14 +138,14 @@ export function HazardLine({
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
       {state.status === "ok" && !onOpen && (
-        <Sheet title="災害リスク（参考）" open={open} onClose={() => setOpen(false)}>
+        <Sheet detail title="災害リスク（参考）" open={open} onClose={() => setOpen(false)}>
           <HazardDetail
             state={state}
             city={city}
             onShowMap={
               onShowMap &&
               ((k) => {
-                setOpen(false);
+                if (!inPanel) setOpen(false);
                 onShowMap(k);
               })
             }

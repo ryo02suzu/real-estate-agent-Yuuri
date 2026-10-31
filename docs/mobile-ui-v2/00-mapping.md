@@ -13,8 +13,8 @@ Issue #22 の最初の成果物。**このファイルは現行コードを読�
 ## 2. F01〜F12 対応表
 | ID | 現行の場所 | 新UIの入口 | 押した後 | 確認方法（予定） |
 | --- | --- | --- | --- | --- |
-| F01 住所・地番・地点 | `SearchCard`、`Choose`、`LocationPicker`、`lib/roadmap` の `lookup`/`lookupPoint`、`Place` | ホーム検索パネル／検索編集／結果見出し「場所を直す」 | 候補選択→確定座標へ移動→結果 | 実ブラウザで通し操作、`?q=`/`?ll=` 直開き |
-| F02 道路 | `MapButton`、`NearbyRoadsLine`、`useNearbyRoads` | 結果の最初の導線（公式道路図） | 公式図を開く／地図で道路を重ねる／PDF図 | 地点指定・入口のみ・PDFの表示区別を維持 |
+| F01 住所・地番・地点 | `SearchCard`、`Choose`、`LocationPicker`、`lib/roadmap` の `lookup`/`lookupPoint`、`Place` | ホーム検索パネル／検索編集／結果の「位置の目安（付近・推定・町の中心）」「場所を直す」「地図に重ねて見る」（`PositionBar`、`lib/position-accuracy.ts`） | 候補選択→確定座標へ移動→結果 | 実ブラウザで通し操作、`?q=`/`?ll=` 直開き |
+| F02 道路 | `MapButton`、`NearbyRoadsLine`、`useNearbyRoads`、`SheetPreview`（図の範囲） | 結果の最初の導線（公式道路図）と、「図の範囲」「近くの道路」の行（同じパネルの中の詳細） | 公式図を開く／地図で道路を重ねる／PDF図 | 地点指定・入口のみ・PDFの表示区別を維持 |
 | F03 都市計画 | `ZoningLine`、`zoning-card.tsx`、`useZoning` | 「都市計画・法令」行 | 詳細→地図レイヤー／確認先 | 出典・時点が残るか |
 | F04 その他の法令 | `zoning-card.tsx` 内 | 「都市計画・法令」詳細の中 | 区域の参考情報と担当先 | 同上 |
 | F05 災害 | `HazardLine`、`hazard-card.tsx`、`useHazard` | 「災害リスク」行 | 種類別詳細→地図→自治体ハザードマップ | 「データなし≠安全」の文言 |
@@ -23,7 +23,7 @@ Issue #22 の最初の成果物。**このファイルは現行コードを読�
 | F08 地価 | `LandPriceLine`、`land-price-card.tsx` | 「地価」行 | 近隣地点の一覧・詳細・地図、路線価図 | 査定額に見えない表記 |
 | F09 駅・周辺・学区 | `StationLine`、`SchoolButton`、`station-card`/`poi-card`/`school-card` | 「駅・周辺施設・学区」行 | 既存カテゴリの詳細 | 直線距離等の注意 |
 | F10 窓口 | `ContactCard`、`lib/inquiry.ts` | 各詳細内＋結果下部 | 窓口情報・問い合わせ事項コピー | 電話不可・窓口のみの表示 |
-| F11 共有・書類 | `ShareButton`、`CopyButton`、`PrintSheet`、`DraftSheet`、`GuideMapSheet`、`MenuSheet` | 結果の補助操作＋メニュー | 共有・メモ・案内図・下書き・印刷 | 印刷CSSが壊れないか |
+| F11 共有・書類 | `ShareButton`、`CopyButton`、`PrintSheet`、`DraftSheet`、`GuideMapSheet`、`MenuSheet` | 結果の住所の行（共有・住所コピー）＋結果の「共有・書類」行（調査メモの印刷・PDF保存／案内図／重説・物件概要の下書き）＋メニュー | 共有・メモ・案内図・下書き・印刷 | 印刷CSSが壊れないか |
 | F12 履歴 | `lib/history.ts`、`HistoryChips`、`HistoryList` | ホーム最近3件＋全履歴5件 | 再検索・消去 | 履歴ゼロの空状態 |
 
 お気に入り・手動の確認記録: コード上では確認していない（未実装として扱い、追加しない）。

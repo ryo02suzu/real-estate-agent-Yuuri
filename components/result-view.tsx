@@ -1,19 +1,20 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { showHazardOnMap, showLandPriceOnMap } from "@/lib/map-style";
+import { positionAccuracy } from "@/lib/position-accuracy";
 import type { LookupResult, Municipality, ResolvedLink } from "@/lib/roadmap";
 import { chibanzuFor } from "@/lib/roadmap/chibanzu";
 import type { HazardKind } from "@/lib/roadmap/hazard";
 import { chibanLabel, kuikiLabel, parcelMark } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
-import { sheetName } from "@/lib/roadmap/sheets";
+import { sheetName, type SheetHit } from "@/lib/roadmap/sheets";
 import type { DraftInput } from "@/lib/draft";
 import { buildSummary } from "@/lib/summary";
 import { BuildingCard, BuildingDetail, useBuilding, type BuildingState } from "./building-card";
 import { ContactCard } from "./contact-card";
 import { COVERAGE, CoveragePill } from "./coverage";
-import { DRAFT_EVENT, DraftSheet } from "./draft-sheet";
+import { DRAFT_EVENT, DraftSheet, openDraft } from "./draft-sheet";
 import { GuideMapSheet } from "./guide-map";
 import { HazardCard, HazardLine, useHazard, type HazardState } from "./hazard-card";
 import {
@@ -21,6 +22,7 @@ import {
   BuildingIcon,
   ChevronRightIcon,
   CopyIcon,
+  FrameIcon,
   InfoIcon,
   MapIcon,
   NoteIcon,
@@ -33,6 +35,7 @@ import { LandPriceCard, LandPriceLine, useLandPrices, type LandPriceState } from
 import { LegendBlock, LegendButton } from "./legend";
 import { MapPreview } from "./map-preview";
 import { NearbyRoadsBlock, NearbyRoadsLine, useNearbyRoads, type RoadsState } from "./nearby-roads";
+import { Sheet } from "./sheet";
 import { SheetPreview } from "./sheet-preview";
 import { parcelLines, ParcelButton, ParcelCard, useParcelInfo, type ParcelInfo } from "./parcel-card";
 import { PrintSheet } from "./print-sheet";
@@ -47,17 +50,19 @@ const CARD = "shadow-soft rounded-2xl border border-white bg-white";
 /** スマホの全画面の地図を開くときに重ねておくもの */
 export type MapOpen = { roads?: boolean; hazard?: HazardKind; /** 地価を重ね、この地点（[経度, 緯度]）も見えるように開く */ landPrice?: [number, number] };
 
+/**
+ * 結果の中身。スマホは地図の下から重なるパネルの中身（Found。縮めず、パネルの中でスクロールして読む）、
+ * PC は地図の左のパネルの中身（desktop）
+ */
 export function ResultView({
   query,
   result,
   onPick,
   onFix,
   onExpand,
+  onGuide,
   desktop,
-  panel,
 }: {
-  /** スマホの新しい結果パネルの中に置く（useFit による縮小をしない） */
-  panel?: boolean;
   query: string;
   result: LookupResult;
   onPick: (address: string) => void;
@@ -65,13 +70,15 @@ export function ResultView({
   onFix?: () => void;
   /** 「地図を拡大」：MICHILU の中の動く地図で物件のまわりを見る（スマホ）。roads なら道路種別、hazard ならその災害の想定区域を重ねて開く */
   onExpand?: (opts?: MapOpen) => void;
+  /** 案内図（A4）を開く（スマホの「共有・書類」） */
+  onGuide?: () => void;
   /** PC（地図の左のパネル）用の配置 */
   desktop?: boolean;
 }) {
   if (result.status === "not_found") return <NotFound query={query} />;
   if (result.status === "choose") return <Choose query={query} result={result} onPick={onPick} />;
   if (result.status === "unsupported") return <Unsupported result={result} onFix={onFix} />;
-  return desktop ? <DesktopFound result={result} onPick={onPick} /> : <Found result={result} onFix={onFix} onExpand={onExpand} onPick={onPick} panel={panel} />;
+  return desktop ? <DesktopFound result={result} onPick={onPick} /> : <Found result={result} onFix={onFix} onExpand={onExpand} onGuide={onGuide} onPick={onPick} />;
 }
 
 function NotFound({ query }: { query: string }) {
@@ -160,17 +167,22 @@ function Unsupported({
   );
 }
 
+/**
+ * スマホの結果（地図の下から重なるパネルの中身）。1行1項目で、F01〜F12 の入口を並べる。
+ * 縮めず、パネルの中でスクロールして全部読む（背の低い画面で項目や文字を減らす詰め方はしない）
+ */
 function Found({
   result,
   onFix,
   onExpand,
+  onGuide,
   onPick,
-  panel,
 }: {
-  panel?: boolean;
   result: Extract<LookupResult, { status: "ok" }>;
   onFix?: () => void;
   onExpand?: (opts?: MapOpen) => void;
+  /** 案内図（A4）を開く */
+  onGuide?: () => void;
   onPick: (address: string) => void;
 }) {
   const m = result.municipality;
@@ -183,10 +195,6 @@ function Found({
   const schools = useSchools(result.lat, result.lng);
   const stations = useStations(result.lat, result.lng);
   const pois = usePois(result.lat, result.lng);
-  const expand = onExpand && (() => onExpand());
-  const body = useRef<HTMLDivElement>(null);
-  // 新しいパネル（panel）ではスクロールで全部読めるので、文字や項目を縮めない
-  useFit(body, !panel);
   // ネットで分からない市は、地図ボタンを参考扱いにして問い合わせ先を先に見せる
   const offline = m.coverage === "none" || m.coverage === "outside";
   const primary = offline
@@ -219,228 +227,175 @@ function Found({
     return () => window.removeEventListener(DRAFT_EVENT, open);
   }, []);
 
-  if (panel) {
-    // スマホの新しい結果パネル：1行1項目（F01〜F12の入口）。縮めず、パネルの中でスクロールして読む
-    const onMapRoads = onExpand && (() => onExpand({ roads: true }));
-    return (
-      <div className="mui-scope flex flex-col gap-3 pb-2" data-testid="result-panel">
-        <Place
-          result={result}
-          fixable={!!onFix}
-          onPick={onPick}
-          actions={
-            <>
-              <CopyButton text={copyText(result)} />
-              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} />
-            </>
-          }
-        />
-        <CityLine municipality={m} />
-        {(primary.length > 0 || secondary.length > 0) && (
-          <section aria-label="道路の公式図">
-            <h3 className="mui-h3">道路の公式図</h3>
-            <div className="space-y-2">
-              {primary.map((l) => (
-                <MapButton key={l.url} link={l} primary />
-              ))}
-              {secondary.map((l) => (
-                <MapButton key={l.url} link={l} />
-              ))}
-            </div>
-            <NearbyRoadsLine state={roads} onShowMap={onMapRoads} />
-            {hint}
-          </section>
-        )}
-        <section aria-label="調べた項目">
-          <h3 className="mui-h3">調べた項目（参考）</h3>
-          <div className="mui-rows">
-            <div>
-              <ZoningLine state={zoning} city={m.name} />
-            </div>
-            <div>
-              <HazardLine state={hazard} city={m.name} onShowMap={onExpand && ((k) => onExpand({ hazard: k }))} />
-            </div>
-            <div>
-              <ParcelButton
-                info={parcels}
-                extra={building.status !== "none" && <BuildingDetail state={building} />}
-                withBuilding={building.status !== "none"}
-                chibanzu={chibanzuFor(m, result.lat, result.lng)}
-              />
-            </div>
-            <div>
-              <UtilityLine state={zoning} city={m.name} />
-            </div>
-            <div>
-              <LandPriceLine state={landPrice} onShowMap={onExpand && ((p) => onExpand({ landPrice: p }))} />
-            </div>
-            <div>
-              <StationLine state={stations} pois={pois} />
-            </div>
-            <div>
-              <SchoolButton state={schools} />
-            </div>
-          </div>
-        </section>
-        {contact}
-        {offline && result.links.length > 0 && (
-          <section className={`${CARD} p-4`}>
-            <h3 className="mb-2 text-[13px] text-ink">参考：公道（市道）かどうかの地図</h3>
-            <div className="space-y-2">
-              {result.links.map((l) => (
-                <MapButton key={l.url} link={l} />
-              ))}
-            </div>
-            {hint}
-          </section>
-        )}
-        {print}
-        <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations, pois })} open={draft} onClose={() => setDraft(false)} />
-      </div>
-    );
-  }
-
+  // 1行1項目（F01〜F12の入口）。縮めず、パネルの中でスクロールして読む
+  const onMapRoads = onExpand && (() => onExpand({ roads: true }));
+  const sheetRange = result.links.find((l) => l.sheet)?.sheet;
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2.5 [&>*]:shrink-0">
-      <section
-        className={`${CARD} flex min-h-0 flex-1 !shrink flex-col`}
-      >
-        <Place
-          result={result}
-          fixable={!!onFix}
-          onPick={onPick}
-          actions={
-            <>
-              <CopyButton text={copyText(result)} />
-              <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} />
-            </>
-          }
-        />
-        <div ref={body} className="flex min-h-0 flex-1 flex-col border-t border-line/70 px-4 pb-4 pt-3 [&>*]:shrink-0 short:pb-3 short:pt-2">
-          {/* 背の低い画面（入りきらないときも）では、災害リスクを市の行の右に入れる（行を1つ減らす） */}
-          <CityLine
-            municipality={m}
-            lowSlot={<HazardLine state={hazard} city={m.name} compact onShowMap={onExpand && ((k) => onExpand({ hazard: k }))} />}
-          />
-          <div className="mt-2 flex gap-1.5 short:mt-1">
+    <div className="mui-scope flex flex-col gap-3 pb-2" data-testid="result-panel">
+      <Place
+        result={result}
+        fixable={!!onFix}
+        onPick={onPick}
+        actions={
+          <>
+            <CopyButton text={copyText(result)} />
+            <ShareButton result={result} zoning={zoning} parcels={parcels} roads={roads} hazard={hazard} building={building} landPrice={landPrice} schools={schools} stations={stations} pois={pois} />
+          </>
+        }
+      />
+      <PositionBar result={result} onFix={onFix} onExpand={onExpand && (() => onExpand())} />
+      <CityLine municipality={m} />
+      {(primary.length > 0 || secondary.length > 0) && (
+        <section aria-label="道路の公式図">
+          <h3 className="mui-h3">道路の公式図</h3>
+          <div className="space-y-2">
+            {primary.map((l) => (
+              <MapButton key={l.url} link={l} primary />
+            ))}
+            {secondary.map((l) => (
+              <MapButton key={l.url} link={l} />
+            ))}
+          </div>
+          <NearbyRoadsLine state={roads} onShowMap={onMapRoads} />
+          {sheetRange && (
+            <div className="mui-rows mt-2">
+              <div>
+                <SheetRangeLine lat={result.lat} lng={result.lng} sheet={sheetRange} />
+              </div>
+            </div>
+          )}
+          {hint}
+        </section>
+      )}
+      <section aria-label="調べた項目">
+        <h3 className="mui-h3">調べた項目（参考）</h3>
+        <div className="mui-rows">
+          <div>
             <ZoningLine state={zoning} city={m.name} />
+          </div>
+          <div>
+            <HazardLine state={hazard} city={m.name} onShowMap={onExpand && ((k) => onExpand({ hazard: k }))} />
+          </div>
+          <div>
             <ParcelButton
               info={parcels}
               extra={building.status !== "none" && <BuildingDetail state={building} />}
               withBuilding={building.status !== "none"}
               chibanzu={chibanzuFor(m, result.lat, result.lng)}
             />
-            {/* 背の低い画面では「場所を直す」をこの行に置く（地図プレビューが入らなくなっても使える） */}
-            {onFix && (
-              <button
-                onClick={onFix}
-                aria-label="場所を直す"
-                className="hidden shrink-0 items-center gap-1 rounded-lg bg-mint px-2 py-1 text-[11px] font-semibold leading-[1.5] text-brand short:flex"
-              >
-                <PinOutlineIcon className="h-3.5 w-3.5" />
-                直す
-              </button>
-            )}
           </div>
-          {/* 災害リスクと、その右に近くの地価（背の低い画面・入りきらないときは出さず、地価は地図の「地価」と共有・印刷で見る） */}
-          <div className="mt-1.5 flex gap-1.5 short:hidden">
-            <HazardLine state={hazard} city={m.name} compact onShowMap={onExpand && ((k) => onExpand({ hazard: k }))} />
-            <LandPriceLine state={landPrice} compact onShowMap={onExpand && ((p) => onExpand({ landPrice: p }))} />
+          <div>
+            <UtilityLine state={zoning} city={m.name} />
           </div>
-          {/* 最寄り駅と学区（背の低い画面・入りきらないときは出さず、共有・印刷・重説の下書きで見る） */}
-          <div className="mt-1.5 flex gap-1.5 tight:hidden">
+          <div>
+            <LandPriceLine state={landPrice} onShowMap={onExpand && ((p) => onExpand({ landPrice: p }))} />
+          </div>
+          <div>
             <StationLine state={stations} pois={pois} />
+          </div>
+          <div>
             <SchoolButton state={schools} />
           </div>
-          {/* 画面の高さに合わせて地図プレビューが伸び縮みする（スクロールさせない）。低すぎるときは地図を隠し、
-              「場所を直す」「場所を地図で見る」だけの細い行にする（背の低い画面では「場所を直す」は上の行にあるので
-              「場所を地図で見る」だけ。細い行も入らなければ何も出さない。app/globals.css の .preview-box） */}
-          <div className="preview-box flex min-h-[36px] flex-1 !shrink flex-col short:min-h-0">
-            <Preview result={result} onFix={onFix} onExpand={expand} fixInRow className="preview-map mt-2 min-h-0 flex-1 short:mt-1.5" />
-            <SlimPreview result={result} onFix={onFix} onExpand={expand} />
-          </div>
-          {(primary.length > 0 || secondary.length > 0) && (
-            <>
-              <h3 className="mb-1.5 mt-3 text-[12px] font-semibold text-ink snug:hidden">
-                地図を開く
-              </h3>
-              <div className="space-y-2 short:mt-2 short:space-y-1.5">
-                {primary.map((l) => (
-                  <MapButton key={l.url} link={l} primary />
-                ))}
-                {secondary.map((l) => (
-                  <MapButton key={l.url} link={l} />
-                ))}
-              </div>
-              <NearbyRoadsLine state={roads} onShowMap={onExpand && (() => onExpand({ roads: true }))} />
-              {hint}
-            </>
-          )}
         </div>
       </section>
-
-      <div className="flex flex-col gap-2.5">
-        {contact}
-
-        {offline && result.links.length > 0 && (
-          <section className={`${CARD} p-4`}>
-            <h3 className="mb-2 text-[13px] text-ink">
-              参考：公道（市道）かどうかの地図
-            </h3>
-            <div className="space-y-2">
-              {result.links.map((l) => (
-                <MapButton key={l.url} link={l} />
-              ))}
+      {/* 共有・書類（F11）：調査メモの印刷・PDF保存、案内図、重説・物件概要の下書き。共有・住所コピーは上の住所の行 */}
+      <section aria-label="共有・書類">
+        <h3 className="mui-h3">共有・書類</h3>
+        <div className="mui-rows">
+          <div>
+            <button type="button" onClick={() => window.print()}>
+              <PrintIcon className="h-4 w-4 shrink-0 text-[var(--mui-primary)]" />
+              <span className="min-w-0 flex-1">調査メモを印刷・PDF保存</span>
+              <ChevronRightIcon className="h-4 w-4 shrink-0 text-[var(--mui-muted)]" />
+            </button>
+          </div>
+          {onGuide && (
+            <div>
+              <button type="button" onClick={onGuide}>
+                <MapIcon className="h-4 w-4 shrink-0 text-[var(--mui-primary)]" />
+                <span className="min-w-0 flex-1">案内図（A4）を印刷・PDF保存</span>
+                <ChevronRightIcon className="h-4 w-4 shrink-0 text-[var(--mui-muted)]" />
+              </button>
             </div>
-            {hint}
-          </section>
-        )}
-      </div>
+          )}
+          <div>
+            <button type="button" onClick={openDraft}>
+              <NoteIcon className="h-4 w-4 shrink-0 text-[var(--mui-primary)]" />
+              <span className="min-w-0 flex-1">重説・物件概要の下書き</span>
+              <ChevronRightIcon className="h-4 w-4 shrink-0 text-[var(--mui-muted)]" />
+            </button>
+          </div>
+        </div>
+      </section>
+      {contact}
+      {offline && result.links.length > 0 && (
+        <section className={`${CARD} p-4`}>
+          <h3 className="mb-2 text-[13px] text-ink">参考：公道（市道）かどうかの地図</h3>
+          <div className="space-y-2">
+            {result.links.map((l) => (
+              <MapButton key={l.url} link={l} />
+            ))}
+          </div>
+          {hint}
+        </section>
+      )}
       {print}
       <DraftSheet result={result} input={loaded({ zoning, parcels, roads, hazard, building, landPrice, schools, stations, pois })} open={draft} onClose={() => setDraft(false)} />
     </div>
   );
 }
 
-/**
- * スマホの結果が画面の高さに入りきらないとき（地図のボタンが多い市など）、body に data-fit を付けて詰める。
- * snug（「地図を開く」の見出しと地図ボタンの説明を外す）→ short（背の低い画面と同じ並びで、最寄り駅の行は残す）→ tight の順（app/globals.css）。
- * あとから届くデータで中身が変わるたび（描画のたび）と、文字の読み込み・画面の大きさが変わったときに測り直す
- */
-function useFit(ref: React.RefObject<HTMLDivElement | null>, enabled = true) {
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el || !enabled) return;
-    const data = document.body.dataset;
-    // 中身の下端が、下の余白（padding）に食い込んでいないか
-    const fits = () => {
-      const bottom = el.getBoundingClientRect().bottom - parseFloat(getComputedStyle(el).paddingBottom);
-      return [...el.children].every((c) => c.getBoundingClientRect().bottom <= bottom + 1);
-    };
-    const fit = () => {
-      for (const level of ["", "snug", "short", "tight"]) {
-        if (level) data.fit = level;
-        else delete data.fit;
-        if (fits()) return;
-      }
-    };
-    fit();
-    // ResizeObserver の中で大きさを変えると観測が回り続けるので、次の描画の前に測り直す
-    let frame = 0;
-    const later = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(fit);
-    };
-    const ro = new ResizeObserver(later);
-    for (const c of el.children) ro.observe(c);
-    addEventListener("resize", later);
-    return () => {
-      cancelAnimationFrame(frame);
-      ro.disconnect();
-      removeEventListener("resize", later);
-      delete data.fit;
-    };
-  });
+/** 位置の目安（付近／推定／町の中心など）と、場所を直す・周辺の地図に重ねて見る入口（F01・F02） */
+function PositionBar({ result, onFix, onExpand }: { result: Extract<LookupResult, { status: "ok" }>; onFix?: () => void; onExpand?: () => void }) {
+  const a = positionAccuracy(result);
+  return (
+    <div className="space-y-2">
+      <p
+        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold ${a.warn ? "bg-[var(--mui-warn-bg)] text-[var(--mui-warn-ink)]" : "bg-[var(--mui-primary-soft)] text-[var(--mui-primary-ink)]"}`}
+      >
+        {a.warn ? <AlertIcon className="h-3.5 w-3.5" /> : <PinOutlineIcon className="h-3.5 w-3.5" />}
+        位置の目安：{a.label}
+      </p>
+      {(onFix || onExpand) && (
+        <div className="flex gap-2">
+          {onFix && (
+            <button type="button" onClick={onFix} className="mui-row-btn">
+              <PinOutlineIcon className="h-4 w-4 shrink-0 text-[var(--mui-primary)]" />
+              <span className="min-w-0 flex-1">場所を直す</span>
+            </button>
+          )}
+          {onExpand && (
+            <button type="button" onClick={onExpand} className="mui-row-btn">
+              <MapIcon className="h-4 w-4 shrink-0 text-[var(--mui-primary)]" />
+              <span className="min-w-0 flex-1">地図に重ねて見る</span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** PDF の図と同じ範囲（北が上）の地図で、物件の場所を見る行。押すと同じパネルの中で詳細を開く（F02） */
+function SheetRangeLine({ lat, lng, sheet }: { lat: number; lng: number; sheet: SheetHit }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="mui-row-btn">
+        <FrameIcon className="h-4 w-4 shrink-0 text-[var(--mui-primary)]" />
+        <span className="mui-row-label">図の範囲</span>
+        <span className="min-w-0 flex-1 truncate text-[var(--mui-muted)]">{sheetName(sheet)}と同じ範囲（北が上）</span>
+        <ChevronRightIcon className="ml-auto h-4 w-4 shrink-0 text-[var(--mui-muted)]" />
+      </button>
+      <Sheet detail title={`${sheetName(sheet)}と同じ範囲`} open={open} onClose={() => setOpen(false)}>
+        <SheetPreview lat={lat} lng={lng} sheet={sheet} zoomable={false} fitWidth />
+        <p className="mt-2 text-[12px] leading-relaxed text-muted">
+          北が上です。道路や川の形を PDF の図と見比べると、物件（●）の場所がすぐ見つかります。
+          {sheet.howto && <span className="mt-1 block text-brand">{sheet.howto}</span>}
+        </p>
+      </Sheet>
+    </>
+  );
 }
 
 /** 「住所コピー」で写す文字。地番で探した筆は地番まで（地図システムの住所検索に貼る） */
@@ -593,26 +548,18 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-/**
- * 市の名前とネットでの分かり方。lowSlot（スマホの災害リスクの1行）があれば、背の低い画面では
- * 丸いアイコンを外し、分かり方を短い言い方にして、同じ行の右に lowSlot を入れる
- */
-function CityLine({ municipality: m, lowSlot }: { municipality: Municipality; lowSlot?: React.ReactNode }) {
-  // Tailwind はソースの文字そのままのクラスしか作らないので、組み立てずに書く
-  const lowRow = lowSlot ? "short:flex-nowrap short:gap-x-2" : "";
-  const lowIcon = lowSlot ? "short:hidden" : "";
-  const lowName = lowSlot ? "short:text-[15px]" : "";
+/** 市の名前とネットでの分かり方 */
+function CityLine({ municipality: m }: { municipality: Municipality }) {
   return (
     <div>
-      <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 ${lowRow}`}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="flex shrink-0 items-center gap-2.5">
-          <span className={`flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-mint to-white text-brand-light ${lowIcon}`}>
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-mint to-white text-brand-light">
             <BuildingIcon className="h-[18px] w-[18px]" />
           </span>
-          <span className={`text-[16px] font-semibold text-ink ${lowName}`}>{m.name}</span>
+          <span className="text-[16px] font-semibold text-ink">{m.name}</span>
         </span>
-        <CoveragePill coverage={m.coverage} shortWhenLow={!!lowSlot} />
-        {lowSlot && <span className="hidden min-w-0 flex-1 short:flex">{lowSlot}</span>}
+        <CoveragePill coverage={m.coverage} />
       </div>
       {(m.note || m.coverage !== "full") && (
         <p className="mt-1.5 text-[10.5px] leading-[1.6] text-muted short:hidden">
@@ -707,107 +654,6 @@ function ShareButton({
       {desktop ? <CopyIcon className="h-3.5 w-3.5" /> : <ShareIcon className="h-3.5 w-3.5" />}
       {done ? "コピー済" : desktop ? "結果をコピー" : "結果を共有"}
     </button>
-  );
-}
-
-/**
- * 地図プレビュー。PDF の分割図を開く市では「図の範囲」（開く図と同じ範囲・北が上）を先に見せ、
- * 「周辺」に切り替えられる。図を開いたあと、道路や川の形を見比べて物件の場所を探せる
- */
-function Preview({
-  result,
-  className,
-  onFix,
-  onExpand,
-  fixInRow,
-}: {
-  result: Extract<LookupResult, { status: "ok" }>;
-  className: string;
-  onFix?: () => void;
-  onExpand?: () => void;
-  /** 背の低い画面では「場所を直す」を上の行に出すので、ここでは出さない */
-  fixInRow?: boolean;
-}) {
-  const sheet = result.links.find((l) => l.sheet)?.sheet;
-  const [mode, setMode] = useState<"sheet" | "around">("sheet");
-  if (!sheet)
-    return (
-      <MapPreview
-        lat={result.lat}
-        lng={result.lng}
-        className={className}
-        onFix={onFix}
-        onExpand={onExpand}
-        fixClassName={fixInRow ? "short:hidden" : ""}
-        parcel={result.parcel}
-      />
-    );
-  const tab = (m: typeof mode, label: string) => (
-    <button
-      onClick={() => setMode(m)}
-      className={`rounded-full px-2.5 py-0.5 text-[10.5px] short:py-0 short:text-[10px] ${mode === m ? "bg-gold text-white" : "text-ink"}`}
-    >
-      {label}
-    </button>
-  );
-  // 地図の上には何も重ねない（ピンが隠れないように）。見出しと切り替えは地図の上の行に置く
-  return (
-    <div className={`flex flex-col ${className}`}>
-      <div className="mb-1.5 flex items-center justify-between gap-2 short:mb-1">
-        <span className="truncate text-[11px] text-muted short:text-[10px]">
-          {mode === "sheet" ? `${sheetName(sheet)}と同じ範囲（北が上）` : "物件の周辺"}
-        </span>
-        <span className="flex shrink-0 items-center gap-1.5">
-          {onFix && (
-            <button
-              onClick={onFix}
-              className={`rounded-full bg-mint px-2.5 py-0.5 text-[10.5px] font-semibold text-brand short:py-0 short:text-[10px] ${fixInRow ? "short:hidden" : ""}`}
-            >
-              場所を直す
-            </button>
-          )}
-          <span className="flex rounded-full border border-line bg-white p-0.5">
-            {tab("sheet", "図の範囲")}
-            {tab("around", "周辺")}
-          </span>
-        </span>
-      </div>
-      {mode === "sheet" ? (
-        <SheetPreview lat={result.lat} lng={result.lng} sheet={sheet} className="min-h-0 flex-1" />
-      ) : (
-        <MapPreview lat={result.lat} lng={result.lng} className="min-h-0 flex-1" parcel={result.parcel} onExpand={onExpand} />
-      )}
-    </div>
-  );
-}
-
-/** 地図プレビューが入らないほど狭いときの代わり（「場所を直す」と、地図をその場所で開く） */
-function SlimPreview({ result, onFix, onExpand }: { result: Extract<LookupResult, { status: "ok" }>; onFix?: () => void; onExpand?: () => void }) {
-  return (
-    <div className="preview-slim my-auto items-center gap-1.5">
-      {onFix && (
-        <button onClick={onFix} className="flex items-center gap-1 rounded-full bg-mint px-3 py-1 text-[11px] font-semibold text-brand short:hidden">
-          <PinOutlineIcon className="h-3.5 w-3.5" />
-          場所を直す
-        </button>
-      )}
-      {onExpand ? (
-        <button onClick={() => onExpand()} className="flex items-center gap-1 rounded-full border border-line px-3 py-1 text-[11px] text-ink">
-          <MapIcon className="h-3.5 w-3.5 text-brand-light" />
-          場所を地図で見る
-        </button>
-      ) : (
-        <a
-          href={`https://maps.gsi.go.jp/#17/${result.lat.toFixed(6)}/${result.lng.toFixed(6)}/`}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-1 rounded-full border border-line px-3 py-1 text-[11px] text-ink"
-        >
-          <MapIcon className="h-3.5 w-3.5 text-brand-light" />
-          場所を地図で見る
-        </a>
-      )}
-    </div>
   );
 }
 

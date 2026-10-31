@@ -20,39 +20,25 @@
 }
 
 /*
- * スマホの結果の画面を高さに収める詰め方。背の低い画面（高さ720px以下。iPhone SE など）はいつも詰める。
- * それより高い画面でも、地図のボタンが多い市などで入りきらなければ、body の data-fit（components/result-view.tsx の useFit）で
- * snug（「地図を開く」の見出しと地図ボタンの説明を外す）→ short（背の低い画面と同じ並び。ただし最寄り駅の行は残す）
- * → tight（背の低い画面と同じ）の順に詰める
+ * 背の低い画面で、PC（横幅 1024px 以上）の表示を詰める印。PC の見た目は従来のまま（高さ720px以下の窓だけ詰める）。
+ * スマホ（1024px 未満）は詰めない：新しい画面（地図の下から重なるパネル）は、項目や文字を減らさず、パネルの中でスクロールして読む。
+ * snug と short は同じ条件（クラス名はそのまま）
  */
 @custom-variant snug {
-  @media (max-height: 720px) {
-    @slot;
-  }
-  &:where(body[data-fit] *) {
+  @media (min-width: 1024px) and (max-height: 720px) {
     @slot;
   }
 }
 @custom-variant short {
-  @media (max-height: 720px) {
-    @slot;
-  }
-  &:where(body[data-fit="short"] *, body[data-fit="tight"] *) {
-    @slot;
-  }
-}
-@custom-variant tight {
-  @media (max-height: 720px) {
-    @slot;
-  }
-  &:where(body[data-fit="tight"] *) {
+  @media (min-width: 1024px) and (max-height: 720px) {
     @slot;
   }
 }
 
 /*
- * シート（components/sheet.tsx）の中身が画面に入りきらないときの詰め方。Sheet が data-dense を付ける：
- * dense（"1"。行の間を詰める）→ denser（"2"。文字も少し小さくする）→ densest（"3"。見出しのまわりと行の高さも詰める）
+ * シート（components/sheet.tsx）の中身が画面に入りきらないときの詰め方（PC だけ）。Sheet が data-dense を付ける：
+ * dense（"1"。行の間を詰める）→ denser（"2"。文字も少し小さくする）→ densest（"3"。見出しのまわりと行の高さも詰める）。
+ * スマホでは Sheet が data-dense を付けないので、詰めずにシートの中でスクロールする
  */
 @custom-variant dense {
   &:where([data-dense] *) {
@@ -99,29 +85,6 @@ body {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
-}
-
-/* スマホの結果の地図プレビューの枠。高さは画面に合わせて決まり、低すぎるときは地図を隠して細い行（.preview-slim）にする */
-.preview-box {
-  container-type: size;
-}
-.preview-slim {
-  display: none;
-}
-/* ピン（高さ32px・地図の真ん中が先）の頭が大きく切れる高さなら、地図を隠して細い行にする */
-@container (max-height: 59px) {
-  .preview-map {
-    display: none;
-  }
-  .preview-slim {
-    display: flex;
-  }
-}
-/* 細い行も入らない高さ（背の低い画面だけ起きる）なら、何も出さない */
-@container (max-height: 31px) {
-  .preview-slim {
-    display: none;
-  }
 }
 
 /*
@@ -185,12 +148,14 @@ body {
   --mui-dur-press: 100ms;
   --mui-dur-row: 140ms;
   --mui-dur-panel: 300ms;
+  --mui-dur-detail: 240ms;
 }
 @media (prefers-reduced-motion: reduce) {
   :root {
     --mui-dur-press: 0ms;
     --mui-dur-row: 0ms;
     --mui-dur-panel: 0ms;
+    --mui-dur-detail: 0ms;
   }
 }
 .mui-panel {
@@ -199,6 +164,31 @@ body {
 .mui-panel[data-dragging="1"] {
   transition: none;
 }
+/* 一覧 ⇄ 詳細：詳細は右から、一覧は戻ったときにふわっと。操作できる状態のまま動く（待たせない）。reduced-motion では動かさない */
+@keyframes mui-detail-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mui-list-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.mui-detail-in {
+  animation: mui-detail-in var(--mui-dur-detail) var(--mui-ease) both;
+}
+.mui-list-in {
+  animation: mui-list-in var(--mui-dur-detail) var(--mui-ease) both;
+}
 .mui-press {
   transition: transform var(--mui-dur-press) var(--mui-ease), background-color var(--mui-dur-row) var(--mui-ease);
 }
@@ -206,7 +196,7 @@ body {
   transform: scale(0.96);
 }
 
-/* 結果パネルの項目行（components/result-view.tsx の panel）。既存の行ボタンを、1行1項目・折り返し可・タップしやすい高さにそろえる */
+/* 結果パネルの項目行（components/result-view.tsx）。既存の行ボタンを、1行1項目・折り返し可・タップしやすい高さにそろえる */
 .mui-h3 {
   margin: 0 0 6px;
   font-size: 12px;
@@ -222,6 +212,7 @@ body {
   display: flex;
 }
 .mui-rows button,
+.mui-rows > div > a,
 .mui-row-btn {
   display: flex;
   min-height: 48px;
@@ -239,25 +230,34 @@ body {
   color: var(--mui-ink);
   transition: background-color var(--mui-dur-row) var(--mui-ease), transform var(--mui-dur-press) var(--mui-ease);
 }
-.mui-rows button:active:not(:disabled) {
+.mui-rows button:active:not(:disabled),
+.mui-rows > div > a:active,
+.mui-row-btn:active {
   background: var(--mui-primary-soft);
   transform: scale(0.99);
 }
 .mui-rows button:disabled {
   opacity: 0.8;
 }
-/* 印（チップ）は隠さず折り返す。背の低い画面で見出しを消すルールも、このパネルでは効かせない */
+/* 印（チップ）は隠さず折り返す（既存の行は1行に収まる分だけ出す作りなので、このパネルでは高さの固定を外す） */
 .mui-rows button span.flex-wrap {
   height: auto;
   overflow: visible;
   row-gap: 4px;
 }
-.mui-rows .short\:hidden {
-  display: inline !important;
-}
 .mui-row-label {
   flex-shrink: 0;
   color: var(--mui-muted);
+}
+
+/*
+ * スマホの日本地図（components/japan-map.tsx）：出典（地理院タイル）を、下から重なるパネルの上に出す。
+ * パネルの下に隠れないよう、地図の下の操作欄（出典）をパネルの高さの分だけ持ち上げる（パネルの動きと同じ長さ・カーブ）
+ */
+.mui-japan-map .maplibregl-ctrl-bottom-right,
+.mui-japan-map .maplibregl-ctrl-bottom-left {
+  bottom: var(--mui-map-bottom, 0px);
+  transition: bottom var(--mui-dur-panel) var(--mui-ease);
 }
 
 /*
@@ -280,7 +280,58 @@ body {
     background-color: var(--mui-primary-soft) !important;
   }
   body[data-mui] .border-line,
-  body[data-mui] .border-line\/70 {
+  body[data-mui] .border-line\/70,
+  body[data-mui] [class*="divide-line"] > * {
     border-color: var(--mui-line) !important;
+  }
+  /* グラデーション（案内図のボタン・市のアイコン）の金色 */
+  body[data-mui] .from-brand-light {
+    --tw-gradient-from: var(--mui-primary) !important;
+  }
+  body[data-mui] .to-brand {
+    --tw-gradient-to: var(--mui-primary-ink) !important;
+  }
+  body[data-mui] .from-mint {
+    --tw-gradient-from: var(--mui-primary-soft) !important;
+  }
+  /* 薄いクリーム色の面（注意書きの箱・行・印）を、青緑がかった白にそろえる。注意（赤茶）と下がった（青）の印は意味があるので、そのまま */
+  body[data-mui] [class*="bg-[#f7f3ec]"] {
+    background-color: #eef6f5 !important;
+  }
+  body[data-mui] [class*="bg-[#fcfaf6]"] {
+    background-color: #f6fbfa !important;
+  }
+  body[data-mui] [class*="bg-[#f3f1ed]"] {
+    background-color: #edf3f2 !important;
+  }
+  /* 「ネットで全種別が分かります」（全種別あり）の金色を青緑に。一部のみ・非公開・区域外は注意の段階なのでそのまま */
+  body[data-mui] [class*="bg-[#f3ead9]"],
+  body[data-mui] [class*="bg-[#faf5ec]"] {
+    background-color: #e1f1ee !important;
+  }
+  body[data-mui] [class*="text-[#76572a]"],
+  body[data-mui] [class*="text-[#5f4722]"] {
+    color: var(--mui-primary-ink) !important;
+  }
+  body[data-mui] [class*="border-[#eadcc3]"] {
+    border-color: #bfdcd7 !important;
+  }
+  body[data-mui] [class*="bg-[#b88a4d]"] {
+    background-color: var(--mui-primary) !important;
+  }
+  /* 金色の影 */
+  body[data-mui] [class*="shadow-[0_6px_16px_rgba(138,102,50"] {
+    box-shadow: 0 6px 16px rgba(15, 118, 110, 0.28) !important;
+  }
+  body[data-mui] [class*="shadow-[0_0_0_1px_rgba(138,102,50"] {
+    box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.35) !important;
+  }
+  body[data-mui] [class*="shadow-[0_0_0_5px_rgba(138,102,50"] {
+    box-shadow: 0 0 0 5px rgba(15, 118, 110, 0.3) !important;
+  }
+  /* キーボードで操作したときの見えるフォーカス（住所の入力欄は枠全体で示すので除く。見出しへの移動のフォーカスも除く） */
+  body[data-mui] :focus-visible:not(input, [tabindex="-1"]) {
+    outline: 2px solid var(--mui-primary);
+    outline-offset: 2px;
   }
 }

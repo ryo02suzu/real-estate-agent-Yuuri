@@ -10,8 +10,10 @@ import { openDraft } from "@/components/draft-sheet";
 import { GuideMapSheet } from "@/components/guide-map";
 import { LocationPicker } from "@/components/location-picker";
 import { MobileShell } from "@/components/mobile-shell";
+import { DETAIL_CLOSE_EVENT } from "@/components/panel-detail";
 import type { MapOpen } from "@/components/result-view";
 import { Sheet } from "@/components/sheet";
+import { decidePop, depthOf, detailState, resultState, withoutDetail, type NavState } from "@/lib/detail-history";
 import { addHistory, clearHistory, loadHistory, type HistoryItem } from "@/lib/history";
 import { createGeneration, runGuarded } from "@/lib/search-gen";
 import { lookup, lookupPoint, MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
@@ -19,11 +21,8 @@ import { lookup, lookupPoint, MUNICIPALITIES, type LookupResult } from "@/lib/ro
 type Shown = { query: string; result: LookupResult };
 /** 地図で選んだ地点の URL（?ll=緯度,経度）。小数5桁（約1m） */
 const llParam = (lat: number, lng: number) => `${lat.toFixed(5)},${lng.toFixed(5)}`;
-/** いまの画面が、ホームから何画面進んだところか（pushState で積んだ数） */
-function historyDepth(): number {
-  const d = (window.history.state as { depth?: unknown } | null)?.depth;
-  return typeof d === "number" ? d : 0;
-}
+/** いまの画面が、ホームから何画面進んだところか（pushState で積んだ数。結果パネルの詳細の分も数える） */
+const historyDepth = () => depthOf(window.history.state as NavState);
 function parseLl(v: string | null): [number, number] | null {
   const m = v?.match(/^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/);
   return m ? [Number(m[1]), Number(m[2])] : null;
@@ -53,6 +52,10 @@ export default function Home() {
 
   // 検索の世代。新検索・ホーム・戻るで進め、古い応答が画面・履歴・URLを上書きしないようにする
   const gen = useRef(createGeneration());
+  // 結果パネルの詳細を開いている間、履歴の先頭に積んだ「詳細の履歴」があるか（端末の「戻る」で詳細だけ閉じる。lib/detail-history.ts）
+  const detailHist = useRef(false);
+  // 画面の「戻る」で自分が history.back() した分の popstate は無視する（この時刻まで）
+  const skipUntil = useRef(0);
 
   /** 住所（q）か、地図で選んだ地点（ll）で調べて結果を出す */
   const run = useCallback(
@@ -81,8 +84,14 @@ export default function Home() {
           }
           // 端末の「戻る」でひとつ前の画面に戻れるよう、結果画面を履歴に積む
           const url = "q" in target ? `?q=${encodeURIComponent(target.q)}` : `?ll=${llParam(...target.ll)}`;
-          // depth: ホームから何画面進んだか（ロゴで一度にホームへ戻るのに使う）
-          if (push) window.history.pushState({ ...window.history.state, depth: historyDepth() + 1 }, "", url);
+          // depth: ホームから何画面進んだか（ロゴで一度にホームへ戻るのに使う）。
+          // 詳細の履歴が積まれたまま新しい結果が出たら、その詳細の履歴を結果に置き換える（詳細の分を残さない）
+          const nav = window.history.state as NavState;
+          if (push) {
+            if (detailHist.current) window.history.replaceState(resultState(nav, false), "", url);
+            else window.history.pushState(resultState(nav, true), "", url);
+          } else if (detailHist.current) window.history.replaceState(withoutDetail(nav), "");
+          detailHist.current = false;
           window.scrollTo(0, 0);
         },
         onError: () => setError("通信に失敗しました。電波の良い場所でもう一度お試しください。"),
@@ -115,9 +124,29 @@ export default function Home() {
     };
     queueMicrotask(() => {
       setHistory(loadHistory());
+      // 詳細の履歴の印が付いたまま開き直したとき（再読み込みなど）は、詳細は閉じた状態から始まるので印だけ外す
+      if ((window.history.state as NavState)?.detail) window.history.replaceState(withoutDetail(window.history.state as NavState), "");
       fromUrl();
     });
-    const onPop = () => {
+    const onPop = (e: PopStateEvent) => {
+      const action = decidePop({ skip: Date.now() < skipUntil.current, detailOpen: detailHist.current, state: e.state as NavState });
+      // 画面の「戻る」ボタンで自分が戻した分は、何もしない
+      if (action === "skip") {
+        skipUntil.current = 0;
+        return;
+      }
+      // 詳細を出している最中の端末の「戻る」：詳細だけ閉じて一覧に戻る（検索し直さない）。詳細の上に重なった地図も閉じる
+      if (action === "close-detail") {
+        detailHist.current = false;
+        setFullMap(null);
+        window.dispatchEvent(new Event(DETAIL_CLOSE_EVENT));
+        return;
+      }
+      // 詳細の履歴の印が付いた履歴に、詳細を出さずに着いた（進む）：印だけ外し、画面はそのまま
+      if (action === "normalize") {
+        window.history.replaceState(withoutDetail(e.state as NavState), "");
+        return;
+      }
       // 戻る・進むで、飛んでいる検索の応答は無効にする（fromUrl が新しい検索を始めればその世代が有効）
       gen.current.cancel();
       setLoading(false);
@@ -128,9 +157,24 @@ export default function Home() {
     return () => window.removeEventListener("popstate", onPop);
   }, [search, searchPoint]);
 
+  // 結果パネルの詳細を開いた・閉じた。開くと同じURLで履歴をひとつ積み（端末の「戻る」で詳細だけ閉じられる）、
+  // 画面の「戻る」ボタンなどで閉じたときは、積んだ履歴を戻す
+  const onDetailChange = useCallback((open: boolean) => {
+    if (open && !detailHist.current) {
+      window.history.pushState(detailState(window.history.state as NavState), "", window.location.href);
+      detailHist.current = true;
+    } else if (!open && detailHist.current) {
+      detailHist.current = false;
+      skipUntil.current = Date.now() + 800;
+      window.history.back();
+    }
+  }, []);
+
   // ホームへ。結果画面を積んできた分だけ戻る（地図で選び直した画面も含めて一度に）
   function backHome() {
     gen.current.cancel();
+    // 詳細の履歴も含めて一度に戻るので、詳細だけ閉じる扱いにしない
+    detailHist.current = false;
     setLoading(false);
     setError(null);
     const depth = historyDepth();
@@ -215,6 +259,7 @@ export default function Home() {
         loading={loading}
         error={error}
         history={history}
+        areaText={AREA_TEXT}
         onSearch={() => search(input, true)}
         onPickAddress={(a) => search(a, false)}
         onPickHistory={pickHistory}
@@ -227,8 +272,10 @@ export default function Home() {
           setPicker({ start: r && (r.status === "ok" || r.status === "unsupported") ? { lat: r.lat, lng: r.lng } : undefined });
         }}
         onExpand={(o) => setFullMap(o ?? {})}
+        onGuide={() => setGuide(true)}
         onOpenHelp={() => open("help")}
         onOpenCities={() => open("cities")}
+        onDetailChange={onDetailChange}
       />
 
       {sheetsEl}

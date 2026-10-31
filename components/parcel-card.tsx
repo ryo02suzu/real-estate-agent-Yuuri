@@ -124,7 +124,7 @@ export function ParcelButton({
         {info.status === "ok" && <ChevronRightIcon className="h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
       {info.status === "ok" && !onOpen && (
-        <Sheet title={withBuilding ? "地番・建物" : "謄本・公図を取るときの地番"} open={open} onClose={() => setOpen(false)}>
+        <Sheet detail title={withBuilding ? "地番・建物" : "謄本・公図を取るときの地番"} open={open} onClose={() => setOpen(false)}>
           {withBuilding ? (
             <Tabs names={["謄本・公図用の地番", "建物"]} panels={[<ParcelDetail key="p" info={info} chibanzu={chibanzu} />, extra]} />
           ) : (

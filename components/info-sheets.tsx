@@ -55,7 +55,7 @@ export function HelpSheet({ open, onClose }: { open: boolean; onClose: () => voi
   ];
   return (
     <Sheet title="使い方" open={open} onClose={onClose}>
-      <ol className="space-y-4 [@media(max-height:720px)]:space-y-2">
+      <ol className="space-y-4 short:space-y-2">
         {steps.map(([title, body], i) => (
           <li key={title} className="flex gap-3">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gold text-sm font-bold text-white">{i + 1}</span>
@@ -66,7 +66,7 @@ export function HelpSheet({ open, onClose }: { open: boolean; onClose: () => voi
           </li>
         ))}
       </ol>
-      <div className="mt-6 rounded-2xl bg-mint p-4 text-sm text-ink [@media(max-height:720px)]:mt-3 [@media(max-height:720px)]:p-3 [@media(max-height:720px)]:text-xs">
+      <div className="mt-6 rounded-2xl bg-mint p-4 text-sm text-ink short:mt-3 short:p-3 short:text-xs">
         <p className="font-bold">MICHILUは判定をしません</p>
         <p className="mt-1 text-muted">
           市町村の公式地図を開くためのツールです。地図は参考情報で、重要事項説明などの最終確認は必ず役所の窓口で行ってください。
@@ -106,7 +106,7 @@ export function MenuSheet({
         {onPrint &&
           prints.map(([kind, label, Icon]) => (
             <li key={kind}>
-              <button onClick={() => onPrint(kind)} className="flex w-full items-center gap-3 py-4 text-left text-ink [@media(max-height:720px)]:py-3">
+              <button onClick={() => onPrint(kind)} className="flex w-full items-center gap-3 py-4 text-left text-ink short:py-3">
                 <Icon className="h-5 w-5 text-brand-light" />
                 <span className="flex-1">{label}</span>
                 <ChevronRightIcon className="h-4 w-4 text-muted" />

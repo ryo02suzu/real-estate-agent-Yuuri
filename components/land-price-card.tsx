@@ -23,6 +23,7 @@ import { pmtilesLandPriceSource } from "@/lib/roadmap/land-price-tiles";
 import { ROSENKA_CHECK, ROSENKA_NOTE, rosenkaLinks, type RosenkaLink } from "@/lib/roadmap/rosenka";
 import { ChevronRightIcon, ExternalIcon, LandPriceIcon, MapIcon } from "./icons";
 import { Notes } from "./notes";
+import { usePanelDetail } from "./panel-detail";
 import { Sheet } from "./sheet";
 
 /** シート・カードに最初に出す地点の数（残りは「ほかの地点」で開く） */
@@ -73,6 +74,8 @@ export function LandPriceLine({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // 結果パネルの中の詳細なら、地図の重ね表示へ移っても詳細は開いたまま（地図を閉じると同じ詳細に戻る）
+  const inPanel = !!usePanelDetail();
   if (state.status === "ok" && state.hits.length === 0) return null;
   const top = state.status === "ok" ? state.hits[0] : undefined;
   return (
@@ -101,14 +104,14 @@ export function LandPriceLine({
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
       {state.status === "ok" && !onOpen && (
-        <Sheet title="近くの地価（参考）" open={open} onClose={() => setOpen(false)}>
+        <Sheet detail title="近くの地価（参考）" open={open} onClose={() => setOpen(false)}>
           <LandPriceDetail
             hits={state.hits}
             rosenka={state.rosenka}
             onShowMap={
               onShowMap &&
               ((p) => {
-                setOpen(false);
+                if (!inPanel) setOpen(false);
                 onShowMap(p);
               })
             }

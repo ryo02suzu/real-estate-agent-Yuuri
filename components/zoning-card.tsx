@@ -120,7 +120,7 @@ export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: 
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
       {state.status === "ok" && !onOpen && (
-        <Sheet title="法令に基づく制限（参考）" open={open} onClose={() => setOpen(false)}>
+        <Sheet detail title="法令に基づく制限（参考）" open={open} onClose={() => setOpen(false)}>
           <ZoningDetail state={state} city={city} tabs />
         </Sheet>
       )}
@@ -141,7 +141,7 @@ export function UtilityLine({ state, city }: { state: ZoningState; city: string 
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-4 w-4 shrink-0 text-[var(--mui-muted)]" />}
       </button>
       {state.status === "ok" && (
-        <Sheet title="上下水道・ガス（参考）" open={open} onClose={() => setOpen(false)}>
+        <Sheet detail title="上下水道・ガス（参考）" open={open} onClose={() => setOpen(false)}>
           <ZoningDetail state={state} city={city} tabs initialTab={2} />
         </Sheet>
       )}

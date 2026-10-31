@@ -118,7 +118,7 @@ export function SchoolButton({ state, onOpen }: { state: SchoolState; onOpen?: (
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
       {s && !onOpen && (
-        <Sheet title="学区（参考）" open={open} onClose={() => setOpen(false)}>
+        <Sheet detail title="学区（参考）" open={open} onClose={() => setOpen(false)}>
           <SchoolDetail schools={s} />
         </Sheet>
       )}

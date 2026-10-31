@@ -72,7 +72,7 @@ export function StationLine({ state, pois, onOpen }: { state: StationState; pois
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
       {state.status === "ok" && !onOpen && (
-        <Sheet title={withPois ? "最寄り駅・周辺施設（徒歩の目安）" : "最寄り駅（徒歩の目安）"} open={open} onClose={() => setOpen(false)}>
+        <Sheet detail title={withPois ? "最寄り駅・周辺施設（徒歩の目安）" : "最寄り駅（徒歩の目安）"} open={open} onClose={() => setOpen(false)}>
           {withPois ? (
             <Tabs names={["最寄り駅", "周辺施設"]} panels={[<StationList key="s" stations={state.stations} />, <PoiList key="p" state={pois} />]} />
           ) : (
