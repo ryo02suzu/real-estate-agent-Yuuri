@@ -169,12 +169,10 @@ You MUST complete each phase before proceeding to the next.
 
 **Fix the root cause, not the symptom:**
 
-1. **Create Failing Test Case**
-   - Simplest possible reproduction
-   - Automated test if possible
-   - One-off test script if no framework
-   - MUST have before fixing
-   - Use an appropriate regression test or reliable reproduction for the bug. Invoke `test-driven-development` only when the user explicitly requests TDD; otherwise do not impose its delete-and-rewrite rule on UI/CSS changes. Keep the project's required checks.
+1. **Reproduce and define a verification check**
+   - For behavior/logic bugs: add an automated regression test where feasible, or document a reliable reproduction and expected result
+   - For visual-only UI/CSS defects: capture the before/after state and verify affected breakpoints in a real browser when one is available; do not invent a unit test just to satisfy a TDD ritual
+   - Strict failing-test-first TDD is opt-in only when the user explicitly invokes `test-driven-development`. Do not delete working UI code for lacking a prior test. Keep MICHILU's required checks.
 
 2. **Implement Single Fix**
    - Address the root cause identified
@@ -217,7 +215,7 @@ If you catch yourself thinking:
 - "Quick fix for now, investigate later"
 - "Just try changing X and see if it works"
 - "Add multiple changes, run tests"
-- "Skip the test, I'll manually verify"
+- "Skip all validation, I'll manually verify"
 - "It's probably X, let me fix that"
 - "I don't fully understand but this might work"
 - "Pattern says X but I'll adapt it differently"
