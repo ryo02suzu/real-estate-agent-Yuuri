@@ -107,7 +107,7 @@ export function normalizeChiban(s: string): string {
 }
 
 const KANJI_DIGIT: Record<string, number> = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
-function kanjiToInt(k: string): number {
+export function kanjiToInt(k: string): number {
   let n = 0;
   let cur = 0;
   for (const ch of k) {
@@ -422,6 +422,33 @@ export function estimatedNote(e: Estimated): string {
 /** 地番区域を「熊谷市下奈良」「川口市青木２丁目」のように読める形に */
 export function kuikiLabel(kuiki: string): string {
   return kuiki.split("_").filter(Boolean).join("");
+}
+
+/** 地番区域の名前。基準の地番区域と同じ市区町村なら、市区町村を外す（「青木２丁目」）。違う市区町村なら市区町村から */
+export function kuikiLabelFrom(kuiki: string, base: string): string {
+  const [city, ...rest] = kuiki.split("_");
+  return city === base.split("_")[0] && rest.some(Boolean) ? rest.filter(Boolean).join("") : kuikiLabel(kuiki);
+}
+
+/**
+ * 選んだ筆の地番を「、」でつなぐ（謄本・公図の請求に貼る）。物件と同じ地番区域の筆は地番の数字だけ（「3555-1」）。
+ * 違う地番区域の筆は、同じ数字の別の土地と取り違えないよう町の名前を付ける（「古ヶ崎三丁目 100-1」）。
+ * 並びは、物件と同じ地番区域が先、あとは地番区域・地番の順。地番の後ろの印（W・V・X）は外し、同じ筆は1つに
+ */
+export function pickedChibanText(picked: readonly Neighbor[], baseKuiki: string): string {
+  const seen = new Set<string>();
+  const list: Neighbor[] = [];
+  for (const n of picked) {
+    const chiban = registryChiban(n.chiban);
+    if (!/^\d/.test(chiban) || seen.has(`${n.kuiki}|${chiban}`)) continue;
+    seen.add(`${n.kuiki}|${chiban}`);
+    list.push({ kuiki: n.kuiki, chiban });
+  }
+  const other = (n: Neighbor) => (n.kuiki === baseKuiki ? 0 : 1);
+  return list
+    .sort((a, b) => other(a) - other(b) || a.kuiki.localeCompare(b.kuiki) || compareChiban(a.chiban, b.chiban))
+    .map((n) => (n.kuiki === baseKuiki ? n.chiban : `${kuikiLabelFrom(n.kuiki, baseKuiki)} ${n.chiban}`))
+    .join("、");
 }
 
 /** 地番の並べ替え（「391」「391-1」「391-2」「391-10」の順） */

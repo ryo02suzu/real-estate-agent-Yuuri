@@ -8,19 +8,20 @@
 // 届いた順に模型に足す：建物と土地 → まわりの筆の線 → 用途地域の色 → 施設の印・札。
 // WebGL が使えない端末では、模型の代わりに平らな地図（地理院タイル）に筆の形を重ねて出す
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { classAt } from "@/lib/app/hazard-level";
+import { classAt, hazardCards } from "@/lib/app/hazard-level";
 import { boundsOf, labelPoint, nearOrigin, ringArea, shapeOf, tileRect, type SceneShape } from "@/lib/app/scene-lots";
 import { dayPart, overrideTime, solar } from "@/lib/app/sun";
 import { buildTown, decodeTownTile, depthFloor, directionOf, frontRoads, localOf, metersPerPixel, nearestOnLine, rankText, townSeams, townTiles, townTileUrl, type Origin, type RawTown, type TownModel, type XZ } from "@/lib/app/town-model";
 import { webglAvailable } from "@/lib/map-style";
 import { HAZARDS, hazardTileUrl } from "@/lib/roadmap/hazard";
-import { PARCEL_ZOOM, registryChiban, type Parcel } from "@/lib/roadmap/parcel";
+import { PARCEL_ZOOM, registryChiban, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
 import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
 import { YOUTO_COLORS, youtoShort, ZONING_ZOOM } from "@/lib/roadmap/zoning";
 import { pmtilesZoningSource } from "@/lib/roadmap/zoning-tiles";
 import { toWorldPixel } from "@/lib/tiles";
 import { addressOffLot } from "../parcel-card";
 import { createPropertyScene, SHADE, SKY, type PropertyScene, type SceneLabel, type SceneLot, type ScenePart, type ScenePin, type SceneTab, type SceneZone } from "./property-3d";
+import { shortName } from "./r-around";
 import { KIND_STYLE, metersText } from "./shared";
 import { SKY_EVENT } from "./sky-event";
 import { TileMap } from "./tile-map";
@@ -119,9 +120,9 @@ async function loadLots(origin: Origin, target: Parcel | undefined, neighborKeys
       const shape = shapeOf([{ polygons: f.polygons(), rect }], toLocal);
       if (!shape.fills.length || !nearOrigin(boundsOf(shape), 330)) continue;
       const neighbor = neighborKeys.has(key) && /^\d/.test(f.chiban);
-      lots.push({ ...shape, neighbor });
+      const reg = `${f.kuiki}|${registryChiban(f.chiban)}`;
+      lots.push({ ...shape, neighbor, ...(neighbor ? { key: reg } : {}) });
       if (neighbor) {
-        const reg = `${f.kuiki}|${registryChiban(f.chiban)}`;
         const at = labelPoint(shape);
         const area = shape.fills.reduce((s, fl) => s + ringArea(fl.outer), 0);
         const prev = nb.get(reg);
@@ -229,6 +230,8 @@ export type BackdropProps = {
   /** 地球からのズームの演出が出ている間は、着地を待つ */
   hold: boolean;
   neighbors: boolean;
+  /** 選んだ隣の土地（地番区域と登記の地番）。模型では濃い金色にしてチェックを付ける */
+  picked: Neighbor[];
   hazard: HazardPick;
   /** 見えているか（ほかのページを見ている間・シートが模型を覆いきった間は描かない） */
   visible: boolean;
@@ -245,7 +248,7 @@ export type BackdropProps = {
 };
 
 /** 物件の画面のいちばん奥（空・街の模型・札・影） */
-export function PropertyBackdrop({ result, data, tab, motion, hold, neighbors, hazard, visible, onReady, onFlat, onFront, flatCenter, boxRef }: BackdropProps) {
+export function PropertyBackdrop({ result, data, tab, motion, hold, neighbors, picked, hazard, visible, onReady, onFlat, onFront, flatCenter, boxRef }: BackdropProps) {
   const host = useRef<HTMLDivElement>(null);
   const labelBox = useRef<HTMLDivElement>(null);
   const [api, setApi] = useState<PropertyScene | null>(null);
@@ -318,6 +321,8 @@ export function PropertyBackdrop({ result, data, tab, motion, hold, neighbors, h
   useEffect(() => api?.setMotion(motion), [api, motion]);
   useEffect(() => api?.setTab(tab), [api, tab]);
   useEffect(() => api?.setNeighbors(neighbors), [api, neighbors]);
+  const pickedKeys = picked.map((n) => `${n.kuiki}|${registryChiban(n.chiban)}`).join(",");
+  useEffect(() => api?.setPicked(pickedKeys ? pickedKeys.split(",") : []), [api, pickedKeys]);
   // 見えているか（画面が裏に回ったときも止める）
   useEffect(() => {
     if (!api) return;
@@ -463,10 +468,20 @@ export function PropertyBackdrop({ result, data, tab, motion, hold, neighbors, h
       const name = y.name.normalize("NFKC");
       labels.push({ key: "zone", title: name.length <= 9 ? name : youtoShort(name), sub: y.bcr && y.far ? `建ぺい${y.bcr}%・容積${y.far}%` : undefined, color: YOUTO_COLORS[y.code], at: [c[0], 10, c[1]], tabs: ["law"] });
     }
-    // ハザード（ハザードのタブ）
+    // ハザード（ハザードのタブ）。区分が無いときは、カードと同じ言い方（区域外・データなし・近くに区域）
     if (hazReport) {
       const at = classAt(hazReport, hazard);
-      labels.push({ key: "haz", title: `${HAZARDS[hazard].short}　${at ? at.label : "想定区域の外"}`, sub: at && hazard !== "dosha" ? "想定最大規模・国のデータ" : undefined, color: at?.color ?? "#8ff0c8", at: [c[0], Math.max(4, depthFloor(at?.label) + 3), c[1]], tabs: ["hazard"] });
+      const card = hazardCards(hazReport).find((x) => x.kind === hazard);
+      const none = card?.tone === "none";
+      const state = at ? at.label : card?.chip === "区域外" ? "想定区域の外" : (card?.chip ?? "確認中");
+      labels.push({
+        key: "haz",
+        title: `${HAZARDS[hazard].short}　${state}`,
+        sub: at ? (hazard === "dosha" ? "国のデータ" : hazard === "naisui" ? "国のデータ" : "想定最大規模・国のデータ") : none ? "市区町村のハザードマップで確認" : "国のデータ",
+        color: at?.color ?? (none ? "#c9d3e0" : "#8ff0c8"),
+        at: [c[0], Math.max(4, depthFloor(at?.label) + 3), c[1]],
+        tabs: ["hazard"],
+      });
     }
     if (evac.status === "ok")
       evac.sites.slice(0, 3).forEach((s, i) => {
@@ -500,7 +515,7 @@ export function PropertyBackdrop({ result, data, tab, motion, hold, neighbors, h
         pins.push({ at: p, color, tabs: ["around"], size: 12 });
         if ([1, 2, 6, 4].includes(poi.kind) && !shown.has(poi.kind) && poi.straight < 500) {
           shown.add(poi.kind);
-          const name = poi.name.replace(/[ 　].*$/, "");
+          const name = shortName(poi.name);
           labels.push({ key: `poi:${poi.kind}`, title: name.length > 10 ? `${name.slice(0, 10)}…` : name, sub: poi.routed && poi.minutes !== undefined ? `徒歩${poi.minutes}分` : `直線${metersText(poi.straight)}`, color, at: [p[0], 3, p[1]], tabs: ["around"] });
         }
       }

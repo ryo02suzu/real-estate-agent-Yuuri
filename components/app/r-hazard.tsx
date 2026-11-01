@@ -135,7 +135,8 @@ export function HazardTab({ result, data, open, expand, has3d, hazard: shown, se
           </p>
           {has3d && range && (
             <p className="mt-[8px] leading-[1.45]" style={{ fontSize: 11, color: G.faint }}>
-              模型の水は区分の下限（{depthFloor(at!.label)}m）まで。目盛りは1mごと
+              {/未満/.test(at!.label.normalize("NFKC")) ? `模型の水は${at!.label}の目安として${depthFloor(at!.label)}m。` : `模型の水は区分の下限（${depthFloor(at!.label)}m）まで。`}
+              目盛りは1mごと
             </p>
           )}
         </div>

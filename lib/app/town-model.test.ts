@@ -102,7 +102,7 @@ describe("向きと幅の書き方", () => {
     expect(directionOf(-10, 10)).toBe("南西");
   });
   it("幅員の区分を短く", () => {
-    expect(rankText("3m-5.5m未満")).toBe("3〜5.5m");
+    expect(rankText("3m-5.5m未満")).toBe("3〜5.5m未満");
     expect(rankText("3m未満")).toBe("3m未満");
     expect(rankText("19.5m以上")).toBe("19.5m以上");
     expect(rankText("不明")).toBe("");

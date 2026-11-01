@@ -45,7 +45,7 @@ import { pmtilesBuildingSource } from "@/lib/roadmap/building-tiles";
 import { HAZARD_KINDS, HAZARD_LAYERS, hazardAt, hazardPointLabel, HAZARDS, type HazardKind } from "@/lib/roadmap/hazard";
 import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
 import { LAND_USAGE_COLORS, landPriceSummary, usageFromCode } from "@/lib/roadmap/land-price";
-import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
+import { chibanLabel, kuikiLabel, registryChiban } from "@/lib/roadmap/parcel";
 import { readRoadShapes, type RoadRead } from "@/lib/roadmap/road-read";
 import { sheetName, type SheetHit } from "@/lib/roadmap/sheets";
 import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
@@ -225,6 +225,11 @@ export type LiveMapProps = {
   initialLandPrice?: [number, number];
   /** 重ねた色の濃さ（1 でいつもの濃さ。用途地域・道路種別・ハザードの元の不透明度に掛ける） */
   overlayOpacity?: number;
+  /**
+   * スマホの物件の画面から開いた地図：タップした筆を、謄本・公図の請求に貼る地番として選ぶ・外す（「筆・地番」を表示しているとき。
+   * 吹き出しに「ここで調べる」と並べて出す）。地番は登記の地番
+   */
+  parcelPick?: { has: (kuiki: string, chiban: string) => boolean; toggle: (kuiki: string, chiban: string) => void };
 };
 
 /** 濃さを変えるレイヤとその不透明度の属性（ハザードのタイルはこれに加えて raster-opacity） */
@@ -272,6 +277,7 @@ export default function LiveMap({
   initialHazard,
   initialLandPrice,
   overlayOpacity,
+  parcelPick,
 }: LiveMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -312,9 +318,9 @@ export default function LiveMap({
     hazardRef.current = hazard;
   });
   // 地図のイベントからは最新の関数を呼ぶ
-  const cb = useRef({ onPick, onCenter, onFail });
+  const cb = useRef({ onPick, onCenter, onFail, parcelPick });
   useEffect(() => {
-    cb.current = { onPick, onCenter, onFail };
+    cb.current = { onPick, onCenter, onFail, parcelPick };
   });
   const pad: Padding = { top: 0, bottom: 0, left: 0, right: 0, ...padding };
   const padKey = `${pad.top},${pad.bottom},${pad.left},${pad.right}`;
@@ -510,6 +516,29 @@ export default function LiveMap({
           hazardAt(e.lngLat.lat, e.lngLat.lng, browserTileFetcher, [hk])
             .then((r) => (l.textContent = hazardPointLabel(hk, r[hk]) ?? ""))
             .catch(() => (l.textContent = `${HAZARDS[hk].short}：読み込めませんでした`));
+        }
+        // 物件の画面から開いた地図：タップした筆（地番のあるもの）を、コピーする地番として選ぶ・外す
+        const pp = cb.current.parcelPick;
+        if (pp && onRef.current.parcels && map.getZoom() >= PARCEL_MIN_ZOOM) {
+          const f = map.queryRenderedFeatures([e.point.x, e.point.y], { layers: PARCEL_PICK_LAYERS })[0];
+          const kuiki = String(f?.properties?.地番区域 ?? "");
+          const chiban = registryChiban(String(f?.properties?.地番 ?? ""));
+          if (kuiki && /^\d/.test(chiban)) {
+            let on = pp.has(kuiki, chiban);
+            const sel = document.createElement("button");
+            sel.type = "button";
+            const paint = () => {
+              sel.className = `rounded-full border px-4 py-1.5 text-[13px] font-semibold ${on ? "border-brand bg-brand text-white" : "border-brand text-brand"}`;
+              sel.textContent = on ? `✓ ${chiban} を選んでいます（押すと外す）` : `${chiban} をコピー用に選ぶ`;
+            };
+            paint();
+            sel.onclick = () => {
+              pp.toggle(kuiki, chiban);
+              on = !on;
+              paint();
+            };
+            box.append(sel);
+          }
         }
         const btn = document.createElement("button");
         btn.type = "button";

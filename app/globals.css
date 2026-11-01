@@ -1235,6 +1235,17 @@ body {
   border-color: rgba(255, 210, 122, 0.45);
   color: #ffe2a3;
 }
+/* 選んだ隣の土地（地番をコピーする筆）：金色にチェック */
+.pv-nb.pv-pick .pv-chip {
+  background: #ffd36b;
+  border-color: #ffd36b;
+  color: #2a1a04;
+}
+.pv-nb.pv-pick .pv-chip::before {
+  content: "✓";
+  font-weight: 800;
+  margin-right: -2px;
+}
 .pv-big .pv-chip {
   font-size: 12.5px;
   padding: 5px 12px 5px 9px;

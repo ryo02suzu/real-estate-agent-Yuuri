@@ -99,6 +99,12 @@ export function LawTab({ result, data, open }: TabProps) {
             </span>
           ))}
         </span>
+        {/* （参考）の値の出どころ：この市の都市計画のデータに数値が無いので、近くの同じ用途地域の地価公示・地価調査の地点の値 */}
+        {hint && (!y?.bcr || !y?.far) && (
+          <span className="block px-[13px] pb-[12px] leading-[1.5]" style={{ fontSize: 11.5, color: G.sub }}>
+            （参考）は、{m.name}の都市計画のデータに数値が無いため、約{Math.round(hint.distance / 10) * 10}m先の同じ用途地域の{hint.label}の値です。同じ用途地域でも場所で違うことがあるので、この土地の値は都市計画図・窓口で確かめてください。
+          </span>
+        )}
       </button>
 
       <div className="grid grid-cols-2 gap-[8px]">

@@ -227,11 +227,14 @@ export function frontRoads(roads: TownRoad[], ring: XZ[]): number[] {
   return out;
 }
 
-/** 地図の幅員の区分を短く（「3m-5.5m未満」→「3〜5.5m」、「3m未満」はそのまま）。分からなければ空 */
+/**
+ * 地図の幅員の区分を短く（「3m-5.5m未満」→「3〜5.5m未満」、「3m未満」はそのまま）。分からなければ空。
+ * 区分の上の値は「未満」（5.5m ちょうどは次の区分）なので、それを落とさない
+ */
 export function rankText(rank: string | undefined): string {
   if (!rank) return "";
   const m = rank.match(/^([\d.]+)m-([\d.]+)m未満$/);
-  if (m) return `${m[1]}〜${m[2]}m`;
+  if (m) return `${m[1]}〜${m[2]}m未満`;
   return /^[\d.]+m(未満|以上)$/.test(rank) ? rank : "";
 }
 

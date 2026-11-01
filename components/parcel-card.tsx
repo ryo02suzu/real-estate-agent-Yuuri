@@ -4,12 +4,13 @@
 // 筆は登記所備付地図データ（lib/roadmap/parcel.ts）。公図（任意座標）の地域は、市町村の地番参考図（sanko-data.ts）か
 // 推定の位置（kozu-data.ts）の筆。住所で調べたときは、住所の地点にある筆を参考として出す。
 // 市町村が地番図を公開していれば、物件の場所で開く入口も出す（lib/roadmap/chibanzu.ts。筆が無い地点ではそれだけを出す）
+import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
 import type { LookupResult } from "@/lib/roadmap";
 import type { ChibanzuLink } from "@/lib/roadmap/chibanzu";
 import { KOZU_DATA } from "@/lib/roadmap/kozu-data";
-import { adjacentParcels, chibanLabel, hasPieceMark, kuikiLabel, parcelAt, parcelMark, registryChiban, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
+import { adjacentParcels, chibanLabel, hasPieceMark, kuikiLabel, kuikiLabelFrom, parcelAt, parcelMark, pickedChibanText, registryChiban, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
 import { SANKO_CITIES, sankoSource } from "@/lib/roadmap/sanko-data";
@@ -93,6 +94,20 @@ export function addressOffLot(info: ParcelInfo): "道路" | "水路" | "large" |
   if (/^水/.test(info.parcel.chibanRaw)) return "水路";
   return registryNeighbors(info).length >= ROADLIKE_NEIGHBORS ? "large" : undefined;
 }
+
+/**
+ * スマホ：隣の筆を押して選び、選んだ地番だけを「、」区切りでコピーする（選んだ筆は物件の画面が持ち、概要の「隣の土地」・
+ * 街の模型・拡大した地図と同じものを使う）。地番は登記の地番（「3555-1」）
+ */
+export type ParcelPick = {
+  list: Neighbor[];
+  toggle: (n: Neighbor) => void;
+  set: (list: Neighbor[]) => void;
+  /** 拡大した地図を、筆・地番を出して開く（地図をタップして選べる） */
+  onMap?: () => void;
+};
+
+export const pickKey = (n: Neighbor) => `${n.kuiki}|${registryChiban(n.chiban)}`;
 
 /** 謄本・公図の請求に貼れる「所在 地番」（物件の筆と隣の筆。地番の無い道路・水路は除く。地番は登記の地番） */
 export function parcelLines(info: Extract<ParcelInfo, { status: "ok" }>): { target?: string; neighbors: string[] } {
@@ -257,7 +272,7 @@ const KIND_LABEL: Record<ParcelKind, string> = {
   address: "住所の地点にある筆（参考）",
 };
 
-export function ParcelDetail({ info, chibanzu }: { info: Extract<ParcelInfo, { status: "ok" }>; chibanzu?: ChibanzuLink }) {
+export function ParcelDetail({ info, chibanzu, pick }: { info: Extract<ParcelInfo, { status: "ok" }>; chibanzu?: ChibanzuLink; pick?: ParcelPick }) {
   const { parcel, kind, neighbors } = info;
   const numbered = registryNeighbors(info);
   const roads = [...new Set(neighbors.filter((n) => !/^\d/.test(n.chiban)).map((n) => chibanLabel(n.chiban)))];
@@ -304,23 +319,29 @@ export function ParcelDetail({ info, chibanzu }: { info: Extract<ParcelInfo, { s
         </p>
       )}
 
-      <p className="mt-3 text-[12px] text-muted dense:mt-2">
-        境界が接している筆（{numbered.length}）{numbered.length > 0 && "。押すとその筆をコピー"}
-      </p>
-      {/* 隣の筆は多いと20を超えるので、1行に並べる（1画面に収める） */}
-      {numbered.length > 0 ? (
-        <div className="mt-1 flex flex-wrap gap-1">
-          {numbered.map((n) => (
-            <NeighborChip key={`${n.kuiki}|${n.chiban}`} kuiki={n.kuiki} chiban={n.chiban} hideTown={kuikiLabel(n.kuiki) === town} />
-          ))}
-        </div>
+      {pick ? (
+        <NeighborPicker info={info} numbered={numbered} roads={roads} pick={pick} />
       ) : (
-        <p className="py-1 text-[13px] text-muted">地図データの中には見つかりませんでした</p>
+        <>
+          <p className="mt-3 text-[12px] text-muted dense:mt-2">
+            境界が接している筆（{numbered.length}）{numbered.length > 0 && "。押すとその筆をコピー"}
+          </p>
+          {/* 隣の筆は多いと20を超えるので、1行に並べる（1画面に収める） */}
+          {numbered.length > 0 ? (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {numbered.map((n) => (
+                <NeighborChip key={`${n.kuiki}|${n.chiban}`} kuiki={n.kuiki} chiban={n.chiban} hideTown={kuikiLabel(n.kuiki) === town} />
+              ))}
+            </div>
+          ) : (
+            <p className="py-1 text-[13px] text-muted">地図データの中には見つかりませんでした</p>
+          )}
+        </>
       )}
-      {roads.length > 0 && <p className="mt-1 text-[12px] text-muted">ほかに{roads.join("・")}に接しています。</p>}
+      {!pick && roads.length > 0 && <p className="mt-1 text-[12px] text-muted">ほかに{roads.join("・")}に接しています。</p>}
 
       <div className="mt-3 flex flex-col gap-2 dense:mt-2 denser:gap-1.5">
-        <CopyAll text={lines.join("\n")} count={lines.length} />
+        {!pick && <CopyAll text={lines.join("\n")} count={lines.length} />}
         {/* 地番図があれば、登記情報提供サービスと横に並べる */}
         <div className="flex gap-2 denser:gap-1.5">
           <LinkButton {...TOUKI} />
@@ -362,16 +383,109 @@ function Row({ kuiki, chiban, strong, hideTown }: { kuiki: string; chiban: strin
   );
 }
 
-/** 隣の筆（「226-2」。町が違えば町の名前も）。押すと「所在 地番」をコピー */
+/** 隣の筆（「226-2」。町が違えば町の名前も）。押すと札に出ている字をコピー（物件と同じ町なら地番の数字だけ） */
 function NeighborChip({ kuiki, chiban, hideTown }: { kuiki: string; chiban: string; hideTown?: boolean }) {
   const { done, copy } = useCopy();
   return (
     <button
-      onClick={() => copy(`${kuikiLabel(kuiki)} ${chiban}`)}
+      onClick={() => copy(hideTown ? chiban : `${kuikiLabel(kuiki)} ${chiban}`)}
       className={`rounded-full border px-2.5 py-1 text-[13px] leading-[1.5] dense:py-0.5 denser:px-2 denser:text-[12.5px] ${done ? "border-brand bg-mint text-brand" : "border-line text-ink"}`}
     >
       {!hideTown && <span className="text-muted">{kuikiLabel(kuiki)} </span>}
       {done ? "コピー済" : chiban}
+    </button>
+  );
+}
+
+/**
+ * スマホ：隣の筆を押して選ぶ（もう一度押すと外す）。選んだ地番だけを「、」区切りでコピーする。
+ * 拡大した地図で選んだ、隣ではない筆（向かいの土地など）も一緒に出す
+ */
+function NeighborPicker({ info, numbered, roads, pick }: { info: Extract<ParcelInfo, { status: "ok" }>; numbered: Neighbor[]; roads: string[]; pick: ParcelPick }) {
+  const base = info.parcel.kuiki;
+  const self = pickKey({ kuiki: base, chiban: info.parcel.chibanRaw });
+  const chosen = new Set(pick.list.map(pickKey));
+  const near = new Set(numbered.map(pickKey));
+  const others = pick.list.filter((n) => !near.has(pickKey(n)));
+  const all = numbered.length > 0 && numbered.every((n) => chosen.has(pickKey(n)));
+  const text = pickedChibanText(pick.list, base);
+  const label = (n: Neighbor) => (n.kuiki === base ? registryChiban(n.chiban) : `${kuikiLabelFrom(n.kuiki, base)} ${registryChiban(n.chiban)}`);
+  return (
+    <>
+      <div className="mt-3 flex items-center gap-2 dense:mt-2">
+        <p className="min-w-0 flex-1 text-[12px] text-muted">
+          境界が接している筆（{numbered.length}）{numbered.length > 0 && "。押して選ぶ"}
+        </p>
+        {numbered.length > 0 && (
+          <button
+            onClick={() => pick.set(all ? others : [...others, ...numbered])}
+            className="-my-1 shrink-0 rounded-full px-2 py-1 text-[12px] font-semibold text-brand"
+          >
+            {all ? "選択を外す" : "すべて選ぶ"}
+          </button>
+        )}
+      </div>
+      {numbered.length > 0 ? (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {numbered.map((n) => (
+            <PickChip key={pickKey(n)} label={label(n)} on={chosen.has(pickKey(n))} onClick={() => pick.toggle(n)} />
+          ))}
+        </div>
+      ) : (
+        <p className="py-1 text-[13px] text-muted">地図データの中には見つかりませんでした</p>
+      )}
+      {roads.length > 0 && <p className="mt-1 text-[12px] text-muted">ほかに{roads.join("・")}に接しています。</p>}
+      {others.length > 0 && (
+        <>
+          <p className="mt-2 text-[12px] text-muted">地図で選んだ筆（押すと外す）</p>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {others.map((n) => (
+              <PickChip key={pickKey(n)} label={`${label(n)}${pickKey(n) === self ? "（この土地）" : ""}`} on onClick={() => pick.toggle(n)} />
+            ))}
+          </div>
+        </>
+      )}
+      <div className="mt-3 dense:mt-2">
+        <PickCopy text={text} count={chosen.size} />
+        <p className="mt-1 break-all text-[11.5px] leading-[1.5] text-muted">
+          {text ? `コピーする文：${text}` : "地番の数字だけを「、」でつないでコピーします（町が違う筆は町の名前も付けます）。"}
+        </p>
+        {pick.onMap && (
+          <button onClick={pick.onMap} className="mt-1 flex items-center gap-1 py-1 text-[12.5px] font-semibold text-brand">
+            地図で筆を見ながら選ぶ
+            <ChevronRightIcon className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+/** 選べる地番の札（選ぶと塗りつぶしてチェック） */
+function PickChip({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={on}
+      className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[13px] leading-[1.5] dense:py-0.5 denser:px-2 denser:text-[12.5px] ${on ? "border-brand bg-brand font-semibold text-white" : "border-line text-ink"}`}
+    >
+      {on && <Check className="h-3 w-3 shrink-0" strokeWidth={3} />}
+      {label}
+    </button>
+  );
+}
+
+/** 選んだ地番をまとめてコピー */
+function PickCopy({ text, count }: { text: string; count: number }) {
+  const { done, copy } = useCopy();
+  return (
+    <button
+      onClick={() => text && copy(text)}
+      disabled={!text}
+      className="bg-gold flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold text-white disabled:opacity-40 dense:py-2"
+    >
+      <CopyIcon className="h-4 w-4" />
+      {done ? "コピーしました" : count ? `選んだ地番をコピー（${count}筆）` : "コピーする地番を選んでください"}
     </button>
   );
 }

@@ -9,7 +9,7 @@ import { TSUBO_M2 } from "@/lib/app/area";
 import { DEAL_KIND_LABEL, DEALS_CREDIT, DEALS_DATA, DEALS_NOTE, dealKind, dealSummary, totalText, unitPrice, type DealKind, type DealRecord } from "@/lib/roadmap/deals";
 import { distanceText, type LandPriceHit, type LandUsage } from "@/lib/roadmap/land-price";
 import { G, GHead, GNote, GStat, NUM, TILE } from "./g-ui";
-import { yen } from "./r-ui";
+import { manYen, yen } from "./r-ui";
 import type { TabProps } from "./types";
 
 type KindFilter = "all" | "公示" | "調査";
@@ -38,6 +38,8 @@ export function DealsSection({ result, data, open }: TabProps) {
     .filter((h) => (kind === "all" || h.kind === kind) && (usage === 0 || h.usage === USAGES[usage]) && h.distance <= RANGES[range])
     .sort((a, b) => (sort === 0 ? a.distance - b.distance : sort === 1 ? b.price - a.price : a.price - b.price));
   const avg = list.length ? list.reduce((s, h) => s + h.price, 0) / list.length : undefined;
+  // 住宅地と商業地などが混ざった平均は、そう書く（用途で絞ると、その用途だけの平均）
+  const mixed = new Set(list.map((h) => h.usage)).size > 1;
   const withChange = list.filter((h) => h.change !== undefined);
   const avgChange = withChange.length ? withChange.reduce((s, h) => s + (h.change ?? 0), 0) / withChange.length : undefined;
 
@@ -57,7 +59,7 @@ export function DealsSection({ result, data, open }: TabProps) {
         </div>
         <div className="mt-[8px] grid grid-cols-3 gap-[8px]">
           <GStat label="事例の件数" value={lp.status === "loading" ? "…" : `${list.length}件`} note={`半径${RANGES[range] / 1000}km`} />
-          <GStat label="平均単価" value={avg ? `${man(avg)}万` : "―"} unit={avg ? "円/㎡" : undefined} note={avg ? `坪 約${yen(avg * TSUBO_M2)}円` : undefined} />
+          <GStat label={mixed ? "平均単価（用途混在）" : "平均単価"} value={avg ? `${man(avg)}万` : "―"} unit={avg ? "円/㎡" : undefined} note={avg ? (mixed ? "用途で絞ると比べやすい" : `坪 約${manYen(avg * TSUBO_M2)}`) : undefined} />
           <GStat label="前年比の平均" value={avgChange === undefined ? "―" : `${avgChange >= 0 ? "+" : ""}${avgChange.toFixed(1)}%`} note="同じ地点の前年比" />
         </div>
         <div className="mt-[8px] overflow-hidden rounded-[18px]" style={TILE}>
@@ -72,6 +74,12 @@ export function DealsSection({ result, data, open }: TabProps) {
       </section>
     </div>
   );
+}
+
+/** データの期間を短く：「2024年第3四半期〜2026年第1四半期」→「2024年7月〜2026年3月」（読めなければそのまま） */
+export function periodShort(periods: string): string {
+  const m = periods.normalize("NFKC").match(/^(\d{4})年第(\d)四半期[〜~-](\d{4})年第(\d)四半期$/);
+  return m ? `${m[1]}年${(Number(m[2]) - 1) * 3 + 1}月〜${m[3]}年${Number(m[4]) * 3}月` : periods;
 }
 
 /** 万円の数だけ（10万以上は整数、それ未満は小数1桁）：「314」「1640」「0.9」 */
@@ -111,7 +119,7 @@ function DealRow({ hit, onClick }: { hit: LandPriceHit; onClick: () => void }) {
           </span>
         </span>
         <span className="mt-[4px] block whitespace-nowrap leading-none" style={{ fontSize: 11, color: hit.change !== undefined && hit.change < 0 ? G.blue : G.red }}>
-          {hit.change !== undefined ? `前年比${hit.change >= 0 ? "+" : ""}${hit.change.toFixed(1)}%` : `坪 約${yen(hit.price * TSUBO_M2)}円`}
+          {hit.change !== undefined ? `前年比${hit.change >= 0 ? "+" : ""}${hit.change.toFixed(1)}%` : `坪 約${manYen(hit.price * TSUBO_M2)}`}
         </span>
       </span>
       <ChevronRight size={16} strokeWidth={1.8} absoluteStrokeWidth color={G.chevron} className="shrink-0" />
@@ -154,7 +162,7 @@ function Transactions({ data, town }: { data: TabProps["data"]; town: string }) 
   const where = scope === "town" && d.town.length ? town.replace(/[0-9一二三四五六七八九十]+丁目$/, "") : d.city;
   return (
     <section>
-      <GHead title="実際の取引事例" note={`${where}・直近2年`} />
+      <GHead title="実際の取引事例" note={`${where}・${periodShort(DEALS_DATA.periods)}`} />
       <div className="no-scrollbar -mx-[14px] flex gap-[6px] overflow-x-auto px-[14px] pb-[2px]">
         {KIND_FILTERS.map((k) => (
           <Chip key={k} label={k === "all" ? "すべて" : DEAL_KIND_LABEL[k]} on={kind === k} onClick={() => setKind(k)} />
@@ -162,8 +170,8 @@ function Transactions({ data, town }: { data: TabProps["data"]; town: string }) 
         {d.town.length > 0 && <Chip label={scope === "town" ? `${d.city}全体にする` : "同じ町だけ"} on={false} onClick={() => setScope((v) => (v === "town" ? "city" : "town"))} drop />}
       </div>
       <div className="mt-[8px] grid grid-cols-3 gap-[8px]">
-        <GStat label="事例の件数" value={`${base.length}件`} note="直近2年" />
-        <GStat label="土地の単価" value={sum.land ? `${man(sum.land)}万` : "―"} unit={sum.land ? "円/㎡" : undefined} note={sum.land ? `中央値・坪 約${yen(sum.land * TSUBO_M2)}円` : "土地の事例なし"} />
+        <GStat label="事例の件数" value={`${base.length}件`} note={periodShort(DEALS_DATA.periods)} />
+        <GStat label="土地の単価" value={sum.land ? `${man(sum.land)}万` : "―"} unit={sum.land ? "円/㎡" : undefined} note={sum.land ? `中央値・坪 約${manYen(sum.land * TSUBO_M2)}` : "土地の事例なし"} />
         <GStat label="マンション" value={sum.mansion ? `${man(sum.mansion)}万` : "―"} unit={sum.mansion ? "円/㎡" : undefined} note="中央値・専有面積あたり" />
       </div>
       <div className="mt-[8px] overflow-hidden rounded-[18px]" style={TILE}>
@@ -205,7 +213,7 @@ function TxRow({ r }: { r: DealRecord }) {
           {DEAL_KIND_LABEL[k]}・{r.pe ?? "時期不明"}
           {r.by ? `・${r.by}築` : ""}
           {r.a ? `・${k === "mansion" ? "専有" : ""}${r.a.toLocaleString("ja-JP", { maximumFractionDigits: 1 })}㎡` : r.as ? `・${r.as}` : ""}
-          {r.rc || r.br ? `・前面道路 ${[r.dir, r.rc, r.br ? `${r.br}m` : ""].filter(Boolean).join("")}` : ""}
+          {r.rc || r.br ? `・前面道路 ${[r.dir, r.rc, r.br ? `${r.br}m` : ""].filter(Boolean).join(" ")}` : ""}
         </span>
       </span>
       <span className="shrink-0 text-right">

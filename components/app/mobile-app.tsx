@@ -55,11 +55,13 @@ import {
   type Resume,
 } from "@/lib/resume";
 import type { LookupResult } from "@/lib/roadmap";
+import { partialMatch } from "@/lib/roadmap/geocode";
 import { groupHazardMaps, wagamachiUrl } from "@/lib/roadmap/hazard";
 import {
   chibanLabel,
   chibanQueryOf,
   registryChiban,
+  type Neighbor,
 } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { buildSummary } from "@/lib/summary";
@@ -68,7 +70,12 @@ import { DraftSheet } from "../draft-sheet";
 import { FullMap } from "../full-map";
 import { GuideMapSheet } from "../guide-map";
 import { LocationPicker } from "../location-picker";
-import { addressOffLot, registryNeighbors } from "../parcel-card";
+import {
+  addressOffLot,
+  pickKey,
+  registryNeighbors,
+  type ParcelPick,
+} from "../parcel-card";
 import { PrintSheet } from "../print-sheet";
 import { copyText, loaded } from "../result-view";
 import { TriageSheet, useChecklist } from "../triage-sheet";
@@ -118,7 +125,7 @@ import { topicStatuses } from "./status";
 import { markNewsSeen, NewsSheet, useUnreadNews } from "./news";
 import { NotOkPage } from "./pages";
 import { AroundTab } from "./r-around";
-import { BasicTab } from "./r-basic";
+import { areaLabel, BasicTab } from "./r-basic";
 import { HazardTab } from "./r-hazard";
 import { LawTab } from "./r-law";
 import { PriceTab } from "./r-price";
@@ -1087,6 +1094,26 @@ function PropertyView({
   const [has3d, setHas3d] = useState(true);
   const [front, setFront] = useState<FrontRoad[] | null>(null);
   const scene = useRef<PropertyScene | null>(null);
+  // 謄本・公図の請求に貼る地番：押して選んだ筆（概要の「隣の土地」・地番の詳しい画面・街の模型・拡大した地図で同じものを選ぶ）。
+  // 地番は登記の地番。物件ごとに空から（この画面は物件ごとに作り直す）
+  const [picked, setPicked] = useState<Neighbor[]>([]);
+  const togglePick = (n: Neighbor) => {
+    const k = pickKey(n);
+    setPicked((cur) =>
+      cur.some((x) => pickKey(x) === k)
+        ? cur.filter((x) => pickKey(x) !== k)
+        : [...cur, { kuiki: n.kuiki, chiban: registryChiban(n.chiban) }],
+    );
+  };
+  const pick: ParcelPick = {
+    list: picked,
+    toggle: togglePick,
+    set: setPicked,
+    onMap: () => {
+      setDetail(null);
+      setFull({ parcels: true });
+    },
+  };
   // レポートに入れない項目（レポートの画面で選ぶ）
   const [off, setOff] = useState<ReadonlySet<SectionKey>>(() => new Set());
   const addr = useCopy();
@@ -1375,6 +1402,7 @@ function PropertyView({
     has3d,
     neighbors,
     setNeighbors,
+    pick,
     hazard: hazPick,
     setHazard: setHazPick,
     front,
@@ -1491,9 +1519,11 @@ function PropertyView({
     <>
       {lotArea && (
         <HeroChip>
-          約{lotArea.toLocaleString("ja-JP", { maximumFractionDigits: 2 })}㎡
+          約{areaLabel(lotArea, !!(lotParcel?.estimated || lotParcel?.sanko))}㎡
           <span className="opacity-60">・</span>
-          {(lotArea / TSUBO_M2).toFixed(1)}坪
+          {lotParcel?.estimated || lotParcel?.sanko
+            ? `約${Math.round(lotArea / TSUBO_M2)}坪（目安）`
+            : `${(lotArea / TSUBO_M2).toFixed(1)}坪`}
         </HeroChip>
       )}
       {lotParcel && (lotParcel.estimated || lotParcel.sanko) && (
@@ -1526,7 +1556,10 @@ function PropertyView({
       : "",
     tab === "law" ? "用途地域：国土交通省 都市計画決定GISデータ" : "",
     tab === "hazard" ? "ハザード：重ねるハザードマップ（国土地理院）" : "",
-    tab === "around" ? "施設：© OpenStreetMap contributors" : "",
+    tab === "around"
+      ? "施設：© OpenStreetMap contributors・駅・学区：国土数値情報"
+      : "",
+    tab === "price" ? "地価：国土数値情報（地価公示・地価調査）" : "",
   ].filter(Boolean);
 
   return (
@@ -1541,6 +1574,7 @@ function PropertyView({
             motion={motion}
             hold={hold}
             neighbors={neighbors}
+            picked={picked}
             hazard={hazPick}
             visible={!barHidden && !covered}
             onReady={(api) => {
@@ -1636,8 +1670,18 @@ function PropertyView({
         onPointerUp={onHeroPointer}
         onPointerCancel={onHeroPointer}
         onClick={() => {
-          // 模型の土地をたたいたら、地番の詳しい画面
-          if (scene.current?.takeLotTap()) setDetail({ kind: "parcel" });
+          // 模型の土地をたたいたら、地番の詳しい画面。隣の土地を出しているときは、隣の筆をたたくと選ぶ・外す
+          const s = scene.current;
+          if (!s) return;
+          if (s.takeLotTap()) {
+            setDetail({ kind: "parcel" });
+            return;
+          }
+          const nb = s.takeNeighborTap();
+          if (nb) {
+            const [kuiki, chiban] = nb.split("|");
+            togglePick({ kuiki, chiban });
+          }
         }}
       >
         <PropertyHero
@@ -1757,6 +1801,7 @@ function PropertyView({
           result={result}
           data={data}
           expand={(o) => setFull(o ?? {})}
+          pick={pick}
           statuses={statuses}
           onRecord={(t) => {
             setDetail(null);
@@ -1820,6 +1865,12 @@ function PropertyView({
             withRoads={full.roads}
             hazard={full.hazard}
             landPrice={full.landPrice}
+            parcels={full.parcels}
+            pick={
+              data.parcels.status === "ok"
+                ? { ...pick, base: data.parcels.parcel.kuiki }
+                : undefined
+            }
             onClose={() => setFull(null)}
             onPick={(lat, lng) => onPickPoint(lat, lng)}
           />
@@ -1967,6 +2018,15 @@ function PlaceNote({
         )}
       </>
     );
+  } else if (
+    !picked &&
+    !parcel &&
+    partialMatch(query, result.matchedAddress)
+  ) {
+    // 号などが住所のデータに無く、その手前（番まで）の代表の地点を出しているとき
+    const matched = displayAddress(result.matchedAddress);
+    short = `住所は「${matched}」までの一致です`;
+    text = `入力した住所の最後の番号（号など）は国土地理院の住所のデータに無いため、「${matched}」の代表の地点を出しています。建物の位置と違うときは「場所を直す」で直してください。`;
   } else if (picked && !parcel) {
     short = "地図で選んだ地点です（町名まで）";
     text = "地図で選んだ地点です（番地は分からないので町名まで）。";

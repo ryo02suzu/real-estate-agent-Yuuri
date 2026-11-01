@@ -5,16 +5,17 @@
 // 調査の状況（6つの項目の札。押すと確認の記録）、地図のボタン。「レポートを作成」は下の操作バー（components/app/action-bar.tsx）。
 // くわしい話は札を押して下から出る画面で（地番・建物・駅・学区）。都市計画・防火などは法令のタブで。
 // 街の模型が出せない端末では、いちばん上に平らな地図を出す
-import { Check, ChevronRight, Eye, EyeOff, ListChecks, Map as MapIcon, SquareArrowOutUpRight, TriangleAlert } from "lucide-react";
+import { Check, ChevronRight, Copy, Eye, EyeOff, ListChecks, Map as MapIcon, SquareArrowOutUpRight, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { parcelAreaM2 } from "@/lib/app/area";
 import { ratioHint } from "@/lib/app/ratio-hint";
 import type { Triage } from "@/lib/app/triage";
 import { usageShort } from "@/lib/roadmap/building";
-import { chibanLabel, parcelMark } from "@/lib/roadmap/parcel";
+import { chibanLabel, kuikiLabelFrom, parcelMark, pickedChibanText } from "@/lib/roadmap/parcel";
 import { schoolShort } from "@/lib/roadmap/school";
 import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
-import { addressOffLot, registryNeighbors } from "../parcel-card";
+import { addressOffLot, pickKey, registryNeighbors } from "../parcel-card";
+import { useCopy } from "../use-copy";
 import { G, GCard, GCell, GFaint, GHead, GPill, NUM, TILE, TILE_GOLD, TILE_WARN } from "./g-ui";
 import { CoinStack } from "./icons";
 import { PropertyMap } from "./property-map";
@@ -26,7 +27,7 @@ import type { TabProps } from "./types";
 
 const TSUBO = 400 / 121;
 
-export function BasicTab({ result, data, go, open, expand, mapApps, statuses, record, triage, checklist, has3d, neighbors, setNeighbors }: TabProps) {
+export function BasicTab({ result, data, go, open, expand, mapApps, statuses, record, triage, checklist, has3d, neighbors, setNeighbors, pick }: TabProps) {
   const { zoning, parcels, building, stations, schools, landPrice } = data;
   const parcel = parcels.status === "ok" ? parcels.parcel : undefined;
   const z = zoning.status === "ok" ? zoning.zoning : undefined;
@@ -36,6 +37,8 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
   // 住所の地点の筆が、隣地のとても多い筆（地番の付いた公道など）なら、その面積は物件の土地のものではないので出さない
   const offLot = addressOffLot(parcels) === "large";
   const area = parcel && /^\d/.test(parcel.chibanRaw) && !offLot ? parcelAreaM2(parcel) : undefined;
+  // 公図から推定した筆・市の地番参考図の筆は、形から測った面積が地積と大きく違うことがあるので、10㎡単位の目安にする
+  const roughArea = !!parcel && !!(parcel.estimated || parcel.sanko);
   const st = stations.status === "ok" ? stations.stations[0] : undefined;
   const school = schools.status === "ok" ? schools.schools.elementary : undefined;
   const hit = building.status === "ok" ? building.result.hit : undefined;
@@ -98,8 +101,8 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
           />
           <GCell
             label="面積（図面上）"
-            value={parcels.status === "loading" ? <GFaint /> : area ? <span style={NUM}>約{area.toLocaleString("ja-JP", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}㎡</span> : <GFaint>{parcels.status === "error" ? "読み込めず" : townCenter || offLot ? "場所を直すと出ます" : "登記で確認"}</GFaint>}
-            sub={area ? `約${(area / TSUBO).toFixed(1)}坪・公簿は登記で確認` : ""}
+            value={parcels.status === "loading" ? <GFaint /> : area ? <span style={NUM}>約{areaLabel(area, roughArea)}㎡</span> : <GFaint>{parcels.status === "error" ? "読み込めず" : townCenter || offLot ? "場所を直すと出ます" : "登記で確認"}</GFaint>}
+            sub={area ? (roughArea ? `公図の形からの目安・約${Math.round(area / TSUBO)}坪` : `約${(area / TSUBO).toFixed(1)}坪・公簿は登記で確認`) : ""}
             onClick={parcel ? () => open("parcel") : undefined}
           />
           <GCell
@@ -151,7 +154,7 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
         <ChevronRight size={18} strokeWidth={1.8} absoluteStrokeWidth color={G.chevron} className="shrink-0" />
       </GCard>
 
-      <NeighborsCard data={data} open={open} has3d={has3d} neighbors={neighbors} setNeighbors={setNeighbors} />
+      <NeighborsCard data={data} open={open} has3d={has3d} neighbors={neighbors} setNeighbors={setNeighbors} pick={pick} />
 
       <ResearchCard statuses={statuses} summary={statusSummary(statuses)} onTopic={record} />
 
@@ -252,13 +255,21 @@ function TriageCard({ triage, checklist, onAll }: { triage: Triage; checklist: T
   );
 }
 
-/** 隣の土地（謄本・公図を取るときの隣地。地番のある筆）。街の模型があれば、金色の線と地番の札で出せる */
-function NeighborsCard({ data, open, has3d, neighbors, setNeighbors }: Pick<TabProps, "data" | "open" | "has3d" | "neighbors" | "setNeighbors">) {
+/**
+ * 隣の土地（謄本・公図を取るときの隣地。地番のある筆）。札を押して選ぶと、選んだ地番だけを「、」区切りでコピーできる
+ * （地番の詳しい画面・街の模型・拡大した地図で選んだものと同じ）。街の模型があれば、金色の線と地番の札で出せ、模型の土地をたたいても選べる
+ */
+function NeighborsCard({ data, open, has3d, neighbors, setNeighbors, pick }: Pick<TabProps, "data" | "open" | "has3d" | "neighbors" | "setNeighbors" | "pick">) {
+  const copied = useCopy();
   const info = data.parcels;
   // 住所の地点の筆が道路・水路や、隣地のとても多い筆（物件の土地ではなさそう）のときは出さない
   if (info.status !== "ok" || !/^\d/.test(info.parcel.chibanRaw) || addressOffLot(info) !== undefined) return null;
   const list = registryNeighbors(info);
   const roads = info.neighbors.filter((n) => !/^\d/.test(n.chiban)).length;
+  const base = info.parcel.kuiki;
+  const chosen = new Set(pick.list.map(pickKey));
+  const text = pickedChibanText(pick.list, base);
+  const SHOW = 12;
   return (
     <div className="rounded-[18px] transition-[background,border-color] duration-300" style={neighbors ? TILE_GOLD : TILE}>
       <div className="flex items-center gap-[10px] px-[13px] pt-[11px]">
@@ -277,16 +288,26 @@ function NeighborsCard({ data, open, has3d, neighbors, setNeighbors }: Pick<TabP
           </button>
         )}
       </div>
-      <div className="flex flex-wrap gap-[6px] px-[13px] pb-[12px] pt-[10px]">
-        {list.slice(0, 12).map((n) => (
-          <span key={`${n.kuiki}|${n.chiban}`} className="rounded-full px-[9px] py-[3px] transition-colors duration-300" style={{ fontSize: 12.5, ...NUM, background: neighbors ? "rgba(255,201,74,0.16)" : "rgba(255,255,255,0.07)", border: `1px solid ${neighbors ? "rgba(255,201,74,0.45)" : "rgba(255,255,255,0.1)"}`, color: neighbors ? "#ffe2a3" : G.text }}>
-            {n.chiban}
-          </span>
-        ))}
-        {list.length > 12 && (
-          <span className="px-[4px] py-[3px]" style={{ fontSize: 12, color: G.faint }}>
-            ほか{list.length - 12}筆
-          </span>
+      <div className="flex flex-wrap gap-[6px] px-[13px] pb-[10px] pt-[10px]">
+        {list.slice(0, SHOW).map((n) => {
+          const on = chosen.has(pickKey(n));
+          return (
+            <button
+              key={`${n.kuiki}|${n.chiban}`}
+              onClick={() => pick.toggle(n)}
+              aria-pressed={on}
+              className="press flex items-center gap-[3px] rounded-full px-[9px] py-[3px] transition-colors duration-200"
+              style={{ fontSize: 12.5, ...NUM, background: on ? "#ffd36b" : neighbors ? "rgba(255,201,74,0.16)" : "rgba(255,255,255,0.07)", border: `1px solid ${on ? "#ffd36b" : neighbors ? "rgba(255,201,74,0.45)" : "rgba(255,255,255,0.1)"}`, color: on ? "#2a1a04" : neighbors ? "#ffe2a3" : G.text, fontWeight: on ? 600 : 400 }}
+            >
+              {on && <Check size={11} strokeWidth={3} absoluteStrokeWidth />}
+              {n.kuiki === base ? n.chiban : `${kuikiLabelFrom(n.kuiki, base)} ${n.chiban}`}
+            </button>
+          );
+        })}
+        {list.length > SHOW && (
+          <button onClick={() => open("parcel")} className="px-[4px] py-[3px] underline-offset-2 active:underline" style={{ fontSize: 12, color: G.sub }}>
+            ほか{list.length - SHOW}筆 ›
+          </button>
         )}
         {!list.length && (
           <span style={{ fontSize: 12.5, color: G.faint }} className="py-[3px]">
@@ -294,8 +315,46 @@ function NeighborsCard({ data, open, has3d, neighbors, setNeighbors }: Pick<TabP
           </span>
         )}
       </div>
+      {list.length > 0 && (
+        <div className="flex items-center gap-[8px] border-t px-[13px] py-[9px]" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+          <p className="min-w-0 flex-1 leading-[1.4]" style={{ fontSize: 11.5, color: text ? G.sub : G.faint }}>
+            {text ? (
+              <span className="line-clamp-2 break-all" style={{ color: G.text }}>
+                {text}
+              </span>
+            ) : neighbors ? (
+              "札か模型の土地を押して選ぶと、地番だけを「、」区切りでコピーできます"
+            ) : (
+              "札を押して選ぶと、地番だけを「、」区切りでコピーできます"
+            )}
+          </p>
+          {text ? (
+            <>
+              <button onClick={() => pick.set([])} className="press h-[32px] shrink-0 rounded-full px-[10px]" style={{ fontSize: 12, color: G.sub }}>
+                外す
+              </button>
+              <button onClick={() => copied.copy(text)} className="press flex h-[32px] shrink-0 items-center gap-[5px] rounded-full px-[12px] font-semibold" style={{ fontSize: 12.5, color: "#2a1a04", background: "#ffd36b" }}>
+                {copied.done ? <Check size={13} strokeWidth={2.4} absoluteStrokeWidth /> : <Copy size={13} strokeWidth={2} absoluteStrokeWidth />}
+                {copied.done ? "コピーしました" : `${chosen.size}筆をコピー`}
+              </button>
+            </>
+          ) : (
+            <button onClick={() => pick.set([...pick.list, ...list.filter((n) => !chosen.has(pickKey(n)))])} className="press h-[32px] shrink-0 rounded-full px-[11px] font-semibold" style={{ fontSize: 12, color: "#fff", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.16)" }}>
+              すべて選ぶ
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
+}
+
+/**
+ * 図面上の面積の数字（㎡）。登記所備付地図の筆は1㎡単位（地図の座標と面積の測り方の誤差より細かい桁は出さない）。
+ * 公図から推定した筆・市の地番参考図の筆は10㎡単位の目安
+ */
+export function areaLabel(m2: number, rough: boolean): string {
+  return (rough ? Math.round(m2 / 10) * 10 : Math.round(m2)).toLocaleString("ja-JP");
 }
 
 /** 用途地域の色の札（長い名前は短く。暗い地の上） */

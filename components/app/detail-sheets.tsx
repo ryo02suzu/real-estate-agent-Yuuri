@@ -21,7 +21,7 @@ import { HazardDetail } from "../hazard-card";
 import { LandPriceDetail } from "../land-price-card";
 import { LegendList } from "../legend";
 import { Notes } from "../notes";
-import { ParcelDetail } from "../parcel-card";
+import { ParcelDetail, type ParcelPick } from "../parcel-card";
 import { SchoolDetail } from "../school-card";
 import { Sheet } from "../sheet";
 import { StationList } from "../station-card";
@@ -63,6 +63,7 @@ export function DetailSheet({
   result,
   data,
   expand,
+  pick,
   statuses,
   onRecord,
 }: {
@@ -72,6 +73,8 @@ export function DetailSheet({
   result: Ok;
   data: PropertyData;
   expand: (o?: MapOpen) => void;
+  /** 謄本・公図の請求に貼る地番として選んだ筆（隣の筆を押して選び、地番だけをコピー） */
+  pick?: ParcelPick;
   /** 調査の状況（上に「この項目の確認を記録」を出す） */
   statuses?: TopicStatus[];
   onRecord?: (topic: RecordTopic) => void;
@@ -86,7 +89,7 @@ export function DetailSheet({
       const chibanzu = chibanzuFor(m, result.lat, result.lng);
       body =
         data.parcels.status === "ok" ? (
-          <ParcelDetail info={data.parcels} chibanzu={chibanzu} />
+          <ParcelDetail info={data.parcels} chibanzu={chibanzu} pick={pick} />
         ) : (
           <>
             <Loading state={data.parcels} />

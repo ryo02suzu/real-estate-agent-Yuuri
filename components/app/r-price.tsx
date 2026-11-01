@@ -26,14 +26,18 @@ export function PriceTab(props: TabProps) {
   const hits = landPrice.status === "ok" ? landPrice.hits : [];
   const top = hits[0];
   const near = hits.filter((h) => h.distance <= 2000);
-  const avg = near.length ? near.reduce((s, h) => s + h.price, 0) / near.length : undefined;
-  // 用途（住宅地・商業地）が同じ、2km 以内の近い6地点の幅
-  const same = near.filter((h) => h.usage === top?.usage).slice(0, 6);
+  // 平均と幅は、いちばん近い地点と用途（住宅地・商業地など）が同じ 2km 以内の地点だけで出す（商業地と住宅地を混ぜると意味のない値になる）
+  const sameAll = near.filter((h) => h.usage === top?.usage);
+  const avg = sameAll.length ? sameAll.reduce((s, h) => s + h.price, 0) / sameAll.length : undefined;
+  // 幅は近い6地点
+  const same = sameAll.slice(0, 6);
   const prices = same.map((h) => h.price);
   const parcel = parcels.status === "ok" ? parcels.parcel : undefined;
-  // 住所で調べたときの筆は、物件の土地と合っているか分からないので計算しない（地番で調べるか、地図で選んだ地点だけ）
+  // 住所で調べたときの筆は、物件の土地と合っているか分からないので計算しない（地番で調べるか、地図で選んだ地点だけ）。
+  // 公図から推定した筆・市の地番参考図の筆は、形から測った面積が地積と大きく違うことがあるので計算しない
   const own = parcels.status === "ok" && parcels.kind !== "address";
-  const area = own && parcel && /^\d/.test(parcel.chibanRaw) ? parcelAreaM2(parcel) : undefined;
+  const rough = !!parcel && !!(parcel.estimated || parcel.sanko);
+  const area = own && parcel && !rough && /^\d/.test(parcel.chibanRaw) ? parcelAreaM2(parcel) : undefined;
 
   return (
     <div className="flex flex-col gap-[10px]">
@@ -71,9 +75,14 @@ export function PriceTab(props: TabProps) {
 
           {/* 周辺の平均・幅・土地の概算 */}
           <div className="grid grid-cols-3 gap-[8px]">
-            <GStat label="周辺の平均" value={avg ? `${man(avg)}万` : "―"} unit={avg ? "円/㎡" : undefined} note={`半径2km・${near.length}地点`} />
+            <GStat label="周辺の平均" value={avg ? `${man(avg)}万` : "―"} unit={avg ? "円/㎡" : undefined} note={`半径2km・${top.usage}${sameAll.length}地点`} />
             <GStat label="周辺の幅" value={prices.length > 1 ? `${man(Math.min(...prices))}〜${man(Math.max(...prices))}万` : "―"} note={prices.length > 1 ? `${top.usage}・近い${prices.length}地点` : "比べる地点なし"} small />
-            <GStat label="土地の概算" value={area ? `約${okuText(area * top.price)}` : "―"} note={area ? `${area.toLocaleString("ja-JP", { maximumFractionDigits: 1 })}㎡ × 単価` : parcels.status === "loading" ? "筆を確認中…" : "地番か地図で調べると出ます"} small />
+            <GStat
+              label="地価×面積"
+              value={area ? `約${okuText(area * top.price)}` : "―"}
+              note={area ? `${Math.round(area).toLocaleString("ja-JP")}㎡×上の単価` : parcels.status === "loading" ? "筆を確認中…" : rough ? "推定の筆は対象外" : "地番か地図で調べると出ます"}
+              small
+            />
           </div>
 
           {/* 価格の推移 */}
@@ -91,7 +100,10 @@ export function PriceTab(props: TabProps) {
               ))}
             </div>
           )}
-          <GNote>出典：国土数値情報（地価公示・地価調査）。地域の標準的な土地の価格で、物件そのものの価格・査定ではありません。</GNote>
+          <GNote>
+            出典：国土数値情報（地価公示・地価調査）。地域の標準的な土地の価格で、物件そのものの価格・査定ではありません。平均と幅は{top.usage}の地点だけ。
+            {area ? "「地価×面積」は、筆の形から測った図面上の面積に上の地点の単価を掛けた目安です（地積は登記で、価格は個別の条件で変わります）。" : ""}
+          </GNote>
         </>
       ) : (
         <div className="rounded-[18px] px-[14px] py-[16px] leading-[1.6]" style={{ ...TILE, fontSize: 14, color: G.sub }}>

@@ -1,13 +1,16 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { LookupResult } from "@/lib/roadmap";
 import type { HazardKind } from "@/lib/roadmap/hazard";
+import { pickedChibanText, registryChiban } from "@/lib/roadmap/parcel";
 import { displayAddress, GLASS, HEAD, LIGHT } from "./app/r-ui";
 import { NAVY } from "./app/ui";
 import { MapPanel } from "./map-panel";
 import { MapPreview } from "./map-preview";
+import { pickKey, type ParcelPick } from "./parcel-card";
+import { useCopy } from "./use-copy";
 
 type Ok = Extract<LookupResult, { status: "ok" }>;
 
@@ -22,6 +25,8 @@ export function FullMap({
   withRoads,
   hazard,
   landPrice,
+  parcels,
+  pick,
   onClose,
   onPick,
 }: {
@@ -32,6 +37,10 @@ export function FullMap({
   hazard?: HazardKind;
   /** 地価を重ね、この地点（[経度, 緯度]）も見えるように開く（地価の一覧の「地図」から開いたとき） */
   landPrice?: [number, number];
+  /** 筆・地番を重ねて開く（隣の土地の「地図で筆を見ながら選ぶ」から開いたとき） */
+  parcels?: boolean;
+  /** 物件の画面で選んだ地番（地図をタップして選ぶ・外す）。base は物件の筆の地番区域 */
+  pick?: ParcelPick & { base: string };
   onClose: () => void;
   onPick: (lat: number, lng: number) => void;
 }) {
@@ -58,11 +67,17 @@ export function FullMap({
           roads={roads}
           compact
           toolsClassName="right-3 top-[calc(max(10px,env(safe-area-inset-top))+56px)]"
-          initial={withRoads && roads ? { roads: true } : landPrice ? { landPrice: true } : undefined}
+          initial={withRoads && roads ? { roads: true } : landPrice ? { landPrice: true } : parcels ? { parcels: true } : undefined}
           initialHazard={hazard}
           initialLandPrice={landPrice}
           overlayOpacity={opacity / 100}
           legendTarget={legendSlot}
+          parcelPick={
+            pick && {
+              has: (kuiki, chiban) => pick.list.some((n) => pickKey(n) === `${kuiki}|${registryChiban(chiban)}`),
+              toggle: (kuiki, chiban) => pick.toggle({ kuiki, chiban }),
+            }
+          }
           onPick={(lat, lng) => {
             onClose();
             onPick(lat, lng);
@@ -97,11 +112,39 @@ export function FullMap({
             {opacity}%
           </span>
         </label>
+        {pick && pick.list.length > 0 && <PickTray pick={pick} />}
         <div ref={setLegendSlot} className="empty:hidden [&:not(:empty)]:mb-2" />
         <p className="leading-[1.6]" style={{ fontSize: 11, color: LIGHT }}>
-          地図をタップすると、その地点の地番・用途地域・道路種別・建物・地価・ハザード（表示中のもの）と「ここで調べる」が出ます。地図は参考情報です。最終確認は窓口で。
+          地図をタップすると、その地点の地番・用途地域・道路種別・建物・地価・ハザード（表示中のもの）と「ここで調べる」が出ます。
+          {pick && "「筆・地番」を出しているときは、タップした筆を謄本・公図の請求用の地番として選べます（「ここで調べる」も並べて出ます）。"}
+          地図は参考情報です。最終確認は窓口で。
         </p>
       </div>
+    </div>
+  );
+}
+
+/** 地図で選んだ地番（物件の画面と同じもの）。地番の数字だけを「、」区切りでコピーする */
+function PickTray({ pick }: { pick: ParcelPick & { base: string } }) {
+  const { done, copy } = useCopy();
+  const text = pickedChibanText(pick.list, pick.base);
+  return (
+    <div className="mb-[10px] flex items-center gap-[8px] rounded-[14px] px-[12px] py-[8px]" style={{ background: "#eef3fa" }}>
+      <p className="min-w-0 flex-1 leading-[1.4]">
+        <span className="block" style={{ fontSize: 11, color: LIGHT }}>
+          選んだ地番 {pick.list.length}筆（謄本・公図の請求用）
+        </span>
+        <span className="line-clamp-2 break-all font-semibold" style={{ fontSize: 13, color: HEAD }}>
+          {text}
+        </span>
+      </p>
+      <button onClick={() => pick.set([])} className="press h-[36px] shrink-0 px-[6px]" style={{ fontSize: 12, color: LIGHT }}>
+        外す
+      </button>
+      <button onClick={() => copy(text)} className="press flex h-[36px] shrink-0 items-center gap-[5px] rounded-full px-[12px] font-semibold text-white" style={{ fontSize: 12.5, background: NAVY }}>
+        {done ? <Check size={14} strokeWidth={2.4} absoluteStrokeWidth /> : <Copy size={14} strokeWidth={2} absoluteStrokeWidth />}
+        {done ? "コピーしました" : "コピー"}
+      </button>
     </div>
   );
 }

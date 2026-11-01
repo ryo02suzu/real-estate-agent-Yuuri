@@ -10,8 +10,10 @@ import {
   parcelMark,
   estimatedNote,
   kuikiLabel,
+  kuikiLabelFrom,
   adjacentParcels,
   neighborList,
+  pickedChibanText,
   registryChiban,
   chibanQueryOf,
   parcelAt,
@@ -307,6 +309,26 @@ describe("地点の筆", () => {
     // 丁目の無い町の「1-2-3」は地番にできない。もう地番で探したものはそのまま
     expect(chibanQueryOf("埼玉県熊谷市下奈良1-391-3", false)).toBeUndefined();
     expect(chibanQueryOf("地番 熊谷市下奈良391-3", false)).toBeUndefined();
+  });
+
+  it("選んだ隣地の地番：同じ地番区域は数字だけを「、」でつなぎ、違う町は町の名前を付ける", () => {
+    const base = "松戸市_古ヶ崎_四丁目__";
+    const picked = [
+      { kuiki: base, chiban: "3557-4" },
+      { kuiki: "松戸市_古ヶ崎_三丁目__", chiban: "100-1" },
+      { kuiki: base, chiban: "3555-10" },
+      { kuiki: base, chiban: "3555-2" },
+      // 二重地番の区画は登記の地番にそろえて1つに。地番の無い道路は入れない
+      { kuiki: base, chiban: "3555-2W1" },
+      { kuiki: base, chiban: "道-12" },
+      { kuiki: "流山市_西深井___", chiban: "5" },
+    ];
+    expect(pickedChibanText(picked, base)).toBe("3555-2、3555-10、3557-4、古ヶ崎三丁目 100-1、流山市西深井 5");
+    expect(pickedChibanText([], base)).toBe("");
+    expect(kuikiLabelFrom("松戸市_古ヶ崎_三丁目__", base)).toBe("古ヶ崎三丁目");
+    expect(kuikiLabelFrom("流山市_西深井___", base)).toBe("流山市西深井");
+    // 町の部分が無ければ市区町村から
+    expect(kuikiLabelFrom("松戸市____", base)).toBe("松戸市");
   });
 
   it("隣地が多いとき（道路の筆など）は、先頭の20筆と「ほかN筆」", () => {

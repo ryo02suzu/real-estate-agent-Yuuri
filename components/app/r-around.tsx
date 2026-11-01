@@ -6,7 +6,7 @@
 import { ChevronRight, Cross, ShoppingCart, SquareArrowOutUpRight, Store } from "lucide-react";
 import type { ReactNode } from "react";
 import { livingScores, totalScore } from "@/lib/app/scores";
-import type { PoiWalk } from "@/lib/roadmap/poi";
+import { POI_SOURCES, type PoiWalk } from "@/lib/roadmap/poi";
 import { schoolShort } from "@/lib/roadmap/school";
 import { lineLabel } from "@/lib/roadmap/walk";
 import { G, GCard, GNote, GRow, NUM, TILE } from "./g-ui";
@@ -129,7 +129,7 @@ export function AroundTab({ result, data, open, expand, mapApps, has3d }: TabPro
           <ChevronRight size={15} strokeWidth={2} absoluteStrokeWidth />
         </span>
       </GCard>
-      <GNote>施設：© OpenStreetMap contributors（ODbL）。駅・学区・病院：国土数値情報。徒歩は道路距離80mを1分とした目安です。模型の印の色は、上の札と同じ種類です。</GNote>
+      <GNote>施設：{POI_SOURCES}。駅・学区：国土数値情報。徒歩は道路距離80mを1分とした、施設・駅（ホーム）の位置までの目安です。今もあるかと実際の道のりは確かめてください。模型の印の色は、上の札と同じ種類です。</GNote>
     </div>
   );
 }
@@ -178,9 +178,12 @@ function FlatMap({ result, data, expand, mapApps }: Pick<TabProps, "result" | "d
   );
 }
 
-/** 「セブン-イレブン 渋谷神南1丁目店」→ 名前（支店名は外す） */
-function shortName(name: string): string {
-  const m = name.match(/^(.+)[ 　](.+)$/);
+/**
+ * 「セブン-イレブン 渋谷神南1丁目店」→「セブン-イレブン」（後ろの支店名だけ外す）。「中華 一番」のように
+ * 空白のあとが支店名でない名前は、そのまま（名前の前半だけにすると、別の名前に見える）
+ */
+export function shortName(name: string): string {
+  const m = name.match(/^(.+?)[ 　]+\S*(?:店|支店|営業所)$/);
   return m ? m[1] : name;
 }
 

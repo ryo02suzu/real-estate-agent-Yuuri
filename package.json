@@ -19,7 +19,7 @@
     "3d-tiles-renderer": "0.5.3",
     "lucide-react": "1.61.0",
     "maplibre-gl": "6.10.0",
-    "next": "16.3.8",
+    "next": "16.4.3",
     "pbf": "5.1.2",
     "pmtiles": "4.5.0",
     "react": "19.2.8",
@@ -34,7 +34,7 @@
     "@types/react-dom": "^19",
     "@types/three": "0.186.0",
     "eslint": "^9",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.3",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^5.0.1"

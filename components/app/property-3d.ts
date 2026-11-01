@@ -17,8 +17,8 @@ export type SceneTab = "basic" | "road" | "law" | "hazard" | "around" | "price";
 export type ScenePart = "day" | "evening" | "night";
 /** 建物・道路・水と、調べた土地（無ければ地点だけ）。front は土地に接する道路（town.roads の番号） */
 export type SceneBase = { town: TownModel; target: SceneShape | null; center: XZ; front: number[] };
-/** まわりの筆（neighbor は隣の土地） */
-export type SceneLot = SceneShape & { neighbor: boolean };
+/** まわりの筆（neighbor は隣の土地。key は隣の土地の「地番区域|登記の地番」で、たたいて選ぶときに使う） */
+export type SceneLot = SceneShape & { neighbor: boolean; key?: string };
 export type SceneZone = { fill: SceneFill; color: string };
 export type ScenePin = { at: XZ; color: string; tabs: SceneTab[]; size?: number };
 /** 駅といちばん近い地価の地点（光の道）、施設の印、地価の柱（高さは m） */
@@ -45,6 +45,8 @@ export type PropertyScene = {
   setSun(sun: { az: number; alt: number }): void;
   setMotion(on: boolean): void;
   setNeighbors(on: boolean): void;
+  /** 選んだ隣の土地（SceneLot の key）。模型では濃い金色に塗り、札にチェックを付ける */
+  setPicked(keys: string[]): void;
   /** ハザードの種類を変えた：地面に敷く絵（無ければ消す）と、水の高さ（m。0 で水なし） */
   setHazard(image: HTMLCanvasElement | null, bounds: { x0: number; z0: number; x1: number; z1: number } | null, depth: number): void;
   setLayout(l: SceneLayout): void;
@@ -59,6 +61,8 @@ export type PropertyScene = {
    * （pointerup で開くと、すぐ後の click が開いた画面の外側に当たって閉じてしまうため）
    */
   takeLotTap(): boolean;
+  /** 直前に隣の土地をたたいたか（隣の土地を出しているときだけ。たたいた印は1回で消える）。たたいた土地の key */
+  takeNeighborTap(): string | null;
   /** 2本指のトラックパッド（ctrl＋ホイール）で寄る */
   wheel(e: WheelEvent): void;
   dispose(): void;
@@ -91,6 +95,16 @@ export function sceneTop(part: ScenePart): string {
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+/** 点（x, z）が輪の中か */
+function inRing(x: number, z: number, ring: XZ[]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, zi] = ring[i];
+    const [xj, zj] = ring[j];
+    if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+  }
+  return inside;
+}
 const E = {
   inOut: (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
   out: (t: number) => 1 - Math.pow(1 - t, 3),
@@ -370,17 +384,21 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
     lot?: T.LineBasicMaterial;
     nb?: T.LineBasicMaterial;
     nbFill?: T.MeshBasicMaterial;
+    nbPick?: T.MeshBasicMaterial;
     route?: T.ShaderMaterial;
     priceRoute?: T.ShaderMaterial;
     bar?: T.MeshBasicMaterial;
   } = {};
   let zoneMats: T.MeshBasicMaterial[] = [];
   let pinMats: { m: T.SpriteMaterial; tabs: SceneTab[] }[] = [];
-  const parts: { line?: T.Mesh; glow?: T.Mesh; fill?: T.Group; curtain?: T.Mesh; pulse?: T.Mesh; flood?: T.Mesh; gauge?: T.Group; haz?: T.Mesh; edgeCount: number; center: T.Vector3 } = { edgeCount: 0, center: new THREE.Vector3() };
+  const parts: { line?: T.Mesh; glow?: T.Mesh; fill?: T.Group; curtain?: T.Mesh; pulse?: T.Mesh; flood?: T.Mesh; gauge?: T.Group; haz?: T.Mesh; bldg: T.Mesh[]; edgeCount: number; center: T.Vector3 } = { bldg: [], edgeCount: 0, center: new THREE.Vector3() };
+  // 隣の土地（たたいて選ぶ）：形と面。選んだ土地の key
+  let nbLots: { key: string; fills: SceneShape["fills"]; meshes: T.Mesh[] }[] = [];
+  let picked = new Set<string>();
   let base: SceneBase | null = null;
   let marks: SceneMarks | null = null;
   const presets: Partial<Record<SceneTab | "intro" | "nb", Preset>> = {};
-  type Lbl = { key: string; el: HTMLDivElement; pos: T.Vector3; tabs: SceneLabel["tabs"]; on: boolean; sig: string; w: number; h: number };
+  type Lbl = { key: string; el: HTMLDivElement; pos: T.Vector3; tabs: SceneLabel["tabs"]; on: boolean; sig: string; w: number; h: number; box?: ScreenRect };
   let labels: Lbl[] = [];
 
   // ---- 状態
@@ -579,17 +597,20 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
     M.wall = riseMat(bag, new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, map: wallMap, emissive: new THREE.Color(0xffd08a), emissiveMap: wallEmit, emissiveIntensity: 0, roughness: 0.9, metalness: 0 }));
     M.roof = riseMat(bag, new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.95, metalness: 0 }));
     const depth = riseMat(bag, new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }));
+    parts.bldg = [];
     if (wp.length) {
       const walls = new THREE.Mesh(geo(wp, wn, wc, wd, wu), M.wall);
       walls.castShadow = walls.receiveShadow = true;
       walls.customDepthMaterial = depth;
       g.add(walls);
+      parts.bldg.push(walls);
     }
     if (rp.length) {
       const roofs = new THREE.Mesh(geo(rp, rn, rc, rd), M.roof);
       roofs.castShadow = roofs.receiveShadow = true;
       roofs.customDepthMaterial = depth;
       g.add(roofs);
+      parts.bldg.push(roofs);
     }
 
     // 調べた土地：細い光る輪郭・やわらかいにじみ・薄い面・低い光の幕・角の点・押したときの光の輪
@@ -746,11 +767,27 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
     const lp: number[] = [];
     const np: number[] = [];
     M.nbFill = bag.keep(new THREE.MeshBasicMaterial({ color: col("#ffd27a"), transparent: true, opacity: 0, depthWrite: false }));
+    M.nbPick = bag.keep(new THREE.MeshBasicMaterial({ color: col("#ffd36b"), transparent: true, opacity: 0, depthWrite: false }));
+    const byKey = new Map<string, { key: string; fills: SceneShape["fills"]; meshes: T.Mesh[] }>();
     for (const lot of lots) {
       const arr = lot.neighbor ? np : lp;
       for (const [a, b] of lot.edges) arr.push(a[0], 0.07, a[1], b[0], 0.07, b[1]);
-      if (lot.neighbor) for (const f of lot.fills) g.add(flat(bag, new THREE.ShapeGeometry(shapeOf(f)), M.nbFill, 0.06));
+      if (!lot.neighbor) continue;
+      // 同じ地番の区画（二重地番など）は1つの土地として選ぶ
+      const k = lot.key ?? "";
+      const nb = byKey.get(k) ?? { key: k, fills: [], meshes: [] };
+      byKey.set(k, nb);
+      for (const f of lot.fills) {
+        const m = flat(bag, new THREE.ShapeGeometry(shapeOf(f)), picked.has(k) ? M.nbPick : M.nbFill, 0.06);
+        g.add(m);
+        nb.fills.push(f);
+        nb.meshes.push(m);
+      }
     }
+    nbLots = [...byKey.values()].filter((n) => n.key);
+    // 隣の土地が届いたら、隣の土地を見る向き・距離を決め直す（出しているときは、自分で動かしていなければ合わせ直す）
+    updatePresets();
+    if (arrived && !touched && nbOn && tab === "basic") applyPreset("nb", true, 1200);
     M.lot = bag.keep(new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
     M.nb = bag.keep(new THREE.LineBasicMaterial({ color: col("#ffd27a"), transparent: true, opacity: 0, depthWrite: false }));
     g.add(new THREE.LineSegments(lineGeo(bag, lp), M.lot), new THREE.LineSegments(lineGeo(bag, np), M.nb));
@@ -833,6 +870,15 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
     invalidate();
   }
 
+  // ---- 隣の土地の札：選んだ土地はチェック付きの金色（幅が変わるので測り直す）
+  function markPicked(l: Lbl) {
+    if (!l.key.startsWith("nb:")) return;
+    const on = picked.has(l.key.slice(3));
+    if (l.el.classList.contains("pv-pick") === on) return;
+    l.el.classList.toggle("pv-pick", on);
+    l.w = 0;
+  }
+
   // ---- 札（同じ key の札は使い回す。消えた札は外す。字は textContent で入れる）
   function setLabels(list: SceneLabel[]) {
     const old = new Map(labels.map((l) => [l.key, l]));
@@ -868,6 +914,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
         l.el.replaceChildren(chip);
         l.w = 0;
       }
+      markPicked(l);
       l.pos.set(s.at[0], s.at[1], s.at[2]);
       l.tabs = s.tabs;
       next.push(l);
@@ -915,10 +962,17 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
       const s = Math.min(d * 0.3, shift);
       return { t: [c.x + ux * s, 0, c.z + uz * s], dist, polar, azim: Math.atan2(ux, uz) + turn + Math.PI };
     };
+    // 隣の土地を見るとき：調べた土地と隣の筆がみな入る距離。縦長の画面は横が狭いので、横の幅で決める（上から見下ろして、
+    // 札が縦にも散らばるようにする）。大きな隣の筆（畑・道路の筆など）で遠くなりすぎないよう、70m までで決める
+    let reach = 0;
+    for (const n of nbLots) for (const f of n.fills) for (const [x, z] of f.outer) reach = Math.max(reach, Math.hypot(x - c.x, z - c.z));
+    for (const f of base.target?.fills ?? []) for (const [x, z] of f.outer) reach = Math.max(reach, Math.hypot(x - c.x, z - c.z));
+    const halfW = Math.tan((camera.fov * Math.PI) / 360) * (W / H);
+    const nbDist = clamp((clamp(reach, 18, 70) + 5) / Math.max(0.06, halfW), 110, 560);
     const next: Record<SceneTab | "intro" | "nb", Preset> = {
       intro: { t: [c.x, 0, c.z], dist: 1300, polar: 0.03, azim: faz },
       basic: { t: [c.x, 0, c.z], dist: 250, polar: 0.92, azim: faz },
-      nb: { t: [c.x, 0, c.z], dist: 100, polar: 0.82, azim: faz },
+      nb: { t: [c.x, 0, c.z], dist: nbDist, polar: 0.5, azim: faz },
       road: { t: [lerp(c.x, fx, 0.8), 0, lerp(c.z, fz, 0.8)], dist: base.front.length ? 118 : 150, polar: 1.0, azim: faz },
       law: { t: [c.x, 0, c.z], dist: 430, polar: 0.62, azim: faz - 0.2 },
       hazard: { t: [c.x, 3, c.z], dist: 165, polar: 1.12, azim: faz + 0.5 },
@@ -1002,6 +1056,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
   let tap: { x: number; y: number; t: number } | null = null;
   let lastTap = 0;
   let lotTapAt = 0;
+  let nbTap: { key: string; at: number } | null = null;
   const ptrs = new Map<number, { x: number; y: number }>();
   let inertia = 0;
   let idleAt = performance.now();
@@ -1160,6 +1215,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
     if (M.lot) M.lot.opacity = fade.lots * ((cur.lotA as number) ?? 0.2) * (1 - fade.zone * 0.5);
     if (M.nb) M.nb.opacity = fade.lots * fade.nb * 0.9;
     if (M.nbFill) M.nbFill.opacity = fade.lots * fade.nb * 0.12;
+    if (M.nbPick) M.nbPick.opacity = fade.lots * fade.nb * 0.42;
     if (M.haz) M.haz.opacity = fade.haz;
     if (parts.haz) parts.haz.visible = fade.haz > 0.002 && !!M.haz?.map;
     if (parts.flood && M.flood) {
@@ -1196,9 +1252,11 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
         else if (placed.some((p) => hit(box, p))) vis = false;
         else {
           placed.push(box);
+          l.box = box;
           l.el.style.transform = `translate3d(${cx.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-100%)`;
         }
       }
+      if (!vis) l.box = undefined;
       if (vis !== l.on) {
         l.on = vis;
         l.el.classList.toggle("off", !vis);
@@ -1270,6 +1328,33 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
   canvas.addEventListener("webglcontextrestored", onRestored);
 
   const ray = new THREE.Raycaster();
+  const tapPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const tapAt = new THREE.Vector3();
+  const nbShown = () => nbOn && tab === "basic" && fade.nb > 0.5;
+  /** 点が塗る面の中か（穴は外） */
+  const inFill = ([x, z]: XZ, f: SceneShape["fills"][number]) => inRing(x, z, f.outer) && !f.holes.some((h) => inRing(x, z, h));
+  /**
+   * たたいた所：調べた土地（"lot"）か、隣の土地（その key。隣の土地を出しているときだけ）か。札を押したらその土地。
+   * 建物を押したら、その建物の足もとの土地（建物の向こうの地面ではなく）
+   */
+  function tapTarget(e: PointerEvent): string | null {
+    const r = canvas.getBoundingClientRect();
+    const sx = e.clientX - r.left;
+    const sy = e.clientY - r.top;
+    for (const l of labels) {
+      if (!l.on || !l.box || sx < l.box.l || sx > l.box.r || sy < l.box.t || sy > l.box.b) continue;
+      if (l.key === "lot") return parts.fill ? "lot" : null;
+      if (l.key.startsWith("nb:") && nbShown()) return l.key.slice(3);
+    }
+    ray.setFromCamera(new THREE.Vector2((sx / r.width) * 2 - 1, -(sy / r.height) * 2 + 1), camera);
+    const b = parts.bldg.length ? ray.intersectObjects(parts.bldg, false)[0] : undefined;
+    const p = b ? b.point : ray.ray.intersectPlane(tapPlane, tapAt);
+    if (!p) return null;
+    const at: XZ = [p.x, p.z];
+    if (parts.fill && base?.target?.fills.some((f) => inFill(at, f))) return "lot";
+    if (nbShown()) for (const n of nbLots) if (n.fills.some((f) => inFill(at, f))) return n.key;
+    return null;
+  }
   const endPointer = (e: PointerEvent, cancelled: boolean) => {
     if (!ptrs.has(e.pointerId)) return;
     ptrs.delete(e.pointerId);
@@ -1287,14 +1372,11 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
         lastTap = 0;
       } else {
         lastTap = now;
-        if (parts.fill) {
-          const r = canvas.getBoundingClientRect();
-          ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
-          if (ray.intersectObject(parts.fill, true).length) {
-            pulse();
-            lotTapAt = now;
-          }
-        }
+        const hit = tapTarget(e);
+        if (hit === "lot") {
+          pulse();
+          lotTapAt = now;
+        } else if (hit) nbTap = { key: hit, at: now };
       }
     }
     tap = null;
@@ -1416,6 +1498,17 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
       const hit = performance.now() - lotTapAt < 800;
       lotTapAt = 0;
       return hit;
+    },
+    takeNeighborTap: () => {
+      const key = nbTap && performance.now() - nbTap.at < 800 ? nbTap.key : null;
+      nbTap = null;
+      return key;
+    },
+    setPicked: (keys) => {
+      picked = new Set(keys);
+      if (M.nbPick && M.nbFill) for (const n of nbLots) for (const m of n.meshes) m.material = picked.has(n.key) ? M.nbPick : M.nbFill;
+      for (const l of labels) markPicked(l);
+      invalidate();
     },
     wheel: (e) => {
       if (!arrived) return;

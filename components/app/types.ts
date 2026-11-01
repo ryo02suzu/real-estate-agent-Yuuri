@@ -1,5 +1,6 @@
 import type { PropertyRecords, RecordTopic } from "@/lib/records";
 import type { HazardKind } from "@/lib/roadmap/hazard";
+import type { ParcelPick } from "../parcel-card";
 import type { TabKey } from "./result-head";
 import type { TopicStatus } from "./status";
 import type { Ok, PropertyData } from "./use-property";
@@ -9,7 +10,7 @@ export const SHEET_KINDS = ["parcel", "zoning", "hazard", "landPrice", "stations
 export type SheetKind = (typeof SHEET_KINDS)[number];
 
 /** 拡大した地図（MICHILU の動く地図）を開くときの重ね */
-export type MapOpen = { roads?: boolean; hazard?: HazardKind; landPrice?: [number, number] };
+export type MapOpen = { roads?: boolean; hazard?: HazardKind; landPrice?: [number, number]; /** 筆・地番を重ねて開く（地図をタップして地番を選べる） */ parcels?: boolean };
 
 /** 地図に重ねて選ぶハザードの種類（ハザードのタブ。街の模型の地面にも同じ種類の色を敷く） */
 export type HazardPick = "flood" | "naisui" | "takashio" | "tsunami" | "dosha";
@@ -46,6 +47,8 @@ export type TabProps = {
   /** 隣の土地を模型に出すか */
   neighbors: boolean;
   setNeighbors: (on: boolean) => void;
+  /** 謄本・公図の請求に貼る地番として選んだ筆（隣の土地の札・模型・地図で選ぶ） */
+  pick: ParcelPick;
   /** ハザードのタブで選んだ種類 */
   hazard: HazardPick;
   setHazard: (k: HazardPick) => void;

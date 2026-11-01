@@ -1,5 +1,6 @@
 // 国土地理院の無料API（APIキー不要・保存制限なし）で住所→座標→市区町村コードを引く。
 // 住所をサーバーに送らないよう、ブラウザから直接呼ぶ想定。
+import { kanjiToInt } from "./parcel";
 
 export type GeocodeResult = {
   lat: number;
@@ -57,6 +58,25 @@ export function needsChoice(input: string, candidates: GeocodeResult[]): boolean
 export function isApproximate(input: string, matchedAddress: string): boolean {
   const digit = /[0-9０-９]/;
   return digit.test(input) && !digit.test(matchedAddress);
+}
+
+/** 住所の番号（丁目・番地・号）を数の並びにする（「丸の内一丁目9番」→ [1, 9]）。郵便番号は外し、漢数字の丁目も数える */
+function addressNumbers(a: string): number[] {
+  const s = a
+    .normalize("NFKC")
+    .replace(/〒?\s*\d{3}-\d{4}/g, "")
+    .replace(/([一二三四五六七八九十]+)丁目/g, (_, k: string) => `${kanjiToInt(k)}丁目`);
+  return (s.match(/\d+/g) ?? []).map(Number);
+}
+
+/**
+ * 入力した住所の番号の一部（多くは「号」）が、見つかった住所に無いか（「丸の内1-9-1」が「丸の内一丁目9番」までの一致）。
+ * 番地がまったく無い一致（町の中心）は isApproximate で見る。建物名・部屋番号を数えないよう、入力は丁目・番地・号の3つまで
+ */
+export function partialMatch(input: string, matchedAddress: string): boolean {
+  const a = addressNumbers(input).slice(0, 3);
+  const b = addressNumbers(matchedAddress);
+  return b.length > 0 && a.length > b.length;
 }
 
 export type ReverseResult = {
