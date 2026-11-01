@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BASE, blend, dayPart, HOME_CAMERA, layerOpacity, light, overrideTime, PHOTO_ORDER, projectSun, solar } from "./sun";
+import { AFTERNOON_FROM, BASE, blend, dayPart, favPart, HOME_CAMERA, layerOpacity, light, overrideTime, PHOTO_ORDER, projectSun, solar } from "./sun";
 
 // 国立天文台「こよみの計算」東京（35.6581, 139.7414）2026年の日の出入り・南中（分と 0.1° に丸めた値）
 const NAOJ = { lat: 35.6581, lng: 139.7414, utcOffset: 540 };
@@ -94,6 +94,39 @@ describe("dayPart（書類・出力の写真の昼・夕方・夜）", () => {
     expect(dayPart(-5, false)).toBe("evening");
     expect(dayPart(-7, false)).toBe("night");
     expect(dayPart(30, false)).toBe("day");
+  });
+});
+
+describe("favPart（お気に入りの写真の昼・昼と夕方のあいだ・夕方・夜）", () => {
+  const at = (ymd: string, hm: string) => {
+    const s = solar(jst(ymd, hm));
+    return favPart(s.altitude, s.rising);
+  };
+  it("11 月 1 日：昼 → 15:16 から昼と夕方のあいだ → 16:12 から夕方 → 夜", () => {
+    expect(at("2026-11-01", "07:00")).toBe("day");
+    expect(at("2026-11-01", "12:00")).toBe("day");
+    expect(at("2026-11-01", "15:10")).toBe("day");
+    expect(at("2026-11-01", "15:20")).toBe("afternoon");
+    expect(at("2026-11-01", "16:05")).toBe("afternoon");
+    expect(at("2026-11-01", "16:20")).toBe("evening");
+    expect(at("2026-11-01", "17:30")).toBe("night");
+  });
+  it("季節で時刻が変わる（夏至は 17 時半から、冬至は 15 時前から）", () => {
+    expect(at("2026-06-21", "17:20")).toBe("day");
+    expect(at("2026-06-21", "17:40")).toBe("afternoon");
+    expect(at("2026-06-21", "18:30")).toBe("evening");
+    expect(at("2026-12-22", "14:40")).toBe("day");
+    expect(at("2026-12-22", "15:00")).toBe("afternoon");
+    expect(at("2026-12-22", "16:00")).toBe("evening");
+  });
+  it("朝の低い太陽は昼のまま。夕方・夜の境目と、書類・出力の分け方（dayPart）は変わらない", () => {
+    expect(favPart(10, true)).toBe("day");
+    expect(favPart(AFTERNOON_FROM, false)).toBe("day");
+    expect(favPart(AFTERNOON_FROM - 0.1, false)).toBe("afternoon");
+    expect(favPart(6, false)).toBe("afternoon");
+    expect(favPart(5.9, false)).toBe("evening");
+    expect(favPart(-7, false)).toBe("night");
+    expect(dayPart(10, false)).toBe("day");
   });
 });
 

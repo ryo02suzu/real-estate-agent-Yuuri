@@ -117,6 +117,23 @@ export function dayPart(altitude: number, rising: boolean): DayPart {
   return "night";
 }
 
+/** お気に入りのページの写真の時間帯（届いた富士山の写真 4 枚：昼・昼と夕方のあいだ・夕方・夜） */
+export type FavPart = DayPart | "afternoon";
+
+/** 昼と夕方のあいだが始まる太陽の高さ（度。沈んでいくとき。日の入りの約 1 時間 30 分前） */
+export const AFTERNOON_FROM = 16;
+
+/**
+ * 太陽の高さで、お気に入りのページの富士山の写真を選ぶ。書類・出力（dayPart）の昼のうち、太陽が沈んでいく途中で
+ * +16° より低くなってから、夕方の始まり（+6°）までを「昼と夕方のあいだ」にする（約 1 時間。東京駅で 11 月 1 日なら 15:16〜16:12、
+ * 6 月 21 日なら 17:30〜18:23、12 月 22 日なら 14:49〜15:53）。夕方・夜の境目は dayPart と同じ。
+ * 朝（昇る）は低い太陽でも昼のまま（あいだの写真は西日なので）
+ */
+export function favPart(altitude: number, rising: boolean): FavPart {
+  const p = dayPart(altitude, rising);
+  return p === "day" && !rising && altitude < AFTERNOON_FROM ? "afternoon" : p;
+}
+
 /** 写真の重ね順（下から上）。components/app/sky.tsx はこの順に重ねる */
 export const PHOTO_ORDER = ["night", "twilight", "dawn", "golden", "day"] as const;
 

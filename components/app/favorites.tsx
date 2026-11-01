@@ -1,7 +1,8 @@
 "use client";
 
-// スマホの下のメニューの「お気に入り」。画面いっぱいの写真（届いた富士山と湖の絵。昼は public/favorites/fuji-day.webp、夕方は fuji-evening.webp、夜は fuji-night.webp。
-// 太陽の高さで切り替える。components/app/day-photo.ts。下のメニューの後ろまで
+// スマホの下のメニューの「お気に入り」。画面いっぱいの写真（届いた富士山と湖の絵。昼は public/favorites/fuji-day.webp、昼と夕方のあいだは
+// fuji-afternoon.webp、夕方は fuji-evening.webp、夜は fuji-night.webp。太陽の高さで切り替える。lib/app/sun.ts の favPart と
+// components/app/day-photo.ts。下のメニューの後ろまで
 // 敷くので、components/app/mobile-app.tsx が FavoritesBackdrop で画面のいちばん奥に置く）の上に、ふたつの画面：
 // ・いつもの画面（スクロールしない）：ホームと同じ位置に、見出し「お気に入り」と右上のメニュー（≡）、2行のひとこと（件数）、
 //   ホームと同じ検索欄（絞り込み）。その下は富士山の窓（富士山を隠さない）。富士山のふもとより下に「最近保存した物件　すべて見る ›」と、
@@ -11,7 +12,8 @@
 //   行き来するときは、板と行と検索欄が滑ってつながる（View Transitions。名前は components/app/home.tsx の VT。.vt-fav）。
 // 行は写真の札を付けず、市区町村と町名・番地か地番と日時・書類のボタン・★。板は字が読みやすいよう、ホームより少し濃いすりガラス。
 // 動き（app/globals.css の .fav-*）：開くと写真がふわっと落ち着き、上から順に浮き上がり、行は少しずつ遅れて現れる。
-// 夕方は太陽の光がゆっくり揺らぎ、湖に映った光の道がきらめき、富士山の雪が朝日にほんのり染まる。夜は月の光が揺らぎ、星が瞬き、月の光の道がきらめく
+// 昼と夕方のあいだは左のふもとの西日がゆっくり揺らぎ、湖に映った西日がきらめく。夕方は太陽の光がゆっくり揺らぎ、湖に映った光の道がきらめき、
+// 富士山の雪が夕日にほんのり染まる。夜は月の光が揺らぎ、星が瞬き、月の光の道がきらめく
 // （≡ の「動きの演出」がオンのとき）。すべて見るでスクロールすると、写真が
 // ゆっくり上へ寄って暗くなり、上に見出しの細いバーが出る（押すといちばん上へ）。
 // ★を押すと星が抜けて行がたたまれ、下に「元に戻す」が出る（UndoToast。mobile-app.tsx が出す）。
@@ -20,8 +22,9 @@ import { ChevronLeft, ChevronRight, FileText, Menu, Search, Star, X } from "luci
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import { placeParts } from "@/lib/app/scene";
+import { favPart, type FavPart } from "@/lib/app/sun";
 import { favoriteKey, type FavoriteItem } from "@/lib/favorites";
-import { partNow, useDayLayers, useDayPart, useLayerEntry, type DayPart } from "./day-photo";
+import { partNow, useDayLayers, useDayPart, useLayerEntry } from "./day-photo";
 import { PhoneImg, ScaledInput } from "./frame";
 import { DARK_GLASS, HIT, LIGHT_GLASS, SHADOW, useScreenHeight, VT } from "./home";
 import { useShrink } from "./sky";
@@ -29,7 +32,7 @@ import { matches, useNow, when } from "./tab-pages";
 import { reducedMotion } from "./tokens";
 
 /**
- * 時間帯ごとの富士山の写真（昼・夕方・夜の切り替えは components/app/day-photo.ts）。
+ * 時間帯ごとの富士山の写真（昼・昼と夕方のあいだ・夕方・夜。切り替えは lib/app/sun.ts の favPart と components/app/day-photo.ts）。
  * ar は写真の縦横比（幅÷高さ）、x・y は写真が画面より大きいときに切る位置（0〜1）。bg は読み込むまでの地の色、top は時刻・電池の帯の色
  * （写真のいちばん上に、上の暗いぼかしを重ねた色）。fuji は富士山の位置（絵の高さに対する割合。届いた絵で測った）：頂・雪の下の端・
  * foot はいつもの画面の一覧の板の上の端の限り（ふもと。ここより上に板を置かず、富士山を隠さない）、x は頂の横の位置（絵の幅に対する %）。
@@ -103,7 +106,7 @@ const EVENING: FavPhoto = {
   glints: pathGlints(11, 14, 9.1, 60.2, 13, 0.9, 0.18),
   glint: { core: "#fff6dc", glow: "rgba(255,214,140,0.85)" },
 };
-const FAV_PHOTOS: Record<DayPart, FavPhoto> = {
+const FAV_PHOTOS: Record<FavPart, FavPhoto> = {
   /** 昼：青空と雪の富士山・湖・すすき（届いた絵 941×1672）。頂 39.7%・雪と雲 46%・ふもと 55.5%・湖 60% から。頂が画面の中ほどより少し右に来る位置で切る */
   day: {
     src: "/favorites/fuji-day.webp",
@@ -113,6 +116,22 @@ const FAV_PHOTOS: Record<DayPart, FavPhoto> = {
     bg: "#2f5a8a",
     top: "#134078",
     fuji: { peak: 0.397, snow: 0.46, foot: 0.555, x: 62.5 },
+  },
+  /**
+   * 昼と夕方のあいだ：青空と雪の富士山、左のふもとに傾いた西日・湖・すすき（届いた絵 941×1672）。頂 40.1%（横 64.7%）・雪 46.5% まで・
+   * ふもと 55.5%・湖 59.5% から。西日は絵の左の端（2%・49.7%）なので、左に寄せて切る（富士山は右）。湖に映った西日は左の端から 8% のあたり
+   */
+  afternoon: {
+    src: "/favorites/fuji-afternoon.webp",
+    ar: 941 / 1672,
+    x: 0,
+    y: 0.4,
+    bg: "#3a5478",
+    top: "#36527c",
+    fuji: { peak: 0.401, snow: 0.466, foot: 0.555, x: 64.7 },
+    halo: { x: 2, y: 49.7, w: 60, bg: "radial-gradient(circle, rgba(255,240,205,0.55) 0%, rgba(255,214,150,0.26) 14%, rgba(255,190,120,0.1) 34%, rgba(255,180,110,0) 62%)" },
+    glints: pathGlints(5, 14, 8, 61.5, 9, 3, 0.6),
+    glint: { core: "#fff8e6", glow: "rgba(255,226,170,0.85)" },
   },
   evening: EVENING,
   /**
@@ -136,7 +155,7 @@ const FAV_PHOTOS: Record<DayPart, FavPhoto> = {
 
 /** お気に入りのページの時刻・電池の帯の色（いまの時間帯の写真のいちばん上の色） */
 export function favoritesTop(): string {
-  return FAV_PHOTOS[partNow()].top;
+  return FAV_PHOTOS[partNow(favPart)].top;
 }
 
 /** 富士山の頂を置く高さ：検索欄の下の端から、この分だけ下（pt） */
@@ -193,14 +212,15 @@ const UNDO_MS = 5000;
 const delay = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
 
 /**
- * 画面いっぱいの富士山の写真（下のメニューの後ろまで敷く。昼・夕方・夜で切り替え、変わるときはゆっくり重ねる）。上と下を少し暗くして、
- * 白い字とメニューを読みやすくする。写真の上に、光（夕方は太陽の揺らぎ・湖のきらめき・紅富士、夜は月の光・星の瞬き・月の光の道のきらめき）を絵と同じ位置に重ねる
+ * 画面いっぱいの富士山の写真（下のメニューの後ろまで敷く。昼・昼と夕方のあいだ・夕方・夜で切り替え、変わるときはゆっくり重ねる）。上と下を少し暗くして、
+ * 白い字とメニューを読みやすくする。写真の上に、光（昼と夕方のあいだは西日の揺らぎ・湖のきらめき、夕方は太陽の揺らぎ・湖のきらめき・紅富士、
+ * 夜は月の光・星の瞬き・月の光の道のきらめき）を絵と同じ位置に重ねる
  * （写真と光を同じ箱に入れ、箱を画面いっぱいに合わせる。.fav-stage）。
  * スクロールした量を --fav-p（0〜1）に書き、写真が上へ寄って暗くなる（動きの演出がオフ・動きを減らす設定では暗くなるだけ）
  */
 export function FavoritesBackdrop({ scroller, motion }: { scroller: RefObject<HTMLElement | null>; motion: boolean }) {
   const box = useRef<HTMLDivElement>(null);
-  const { shown, layers, swapping, done } = useDayLayers();
+  const { shown, layers, swapping, done } = useDayLayers(favPart);
   const size = useBox(box, scroller);
   useEffect(() => {
     const el = box.current;
@@ -402,7 +422,7 @@ export function FavoritesPage({
   // いつもの画面：検索欄と一覧のあいだを富士山の窓にする。一覧の板は富士山のふもとより下に、入るだけ（スクロールしない）。
   // 横向きなど低い画面は、検索欄のすぐ下から
   const h = screen ?? 700;
-  const part = useDayPart();
+  const part = useDayPart(favPart);
   const photo = FAV_PHOTOS[part];
   const foot = useFujiFoot(root, screen, photo);
   // 板の上の端：検索欄のすぐ下か、富士山のふもとより下。行は板の中の見出しの下に、入るだけ

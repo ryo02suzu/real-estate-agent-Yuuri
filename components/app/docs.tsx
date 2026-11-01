@@ -4,7 +4,8 @@
 // 太陽の高さで昼・夕方・夜に切り替えて敷く（lib/app/sun.ts の dayPart。開いている間に時間帯が変わったら、ゆっくり入れ替わる）。
 // 写真は下のメニューの後ろまで敷くので、components/app/mobile-app.tsx が DocsBackdrop で画面のいちばん奥に置く。
 // 上から：ホームと同じ位置に見出し「書類・出力」と右上のメニュー（≡）、2行のひとこと、写真を見せる空き、
-// 物件のカード（書類を作る物件と、作れる書類。いちばん使う「要注意点と次にやること」は白い大きなボタン、ほかの4つは小さなボタン）、
+// 物件のカード（書類を作る物件と、作れる書類。いちばん使う「要注意点と次にやること」は横いっぱいの大きなボタン（すりガラスのまま少し明るく、
+// 金色のアイコン）、ほかの4つは小さなボタン）、
 // ほかの物件から作る（すりガラスの板に、画面に収まる数だけ。続きは履歴）、注意の一文。
 // 字・すりガラスはホームとお気に入りと同じ（白い字にごく薄い影、板は components/app/favorites.tsx の BOARD）。スクロールしない
 // （背の低い画面だけ、はみ出した分をスクロールできる）。
@@ -14,6 +15,7 @@
 import { ChevronRight, ClipboardCopy, Clock3, ListChecks, Map as MapIcon, MapPin, Menu, Printer, ScrollText, Search, type LucideIcon } from "lucide-react";
 import { useRef, type CSSProperties, type ReactNode } from "react";
 import { placeParts } from "@/lib/app/scene";
+import { dayPart } from "@/lib/app/sun";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import { partNow, useDayLayers, useLayerEntry, type DayPart } from "./day-photo";
 import { BOARD, LABEL, placeSubLine } from "./favorites";
@@ -99,7 +101,7 @@ const LIGHTS: Record<DayPart, { glows: { x: number; y: number; w: number; ar?: n
 
 /** 書類・出力のページの時刻・電池の帯の色（いまの時間帯の写真のいちばん上の色） */
 export function docsTop(): string {
-  return PHOTOS[partNow()].top;
+  return PHOTOS[partNow(dayPart)].top;
 }
 
 /**
@@ -107,7 +109,7 @@ export function docsTop(): string {
  * （components/app/day-photo.ts）
  */
 export function DocsBackdrop({ motion }: { motion: boolean }) {
-  const { shown, layers, swapping, done } = useDayLayers();
+  const { shown, layers, swapping, done } = useDayLayers(dayPart);
   return (
     <div aria-hidden data-part={shown} className={`docs-backdrop pointer-events-none absolute inset-0 overflow-hidden ${motion ? "docs-alive" : ""}`} style={{ background: PHOTOS[shown].bg }}>
       {layers.map((p) => (
