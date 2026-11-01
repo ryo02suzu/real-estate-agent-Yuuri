@@ -1,6 +1,6 @@
 "use client";
 
-// スマホの下のメニューのページ（履歴・お気に入り・書類・出力・その他）。ホームと同じ系統：上にホームと同じ街の帯（時間連動の空と
+// スマホの下のメニューのページ（履歴・書類・出力・その他。お気に入りは写真の上のページで components/app/favorites.tsx）。ホームと同じ系統：上にホームと同じ街の帯（時間連動の空と
 // PLATEAU の街。components/app/sky.tsx の SkyPhotos）、その帯に重ねるすりガラスのカード（そのページでいちばん使う操作）、白い角丸の一覧。
 // 字は端末の標準の字（app/globals.css の .theme-navy）。大きさは iPhone の段階：帯の見出し28pt太字、章の見出し17pt太字、
 // 行の名前15.5pt中太字、説明12.5pt、押せる所は44pt以上。寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）
@@ -11,7 +11,6 @@ import {
   ClipboardCopy,
   Database,
   Download,
-  FileText,
   Info,
   ListChecks,
   LoaderCircle,
@@ -30,12 +29,11 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { placeholderScenes, placeParts, sceneSrc, SCENES, type SceneKey } from "@/lib/app/scene";
-import { favoriteKey, type FavoriteItem } from "@/lib/favorites";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import { allRecords, recordsSummary, type PropertyRecords } from "@/lib/records";
 import { MUNICIPALITIES } from "@/lib/roadmap";
 import { PhoneImg, ScaledInput } from "./frame";
-import { AURORA, GLOW, PAGE } from "./home";
+import { AURORA, DARK_GLASS, GLOW, PAGE } from "./home";
 import { ClockBack } from "./icons";
 import { FavStar } from "./star";
 import { NEWS } from "./news";
@@ -102,11 +100,11 @@ function TabScreen({ title, sub, action, hero, banner, children }: { title: stri
   );
 }
 
-/** 調べている・通信の失敗（橙）・お知らせ（青）。ページの上 */
-export function TabBanner({ loading, error, notice, onDismiss }: { loading: boolean; error: string | null; notice: string | null; onDismiss: () => void }) {
+/** 調べている・通信の失敗（橙）・お知らせ（青）。ページの上。glass は写真の上のページ（お気に入り）用の暗いすりガラスに白い字 */
+export function TabBanner({ loading, error, notice, onDismiss, glass = false }: { loading: boolean; error: string | null; notice: string | null; onDismiss: () => void; glass?: boolean }) {
   if (loading)
     return (
-      <p className="flex items-center gap-[8px] rounded-[12px] bg-[#eef4fb] px-[12px] py-[10px] leading-[1.5]" style={{ fontSize: 13, color: "#1c3a6a" }}>
+      <p className={`flex items-center gap-[8px] px-[12px] py-[10px] leading-[1.5] ${glass ? "rounded-[16px]" : "rounded-[12px] bg-[#eef4fb]"}`} style={glass ? { ...DARK_GLASS, fontSize: 13, color: "#fff" } : { fontSize: 13, color: "#1c3a6a" }}>
         <LoaderCircle size={16} strokeWidth={1.8} absoluteStrokeWidth className="shrink-0 animate-spin" />
         調べています…
       </p>
@@ -115,8 +113,12 @@ export function TabBanner({ loading, error, notice, onDismiss }: { loading: bool
   if (!text) return null;
   const warn = !!error;
   return (
-    <button onClick={onDismiss} className="flex w-full items-start gap-[8px] rounded-[12px] px-[12px] py-[10px] text-left leading-[1.55]" style={{ fontSize: 13, background: warn ? "#fdf1ec" : "#eef4fb", color: warn ? "#8a4f3a" : "#1c3a6a" }}>
-      {warn ? <TriangleAlert size={16} strokeWidth={1.8} absoluteStrokeWidth className="mt-[1px] shrink-0" /> : <Info size={16} strokeWidth={1.8} absoluteStrokeWidth className="mt-[1px] shrink-0" />}
+    <button
+      onClick={onDismiss}
+      className={`flex w-full items-start gap-[8px] px-[12px] py-[10px] text-left leading-[1.55] ${glass ? "rounded-[16px]" : "rounded-[12px]"}`}
+      style={glass ? { ...DARK_GLASS, fontSize: 13, color: "#fff" } : { fontSize: 13, background: warn ? "#fdf1ec" : "#eef4fb", color: warn ? "#8a4f3a" : "#1c3a6a" }}
+    >
+      {warn ? <TriangleAlert size={16} strokeWidth={1.8} absoluteStrokeWidth color={glass ? "#ffcf8a" : undefined} className="mt-[1px] shrink-0" /> : <Info size={16} strokeWidth={1.8} absoluteStrokeWidth className="mt-[1px] shrink-0" />}
       {text}
     </button>
   );
@@ -219,7 +221,7 @@ function groupPills(g: Grouped, recs: Map<string, PropertyRecords>): ReactNode {
 }
 
 /** 絞り込みの文字に合うか（町名・市区町村・住所のどこかに含む。全角・半角は同じに） */
-function matches(h: HistoryItem, q: string): boolean {
+export function matches(h: HistoryItem, q: string): boolean {
   const n = q.normalize("NFKC").trim();
   if (!n) return true;
   return `${h.city ?? ""} ${h.address.normalize("NFKC")}`.includes(n);
@@ -237,7 +239,7 @@ function dayGroup(t: number, now: number): string {
 }
 
 /** 行に出す日時：今日・昨日は時刻だけ、それ以外は月日（年が違えば年も） */
-function when(t: number, now: number): string {
+export function when(t: number, now: number): string {
   const d = new Date(t);
   const n = new Date(now);
   const p = (v: number) => String(v).padStart(2, "0");
@@ -292,12 +294,12 @@ function IconButton({ label, onClick, children }: { label: string; onClick: () =
 }
 
 /** いまの時刻（ページを開いたときに決める。ページは開くたびに作り直されるので、それで足りる） */
-function useNow(): number {
+export function useNow(): number {
   return useState(() => Date.now())[0];
 }
 
 /** 写真の札を、一覧の順に決める（同じ写真が続かないように） */
-function useScenes(items: readonly HistoryItem[]): Map<string, SceneKey> {
+export function useScenes(items: readonly HistoryItem[]): Map<string, SceneKey> {
   return useMemo(() => {
     const keys = placeholderScenes(items);
     return new Map(items.map((h, i) => [historyKey(h), keys[i]]));
@@ -419,93 +421,6 @@ export function HistoryPage({
             {confirm ? "もう一度押すと消えます" : "履歴をすべて消す"}
           </button>
         </div>
-      )}
-      <Disclaimer />
-    </TabScreen>
-  );
-}
-
-export function FavoritesPage({
-  favorites,
-  onPick,
-  onDocs,
-  onRemove,
-  onHome,
-  banner,
-}: {
-  favorites: FavoriteItem[];
-  onPick: (f: FavoriteItem) => void;
-  /** その物件の書類を作る（レポートの画面） */
-  onDocs: (f: FavoriteItem) => void;
-  onRemove: (f: FavoriteItem) => void;
-  onHome: () => void;
-  banner?: ReactNode;
-}) {
-  const [q, setQ] = useState("");
-  const [byCity, setByCity] = useState(false);
-  const now = useNow();
-  const scenes = useScenes(favorites);
-  const list = favorites.filter((f) => matches(f, q));
-  const groups: { label: string; items: FavoriteItem[] }[] = [];
-  if (byCity) {
-    const m = new Map<string, FavoriteItem[]>();
-    for (const f of list) {
-      const k = f.city ?? "対応エリアの外";
-      m.set(k, [...(m.get(k) ?? []), f]);
-    }
-    for (const [label, items] of [...m.entries()].sort((a, b) => b[1].length - a[1].length)) groups.push({ label, items });
-  } else groups.push({ label: "", items: list });
-  const trailing = (f: FavoriteItem) => (
-    <span className="flex shrink-0 items-center">
-      <IconButton label="この物件の書類を作る" onClick={() => onDocs(f)}>
-        <FileText size={20} strokeWidth={1.8} absoluteStrokeWidth color={NAVY} />
-      </IconButton>
-      <IconButton label="お気に入りから外す" onClick={() => onRemove(f)}>
-        <Star size={21} strokeWidth={1.7} absoluteStrokeWidth color="#f5a524" fill="#f5a524" />
-      </IconButton>
-    </span>
-  );
-
-  return (
-    <TabScreen
-      title="お気に入り"
-      sub={favorites.length ? `${favorites.length}件・この端末だけに保存（最大50件）` : "案内の前の下調べや、見返したい物件を"}
-      hero={
-        <>
-          <SearchField value={q} onChange={setQ} placeholder="町名・市区町村でしぼる" label="お気に入りを検索" />
-          <div className="mt-[8px] flex gap-[6px]">
-            <Chip label="新しい順" on={!byCity} onClick={() => setByCity(false)} />
-            <Chip label="市区町村ごと" on={byCity} onClick={() => setByCity(true)} />
-          </div>
-        </>
-      }
-      banner={banner}
-    >
-      {favorites.length === 0 ? (
-        <Empty
-          icon={<Star size={26} strokeWidth={1.7} absoluteStrokeWidth color="#8fa3c2" />}
-          title="保存した物件はまだありません"
-          body="物件を調べた画面の右上の ☆ を押すと保存できます。履歴の行の ☆ からも保存できます。"
-          action={
-            <button onClick={onHome} className="press flex h-[40px] items-center gap-[6px] rounded-full px-[16px] font-semibold leading-none text-white" style={{ fontSize: 14, background: NAVY }}>
-              <Search size={15} strokeWidth={2} absoluteStrokeWidth />
-              ホームで調べる
-            </button>
-          }
-        />
-      ) : list.length === 0 ? (
-        <Empty icon={<Search size={26} strokeWidth={1.7} absoluteStrokeWidth color="#8fa3c2" />} title="当てはまる物件がありません" body="絞り込みの文字を変えてみてください。" />
-      ) : (
-        groups.map((g) => (
-          <section key={g.label || "all"}>
-            {g.label ? <Head title={g.label} note={`${g.items.length}件`} className="mt-[10px]" /> : <div className="h-[14px]" />}
-            <ul className={`overflow-hidden ${CARD}`}>
-              {g.items.map((f) => (
-                <PlaceRow key={favoriteKey(f)} item={f} scene={scenes.get(historyKey(f)) ?? "suburb"} time={when(f.at, now)} onClick={() => onPick(f)} trailing={trailing(f)} />
-              ))}
-            </ul>
-          </section>
-        ))
       )}
       <Disclaimer />
     </TabScreen>

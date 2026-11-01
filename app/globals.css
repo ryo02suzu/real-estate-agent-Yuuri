@@ -214,6 +214,214 @@ body {
   }
 }
 
+/*
+ * スマホのお気に入りのページ（components/app/favorites.tsx）。画面いっぱいの富士山の写真と、ホームと同じすりガラス。
+ * 写真の箱（.fav-stage）は画面を覆う大きさにし、太陽の光（.fav-sun）と湖のきらめき（.fav-glint）を絵と同じ位置に重ねる
+ * （箱の大きさは写真の縦横比 1438:2576。横は 25% の位置で切る。コンテナの単位が使えない古い端末は、画面いっぱいの箱に写真を合わせるだけ）。
+ * スクロールした量（--fav-p。0〜1）で写真が上へ寄り（.fav-alive のとき）、暗くなる（.fav-dim）。
+ * 現れる動き（.fav-rise・.fav-row）は、すりガラスの箱そのものに付け、終わったら外す（backwards）。動きを減らす設定では動かさない
+ */
+.fav-stage {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 0;
+}
+@supports (width: 1cqw) {
+  .fav-backdrop {
+    container-type: size;
+  }
+  .fav-stage {
+    inset: auto;
+    width: max(100cqw, calc(100cqh * 0.5582));
+    aspect-ratio: 1438 / 2576;
+    left: calc((100cqw - max(100cqw, calc(100cqh * 0.5582))) * 0.25);
+    top: calc((100cqh - max(calc(100cqw / 0.5582), 100cqh)) * 0.4);
+  }
+}
+.fav-sun {
+  position: absolute;
+  width: 78%;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(
+    circle,
+    rgba(255, 236, 196, 0.62) 0%,
+    rgba(255, 196, 120, 0.3) 14%,
+    rgba(255, 160, 90, 0.12) 34%,
+    rgba(255, 150, 80, 0) 62%
+  );
+  mix-blend-mode: screen;
+  opacity: 0.8;
+}
+.fav-glint {
+  position: absolute;
+  border-radius: 9999px;
+  background: #fff6dc;
+  box-shadow: 0 0 6px 2px rgba(255, 214, 140, 0.85);
+  mix-blend-mode: screen;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+.fav-dim {
+  background: rgba(3, 8, 20, 0.55);
+  opacity: calc(var(--fav-p, 0) * 0.85);
+}
+.fav-focus {
+  background: rgba(4, 10, 24, 0.32);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.theme-navy:has(.fav-search input:focus) .fav-focus {
+  opacity: 1;
+}
+.fav-thumb {
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 4px 14px rgba(5, 15, 35, 0.22);
+}
+.fav-row {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+.fav-row > .fav-row-in {
+  min-height: 0;
+  overflow: hidden;
+}
+.fav-row.fav-leaving {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateX(-18px);
+  border-color: transparent;
+}
+.fav-bar {
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition:
+    opacity 0.25s ease,
+    transform 0.3s ease;
+}
+[data-compact] .fav-bar {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.fav-toast-out {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .fav-alive .fav-stage {
+    transform: translate3d(0, calc(var(--fav-p, 0) * -48px), 0) scale(calc(1 + var(--fav-p, 0) * 0.1));
+    will-change: transform;
+  }
+  .fav-intro {
+    animation: fav-intro 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  }
+  .fav-alive .fav-drift {
+    animation: fav-drift 44s ease-in-out infinite alternate;
+    transform-origin: 62% 45%;
+  }
+  .fav-alive .fav-sun {
+    animation: fav-sun 6.5s ease-in-out infinite alternate;
+  }
+  .fav-alive .fav-glint {
+    animation-name: fav-glint;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+  }
+  .fav-rise {
+    animation: home-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  }
+  .fav-row {
+    animation: fav-row 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    transition:
+      grid-template-rows 0.34s cubic-bezier(0.2, 0.7, 0.2, 1),
+      opacity 0.24s ease,
+      transform 0.34s cubic-bezier(0.2, 0.7, 0.2, 1),
+      border-color 0.2s ease;
+  }
+  .fav-star-off {
+    animation: fav-star-off 0.32s ease-in forwards;
+  }
+  .fav-thumb {
+    transition: transform 0.42s cubic-bezier(0.3, 1.3, 0.4, 1);
+  }
+  .fav-gap {
+    transition: height 0.45s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .fav-toast {
+    animation: fav-toast-in 0.42s cubic-bezier(0.2, 0.9, 0.25, 1.12) backwards;
+  }
+  .fav-empty-star {
+    animation: fav-float 3.6s ease-in-out infinite alternate;
+  }
+}
+@keyframes fav-intro {
+  from {
+    opacity: 0;
+    transform: scale(1.07);
+  }
+}
+@keyframes fav-drift {
+  to {
+    transform: scale(1.05) translate(-0.8%, -0.5%);
+  }
+}
+@keyframes fav-sun {
+  from {
+    opacity: 0.62;
+    transform: translate(-50%, -50%) scale(0.93);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.07);
+  }
+}
+@keyframes fav-glint {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  50% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@keyframes fav-row {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes fav-star-off {
+  40% {
+    transform: scale(1.28) rotate(-14deg);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.2) rotate(-40deg);
+  }
+}
+@keyframes fav-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+}
+@keyframes fav-float {
+  from {
+    transform: translateY(2px);
+  }
+  to {
+    transform: translateY(-3px);
+  }
+}
+
 @keyframes home-rise {
   from {
     opacity: 0;

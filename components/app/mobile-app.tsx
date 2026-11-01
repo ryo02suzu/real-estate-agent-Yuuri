@@ -31,6 +31,7 @@ import { createPortal, flushSync } from "react-dom";
 import {
   favoriteKey,
   removeFavorite,
+  restoreFavorite,
   toggleFavoriteChecked,
   type FavoriteItem,
 } from "@/lib/favorites";
@@ -77,6 +78,7 @@ import {
 } from "./app-sheets";
 import { DetailSheet } from "./detail-sheets";
 import { ART_W, BottomNav, ZOOM, type NavKey } from "./frame";
+import { FAVORITES_TOP, FavoritesBackdrop, FavoritesPage, UndoToast } from "./favorites";
 import { prefetchFlight, SPACE_BACKGROUND } from "./flight-space";
 import type { FlightTarget } from "./globe-flight";
 import { HOME_TOP, HomeBackdrop, HomeMenu, HomeScreen, PAGE, SKY, type HomeMessage } from "./home";
@@ -112,7 +114,6 @@ import {
 import {
   AccountPage,
   DocsPage,
-  FavoritesPage,
   HistoryPage,
   TabBanner,
   type DocKind,
@@ -202,6 +203,8 @@ export function MobileApp(props: MobileAppProps) {
   const [leaving, setLeaving] = useState(false);
   // 降りたあと、物件の画面がふわっと出る間
   const [arrive, setArrive] = useState(false);
+  // お気に入りから外した物件（下に「元に戻す」を出す。index は外す前の位置、key は出し直すための印）
+  const [undo, setUndo] = useState<{ item: FavoriteItem; index: number; key: number } | null>(null);
   const unread = useUnreadNews();
   const offline = useOffline();
   const standalone = useStandalone();
@@ -318,12 +321,24 @@ export function MobileApp(props: MobileAppProps) {
     const set = () =>
       meta?.setAttribute(
         "content",
-        flying ? FLIGHT_TOP : showHome ? HOME_TOP : tabPage ? (skyTop() ?? SKY) : BAND_TOP,
+        flying
+          ? FLIGHT_TOP
+          : showHome
+            ? HOME_TOP
+            : page === "favorites"
+              ? FAVORITES_TOP
+              : tabPage
+                ? (skyTop() ?? SKY)
+                : BAND_TOP,
       );
     set();
     addEventListener(SKY_EVENT, set);
     return () => removeEventListener(SKY_EVENT, set);
-  }, [showHome, tabPage, flying]);
+  }, [showHome, tabPage, flying, page]);
+  // お気に入りのページを離れたら「元に戻す」はしまう
+  useEffect(() => {
+    if (page !== "favorites") queueMicrotask(() => setUndo(null));
+  }, [page]);
   // 調べ終わったら、降りる先を地球の演出に渡す（見つからない・候補から選ぶ・調べられなかったときは降りない）
   useEffect(() => {
     if (!flight) return;
@@ -438,9 +453,25 @@ export function MobileApp(props: MobileAppProps) {
         favorites={favorites}
         onPick={pickRecent}
         onDocs={openDocsFor}
-        onRemove={(f) => setFavorites(removeFavorite(f))}
+        onRemove={(f) => {
+          const index = favorites.findIndex(
+            (x) => favoriteKey(x) === favoriteKey(f),
+          );
+          setFavorites(removeFavorite(f));
+          setUndo({ item: f, index, key: Date.now() });
+        }}
         onHome={() => go("home")}
-        banner={tabBanner}
+        onMenu={() => setMenu(true)}
+        unread={unread}
+        banner={
+          <TabBanner
+            glass
+            loading={loading && !offline}
+            error={failure}
+            notice={notice}
+            onDismiss={() => setNotice(null)}
+          />
+        }
       />
     );
   else if (page === "docs")
@@ -507,8 +538,11 @@ export function MobileApp(props: MobileAppProps) {
         background: PAGE,
       }}
     >
-      {/* ホームは画面いっぱいの写真（下のメニューの後ろまで） */}
+      {/* ホームとお気に入りは画面いっぱいの写真（下のメニューの後ろまで） */}
       {showHome && <HomeBackdrop drift={motionOn} />}
+      {page === "favorites" && (
+        <FavoritesBackdrop scroller={scroller} motion={motionOn} />
+      )}
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div
           ref={scroller}
@@ -573,8 +607,12 @@ export function MobileApp(props: MobileAppProps) {
                 />
               </div>
             )}
+            {/* お気に入りは自分で上から順に浮き上がる（外の箱を動かすと、すりガラスの後ろがぼけない） */}
             {tabPage && (
-              <div key={page} className="page-in">
+              <div
+                key={page}
+                className={page === "favorites" ? undefined : "page-in"}
+              >
                 {body}
               </div>
             )}
@@ -586,9 +624,28 @@ export function MobileApp(props: MobileAppProps) {
           ref={setBarSlot}
           className="pointer-events-none absolute inset-x-0 bottom-0 z-30"
         />
+        {/* お気に入りから外したあとの「元に戻す」（下のメニューのすぐ上） */}
+        {undo && page === "favorites" && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-[12px] z-40 flex justify-center">
+            <div
+              className="flex justify-center px-[16px]"
+              style={{ width: ART_W, zoom: ZOOM }}
+            >
+              <UndoToast
+                key={undo.key}
+                item={undo.item}
+                onUndo={() => {
+                  setFavorites(restoreFavorite(undo.item, undo.index));
+                  setUndo(null);
+                }}
+                onClose={() => setUndo(null)}
+              />
+            </div>
+          </div>
+        )}
       </div>
       <BottomNav
-        dark={showHome}
+        dark={showHome || page === "favorites"}
         active={page}
         onSelect={(k) => {
           if (k === "home" && page === "home") {

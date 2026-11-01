@@ -25,16 +25,16 @@ export const SKY = "#e6eff9";
 export const HOME_TOP = "#386fab";
 export { PAGE };
 
-/** 写真の上の字が明るい空や建物に重なっても読めるよう、薄い影を付ける */
-const SHADOW = "0 1px 3px rgba(0,0,0,0.35), 0 0 12px rgba(0,0,0,0.18)";
+/** 写真の上の字が明るい空や建物に重なっても読めるよう、薄い影を付ける（お気に入りのページも同じ。components/app/favorites.tsx） */
+export const SHADOW = "0 1px 3px rgba(0,0,0,0.35), 0 0 12px rgba(0,0,0,0.18)";
 /** 写真の上の字が建物に重なっても読めるよう、にじませる（下のメニューのページの帯。昼は白、夜は紺。空の変数 --sky-halo） */
 export const GLOW = "0 0 10px rgba(var(--sky-halo, 255,255,255),0.95), 0 0 3px rgba(var(--sky-halo, 255,255,255),0.95)";
 /** 地の奥の淡い光（下のメニューのページで使う） */
 export const AURORA =
   "radial-gradient(60% 42% at 0% 45%, rgba(110,140,255,0.13) 0%, rgba(110,140,255,0) 100%), radial-gradient(55% 38% at 100% 58%, rgba(40,190,255,0.12) 0%, rgba(40,190,255,0) 100%)";
 
-/** 明るいすりガラス（検索欄・右上のメニュー） */
-const LIGHT_GLASS: CSSProperties = {
+/** 明るいすりガラス（検索欄・右上のメニュー。お気に入りのページも同じ） */
+export const LIGHT_GLASS: CSSProperties = {
   // ぼかしが描かれないブラウザでも、写真の明暗に字が埋もれない下地。
   backgroundColor: "rgba(12,24,45,0.68)",
   backgroundImage: "linear-gradient(180deg, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0.14) 100%)",
@@ -43,17 +43,18 @@ const LIGHT_GLASS: CSSProperties = {
   backdropFilter: "blur(18px) saturate(140%)",
   WebkitBackdropFilter: "blur(18px) saturate(140%)",
 };
-/** 暗いすりガラス（最近の検索の一覧・注意） */
-const DARK_GLASS: CSSProperties = {
+/** 暗いすりガラス（最近の検索の一覧・注意。お気に入りのページも同じ） */
+export const DARK_GLASS: CSSProperties = {
   background: "linear-gradient(180deg, rgba(40,44,54,0.78) 0%, rgba(28,32,42,0.84) 100%)",
   border: "1px solid rgba(255,255,255,0.16)",
   boxShadow: "0 14px 34px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)",
   backdropFilter: "blur(22px) saturate(140%)",
   WebkitBackdropFilter: "blur(22px) saturate(140%)",
 };
-const SUB = "rgba(255,255,255,0.72)";
-/** 393pt の絵が縮小されても、実際に押せる範囲は44px以上にする。 */
-const HIT = "max(44px, calc(44px / var(--app-zoom, 1)))";
+/** 写真の上の2行目の字 */
+export const SUB = "rgba(255,255,255,0.72)";
+/** 393pt の絵が縮小されても、実際に押せる範囲は44px以上にする（お気に入りのページも同じ）。 */
+export const HIT = "max(44px, calc(44px / var(--app-zoom, 1)))";
 
 /** 最近の検索に出す数 */
 const RECENT = 3;
@@ -96,7 +97,7 @@ export function HomeBackdrop({ drift = false }: { drift?: boolean }) {
 }
 
 /** 画面の高さ（pt。拡大・縮小の前の値）。スクロールする箱の高さを拡大率で割る */
-function useScreenHeight(root: RefObject<HTMLElement | null>): number | undefined {
+export function useScreenHeight(root: RefObject<HTMLElement | null>): number | undefined {
   const [h, setH] = useState<number>();
   useEffect(() => {
     const box = root.current?.closest<HTMLElement>("[data-scroller]");
@@ -351,7 +352,7 @@ export function HomeMenu({
   standalone: boolean;
   /** アカウント・その他のページ */
   onMore: () => void;
-  /** 動きの演出（検索したときの地球からのズーム・ホームの写真の動き）がオンか */
+  /** 動きの演出（検索したときの地球からのズーム・ホームとお気に入りの写真の動き）がオンか */
   motion: boolean;
   onMotion: (on: boolean) => void;
 }) {
@@ -426,7 +427,7 @@ export function HomeMenu({
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-[14.5px] font-semibold text-ink">動きの演出</span>
-              <span className="mt-0.5 block text-[12px] leading-[1.5] text-muted">検索したときの地球からのズーム・ホームの写真の動き</span>
+              <span className="mt-0.5 block text-[12px] leading-[1.5] text-muted">検索したときの地球からのズーム・写真のゆっくりした動き</span>
             </span>
             <input id={switchId} type="checkbox" role="switch" checked={motion} onChange={(e) => onMotion(e.target.checked)} className="peer sr-only" />
             <span aria-hidden className="relative h-[30px] w-[50px] shrink-0 rounded-full bg-[#d5dbe5] transition-colors peer-checked:bg-[#2f7cf6] peer-focus-visible:ring-2 peer-focus-visible:ring-[#9db8e6]">

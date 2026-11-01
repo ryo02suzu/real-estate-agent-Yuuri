@@ -57,6 +57,18 @@ export function toggleFavoriteChecked(item: FavoriteItem): { items: FavoriteItem
 
 export const removeFavorite = (item: FavoriteItem): FavoriteItem[] => save(loadFavorites().filter((f) => favoriteKey(f) !== favoriteKey(item)));
 
+/**
+ * 外したお気に入りを元の位置に戻す（スマホのお気に入りのページの「元に戻す」）。もう入っていれば何もしない。
+ * 位置は外す前の順番（一覧が短くなっていれば最後）。保存後の一覧を返す
+ */
+export function restoreFavorite(item: FavoriteItem, index: number): FavoriteItem[] {
+  const cur = loadFavorites();
+  if (cur.some((f) => favoriteKey(f) === favoriteKey(item))) return cur;
+  const next = [...cur];
+  next.splice(Math.max(0, Math.min(Math.trunc(index) || 0, next.length)), 0, item);
+  return save(next.slice(0, MAX));
+}
+
 /** 読み込み（書き出したファイルから）：無いものだけ足す。足した数を返す */
 export function mergeFavorites(items: FavoriteItem[]): number {
   const cur = loadFavorites();
