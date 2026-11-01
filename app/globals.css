@@ -267,6 +267,16 @@ body {
     top: calc((100cqh - max(calc(100cqw / var(--fav-ar, 0.5582)), 100cqh)) * var(--fav-y, 0.4));
   }
 }
+/*
+ * 写真を上へ寄せる枠：富士山の頂が検索欄の少し下に来るよう、頂を中心に少し大きくして上へ動かす
+ * （量は components/app/favorites.tsx の fujiFrame が画面の大きさから出す）。光や星も同じ枠の中なので、写真と一緒に動く
+ */
+.fav-frame {
+  position: absolute;
+  inset: 0;
+  transform: translateY(var(--fav-shift, 0px)) scale(var(--fav-scale, 1));
+  transform-origin: 50% var(--fav-origin, 50%);
+}
 /* 太陽・月のまわりの光（大きさと色は写真ごとに components/app/favorites.tsx が付ける） */
 .fav-halo {
   position: absolute;
