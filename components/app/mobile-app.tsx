@@ -79,7 +79,7 @@ import {
 import { DetailSheet } from "./detail-sheets";
 import { ART_W, BottomNav, ZOOM, type NavKey } from "./frame";
 import { DocsBackdrop, DocsPage, docsTop, type DocKind } from "./docs";
-import { FAVORITES_TOP, FavoritesBackdrop, FavoritesPage, UndoToast } from "./favorites";
+import { FavoritesBackdrop, FavoritesPage, favoritesTop, UndoToast } from "./favorites";
 import { prefetchFlight, SPACE_BACKGROUND } from "./flight-space";
 import type { FlightTarget } from "./globe-flight";
 import { HOME_TOP, HomeBackdrop, HomeMenu, HomeScreen, PAGE, SKY, type HomeMessage } from "./home";
@@ -353,7 +353,7 @@ export function MobileApp(props: MobileAppProps) {
           : showHome
             ? HOME_TOP
             : page === "favorites"
-              ? FAVORITES_TOP
+              ? favoritesTop()
               : page === "docs"
                 ? docsTop()
                 : tabPage

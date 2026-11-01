@@ -1,6 +1,7 @@
 "use client";
 
-// スマホの下のメニューの「お気に入り」。画面いっぱいの写真（届いた富士山と湖の絵。public/favorites/fuji-*.webp。下のメニューの後ろまで
+// スマホの下のメニューの「お気に入り」。画面いっぱいの写真（届いた富士山と湖の絵。昼は public/favorites/fuji-day.webp、夕方は fuji-*.webp。
+// 太陽の高さで切り替える。components/app/day-photo.ts。下のメニューの後ろまで
 // 敷くので、components/app/mobile-app.tsx が FavoritesBackdrop で画面のいちばん奥に置く）の上に、ふたつの画面：
 // ・いつもの画面（スクロールしない）：ホームと同じ位置に、見出し「お気に入り」と右上のメニュー（≡）、2行のひとこと（件数）、
 //   ホームと同じ検索欄（絞り込み）。その下は富士山の窓（富士山を隠さない）。富士山のふもとより下に「最近保存した物件　すべて見る ›」と、
@@ -19,26 +20,72 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { flushSync } from "react-dom";
 import { placeParts } from "@/lib/app/scene";
 import { favoriteKey, type FavoriteItem } from "@/lib/favorites";
+import { partNow, useDayLayers, useDayPart, useLayerEntry, type DayPart } from "./day-photo";
 import { PhoneImg, ScaledInput } from "./frame";
 import { DARK_GLASS, HIT, LIGHT_GLASS, SHADOW, useScreenHeight, VT } from "./home";
 import { useShrink } from "./sky";
 import { matches, useNow, when } from "./tab-pages";
 import { reducedMotion } from "./tokens";
 
-/** お気に入りのページの時刻・電池の帯の色（写真のいちばん上の空に、上の暗いぼかしを重ねた色） */
-export const FAVORITES_TOP = "#11304f";
-
-/** 写真の中の太陽の位置（絵の幅・高さに対する %。届いた絵 1438×2576 で測った） */
-const SUN = { x: 10.69, y: 55.17 };
-/** 写真の縦横比（app/globals.css の .fav-stage と同じ） */
-const PHOTO_AR = 1438 / 2576;
 /**
- * 富士山（絵の高さに対する割合。届いた絵で測った）：頂は 45%、雪は 52.5% まで、斜面が終わって木と町になるふもとは 59%、湖は 63% から。
- * いつもの画面の一覧の板は、ふもとより下に置く（富士山を隠さない）
+ * 時間帯ごとの富士山の写真（昼・夕方・夜の切り替えは components/app/day-photo.ts）。
+ * ar は写真の縦横比（幅÷高さ）、x・y は写真が画面より大きいときに切る位置（0〜1）。bg は読み込むまでの地の色、top は時刻・電池の帯の色
+ * （写真のいちばん上に、上の暗いぼかしを重ねた色）。fuji は富士山の位置（絵の高さに対する割合。届いた絵で測った）：頂・雪の下の端・
+ * foot はいつもの画面の一覧の板の上の端の限り（ふもと。ここより上に板を置かず、富士山を隠さない）、x は頂の横の位置（絵の幅に対する %）。
+ * glow は雪をほんのり染める光の色（動きの演出がオンのとき）。sun は太陽の位置（%）で、あれば太陽の光の揺らぎと湖の光の道のきらめきを重ねる
  */
-const FUJI = { peak: 0.45, snow: 0.525, foot: 0.59 };
+type FavPhoto = {
+  src: string;
+  srcSet?: string;
+  sizes?: string;
+  ar: number;
+  x: number;
+  y: number;
+  bg: string;
+  top: string;
+  fuji: { peak: number; snow: number; foot: number; x: number };
+  glow?: string;
+  sun?: { x: number; y: number };
+};
+/**
+ * 夕方：日の出（日の入り）の光と紅富士・湖（届いた絵 1438×2576。幅 900・1260・1438 の3枚から端末が選ぶ）。頂 45%・雪 52.5%・ふもと 59%・湖 63% から。
+ * 板の上の端は 56%（雪の下の暗い斜面のいちばん下を少しだけ覆う。iPhone 16 で4件入る）
+ */
+const EVENING: FavPhoto = {
+  src: "/favorites/fuji-1260.webp",
+  srcSet: "/favorites/fuji-900.webp 900w, /favorites/fuji-1260.webp 1260w, /favorites/fuji-1438.webp 1438w",
+  sizes: "(min-aspect-ratio: 1438/2576) 100vw, 55.8vh",
+  ar: 1438 / 2576,
+  x: 0.25,
+  y: 0.4,
+  bg: "#0f2440",
+  top: "#0f2c50",
+  fuji: { peak: 0.45, snow: 0.525, foot: 0.56, x: 60 },
+  glow: "255,150,120",
+  sun: { x: 10.69, y: 55.17 },
+};
+const FAV_PHOTOS: Record<DayPart, FavPhoto> = {
+  /** 昼：青空と雪の富士山・湖・すすき（届いた絵 941×1672）。頂 39.7%・雪と雲 46%・ふもと 55.5%・湖 60% から。頂が画面の中ほどより少し右に来る位置で切る */
+  day: {
+    src: "/favorites/fuji-day.webp",
+    ar: 941 / 1672,
+    x: 0.65,
+    y: 0.4,
+    bg: "#2f5a8a",
+    top: "#134078",
+    fuji: { peak: 0.397, snow: 0.46, foot: 0.555, x: 62.5 },
+  },
+  evening: EVENING,
+  /** 夜：写真が届くまでは夕方の写真 */
+  night: EVENING,
+};
 
-/** 湖に映った太陽の光の道のきらめき（位置は絵に対する %、大きさ px、長さと遅れ 秒）。毎回同じ並び */
+/** お気に入りのページの時刻・電池の帯の色（いまの時間帯の写真のいちばん上の色） */
+export function favoritesTop(): string {
+  return FAV_PHOTOS[partNow()].top;
+}
+
+/** 湖に映った太陽の光の道のきらめき（夕方の写真。位置は絵に対する %、大きさ px、長さと遅れ 秒）。毎回同じ並び */
 const GLINTS = (() => {
   let s = 11;
   const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -68,12 +115,14 @@ const UNDO_MS = 5000;
 const delay = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
 
 /**
- * 画面いっぱいの富士山の写真（下のメニューの後ろまで敷く）。上と下を少し暗くして、白い字とメニューを読みやすくする。
- * 写真の上に、太陽の光の揺らぎと湖のきらめきを、絵と同じ位置に重ねる（写真と光を同じ箱に入れ、箱を画面いっぱいに合わせる。.fav-stage）。
+ * 画面いっぱいの富士山の写真（下のメニューの後ろまで敷く。昼・夕方・夜で切り替え、変わるときはゆっくり重ねる）。上と下を少し暗くして、
+ * 白い字とメニューを読みやすくする。写真の上に、光（夕方は太陽の揺らぎ・湖のきらめき・紅富士）を絵と同じ位置に重ねる
+ * （写真と光を同じ箱に入れ、箱を画面いっぱいに合わせる。.fav-stage）。
  * スクロールした量を --fav-p（0〜1）に書き、写真が上へ寄って暗くなる（動きの演出がオフ・動きを減らす設定では暗くなるだけ）
  */
 export function FavoritesBackdrop({ scroller, motion }: { scroller: RefObject<HTMLElement | null>; motion: boolean }) {
   const box = useRef<HTMLDivElement>(null);
+  const { shown, layers, swapping, done } = useDayLayers();
   useEffect(() => {
     const el = box.current;
     const sc = scroller.current;
@@ -95,33 +144,55 @@ export function FavoritesBackdrop({ scroller, motion }: { scroller: RefObject<HT
     };
   }, [scroller]);
   return (
-    <div ref={box} aria-hidden className={`fav-backdrop pointer-events-none absolute inset-0 overflow-hidden ${motion ? "fav-alive" : ""}`} style={{ background: "#0f2440" }}>
-      <div className="fav-stage">
-        <div className="fav-intro absolute inset-0">
-          <div className="fav-drift absolute inset-0">
-            <PhoneImg
-              src="/favorites/fuji-1260.webp"
-              srcSet="/favorites/fuji-900.webp 900w, /favorites/fuji-1260.webp 1260w, /favorites/fuji-1438.webp 1438w"
-              sizes="(min-aspect-ratio: 1438/2576) 100vw, 55.8vh"
-              alt=""
-              draggable={false}
-              className="absolute inset-0 h-full w-full object-cover"
-              style={{ objectPosition: "25% 40%" }}
-            />
-            <span className="fav-sun" style={{ left: `${SUN.x}%`, top: `${SUN.y}%` }} />
-            {/* 紅富士：朝日に染まった雪が、ゆっくり明るくなっては落ち着く（動きの演出がオンのときだけ） */}
-            <span className="fav-alpen" style={{ left: "60%", top: `${((FUJI.peak + FUJI.snow) / 2 + 0.01) * 100}%` }} />
-            {GLINTS.map((g, i) => (
-              <span key={i} className="fav-glint" style={{ left: `${g.x}%`, top: `${g.y}%`, width: g.size, height: g.size, animationDuration: `${g.dur}s`, animationDelay: `${g.delay}s` }} />
-            ))}
-          </div>
-        </div>
-      </div>
+    <div ref={box} aria-hidden data-part={shown} className={`fav-backdrop pointer-events-none absolute inset-0 overflow-hidden ${motion ? "fav-alive" : ""}`} style={{ background: FAV_PHOTOS[shown].bg }}>
+      {layers.map((p) => (
+        <FujiScene key={p} photo={FAV_PHOTOS[p]} swap={p === shown && swapping} onShown={done} />
+      ))}
       {/* 上は少し暗く（見出し）、下も少しだけ暗く（下のメニュー）。物件はすりガラスの板に乗せるので、写真はなるべくそのまま */}
       <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(5,14,32,0.36) 0%, rgba(5,14,32,0) 30%, rgba(0,0,0,0) 60%, rgba(3,8,18,0.36) 100%)" }} />
       {/* スクロールするほど暗く（一覧が読みやすい）。絞り込みに触れている間も少し暗く */}
       <div className="fav-dim absolute inset-0" />
       <div className="fav-focus absolute inset-0" />
+    </div>
+  );
+}
+
+/** 1枚の富士山の写真と、その上の光。読み込めてから現れる（components/app/day-photo.ts の useLayerEntry） */
+function FujiScene({ photo: p, swap, onShown }: { photo: FavPhoto; swap: boolean; onShown: () => void }) {
+  const entry = useLayerEntry(swap, onShown);
+  return (
+    <div className={`absolute inset-0 ${entry.className}`}>
+      <div className="fav-stage" style={{ "--fav-ar": p.ar, "--fav-x": p.x, "--fav-y": p.y } as CSSProperties}>
+        <div className="fav-drift absolute inset-0">
+          <PhoneImg
+            src={p.src}
+            srcSet={p.srcSet}
+            sizes={p.sizes}
+            alt=""
+            draggable={false}
+            decoding="async"
+            onLoad={entry.onLoad}
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ objectPosition: `${p.x * 100}% ${p.y * 100}%` }}
+          />
+          {p.sun && <span className="fav-sun" style={{ left: `${p.sun.x}%`, top: `${p.sun.y}%` }} />}
+          {/* 雪が光にほんのり染まって、ゆっくり明るくなっては落ち着く（動きの演出がオンのときだけ） */}
+          {p.glow && (
+            <span
+              className="fav-alpen"
+              style={{
+                left: `${p.fuji.x}%`,
+                top: `${((p.fuji.peak + p.fuji.snow) / 2 + 0.01) * 100}%`,
+                background: `radial-gradient(closest-side, rgba(${p.glow},0.55) 0%, rgba(${p.glow},0.22) 45%, rgba(${p.glow},0) 100%)`,
+              }}
+            />
+          )}
+          {p.sun &&
+            GLINTS.map((g, i) => (
+              <span key={i} className="fav-glint" style={{ left: `${g.x}%`, top: `${g.y}%`, width: g.size, height: g.size, animationDuration: `${g.dur}s`, animationDelay: `${g.delay}s` }} />
+            ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -144,16 +215,16 @@ export const BOARD: CSSProperties = {
   WebkitBackdropFilter: "blur(22px) saturate(160%)",
 };
 /**
- * いつもの画面の寸法（pt）：検索欄の下の端（ホームと同じ位置）、そこから板の行の始まりまで（見出しの行と余白）、行の高さ、下の余白。
- * 下のメニューの高さ（富士山の位置を測る前の見積もりに使う）
+ * いつもの画面の寸法（pt）：検索欄の下の端（ホームと同じ位置）、検索欄と板のあいだ、板の中の見出しの行（「最近保存した物件　すべて見る」と線）、
+ * 行の高さ、下の余白。下のメニューの高さ（富士山の位置を測る前の見積もりに使う）
  */
-const LAYOUT = { searchBottom: 256, compactSearchBottom: 202, toRows: 68, row: 63, bottom: 18, nav: 59 };
+const LAYOUT = { searchBottom: 256, compactSearchBottom: 202, gap: 24, head: 45, row: 63, bottom: 14, nav: 59 };
 
 /**
  * 富士山のふもとが、いつもの画面のどこに来るか（pt。ページの上から）。写真の箱の大きさと位置は app/globals.css の .fav-stage と同じ計算
- * （画面を覆う大きさ、縦は余りの 40% の位置）。写真（.fav-backdrop）の大きさが変わったら測り直す
+ * （画面を覆う大きさ、余りは写真ごとの位置で切る）。写真（.fav-backdrop）の大きさや、時間帯で写真が変わったら測り直す
  */
-function useFujiFoot(root: RefObject<HTMLElement | null>, screen: number | undefined): number | undefined {
+function useFujiFoot(root: RefObject<HTMLElement | null>, screen: number | undefined, photo: FavPhoto): number | undefined {
   const [foot, setFoot] = useState<number>();
   useEffect(() => {
     const el = root.current;
@@ -162,24 +233,25 @@ function useFujiFoot(root: RefObject<HTMLElement | null>, screen: number | undef
     const measure = () => {
       const zoom = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--app-zoom")) || 1;
       const b = back.getBoundingClientRect();
-      const stageH = Math.max(b.width / PHOTO_AR, b.height);
-      const stageTop = b.top + (b.height - stageH) * 0.4;
-      setFoot((stageTop + stageH * FUJI.foot - el.getBoundingClientRect().top) / zoom);
+      const stageH = Math.max(b.width / photo.ar, b.height);
+      const stageTop = b.top + (b.height - stageH) * photo.y;
+      setFoot((stageTop + stageH * photo.fuji.foot - el.getBoundingClientRect().top) / zoom);
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(back);
     return () => ro.disconnect();
-  }, [root, screen]);
+  }, [root, screen, photo]);
   return foot;
 }
 
 /**
- * 一覧が「富士山の下」⇄「検索欄のすぐ下」へ移ったとき、前の位置から滑らせる（移ったあとで、前の位置との差を 0 へ戻していく）。
+ * 一覧が「富士山の下」⇄「検索欄のすぐ下」へ移ったとき（key が変わったとき。時間帯で写真が変わり、ふもとの高さが変わったときも）、
+ * 前の位置から滑らせる（移ったあとで、前の位置との差を 0 へ戻していく）。
  * すりガラスの後ろがぼけるよう、動かすのは位置だけ（薄くしない）。動きを減らす設定では、すぐ切り替える
  */
-function useSlide(el: RefObject<HTMLElement | null>, near: boolean) {
-  const last = useRef<{ near: boolean; top: number } | null>(null);
+function useSlide(el: RefObject<HTMLElement | null>, key: string) {
+  const last = useRef<{ key: string; top: number } | null>(null);
   useLayoutEffect(() => {
     const node = el.current;
     if (!node) {
@@ -188,8 +260,8 @@ function useSlide(el: RefObject<HTMLElement | null>, near: boolean) {
     }
     const top = node.getBoundingClientRect().top;
     const prev = last.current;
-    last.current = { near, top };
-    if (!prev || prev.near === near || Math.abs(prev.top - top) < 1 || reducedMotion()) return;
+    last.current = { key, top };
+    if (!prev || prev.key === key || Math.abs(prev.top - top) < 1 || reducedMotion()) return;
     const zoom = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--app-zoom")) || 1;
     node.animate([{ transform: `translateY(${(prev.top - top) / zoom}px)` }, { transform: "translateY(0)" }], { duration: 480, easing: "cubic-bezier(0.22, 0.9, 0.24, 1)" });
   });
@@ -244,10 +316,13 @@ export function FavoritesPage({
   // いつもの画面：検索欄と一覧のあいだを富士山の窓にする。一覧の板は富士山のふもとより下に、入るだけ（スクロールしない）。
   // 横向きなど低い画面は、検索欄のすぐ下から
   const h = screen ?? 700;
-  const foot = useFujiFoot(root, screen);
-  const nearTop = (compact ? LAYOUT.compactSearchBottom : LAYOUT.searchBottom) + LAYOUT.toRows;
-  const limit = compact ? nearTop : Math.max(nearTop, foot ?? (h + LAYOUT.nav) * FUJI.foot);
-  const fit = Math.max(1, Math.floor((h - limit - LAYOUT.bottom) / LAYOUT.row));
+  const part = useDayPart();
+  const photo = FAV_PHOTOS[part];
+  const foot = useFujiFoot(root, screen, photo);
+  // 板の上の端：検索欄のすぐ下か、富士山のふもとより下。行は板の中の見出しの下に、入るだけ
+  const nearTop = (compact ? LAYOUT.compactSearchBottom : LAYOUT.searchBottom) + LAYOUT.gap;
+  const boardTop = compact ? nearTop : Math.max(nearTop, foot ?? (h + LAYOUT.nav) * photo.fuji.foot);
+  const fit = Math.max(1, Math.floor((h - boardTop - LAYOUT.head - LAYOUT.bottom) / LAYOUT.row));
   const shown = list.slice(0, fit);
   // 絞り込みの欄に触れている間（キーボードが出ている間）は、一覧を検索欄のすぐ下へ滑らせる（下に置いたままだとキーボードに隠れる）。
   // 離したら富士山の下へ戻る。行を押した指の下で板が動かないよう、戻るのは少し待ってから
@@ -255,7 +330,7 @@ export function FavoritesPage({
   const typingTimer = useRef(0);
   useEffect(() => () => clearTimeout(typingTimer.current), []);
   const section = useRef<HTMLElement>(null);
-  useSlide(section, typing);
+  useSlide(section, `${typing}:${part}`);
   // つながる動きで結ぶ行（いつもの画面の何行目か）
   const rowIndex = new Map(shown.map((f, i) => [favoriteKey(f), i]));
   const rowVt = (f: FavoriteItem) => {
@@ -422,30 +497,29 @@ export function FavoritesPage({
         {/* 富士山の窓（画面の高さで伸び縮みする）。絞り込みの欄に触れている間はたたんで、一覧を検索欄のすぐ下へ */}
         {!typing && <div aria-hidden className="flex-1" />}
         {/* 最近保存した物件（新しく保存した順。富士山のふもとより下に、入るだけ） */}
-        <section ref={section} className="relative" style={{ padding: `24px 19px ${LAYOUT.bottom}px` }}>
+        <section ref={section} className="relative" style={{ padding: `${LAYOUT.gap}px 19px ${LAYOUT.bottom}px` }}>
           {favorites.length === 0 ? (
             empty
           ) : list.length === 0 ? (
             noMatch
           ) : (
-            <>
-              <div className="fav-rise flex min-h-[36px] items-center justify-between gap-x-[8px]" style={{ marginBottom: 6, ...delay(150) }}>
-                <h2 className="truncate font-semibold leading-[1.3]" style={LABEL}>
+            // 見出し（「最近保存した物件　すべて見る（n件）›」）は板の中のいちばん上に。写真の町並みや湖の明るさに字が埋もれない
+            <div className="fav-rise overflow-hidden rounded-[22px]" style={{ ...BOARD, ...delay(170), viewTransitionName: morph ? VT.card : undefined }}>
+              <div className="flex items-center justify-between gap-x-[8px] border-b border-white/[0.12] pl-[18px] pr-[6px]" style={{ minHeight: LAYOUT.head - 1 }}>
+                <h2 className="truncate font-semibold leading-[1.3]" style={{ ...LABEL, fontSize: 14, letterSpacing: 1.2 }}>
                   {q ? `「${q}」に当てはまる物件` : "最近保存した物件"}
                 </h2>
                 <button
                   onClick={() => toAll(true)}
-                  className="press group -mr-[8px] flex shrink-0 items-center gap-[2px] rounded-full px-[8px] transition-[background-color,opacity] active:bg-white/15"
+                  className="press group flex shrink-0 items-center gap-[2px] rounded-full px-[8px] transition-[background-color,opacity] active:bg-white/15"
                   style={{ minHeight: HIT, fontSize: 14, color: "rgba(255,255,255,0.78)" }}
                 >
                   すべて見る{list.length > shown.length ? `（${list.length}件）` : ""}
                   <ChevronRight size={15} strokeWidth={2} absoluteStrokeWidth className="transition-transform duration-200 group-active:translate-x-[3px]" />
                 </button>
               </div>
-              <ul className="fav-rise overflow-hidden rounded-[22px]" style={{ ...BOARD, ...delay(190), viewTransitionName: morph ? VT.card : undefined }}>
-                {shown.map((f, i) => row(f, i, 240))}
-              </ul>
-            </>
+              <ul>{shown.map((f, i) => row(f, i, 230))}</ul>
+            </div>
           )}
         </section>
         {/* 読み込み中・お知らせの札は、下に浮かせて出す（いつもの画面はスクロールしないので、物件の数を変えない） */}

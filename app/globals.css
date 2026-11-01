@@ -244,9 +244,9 @@ body {
 }
 
 /*
- * スマホのお気に入りのページ（components/app/favorites.tsx）。画面いっぱいの富士山の写真と、ホームと同じすりガラス。
- * 写真の箱（.fav-stage）は画面を覆う大きさにし、太陽の光（.fav-sun）と湖のきらめき（.fav-glint）を絵と同じ位置に重ねる
- * （箱の大きさは写真の縦横比 1438:2576。横は 25% の位置で切る。コンテナの単位が使えない古い端末は、画面いっぱいの箱に写真を合わせるだけ）。
+ * スマホのお気に入りのページ（components/app/favorites.tsx）。画面いっぱいの富士山の写真（昼・夕方・夜で切り替え）と、ホームと同じすりガラス。
+ * 写真の箱（.fav-stage）は画面を覆う大きさにし、太陽の光（.fav-sun）・湖のきらめき（.fav-glint）・紅富士（.fav-alpen）を絵と同じ位置に重ねる
+ * （箱の縦横比と切る位置は写真ごと：--fav-ar・--fav-x・--fav-y。コンテナの単位が使えない古い端末は、画面いっぱいの箱に写真を合わせるだけ）。
  * スクロールした量（--fav-p。0〜1）で写真が上へ寄り（.fav-alive のとき）、暗くなる（.fav-dim）。
  * 現れる動き（.fav-rise・.fav-row）は、すりガラスの箱そのものに付け、終わったら外す（backwards）。動きを減らす設定では動かさない
  */
@@ -261,10 +261,10 @@ body {
   }
   .fav-stage {
     inset: auto;
-    width: max(100cqw, calc(100cqh * 0.5582));
-    aspect-ratio: 1438 / 2576;
-    left: calc((100cqw - max(100cqw, calc(100cqh * 0.5582))) * 0.25);
-    top: calc((100cqh - max(calc(100cqw / 0.5582), 100cqh)) * 0.4);
+    width: max(100cqw, calc(100cqh * var(--fav-ar, 0.5582)));
+    aspect-ratio: var(--fav-ar, 0.5582);
+    left: calc((100cqw - max(100cqw, calc(100cqh * var(--fav-ar, 0.5582)))) * var(--fav-x, 0.25));
+    top: calc((100cqh - max(calc(100cqw / var(--fav-ar, 0.5582)), 100cqh)) * var(--fav-y, 0.4));
   }
 }
 .fav-sun {
@@ -292,14 +292,13 @@ body {
   opacity: 0;
   transform: translate(-50%, -50%);
 }
-/* 紅富士（雪の上に重ねる暖かい光。柔らかく重ねるので、空は白っぽくならない） */
+/* 紅富士（雪の上に重ねる光。色は写真ごとに components/app/favorites.tsx が付ける。柔らかく重ねるので、空は白っぽくならない） */
 .fav-alpen {
   position: absolute;
   width: 50%;
   aspect-ratio: 2.4;
   border-radius: 9999px;
   transform: translate(-50%, -50%);
-  background: radial-gradient(closest-side, rgba(255, 150, 120, 0.55) 0%, rgba(255, 150, 120, 0.22) 45%, rgba(255, 150, 120, 0) 100%);
   mix-blend-mode: soft-light;
   opacity: 0;
 }
@@ -358,9 +357,6 @@ body {
     transform: translate3d(0, calc(var(--fav-p, 0) * -48px), 0) scale(calc(1 + var(--fav-p, 0) * 0.1));
     will-change: transform;
   }
-  .fav-intro {
-    animation: fav-intro 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
-  }
   .fav-alive .fav-drift {
     animation: fav-drift 44s ease-in-out infinite alternate;
     transform-origin: 62% 45%;
@@ -398,12 +394,6 @@ body {
   }
   .fav-empty-star {
     animation: fav-float 3.6s ease-in-out infinite alternate;
-  }
-}
-@keyframes fav-intro {
-  from {
-    opacity: 0;
-    transform: scale(1.07);
   }
 }
 @keyframes fav-drift {
@@ -474,7 +464,7 @@ body {
  * スマホの書類・出力のページ（components/app/docs.tsx）。画面いっぱいの机の写真（昼・夕方・夜で切り替え）と、ホームと同じすりガラス。
  * 写真の箱（.docs-stage）は画面を覆う大きさにし（写真の縦横比 941:1672。横は --docs-x の位置で切る）、光のにじみ（.docs-glow）と
  * ビルの屋上の赤い灯（.docs-beacon）を絵と同じ位置に重ねる。コンテナの単位が使えない古い端末は、画面いっぱいの箱に写真を合わせるだけ。
- * 初めて開いたときは写真がふわっと落ち着き（.docs-intro）、時間帯が変わったときは新しい写真がゆっくり重なる（.docs-swap）。
+ * 初めて開いたときは写真がふわっと落ち着き（.day-intro）、時間帯が変わったときは新しい写真がゆっくり重なる（.day-swap。お気に入りも同じ）。
  * 現れる動き（.docs-rise・.docs-row）は、すりガラスの箱そのものに付け、終わったら外す（backwards）。動きを減らす設定では動かさない
  */
 .docs-stage {
@@ -512,11 +502,11 @@ body {
   opacity: 0;
 }
 @media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
-  .docs-intro {
-    animation: docs-intro 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  .day-intro {
+    animation: day-intro 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
   }
-  .docs-swap {
-    animation: docs-swap 1.6s ease-in-out backwards;
+  .day-swap {
+    animation: day-swap 1.6s ease-in-out backwards;
   }
   .docs-alive .docs-drift {
     animation: docs-drift 46s ease-in-out infinite alternate;
@@ -541,13 +531,13 @@ body {
     animation: fav-row 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
   }
 }
-@keyframes docs-intro {
+@keyframes day-intro {
   from {
     opacity: 0;
     transform: scale(1.06);
   }
 }
-@keyframes docs-swap {
+@keyframes day-swap {
   from {
     opacity: 0;
   }

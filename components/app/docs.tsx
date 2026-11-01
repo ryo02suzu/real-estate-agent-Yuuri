@@ -8,18 +8,17 @@
 // ほかの物件から作る（すりガラスの板に、画面に収まる数だけ。続きは履歴）、注意の一文。
 // 字・すりガラスはホームとお気に入りと同じ（白い字にごく薄い影、板は components/app/favorites.tsx の BOARD）。スクロールしない
 // （背の低い画面だけ、はみ出した分をスクロールできる）。
-// 動き（app/globals.css の .docs-*）：開くと写真がふわっと落ち着き、上から順に浮き上がる。≡ の「動きの演出」がオンのときは、
+// 動き（app/globals.css の .docs-*・.day-*）：開くと写真がふわっと落ち着き、上から順に浮き上がる。≡ の「動きの演出」がオンのときは、
 // 写真がごくゆっくり寄り、昼は窓の光、夕方は夕日とスタンド、夜はスタンドの明かりがゆっくり揺らぎ、夜はビルの屋上の赤い灯が点滅する。
 // 動きを減らす設定では動かさない
 import { ChevronRight, ClipboardCopy, Clock3, ListChecks, Map as MapIcon, MapPin, Menu, Printer, ScrollText, Search, type LucideIcon } from "lucide-react";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useRef, type CSSProperties, type ReactNode } from "react";
 import { placeParts } from "@/lib/app/scene";
-import { dayPart, overrideTime, solar, type DayPart } from "@/lib/app/sun";
 import { historyKey, type HistoryItem } from "@/lib/history";
+import { partNow, useDayLayers, useLayerEntry, type DayPart } from "./day-photo";
 import { BOARD, LABEL, placeSubLine } from "./favorites";
 import { PhoneImg } from "./frame";
 import { HIT, LIGHT_GLASS, SHADOW, useScreenHeight } from "./home";
-import { SKY_EVENT } from "./sky-event";
 import { useNow, when } from "./tab-pages";
 import { NAVY } from "./ui";
 
@@ -99,73 +98,33 @@ const LIGHTS: Record<DayPart, { glows: { x: number; y: number; w: number; ar?: n
   },
 };
 
-/** 写真が入れ替わる時間（app/globals.css の .docs-swap と同じ） */
-const SWAP_MS = 1600;
-
-/** いまの時間帯（URL の #t= で日時を固定していればその時刻。lib/app/sun.ts の overrideTime） */
-export function docsPartNow(): DayPart {
-  const s = solar(overrideTime(location.hash) ?? new Date());
-  return dayPart(s.altitude, s.rising);
-}
-
 /** 書類・出力のページの時刻・電池の帯の色（いまの時間帯の写真のいちばん上の色） */
 export function docsTop(): string {
-  return PHOTOS[docsPartNow()].top;
-}
-
-/** いまの時間帯。空を入れ直すたび（1分ごと・戻ったとき・#t= が変わったとき。components/app/sky.tsx の useSkyClock）に見直す */
-function useDayPart(): DayPart {
-  const [part, setPart] = useState<DayPart>(() => (typeof window === "undefined" ? "day" : docsPartNow()));
-  useEffect(() => {
-    const read = () => setPart(docsPartNow());
-    addEventListener(SKY_EVENT, read);
-    return () => removeEventListener(SKY_EVENT, read);
-  }, []);
-  return part;
+  return PHOTOS[partNow()].top;
 }
 
 /**
  * 画面いっぱいの机の写真（下のメニューの後ろまで敷く）。時間帯が変わったら、前の写真の上に新しい写真をゆっくり重ねてから前のを外す
- * （構図の違う写真なので、途中で混ぜたままにはしない）
+ * （components/app/day-photo.ts）
  */
 export function DocsBackdrop({ motion }: { motion: boolean }) {
-  const part = useDayPart();
-  const [shown, setShown] = useState(part);
-  const [prev, setPrev] = useState<DayPart | null>(null);
-  if (part !== shown) {
-    setPrev(shown);
-    setShown(part);
-  }
-  // 前の写真が下、新しい写真が上（並びを変えないので、前の写真の箱は動かさずに残る）
-  const layers = prev ? [prev, shown] : [shown];
+  const { shown, layers, swapping, done } = useDayLayers();
   return (
     <div aria-hidden data-part={shown} className={`docs-backdrop pointer-events-none absolute inset-0 overflow-hidden ${motion ? "docs-alive" : ""}`} style={{ background: PHOTOS[shown].bg }}>
       {layers.map((p) => (
-        <DocsScene key={p} part={p} swap={p === shown && prev !== null} onShown={() => setPrev(null)} />
+        <DocsScene key={p} part={p} swap={p === shown && swapping} onShown={done} />
       ))}
     </div>
   );
 }
 
-/** 1枚の写真と、その上の光・暗さ。読み込めてから現れる（初めは .docs-intro、入れ替わりは .docs-swap） */
+/** 1枚の写真と、その上の光・暗さ。読み込めてから現れる（初めは .day-intro、入れ替わりは .day-swap） */
 function DocsScene({ part, swap, onShown }: { part: DayPart; swap: boolean; onShown: () => void }) {
   const p = PHOTOS[part];
   const l = LIGHTS[part];
-  const [ready, setReady] = useState(false);
-  // 現れ方は置いたときに決める（入れ替わりが終わって前の写真を外したあと、もう一度動き出さないように）
-  const [entry] = useState(swap ? "docs-swap" : "docs-intro");
-  const done = useRef(onShown);
-  useEffect(() => {
-    done.current = onShown;
-  });
-  // 入れ替わりの重なりは、新しい写真が現れきったら前の写真を外す
-  useEffect(() => {
-    if (!ready || entry !== "docs-swap") return;
-    const t = window.setTimeout(() => done.current(), SWAP_MS + 80);
-    return () => clearTimeout(t);
-  }, [ready, entry]);
+  const entry = useLayerEntry(swap, onShown);
   return (
-    <div className={`absolute inset-0 ${ready ? entry : "opacity-0"}`}>
+    <div className={`absolute inset-0 ${entry.className}`}>
       <div className="docs-stage" style={{ "--docs-x": p.x } as CSSProperties}>
         <div className="docs-drift absolute inset-0">
           <PhoneImg
@@ -173,7 +132,7 @@ function DocsScene({ part, swap, onShown }: { part: DayPart; swap: boolean; onSh
             alt=""
             draggable={false}
             decoding="async"
-            onLoad={() => setReady(true)}
+            onLoad={entry.onLoad}
             className="absolute inset-0 h-full w-full object-cover"
             style={{ objectPosition: `${p.x * 100}% 50%` }}
           />
