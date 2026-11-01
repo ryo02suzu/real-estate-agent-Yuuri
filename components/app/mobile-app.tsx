@@ -205,6 +205,8 @@ export function MobileApp(props: MobileAppProps) {
   const [arrive, setArrive] = useState(false);
   // お気に入りから外した物件（下に「元に戻す」を出す。index は外す前の位置、key は出し直すための印）
   const [undo, setUndo] = useState<{ item: FavoriteItem; index: number; key: number } | null>(null);
+  // お気に入りの「すべて見る」を開いているか（ほかのページへ行ったら閉じる。下のメニューのお気に入りをもう一度押しても閉じる）
+  const [favAll, setFavAll] = useState(false);
   const unread = useUnreadNews();
   const offline = useOffline();
   const standalone = useStandalone();
@@ -365,9 +367,13 @@ export function MobileApp(props: MobileAppProps) {
     addEventListener(SKY_EVENT, set);
     return () => removeEventListener(SKY_EVENT, set);
   }, [showHome, tabPage, flying, page]);
-  // お気に入りのページを離れたら「元に戻す」はしまう
+  // お気に入りのページを離れたら「元に戻す」はしまい、「すべて見る」も閉じる
   useEffect(() => {
-    if (page !== "favorites") queueMicrotask(() => setUndo(null));
+    if (page !== "favorites")
+      queueMicrotask(() => {
+        setUndo(null);
+        setFavAll(false);
+      });
   }, [page]);
   // 調べ終わったら、降りる先を地球の演出に渡す（見つからない・候補から選ぶ・調べられなかったときは降りない）
   useEffect(() => {
@@ -494,6 +500,8 @@ export function MobileApp(props: MobileAppProps) {
         onHome={() => go("home")}
         onMenu={() => setMenu(true)}
         unread={unread}
+        all={favAll}
+        onAll={setFavAll}
         banner={
           <TabBanner
             glass
@@ -685,6 +693,10 @@ export function MobileApp(props: MobileAppProps) {
           if (k === "home" && page === "home") {
             if (shown) props.onHome();
             else scroller.current?.scrollTo({ top: 0, behavior: "smooth" });
+          } else if (k === "favorites" && page === "favorites") {
+            // すべて見るを開いていたら、いつもの画面へ戻る
+            setFavAll(false);
+            scroller.current?.scrollTo(0, 0);
           } else if (
             // ホームの最近の検索 ⇄ 履歴は、行がつながる動きで行き来する
             (k === "history" && showHome) ||

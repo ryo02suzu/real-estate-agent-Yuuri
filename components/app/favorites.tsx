@@ -1,25 +1,27 @@
 "use client";
 
-// スマホの下のメニューの「お気に入り」。ホームと同じ作り：画面いっぱいの写真（届いた富士山と湖の絵。public/favorites/fuji-*.webp。
-// 下のメニューの後ろまで敷くので、components/app/mobile-app.tsx が FavoritesBackdrop で画面のいちばん奥に置く）の上に、上から：
-// 見出し（お気に入り・件数）と右上のメニュー（≡）、絞り込みの欄（明るいすりガラス）、並べ方（新しい順・市区町村ごと。白い札が滑る）、
-// 富士山を見せる空き（絞り込みに触れている間・字が入っている間は詰める）、保存した物件（板は置かず、写真の下の暗いところに
-// 行を直接並べる。ホームの最近の検索と同じ）、注意書き。
-// 部品の色・すりガラス・字の影はホームと同じもの（components/app/home.tsx の LIGHT_GLASS・DARK_GLASS・SHADOW）。
+// スマホの下のメニューの「お気に入り」。画面いっぱいの写真（届いた富士山と湖の絵。public/favorites/fuji-*.webp。下のメニューの後ろまで
+// 敷くので、components/app/mobile-app.tsx が FavoritesBackdrop で画面のいちばん奥に置く）の上に、ふたつの画面：
+// ・いつもの画面（スクロールしない）：ホームと同じ位置に、見出し「お気に入り」と右上のメニュー（≡）、2行のひとこと（件数）、
+//   ホームと同じ検索欄（絞り込み）。その下に「最近保存した物件　すべて見る ›」と、半透明のすりガラスの板に最近保存した物件を、
+//   画面に収まる数だけ（新しく保存した順）。
+// ・すべて見る：戻るボタン・絞り込み・並べ方（新しい順・市区町村ごと。白い札が滑る）・すべての物件（スクロールできる）。
+//   行き来するときは、板と行と検索欄が滑ってつながる（View Transitions。名前は components/app/home.tsx の VT。.vt-fav）。
+// 行は写真の札を付けず、市区町村と町名・番地か地番と日時・書類のボタン・★。板は字が読みやすいよう、ホームより少し濃いすりガラス。
 // 動き（app/globals.css の .fav-*）：開くと写真がふわっと落ち着き、上から順に浮き上がり、行は少しずつ遅れて現れる。
-// スクロールすると写真がゆっくり上へ寄って暗くなり、上に見出しの細いバーが出る（押すといちばん上へ）。
-// 太陽の光がゆっくり揺らぎ、湖に映った光の道がきらめく（≡ の「動きの演出」がオンのとき）。
-// ★を押すと星が抜けて行がたたまれ、下に「元に戻す」が出る（UndoToast。mobile-app.tsx が出す）。並べ方を変えると行が順に入れ替わる。
+// 太陽の光がゆっくり揺らぎ、湖に映った光の道がきらめく（≡ の「動きの演出」がオンのとき）。すべて見るでスクロールすると、写真が
+// ゆっくり上へ寄って暗くなり、上に見出しの細いバーが出る（押すといちばん上へ）。
+// ★を押すと星が抜けて行がたたまれ、下に「元に戻す」が出る（UndoToast。mobile-app.tsx が出す）。
 // 動きを減らす設定では、位置の動きを止める（すぐ切り替わる）
-import { FileText, Menu, Search, Star, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, Menu, Search, Star, X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
-import { placeParts, sceneSrc, SCENES, type SceneKey } from "@/lib/app/scene";
+import { flushSync } from "react-dom";
+import { placeParts } from "@/lib/app/scene";
 import { favoriteKey, type FavoriteItem } from "@/lib/favorites";
-import { historyKey } from "@/lib/history";
 import { PhoneImg, ScaledInput } from "./frame";
-import { DARK_GLASS, HIT, LIGHT_GLASS, SHADOW, SUB, useScreenHeight } from "./home";
+import { DARK_GLASS, HIT, LIGHT_GLASS, SHADOW, useScreenHeight, VT } from "./home";
 import { useShrink } from "./sky";
-import { matches, useNow, useScenes, when } from "./tab-pages";
+import { matches, useNow, when } from "./tab-pages";
 import { reducedMotion } from "./tokens";
 
 /** お気に入りのページの時刻・電池の帯の色（写真のいちばん上の空に、上の暗いぼかしを重ねた色） */
@@ -105,8 +107,8 @@ export function FavoritesBackdrop({ scroller, motion }: { scroller: RefObject<HT
           </div>
         </div>
       </div>
-      {/* 上は少し暗く（見出し）、下は一覧が乗る湖のあたりを暗く（ホームと同じく、板を置かずに字を読みやすくする） */}
-      <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(5,14,32,0.36) 0%, rgba(5,14,32,0) 30%, rgba(3,8,18,0) 52%, rgba(3,8,18,0.4) 66%, rgba(3,8,18,0.6) 82%, rgba(3,8,18,0.7) 100%)" }} />
+      {/* 上は少し暗く（見出し）、下も少しだけ暗く（下のメニュー）。物件はすりガラスの板に乗せるので、写真はなるべくそのまま */}
+      <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(5,14,32,0.36) 0%, rgba(5,14,32,0) 30%, rgba(0,0,0,0) 60%, rgba(3,8,18,0.36) 100%)" }} />
       {/* スクロールするほど暗く（一覧が読みやすい）。絞り込みに触れている間も少し暗く */}
       <div className="fav-dim absolute inset-0" />
       <div className="fav-focus absolute inset-0" />
@@ -123,6 +125,19 @@ function subLine(f: FavoriteItem, time: string): string {
   return num ? `${chiban ? "地番" : "番地"}：${num}・${time}` : time;
 }
 
+/** 物件を乗せる板（ホームの最近の検索より少し濃いすりガラス。透けすぎると字が読みにくいので。色は app/globals.css の --glass-board-bg） */
+const BOARD: CSSProperties = {
+  background: "var(--glass-board-bg)",
+  border: "1px solid rgba(255,255,255,0.18)",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12), 0 12px 30px rgba(0,0,0,0.22)",
+  backdropFilter: "blur(22px) saturate(160%)",
+  WebkitBackdropFilter: "blur(22px) saturate(160%)",
+};
+/** いつもの画面の寸法（pt）：検索欄の下の端（ホームと同じ位置）、そこから板の行の始まりまで、行の高さ、下の余白 */
+const LAYOUT = { searchBottom: 256, compactSearchBottom: 202, toRows: 68, row: 63, bottom: 18 };
+/** 章の見出し（ホームの「最近の検索」と同じ、控えめな白の字） */
+const LABEL: CSSProperties = { fontSize: 15, letterSpacing: 1.5, color: "rgba(255,255,255,0.62)" };
+
 export function FavoritesPage({
   favorites,
   onPick,
@@ -132,6 +147,8 @@ export function FavoritesPage({
   onMenu,
   unread,
   banner,
+  all,
+  onAll,
 }: {
   favorites: FavoriteItem[];
   onPick: (f: FavoriteItem) => void;
@@ -144,6 +161,9 @@ export function FavoritesPage({
   onMenu: () => void;
   unread: boolean;
   banner?: ReactNode;
+  /** すべて見るの画面を開いているか（mobile-app.tsx が持つ。下のメニューのお気に入りをもう一度押すと閉じる） */
+  all: boolean;
+  onAll: (open: boolean) => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -153,21 +173,25 @@ export function FavoritesPage({
   const [byCity, setByCity] = useState(false);
   // 並べ方を変えたあとは、行をすぐ出し始める（開いたときは見出しや欄が浮き上がるのを待つ）
   const [resorted, setResorted] = useState(false);
-  const [focused, setFocused] = useState(false);
   // たたんでいる途中の行（星を押した）
   const [leaving, setLeaving] = useState<string[]>([]);
+  // いつもの画面 ⇄ すべて見るのつながる動きの間（板・行・検索欄に名前を付ける）
+  const [morph, setMorph] = useState(false);
   const now = useNow();
-  const scenes = useScenes(favorites);
   const list = favorites.filter((f) => matches(f, q));
-  const groups: { label: string; items: FavoriteItem[] }[] = [];
-  if (byCity) {
-    const m = new Map<string, FavoriteItem[]>();
-    for (const f of list) {
-      const k = f.city ?? "対応エリアの外";
-      m.set(k, [...(m.get(k) ?? []), f]);
-    }
-    for (const [label, items] of [...m.entries()].sort((a, b) => b[1].length - a[1].length)) groups.push({ label, items });
-  } else groups.push({ label: "", items: list });
+  // 横向き・キーボードで画面が低いときは、ホームと同じく余白を詰める
+  const compact = screen !== undefined && screen < 520;
+
+  // いつもの画面に出す数：画面に収まるだけ（スクロールしない）
+  const top = compact ? LAYOUT.compactSearchBottom : LAYOUT.searchBottom;
+  const fit = Math.max(1, Math.floor(((screen ?? 700) - top - LAYOUT.toRows - LAYOUT.bottom) / LAYOUT.row));
+  const shown = list.slice(0, fit);
+  // つながる動きで結ぶ行（いつもの画面の何行目か）
+  const rowIndex = new Map(shown.map((f, i) => [favoriteKey(f), i]));
+  const rowVt = (f: FavoriteItem) => {
+    const i = morph ? rowIndex.get(favoriteKey(f)) : undefined;
+    return i === undefined ? undefined : VT.row(i);
+  };
 
   /** 星を押した：星が抜けて行がたたまれてから外す（動きを減らす設定ではすぐ外す） */
   const release = (f: FavoriteItem) => {
@@ -185,16 +209,183 @@ export function FavoritesPage({
     }, LEAVE_MS);
   };
 
-  // 富士山を見せる空き：一覧の上端が湖のあたり（画面の高さの 64%）に来るように。絞り込みに触れている間・字が入っている間は詰める
-  const HEAD = 200;
-  const gap = focused || q ? 14 : Math.max(20, Math.min(380, (screen ?? 760) * 0.64 - HEAD));
-  // 字を入れている間は、行を遅らせずに出す（打つたびに順番に出ると落ち着かない）
-  const stagger = !q;
-  const base = resorted ? 0 : 170;
-  // 行が現れる順（並べ方どおり、上から）
+  /** いつもの画面 ⇄ すべて見る（板と行と検索欄が滑ってつながる。対応していない端末・動きを減らす設定ではそのまま切り替える） */
+  const toAll = (open: boolean) => {
+    const scroller = root.current?.closest<HTMLElement>("[data-scroller]");
+    if (typeof document.startViewTransition !== "function" || reducedMotion()) {
+      onAll(open);
+      scroller?.scrollTo(0, 0);
+      return;
+    }
+    flushSync(() => setMorph(true));
+    const html = document.documentElement;
+    html.classList.add("vt-fav");
+    const t = document.startViewTransition(() => {
+      flushSync(() => onAll(open));
+      scroller?.scrollTo(0, 0);
+    });
+    const done = () => {
+      html.classList.remove("vt-fav");
+      setMorph(false);
+    };
+    t.finished.then(done, done);
+    t.ready.catch(() => {});
+  };
+
+  const row = (f: FavoriteItem, i: number, stagger: number) => {
+    const key = favoriteKey(f);
+    return (
+      <FavRow
+        key={key}
+        item={f}
+        time={when(f.at, now)}
+        leaving={leaving.includes(key)}
+        vt={rowVt(f)}
+        style={delay(q ? 0 : stagger + Math.min(i, 9) * 45)}
+        onPick={() => onPick(f)}
+        onDocs={() => onDocs(f)}
+        onRelease={() => release(f)}
+      />
+    );
+  };
+
+  const search = (
+    <form
+      role="search"
+      className="fav-search relative"
+      style={{ margin: all ? "18px 19px 0" : `${compact ? 20 : 74}px 19px 0` }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        inputRef.current?.blur();
+      }}
+    >
+      {/* ホームの検索欄と同じ形・大きさ・すりガラス */}
+      <div
+        className="fav-rise flex items-center rounded-full transition-[box-shadow] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.28)]"
+        style={{ ...LIGHT_GLASS, height: "max(56px, 3.3em)", fontSize: 17, ...delay(100), viewTransitionName: morph ? VT.search : undefined }}
+      >
+        <Search size={22} strokeWidth={1.9} absoluteStrokeWidth color="#fff" className="ml-[20px] shrink-0" />
+        <ScaledInput value={q} onChange={setQ} inputRef={inputRef} size={17} className="ml-[13px] mr-[4px]" label="お気に入りを絞り込む" autoComplete="off" placeholder="町名・市区町村でしぼる" onPhoto />
+        {q && (
+          <button type="button" onClick={() => setQ("")} aria-label="入力を消す" className="mr-[4px] flex shrink-0 items-center justify-center" style={{ width: HIT, height: HIT }}>
+            <span className="flex items-center justify-center rounded-full bg-white/25" style={{ width: 20, height: 20 }}>
+              <X size={12} strokeWidth={2.4} absoluteStrokeWidth color="#fff" />
+            </span>
+          </button>
+        )}
+      </div>
+    </form>
+  );
+
+  const menuButton = (
+    <button onClick={onMenu} aria-label={unread ? "メニュー（新しいお知らせがあります）" : "メニュー"} className="press relative flex shrink-0 items-center justify-center rounded-full" style={{ ...LIGHT_GLASS, width: 46, height: 46, minWidth: HIT, minHeight: HIT }}>
+      <Menu size={22} strokeWidth={1.8} absoluteStrokeWidth color="#fff" />
+      {unread && <span className="absolute rounded-full border-2 border-white bg-[#f0263a]" style={{ right: 2, top: 2, width: 11, height: 11 }} />}
+    </button>
+  );
+
+  const empty = (
+    <div className="fav-rise flex flex-col items-center rounded-[22px] px-[22px] pb-[22px] pt-[20px] text-center" style={{ ...BOARD, ...delay(200) }}>
+      <span className="fav-empty-star flex items-center justify-center rounded-full" style={{ width: 62, height: 62, background: "radial-gradient(circle, rgba(255,201,74,0.3) 0%, rgba(255,201,74,0) 70%)" }}>
+        <Star size={28} strokeWidth={1.6} absoluteStrokeWidth color="#ffc94a" style={{ filter: "drop-shadow(0 0 8px rgba(255,196,74,0.6))" }} />
+      </span>
+      <p className="mt-[8px] font-medium leading-[1.4]" style={{ fontSize: 16.5, color: "rgba(255,255,255,0.95)" }}>
+        保存した物件はまだありません
+      </p>
+      <p className="mt-[6px] leading-[1.65]" style={{ fontSize: 13.5, color: "rgba(255,255,255,0.62)" }}>
+        物件を調べた画面の右上の ☆ を押すと、ここに並びます。履歴の行の ☆ からも保存できます。
+      </p>
+      <button onClick={onHome} className="press mt-[14px] flex items-center gap-[7px] rounded-full bg-white px-[20px] font-semibold" style={{ height: HIT, fontSize: 15, color: "#1b3f73" }}>
+        <Search size={17} strokeWidth={2.1} absoluteStrokeWidth />
+        ホームで調べる
+      </button>
+    </div>
+  );
+
+  const noMatch = (
+    <div className="fav-rise rounded-[22px] px-[20px] py-[16px] text-center" style={BOARD}>
+      <p className="font-medium" style={{ fontSize: 15.5, color: "rgba(255,255,255,0.95)" }}>
+        当てはまる物件がありません
+      </p>
+      <p className="mt-[4px]" style={{ fontSize: 13, color: "rgba(255,255,255,0.62)" }}>
+        絞り込みの文字を変えてみてください。
+      </p>
+    </div>
+  );
+
+  // ── いつもの画面（スクロールしない） ──
+  if (!all)
+    return (
+      <div ref={root} className="fav-page app-touch relative flex flex-col overflow-hidden text-white" style={{ height: screen }}>
+        {/* 見出しと右上のメニュー（ホームのロゴと同じ位置） */}
+        <div className="relative flex items-start justify-between" style={{ padding: "16px 18px 0 20px" }}>
+          <h1 className="fav-rise truncate font-bold" style={{ fontSize: 28, lineHeight: "34px", letterSpacing: 1.6, marginTop: 6, textShadow: SHADOW }}>
+            お気に入り
+          </h1>
+          {menuButton}
+        </div>
+        {/* ひとこと（ホームの「不動産の現場に、すぐ使える情報を。」と同じ位置・大きさ） */}
+        <p className="fav-rise relative font-medium" style={{ margin: "14px 20px 0", fontSize: 15.5, lineHeight: 1.6, letterSpacing: 1.6, textShadow: SHADOW, ...delay(60) }}>
+          {favorites.length ? (
+            <>
+              保存した物件　{favorites.length}件
+              <br />
+              この端末だけに保存しています
+            </>
+          ) : (
+            <>
+              見返したい物件を、
+              <br />
+              ここに保存できます。
+            </>
+          )}
+        </p>
+        {search}
+        {/* 最近保存した物件（新しく保存した順。画面に収まる数だけ） */}
+        <section className="relative" style={{ padding: "24px 19px 0" }}>
+          {favorites.length === 0 ? (
+            empty
+          ) : list.length === 0 ? (
+            noMatch
+          ) : (
+            <>
+              <div className="fav-rise flex min-h-[36px] items-center justify-between gap-x-[8px]" style={{ marginBottom: 6, ...delay(150) }}>
+                <h2 className="truncate font-semibold leading-[1.3]" style={LABEL}>
+                  {q ? `「${q}」に当てはまる物件` : "最近保存した物件"}
+                </h2>
+                <button
+                  onClick={() => toAll(true)}
+                  className="press group -mr-[8px] flex shrink-0 items-center gap-[2px] rounded-full px-[8px] transition-[background-color,opacity] active:bg-white/15"
+                  style={{ minHeight: HIT, fontSize: 14, color: "rgba(255,255,255,0.78)" }}
+                >
+                  すべて見る{list.length > shown.length ? `（${list.length}件）` : ""}
+                  <ChevronRight size={15} strokeWidth={2} absoluteStrokeWidth className="transition-transform duration-200 group-active:translate-x-[3px]" />
+                </button>
+              </div>
+              <ul className="fav-rise overflow-hidden rounded-[22px]" style={{ ...BOARD, ...delay(190), viewTransitionName: morph ? VT.card : undefined }}>
+                {shown.map((f, i) => row(f, i, 240))}
+              </ul>
+            </>
+          )}
+        </section>
+        {/* 読み込み中・お知らせの札は、下に浮かせて出す（いつもの画面はスクロールしないので、物件の数を変えない） */}
+        {banner && <div className="pointer-events-auto absolute inset-x-[19px] bottom-[14px] z-10">{banner}</div>}
+      </div>
+    );
+
+  // ── すべて見る（スクロールできる） ──
+  const groups: { label: string; items: FavoriteItem[] }[] = [];
+  if (byCity) {
+    const m = new Map<string, FavoriteItem[]>();
+    for (const f of list) {
+      const k = f.city ?? "対応エリアの外";
+      m.set(k, [...(m.get(k) ?? []), f]);
+    }
+    for (const [label, items] of [...m.entries()].sort((a, b) => b[1].length - a[1].length)) groups.push({ label, items });
+  } else groups.push({ label: "", items: list });
   const order = new Map<string, number>();
   groups.flatMap((g) => g.items).forEach((f, i) => order.set(favoriteKey(f), i));
-
+  const base = resorted ? 0 : 170;
   return (
     <div ref={root} className="fav-page app-touch relative text-white" style={{ minHeight: screen }}>
       {/* スクロールすると上に出る細いバー（押すといちばん上へ） */}
@@ -208,52 +399,28 @@ export function FavoritesPage({
         >
           <Star size={15} strokeWidth={1.8} absoluteStrokeWidth color="#ffc94a" fill="#ffc94a" />
           <span className="font-semibold" style={{ fontSize: 16.5, letterSpacing: 0.6 }}>
-            お気に入り
+            すべてのお気に入り
           </span>
-          {favorites.length > 0 && <span style={{ fontSize: 13, color: SUB }}>{favorites.length}件</span>}
+          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.62)" }}>{favorites.length}件</span>
         </button>
       </div>
 
-      {/* 見出しと右上のメニュー */}
-      <div className="relative flex items-start justify-between" style={{ padding: "16px 18px 0 20px" }}>
+      {/* 戻るボタンと見出し */}
+      <div className="relative flex items-center gap-[12px]" style={{ padding: "16px 18px 0 16px" }}>
+        <button onClick={() => toAll(false)} aria-label="お気に入りに戻る" className="press flex shrink-0 items-center justify-center rounded-full" style={{ ...LIGHT_GLASS, width: 46, height: 46, minWidth: HIT, minHeight: HIT }}>
+          <ChevronLeft size={24} strokeWidth={2} absoluteStrokeWidth color="#fff" />
+        </button>
         <div className="min-w-0">
-          <h1 className="fav-rise truncate font-bold" style={{ fontSize: 30, lineHeight: "36px", letterSpacing: 1.6, marginTop: 4, textShadow: SHADOW }}>
-            お気に入り
+          <h1 className="fav-rise truncate font-bold" style={{ fontSize: 22, lineHeight: "28px", letterSpacing: 1.2, textShadow: SHADOW }}>
+            すべてのお気に入り
           </h1>
-          <p className="fav-rise mt-[3px] truncate" style={{ fontSize: 13.5, letterSpacing: 0.6, color: "rgba(255,255,255,0.86)", textShadow: SHADOW, ...delay(60) }}>
-            {favorites.length ? `${favorites.length}件・この端末だけに保存（最大50件）` : "見返したい物件を、ここに"}
+          <p className="fav-rise mt-[2px] truncate" style={{ fontSize: 13, letterSpacing: 0.6, color: "rgba(255,255,255,0.8)", textShadow: SHADOW, ...delay(60) }}>
+            {favorites.length}件・この端末だけに保存（最大50件）
           </p>
         </div>
-        <button onClick={onMenu} aria-label={unread ? "メニュー（新しいお知らせがあります）" : "メニュー"} className="press relative flex shrink-0 items-center justify-center rounded-full" style={{ ...LIGHT_GLASS, width: 46, height: 46, minWidth: HIT, minHeight: HIT }}>
-          <Menu size={22} strokeWidth={1.8} absoluteStrokeWidth color="#fff" />
-          {unread && <span className="absolute rounded-full border-2 border-white bg-[#f0263a]" style={{ right: 2, top: 2, width: 11, height: 11 }} />}
-        </button>
       </div>
 
-      {/* 絞り込み（明るいすりガラス。ホームの検索欄と同じ） */}
-      <form
-        role="search"
-        className="fav-search relative"
-        style={{ margin: "18px 19px 0" }}
-        onSubmit={(e) => {
-          e.preventDefault();
-          inputRef.current?.blur();
-        }}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-      >
-        <div className="fav-rise flex items-center rounded-full transition-[box-shadow] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.28)]" style={{ ...LIGHT_GLASS, height: 52, ...delay(100) }}>
-          <Search size={21} strokeWidth={1.9} absoluteStrokeWidth color="#fff" className="ml-[19px] shrink-0" />
-          <ScaledInput value={q} onChange={setQ} inputRef={inputRef} size={16.5} className="ml-[12px] mr-[4px]" label="お気に入りを絞り込む" autoComplete="off" placeholder="町名・市区町村でしぼる" onPhoto />
-          {q && (
-            <button type="button" onClick={() => setQ("")} aria-label="入力を消す" className="mr-[4px] flex shrink-0 items-center justify-center" style={{ width: HIT, height: HIT }}>
-              <span className="flex items-center justify-center rounded-full bg-white/25" style={{ width: 20, height: 20 }}>
-                <X size={12} strokeWidth={2.4} absoluteStrokeWidth color="#fff" />
-              </span>
-            </button>
-          )}
-        </div>
-      </form>
+      {search}
 
       {/* 並べ方（白い札が滑る） */}
       <div role="radiogroup" aria-label="並べ方" className="fav-rise relative flex rounded-full" style={{ ...LIGHT_GLASS, minHeight: HIT, height: 44, padding: 3, margin: "12px 19px 0", ...delay(140) }}>
@@ -274,7 +441,7 @@ export function FavoritesPage({
               setByCity(v);
             }}
             className="relative flex-1 rounded-full font-semibold transition-colors duration-300"
-            style={{ fontSize: 14, letterSpacing: 0.4, color: byCity === v ? "#1b3f73" : "#fff", textShadow: byCity === v ? "none" : SHADOW }}
+            style={{ fontSize: 14, letterSpacing: 0.4, color: byCity === v ? "#1b3f73" : "#fff" }}
           >
             {label}
           </button>
@@ -283,71 +450,29 @@ export function FavoritesPage({
 
       {banner && <div className="relative mt-[10px] px-[19px]">{banner}</div>}
 
-      {/* 富士山を見せる空き */}
-      <div aria-hidden className="fav-gap" style={{ height: gap }} />
-
-      {/* 保存した物件（並べ方を変えたら作り直して、行が順に入れ替わる） */}
-      <section key={byCity ? "city" : "new"} className="relative" style={{ padding: "0 19px 24px" }}>
-        {favorites.length === 0 ? (
-          <div className="fav-rise flex flex-col items-center px-[16px] pb-[12px] pt-[6px] text-center" style={delay(200)}>
-            <span className="fav-empty-star flex items-center justify-center rounded-full" style={{ width: 66, height: 66, background: "radial-gradient(circle, rgba(255,201,74,0.3) 0%, rgba(255,201,74,0) 70%)" }}>
-              <Star size={30} strokeWidth={1.6} absoluteStrokeWidth color="#ffc94a" style={{ filter: "drop-shadow(0 0 8px rgba(255,196,74,0.6))" }} />
-            </span>
-            <p className="mt-[10px] font-medium leading-[1.4]" style={{ fontSize: 17, color: "rgba(255,255,255,0.95)" }}>
-              保存した物件はまだありません
-            </p>
-            <p className="mt-[6px] leading-[1.65]" style={{ fontSize: 13.5, color: "rgba(255,255,255,0.62)" }}>
-              物件を調べた画面の右上の ☆ を押すと、ここに並びます。履歴の行の ☆ からも保存できます。
-            </p>
-            <button onClick={onHome} className="press mt-[16px] flex items-center gap-[7px] rounded-full bg-white px-[20px] font-semibold" style={{ height: HIT, fontSize: 15, color: "#1b3f73" }}>
-              <Search size={17} strokeWidth={2.1} absoluteStrokeWidth />
-              ホームで調べる
-            </button>
-          </div>
-        ) : list.length === 0 ? (
-          <div className="fav-rise px-[12px] py-[14px] text-center">
-            <p className="font-medium" style={{ fontSize: 15.5, color: "rgba(255,255,255,0.95)" }}>
-              当てはまる物件がありません
-            </p>
-            <p className="mt-[4px]" style={{ fontSize: 13, color: "rgba(255,255,255,0.62)" }}>
-              絞り込みの文字を変えてみてください。
-            </p>
-          </div>
-        ) : (
-          groups.map((g, gi) => (
-            <div key={g.label || "all"} style={{ marginTop: gi ? 16 : 0 }}>
-              {g.label && (
-                <div className="fav-rise flex h-[34px] items-center justify-between px-[4px]" style={{ marginBottom: 6, ...delay(stagger ? base + gi * 60 : 0) }}>
-                  <h2 className="truncate font-semibold leading-none" style={{ fontSize: 15, letterSpacing: 1.5, color: "rgba(255,255,255,0.62)" }}>
-                    {g.label}
-                  </h2>
-                  <span className="shrink-0" style={{ fontSize: 13, color: "rgba(255,255,255,0.55)" }}>
-                    {g.items.length}件
-                  </span>
+      {/* すべての物件（並べ方を変えたら作り直して、行が順に入れ替わる） */}
+      <section key={byCity ? "city" : "new"} className="relative" style={{ padding: "18px 19px 24px" }}>
+        {favorites.length === 0
+          ? empty
+          : list.length === 0
+            ? noMatch
+            : groups.map((g, gi) => (
+                <div key={g.label || "all"} style={{ marginTop: gi ? 16 : 0 }}>
+                  {g.label && (
+                    <div className="fav-rise flex h-[34px] items-center justify-between px-[4px]" style={{ marginBottom: 6, ...delay(q ? 0 : base + gi * 60) }}>
+                      <h2 className="truncate font-semibold leading-none" style={LABEL}>
+                        {g.label}
+                      </h2>
+                      <span className="shrink-0" style={{ fontSize: 13, color: "rgba(255,255,255,0.55)" }}>
+                        {g.items.length}件
+                      </span>
+                    </div>
+                  )}
+                  <ul className="fav-rise overflow-hidden rounded-[22px]" style={{ ...BOARD, ...delay(q ? 0 : base + 20 + gi * 60), viewTransitionName: morph && gi === 0 ? VT.card : undefined }}>
+                    {g.items.map((f) => row(f, order.get(favoriteKey(f)) ?? 0, base + 80))}
+                  </ul>
                 </div>
-              )}
-              <ul className="fav-rise" style={delay(stagger ? base + 20 + gi * 60 : 0)}>
-                {g.items.map((f) => {
-                  const key = favoriteKey(f);
-                  const i = order.get(key) ?? 0;
-                  return (
-                    <FavRow
-                      key={key}
-                      item={f}
-                      sceneKey={scenes.get(historyKey(f)) ?? "suburb"}
-                      time={when(f.at, now)}
-                      leaving={leaving.includes(key)}
-                      style={delay(stagger ? base + 80 + Math.min(i, 9) * 45 : 0)}
-                      onPick={() => onPick(f)}
-                      onDocs={() => onDocs(f)}
-                      onRelease={() => release(f)}
-                    />
-                  );
-                })}
-              </ul>
-            </div>
-          ))
-        )}
+              ))}
         <p className="fav-rise mt-[16px] px-[4px] leading-[1.6]" style={{ fontSize: 11.5, color: "rgba(255,255,255,0.66)", textShadow: SHADOW, ...delay(320) }}>
           地図・データは参考情報です。MICHILUは判定をしません。重要事項説明などの最終確認は、必ず役所の窓口・公的な資料で行ってください。
         </p>
@@ -356,21 +481,21 @@ export function FavoritesPage({
   );
 }
 
-/** 保存した物件の1行（写真の札・町名・番地と日時）。右に書類と★ */
+/** 保存した物件の1行（市区町村と町名・番地と日時）。右に書類と★ */
 function FavRow({
   item,
-  sceneKey,
   time,
   leaving,
+  vt,
   style,
   onPick,
   onDocs,
   onRelease,
 }: {
   item: FavoriteItem;
-  sceneKey: SceneKey;
   time: string;
   leaving: boolean;
+  vt?: string;
   style: CSSProperties;
   onPick: () => void;
   onDocs: () => void;
@@ -378,30 +503,20 @@ function FavRow({
 }) {
   const { city, town, full } = placeParts(item);
   return (
-    <li className={`fav-row border-t border-white/[0.12] first:border-t-0 ${leaving ? "fav-leaving" : ""}`} style={style}>
+    <li className={`fav-row border-t border-white/[0.12] first:border-t-0 ${leaving ? "fav-leaving" : ""}`} style={{ ...style, viewTransitionName: vt }}>
       <div className="fav-row-in flex items-center">
-        <button onClick={onPick} aria-label={`${full}を開く`} className="flex min-h-[66px] min-w-0 flex-1 items-center gap-[13px] rounded-[12px] py-[9px] pl-[2px] pr-[2px] text-left transition-colors active:bg-white/10">
-          <PhoneImg
-            src={sceneSrc(sceneKey)}
-            alt=""
-            loading="lazy"
-            draggable={false}
-            className="size-[48px] shrink-0 rounded-[14px] object-cover"
-            style={{ objectPosition: `50% ${SCENES[sceneKey].y}%`, boxShadow: "0 0 0 1px rgba(255,255,255,0.2), 0 4px 12px rgba(0,0,0,0.28)" }}
-          />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate font-medium leading-[1.3]" style={{ fontSize: 16, color: "rgba(255,255,255,0.95)" }}>
-              {city && town ? `${city}${town}` : full}
-            </span>
-            <span className="mt-[3px] block truncate leading-[1.3]" style={{ fontSize: 13, color: "rgba(255,255,255,0.58)" }}>
-              {subLine(item, time)}
-            </span>
+        <button onClick={onPick} aria-label={`${full}を開く`} className="flex min-h-[62px] min-w-0 flex-1 flex-col justify-center py-[9px] pl-[18px] pr-[4px] text-left transition-colors active:bg-white/10">
+          <span className="block truncate font-medium leading-[1.3]" style={{ fontSize: 16, color: "rgba(255,255,255,0.95)" }}>
+            {city && town ? `${city}${town}` : full}
+          </span>
+          <span className="mt-[3px] block truncate leading-[1.3]" style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>
+            {subLine(item, time)}
           </span>
         </button>
         <button onClick={onDocs} aria-label="この物件の書類を作る" className="press flex shrink-0 items-center justify-center rounded-full active:bg-white/10" style={{ width: HIT, height: HIT }}>
-          <FileText size={20} strokeWidth={1.8} absoluteStrokeWidth color="rgba(255,255,255,0.7)" />
+          <FileText size={20} strokeWidth={1.8} absoluteStrokeWidth color="rgba(255,255,255,0.72)" />
         </button>
-        <button onClick={onRelease} aria-label="お気に入りから外す" className="mr-[4px] flex shrink-0 items-center justify-center rounded-full active:bg-white/10" style={{ width: HIT, height: HIT }}>
+        <button onClick={onRelease} aria-label="お気に入りから外す" className="mr-[6px] flex shrink-0 items-center justify-center rounded-full active:bg-white/10" style={{ width: HIT, height: HIT }}>
           <Star size={21} strokeWidth={1.7} absoluteStrokeWidth color="#ffc94a" fill="#ffc94a" className={leaving ? "fav-star-off" : ""} style={{ filter: "drop-shadow(0 0 6px rgba(255,196,74,0.55))" }} />
         </button>
       </div>
