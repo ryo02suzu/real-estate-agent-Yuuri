@@ -261,6 +261,36 @@ export function MobileApp(props: MobileAppProps) {
     setPage(p);
     scroller.current?.scrollTo(0, 0);
   }, []);
+  // ホームの最近の検索 ⇄ 履歴のつながる動きの間（両方のページの行・見出し・検索欄に同じ名前が付く。home.tsx の VT）
+  const [morph, setMorph] = useState(false);
+  /**
+   * ホームの最近の検索 ⇄ 履歴を、つながる動きで行き来する（View Transitions）：最近の3件の行・見出し・検索欄は、
+   * 相手のページの同じ物件の行・見出し・欄へ滑って形を変え、ほかはふわっと入れ替わる（app/globals.css の .vt-recent）。
+   * 対応していない端末と、動きを減らす設定では、そのまま切り替える
+   */
+  const morphTo = (p: NavKey) => {
+    if (typeof document.startViewTransition !== "function" || reducedMotion()) {
+      go(p);
+      return;
+    }
+    // 名前は動きの間だけ付ける（今の画面に付けてから、切り替える）
+    flushSync(() => setMorph(true));
+    const html = document.documentElement;
+    // 向き（履歴へは上へ、ホームへは下へ。行の動き出す順を変える）
+    const dir = p === "history" ? "vt-up" : "vt-down";
+    html.classList.add("vt-recent", dir);
+    const t = document.startViewTransition(() => {
+      flushSync(() => setPage(p));
+      scroller.current?.scrollTo(0, 0);
+    });
+    const done = () => {
+      html.classList.remove("vt-recent", dir);
+      setMorph(false);
+    };
+    // 動きが作れなかったときも、切り替えはそのまま（失敗を画面のエラーにしない）
+    t.finished.then(done, done);
+    t.ready.catch(() => {});
+  };
 
   const openMap = () => {
     const r = shown?.result;
@@ -445,6 +475,7 @@ export function MobileApp(props: MobileAppProps) {
         onClear={props.onClearHistory}
         onHome={() => go("home")}
         banner={tabBanner}
+        morph={morph}
       />
     );
   else if (page === "favorites")
@@ -564,7 +595,8 @@ export function MobileApp(props: MobileAppProps) {
                 onDismiss={() => setNotice(null)}
                 history={history}
                 onPickRecent={pickRecent}
-                onHistory={() => go("history")}
+                onHistory={() => morphTo("history")}
+                morph={morph}
                 onTry={(a) => {
                   takeOff(a);
                   props.onPickAddress(a);
@@ -611,7 +643,9 @@ export function MobileApp(props: MobileAppProps) {
             {tabPage && (
               <div
                 key={page}
-                className={page === "favorites" ? undefined : "page-in"}
+                className={
+                  page === "favorites" || morph ? undefined : "page-in"
+                }
               >
                 {body}
               </div>
@@ -651,7 +685,13 @@ export function MobileApp(props: MobileAppProps) {
           if (k === "home" && page === "home") {
             if (shown) props.onHome();
             else scroller.current?.scrollTo({ top: 0, behavior: "smooth" });
-          } else go(k);
+          } else if (
+            // ホームの最近の検索 ⇄ 履歴は、行がつながる動きで行き来する
+            (k === "history" && showHome) ||
+            (k === "home" && page === "history" && !shown)
+          )
+            morphTo(k);
+          else go(k);
         }}
       />
 

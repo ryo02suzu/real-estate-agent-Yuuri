@@ -215,6 +215,31 @@ body {
 }
 
 /*
+ * 写真の上のすりガラスの色（components/app/home.tsx の LIGHT_GLASS・DARK_GLASS、frame.tsx の写真の上の下のメニュー）。
+ * ぼかしが使える端末では、後ろの写真が透ける薄い色（ぼかしと彩度で読みやすくする）。
+ * ぼかしが使えない端末と、「透明度を下げる」設定の端末では、白い字が写真の明暗に埋もれない濃い下地にする
+ */
+:root {
+  --glass-light-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.12) 100%);
+  --glass-dark-bg: linear-gradient(180deg, rgba(34, 38, 50, 0.42) 0%, rgba(22, 26, 36, 0.5) 100%);
+  --glass-nav-bg: rgba(20, 24, 32, 0.5);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass-light-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.14) 100%), rgba(12, 24, 45, 0.68);
+    --glass-dark-bg: linear-gradient(180deg, rgba(40, 44, 54, 0.78) 0%, rgba(28, 32, 42, 0.84) 100%);
+    --glass-nav-bg: rgba(22, 26, 34, 0.82);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-light-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.14) 100%), rgba(12, 24, 45, 0.68);
+    --glass-dark-bg: linear-gradient(180deg, rgba(40, 44, 54, 0.78) 0%, rgba(28, 32, 42, 0.84) 100%);
+    --glass-nav-bg: rgba(22, 26, 34, 0.82);
+  }
+}
+
+/*
  * スマホのお気に入りのページ（components/app/favorites.tsx）。画面いっぱいの富士山の写真と、ホームと同じすりガラス。
  * 写真の箱（.fav-stage）は画面を覆う大きさにし、太陽の光（.fav-sun）と湖のきらめき（.fav-glint）を絵と同じ位置に重ねる
  * （箱の大きさは写真の縦横比 1438:2576。横は 25% の位置で切る。コンテナの単位が使えない古い端末は、画面いっぱいの箱に写真を合わせるだけ）。
@@ -754,6 +779,64 @@ body {
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation-duration: 240ms;
+  }
+}
+/*
+ * ホームの最近の検索 ⇄ 履歴のつながる動き（components/app/mobile-app.tsx の morphTo。html に .vt-recent が付いている間だけ）。
+ * 一覧の板・最近の3件の行・検索欄（名前は components/app/home.tsx の VT）は、相手のページの同じものへ 0.56 秒で滑って形を変える
+ * （板は暗いすりガラス ⇄ 白に色を変え、行は板に乗ったまま、動く向きの先頭の行から 18ms ずつ遅れて着く。向きは .vt-up・.vt-down）。
+ * ほかの画面は、前のページが少し手前に寄りながら薄れ、次のページが下から浮き上がる
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  html.vt-recent::view-transition-group(*) {
+    animation-duration: 0.56s;
+    animation-timing-function: cubic-bezier(0.22, 0.9, 0.24, 1);
+  }
+  /* 行は、動く向きの先頭の行から少しずつ遅れて動き出す（上へ＝履歴へは上の行から、下へ＝ホームへは下の行から。追いついて重ならない） */
+  html.vt-recent.vt-up::view-transition-group(vt-r1),
+  html.vt-recent.vt-down::view-transition-group(vt-r1) {
+    animation-delay: 18ms;
+  }
+  html.vt-recent.vt-up::view-transition-group(vt-r2),
+  html.vt-recent.vt-down::view-transition-group(vt-r0) {
+    animation-delay: 36ms;
+  }
+  html.vt-recent::view-transition-old(vt-r0),
+  html.vt-recent::view-transition-new(vt-r0),
+  html.vt-recent::view-transition-old(vt-r1),
+  html.vt-recent::view-transition-new(vt-r1),
+  html.vt-recent::view-transition-old(vt-r2),
+  html.vt-recent::view-transition-new(vt-r2),
+  html.vt-recent::view-transition-old(vt-search),
+  html.vt-recent::view-transition-new(vt-search) {
+    animation-duration: 0.42s;
+    animation-timing-function: ease;
+  }
+  /* 一覧の板（暗いすりガラス ⇄ 白）は、行を除いた板だけの絵なので、箱いっぱいに合わせて形と色を変える */
+  html.vt-recent::view-transition-old(vt-card),
+  html.vt-recent::view-transition-new(vt-card) {
+    height: 100%;
+    animation-duration: 0.46s;
+    animation-timing-function: ease;
+  }
+  /* 前と次のページが重なって見える時間を短くする（字が二重に見えないように） */
+  html.vt-recent::view-transition-old(root) {
+    animation: vt-recent-out 0.26s cubic-bezier(0.4, 0, 1, 1) both;
+  }
+  html.vt-recent::view-transition-new(root) {
+    animation: vt-recent-in 0.46s cubic-bezier(0.2, 0.8, 0.2, 1) 0.05s both;
+  }
+}
+@keyframes vt-recent-out {
+  to {
+    opacity: 0;
+    transform: scale(1.03);
+  }
+}
+@keyframes vt-recent-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
   }
 }
 @media (prefers-reduced-motion: reduce) {

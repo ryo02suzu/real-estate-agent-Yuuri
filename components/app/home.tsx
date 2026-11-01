@@ -33,31 +33,38 @@ export const GLOW = "0 0 10px rgba(var(--sky-halo, 255,255,255),0.95), 0 0 3px r
 export const AURORA =
   "radial-gradient(60% 42% at 0% 45%, rgba(110,140,255,0.13) 0%, rgba(110,140,255,0) 100%), radial-gradient(55% 38% at 100% 58%, rgba(40,190,255,0.12) 0%, rgba(40,190,255,0) 100%)";
 
-/** 明るいすりガラス（検索欄・右上のメニュー。お気に入りのページも同じ） */
+/**
+ * 明るいすりガラス（検索欄・右上のメニュー。お気に入りのページも同じ）。色は app/globals.css の --glass-light-bg：
+ * ぼかしが使える端末では後ろの写真が透ける薄い白。ぼかしが使えない端末と「透明度を下げる」設定では、字が写真に埋もれない濃い下地
+ */
 export const LIGHT_GLASS: CSSProperties = {
-  // ぼかしが描かれないブラウザでも、写真の明暗に字が埋もれない下地。
-  backgroundColor: "rgba(12,24,45,0.68)",
-  backgroundImage: "linear-gradient(180deg, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0.14) 100%)",
+  background: "var(--glass-light-bg)",
   border: "1px solid rgba(255,255,255,0.42)",
   boxShadow: "0 10px 30px rgba(10,20,40,0.22), inset 0 1px 0 rgba(255,255,255,0.35)",
-  backdropFilter: "blur(18px) saturate(140%)",
-  WebkitBackdropFilter: "blur(18px) saturate(140%)",
+  backdropFilter: "blur(20px) saturate(160%)",
+  WebkitBackdropFilter: "blur(20px) saturate(160%)",
 };
-/** 暗いすりガラス（最近の検索の一覧・注意。お気に入りのページも同じ） */
+/** 暗いすりガラス（最近の検索の一覧・注意。お気に入りのページも同じ）。色は --glass-dark-bg（透け方は明るいすりガラスと同じ考え方） */
 export const DARK_GLASS: CSSProperties = {
-  background: "linear-gradient(180deg, rgba(40,44,54,0.78) 0%, rgba(28,32,42,0.84) 100%)",
-  border: "1px solid rgba(255,255,255,0.16)",
-  boxShadow: "0 14px 34px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)",
-  backdropFilter: "blur(22px) saturate(140%)",
-  WebkitBackdropFilter: "blur(22px) saturate(140%)",
+  background: "var(--glass-dark-bg)",
+  border: "1px solid rgba(255,255,255,0.18)",
+  boxShadow: "0 14px 34px rgba(0,0,0,0.26), inset 0 1px 0 rgba(255,255,255,0.1)",
+  backdropFilter: "blur(24px) saturate(160%)",
+  WebkitBackdropFilter: "blur(24px) saturate(160%)",
 };
 /** 写真の上の2行目の字 */
 export const SUB = "rgba(255,255,255,0.72)";
 /** 393pt の絵が縮小されても、実際に押せる範囲は44px以上にする（お気に入りのページも同じ）。 */
 export const HIT = "max(44px, calc(44px / var(--app-zoom, 1)))";
 
-/** 最近の検索に出す数 */
-const RECENT = 3;
+/** 最近の検索に出す数（履歴のページは、この先頭の3件を同じ行として受け取る） */
+export const RECENT = 3;
+/**
+ * 最近の検索 ⇄ 履歴のつながる動き（View Transitions。components/app/mobile-app.tsx の morphTo）で、両方のページの同じものに付ける名前。
+ * 一覧の板は最近の検索の暗いすりガラス ⇄ 履歴のいちばん上の白い板、行は最近の検索の何番目か（0〜2）、
+ * 検索欄はホームの検索欄 ⇄ 履歴の絞り込みの欄。板が行を乗せたまま滑って、色を変える
+ */
+export const VT = { card: "vt-card", search: "vt-search", row: (i: number) => `vt-r${i}` };
 /** まだ何も調べていないときの例（押すとそのまま調べる） */
 const EXAMPLES: { Icon: typeof Search; title: string; sub: string; query: string }[] = [
   { Icon: Search, title: "住所で調べる", sub: "例：渋谷区神南1-19-11", query: "渋谷区神南1-19-11" },
@@ -139,6 +146,7 @@ export function HomeScreen({
   unread,
   inputRef,
   resume,
+  morph = false,
 }: {
   input: string;
   setInput: (v: string) => void;
@@ -159,6 +167,8 @@ export function HomeScreen({
   inputRef: RefObject<HTMLInputElement | null>;
   /** 直近7日に見ていた物件（最近の検索のその行に「続きから」と、見ていたタブを添える。開くとそのタブから） */
   resume?: Resume;
+  /** 履歴のページへつながる動きの間（一覧の板・行・検索欄に、履歴のページと同じ名前を付ける。VT） */
+  morph?: boolean;
 }) {
   const recent = history.slice(0, RECENT);
   const root = useRef<HTMLDivElement>(null);
@@ -173,7 +183,7 @@ export function HomeScreen({
   const riseClass = first ? "home-rise" : "";
 
   return (
-    <div ref={root} className={`app-touch relative flex flex-col text-white ${first ? "" : "page-in"}`} style={{ minHeight: screen }}>
+    <div ref={root} className={`app-touch relative flex flex-col text-white ${first || morph ? "" : "page-in"}`} style={{ minHeight: screen }}>
       {/* ロゴと右上のメニュー */}
       <div className="relative flex items-start justify-between" style={{ padding: "16px 18px 0 20px" }}>
         <PhoneImg src="/home/logo-mark-white.webp" alt="MICHILU" width={802} height={159} draggable={false} className={`${riseClass} block`} style={{ height: 30, width: "auto", marginTop: 6, filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.3))" }} />
@@ -203,7 +213,7 @@ export function HomeScreen({
           onSubmit();
         }}
       >
-        <div className={`${riseClass} flex items-center rounded-full transition-[box-shadow] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.28)]`} style={{ ...LIGHT_GLASS, height: "max(56px, 3.3em)", fontSize: 17, ...rise(100) }}>
+        <div className={`${riseClass} flex items-center rounded-full transition-[box-shadow] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.28)]`} style={{ ...LIGHT_GLASS, height: "max(56px, 3.3em)", fontSize: 17, ...rise(100), viewTransitionName: morph ? VT.search : undefined }}>
           <Search size={22} strokeWidth={1.9} absoluteStrokeWidth color="#fff" className="ml-[20px] shrink-0" />
           <ScaledInput value={input} onChange={setInput} inputRef={inputRef} size={17} className="ml-[13px] mr-[4px]" label="住所・地番" autoComplete="off" placeholder="住所・地番で検索" onPhoto />
           {loading ? (
@@ -242,12 +252,12 @@ export function HomeScreen({
         {recent.length ? (
           <>
             <SectionHead title="最近の検索" onMore={onHistory} className={riseClass} />
-            <ul className={`${riseClass} overflow-hidden rounded-[22px]`} style={{ ...DARK_GLASS, ...rise(160) }}>
-              {recent.map((h) => {
+            <ul className={`${riseClass} overflow-hidden rounded-[22px]`} style={{ ...DARK_GLASS, ...rise(160), viewTransitionName: morph ? VT.card : undefined }}>
+              {recent.map((h, i) => {
                 const { city, town, full } = placeParts(h);
                 const resumed = resume && historyKey(h) === resume.historyKey;
                 return (
-                  <li key={historyKey(h)} className="border-t border-white/[0.12] first:border-t-0">
+                  <li key={historyKey(h)} className="border-t border-white/[0.12] first:border-t-0" style={morph ? { viewTransitionName: VT.row(i) } : undefined}>
                     <Row
                       Icon={Search}
                       title={city && town ? `${city}${town}` : full}
@@ -300,7 +310,7 @@ function Row({ Icon, title, sub, label, onClick }: { Icon: typeof Search; title:
   );
 }
 
-/** 章の見出し（白い太字）と「すべて見る ›」（押せる高さは44pt） */
+/** 章の見出し（白い太字）と「すべて見る ›」（押せる高さは44pt。押すと沈んで › が右へ動く） */
 function SectionHead({ title, onMore, className = "" }: { title: string; onMore?: () => void; className?: string }) {
   return (
     <div className={`${className} flex min-h-[36px] flex-wrap items-center justify-between gap-x-[8px]`} style={{ marginBottom: 6, ...rise(140) }}>
@@ -308,9 +318,9 @@ function SectionHead({ title, onMore, className = "" }: { title: string; onMore?
         {title}
       </h2>
       {onMore && (
-        <button onClick={onMore} className="-mr-[8px] flex shrink-0 items-center gap-[2px] px-[8px] active:opacity-60" style={{ minHeight: HIT, fontSize: 14, color: "rgba(255,255,255,0.9)", textShadow: SHADOW }}>
+        <button onClick={onMore} className="press group -mr-[8px] flex shrink-0 items-center gap-[2px] rounded-full px-[8px] transition-[background-color,opacity] active:bg-white/15" style={{ minHeight: HIT, fontSize: 14, color: "rgba(255,255,255,0.92)", textShadow: SHADOW }}>
           すべて見る
-          <ChevronRight size={15} strokeWidth={2} absoluteStrokeWidth />
+          <ChevronRight size={15} strokeWidth={2} absoluteStrokeWidth className="transition-transform duration-200 group-active:translate-x-[3px]" />
         </button>
       )}
     </div>

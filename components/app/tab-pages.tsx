@@ -33,7 +33,7 @@ import { historyKey, type HistoryItem } from "@/lib/history";
 import { allRecords, recordsSummary, type PropertyRecords } from "@/lib/records";
 import { MUNICIPALITIES } from "@/lib/roadmap";
 import { PhoneImg, ScaledInput } from "./frame";
-import { AURORA, DARK_GLASS, GLOW, PAGE } from "./home";
+import { AURORA, DARK_GLASS, GLOW, PAGE, RECENT, VT } from "./home";
 import { ClockBack } from "./icons";
 import { FavStar } from "./star";
 import { NEWS } from "./news";
@@ -125,9 +125,9 @@ export function TabBanner({ loading, error, notice, onDismiss, glass = false }: 
 }
 
 /** ガラスのカードの中の検索の欄（iPhone で拡大しないよう、字は ScaledInput で描く） */
-function SearchField({ value, onChange, placeholder, label }: { value: string; onChange: (v: string) => void; placeholder: string; label: string }) {
+function SearchField({ value, onChange, placeholder, label, vt }: { value: string; onChange: (v: string) => void; placeholder: string; label: string; vt?: string }) {
   return (
-    <form role="search" onSubmit={(e) => e.preventDefault()} className="flex h-[42px] items-center rounded-full border border-[#d8e0eb] bg-white pl-[12px] pr-[4px] shadow-[inset_0_1px_2px_rgba(20,45,85,0.05)] focus-within:border-[#9db8e6]">
+    <form role="search" onSubmit={(e) => e.preventDefault()} className="flex h-[42px] items-center rounded-full border border-[#d8e0eb] bg-white pl-[12px] pr-[4px] shadow-[inset_0_1px_2px_rgba(20,45,85,0.05)] focus-within:border-[#9db8e6]" style={{ viewTransitionName: vt }}>
       <Search size={17} strokeWidth={1.9} absoluteStrokeWidth color="#6b778a" className="shrink-0" />
       <ScaledInput value={value} onChange={onChange} placeholder={placeholder} label={label} size={15} autoComplete="off" className="ml-[8px] mr-[2px]" />
       {value && (
@@ -258,11 +258,11 @@ function Pill({ color, bg, children }: { color: string; bg: string; children: Re
 }
 
 /** 調べた物件の1行（写真の札・町名・市区町村と日時と調べ方。extra は3行目の札）。右に小さなボタン */
-function PlaceRow({ item, scene, time, onClick, trailing, extra }: { item: HistoryItem; scene: SceneKey; time?: string; onClick: () => void; trailing?: ReactNode; extra?: ReactNode }) {
+function PlaceRow({ item, scene, time, onClick, trailing, extra, vt }: { item: HistoryItem; scene: SceneKey; time?: string; onClick: () => void; trailing?: ReactNode; extra?: ReactNode; vt?: string }) {
   const { city, town, full, chiban } = placeParts(item);
   const kind = chiban ? "・地番" : item.ll ? "・地図" : "";
   return (
-    <li className="border-t border-[#eef2f6] first:border-t-0">
+    <li className="border-t border-[#eef2f6] first:border-t-0" style={vt ? { viewTransitionName: vt } : undefined}>
       <div className="flex items-center">
         <button onClick={onClick} className="flex min-h-[64px] min-w-0 flex-1 items-center gap-[12px] py-[8px] pl-[10px] pr-[4px] text-left active:bg-[#f5f8fc]">
           <PhoneImg src={sceneSrc(scene)} alt="" loading="lazy" draggable={false} className="size-[46px] shrink-0 rounded-[13px] object-cover" style={{ objectPosition: `50% ${SCENES[scene].y}%` }} />
@@ -314,6 +314,7 @@ export function HistoryPage({
   onClear,
   onHome,
   banner,
+  morph = false,
 }: {
   history: HistoryItem[];
   isFavorite: (h: HistoryItem) => boolean;
@@ -322,9 +323,17 @@ export function HistoryPage({
   onClear: () => void;
   onHome: () => void;
   banner?: ReactNode;
+  /** ホームの最近の検索とつながる動きの間（いちばん上の板・検索欄・最近の3件の行に、ホームと同じ名前を付ける。home.tsx の VT） */
+  morph?: boolean;
 }) {
   const [q, setQ] = useState("");
   const [kind, setKind] = useState<Kind | "all">("all");
+  // ホームの最近の検索の何番目か（つながる動きで、同じ物件の行どうしを結ぶ）
+  const recentIndex = new Map(history.slice(0, RECENT).map((h, i) => [historyKey(h), i]));
+  const rowVt = (h: HistoryItem) => {
+    const i = morph ? recentIndex.get(historyKey(h)) : undefined;
+    return i === undefined ? undefined : VT.row(i);
+  };
   const [confirm, setConfirm] = useState(false);
   const now = useNow();
   // 「すべて消す」は2回押す（4秒で戻る）
@@ -357,7 +366,7 @@ export function HistoryPage({
       sub={history.length ? `${history.length}件・この端末だけに保存（最大30件）` : "調べた物件がここに残ります"}
       hero={
         <>
-          <SearchField value={q} onChange={setQ} placeholder="町名・市区町村でしぼる" label="履歴を検索" />
+          <SearchField value={q} onChange={setQ} placeholder="町名・市区町村でしぼる" label="履歴を検索" vt={morph ? VT.search : undefined} />
           <div className="mt-[8px] flex gap-[6px]">
             {KINDS.map((k) => (
               <Chip key={k.key} label={counts[k.key] ? `${k.label} ${counts[k.key]}` : k.label} on={kind === k.key} onClick={() => setKind(k.key)} />
@@ -382,10 +391,10 @@ export function HistoryPage({
       ) : list.length === 0 ? (
         <Empty icon={<Search size={26} strokeWidth={1.7} absoluteStrokeWidth color="#8fa3c2" />} title="当てはまる履歴がありません" body="絞り込みの文字や種類を変えてみてください。" />
       ) : (
-        groups.map((g) => (
+        groups.map((g, gi) => (
           <section key={g.label}>
             <Head title={g.label} note={`${g.items.length}件`} className="mt-[10px]" />
-            <ul className={`overflow-hidden ${CARD}`}>
+            <ul className={`overflow-hidden ${CARD}`} style={morph && gi === 0 ? { viewTransitionName: VT.card } : undefined}>
               {g.items.map(({ item: h, ...grp }) => (
                 <PlaceRow
                   key={historyKey(h)}
@@ -393,6 +402,7 @@ export function HistoryPage({
                   scene={scenes.get(historyKey(h)) ?? "suburb"}
                   time={when(h.at, now)}
                   onClick={() => onPick(h)}
+                  vt={rowVt(h)}
                   extra={groupPills({ item: h, ...grp }, recs)}
                   trailing={
                     <IconButton label={isFavorite(h) ? "お気に入りから外す" : "お気に入りに保存"} onClick={() => onToggleFavorite(h)}>
