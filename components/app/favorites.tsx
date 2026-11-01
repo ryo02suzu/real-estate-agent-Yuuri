@@ -1,6 +1,6 @@
 "use client";
 
-// スマホの下のメニューの「お気に入り」。画面いっぱいの写真（届いた富士山と湖の絵。昼は public/favorites/fuji-day.webp、夕方は fuji-*.webp。
+// スマホの下のメニューの「お気に入り」。画面いっぱいの写真（届いた富士山と湖の絵。昼は public/favorites/fuji-day.webp、夕方は fuji-*.webp、夜は fuji-night.webp。
 // 太陽の高さで切り替える。components/app/day-photo.ts。下のメニューの後ろまで
 // 敷くので、components/app/mobile-app.tsx が FavoritesBackdrop で画面のいちばん奥に置く）の上に、ふたつの画面：
 // ・いつもの画面（スクロールしない）：ホームと同じ位置に、見出し「お気に入り」と右上のメニュー（≡）、2行のひとこと（件数）、
@@ -11,7 +11,8 @@
 //   行き来するときは、板と行と検索欄が滑ってつながる（View Transitions。名前は components/app/home.tsx の VT。.vt-fav）。
 // 行は写真の札を付けず、市区町村と町名・番地か地番と日時・書類のボタン・★。板は字が読みやすいよう、ホームより少し濃いすりガラス。
 // 動き（app/globals.css の .fav-*）：開くと写真がふわっと落ち着き、上から順に浮き上がり、行は少しずつ遅れて現れる。
-// 太陽の光がゆっくり揺らぎ、湖に映った光の道がきらめき、富士山の雪が朝日にほんのり染まる（≡ の「動きの演出」がオンのとき）。すべて見るでスクロールすると、写真が
+// 夕方は太陽の光がゆっくり揺らぎ、湖に映った光の道がきらめき、富士山の雪が朝日にほんのり染まる。夜は月の光が揺らぎ、星が瞬き、月の光の道がきらめく
+// （≡ の「動きの演出」がオンのとき）。すべて見るでスクロールすると、写真が
 // ゆっくり上へ寄って暗くなり、上に見出しの細いバーが出る（押すといちばん上へ）。
 // ★を押すと星が抜けて行がたたまれ、下に「元に戻す」が出る（UndoToast。mobile-app.tsx が出す）。
 // 動きを減らす設定では、位置の動きを止める（すぐ切り替わる）
@@ -32,7 +33,8 @@ import { reducedMotion } from "./tokens";
  * ar は写真の縦横比（幅÷高さ）、x・y は写真が画面より大きいときに切る位置（0〜1）。bg は読み込むまでの地の色、top は時刻・電池の帯の色
  * （写真のいちばん上に、上の暗いぼかしを重ねた色）。fuji は富士山の位置（絵の高さに対する割合。届いた絵で測った）：頂・雪の下の端・
  * foot はいつもの画面の一覧の板の上の端の限り（ふもと。ここより上に板を置かず、富士山を隠さない）、x は頂の横の位置（絵の幅に対する %）。
- * glow は雪をほんのり染める光の色（動きの演出がオンのとき）。sun は太陽の位置（%）で、あれば太陽の光の揺らぎと湖の光の道のきらめきを重ねる
+ * 動きの演出がオンのときに重ねる光：glow は雪をほんのり染める光の色、halo は太陽・月のまわりの光（位置 %、幅は絵の幅に対する %、色）、
+ * glints は湖に映った光の道のきらめき（glint は粒の色とにじみの色）、stars は写真の星（瞬かせる）
  */
 type FavPhoto = {
   src: string;
@@ -45,8 +47,45 @@ type FavPhoto = {
   top: string;
   fuji: { peak: number; snow: number; foot: number; x: number };
   glow?: string;
-  sun?: { x: number; y: number };
+  halo?: { x: number; y: number; w: number; bg: string };
+  glints?: Sparkle[];
+  glint?: { core: string; glow: string };
+  stars?: Sparkle[];
 };
+/** 光の粒（位置は絵に対する %、大きさ px、点滅の長さと遅れ 秒、明るさ 0〜1） */
+type Sparkle = { x: number; y: number; size: number; dur: number; delay: number; a?: number };
+
+/** 決まった並びの乱数（毎回同じ並び） */
+const seeded = (seed: number) => {
+  let s = seed;
+  return () => (s = (s * 16807) % 2147483647) / 2147483647;
+};
+
+/** 湖に映った光の道のきらめき：道の真ん中 x（%）、始まり y0（%）と長さ（%）、広がり（下ほど広がる） */
+function pathGlints(seed: number, n: number, x: number, y0: number, len: number, spread0: number, grow: number): Sparkle[] {
+  const rnd = seeded(seed);
+  return Array.from({ length: n }, () => {
+    const y = y0 + Math.pow(rnd(), 1.6) * len;
+    const spread = spread0 + (y - y0) * grow;
+    return { x: x + (rnd() * 2 - 1) * spread, y, size: 2 + Math.round(rnd() * 2), dur: 2.2 + rnd() * 2.2, delay: rnd() * 3.2 };
+  });
+}
+
+/**
+ * 夜の写真の星（届いた絵で、まわりより明るい小さな点を探して測った。x・y は %、d はまわりとの明るさの差）。
+ * 雲のふちの明るい所と、画面のいちばん上の端は外した
+ */
+const NIGHT_STARS: Sparkle[] = (() => {
+  const rnd = seeded(29);
+  const found: [number, number, number][] = [
+    [85.12, 1.97, 171], [90.75, 6.46, 123], [54.73, 2.45, 121], [23.27, 14.0, 120], [4.36, 15.74, 109], [30.29, 19.45, 103],
+    [34.86, 14.54, 99], [12.43, 27.35, 98], [40.6, 10.53, 91], [53.88, 13.17, 87], [49.2, 33.39, 85], [8.18, 21.01, 84],
+    [17.96, 31.0, 78], [61.0, 7.3, 77], [15.83, 31.36, 76], [67.48, 6.64, 72], [5.42, 33.33, 70], [27.21, 32.02, 69],
+    [42.51, 3.17, 65], [6.38, 14.9, 65], [63.66, 7.3, 64], [30.82, 26.87, 60], [20.51, 32.32, 58], [75.66, 37.7, 48],
+    [96.39, 11.31, 47], [15.09, 36.51, 46],
+  ];
+  return found.map(([x, y, d]) => ({ x, y, size: d > 100 ? 3 : 2, dur: 2.6 + rnd() * 2.8, delay: rnd() * 4, a: Math.min(1, Math.max(0.5, d / 150)) }));
+})();
 /**
  * 夕方：日の出（日の入り）の光と紅富士・湖（届いた絵 1438×2576。幅 900・1260・1438 の3枚から端末が選ぶ）。頂 45%・雪 52.5%・ふもと 59%・湖 63% から。
  * 板の上の端は 56%（雪の下の暗い斜面のいちばん下を少しだけ覆う。iPhone 16 で4件入る）
@@ -62,7 +101,10 @@ const EVENING: FavPhoto = {
   top: "#0f2c50",
   fuji: { peak: 0.45, snow: 0.525, foot: 0.56, x: 60 },
   glow: "255,150,120",
-  sun: { x: 10.69, y: 55.17 },
+  // 富士山の左のふもとに出る太陽（絵 1438×2576 で測った）と、湖に映った光の道
+  halo: { x: 10.69, y: 55.17, w: 78, bg: "radial-gradient(circle, rgba(255,236,196,0.62) 0%, rgba(255,196,120,0.3) 14%, rgba(255,160,90,0.12) 34%, rgba(255,150,80,0) 62%)" },
+  glints: pathGlints(11, 14, 10.9, 64.5, 20, 1.2, 0.09),
+  glint: { core: "#fff6dc", glow: "rgba(255,214,140,0.85)" },
 };
 const FAV_PHOTOS: Record<DayPart, FavPhoto> = {
   /** 昼：青空と雪の富士山・湖・すすき（届いた絵 941×1672）。頂 39.7%・雪と雲 46%・ふもと 55.5%・湖 60% から。頂が画面の中ほどより少し右に来る位置で切る */
@@ -76,32 +118,29 @@ const FAV_PHOTOS: Record<DayPart, FavPhoto> = {
     fuji: { peak: 0.397, snow: 0.46, foot: 0.555, x: 62.5 },
   },
   evening: EVENING,
-  /** 夜：写真が届くまでは夕方の写真 */
-  night: EVENING,
+  /**
+   * 夜：月と星・月明かりの富士山・町の明かりと湖（届いた絵 941×1671）。頂 40.3%・雪 47%・ふもと 56〜57%（その下に町の明かり）・湖 60% から。
+   * 月は 81.8%・21%（検索欄の上の右に見える）。月の光の道は湖の右（81% あたりから下へ広がる）
+   */
+  night: {
+    src: "/favorites/fuji-night.webp",
+    ar: 941 / 1671,
+    x: 0.65,
+    y: 0.4,
+    bg: "#101826",
+    top: "#0c182a",
+    fuji: { peak: 0.403, snow: 0.47, foot: 0.56, x: 61.5 },
+    halo: { x: 81.8, y: 20.95, w: 26, bg: "radial-gradient(circle, rgba(232,240,255,0.55) 0%, rgba(205,220,255,0.24) 16%, rgba(190,205,255,0.08) 38%, rgba(190,205,255,0) 64%)" },
+    glints: pathGlints(7, 18, 80.5, 61.5, 33, 2, 0.2),
+    glint: { core: "#f4f8ff", glow: "rgba(190,210,255,0.8)" },
+    stars: NIGHT_STARS,
+  },
 };
 
 /** お気に入りのページの時刻・電池の帯の色（いまの時間帯の写真のいちばん上の色） */
 export function favoritesTop(): string {
   return FAV_PHOTOS[partNow()].top;
 }
-
-/** 湖に映った太陽の光の道のきらめき（夕方の写真。位置は絵に対する %、大きさ px、長さと遅れ 秒）。毎回同じ並び */
-const GLINTS = (() => {
-  let s = 11;
-  const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
-  return Array.from({ length: 14 }, () => {
-    const y = 64.5 + Math.pow(rnd(), 1.6) * 20;
-    // 光の道は下ほど広がる
-    const spread = 1.2 + (y - 64.5) * 0.09;
-    return {
-      x: 10.9 + (rnd() * 2 - 1) * spread,
-      y,
-      size: 2 + Math.round(rnd() * 2),
-      dur: 2.2 + rnd() * 2.2,
-      delay: rnd() * 3.2,
-    };
-  });
-})();
 
 /** スクロールで写真が寄りきるまでの量（px） */
 const PARALLAX_RANGE = 320;
@@ -116,7 +155,7 @@ const delay = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
 
 /**
  * 画面いっぱいの富士山の写真（下のメニューの後ろまで敷く。昼・夕方・夜で切り替え、変わるときはゆっくり重ねる）。上と下を少し暗くして、
- * 白い字とメニューを読みやすくする。写真の上に、光（夕方は太陽の揺らぎ・湖のきらめき・紅富士）を絵と同じ位置に重ねる
+ * 白い字とメニューを読みやすくする。写真の上に、光（夕方は太陽の揺らぎ・湖のきらめき・紅富士、夜は月の光・星の瞬き・月の光の道のきらめき）を絵と同じ位置に重ねる
  * （写真と光を同じ箱に入れ、箱を画面いっぱいに合わせる。.fav-stage）。
  * スクロールした量を --fav-p（0〜1）に書き、写真が上へ寄って暗くなる（動きの演出がオフ・動きを減らす設定では暗くなるだけ）
  */
@@ -162,7 +201,7 @@ function FujiScene({ photo: p, swap, onShown }: { photo: FavPhoto; swap: boolean
   const entry = useLayerEntry(swap, onShown);
   return (
     <div className={`absolute inset-0 ${entry.className}`}>
-      <div className="fav-stage" style={{ "--fav-ar": p.ar, "--fav-x": p.x, "--fav-y": p.y } as CSSProperties}>
+      <div className="fav-stage" style={{ "--fav-ar": p.ar, "--fav-x": p.x, "--fav-y": p.y, "--glint": p.glint?.core, "--glint-glow": p.glint?.glow } as CSSProperties}>
         <div className="fav-drift absolute inset-0">
           <PhoneImg
             src={p.src}
@@ -175,7 +214,10 @@ function FujiScene({ photo: p, swap, onShown }: { photo: FavPhoto; swap: boolean
             className="absolute inset-0 h-full w-full object-cover"
             style={{ objectPosition: `${p.x * 100}% ${p.y * 100}%` }}
           />
-          {p.sun && <span className="fav-sun" style={{ left: `${p.sun.x}%`, top: `${p.sun.y}%` }} />}
+          {p.halo && <span className="fav-halo" style={{ left: `${p.halo.x}%`, top: `${p.halo.y}%`, width: `${p.halo.w}%`, background: p.halo.bg }} />}
+          {p.stars?.map((g, i) => (
+            <span key={`s${i}`} className="fav-star" style={{ left: `${g.x}%`, top: `${g.y}%`, width: g.size, height: g.size, animationDuration: `${g.dur}s`, animationDelay: `${g.delay}s`, "--a": g.a } as CSSProperties} />
+          ))}
           {/* 雪が光にほんのり染まって、ゆっくり明るくなっては落ち着く（動きの演出がオンのときだけ） */}
           {p.glow && (
             <span
@@ -187,10 +229,9 @@ function FujiScene({ photo: p, swap, onShown }: { photo: FavPhoto; swap: boolean
               }}
             />
           )}
-          {p.sun &&
-            GLINTS.map((g, i) => (
-              <span key={i} className="fav-glint" style={{ left: `${g.x}%`, top: `${g.y}%`, width: g.size, height: g.size, animationDuration: `${g.dur}s`, animationDelay: `${g.delay}s` }} />
-            ))}
+          {p.glints?.map((g, i) => (
+            <span key={i} className="fav-glint" style={{ left: `${g.x}%`, top: `${g.y}%`, width: g.size, height: g.size, animationDuration: `${g.dur}s`, animationDelay: `${g.delay}s` }} />
+          ))}
         </div>
       </div>
     </div>
