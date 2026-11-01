@@ -534,6 +534,7 @@ export function MobileApp(props: MobileAppProps) {
         onHome={() => go("home")}
         onMenu={() => setMenu(true)}
         unread={unread}
+        motion={motionOn}
       />
     );
   else if (page === "account")

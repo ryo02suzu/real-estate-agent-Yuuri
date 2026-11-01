@@ -530,6 +530,41 @@ body {
   mix-blend-mode: screen;
   opacity: 0;
 }
+/*
+ * 書類・出力の「要注意点と次にやること」（いちばん使う書類）：白で浮かせず、ほかのボタンと同じすりガラスのまま少し明るく、上の縁に光。
+ * 押すと明るくなる。.docs-sheen は開いたとき1回だけ横切る光（動きの演出がオンのとき。動きを減らす設定では出ない）
+ */
+.docs-main {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.08) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 6px 18px rgba(0, 0, 0, 0.12);
+  transition: background 0.2s ease;
+}
+.docs-main:active {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.14) 100%);
+}
+.docs-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.24) 48%, rgba(255, 255, 255, 0) 66%);
+  transform: translateX(-120%);
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .docs-sheen {
+    animation: docs-sheen 1.5s cubic-bezier(0.4, 0, 0.2, 1) 0.9s 1 both;
+  }
+}
+@keyframes docs-sheen {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(120%);
+  }
+}
 @media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
   .day-intro {
     animation: day-intro 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;

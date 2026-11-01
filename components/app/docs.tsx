@@ -20,7 +20,6 @@ import { BOARD, LABEL, placeSubLine } from "./favorites";
 import { PhoneImg } from "./frame";
 import { HIT, LIGHT_GLASS, SHADOW, useScreenHeight } from "./home";
 import { useNow, when } from "./tab-pages";
-import { NAVY } from "./ui";
 
 /** 作れる書類（押すと、その書類をすぐ開く） */
 export type DocKind = "triage" | "memo" | "draft" | "guide" | "copy";
@@ -184,6 +183,7 @@ export function DocsPage({
   onHome,
   onMenu,
   unread,
+  motion,
   banner,
 }: {
   /** いま開いている物件（無ければ undefined） */
@@ -202,6 +202,8 @@ export function DocsPage({
   /** 右上のメニュー（≡。ホームと同じ） */
   onMenu: () => void;
   unread: boolean;
+  /** 動きの演出（≡ の「動きの演出」）がオンか */
+  motion: boolean;
   banner?: ReactNode;
 }) {
   const root = useRef<HTMLDivElement>(null);
@@ -271,19 +273,24 @@ export function DocsPage({
         </div>
         {/* まだ物件が無いときは、押すと「先にホームで調べて」の案内（mobile-app.tsx の makeDoc）。見た目も控えめに */}
         <div style={{ opacity: target ? 1 : 0.55 }}>
-          <button onClick={() => onMake(MAIN_DOC.kind)} className="press-soft press mt-[11px] flex w-full items-center gap-[12px] rounded-[18px] bg-white py-[10px] pl-[12px] pr-[10px] text-left shadow-[0_6px_18px_rgba(0,0,0,0.18)] active:bg-[#f2f6fb]" style={{ minHeight: 64 }}>
-            <span className="flex shrink-0 items-center justify-center rounded-full bg-[#eaf1fb]" style={{ width: 38, height: 38 }}>
-              <MAIN_DOC.Icon size={19} strokeWidth={1.9} absoluteStrokeWidth color={NAVY} />
+          {/*
+            いちばん使う書類：白で浮かせず、ほかと同じすりガラスのまま目立たせる（少し明るいガラスと上の縁の光、金色に光るアイコン、
+            横いっぱいの大きさ。動きの演出がオンのときは、開いたとき1回だけ光が横切る。app/globals.css の .docs-main・.docs-sheen）
+          */}
+          <button onClick={() => onMake(MAIN_DOC.kind)} className="docs-main press-soft press relative mt-[11px] flex w-full items-center gap-[12px] overflow-hidden rounded-[18px] py-[10px] pl-[12px] pr-[10px] text-left" style={{ minHeight: 64 }}>
+            {motion && <span aria-hidden className="docs-sheen" />}
+            <span className="relative flex shrink-0 items-center justify-center rounded-full" style={{ width: 38, height: 38, background: "rgba(255,201,74,0.16)", border: "1px solid rgba(255,201,74,0.42)", boxShadow: "0 0 14px rgba(255,190,70,0.28)" }}>
+              <MAIN_DOC.Icon size={19} strokeWidth={1.9} absoluteStrokeWidth color="#ffd36b" />
             </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate font-semibold leading-[1.25]" style={{ fontSize: 16, color: "#14284a" }}>
+            <span className="relative min-w-0 flex-1">
+              <span className="block truncate font-semibold leading-[1.25]" style={{ fontSize: 16, color: "#fff" }}>
                 {MAIN_DOC.title}
               </span>
-              <span className="mt-[3px] block truncate leading-[1.3]" style={{ fontSize: 12, color: "#5d6c84" }}>
+              <span className="mt-[3px] block truncate leading-[1.3]" style={{ fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
                 {MAIN_DOC.sub}
               </span>
             </span>
-            <ChevronRight size={18} strokeWidth={1.9} absoluteStrokeWidth color="#97a3b6" className="shrink-0" />
+            <ChevronRight size={18} strokeWidth={1.9} absoluteStrokeWidth color="rgba(255,255,255,0.75)" className="relative shrink-0" />
           </button>
           <div className="mt-[8px] grid grid-cols-4 gap-[7px]">
             {DOCS.map((d) => (
