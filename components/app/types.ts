@@ -11,6 +11,12 @@ export type SheetKind = (typeof SHEET_KINDS)[number];
 /** 拡大した地図（MICHILU の動く地図）を開くときの重ね */
 export type MapOpen = { roads?: boolean; hazard?: HazardKind; landPrice?: [number, number] };
 
+/** 地図に重ねて選ぶハザードの種類（ハザードのタブ。街の模型の地面にも同じ種類の色を敷く） */
+export type HazardPick = "flood" | "naisui" | "takashio" | "tsunami" | "dosha";
+
+/** 土地に接する道路（国土地理院の地図データ。街の模型から。建築基準法の道路かどうかは分からない） */
+export type FrontRoad = { direction: string; width: string; major: boolean };
+
 export type TabProps = {
   result: Ok;
   data: PropertyData;
@@ -24,6 +30,10 @@ export type TabProps = {
   mapApps: () => void;
   /** 「レポートを作成」（書類・出力） */
   report: () => void;
+  /** 「要注意点と次にやること」の画面 */
+  triage: () => void;
+  /** 次にやることの済んだ印（端末に保存） */
+  checklist: { done: Set<string>; toggle: (id: string) => void };
   /** 物件の鍵（lib/property-id.ts）と、あなたの確認の記録 */
   pid: string;
   records: PropertyRecords;
@@ -31,4 +41,14 @@ export type TabProps = {
   statuses: TopicStatus[];
   /** 確認の記録の画面を開く */
   record: (topic: RecordTopic) => void;
+  /** 街の模型が出ているか（出ていなければ、タブの中に平らな地図を出す） */
+  has3d: boolean;
+  /** 隣の土地を模型に出すか */
+  neighbors: boolean;
+  setNeighbors: (on: boolean) => void;
+  /** ハザードのタブで選んだ種類 */
+  hazard: HazardPick;
+  setHazard: (k: HazardPick) => void;
+  /** 土地に接する道路（地理院の地図データ） */
+  front: FrontRoad[] | null;
 };

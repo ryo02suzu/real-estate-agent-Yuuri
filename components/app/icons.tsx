@@ -380,7 +380,7 @@ export function Runner({ size = 24, color = "#169b4f", style }: IconProps) {
 }
 
 /** 半円のメーター（総合ハザード評価）。needle は針の位置（0=左端・1=右端。無ければ灰色の針を真ん中の少し右に） */
-export function Gauge({ style, needle }: { style?: CSSProperties; needle?: number }) {
+export function Gauge({ style, needle, dark = false }: { style?: CSSProperties; needle?: number; /** 暗い地の上（針と中心を白く） */ dark?: boolean }) {
   // 中心 (31.5, 31.5)、半径 26.5、線の太さ 7。左から 黄 → 橙 → 灰
   const r = 26.5;
   const cx = 31.5;
@@ -413,10 +413,10 @@ export function Gauge({ style, needle }: { style?: CSSProperties; needle?: numbe
       ) : (
         // 針（中心から半径の8割まで。角度は左端 180° → 右端 0°）
         <g transform={`rotate(${-(180 - 180 * Math.min(1, Math.max(0, needle)))} ${cx} ${cy})`}>
-          <path d={`M${cx} ${cy - 2.6}L${cx + r * 0.82} ${cy}L${cx} ${cy + 2.6}Z`} fill="#1e3a66" />
+          <path d={`M${cx} ${cy - 2.6}L${cx + r * 0.82} ${cy}L${cx} ${cy + 2.6}Z`} fill={dark ? "#ffffff" : "#1e3a66"} />
         </g>
       )}
-      <circle cx={cx} cy={cy} r="3.4" fill="#1e5bb7" />
+      <circle cx={cx} cy={cy} r="3.4" fill={dark ? "#ffffff" : "#1e5bb7"} />
     </svg>
   );
 }

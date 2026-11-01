@@ -1,12 +1,15 @@
 "use client";
 
-// スマホの画面（紺の新しい見た目）。検索する前のホームは components/app/home.tsx。物件の画面は、上の街の写真の帯（写真はあとで届くので
-// 今は NO IMAGE）と6つのタブの切り替えの下に、タブごとに1画面に収まる中身（components/app/r-*.tsx）。下のメニューのページ
+// スマホの画面（紺の新しい見た目）。検索する前のホームは components/app/home.tsx。物件の画面は、いちばん奥に街の模型
+// （components/app/property-scene.tsx・property-3d.ts）、その上に地番の見出しと、すりガラスのシート（6つのタブの切り替えと、
+// タブごとの中身 components/app/r-*.tsx）。下のメニューのページ
 // （履歴・お気に入り・書類・出力・その他）は components/app/tab-pages.tsx、見つからない・候補・未対応は components/app/pages.tsx。
 // 幅393ptの絵の寸法で描き、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。下から出す画面（シート）は拡大・縮小しない
 import {
-  ArrowLeft,
+  ChevronLeft,
+  CircleHelp,
   FileText,
+  Landmark,
   Info,
   LoaderCircle,
   Phone,
@@ -60,6 +63,7 @@ import {
 } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { buildSummary } from "@/lib/summary";
+import { parcelAreaM2, TSUBO_M2 } from "@/lib/app/area";
 import { DraftSheet } from "../draft-sheet";
 import { FullMap } from "../full-map";
 import { GuideMapSheet } from "../guide-map";
@@ -79,10 +83,24 @@ import {
 import { DetailSheet } from "./detail-sheets";
 import { ART_W, BottomNav, ZOOM, type NavKey } from "./frame";
 import { DocsBackdrop, DocsPage, docsTop, type DocKind } from "./docs";
-import { FavoritesBackdrop, FavoritesPage, favoritesTop, UndoToast } from "./favorites";
+import {
+  FavoritesBackdrop,
+  FavoritesPage,
+  favoritesTop,
+  UndoToast,
+} from "./favorites";
 import { prefetchFlight, SPACE_BACKGROUND } from "./flight-space";
 import type { FlightTarget } from "./globe-flight";
-import { HOME_TOP, HomeBackdrop, HomeMenu, HomeScreen, PAGE, SKY, type HomeMessage } from "./home";
+import {
+  HOME_TOP,
+  HomeBackdrop,
+  HomeMenu,
+  HomeScreen,
+  PAGE,
+  SKY,
+  useScreenHeight,
+  type HomeMessage,
+} from "./home";
 import { setMotionSetting, useMotionSetting } from "./motion";
 import {
   AppCitiesSheet,
@@ -93,21 +111,26 @@ import {
 import { InstallSheet, useStandalone } from "./install";
 import { useFixedScreen } from "./no-bounce";
 import { RecordSheet } from "./record-sheet";
-import { CompactBar, SKY_EVENT, skyTop, useShrink, useSkyClock } from "./sky";
+import { Expand } from "./research";
+import { SKY_EVENT, skyTop, useShrink, useSkyClock } from "./sky";
 import { FavStar } from "./star";
 import { topicStatuses } from "./status";
 import { markNewsSeen, NewsSheet, useUnreadNews } from "./news";
 import { NotOkPage } from "./pages";
 import { AroundTab } from "./r-around";
 import { BasicTab } from "./r-basic";
-import { DealsTab } from "./r-deals";
 import { HazardTab } from "./r-hazard";
 import { LawTab } from "./r-law";
 import { PriceTab } from "./r-price";
-import { BAND_TOP, displayAddress, HEAD, LIGHT, WARN } from "./r-ui";
+import { RoadTab } from "./r-road";
+import { BAND_TOP, displayAddress, WARN } from "./r-ui";
+import { sceneTop, type PropertyScene } from "./property-3d";
+import { PropertyBackdrop, propertyPartNow } from "./property-scene";
 import {
+  HeroChip,
   PlaceBanner,
-  ResultBand,
+  PropertyHero,
+  tabOf,
   TABS,
   TabSegments,
   type TabKey,
@@ -115,12 +138,13 @@ import {
 import { AccountPage, HistoryPage, TabBanner } from "./tab-pages";
 import {
   SHEET_KINDS,
+  type FrontRoad,
+  type HazardPick,
   type MapOpen,
   type SheetKind,
   type TabProps,
 } from "./types";
 import { reducedMotion } from "./tokens";
-import { NAVY } from "./ui";
 import { useProperty, type Ok, type PropertyData } from "./use-property";
 import { applyAppZoom } from "./zoom";
 
@@ -191,7 +215,9 @@ export function MobileApp(props: MobileAppProps) {
   // 動きの演出（≡ の「動きの演出」。端末の「視差効果を減らす」がオンなら出さない）
   const motionOn = useMotionSetting();
   // 検索したときの「地球から土地までズーム」。flight は飛んでいる間だけ。降りる先は調べ終わった結果から（flightTarget）
-  const [flight, setFlight] = useState<{ key: number; label: string } | null>(null);
+  const [flight, setFlight] = useState<{ key: number; label: string } | null>(
+    null,
+  );
   const [flightTarget, setFlightTarget] = useState<FlightTarget>(null);
   const flightFrom = useRef<unknown>(undefined);
   // 地球の演出が消え始めた（宇宙の背景も一緒に消す）
@@ -199,7 +225,11 @@ export function MobileApp(props: MobileAppProps) {
   // 降りたあと、物件の画面がふわっと出る間
   const [arrive, setArrive] = useState(false);
   // お気に入りから外した物件（下に「元に戻す」を出す。index は外す前の位置、key は出し直すための印）
-  const [undo, setUndo] = useState<{ item: FavoriteItem; index: number; key: number } | null>(null);
+  const [undo, setUndo] = useState<{
+    item: FavoriteItem;
+    index: number;
+    key: number;
+  } | null>(null);
   // お気に入りの「すべて見る」を開いているか（ほかのページへ行ったら閉じる。下のメニューのお気に入りをもう一度押しても閉じる）
   const [favAll, setFavAll] = useState(false);
   const unread = useUnreadNews();
@@ -218,6 +248,8 @@ export function MobileApp(props: MobileAppProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   // 下部操作バーの置き場（物件の画面が中身を入れる。拡大・縮小する枠の外に置く）
   const [barSlot, setBarSlot] = useState<HTMLDivElement | null>(null);
+  // 物件の画面の街の模型の置き場（中身の後ろ。物件の画面が中身を入れる）
+  const [sceneSlot, setSceneSlot] = useState<HTMLDivElement | null>(null);
   // 開発中の再マウントで <html> の style が消えたときのため、拡大率をもう一度入れる
   useLayoutEffect(() => applyAppZoom(), []);
   // 自分で document.body に出す部品（重説の下書き・案内図）も紺の色にする（PC はこの画面を使わないので金色のまま）
@@ -339,8 +371,10 @@ export function MobileApp(props: MobileAppProps) {
     if (showHome) queueMicrotask(() => setResume(latestResume()));
   }, [showHome, history]);
   // 時刻・電池の帯の色をページに合わせる（地球の演出の間は宇宙の色、ホームは写真のいちばん上の空の色、下のメニューのページは
-  // 時間連動の空の上端の色、物件の画面は写真の帯の上の色。PC の色は変えない）。空が変わるたびに合わせ直す
+  // 時間連動の空の上端の色、物件の画面は街の模型の空の上の色（時間帯で変わる）。PC の色は変えない）。空が変わるたびに合わせ直す
   const flying = !!flight;
+  const okLat = ok?.lat;
+  const okLng = ok?.lng;
   useEffect(() => {
     const meta = document.querySelector<HTMLMetaElement>(
       'meta[name="theme-color"][media="(max-width: 1023px)"]',
@@ -357,13 +391,15 @@ export function MobileApp(props: MobileAppProps) {
               : page === "docs"
                 ? docsTop()
                 : tabPage
-                ? (skyTop() ?? SKY)
-                : BAND_TOP,
+                  ? (skyTop() ?? SKY)
+                  : okLat !== undefined && okLng !== undefined
+                    ? sceneTop(propertyPartNow(okLat, okLng))
+                    : BAND_TOP,
       );
     set();
     addEventListener(SKY_EVENT, set);
     return () => removeEventListener(SKY_EVENT, set);
-  }, [showHome, tabPage, flying, page]);
+  }, [showHome, tabPage, flying, page, okLat, okLng]);
   // お気に入りのページを離れたら「元に戻す」はしまい、「すべて見る」も閉じる
   useEffect(() => {
     if (page !== "favorites")
@@ -592,6 +628,14 @@ export function MobileApp(props: MobileAppProps) {
         <FavoritesBackdrop scroller={scroller} motion={motionOn} />
       )}
       {page === "docs" && <DocsBackdrop motion={motionOn} />}
+      {/* 物件の画面の街の模型（ほかのページを見ている間は隠して描かない。戻ったときに作り直さない） */}
+      {ok && (
+        <div
+          ref={setSceneSlot}
+          className="absolute inset-0"
+          style={{ visibility: page === "home" ? "visible" : "hidden" }}
+        />
+      )}
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div
           ref={scroller}
@@ -654,6 +698,9 @@ export function MobileApp(props: MobileAppProps) {
                   scroller={scroller}
                   barSlot={barSlot}
                   barHidden={page !== "home"}
+                  sceneSlot={sceneSlot}
+                  motion={motionOn}
+                  hold={!!flight && !leaving}
                 />
               </div>
             )}
@@ -699,7 +746,12 @@ export function MobileApp(props: MobileAppProps) {
         )}
       </div>
       <BottomNav
-        dark={showHome || page === "favorites" || page === "docs"}
+        dark={
+          showHome ||
+          page === "favorites" ||
+          page === "docs" ||
+          (!!ok && page === "home")
+        }
         active={page}
         onSelect={(k) => {
           if (k === "home" && page === "home") {
@@ -852,17 +904,29 @@ function Banner({
   error,
   notice,
   onDismiss,
+  dark = false,
 }: {
   loading: boolean;
   error: string | null;
   notice?: string | null;
   onDismiss?: () => void;
+  /** 物件の画面のすりガラスのシートの中（暗い地の色） */
+  dark?: boolean;
 }) {
   if (loading)
     return (
       <p
-        className="mx-[16px] mt-[8px] flex items-center gap-[6px] rounded-[12px] bg-[#eef4fb] px-[12px] py-[9px] leading-none"
-        style={{ fontSize: 13, color: "#1c3a6a" }}
+        className={`mx-[16px] mt-[8px] flex items-center gap-[6px] rounded-[12px] px-[12px] py-[9px] leading-none ${dark ? "" : "bg-[#eef4fb]"}`}
+        style={{
+          fontSize: 13,
+          color: dark ? "#cfe5ff" : "#1c3a6a",
+          ...(dark
+            ? {
+                background: "rgba(116,187,255,0.12)",
+                border: "1px solid rgba(116,187,255,0.28)",
+              }
+            : {}),
+        }}
       >
         <LoaderCircle
           size={15}
@@ -880,11 +944,22 @@ function Banner({
     <button
       onClick={onDismiss}
       className="mx-[16px] mt-[8px] flex w-[calc(100%-32px)] items-start gap-[6px] rounded-[12px] px-[12px] py-[9px] text-left leading-[1.45]"
-      style={{
-        fontSize: 13,
-        background: warn ? "#fdf1ec" : "#eef4fb",
-        color: warn ? WARN : "#1c3a6a",
-      }}
+      style={
+        dark
+          ? {
+              fontSize: 13,
+              background: warn
+                ? "rgba(255,183,94,0.12)"
+                : "rgba(116,187,255,0.12)",
+              border: `1px solid ${warn ? "rgba(255,183,94,0.3)" : "rgba(116,187,255,0.28)"}`,
+              color: warn ? "#ffd3a0" : "#cfe5ff",
+            }
+          : {
+              fontSize: 13,
+              background: warn ? "#fdf1ec" : "#eef4fb",
+              color: warn ? WARN : "#1c3a6a",
+            }
+      }
     >
       {warn ? (
         <TriangleAlert
@@ -934,6 +1009,9 @@ function PropertyView({
   scroller,
   barSlot,
   barHidden,
+  sceneSlot,
+  motion,
+  hold,
 }: {
   report: boolean;
   setReport: (open: boolean) => void;
@@ -959,19 +1037,21 @@ function PropertyView({
   scroller: React.RefObject<HTMLDivElement | null>;
   /** 下部操作バーの置き場（拡大・縮小する枠の外） */
   barSlot: HTMLElement | null;
-  /** ほかのページを見ている間は下部操作バーを隠す */
+  /** ほかのページを見ている間は下部操作バーを隠す（街の模型も描かない） */
   barHidden: boolean;
+  /** 街の模型の置き場（中身の後ろ。拡大・縮小する枠の外） */
+  sceneSlot: HTMLElement | null;
+  /** 動きの演出がオンか（≡ の設定） */
+  motion: boolean;
+  /** 地球からのズームの演出が出ている間は、模型の着地を待つ（演出が消え始めたら降りる） */
+  hold: boolean;
 }) {
   const data = useProperty(result);
   // 物件の鍵（筆 → 地図の地点 → 住所。lib/property-id.ts）。確認の記録と再開はこの鍵で
   const pid = propertyIdOf(query, result);
   // 前回見ていた所（7日以内）：タブは戻す。シートは 30 分以内なら戻す（公式道路図・電話から戻ったとき）
   const [resume] = useState(() => loadResume(pid));
-  const [tab, setTab] = useState<TabKey>(() =>
-    resume && TABS.some((t) => t.key === resume.tab)
-      ? (resume.tab as TabKey)
-      : "basic",
-  );
+  const [tab, setTab] = useState<TabKey>(() => tabOf(resume?.tab) ?? "basic");
   const [detail, setDetail] = useState<{
     kind: SheetKind;
     arg?: number;
@@ -999,6 +1079,14 @@ function PropertyView({
   const [draft, setDraft] = useState(false);
   const [guide, setGuide] = useState(false);
   const [full, setFull] = useState<MapOpen | null>(null);
+  // 見出しの「推定の位置」の説明を出しているか
+  const [about, setAbout] = useState(false);
+  // 街の模型：隣の土地を出すか、ハザードのタブで選んだ種類、模型が出せるか（出せなければ平らな地図）、土地に接する道路（地理院の地図）
+  const [neighbors, setNeighbors] = useState(false);
+  const [hazPick, setHazPick] = useState<HazardPick>("flood");
+  const [has3d, setHas3d] = useState(true);
+  const [front, setFront] = useState<FrontRoad[] | null>(null);
+  const scene = useRef<PropertyScene | null>(null);
   // レポートに入れない項目（レポートの画面で選ぶ）
   const [off, setOff] = useState<ReadonlySet<SectionKey>>(() => new Set());
   const addr = useCopy();
@@ -1037,9 +1125,117 @@ function PropertyView({
   const title = `${displayAddress(result.matchedAddress)}${found ? ` ${chibanLabel(found.chibanRaw)}` : ""}`;
   const longTab = TABS.find((t) => t.key === tab)?.long ?? "";
 
-  // スクロールで帯を縮め、上に住所のバーを残す（タブの切り替えはその下に留まる）
+  // スクロールで見出しが流れたら、上に住所のバーを出す（タブの切り替えはその下に留まる）
   const root = useRef<HTMLDivElement>(null);
-  useShrink(root, 28);
+  useShrink(root, 140);
+  const screenH = useScreenHeight(root);
+  // 見出し（街の模型が見える所）の高さ：画面の 60%（背の低い画面でも 330pt）
+  const heroH = Math.round(Math.max(330, (screenH ?? 760) * 0.6));
+  const heroBox = useRef<HTMLDivElement>(null);
+  const topRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const backdropBox = useRef<HTMLDivElement>(null);
+  // シートが模型を覆いきったら模型を描かない
+  const [covered, setCovered] = useState(false);
+  const [flatCenter, setFlatCenter] = useState(300);
+  // 模型の割り付け：土地を見出しの字とシートのあいだに置き、スクロールではその半分の速さで上へ（奥にあるように見せる）。
+  // 札は上のボタン・見出しの字・シートに重ねない。模型ができたときにも測る（placeScene）
+  const placeScene = useRef<() => void>(() => {});
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const place = () => {
+      const box = backdropBox.current?.getBoundingClientRect();
+      const sheet = sheetRef.current?.getBoundingClientRect();
+      const text = textRef.current?.getBoundingClientRect();
+      const top = topRef.current?.getBoundingClientRect();
+      if (!box || !sheet || !text || !top || !box.height) return;
+      const y = Math.max(0, el.scrollTop);
+      const zoom =
+        parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue(
+            "--app-zoom",
+          ),
+        ) || 1;
+      const sheetTop = sheet.top - box.top;
+      const textBottom = text.bottom - box.top;
+      const centerY = (textBottom + sheetTop) / 2 + y * 0.5;
+      const bar = 56 * zoom;
+      const cover = Math.min(
+        1,
+        Math.max(0, y / Math.max(1, sheetTop + y - bar)),
+      );
+      scene.current?.setLayout({
+        centerY,
+        sheetTop,
+        topLimit: Math.max(top.bottom - box.top, y > 4 ? bar : 0) + 4,
+        // 見出しの字の行ごとの四角（字の右の空いた所には札を出せる）
+        avoid: [...(textRef.current?.children ?? [])].map((c) => {
+          const r = c.getBoundingClientRect();
+          return {
+            l: r.left - box.left - 8,
+            t: r.top - box.top - 6,
+            r: r.right - box.left + 8,
+            b: r.bottom - box.top + 6,
+          };
+        }),
+        cover,
+      });
+      setCovered(cover > 0.985);
+      if (y < 1) setFlatCenter(centerY);
+    };
+    placeScene.current = place;
+    let frame = 0;
+    const onScroll = () => {
+      if (!frame)
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          place();
+        });
+    };
+    onScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    const ro = new ResizeObserver(onScroll);
+    ro.observe(el);
+    if (sheetRef.current) ro.observe(sheetRef.current);
+    if (textRef.current) ro.observe(textRef.current);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      ro.disconnect();
+      cancelAnimationFrame(frame);
+      placeScene.current = () => {};
+    };
+  }, [scroller]);
+  // 見出しの上で指を横になぞると模型が回り、2本指で寄る（縦はいつものスクロール。ボタンの上は触らない）
+  const onHeroPointer = (e: React.PointerEvent<HTMLDivElement>) => {
+    const s = scene.current;
+    if (!s) return;
+    const ev = e.nativeEvent;
+    if (e.type === "pointerdown") {
+      if ((e.target as Element).closest("button, a")) return;
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // 押さえ続けられない端末でも、動きはそのまま渡す
+      }
+      s.pointerDown(ev);
+    } else if (e.type === "pointermove") s.pointerMove(ev);
+    else if (e.type === "pointerup") s.pointerUp(ev);
+    else s.pointerCancel(ev);
+  };
+  // トラックパッドの2本指の広げ・すぼめ（ctrl＋ホイール）で寄る。ふつうのホイールはスクロール
+  useEffect(() => {
+    const el = heroBox.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey || !scene.current) return;
+      e.preventDefault();
+      scene.current.wheel(e);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
   // 再開のために、開いているタブ・シートと止まったときのスクロール位置を残す（この物件の鍵があるときだけ）
   const detailKind = detail?.kind;
   const ll = result.picked ? `${result.lat},${result.lng}` : "";
@@ -1115,7 +1311,8 @@ function PropertyView({
       }
     };
     const frame = requestAnimationFrame(go);
-    for (const ms of [300, 700, 1500, 3000]) timers.push(window.setTimeout(go, ms));
+    for (const ms of [300, 700, 1500, 3000])
+      timers.push(window.setTimeout(go, ms));
     return () => {
       cancelAnimationFrame(frame);
       for (const t of timers) clearTimeout(t);
@@ -1141,9 +1338,13 @@ function PropertyView({
   }, []);
 
   const changeTab = (t: TabKey) => {
+    if (t === tab) return;
     setTab(t);
-    // タブを変えたら、その画面のいちばん上から
-    scroller.current?.scrollTo(0, 0);
+    // タブを変えたら、いちばん上へ（街の模型の見せ方が変わるのを見せる）
+    scroller.current?.scrollTo({
+      top: 0,
+      behavior: reducedMotion() ? "auto" : "smooth",
+    });
   };
   const share = async () => {
     const text = summaryText();
@@ -1165,14 +1366,22 @@ function PropertyView({
     expand: (o) => setFull(o ?? {}),
     mapApps: () => setMapApps(true),
     report: () => setReport(true),
+    triage: () => setTriage(true),
+    checklist,
     pid,
     records,
     statuses,
     record: setRecordTopic,
+    has3d,
+    neighbors,
+    setNeighbors,
+    hazard: hazPick,
+    setHazard: setHazPick,
+    front,
   };
 
-  // 下部操作バー：いま見ているタブの主役（基本・取引＝レポート、周辺＝施設の一覧、相場＝価格の事例、法令＝公式道路図か問い合わせ先、
-  // ハザード＝市区町村のハザードマップ）と、脇役の★・共有
+  // 下部操作バー：いま見ているタブの主役（概要＝レポート、道路＝市町村の道路種別の図か問い合わせ先、法令＝都市計画のくわしい話、
+  // ハザード＝市区町村のハザードマップ、周辺＝施設の一覧、相場＝下の取引事例へ）と、脇役の★・共有
   const primary: BarAction = (() => {
     const icon = (I: typeof FileText) => (
       <I size={17} strokeWidth={1.9} absoluteStrokeWidth />
@@ -1186,16 +1395,20 @@ function PropertyView({
         };
       case "price":
         return {
-          label: "価格の事例",
+          label: "取引事例を見る",
           icon: icon(Receipt),
-          onClick: () => changeTab("deals"),
+          onClick: () =>
+            document.getElementById("pv-deals")?.scrollIntoView({
+              behavior: reducedMotion() ? "auto" : "smooth",
+              block: "start",
+            }),
         };
-      case "law": {
+      case "road": {
         const link = result.links[0];
         const offline = m.coverage === "none" || m.coverage === "outside";
         return link && !offline
           ? {
-              label: `${m.name}の公式道路図`,
+              label: `${m.name}の道路種別の図`,
               icon: icon(Route),
               href: link.url,
             }
@@ -1205,6 +1418,18 @@ function PropertyView({
               onClick: () => setDetail({ kind: "contact" }),
             };
       }
+      case "law":
+        return data.zoning.status === "ok"
+          ? {
+              label: "都市計画のくわしい話",
+              icon: icon(Landmark),
+              onClick: () => setDetail({ kind: "zoning" }),
+            }
+          : {
+              label: "問い合わせ先",
+              icon: icon(Phone),
+              onClick: () => setDetail({ kind: "contact" }),
+            };
       case "hazard": {
         const h = data.hazard;
         const url =
@@ -1229,7 +1454,7 @@ function PropertyView({
     {
       label: "",
       title: favorite ? "お気に入りから外す" : "お気に入りに保存",
-      icon: <FavStar on={favorite} size={20} off={NAVY} />,
+      icon: <FavStar on={favorite} size={20} off="#fff" />,
       onClick: onFavorite,
       pressed: favorite,
     },
@@ -1240,88 +1465,278 @@ function PropertyView({
     },
   ];
 
+  // 見出しの札：面積・坪、推定の位置・地番参考図（押すと説明）、同じ地番がほかにある
+  const shownParcel =
+    data.parcels.status === "ok" ? data.parcels.parcel : undefined;
+  const lotParcel =
+    shownParcel &&
+    /^\d/.test(shownParcel.chibanRaw) &&
+    addressOffLot(data.parcels) === undefined
+      ? shownParcel
+      : undefined;
+  const lotNumber = lotParcel ? registryChiban(lotParcel.chibanRaw) : undefined;
+  const lotArea =
+    lotParcel && data.parcels.status === "ok" && data.parcels.kind !== "address"
+      ? parcelAreaM2(lotParcel)
+      : undefined;
+  const eyebrow = result.picked
+    ? "地図で選んだ地点"
+    : found
+      ? "地番で調べた土地"
+      : lotNumber
+        ? "住所で調べた場所（住所の地点の筆）"
+        : "住所で調べた場所";
+  const where = displayAddress(result.matchedAddress);
+  const chips = (
+    <>
+      {lotArea && (
+        <HeroChip>
+          約{lotArea.toLocaleString("ja-JP", { maximumFractionDigits: 2 })}㎡
+          <span className="opacity-60">・</span>
+          {(lotArea / TSUBO_M2).toFixed(1)}坪
+        </HeroChip>
+      )}
+      {lotParcel && (lotParcel.estimated || lotParcel.sanko) && (
+        <HeroChip
+          tone="gold"
+          onClick={() => setAbout((v) => !v)}
+          icon={<CircleHelp size={13} strokeWidth={2} absoluteStrokeWidth />}
+        >
+          {lotParcel.sanko ? "市の地番参考図" : "推定の位置"}
+        </HeroChip>
+      )}
+      {!!result.parcelOthers && (
+        <HeroChip tone="warn" onClick={() => setDetail({ kind: "parcel" })}>
+          同じ地番がほかに{result.parcelOthers}件
+        </HeroChip>
+      )}
+    </>
+  );
+  // 出典（模型に使っているもの。タブで変わる）
+  const credit = [
+    has3d
+      ? "地図：国土地理院ベクトルタイル（建物の高さは目安）"
+      : "地図：地理院タイル",
+    lotParcel
+      ? lotParcel.sanko
+        ? "筆：市町村の地番参考図"
+        : lotParcel.estimated
+          ? "筆：登記所備付地図データ（法務省）から推定した位置"
+          : "筆：登記所備付地図データ（法務省）を加工"
+      : "",
+    tab === "law" ? "用途地域：国土交通省 都市計画決定GISデータ" : "",
+    tab === "hazard" ? "ハザード：重ねるハザードマップ（国土地理院）" : "",
+    tab === "around" ? "施設：© OpenStreetMap contributors" : "",
+  ].filter(Boolean);
+
   return (
-    <div ref={root} className="relative">
-      {/* スクロールしたら上に残るバー：戻る・住所（押すとコピー）・見ているタブ・★ */}
-      <CompactBar>
-        <button
-          onClick={onBack}
-          aria-label="ホームに戻る"
-          className="press flex size-[40px] shrink-0 items-center justify-center rounded-full"
+    <div ref={root} className="pv-page relative text-white">
+      {/* いちばん奥：街の模型（拡大・縮小する枠の外の置き場に出す） */}
+      {sceneSlot &&
+        createPortal(
+          <PropertyBackdrop
+            result={result}
+            data={data}
+            tab={tab}
+            motion={motion}
+            hold={hold}
+            neighbors={neighbors}
+            hazard={hazPick}
+            visible={!barHidden && !covered}
+            onReady={(api) => {
+              scene.current = api;
+              if (api) placeScene.current();
+            }}
+            onFlat={() => setHas3d(false)}
+            onFront={setFront}
+            flatCenter={flatCenter}
+            boxRef={backdropBox}
+          />,
+          sceneSlot,
+        )}
+
+      {/* スクロールしたら上に出る細いバー：戻る・地番か住所（押すとコピー）・見ているタブ・★ */}
+      <div className="pointer-events-none sticky top-0 z-20 h-0">
+        <div
+          className="compact-bar pointer-events-auto flex items-center gap-[6px] px-[8px]"
+          style={{
+            height: 56,
+            background:
+              "linear-gradient(180deg, rgba(14,24,42,0.66) 0%, rgba(14,24,42,0.54) 100%)",
+            borderBottom: "1px solid rgba(255,255,255,0.12)",
+            backdropFilter: "blur(20px) saturate(140%)",
+            WebkitBackdropFilter: "blur(20px) saturate(140%)",
+          }}
         >
-          <ArrowLeft
-            size={22}
-            strokeWidth={2}
-            absoluteStrokeWidth
-            color={HEAD}
-          />
-        </button>
-        <button
-          onClick={() => addr.copy(copyText(result))}
-          aria-label="住所をコピー"
-          className="min-w-0 flex-1 text-left"
-        >
-          <span
-            className="block truncate font-bold leading-none"
-            style={{ fontSize: 15, color: HEAD }}
+          <button
+            onClick={onBack}
+            aria-label="ホームに戻る"
+            className="press flex size-[44px] shrink-0 items-center justify-center rounded-full"
           >
-            {title}
-          </span>
-          <span
-            className="mt-[3px] block truncate leading-none"
-            style={{ fontSize: 11, color: addr.done ? "#1f8f5a" : LIGHT }}
+            <ChevronLeft
+              size={24}
+              strokeWidth={2}
+              absoluteStrokeWidth
+              color="#fff"
+            />
+          </button>
+          <button
+            onClick={() => addr.copy(copyText(result))}
+            aria-label="住所をコピー"
+            className="min-w-0 flex-1 text-left"
           >
-            {addr.done ? "住所をコピーしました" : longTab}
-          </span>
-        </button>
-        <button
-          onClick={onFavorite}
-          aria-label={favorite ? "お気に入りから外す" : "お気に入りに保存"}
-          aria-pressed={favorite}
-          className="press flex size-[40px] shrink-0 items-center justify-center rounded-full"
-        >
-          <FavStar on={favorite} size={21} off={HEAD} />
-        </button>
-      </CompactBar>
-      <ResultBand
-        title={title}
-        sub={copyText(result)}
-        onBack={onBack}
-        onCopy={() => addr.copy(copyText(result))}
-        copied={addr.done}
-        favorite={favorite}
-        onFavorite={onFavorite}
-        onShare={share}
-        named={named}
-      />
-      {/* タブの切り替えは、帯が縮んでも上のバーの下に留まる */}
-      <div className="sticky-tabs sticky z-[15]" style={{ top: 56 }}>
-        <TabSegments tab={tab} onTab={changeTab} />
+            <span
+              className="block truncate font-semibold leading-none"
+              style={{ fontSize: 16 }}
+            >
+              {lotNumber ? (
+                <>
+                  <span
+                    className="mr-[6px] font-medium"
+                    style={{ fontSize: 12, color: "#ffe2a3", letterSpacing: 1 }}
+                  >
+                    地番
+                  </span>
+                  {lotNumber}
+                </>
+              ) : (
+                where
+              )}
+            </span>
+            <span
+              className="mt-[4px] block truncate leading-none"
+              style={{
+                fontSize: 11,
+                color: addr.done ? "#a6f0c6" : "rgba(255,255,255,0.66)",
+              }}
+            >
+              {addr.done
+                ? "住所をコピーしました"
+                : `${lotNumber ? `${where}・` : ""}${longTab}`}
+            </span>
+          </button>
+          <button
+            onClick={onFavorite}
+            aria-label={favorite ? "お気に入りから外す" : "お気に入りに保存"}
+            aria-pressed={favorite}
+            className="press flex size-[44px] shrink-0 items-center justify-center rounded-full"
+          >
+            <FavStar on={favorite} size={21} off="#fff" />
+          </button>
+        </div>
       </div>
-      <Banner
-        loading={loading && !offline}
-        error={error ?? (offline ? OFFLINE : null)}
-        notice={notice ?? (shareCopy.done ? "共有の文をコピーしました" : null)}
-        onDismiss={onDismiss}
-      />
-      <PlaceNote
-        query={query}
-        result={result}
-        data={data}
-        onPick={onPick}
-        onFix={onFix}
-      />
+
+      {/* 見出し（街の模型が見える所）。指で横になぞると模型が回る */}
       <div
-        key={tab}
-        className="tab-in px-[16px] pt-[8px]"
-        style={{ paddingBottom: BAR_PAD }}
+        ref={heroBox}
+        className="pv-hero relative select-none"
+        style={{ height: heroH, touchAction: "pan-y" }}
+        onPointerDown={onHeroPointer}
+        onPointerMove={onHeroPointer}
+        onPointerUp={onHeroPointer}
+        onPointerCancel={onHeroPointer}
+        onClick={() => {
+          // 模型の土地をたたいたら、地番の詳しい画面
+          if (scene.current?.takeLotTap()) setDetail({ kind: "parcel" });
+        }}
       >
-        {tab === "basic" && <BasicTab {...props} />}
-        {tab === "around" && <AroundTab {...props} />}
-        {tab === "price" && <PriceTab {...props} />}
-        {tab === "law" && <LawTab {...props} />}
-        {tab === "hazard" && <HazardTab {...props} />}
-        {tab === "deals" && <DealsTab {...props} />}
+        <PropertyHero
+          eyebrow={eyebrow}
+          lot={lotNumber}
+          title={where}
+          address={copyText(result).normalize("NFKC")}
+          onCopy={() => addr.copy(copyText(result))}
+          copied={addr.done}
+          chips={chips}
+          more={
+            lotParcel && (lotParcel.estimated || lotParcel.sanko) ? (
+              <Expand open={about}>
+                <div>
+                  <p
+                    className="mt-[8px] max-w-[300px] rounded-[14px] px-[11px] py-[8px] leading-[1.55]"
+                    style={{
+                      fontSize: 12,
+                      color: "rgba(255,255,255,0.88)",
+                      background: "rgba(10,16,30,0.55)",
+                      textShadow: "none",
+                    }}
+                  >
+                    {lotParcel.sanko
+                      ? "この筆の形は、市町村の地番参考図から作ったものです。登記所の地図とは違うことがあります。公図・地積測量図で確かめてください。"
+                      : `この筆の位置は、公図（任意座標）を道路の縁に合わせて推定したものです（確かさ：${lotParcel.estimated === "high" ? "高め" : "低め"}）。数mずれることがあります。公図・地積測量図で確かめてください。`}
+                  </p>
+                </div>
+              </Expand>
+            ) : undefined
+          }
+          onBack={onBack}
+          favorite={favorite}
+          onFavorite={onFavorite}
+          onShare={share}
+          named={named}
+          topRef={topRef}
+          textRef={textRef}
+        />
+        <p
+          className="pv-credit pointer-events-none absolute bottom-[10px] right-[12px] max-w-[300px] text-right leading-[1.35]"
+          style={{
+            fontSize: 9,
+            color: "rgba(255,255,255,0.62)",
+            textShadow: "0 1px 2px rgba(0,0,0,0.6)",
+          }}
+        >
+          {credit.map((c) => (
+            <span key={c} className="block">
+              {c}
+            </span>
+          ))}
+        </p>
+      </div>
+
+      {/* すりガラスのシート（タブの切り替えと中身） */}
+      <div
+        ref={sheetRef}
+        className="pv-sheet relative"
+        style={{ minHeight: Math.max(0, (screenH ?? 760) - 56) }}
+      >
+        <div aria-hidden className="flex h-[18px] items-center justify-center">
+          <span className="h-[5px] w-[38px] rounded-full bg-white/30" />
+        </div>
+        {/* タブの切り替えは、見出しが流れても上のバーの下に留まる */}
+        <div
+          className="sticky-tabs pv-tabs sticky z-[15] pb-[4px]"
+          style={{ top: 56 }}
+        >
+          <TabSegments tab={tab} onTab={changeTab} />
+        </div>
+        <Banner
+          dark
+          loading={loading && !offline}
+          error={error ?? (offline ? OFFLINE : null)}
+          notice={
+            notice ?? (shareCopy.done ? "共有の文をコピーしました" : null)
+          }
+          onDismiss={onDismiss}
+        />
+        <PlaceNote
+          query={query}
+          result={result}
+          data={data}
+          onPick={onPick}
+          onFix={onFix}
+        />
+        <div
+          key={tab}
+          className="pv-pane px-[14px] pt-[10px]"
+          style={{ paddingBottom: BAR_PAD + 18 }}
+        >
+          {tab === "basic" && <BasicTab {...props} />}
+          {tab === "road" && <RoadTab {...props} />}
+          {tab === "law" && <LawTab {...props} />}
+          {tab === "hazard" && <HazardTab {...props} />}
+          {tab === "around" && <AroundTab {...props} />}
+          {tab === "price" && <PriceTab {...props} />}
+        </div>
       </div>
       {barSlot &&
         createPortal(

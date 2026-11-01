@@ -1,7 +1,7 @@
 // ハザードの画面の「区分」と「総合の目安」。国の重ねるハザードマップから読んだ区分（lib/roadmap/hazard.ts）を、
 // カードの印（区域外・注意・やや高い・高い）と一言にする。総合の目安は区域にかかる種類と深さから MICHILU が出したもので、
 // 公的な評価ではない（画面に「目安」と書き、根拠の画面で読んだ値をすべて出す）
-import { HAZARDS, type HazardKind, type HazardReport, type KindReport, type LayerHit } from "../roadmap/hazard";
+import { HAZARDS, type HazardClass, type HazardKind, type HazardReport, type KindReport, type LayerHit } from "../roadmap/hazard";
 
 /** 印の種類。tone は色（区域外=緑、注意=淡い黄、やや高い=黄、高い=赤、データなし・確認中=灰、地図で確認=青） */
 export type Tone = "out" | "caution" | "mid" | "high" | "none" | "map" | "near";
@@ -27,6 +27,12 @@ function depthTone(rank: number): { chip: string; tone: Tone } {
 }
 
 const worstAt = (hits: LayerHit[]) => hits.filter((h) => h.at).sort((a, b) => b.at!.rank - a.at!.rank)[0];
+
+/** 地点の区分（その種類でいちばん危ない区分。区域外・読めていなければ undefined）。街の模型の水の高さと目盛りに使う */
+export function classAt(report: HazardReport, kind: HazardKind): HazardClass | undefined {
+  const r = report[kind];
+  return r?.status === "ok" ? worstAt(r.hits)?.at : undefined;
+}
 const nearestNear = (hits: LayerHit[]) => hits.filter((h) => h.near).sort((a, b) => a.near!.distance - b.near!.distance)[0];
 
 /** 浸水の種類（洪水・内水・高潮・津波）のカード */

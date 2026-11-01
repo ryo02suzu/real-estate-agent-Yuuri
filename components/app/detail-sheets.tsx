@@ -330,7 +330,7 @@ function RoadsSheet({ result, data }: { result: Ok; data: PropertyData }) {
           <LegendList legend={l.legend!} />
         </section>
       ))}
-      {roads.status === "none" && legends.length === 0 && <p className="text-[13px] text-muted">この市町村は、地図の道路の種別を MICHILU で読めません。法令・規制のタブの「道路種別」から市町村の地図を開いて確認してください。</p>}
+      {roads.status === "none" && legends.length === 0 && <p className="text-[13px] text-muted">この市町村は、地図の道路の種別を MICHILU で読めません。道路のタブから市町村の地図を開いて確認してください。</p>}
       <Notes lead="地図に色の無い道は載っていません。前面道路と幅員は、地図と現地で確かめ、最終確認は窓口で行ってください。" />
     </div>
   );

@@ -1,15 +1,17 @@
 "use client";
 
-// 「相場」タブ：近くの地価公示・地価調査から土地の相場の目安（最寄りの地点の価格・前年比・周辺の平均と幅・価格の推移）、
-// 図面上の面積から出した土地の概算、路線価の地図、取引事例への入口。どれも物件そのものの価格・査定ではない（「目安」と書く）。1画面に収める
+// 「相場」タブ（すりガラスのシートの中。街の模型では、いちばん近い地価の地点へ光の道を流し、近くの地点に価格の高さの柱を立てる）：
+// 近くの地価公示・地価調査から土地の相場の目安（最寄りの地点の価格・前年比・周辺の平均と幅・価格の推移の線）、図面上の面積から出した
+// 土地の概算、路線価の地図、その下に取引事例（components/app/r-deals.tsx。前の版の「取引」タブ）。
+// どれも物件そのものの価格・査定ではない（「目安」と書く）
 import { Map as MapIcon } from "lucide-react";
 import { useState } from "react";
 import { parcelAreaM2, TSUBO_M2 } from "@/lib/app/area";
 import { asOfText, changeText, distanceText, kindText, type LandPriceHit } from "@/lib/roadmap/land-price";
-import { CARD, Ghost, LIGHT, manYen, Note, Stat, TEXT, yen } from "./r-ui";
+import { G, GBadge, GNote, GPill, GStat, NUM, TILE, TILE_GOLD } from "./g-ui";
+import { DealsSection } from "./r-deals";
+import { manYen, yen } from "./r-ui";
 import type { TabProps } from "./types";
-import { NAVY } from "./ui";
-
 
 /** 「3.02億円」「12.4億円」「8,500万円」 */
 export function okuText(v: number): string {
@@ -18,7 +20,8 @@ export function okuText(v: number): string {
   return `${Math.round(v / 1e4).toLocaleString("ja-JP")}万円`;
 }
 
-export function PriceTab({ data, expand }: TabProps) {
+export function PriceTab(props: TabProps) {
+  const { data, expand } = props;
   const { landPrice, parcels } = data;
   const hits = landPrice.status === "ok" ? landPrice.hits : [];
   const top = hits[0];
@@ -32,70 +35,72 @@ export function PriceTab({ data, expand }: TabProps) {
   const own = parcels.status === "ok" && parcels.kind !== "address";
   const area = own && parcel && /^\d/.test(parcel.chibanRaw) ? parcelAreaM2(parcel) : undefined;
 
-  if (!top)
-    return (
-      <div className={`px-[16px] py-[18px] leading-[1.6] ${CARD}`} style={{ fontSize: 14, color: LIGHT }}>
-        {landPrice.status === "loading" ? "地価公示・地価調査の地点を確認しています…" : landPrice.status === "error" ? "地価のデータを読み込めませんでした。時間をおいて調べ直してください。" : "4km以内に地価公示・地価調査の地点がありません。"}
-      </div>
-    );
-
   return (
-    <div>
-      {/* 最寄りの地点の価格 */}
-      <div className={`px-[14px] pb-[10px] pt-[10px] ${CARD}`}>
-        <p className="flex items-center justify-between leading-none" style={{ fontSize: 12, color: LIGHT }}>
-          <span className="truncate">
-            土地の参考価格（{kindText(top.kind)}・{top.usage}）
-          </span>
-          <span className="shrink-0 rounded-full bg-[#fbe7f0] px-[8px] py-[5px] font-bold" style={{ fontSize: 11.5, color: "#c1246c" }}>
-            前年比 {changeText(top.change)}
-          </span>
-        </p>
-        <p className="mt-[8px] leading-none" style={{ color: TEXT }}>
-          <b className="font-bold" style={{ fontSize: 28 }}>
-            {yen(top.price)}
-          </b>
-          <span className="ml-[3px] font-semibold" style={{ fontSize: 14 }}>
-            円/㎡
-          </span>
-          <span className="ml-[10px]" style={{ fontSize: 13, color: LIGHT }}>
-            坪 約{manYen(top.price * TSUBO_M2)}
-          </span>
-        </p>
-        <div className="mt-[8px] flex items-center justify-between gap-[8px]">
-          <p className="min-w-0 truncate leading-[1.4]" style={{ fontSize: 12, color: LIGHT }}>
-            {top.bearing}へ{distanceText(top.distance)}・{asOfText(top)}
-            {top.address && `・${top.address}`}
-          </p>
-          <Ghost onClick={() => expand({ landPrice: top.point })} icon={<MapIcon size={15} strokeWidth={1.8} absoluteStrokeWidth />} className="h-[34px] shrink-0 px-[12px]">
-            地図
-          </Ghost>
-        </div>
-      </div>
+    <div className="flex flex-col gap-[10px]">
+      {top ? (
+        <>
+          {/* 最寄りの地点の価格 */}
+          <div className="rounded-[18px] px-[13px] pb-[12px] pt-[12px]" style={TILE_GOLD}>
+            <p className="flex items-center justify-between gap-[8px] leading-none">
+              <span className="truncate" style={{ fontSize: 12, color: "#ffe2a3", letterSpacing: 0.4 }}>
+                土地の参考価格（{kindText(top.kind)}・{top.usage}）
+              </span>
+              {top.change !== undefined && <GBadge tone="none">前年比 {changeText(top.change)}</GBadge>}
+            </p>
+            <p className="mt-[10px] leading-none" style={{ color: G.text, ...NUM }}>
+              <b className="font-semibold" style={{ fontSize: 32 }}>
+                {yen(top.price)}
+              </b>
+              <span className="ml-[3px] font-medium" style={{ fontSize: 14, color: G.sub }}>
+                円/㎡
+              </span>
+              <span className="ml-[10px]" style={{ fontSize: 13, color: G.sub }}>
+                坪 約{manYen(top.price * TSUBO_M2)}
+              </span>
+            </p>
+            <div className="mt-[10px] flex items-center justify-between gap-[8px]">
+              <p className="min-w-0 truncate leading-[1.4]" style={{ fontSize: 12, color: G.sub }}>
+                {top.bearing}へ{distanceText(top.distance)}・{asOfText(top)}
+                {top.address && `・${top.address}`}
+              </p>
+              <GPill onClick={() => expand({ landPrice: top.point })} icon={<MapIcon size={14} strokeWidth={1.8} absoluteStrokeWidth />} className="h-[32px] px-[11px]">
+                地図
+              </GPill>
+            </div>
+          </div>
 
-      {/* 周辺の平均・幅・地点数 */}
-      <div className="mt-[8px] grid grid-cols-3 gap-[8px]">
-        <Stat label="周辺の平均" value={avg ? `${man(avg)}万` : "―"} unit={avg ? "円/㎡" : undefined} note={`半径2km・${near.length}地点`} />
-        <Stat label="周辺の幅" value={prices.length > 1 ? `${man(Math.min(...prices))}〜${man(Math.max(...prices))}万` : "―"} note={prices.length > 1 ? `${top.usage}・近い${prices.length}地点` : "比べる地点なし"} small />
-        <Stat label="土地の概算" value={area ? `約${okuText(area * top.price)}` : "―"} note={area ? `${area.toLocaleString("ja-JP", { maximumFractionDigits: 1 })}㎡ × 単価` : parcels.status === "loading" ? "筆を確認中…" : "地番か地図で調べると出ます"} />
-      </div>
+          {/* 周辺の平均・幅・土地の概算 */}
+          <div className="grid grid-cols-3 gap-[8px]">
+            <GStat label="周辺の平均" value={avg ? `${man(avg)}万` : "―"} unit={avg ? "円/㎡" : undefined} note={`半径2km・${near.length}地点`} />
+            <GStat label="周辺の幅" value={prices.length > 1 ? `${man(Math.min(...prices))}〜${man(Math.max(...prices))}万` : "―"} note={prices.length > 1 ? `${top.usage}・近い${prices.length}地点` : "比べる地点なし"} small />
+            <GStat label="土地の概算" value={area ? `約${okuText(area * top.price)}` : "―"} note={area ? `${area.toLocaleString("ja-JP", { maximumFractionDigits: 1 })}㎡ × 単価` : parcels.status === "loading" ? "筆を確認中…" : "地番か地図で調べると出ます"} small />
+          </div>
 
-      {/* 価格の推移 */}
-      <div className={`mt-[8px] px-[14px] pb-[4px] pt-[8px] ${CARD}`}>
-        <History hit={top} />
-      </div>
+          {/* 価格の推移 */}
+          <div className="rounded-[18px] px-[13px] pb-[6px] pt-[11px]" style={TILE}>
+            <History hit={top} />
+          </div>
 
-      {/* 路線価・一覧 */}
-      {landPrice.status === "ok" && landPrice.rosenka.length > 0 && (
-        <div className="mt-[8px] flex gap-[8px]">
-          {landPrice.rosenka.slice(0, 2).map((l) => (
-            <Ghost key={l.kind} href={l.url} className="min-w-0 flex-1 px-[8px]">
-              <span className="truncate">{l.name.replace(/等（.*$/, "").replace(/（.*$/, "")}</span>
-            </Ghost>
-          ))}
+          {/* 路線価 */}
+          {landPrice.status === "ok" && landPrice.rosenka.length > 0 && (
+            <div className="flex gap-[8px]">
+              {landPrice.rosenka.slice(0, 2).map((l) => (
+                <GPill key={l.kind} href={l.url} className="min-w-0 flex-1 justify-center">
+                  <span className="truncate">{l.name.replace(/等（.*$/, "").replace(/（.*$/, "")}</span>
+                </GPill>
+              ))}
+            </div>
+          )}
+          <GNote>出典：国土数値情報（地価公示・地価調査）。地域の標準的な土地の価格で、物件そのものの価格・査定ではありません。</GNote>
+        </>
+      ) : (
+        <div className="rounded-[18px] px-[14px] py-[16px] leading-[1.6]" style={{ ...TILE, fontSize: 14, color: G.sub }}>
+          {landPrice.status === "loading" ? "地価公示・地価調査の地点を確認しています…" : landPrice.status === "error" ? "地価のデータを読み込めませんでした。時間をおいて調べ直してください。" : "4km以内に地価公示・地価調査の地点がありません。"}
         </div>
       )}
-      <Note className="mt-[8px]">出典：国土数値情報（地価公示・地価調査）。地域の標準的な土地の価格で、物件そのものの価格・査定ではありません。</Note>
+
+      {/* 取引事例（実際の取引価格・成約価格と、公的な価格の事例） */}
+      <DealsSection {...props} />
     </div>
   );
 }
@@ -111,16 +116,16 @@ function man(v: number): string {
 }
 
 const CW = 330;
-const CH = 78;
-const PAD = { l: 38, r: 46, t: 9, b: 16 };
+const CH = 92;
+const PAD = { l: 38, r: 46, t: 10, b: 16 };
 
-/** 価格の推移（1つの地点の年ごとの価格の折れ線）。押した年の価格を出す */
+/** 価格の推移（1つの地点の年ごとの価格の折れ線。開いたときに左から描く）。押した年の価格を出す */
 function History({ hit }: { hit: LandPriceHit }) {
   const pts = hit.history.filter((h) => h.price > 0);
   const [sel, setSel] = useState<number | null>(null);
   if (pts.length < 2)
     return (
-      <p className="leading-[1.5]" style={{ fontSize: 13, color: LIGHT }}>
+      <p className="pb-[8px] leading-[1.5]" style={{ fontSize: 13, color: G.sub }}>
         価格の推移は、この地点のデータにありません。
       </p>
     );
@@ -149,46 +154,52 @@ function History({ hit }: { hit: LandPriceHit }) {
   return (
     <div>
       <p className="flex items-baseline justify-between leading-none">
-        <span className="font-semibold" style={{ fontSize: 13, color: TEXT }}>
+        <span className="font-semibold" style={{ fontSize: 13, color: G.text }}>
           価格の推移
-          <span className="ml-[6px] font-normal" style={{ fontSize: 12, color: LIGHT }}>
+          <span className="ml-[6px] font-normal" style={{ fontSize: 12, color: G.faint }}>
             {first.year}年→{last.year}年
           </span>
         </span>
-        <span className="font-bold" style={{ fontSize: 13, color: rate >= 0 ? "#c1246c" : "#1f5fbf" }}>
+        <span className="font-semibold" style={{ fontSize: 13, color: rate >= 0 ? G.red : G.blue, ...NUM }}>
           {rate >= 0 ? "+" : ""}
           {rate.toFixed(1)}%
         </span>
       </p>
-      <svg viewBox={`0 0 ${CW} ${CH}`} className="mt-[4px] block w-full touch-none select-none" role="img" aria-label={`価格の推移：${pts.map((p) => `${p.year}年 ${yen(p.price)}円`).join("、")}`} onPointerDown={(e) => pick(e.clientX, e.currentTarget)} onPointerMove={(e) => e.buttons && pick(e.clientX, e.currentTarget)}>
+      <svg viewBox={`0 0 ${CW} ${CH}`} className="mt-[4px] block w-full touch-none select-none overflow-visible" role="img" aria-label={`価格の推移：${pts.map((p) => `${p.year}年 ${yen(p.price)}円`).join("、")}`} onPointerDown={(e) => pick(e.clientX, e.currentTarget)} onPointerMove={(e) => e.buttons && pick(e.clientX, e.currentTarget)}>
+        <defs>
+          <linearGradient id="pv-spark" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#f4c25a" stopOpacity="0.35" />
+            <stop offset="1" stopColor="#f4c25a" stopOpacity="0" />
+          </linearGradient>
+        </defs>
         {[hi, lo].map((v) => (
           <g key={v}>
-            <line x1={PAD.l} x2={CW - PAD.r} y1={y(v)} y2={y(v)} stroke="#e6ebf2" strokeWidth={1} />
-            <text x={PAD.l - 5} y={y(v) + 3.5} textAnchor="end" fontSize={10} fill="#8a95a6">
+            <line x1={PAD.l} x2={CW - PAD.r} y1={y(v)} y2={y(v)} stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
+            <text x={PAD.l - 5} y={y(v) + 3.5} textAnchor="end" fontSize={10} fill="rgba(255,255,255,0.55)">
               {short(v)}
             </text>
           </g>
         ))}
-        <path d={areaPath} fill={NAVY} opacity={0.08} />
-        <path d={line} fill="none" stroke={NAVY} strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round" />
-        <circle cx={x(last.year)} cy={y(last.price)} r={4.2} fill={NAVY} stroke="#fff" strokeWidth={2} />
-        <text x={x(last.year) + 7} y={y(last.price) + 3.5} fontSize={10.5} fontWeight={700} fill="#1c2740">
+        <path className="pv-spark-area" d={areaPath} fill="url(#pv-spark)" />
+        <path className="pv-spark-line" pathLength={1} d={line} fill="none" stroke="#f4c25a" strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round" />
+        <circle cx={x(last.year)} cy={y(last.price)} r={4.2} fill="#f4c25a" stroke="rgba(20,24,34,0.9)" strokeWidth={2} />
+        <text x={x(last.year) + 7} y={y(last.price) + 3.5} fontSize={10.5} fontWeight={700} fill="#fff">
           {short(last.price)}
         </text>
         {s && (
           <g>
-            <line x1={x(s.year)} x2={x(s.year)} y1={PAD.t - 2} y2={CH - PAD.b} stroke="#9fb0c8" strokeWidth={1} />
-            <circle cx={x(s.year)} cy={y(s.price)} r={4} fill="#fff" stroke={NAVY} strokeWidth={2} />
+            <line x1={x(s.year)} x2={x(s.year)} y1={PAD.t - 2} y2={CH - PAD.b} stroke="rgba(255,255,255,0.35)" strokeWidth={1} />
+            <circle cx={x(s.year)} cy={y(s.price)} r={4} fill="#fff" stroke="#f4c25a" strokeWidth={2} />
             <g transform={`translate(${Math.min(Math.max(x(s.year) - 46, 2), CW - 94)},${Math.max(y(s.price) - 26, 0)})`}>
-              <rect width={92} height={19} rx={5} fill="#1c2740" opacity={0.92} />
-              <text x={46} y={13} textAnchor="middle" fontSize={10.5} fill="#fff">
+              <rect width={92} height={19} rx={5} fill="rgba(255,255,255,0.94)" />
+              <text x={46} y={13} textAnchor="middle" fontSize={10.5} fill="#1b3f73" fontWeight={600}>
                 {s.year}年 {yen(s.price)}円
               </text>
             </g>
           </g>
         )}
         {[first.year, last.year].map((yr) => (
-          <text key={yr} x={x(yr)} y={CH - 4} textAnchor="middle" fontSize={10} fill="#8a95a6">
+          <text key={yr} x={x(yr)} y={CH - 3} textAnchor="middle" fontSize={10} fill="rgba(255,255,255,0.55)">
             {yr}
           </text>
         ))}

@@ -1,12 +1,12 @@
 "use client";
 
-// 調査の状況のカード（基本情報タブの一番上）と、状態の札、その場で1段広がる部品、シートの上の「確認を記録」の入口。
+// 調査の状況のカード（概要のタブ。すりガラスのシートの中）と、状態の札（白い画面用と暗いすりガラス用）、その場で1段広がる部品、シートの上の「確認を記録」の入口。
 // 6つの項目（道路・都市計画・建築の注意点・ハザード・周辺環境・地番・土地）に、取得済み・公式図を確認・確認済み・一部確認・
 // 未確認・読み込めずの札を付ける（色は components/app/tokens.ts の STATUS。警告の色と混ぜない）。項目を押すと確認の記録の画面
 import { Building2, CheckCircle2, ChevronRight, Circle, ExternalLink, LandPlot, LoaderCircle, Route, RotateCw, Store, TriangleAlert, Waves, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import type { RecordTopic } from "@/lib/records";
-import { CARD, Head, TEXT } from "./r-ui";
+import { G, GHead, GSTATUS, TILE } from "./g-ui";
 import type { TopicStatus } from "./status";
 import { STATUS, type StatusKey } from "./tokens";
 
@@ -55,26 +55,55 @@ const TOPIC_ICON: Record<RecordTopic, LucideIcon> = { road: Route, zoning: Build
 /** カードの札は短く（「確認済み 10/24」→「確認済み」、「一部確認 1/4」→「一部 1/4」）。全文は確認の記録の画面に */
 const shortChip = (s: TopicStatus) => (s.status === "partial" ? s.chip.replace("一部確認", "一部") : s.chip.split(" ")[0]);
 
-/** 調査の状況：6つの項目の札（3列×2段）。押すと確認の記録の画面（取れた情報・次にやること・確認事項） */
+/** 状態の札（暗いすりガラスの上。物件の画面のシートの中） */
+export function GStatusChip({ status, children, size = 11 }: { status: StatusKey | "loading"; children: ReactNode; size?: number }) {
+  const c = GSTATUS[status];
+  return (
+    <span className="inline-flex max-w-full shrink-0 items-center gap-[4px] whitespace-nowrap rounded-full px-[7px] font-bold leading-none" style={{ height: 22, fontSize: size, color: c.color, background: c.bg }}>
+      <GStatusIcon status={status} size={12} color={c.color} />
+      <span className="truncate">{children}</span>
+    </span>
+  );
+}
+
+/** 状態の印（暗い地の上の色） */
+function GStatusIcon({ status, size, color }: { status: StatusKey | "loading"; size: number; color: string }) {
+  if (status === "loading") return <LoaderCircle size={size} strokeWidth={2} absoluteStrokeWidth className="animate-spin" color={color} />;
+  switch (status) {
+    case "auto":
+    case "confirmed":
+      return <CheckCircle2 size={size} strokeWidth={2} absoluteStrokeWidth color={color} />;
+    case "official":
+      return <ExternalLink size={size} strokeWidth={2} absoluteStrokeWidth color={color} />;
+    case "partial":
+      return <HalfCircle size={size} color={color} />;
+    case "failed":
+      return <RotateCw size={size} strokeWidth={2} absoluteStrokeWidth color={color} />;
+    default:
+      return <Circle size={size} strokeWidth={2} absoluteStrokeWidth color={color} />;
+  }
+}
+
+/** 調査の状況：6つの項目の札（3列×2段。すりガラスのシートの中）。押すと確認の記録の画面（取れた情報・次にやること・確認事項） */
 export function ResearchCard({ statuses, summary, onTopic }: { statuses: TopicStatus[]; summary: string; onTopic: (t: RecordTopic) => void }) {
   return (
     <section>
-      <Head title="調査の状況" note={summary} className="-mt-[4px]" />
+      <GHead title="調査の状況" note={summary} />
       <div className="grid grid-cols-3 gap-[6px]">
         {statuses.map((s) => {
           const Icon = TOPIC_ICON[s.topic];
           return (
-            <button key={s.topic} onClick={() => onTopic(s.topic)} aria-label={`${s.label}：${s.chip}。確認を記録する`} className={`press-soft flex min-w-0 flex-col items-start px-[9px] pb-[8px] pt-[8px] text-left ${CARD}`} style={{ minHeight: 58 }}>
+            <button key={s.topic} onClick={() => onTopic(s.topic)} aria-label={`${s.label}：${s.chip}。確認を記録する`} className="press-soft flex min-w-0 flex-col items-start rounded-[16px] px-[9px] pb-[8px] pt-[9px] text-left active:brightness-125" style={{ ...TILE, minHeight: 60 }}>
               <span className="flex w-full items-center gap-[5px]">
-                <Icon size={14} strokeWidth={1.9} absoluteStrokeWidth color="#1d3264" className="shrink-0" />
-                <span className="min-w-0 flex-1 truncate font-semibold leading-none" style={{ fontSize: 12, color: TEXT }}>
+                <Icon size={14} strokeWidth={1.9} absoluteStrokeWidth color="rgba(255,255,255,0.85)" className="shrink-0" />
+                <span className="min-w-0 flex-1 truncate font-semibold leading-none" style={{ fontSize: 12, color: G.text }}>
                   {s.label}
                 </span>
               </span>
-              <span className="mt-[7px] flex w-full">
-                <StatusChip status={s.status} size={10.5}>
+              <span className="mt-[8px] flex w-full">
+                <GStatusChip status={s.status} size={10.5}>
                   {shortChip(s)}
-                </StatusChip>
+                </GStatusChip>
               </span>
             </button>
           );

@@ -16,7 +16,7 @@ import { historyKey, type HistoryItem } from "@/lib/history";
 import type { Resume } from "@/lib/resume";
 import { Sheet } from "../sheet";
 import { PhoneImg, ScaledInput } from "./frame";
-import { TABS } from "./result-head";
+import { TABS, tabOf } from "./result-head";
 import { PAGE } from "./tokens";
 
 /** 時刻・電池の帯の色（下のメニューのページで、空の変数 --sky-top が入る前の値。app/layout.tsx の themeColor と同じ） */
@@ -268,7 +268,7 @@ export function HomeScreen({
                       sub={
                         <>
                           {secondLine(h)}
-                          {resumed && <span className="ml-[6px] font-semibold text-[#8cc8ff]">続きから：{TABS.find((t) => t.key === resume.tab)?.long ?? "基本情報"}</span>}
+                          {resumed && <span className="ml-[6px] font-semibold text-[#8cc8ff]">続きから：{TABS.find((t) => t.key === tabOf(resume.tab))?.long ?? "概要"}</span>}
                         </>
                       }
                       label={`${full}を開く`}

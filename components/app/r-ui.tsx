@@ -1,12 +1,11 @@
 "use client";
 
-// 物件の画面（6つのタブ）と、見つからない画面で共通の小さな部品。ホームと同じ見た目：白い角丸のカード、端末の標準の字、
+// 見つからない画面・履歴などで共通の小さな部品（物件の画面のすりガラスの部品は components/app/g-ui.tsx）。白い角丸のカード、端末の標準の字、
 // iPhone の大きさの段階（章の見出し17pt太字、値16pt中太字、行の名前15pt中太字、説明13pt、小さな字12〜11pt）。
 // 寸法は幅393ptの値（1px = 1pt。画面の幅に合わせて拡大・縮小する）
-import { ChevronRight, ExternalLink, ImageIcon } from "lucide-react";
-import { useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import type { Tone } from "@/lib/app/hazard-level";
-import { NAVY, TONE } from "./ui";
+import { ChevronRight, ExternalLink } from "lucide-react";
+import type { CSSProperties, ReactNode } from "react";
+import { NAVY } from "./ui";
 
 export const HEAD = "#0f1b33";
 export const TEXT = "#162033";
@@ -46,34 +45,8 @@ export function displayAddress(a: string): string {
   return shortAddress(a.normalize("NFKC"));
 }
 
-/** 幅に対して背の低い画面（iPhone SE など。app/globals.css の low: と同じ条件）か。帯や地図を少し低くして1画面に収める */
-const LOW = "(max-width: 520px) and (min-aspect-ratio: 1000/1985)";
-export function useLowScreen(): boolean {
-  return useSyncExternalStore(
-    (cb) => {
-      const mq = matchMedia(LOW);
-      mq.addEventListener("change", cb);
-      return () => mq.removeEventListener("change", cb);
-    },
-    () => matchMedia(LOW).matches,
-    () => false,
-  );
-}
-
 /** 写真の帯の上端の色（NO IMAGE の札の上の色に薄い影が重なった色）。時刻・電池の帯をこの色にする */
 export const BAND_TOP = "#bec7d2";
-
-/** 写真が入る所（写真はあとで届く）。top で NO IMAGE の札を上に寄せる（下に字を重ねる帯のとき） */
-export function NoImage({ className = "", style, label = "NO IMAGE", size = 11, top = false }: { className?: string; style?: CSSProperties; label?: string; size?: number; top?: boolean }) {
-  return (
-    <div className={`flex flex-col items-center overflow-hidden bg-[linear-gradient(160deg,#cfd8e3_0%,#a9b6c6_55%,#8d9bae_100%)] text-white ${top ? "justify-start pt-[8px]" : "justify-center"} ${className}`} style={style}>
-      <ImageIcon size={Math.round(size * 1.8)} strokeWidth={1.6} absoluteStrokeWidth className="opacity-90" />
-      <span className="mt-[3px] font-semibold leading-none opacity-90" style={{ fontSize: size, letterSpacing: "0.14em" }}>
-        {label}
-      </span>
-    </div>
-  );
-}
 
 /** 章の見出し（左に青い印）と右の「もっと見る ›」 */
 export function Head({ title, note, more = "もっと見る", onMore, className = "" }: { title: string; note?: string; more?: string; onMore?: () => void; className?: string }) {
@@ -96,37 +69,6 @@ export function Head({ title, note, more = "もっと見る", onMore, className 
           <ChevronRight size={15} strokeWidth={2} absoluteStrokeWidth />
         </button>
       )}
-    </div>
-  );
-}
-
-/** 値の札（2列の表の1マス）：小さな名前・値・1行の補足。高さは決め打ち（1画面に収めるため）。押せるものは右上に › */
-export function Cell({ label, value, sub, onClick, warn, height = 62 }: { label: string; value: ReactNode; sub?: ReactNode; onClick?: () => void; warn?: boolean; height?: number }) {
-  const body = (
-    <>
-      <span className="block truncate leading-none" style={{ fontSize: 11.5, color: LIGHT }}>
-        {label}
-      </span>
-      <span className="mt-[4px] block truncate font-semibold leading-[1.25]" style={{ fontSize: 16, color: warn ? WARN : TEXT }}>
-        {value}
-      </span>
-      {sub !== undefined && (
-        <span className="mt-[2px] block truncate leading-none" style={{ fontSize: 11, color: LIGHT, minHeight: 11 }}>
-          {sub}
-        </span>
-      )}
-      {onClick && <ChevronRight size={14} strokeWidth={2} absoluteStrokeWidth color="#a3adbd" className="absolute right-[8px] top-[9px]" />}
-    </>
-  );
-  const cls = "relative block min-w-0 overflow-hidden rounded-[14px] bg-white px-[12px] text-left shadow-[0_2px_8px_rgba(20,45,85,0.06)]";
-  const style: CSSProperties = { height, paddingTop: 7, paddingBottom: 6 };
-  return onClick ? (
-    <button onClick={onClick} className={`${cls} press-soft w-full active:bg-[#f5f8fc]`} style={style}>
-      {body}
-    </button>
-  ) : (
-    <div className={cls} style={style}>
-      {body}
     </div>
   );
 }
@@ -195,71 +137,12 @@ export function Primary({ children, onClick, href, icon, className = "" }: { chi
   );
 }
 
-/** 細い線の小さなボタン（白） */
-export function Ghost({ children, onClick, href, icon, className = "" }: { children: ReactNode; onClick?: () => void; href?: string; icon?: ReactNode; className?: string }) {
-  const cls = `press flex h-[40px] items-center justify-center gap-[6px] rounded-full border border-[#cfd8e4] bg-white px-[14px] font-semibold leading-none active:bg-[#f2f5f9] ${className}`;
-  const style: CSSProperties = { fontSize: 14, color: NAVY };
-  return href ? (
-    <a href={href} target="_blank" rel="noreferrer" className={cls} style={style}>
-      {icon}
-      {children}
-      <ExternalLink size={14} strokeWidth={1.8} absoluteStrokeWidth />
-    </a>
-  ) : (
-    <button onClick={onClick} className={cls} style={style}>
-      {icon}
-      {children}
-    </button>
-  );
-}
-
-/** 区分の印（区域外=緑、注意=黄、高い=赤、データなし=灰、地図で確認=青） */
-export function Badge({ tone, children, size = 12 }: { tone: Tone; children: ReactNode; size?: number }) {
-  const t = TONE[tone];
-  return (
-    <span className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full px-[8px] font-bold leading-none" style={{ background: t.bg, color: t.fg, height: 24, fontSize: size }}>
-      {children}
-    </span>
-  );
-}
-
-/** 3つ並べる小さな数字の札 */
-export function Stat({ label, value, unit, note, bg = "#ffffff", small = false }: { label: string; value: string; unit?: string; note?: string; bg?: string; small?: boolean }) {
-  return (
-    <div className="min-w-0 rounded-[14px] px-[10px] py-[8px] shadow-[0_2px_8px_rgba(20,45,85,0.06)]" style={{ background: bg }}>
-      <p className="truncate leading-none" style={{ fontSize: 11.5, color: LIGHT }}>
-        {label}
-      </p>
-      <p className="mt-[6px] flex items-baseline truncate font-bold leading-none" style={{ fontSize: small ? 15 : 17, color: TEXT, height: 17 }}>
-        {value}
-        {unit && (
-          <span className="ml-[2px] font-semibold" style={{ fontSize: 11 }}>
-            {unit}
-          </span>
-        )}
-      </p>
-      <p className="mt-[5px] truncate leading-none" style={{ fontSize: 11, color: LIGHT, minHeight: 11 }}>
-        {note}
-      </p>
-    </div>
-  );
-}
-
 /** 薄い注記（出典など） */
 export function Note({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <p className={`leading-[1.5] ${className}`} style={{ fontSize: 11, color: FAINT }}>
       {children}
     </p>
-  );
-}
-
-/** 読み込み中・データなしの薄い字 */
-export function Faint({ children = "確認中…" }: { children?: ReactNode }) {
-  return (
-    <span className="font-normal" style={{ color: FAINT }}>
-      {children}
-    </span>
   );
 }
 
