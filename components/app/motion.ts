@@ -6,21 +6,29 @@ import { useSyncExternalStore } from "react";
 const KEY = "michilu:motion";
 const EVENT = "michilu:motion";
 
-/** 動きの演出がオンか（端末に「off」と覚えていなければオン） */
+// 保存が拒否されても、このページで選んだ値は失わない。読むだけできる場合も古い保存値より優先する。
+let lastKnown = true;
+let pageOnly = false;
+
+/** 動きの演出がオンか。保存できない間はこのページの選択、未設定ならオン。 */
 export function motionSetting(): boolean {
+  if (pageOnly) return lastKnown;
   try {
-    return localStorage.getItem(KEY) !== "off";
+    lastKnown = localStorage.getItem(KEY) !== "off";
   } catch {
-    return true;
+    // 途中で読み取れなくなっても、最後に読めた設定を保つ。
   }
+  return lastKnown;
 }
 
 export function setMotionSetting(on: boolean): void {
+  lastKnown = on;
   try {
     if (on) localStorage.removeItem(KEY);
     else localStorage.setItem(KEY, "off");
+    pageOnly = false;
   } catch {
-    // 覚えられない（プライベートブラウズなど）ときは、この画面の間だけ
+    pageOnly = true;
   }
   dispatchEvent(new Event(EVENT));
 }
