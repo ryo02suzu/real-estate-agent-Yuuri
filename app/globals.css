@@ -448,6 +448,120 @@ body {
   }
 }
 
+/*
+ * スマホの書類・出力のページ（components/app/docs.tsx）。画面いっぱいの机の写真（昼・夕方・夜で切り替え）と、ホームと同じすりガラス。
+ * 写真の箱（.docs-stage）は画面を覆う大きさにし（写真の縦横比 941:1672。横は --docs-x の位置で切る）、光のにじみ（.docs-glow）と
+ * ビルの屋上の赤い灯（.docs-beacon）を絵と同じ位置に重ねる。コンテナの単位が使えない古い端末は、画面いっぱいの箱に写真を合わせるだけ。
+ * 初めて開いたときは写真がふわっと落ち着き（.docs-intro）、時間帯が変わったときは新しい写真がゆっくり重なる（.docs-swap）。
+ * 現れる動き（.docs-rise・.docs-row）は、すりガラスの箱そのものに付け、終わったら外す（backwards）。動きを減らす設定では動かさない
+ */
+.docs-stage {
+  position: absolute;
+  inset: 0;
+}
+@supports (width: 1cqw) {
+  .docs-backdrop {
+    container-type: size;
+  }
+  .docs-stage {
+    inset: auto;
+    width: max(100cqw, calc(100cqh * 0.5628));
+    aspect-ratio: 941 / 1672;
+    left: calc((100cqw - max(100cqw, calc(100cqh * 0.5628))) * var(--docs-x, 0.5));
+    top: calc((100cqh - max(calc(100cqw / 0.5628), 100cqh)) * 0.5);
+  }
+}
+.docs-glow {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  mix-blend-mode: screen;
+  opacity: 0.8;
+}
+.docs-beacon {
+  position: absolute;
+  width: 1.8%;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(closest-side, rgba(255, 120, 100, 1) 0%, rgba(255, 48, 36, 0.55) 40%, rgba(255, 30, 20, 0) 100%);
+  mix-blend-mode: screen;
+  opacity: 0;
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .docs-intro {
+    animation: docs-intro 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  }
+  .docs-swap {
+    animation: docs-swap 1.6s ease-in-out backwards;
+  }
+  .docs-alive .docs-drift {
+    animation: docs-drift 46s ease-in-out infinite alternate;
+    transform-origin: 50% 40%;
+  }
+  .docs-alive .docs-glow {
+    animation-name: docs-glow;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+  }
+  .docs-alive .docs-beacon {
+    animation-name: docs-beacon;
+    animation-duration: 1.9s;
+    animation-timing-function: ease-out;
+    animation-iteration-count: infinite;
+  }
+  .docs-rise {
+    animation: home-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  }
+  .docs-row {
+    animation: fav-row 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  }
+}
+@keyframes docs-intro {
+  from {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+}
+@keyframes docs-swap {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes docs-drift {
+  to {
+    transform: scale(1.05) translate(-0.6%, -0.4%);
+  }
+}
+@keyframes docs-glow {
+  from {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+}
+/* 航空障害灯の点滅（ぱっと点いて、ゆっくり消える） */
+@keyframes docs-beacon {
+  0% {
+    opacity: 0;
+  }
+  7% {
+    opacity: 1;
+  }
+  32% {
+    opacity: 0.12;
+  }
+  45%,
+  100% {
+    opacity: 0;
+  }
+}
+
 @keyframes home-rise {
   from {
     opacity: 0;

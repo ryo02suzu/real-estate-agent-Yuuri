@@ -1,6 +1,6 @@
 "use client";
 
-// スマホの下のメニューのページ（履歴・書類・出力・その他。お気に入りは写真の上のページで components/app/favorites.tsx）。ホームと同じ系統：上にホームと同じ街の帯（時間連動の空と
+// スマホの下のメニューのページ（履歴・その他。お気に入りと書類・出力は写真の上のページで components/app/favorites.tsx・docs.tsx）。ホームと同じ系統：上にホームと同じ街の帯（時間連動の空と
 // PLATEAU の街。components/app/sky.tsx の SkyPhotos）、その帯に重ねるすりガラスのカード（そのページでいちばん使う操作）、白い角丸の一覧。
 // 字は端末の標準の字（app/globals.css の .theme-navy）。大きさは iPhone の段階：帯の見出し28pt太字、章の見出し17pt太字、
 // 行の名前15.5pt中太字、説明12.5pt、押せる所は44pt以上。寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）
@@ -8,17 +8,12 @@ import {
   Bell,
   ChevronRight,
   CircleHelp,
-  ClipboardCopy,
   Database,
   Download,
   Info,
-  ListChecks,
   LoaderCircle,
   LogIn,
-  Map as MapIcon,
   MapPin,
-  Printer,
-  ScrollText,
   Search,
   Smartphone,
   Star,
@@ -433,109 +428,6 @@ export function HistoryPage({
         </div>
       )}
       <Disclaimer />
-    </TabScreen>
-  );
-}
-
-/** 作れる書類（押すと、その書類をすぐ開く） */
-export type DocKind = "triage" | "memo" | "draft" | "guide" | "copy";
-const DOCS: { kind: DocKind; Icon: LucideIcon; title: string; sub: string }[] = [
-  { kind: "triage", Icon: ListChecks, title: "要注意点と次にやること", sub: "問題になりそうな所と、窓口ごとに確かめること（済んだ印を付けられます）" },
-  { kind: "memo", Icon: Printer, title: "調査メモ", sub: "A4に印刷・PDF" },
-  { kind: "draft", Icon: ScrollText, title: "重説の下書き", sub: "物件概要も一緒に" },
-  { kind: "guide", Icon: MapIcon, title: "案内図", sub: "A4に印刷・PDF" },
-  { kind: "copy", Icon: ClipboardCopy, title: "結果の文面", sub: "コピーして貼る" },
-];
-
-function DocTile({ Icon, title, sub, wide, onClick }: { Icon: LucideIcon; title: string; sub: string; wide?: boolean; onClick: () => void }) {
-  return (
-    <button onClick={onClick} className={`${wide ? "col-span-2" : ""} press-soft flex items-center gap-[10px] rounded-[14px] bg-white px-[11px] py-[8px] text-left shadow-[0_2px_8px_rgba(20,45,85,0.06)] active:bg-[#f5f8fc]`} style={{ minHeight: 52 }}>
-      <span className="flex shrink-0 items-center justify-center rounded-full bg-[#eef3fa]" style={{ width: 34, height: 34 }}>
-        <Icon size={17} strokeWidth={1.8} absoluteStrokeWidth color={NAVY} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-semibold leading-[1.25]" style={{ fontSize: 14, color: TEXT }}>
-          {title}
-        </span>
-        <span className={`mt-[2px] block leading-[1.3] ${wide ? "" : "truncate"}`} style={{ fontSize: 11.5, color: LIGHT }}>
-          {sub}
-        </span>
-      </span>
-      {wide && <ChevronRight size={16} strokeWidth={1.8} absoluteStrokeWidth color="#a3adbd" className="shrink-0" />}
-    </button>
-  );
-}
-
-/** 書類・出力：作れる書類のタイル（押すとすぐ開く）、いま開いている物件、最近調べた物件から作る */
-export function DocsPage({
-  current,
-  history,
-  onMake,
-  onReport,
-  onPick,
-  onHistory,
-  banner,
-}: {
-  /** いま開いている物件（無ければ undefined） */
-  current?: HistoryItem;
-  history: HistoryItem[];
-  /** 書類の種類を押した（開いている物件、無ければ最近の物件で作る） */
-  onMake: (kind: DocKind) => void;
-  /** 開いている物件のレポートの画面 */
-  onReport: () => void;
-  /** 最近の物件を選んで、その物件のレポートの画面 */
-  onPick: (h: HistoryItem) => void;
-  /** 履歴のページ（4件目から） */
-  onHistory: () => void;
-  banner?: ReactNode;
-}) {
-  // 1画面に収めるため3件まで（開いている物件の行があるときは2件。続きは履歴のページから）
-  const others = history.filter((h) => !current || historyKey(h) !== historyKey(current));
-  const recent = others.slice(0, current ? 2 : 3);
-  const all = useMemo(() => (current ? [current, ...recent] : recent), [current, recent]);
-  const scenes = useScenes(all);
-  const now = useNow();
-  return (
-    <TabScreen
-      title="書類・出力"
-      sub={current ? `${placeParts(current).town || placeParts(current).full} の書類を作れます` : "調べた物件から、参考の資料をすぐ作れます"}
-      hero={
-        <>
-          <p className="px-[4px] pt-[2px] font-semibold leading-none" style={{ fontSize: 13, color: HEAD }}>
-            作れる書類{current ? "（いま開いている物件）" : history.length ? "（最近調べた物件）" : ""}
-          </p>
-          <div className="mt-[8px] grid grid-cols-2 gap-[6px]">
-            {DOCS.map((d, i) => (
-              <DocTile key={d.kind} Icon={d.Icon} title={d.title} sub={d.sub} wide={i === 0} onClick={() => onMake(d.kind)} />
-            ))}
-          </div>
-        </>
-      }
-      banner={banner}
-    >
-      {current && (
-        <section>
-          <Head title="いま開いている物件" className="mt-[10px]" />
-          <ul className={`overflow-hidden ${CARD}`}>
-            <PlaceRow item={current} scene={scenes.get(historyKey(current)) ?? "suburb"} time={when(current.at, now)} onClick={onReport} />
-          </ul>
-        </section>
-      )}
-      <section>
-        <Head title={current ? "ほかの物件から作る" : "最近調べた物件から作る"} note="押すとレポートの画面" more="履歴" onMore={others.length > recent.length ? onHistory : undefined} className="mt-[10px]" />
-        {recent.length ? (
-          <ul className={`overflow-hidden ${CARD}`}>
-            {recent.map((h) => (
-              <PlaceRow key={historyKey(h)} item={h} scene={scenes.get(historyKey(h)) ?? "suburb"} time={when(h.at, now)} onClick={() => onPick(h)} />
-            ))}
-          </ul>
-        ) : (
-          <p className={`px-[16px] py-[16px] leading-[1.6] ${CARD}`} style={{ fontSize: 13, color: LIGHT }}>
-            {current ? "ほかに調べた物件はまだありません。" : "まだありません。ホームで物件を調べると、ここから書類を作れます。"}
-          </p>
-        )}
-      </section>
-      <Note className="mt-[12px] px-[4px]">どれも参考の資料です（iPhone はプリントの画面から PDF にできます）。最終確認は役所の窓口・公的な資料で。</Note>
     </TabScreen>
   );
 }

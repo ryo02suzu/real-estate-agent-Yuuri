@@ -116,8 +116,8 @@ export function FavoritesBackdrop({ scroller, motion }: { scroller: RefObject<HT
   );
 }
 
-/** 2行目：番地か地番（地図で選んだ所はそう書く）と、保存した日時 */
-function subLine(f: FavoriteItem, time: string): string {
+/** 2行目：番地か地番（地図で選んだ所はそう書く）と、保存した・調べた日時（書類・出力の一覧も同じ。components/app/docs.tsx） */
+export function placeSubLine(f: FavoriteItem, time: string): string {
   if (f.ll) return `地図で選んだ場所・${time}`;
   const { city, town, full, chiban } = placeParts(f);
   const tail = city && full.startsWith(city) ? full.slice(city.length).trim() : full;
@@ -125,8 +125,8 @@ function subLine(f: FavoriteItem, time: string): string {
   return num ? `${chiban ? "地番" : "番地"}：${num}・${time}` : time;
 }
 
-/** 物件を乗せる板（ホームの最近の検索より少し濃いすりガラス。透けすぎると字が読みにくいので。色は app/globals.css の --glass-board-bg） */
-const BOARD: CSSProperties = {
+/** 物件を乗せる板（ホームの最近の検索より少し濃いすりガラス。透けすぎると字が読みにくいので。色は app/globals.css の --glass-board-bg。書類・出力も同じ） */
+export const BOARD: CSSProperties = {
   background: "var(--glass-board-bg)",
   border: "1px solid rgba(255,255,255,0.18)",
   boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12), 0 12px 30px rgba(0,0,0,0.22)",
@@ -135,8 +135,8 @@ const BOARD: CSSProperties = {
 };
 /** いつもの画面の寸法（pt）：検索欄の下の端（ホームと同じ位置）、そこから板の行の始まりまで、行の高さ、下の余白 */
 const LAYOUT = { searchBottom: 256, compactSearchBottom: 202, toRows: 68, row: 63, bottom: 18 };
-/** 章の見出し（ホームの「最近の検索」と同じ、控えめな白の字） */
-const LABEL: CSSProperties = { fontSize: 15, letterSpacing: 1.5, color: "rgba(255,255,255,0.62)" };
+/** 章の見出し（ホームの「最近の検索」と同じ、控えめな白の字。書類・出力も同じ） */
+export const LABEL: CSSProperties = { fontSize: 15, letterSpacing: 1.5, color: "rgba(255,255,255,0.62)" };
 
 export function FavoritesPage({
   favorites,
@@ -510,7 +510,7 @@ function FavRow({
             {city && town ? `${city}${town}` : full}
           </span>
           <span className="mt-[3px] block truncate leading-[1.3]" style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>
-            {subLine(item, time)}
+            {placeSubLine(item, time)}
           </span>
         </button>
         <button onClick={onDocs} aria-label="この物件の書類を作る" className="press flex shrink-0 items-center justify-center rounded-full active:bg-white/10" style={{ width: HIT, height: HIT }}>

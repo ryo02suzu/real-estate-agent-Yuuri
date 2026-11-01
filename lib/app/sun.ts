@@ -100,6 +100,23 @@ export function blend(altitude: number, rising: boolean): Blend {
   return b;
 }
 
+/** 書類・出力のページの写真の時間帯（届いた机の写真 3 枚：昼・夕方・夜） */
+export type DayPart = "day" | "evening" | "night";
+
+/**
+ * 太陽の高さで、書類・出力のページの写真を選ぶ（季節で時刻が変わる。東京駅で 11 月 1 日なら 昼 5:49〜・夕方 16:12〜・夜 17:15〜、
+ * 6 月 21 日なら 昼 4:11〜・夕方 18:23〜・夜 19:34〜、12 月 22 日なら 昼 6:33〜・夕方 15:53〜・夜 17:03〜）。
+ * 夕方（沈む）：+6°（ゴールデンアワーの始まり。日の入りの約 35 分前）から −6°（市民薄明の終わり。日の入りの約 30 分後）まで。それより低ければ夜。
+ * 朝（昇る）：−3°（日の出の約 15 分前）からは昼（夕方の写真は夕焼けと点いた街の明かりなので、朝には使わない）。
+ * 3 枚は構図が違う写真なので、混ぜずにどれか 1 枚を選ぶ
+ */
+export function dayPart(altitude: number, rising: boolean): DayPart {
+  if (rising) return altitude >= -3 ? "day" : "night";
+  if (altitude >= 6) return "day";
+  if (altitude >= -6) return "evening";
+  return "night";
+}
+
 /** 写真の重ね順（下から上）。components/app/sky.tsx はこの順に重ねる */
 export const PHOTO_ORDER = ["night", "twilight", "dawn", "golden", "day"] as const;
 

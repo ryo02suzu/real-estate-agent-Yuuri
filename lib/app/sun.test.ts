@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BASE, blend, HOME_CAMERA, layerOpacity, light, overrideTime, PHOTO_ORDER, projectSun, solar } from "./sun";
+import { BASE, blend, dayPart, HOME_CAMERA, layerOpacity, light, overrideTime, PHOTO_ORDER, projectSun, solar } from "./sun";
 
 // 国立天文台「こよみの計算」東京（35.6581, 139.7414）2026年の日の出入り・南中（分と 0.1° に丸めた値）
 const NAOJ = { lat: 35.6581, lng: 139.7414, utcOffset: 540 };
@@ -56,6 +56,44 @@ describe("solar（天体計算）", () => {
     expect(solar(jst("2026-06-21", "08:00")).rising).toBe(true);
     expect(solar(jst("2026-06-21", "16:00")).rising).toBe(false);
     expect(solar(jst("2026-06-21", "02:00")).rising).toBe(true);
+  });
+});
+
+describe("dayPart（書類・出力の写真の昼・夕方・夜）", () => {
+  const at = (ymd: string, hm: string) => {
+    const s = solar(jst(ymd, hm));
+    return dayPart(s.altitude, s.rising);
+  };
+  it("11 月 1 日：昼・夕方（日の入り 16:46 の前後）・夜", () => {
+    expect(at("2026-11-01", "05:30")).toBe("night");
+    expect(at("2026-11-01", "06:00")).toBe("day");
+    expect(at("2026-11-01", "12:00")).toBe("day");
+    expect(at("2026-11-01", "16:00")).toBe("day");
+    expect(at("2026-11-01", "16:30")).toBe("evening");
+    expect(at("2026-11-01", "17:05")).toBe("evening");
+    expect(at("2026-11-01", "17:30")).toBe("night");
+    expect(at("2026-11-01", "23:59")).toBe("night");
+    expect(at("2026-11-01", "00:30")).toBe("night");
+  });
+  it("季節で夕方の時刻が変わる（夏至は 18 時台、冬至は 16 時前から）", () => {
+    expect(at("2026-06-21", "18:00")).toBe("day");
+    expect(at("2026-06-21", "18:45")).toBe("evening");
+    expect(at("2026-06-21", "19:20")).toBe("evening");
+    expect(at("2026-06-21", "19:45")).toBe("night");
+    expect(at("2026-06-21", "04:30")).toBe("day");
+    expect(at("2026-12-22", "15:30")).toBe("day");
+    expect(at("2026-12-22", "16:00")).toBe("evening");
+    expect(at("2026-12-22", "17:10")).toBe("night");
+    expect(at("2026-12-22", "06:20")).toBe("night");
+  });
+  it("朝の低い太陽は夕方にしない（昇るときは −3° から昼）", () => {
+    expect(dayPart(2, true)).toBe("day");
+    expect(dayPart(-2, true)).toBe("day");
+    expect(dayPart(-4, true)).toBe("night");
+    expect(dayPart(2, false)).toBe("evening");
+    expect(dayPart(-5, false)).toBe("evening");
+    expect(dayPart(-7, false)).toBe("night");
+    expect(dayPart(30, false)).toBe("day");
   });
 });
 

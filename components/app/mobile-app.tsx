@@ -78,6 +78,7 @@ import {
 } from "./app-sheets";
 import { DetailSheet } from "./detail-sheets";
 import { ART_W, BottomNav, ZOOM, type NavKey } from "./frame";
+import { DocsBackdrop, DocsPage, docsTop, type DocKind } from "./docs";
 import { FAVORITES_TOP, FavoritesBackdrop, FavoritesPage, UndoToast } from "./favorites";
 import { prefetchFlight, SPACE_BACKGROUND } from "./flight-space";
 import type { FlightTarget } from "./globe-flight";
@@ -111,13 +112,7 @@ import {
   TabSegments,
   type TabKey,
 } from "./result-head";
-import {
-  AccountPage,
-  DocsPage,
-  HistoryPage,
-  TabBanner,
-  type DocKind,
-} from "./tab-pages";
+import { AccountPage, HistoryPage, TabBanner } from "./tab-pages";
 import {
   SHEET_KINDS,
   type MapOpen,
@@ -359,7 +354,9 @@ export function MobileApp(props: MobileAppProps) {
             ? HOME_TOP
             : page === "favorites"
               ? FAVORITES_TOP
-              : tabPage
+              : page === "docs"
+                ? docsTop()
+                : tabPage
                 ? (skyTop() ?? SKY)
                 : BAND_TOP,
       );
@@ -516,7 +513,15 @@ export function MobileApp(props: MobileAppProps) {
   else if (page === "docs")
     body = (
       <DocsPage
-        banner={tabBanner}
+        banner={
+          <TabBanner
+            glass
+            loading={loading && !offline}
+            error={failure}
+            notice={notice}
+            onDismiss={() => setNotice(null)}
+          />
+        }
         current={current}
         history={history}
         onMake={makeDoc}
@@ -526,6 +531,9 @@ export function MobileApp(props: MobileAppProps) {
         }}
         onPick={openDocsFor}
         onHistory={() => go("history")}
+        onHome={() => go("home")}
+        onMenu={() => setMenu(true)}
+        unread={unread}
       />
     );
   else if (page === "account")
@@ -577,11 +585,12 @@ export function MobileApp(props: MobileAppProps) {
         background: PAGE,
       }}
     >
-      {/* ホームとお気に入りは画面いっぱいの写真（下のメニューの後ろまで） */}
+      {/* ホーム・お気に入り・書類・出力は画面いっぱいの写真（下のメニューの後ろまで） */}
       {showHome && <HomeBackdrop drift={motionOn} />}
       {page === "favorites" && (
         <FavoritesBackdrop scroller={scroller} motion={motionOn} />
       )}
+      {page === "docs" && <DocsBackdrop motion={motionOn} />}
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div
           ref={scroller}
@@ -647,12 +656,14 @@ export function MobileApp(props: MobileAppProps) {
                 />
               </div>
             )}
-            {/* お気に入りは自分で上から順に浮き上がる（外の箱を動かすと、すりガラスの後ろがぼけない） */}
+            {/* お気に入りと書類・出力は自分で上から順に浮き上がる（外の箱を動かすと、すりガラスの後ろがぼけない） */}
             {tabPage && (
               <div
                 key={page}
                 className={
-                  page === "favorites" || morph ? undefined : "page-in"
+                  page === "favorites" || page === "docs" || morph
+                    ? undefined
+                    : "page-in"
                 }
               >
                 {body}
@@ -687,7 +698,7 @@ export function MobileApp(props: MobileAppProps) {
         )}
       </div>
       <BottomNav
-        dark={showHome || page === "favorites"}
+        dark={showHome || page === "favorites" || page === "docs"}
         active={page}
         onSelect={(k) => {
           if (k === "home" && page === "home") {
