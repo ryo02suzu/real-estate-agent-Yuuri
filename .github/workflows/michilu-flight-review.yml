@@ -15,8 +15,8 @@ jobs:
     env:
       REVIEW_URL: http://127.0.0.1:3000
       PREVIEW_URL: ""
-      REVIEW_SHA: 0a347cebe93bb6566222e4878231dc6159007526
-      REVIEW_PHASE: flight-0a347ce
+      REVIEW_SHA: 8b3d48e1e78bb36520e7888efcff8f19e82b5169
+      REVIEW_PHASE: flight-8b3d48e
     steps:
       - uses: actions/checkout@v4
         with:
@@ -169,6 +169,22 @@ jobs:
               await page.get_by_role("button", name="調べる", exact=True).click()
           
           
+          async def check_mobile_layout(page, field, record):
+              box = await page.locator(".home-search > div").first.bounding_box()
+              area = await page.locator("[data-scroller]").bounding_box()
+              assert box and area and box["y"] >= area["y"] - 1 and box["y"] + box["height"] <= area["y"] + area["height"] + 1, "Search is clipped by the viewport or bottom navigation"
+              await field.fill(ADDRESS)
+              targets = []
+              for name in ["入力を消す", "調べる"]:
+                  button = page.get_by_role("button", name=name, exact=True)
+                  b = await button.bounding_box()
+                  assert b and b["width"] >= 43.99 and b["height"] >= 43.99, f"{name} target is smaller than 44px"
+                  assert await button.evaluate("e => { const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)); }"), f"{name} is obscured"
+                  targets.append({"name":name,"box":b})
+              record["search_targets"] = targets
+              await field.fill("")
+          
+          
           async def case(browser, engine, name, width=390, height=844, mode="home"):
               record = {"name": name, "browser": engine, "browser_version": browser.version, "mode": mode}
               REPORT["checks"].append(record)
@@ -190,7 +206,15 @@ jobs:
                   await capture(page, name + "-home", record)
                   record["home_layout"] = record["layout"]
                   assert not record["layout"]["horizontalOverflow"], "Horizontal overflow on home"
+                  assert not record["page_errors"], "Uncaught JavaScript exception on home"
+                  if width < 1024:
+                      await check_mobile_layout(page, field, record)
                   if mode == "home":
+                      if width > height and width < 1024:
+                          example = page.get_by_role("button", name="住所で調べる（例：渋谷区神南1-19-11）", exact=True)
+                          await example.scroll_into_view_if_needed()
+                          await capture(page, name + "-scrolled", record)
+                          assert await example.evaluate("e => {const r=e.getBoundingClientRect(),s=document.querySelector('[data-scroller]').getBoundingClientRect();return r.top>=s.top-1&&r.bottom<=s.bottom+1;}"), "Landscape content cannot be reached by scrolling"
                       record["status"] = "passed"
                       return
                   if mode == "text200":
@@ -198,11 +222,21 @@ jobs:
                       await page.evaluate("""() => {const e=[...document.querySelectorAll('body *')];const s=e.map(x=>parseFloat(getComputedStyle(x).fontSize));e.forEach((x,i)=>x.style.setProperty('font-size',(s[i]*2)+'px','important'))}""")
                       await capture(page, name + "-text200-simulation", record)
                       assert not record["layout"]["horizontalOverflow"], "Horizontal overflow with 200% text simulation"
+                      record["text_fit"] = await page.evaluate("""() => {
+                        const heading=[...document.querySelectorAll('p')].find(e=>e.textContent.includes('不動産の現場に'));
+                        const s=getComputedStyle(heading);
+                        const labels=[...document.querySelectorAll('nav[aria-label="画面の切り替え"] button > span:not([aria-hidden])')];
+                        return {headingLineHeight:parseFloat(s.lineHeight),headingFontSize:parseFloat(s.fontSize),navLabelsFit:labels.every(e=>{const r=e.getBoundingClientRect(),b=e.parentElement.getBoundingClientRect();return e.scrollWidth<=e.clientWidth+1&&r.left>=b.left-1&&r.right<=b.right+1&&r.bottom<=b.bottom+1})};
+                      }""")
+                      assert record["text_fit"]["headingLineHeight"] >= record["text_fit"]["headingFontSize"] * 1.2, "Enlarged heading lines overlap"
+                      assert record["text_fit"]["navLabelsFit"], "Enlarged navigation labels are clipped"
                       record["status"] = "captured_text_simulation"
                       return
                   if mode == "keyboard":
                       await field.focus()
                       await page.set_viewport_size({"width": 390, "height": 430})
+                      await page.wait_for_timeout(250)
+                      await check_mobile_layout(page, field, record)
                       await field.fill(ADDRESS)
                       await capture(page, name + "-keyboard-viewport-simulation", record)
                       assert await page.get_by_role("button", name="調べる", exact=True).is_visible()
@@ -292,7 +326,7 @@ jobs:
               async with async_playwright() as pw:
                   for engine in ["chromium", "webkit"]:
                       browser = await getattr(pw, engine).launch(args=["--enable-unsafe-swiftshader"] if engine == "chromium" else [])
-                      sizes = [(375,667),(390,844),(402,874),(430,932),(844,390),(1024,768),(1440,900)] if engine == "chromium" else [(390,844)]
+                      sizes = [(375,667),(390,844),(402,874),(430,932),(844,390),(1024,768),(1440,900)] if engine == "chromium" else [(375,667),(390,844),(844,390)]
                       for width, height in sizes:
                           await case(browser, engine, f"{engine}-{width}x{height}", width, height)
                       modes = ["normal", "touch_skip", "escape", "skip_enter", "skip_space", "reduced_initial", "reduced_during", "motion_off", "tile_failure", "text200", "keyboard"] if engine == "chromium" else ["normal", "escape", "skip_enter", "skip_space", "reduced_initial", "reduced_during"]
@@ -312,7 +346,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: michilu-flight-0a347ce-${{ github.run_id }}
+          name: michilu-flight-8b3d48e-${{ github.run_id }}
           path: flight-review/
           if-no-files-found: warn
           retention-days: 14
