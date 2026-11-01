@@ -1,11 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 const KEY = "michilu:motion";
 let data: Map<string, string>;
+// 呼び出せる形の型にする（ReturnType<typeof vi.fn> だと、テストの中で storage.getItem(KEY) を呼べない）
 let storage: {
-  getItem: ReturnType<typeof vi.fn>;
-  setItem: ReturnType<typeof vi.fn>;
-  removeItem: ReturnType<typeof vi.fn>;
+  getItem: Mock<(key: string) => string | null>;
+  setItem: Mock<(key: string, value: string) => void>;
+  removeItem: Mock<(key: string) => void>;
 };
 let notify: ReturnType<typeof vi.fn>;
 
