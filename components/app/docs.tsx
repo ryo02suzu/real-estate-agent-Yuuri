@@ -37,7 +37,7 @@ const DOCS: { kind: DocKind; Icon: LucideIcon; title: string; sub: string; label
 
 /**
  * 時間帯ごとの写真（届いた絵 941×1672）。x は縦長の画面で左右を切るときの位置（0 左 〜 1 右）：
- * 昼は右の法令の本とスタンドが見えるよう右寄せ、夕方は夕日と山が真ん中、夜は東京タワー（右）とスカイツリー（左）が両方入る位置。
+ * 昼は右の法令の本とスタンドが見えるよう右寄せ、夕方は左の夕日と右の高いビル・スタンドが両方入る位置、夜は東京タワー（右）とスカイツリー（左）が両方入る位置。
  * shade は写真に重ねる暗さ：上は見出しの白い字のため、下はカードと一覧が乗る机の白い紙を落ち着かせるため（明るい昼ほど濃く）。
  * top は時刻・電池の帯の色（写真のいちばん上に shade を重ねた色を測った値）
  */
@@ -50,13 +50,14 @@ const PHOTOS: Record<DayPart, { src: string; x: number; bg: string; top: string;
     shade:
       "radial-gradient(80% 24% at 18% 8%, rgba(8,16,30,0.34) 0%, rgba(8,16,30,0) 100%), linear-gradient(180deg, rgba(10,20,36,0.4) 0%, rgba(10,20,36,0.14) 17%, rgba(10,20,36,0) 30%, rgba(6,10,20,0.08) 38%, rgba(6,10,20,0.42) 54%, rgba(6,10,20,0.6) 74%, rgba(6,10,20,0.7) 100%)",
   },
+  // 夕方は空が明るいので、昼と同じく見出しの後ろ（左上）を少し暗くする
   evening: {
     src: "/docs/evening.webp",
-    x: 0.5,
-    bg: "#3f3c48",
-    top: "#4f5261",
+    x: 0.55,
+    bg: "#5a4a44",
+    top: "#42404a",
     shade:
-      "linear-gradient(180deg, rgba(14,16,34,0.32) 0%, rgba(14,16,34,0) 22%, rgba(6,8,18,0) 38%, rgba(6,8,18,0.3) 52%, rgba(6,8,18,0.52) 72%, rgba(6,8,18,0.64) 100%)",
+      "radial-gradient(80% 24% at 18% 8%, rgba(14,12,30,0.32) 0%, rgba(14,12,30,0) 100%), linear-gradient(180deg, rgba(16,14,34,0.38) 0%, rgba(16,14,34,0.12) 17%, rgba(16,14,34,0) 28%, rgba(6,8,18,0.06) 36%, rgba(6,8,18,0.4) 52%, rgba(6,8,18,0.58) 72%, rgba(6,8,18,0.68) 100%)",
   },
   night: {
     src: "/docs/night.webp",
@@ -72,14 +73,14 @@ const PHOTOS: Record<DayPart, { src: string; x: number; bg: string; top: string;
  * 写真の中の光（位置は絵の幅・高さに対する %。届いた絵で測った）。glow は柔らかい光のにじみ（w は絵の幅に対する %、色）、
  * beacon はビルの屋上の赤い航空障害灯（同じビルの灯は同時に点滅。d は点滅の遅れ 秒）
  */
-const LIGHTS: Record<DayPart, { glows: { x: number; y: number; w: number; color: string; a: number; dur: number }[]; beacons: { x: number; y: number; d: number }[] }> = {
+const LIGHTS: Record<DayPart, { glows: { x: number; y: number; w: number; ar?: number; color: string; a: number; dur: number }[]; beacons: { x: number; y: number; d: number }[] }> = {
   // 窓から机のペン立てと本に差す日の光（見出しの字の後ろは明るくしない）
   day: { glows: [{ x: 60, y: 30, w: 56, color: "255,240,205", a: 0.3, dur: 9 }], beacons: [] },
-  // 山の向こうに沈む夕日と、点いたスタンド
+  // 街の向こうに沈む夕日と、点いたスタンド（横に長い光なので、にじみも横長。ar は幅÷高さ）
   evening: {
     glows: [
-      { x: 39, y: 31, w: 78, color: "255,176,104", a: 0.5, dur: 7.5 },
-      { x: 67.5, y: 28, w: 30, color: "255,214,150", a: 0.5, dur: 5.5 },
+      { x: 29.5, y: 31, w: 70, color: "255,170,96", a: 0.5, dur: 7.5 },
+      { x: 79.2, y: 26.5, w: 34, ar: 2.2, color: "255,226,170", a: 0.42, dur: 5.5 },
     ],
     beacons: [],
   },
@@ -177,7 +178,7 @@ function DocsScene({ part, swap, onShown }: { part: DayPart; swap: boolean; onSh
             style={{ objectPosition: `${p.x * 100}% 50%` }}
           />
           {l.glows.map((g, i) => (
-            <span key={i} className="docs-glow" style={{ left: `${g.x}%`, top: `${g.y}%`, width: `${g.w}%`, animationDuration: `${g.dur}s`, background: `radial-gradient(closest-side, rgba(${g.color},${g.a}) 0%, rgba(${g.color},${g.a * 0.4}) 38%, rgba(${g.color},0) 100%)` }} />
+            <span key={i} className="docs-glow" style={{ left: `${g.x}%`, top: `${g.y}%`, width: `${g.w}%`, aspectRatio: g.ar ?? 1, animationDuration: `${g.dur}s`, background: `radial-gradient(closest-side, rgba(${g.color},${g.a}) 0%, rgba(${g.color},${g.a * 0.4}) 38%, rgba(${g.color},0) 100%)` }} />
           ))}
           {l.beacons.map((b, i) => (
             <span key={`b${i}`} className="docs-beacon" style={{ left: `${b.x}%`, top: `${b.y}%`, animationDelay: `${b.d}s` }} />
