@@ -292,6 +292,17 @@ body {
   opacity: 0;
   transform: translate(-50%, -50%);
 }
+/* 紅富士（雪の上に重ねる暖かい光。柔らかく重ねるので、空は白っぽくならない） */
+.fav-alpen {
+  position: absolute;
+  width: 50%;
+  aspect-ratio: 2.4;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(closest-side, rgba(255, 150, 120, 0.55) 0%, rgba(255, 150, 120, 0.22) 45%, rgba(255, 150, 120, 0) 100%);
+  mix-blend-mode: soft-light;
+  opacity: 0;
+}
 .fav-dim {
   background: rgba(3, 8, 20, 0.55);
   opacity: calc(var(--fav-p, 0) * 0.85);
@@ -357,6 +368,9 @@ body {
   .fav-alive .fav-sun {
     animation: fav-sun 6.5s ease-in-out infinite alternate;
   }
+  .fav-alive .fav-alpen {
+    animation: fav-alpen 10s ease-in-out infinite alternate;
+  }
   .fav-alive .fav-glint {
     animation-name: fav-glint;
     animation-timing-function: ease-in-out;
@@ -405,6 +419,14 @@ body {
   to {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1.07);
+  }
+}
+@keyframes fav-alpen {
+  from {
+    opacity: 0.15;
+  }
+  to {
+    opacity: 1;
   }
 }
 @keyframes fav-glint {

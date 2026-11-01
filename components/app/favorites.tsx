@@ -3,18 +3,19 @@
 // スマホの下のメニューの「お気に入り」。画面いっぱいの写真（届いた富士山と湖の絵。public/favorites/fuji-*.webp。下のメニューの後ろまで
 // 敷くので、components/app/mobile-app.tsx が FavoritesBackdrop で画面のいちばん奥に置く）の上に、ふたつの画面：
 // ・いつもの画面（スクロールしない）：ホームと同じ位置に、見出し「お気に入り」と右上のメニュー（≡）、2行のひとこと（件数）、
-//   ホームと同じ検索欄（絞り込み）。その下に「最近保存した物件　すべて見る ›」と、半透明のすりガラスの板に最近保存した物件を、
-//   画面に収まる数だけ（新しく保存した順）。
+//   ホームと同じ検索欄（絞り込み）。その下は富士山の窓（富士山を隠さない）。富士山のふもとより下に「最近保存した物件　すべて見る ›」と、
+//   半透明のすりガラスの板に最近保存した物件を、入るだけ（新しく保存した順）。絞り込みの欄に触れている間は、
+//   一覧が検索欄のすぐ下へ滑り上がり（キーボードに隠れないように）、離すと富士山の下へ戻る。
 // ・すべて見る：戻るボタン・絞り込み・並べ方（新しい順・市区町村ごと。白い札が滑る）・すべての物件（スクロールできる）。
 //   行き来するときは、板と行と検索欄が滑ってつながる（View Transitions。名前は components/app/home.tsx の VT。.vt-fav）。
 // 行は写真の札を付けず、市区町村と町名・番地か地番と日時・書類のボタン・★。板は字が読みやすいよう、ホームより少し濃いすりガラス。
 // 動き（app/globals.css の .fav-*）：開くと写真がふわっと落ち着き、上から順に浮き上がり、行は少しずつ遅れて現れる。
-// 太陽の光がゆっくり揺らぎ、湖に映った光の道がきらめく（≡ の「動きの演出」がオンのとき）。すべて見るでスクロールすると、写真が
+// 太陽の光がゆっくり揺らぎ、湖に映った光の道がきらめき、富士山の雪が朝日にほんのり染まる（≡ の「動きの演出」がオンのとき）。すべて見るでスクロールすると、写真が
 // ゆっくり上へ寄って暗くなり、上に見出しの細いバーが出る（押すといちばん上へ）。
 // ★を押すと星が抜けて行がたたまれ、下に「元に戻す」が出る（UndoToast。mobile-app.tsx が出す）。
 // 動きを減らす設定では、位置の動きを止める（すぐ切り替わる）
 import { ChevronLeft, ChevronRight, FileText, Menu, Search, Star, X } from "lucide-react";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import { placeParts } from "@/lib/app/scene";
 import { favoriteKey, type FavoriteItem } from "@/lib/favorites";
@@ -29,6 +30,13 @@ export const FAVORITES_TOP = "#11304f";
 
 /** 写真の中の太陽の位置（絵の幅・高さに対する %。届いた絵 1438×2576 で測った） */
 const SUN = { x: 10.69, y: 55.17 };
+/** 写真の縦横比（app/globals.css の .fav-stage と同じ） */
+const PHOTO_AR = 1438 / 2576;
+/**
+ * 富士山（絵の高さに対する割合。届いた絵で測った）：頂は 45%、雪は 52.5% まで、斜面が終わって木と町になるふもとは 59%、湖は 63% から。
+ * いつもの画面の一覧の板は、ふもとより下に置く（富士山を隠さない）
+ */
+const FUJI = { peak: 0.45, snow: 0.525, foot: 0.59 };
 
 /** 湖に映った太陽の光の道のきらめき（位置は絵に対する %、大きさ px、長さと遅れ 秒）。毎回同じ並び */
 const GLINTS = (() => {
@@ -101,6 +109,8 @@ export function FavoritesBackdrop({ scroller, motion }: { scroller: RefObject<HT
               style={{ objectPosition: "25% 40%" }}
             />
             <span className="fav-sun" style={{ left: `${SUN.x}%`, top: `${SUN.y}%` }} />
+            {/* 紅富士：朝日に染まった雪が、ゆっくり明るくなっては落ち着く（動きの演出がオンのときだけ） */}
+            <span className="fav-alpen" style={{ left: "60%", top: `${((FUJI.peak + FUJI.snow) / 2 + 0.01) * 100}%` }} />
             {GLINTS.map((g, i) => (
               <span key={i} className="fav-glint" style={{ left: `${g.x}%`, top: `${g.y}%`, width: g.size, height: g.size, animationDuration: `${g.dur}s`, animationDelay: `${g.delay}s` }} />
             ))}
@@ -133,8 +143,57 @@ export const BOARD: CSSProperties = {
   backdropFilter: "blur(22px) saturate(160%)",
   WebkitBackdropFilter: "blur(22px) saturate(160%)",
 };
-/** いつもの画面の寸法（pt）：検索欄の下の端（ホームと同じ位置）、そこから板の行の始まりまで、行の高さ、下の余白 */
-const LAYOUT = { searchBottom: 256, compactSearchBottom: 202, toRows: 68, row: 63, bottom: 18 };
+/**
+ * いつもの画面の寸法（pt）：検索欄の下の端（ホームと同じ位置）、そこから板の行の始まりまで（見出しの行と余白）、行の高さ、下の余白。
+ * 下のメニューの高さ（富士山の位置を測る前の見積もりに使う）
+ */
+const LAYOUT = { searchBottom: 256, compactSearchBottom: 202, toRows: 68, row: 63, bottom: 18, nav: 59 };
+
+/**
+ * 富士山のふもとが、いつもの画面のどこに来るか（pt。ページの上から）。写真の箱の大きさと位置は app/globals.css の .fav-stage と同じ計算
+ * （画面を覆う大きさ、縦は余りの 40% の位置）。写真（.fav-backdrop）の大きさが変わったら測り直す
+ */
+function useFujiFoot(root: RefObject<HTMLElement | null>, screen: number | undefined): number | undefined {
+  const [foot, setFoot] = useState<number>();
+  useEffect(() => {
+    const el = root.current;
+    const back = document.querySelector<HTMLElement>(".fav-backdrop");
+    if (!el || !back) return;
+    const measure = () => {
+      const zoom = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--app-zoom")) || 1;
+      const b = back.getBoundingClientRect();
+      const stageH = Math.max(b.width / PHOTO_AR, b.height);
+      const stageTop = b.top + (b.height - stageH) * 0.4;
+      setFoot((stageTop + stageH * FUJI.foot - el.getBoundingClientRect().top) / zoom);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(back);
+    return () => ro.disconnect();
+  }, [root, screen]);
+  return foot;
+}
+
+/**
+ * 一覧が「富士山の下」⇄「検索欄のすぐ下」へ移ったとき、前の位置から滑らせる（移ったあとで、前の位置との差を 0 へ戻していく）。
+ * すりガラスの後ろがぼけるよう、動かすのは位置だけ（薄くしない）。動きを減らす設定では、すぐ切り替える
+ */
+function useSlide(el: RefObject<HTMLElement | null>, near: boolean) {
+  const last = useRef<{ near: boolean; top: number } | null>(null);
+  useLayoutEffect(() => {
+    const node = el.current;
+    if (!node) {
+      last.current = null;
+      return;
+    }
+    const top = node.getBoundingClientRect().top;
+    const prev = last.current;
+    last.current = { near, top };
+    if (!prev || prev.near === near || Math.abs(prev.top - top) < 1 || reducedMotion()) return;
+    const zoom = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--app-zoom")) || 1;
+    node.animate([{ transform: `translateY(${(prev.top - top) / zoom}px)` }, { transform: "translateY(0)" }], { duration: 480, easing: "cubic-bezier(0.22, 0.9, 0.24, 1)" });
+  });
+}
 /** 章の見出し（ホームの「最近の検索」と同じ、控えめな白の字。書類・出力も同じ） */
 export const LABEL: CSSProperties = { fontSize: 15, letterSpacing: 1.5, color: "rgba(255,255,255,0.62)" };
 
@@ -182,10 +241,21 @@ export function FavoritesPage({
   // 横向き・キーボードで画面が低いときは、ホームと同じく余白を詰める
   const compact = screen !== undefined && screen < 520;
 
-  // いつもの画面に出す数：画面に収まるだけ（スクロールしない）
-  const top = compact ? LAYOUT.compactSearchBottom : LAYOUT.searchBottom;
-  const fit = Math.max(1, Math.floor(((screen ?? 700) - top - LAYOUT.toRows - LAYOUT.bottom) / LAYOUT.row));
+  // いつもの画面：検索欄と一覧のあいだを富士山の窓にする。一覧の板は富士山のふもとより下に、入るだけ（スクロールしない）。
+  // 横向きなど低い画面は、検索欄のすぐ下から
+  const h = screen ?? 700;
+  const foot = useFujiFoot(root, screen);
+  const nearTop = (compact ? LAYOUT.compactSearchBottom : LAYOUT.searchBottom) + LAYOUT.toRows;
+  const limit = compact ? nearTop : Math.max(nearTop, foot ?? (h + LAYOUT.nav) * FUJI.foot);
+  const fit = Math.max(1, Math.floor((h - limit - LAYOUT.bottom) / LAYOUT.row));
   const shown = list.slice(0, fit);
+  // 絞り込みの欄に触れている間（キーボードが出ている間）は、一覧を検索欄のすぐ下へ滑らせる（下に置いたままだとキーボードに隠れる）。
+  // 離したら富士山の下へ戻る。行を押した指の下で板が動かないよう、戻るのは少し待ってから
+  const [typing, setTyping] = useState(false);
+  const typingTimer = useRef(0);
+  useEffect(() => () => clearTimeout(typingTimer.current), []);
+  const section = useRef<HTMLElement>(null);
+  useSlide(section, typing);
   // つながる動きで結ぶ行（いつもの画面の何行目か）
   const rowIndex = new Map(shown.map((f, i) => [favoriteKey(f), i]));
   const rowVt = (f: FavoriteItem) => {
@@ -257,6 +327,14 @@ export function FavoritesPage({
       onSubmit={(e) => {
         e.preventDefault();
         inputRef.current?.blur();
+      }}
+      onFocus={() => {
+        clearTimeout(typingTimer.current);
+        setTyping(true);
+      }}
+      onBlur={() => {
+        clearTimeout(typingTimer.current);
+        typingTimer.current = window.setTimeout(() => setTyping(false), 140);
       }}
     >
       {/* ホームの検索欄と同じ形・大きさ・すりガラス */}
@@ -341,8 +419,10 @@ export function FavoritesPage({
           )}
         </p>
         {search}
-        {/* 最近保存した物件（新しく保存した順。画面に収まる数だけ） */}
-        <section className="relative" style={{ padding: "24px 19px 0" }}>
+        {/* 富士山の窓（画面の高さで伸び縮みする）。絞り込みの欄に触れている間はたたんで、一覧を検索欄のすぐ下へ */}
+        {!typing && <div aria-hidden className="flex-1" />}
+        {/* 最近保存した物件（新しく保存した順。富士山のふもとより下に、入るだけ） */}
+        <section ref={section} className="relative" style={{ padding: `24px 19px ${LAYOUT.bottom}px` }}>
           {favorites.length === 0 ? (
             empty
           ) : list.length === 0 ? (
