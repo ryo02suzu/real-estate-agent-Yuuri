@@ -1,6 +1,6 @@
 "use client";
 
-// スマホの下のメニューの「お気に入り」。画面いっぱいの写真（届いた富士山と湖の絵。昼は public/favorites/fuji-day.webp、夕方は fuji-*.webp、夜は fuji-night.webp。
+// スマホの下のメニューの「お気に入り」。画面いっぱいの写真（届いた富士山と湖の絵。昼は public/favorites/fuji-day.webp、夕方は fuji-evening.webp、夜は fuji-night.webp。
 // 太陽の高さで切り替える。components/app/day-photo.ts。下のメニューの後ろまで
 // 敷くので、components/app/mobile-app.tsx が FavoritesBackdrop で画面のいちばん奥に置く）の上に、ふたつの画面：
 // ・いつもの画面（スクロールしない）：ホームと同じ位置に、見出し「お気に入り」と右上のメニュー（≡）、2行のひとこと（件数）、
@@ -87,23 +87,20 @@ const NIGHT_STARS: Sparkle[] = (() => {
   return found.map(([x, y, d]) => ({ x, y, size: d > 100 ? 3 : 2, dur: 2.6 + rnd() * 2.8, delay: rnd() * 4, a: Math.min(1, Math.max(0.5, d / 150)) }));
 })();
 /**
- * 夕方：日の出（日の入り）の光と紅富士・湖（届いた絵 1438×2576。幅 900・1260・1438 の3枚から端末が選ぶ）。頂 45%・雪 52.5%・ふもと 59%・湖 63% から。
- * 板の上の端は 56%（雪の下の暗い斜面のいちばん下を少しだけ覆う。iPhone 16 で4件入る）
+ * 夕方：夕日と紅富士・湖・すすき（届いた絵 941×1672）。頂 39.6%・雪 46.5% まで・ふもと 55.5%・湖 59.5% から。
+ * 太陽は富士山の左のふもと（9.1%・49%）なので、太陽が画面に入るよう左寄せで切る（富士山は右）。湖に映った太陽の光の道は 9% のあたり
  */
 const EVENING: FavPhoto = {
-  src: "/favorites/fuji-1260.webp",
-  srcSet: "/favorites/fuji-900.webp 900w, /favorites/fuji-1260.webp 1260w, /favorites/fuji-1438.webp 1438w",
-  sizes: "(min-aspect-ratio: 1438/2576) 100vw, 55.8vh",
-  ar: 1438 / 2576,
-  x: 0.25,
+  src: "/favorites/fuji-evening.webp",
+  ar: 941 / 1672,
+  x: 0.15,
   y: 0.4,
-  bg: "#0f2440",
-  top: "#0f2c50",
-  fuji: { peak: 0.45, snow: 0.525, foot: 0.56, x: 60 },
+  bg: "#2c3550",
+  top: "#344968",
+  fuji: { peak: 0.396, snow: 0.465, foot: 0.555, x: 62.7 },
   glow: "255,150,120",
-  // 富士山の左のふもとに出る太陽（絵 1438×2576 で測った）と、湖に映った光の道
-  halo: { x: 10.69, y: 55.17, w: 78, bg: "radial-gradient(circle, rgba(255,236,196,0.62) 0%, rgba(255,196,120,0.3) 14%, rgba(255,160,90,0.12) 34%, rgba(255,150,80,0) 62%)" },
-  glints: pathGlints(11, 14, 10.9, 64.5, 20, 1.2, 0.09),
+  halo: { x: 9.1, y: 49, w: 70, bg: "radial-gradient(circle, rgba(255,236,196,0.62) 0%, rgba(255,196,120,0.3) 14%, rgba(255,160,90,0.12) 34%, rgba(255,150,80,0) 62%)" },
+  glints: pathGlints(11, 14, 9.1, 60.2, 13, 0.9, 0.18),
   glint: { core: "#fff6dc", glow: "rgba(255,214,140,0.85)" },
 };
 const FAV_PHOTOS: Record<DayPart, FavPhoto> = {
