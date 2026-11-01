@@ -97,8 +97,6 @@ const OFF = "#68738a";
 /** ホームの写真の上のメニュー（暗いすりガラス）の色 */
 const ON_DARK = "#5aaeff";
 const OFF_DARK = "rgba(255,255,255,0.78)";
-/** 4つを同じ幅で並べる（幅393pt ÷ 4） */
-const NAV_W = ART_W / 4;
 /** iPhone のアプリの下のメニューと同じくらいの大きさ（アイコン約24pt・名前11pt） */
 const NAV: { key: NavKey; label: string; icon: (color: string, on: boolean) => ReactNode }[] = [
   { key: "home", label: "検索", icon: (c, on) => <Search size={24} strokeWidth={on ? 2.1 : 1.7} absoluteStrokeWidth color={c} /> },
@@ -118,21 +116,20 @@ export function BottomNav({ active, onSelect, dark = false }: { active: NavKey; 
     <nav
       aria-label="画面の切り替え"
       className={`app-touch relative shrink-0 overflow-hidden pb-[max(0px,calc(env(safe-area-inset-bottom)-12px))] ${dark ? "rounded-t-[calc(26px*var(--app-zoom,1))] border-t border-white/15 backdrop-blur-xl backdrop-saturate-150" : "border-t border-[#e6ebf2] bg-white/95 backdrop-blur"}`}
-      style={dark ? { background: "rgba(22,26,34,0.58)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)" } : undefined}
+      style={dark ? { background: "rgba(22,26,34,0.82)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)" } : undefined}
     >
-      <div className="relative mx-auto" style={{ width: ART_W, height: 58, zoom: ZOOM }}>
-        {NAV.map((n, i) => {
+      <div className="relative mx-auto grid grid-cols-4" style={{ width: ART_W, zoom: ZOOM }}>
+        {NAV.map((n) => {
           const sel = n.key === active;
           return (
             <button
               key={n.key}
               onClick={() => onSelect(n.key)}
               aria-current={sel ? "page" : undefined}
-              className="nav-item absolute flex flex-col items-center justify-center gap-[4px] active:opacity-60"
-              style={{ left: i * NAV_W, top: 0, width: NAV_W, height: 58 }}
+              className="nav-item relative flex min-h-[58px] min-w-0 flex-col items-center justify-center gap-[4px] px-[3px] py-[8px] active:opacity-60"
             >
               {n.icon(sel ? on : off, sel)}
-              <span className="whitespace-nowrap leading-none" style={{ fontSize: 11, color: sel ? on : off, fontWeight: sel ? 600 : 500 }}>
+              <span className="max-w-full break-words text-center leading-[1.2]" style={{ fontSize: 11, color: sel ? on : off, fontWeight: sel ? 600 : 500 }}>
                 {n.label}
               </span>
               {dark && sel && <span aria-hidden className="absolute rounded-full" style={{ bottom: 2, width: 34, height: 2.5, background: on }} />}

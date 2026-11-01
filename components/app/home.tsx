@@ -35,7 +35,9 @@ export const AURORA =
 
 /** 明るいすりガラス（検索欄・右上のメニュー） */
 const LIGHT_GLASS: CSSProperties = {
-  background: "linear-gradient(180deg, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0.14) 100%)",
+  // ぼかしが描かれないブラウザでも、写真の明暗に字が埋もれない下地。
+  backgroundColor: "rgba(12,24,45,0.68)",
+  backgroundImage: "linear-gradient(180deg, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0.14) 100%)",
   border: "1px solid rgba(255,255,255,0.42)",
   boxShadow: "0 10px 30px rgba(10,20,40,0.22), inset 0 1px 0 rgba(255,255,255,0.35)",
   backdropFilter: "blur(18px) saturate(140%)",
@@ -43,13 +45,15 @@ const LIGHT_GLASS: CSSProperties = {
 };
 /** 暗いすりガラス（最近の検索の一覧・注意） */
 const DARK_GLASS: CSSProperties = {
-  background: "linear-gradient(180deg, rgba(40,44,54,0.52) 0%, rgba(28,32,42,0.58) 100%)",
+  background: "linear-gradient(180deg, rgba(40,44,54,0.78) 0%, rgba(28,32,42,0.84) 100%)",
   border: "1px solid rgba(255,255,255,0.16)",
   boxShadow: "0 14px 34px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)",
   backdropFilter: "blur(22px) saturate(140%)",
   WebkitBackdropFilter: "blur(22px) saturate(140%)",
 };
 const SUB = "rgba(255,255,255,0.72)";
+/** 393pt の絵が縮小されても、実際に押せる範囲は44px以上にする。 */
+const HIT = "max(44px, calc(44px / var(--app-zoom, 1)))";
 
 /** 最近の検索に出す数 */
 const RECENT = 3;
@@ -158,6 +162,8 @@ export function HomeScreen({
   const recent = history.slice(0, RECENT);
   const root = useRef<HTMLDivElement>(null);
   const screen = useScreenHeight(root);
+  // 横向き・キーボード表示中は余白を詰める。内容は切らず、収まらない部分をスクロールで読めるようにする。
+  const compact = screen !== undefined && screen < 520;
   // 最初の1回かは、このマウントの間は変えない（履歴の読み込みなどで描き直しても、動きの途中で切り替わらない）
   const [first] = useState(() => !risen);
   useEffect(() => {
@@ -170,14 +176,14 @@ export function HomeScreen({
       {/* ロゴと右上のメニュー */}
       <div className="relative flex items-start justify-between" style={{ padding: "16px 18px 0 20px" }}>
         <PhoneImg src="/home/logo-mark-white.webp" alt="MICHILU" width={802} height={159} draggable={false} className={`${riseClass} block`} style={{ height: 30, width: "auto", marginTop: 6, filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.3))" }} />
-        <button onClick={onMenu} aria-label={unread ? "メニュー（新しいお知らせがあります）" : "メニュー"} className="press relative flex items-center justify-center rounded-full" style={{ ...LIGHT_GLASS, width: 46, height: 46 }}>
+        <button onClick={onMenu} aria-label={unread ? "メニュー（新しいお知らせがあります）" : "メニュー"} className="press relative flex items-center justify-center rounded-full" style={{ ...LIGHT_GLASS, width: 46, height: 46, minWidth: HIT, minHeight: HIT }}>
           <Menu size={22} strokeWidth={1.8} absoluteStrokeWidth color="#fff" />
           {unread && <span className="absolute rounded-full border-2 border-white bg-[#f0263a]" style={{ right: 2, top: 2, width: 11, height: 11 }} />}
         </button>
       </div>
 
       {/* ひとこと */}
-      <p className={`${riseClass} relative font-medium`} style={{ margin: "14px 0 0 20px", fontSize: 15.5, lineHeight: "25px", letterSpacing: 1.6, textShadow: SHADOW, ...rise(60) }}>
+      <p className={`${riseClass} relative font-medium`} style={{ margin: "14px 20px 0", fontSize: 15.5, lineHeight: 1.6, letterSpacing: 1.6, textShadow: SHADOW, ...rise(60) }}>
         不動産の現場に、
         <br />
         すぐ使える情報を。
@@ -188,7 +194,7 @@ export function HomeScreen({
       <form
         role="search"
         className="home-search relative"
-        style={{ margin: "74px 19px 0" }}
+        style={{ margin: `${compact ? 20 : 74}px 19px 0` }}
         onSubmit={(e) => {
           e.preventDefault();
           // スマホは調べたらキーボードを閉じる（開いたままだと結果の下半分が隠れる）
@@ -196,7 +202,7 @@ export function HomeScreen({
           onSubmit();
         }}
       >
-        <div className={`${riseClass} flex items-center rounded-full transition-[box-shadow] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.28)]`} style={{ ...LIGHT_GLASS, height: 56, ...rise(100) }}>
+        <div className={`${riseClass} flex items-center rounded-full transition-[box-shadow] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.28)]`} style={{ ...LIGHT_GLASS, height: "max(56px, 3.3em)", fontSize: 17, ...rise(100) }}>
           <Search size={22} strokeWidth={1.9} absoluteStrokeWidth color="#fff" className="ml-[20px] shrink-0" />
           <ScaledInput value={input} onChange={setInput} inputRef={inputRef} size={17} className="ml-[13px] mr-[4px]" label="住所・地番" autoComplete="off" placeholder="住所・地番で検索" onPhoto />
           {loading ? (
@@ -207,12 +213,12 @@ export function HomeScreen({
           ) : (
             input && (
               <>
-                <button type="button" onClick={() => setInput("")} aria-label="入力を消す" className="flex h-[44px] w-[34px] shrink-0 items-center justify-center">
+                <button type="button" onClick={() => setInput("")} aria-label="入力を消す" className="flex shrink-0 items-center justify-center" style={{ width: HIT, height: HIT }}>
                   <span className="flex items-center justify-center rounded-full bg-white/25" style={{ width: 20, height: 20 }}>
                     <X size={12} strokeWidth={2.4} absoluteStrokeWidth color="#fff" />
                   </span>
                 </button>
-                <button type="submit" aria-label="調べる" className="press mr-[7px] flex shrink-0 items-center justify-center rounded-full bg-white" style={{ width: 42, height: 42 }}>
+                <button type="submit" aria-label="調べる" className="press mr-[7px] flex shrink-0 items-center justify-center rounded-full bg-white" style={{ width: HIT, height: HIT }}>
                   <ArrowRight size={20} strokeWidth={2.2} absoluteStrokeWidth color="#1b3f73" />
                 </button>
               </>
@@ -281,10 +287,10 @@ function Row({ Icon, title, sub, label, onClick }: { Icon: typeof Search; title:
     <button onClick={onClick} aria-label={label} className="flex min-h-[57px] w-full items-center gap-[14px] py-[9px] pl-[20px] pr-[16px] text-left active:bg-white/10">
       <Icon size={21} strokeWidth={1.8} absoluteStrokeWidth color="rgba(255,255,255,0.9)" className="shrink-0" />
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-semibold leading-[1.3]" style={{ fontSize: 16 }}>
+        <span className="block break-words font-semibold leading-[1.3]" style={{ fontSize: 16 }}>
           {title}
         </span>
-        <span className="mt-[3px] block truncate leading-[1.3]" style={{ fontSize: 13.5, color: SUB }}>
+        <span className="mt-[3px] block break-words leading-[1.3]" style={{ fontSize: 13.5, color: SUB }}>
           {sub}
         </span>
       </span>
@@ -296,12 +302,12 @@ function Row({ Icon, title, sub, label, onClick }: { Icon: typeof Search; title:
 /** 章の見出し（白い太字）と「すべて見る ›」（押せる高さは44pt） */
 function SectionHead({ title, onMore, className = "" }: { title: string; onMore?: () => void; className?: string }) {
   return (
-    <div className={`${className} flex h-[36px] items-center justify-between`} style={{ marginBottom: 6, ...rise(140) }}>
-      <h2 className="whitespace-nowrap font-bold leading-none" style={{ fontSize: 18.5, letterSpacing: 0.5, textShadow: SHADOW }}>
+    <div className={`${className} flex min-h-[36px] flex-wrap items-center justify-between gap-x-[8px]`} style={{ marginBottom: 6, ...rise(140) }}>
+      <h2 className="max-w-full break-words font-bold leading-[1.3]" style={{ fontSize: 18.5, letterSpacing: 0.5, textShadow: SHADOW }}>
         {title}
       </h2>
       {onMore && (
-        <button onClick={onMore} className="-mr-[8px] flex h-[44px] shrink-0 items-center gap-[2px] px-[8px] active:opacity-60" style={{ fontSize: 14, color: "rgba(255,255,255,0.9)", textShadow: SHADOW }}>
+        <button onClick={onMore} className="-mr-[8px] flex shrink-0 items-center gap-[2px] px-[8px] active:opacity-60" style={{ minHeight: HIT, fontSize: 14, color: "rgba(255,255,255,0.9)", textShadow: SHADOW }}>
           すべて見る
           <ChevronRight size={15} strokeWidth={2} absoluteStrokeWidth />
         </button>
