@@ -25,8 +25,11 @@ export const SKY = "#e6eff9";
 export const HOME_TOP = "#386fab";
 export { PAGE };
 
-/** 写真の上の字が明るい空や建物に重なっても読めるよう、薄い影を付ける（お気に入りのページも同じ。components/app/favorites.tsx） */
-export const SHADOW = "0 1px 3px rgba(0,0,0,0.35), 0 0 12px rgba(0,0,0,0.18)";
+/**
+ * 写真の上の字に付ける、ごく薄い影（お気に入りのページも同じ。components/app/favorites.tsx）。
+ * 濃い影は字が写真から切り抜いたように浮いて見えるので、輪郭が溶けない程度にとどめる（字の後ろは写真の下の暗さで読みやすくする）
+ */
+export const SHADOW = "0 1px 2px rgba(0,0,0,0.25)";
 /** 写真の上の字が建物に重なっても読めるよう、にじませる（下のメニューのページの帯。昼は白、夜は紺。空の変数 --sky-halo） */
 export const GLOW = "0 0 10px rgba(var(--sky-halo, 255,255,255),0.95), 0 0 3px rgba(var(--sky-halo, 255,255,255),0.95)";
 /** 地の奥の淡い光（下のメニューのページで使う） */
@@ -39,10 +42,10 @@ export const AURORA =
  */
 export const LIGHT_GLASS: CSSProperties = {
   background: "var(--glass-light-bg)",
-  border: "1px solid rgba(255,255,255,0.42)",
-  boxShadow: "0 10px 30px rgba(10,20,40,0.22), inset 0 1px 0 rgba(255,255,255,0.35)",
-  backdropFilter: "blur(20px) saturate(160%)",
-  WebkitBackdropFilter: "blur(20px) saturate(160%)",
+  border: "1px solid rgba(255,255,255,0.3)",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 8px 24px rgba(0,0,0,0.14)",
+  backdropFilter: "blur(14px) saturate(170%)",
+  WebkitBackdropFilter: "blur(14px) saturate(170%)",
 };
 /** 暗いすりガラス（最近の検索の一覧・注意。お気に入りのページも同じ）。色は --glass-dark-bg（透け方は明るいすりガラスと同じ考え方） */
 export const DARK_GLASS: CSSProperties = {
@@ -96,7 +99,8 @@ export function HomeBackdrop({ drift = false }: { drift?: boolean }) {
         className={`absolute inset-0 h-full w-full object-cover ${drift ? "home-drift" : ""}`}
         style={{ objectPosition: "62% 50%" }}
       />
-      <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(8,18,40,0.30) 0%, rgba(8,18,40,0) 26%, rgba(0,0,0,0) 52%, rgba(0,0,0,0.30) 100%)" }} />
+      {/* 上は少し暗く（ロゴと字）、下は最近の検索が乗るところを夜景に溶けるように暗く（板を置かずに字を読みやすくする） */}
+      <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(8,18,40,0.30) 0%, rgba(8,18,40,0) 26%, rgba(6,10,20,0) 47%, rgba(6,10,20,0.4) 63%, rgba(6,10,20,0.62) 80%, rgba(6,10,20,0.72) 100%)" }} />
       {/* 検索欄に触れている間は、写真を少し暗くして検索欄を目立たせる（app/globals.css の .home-dim） */}
       <div className="home-dim absolute inset-0" style={{ background: "rgba(4,10,24,0.42)" }} />
     </div>
@@ -252,7 +256,7 @@ export function HomeScreen({
         {recent.length ? (
           <>
             <SectionHead title="最近の検索" onMore={onHistory} className={riseClass} />
-            <ul className={`${riseClass} overflow-hidden rounded-[22px]`} style={{ ...DARK_GLASS, ...rise(160), viewTransitionName: morph ? VT.card : undefined }}>
+            <ul className={riseClass} style={{ ...rise(160), viewTransitionName: morph ? VT.card : undefined }}>
               {recent.map((h, i) => {
                 const { city, town, full } = placeParts(h);
                 const resumed = resume && historyKey(h) === resume.historyKey;
@@ -278,7 +282,7 @@ export function HomeScreen({
         ) : (
           <>
             <SectionHead title="はじめての方へ" className={riseClass} />
-            <ul className={`${riseClass} overflow-hidden rounded-[22px]`} style={{ ...DARK_GLASS, ...rise(160) }}>
+            <ul className={riseClass} style={rise(160)}>
               {EXAMPLES.map((x) => (
                 <li key={x.query} className="border-t border-white/[0.12] first:border-t-0">
                   <Row Icon={x.Icon} title={x.title} sub={x.sub} label={`${x.title}（${x.sub}）`} onClick={() => onTry(x.query)} />
@@ -293,32 +297,36 @@ export function HomeScreen({
 }
 
 /** 一覧の1行（左に虫めがね、2行の字、右に ›） */
+/**
+ * 一覧の1行（左に虫めがね、2行の字、右に ›）。板は置かず、写真の下の暗いところに直接並べ、行の間に細い線（li の上の線）。
+ * 白は3段（名前 95%・2行目 58%・記号 55〜60%）、名前は中くらいの太さ（太すぎると字が浮く）
+ */
 function Row({ Icon, title, sub, label, onClick }: { Icon: typeof Search; title: string; sub: ReactNode; label: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} aria-label={label} className="flex min-h-[57px] w-full items-center gap-[14px] py-[9px] pl-[20px] pr-[16px] text-left active:bg-white/10">
-      <Icon size={21} strokeWidth={1.8} absoluteStrokeWidth color="rgba(255,255,255,0.9)" className="shrink-0" />
+    <button onClick={onClick} aria-label={label} className="flex min-h-[57px] w-full items-center gap-[14px] rounded-[12px] py-[9px] pl-[4px] pr-[2px] text-left transition-colors active:bg-white/10">
+      <Icon size={20} strokeWidth={1.8} absoluteStrokeWidth color="rgba(255,255,255,0.6)" className="shrink-0" />
       <span className="min-w-0 flex-1">
-        <span className="block break-words font-semibold leading-[1.3]" style={{ fontSize: 16 }}>
+        <span className="block break-words font-medium leading-[1.3]" style={{ fontSize: 16, color: "rgba(255,255,255,0.95)" }}>
           {title}
         </span>
-        <span className="mt-[3px] block break-words leading-[1.3]" style={{ fontSize: 13.5, color: SUB }}>
+        <span className="mt-[3px] block break-words leading-[1.3]" style={{ fontSize: 13.5, color: "rgba(255,255,255,0.58)" }}>
           {sub}
         </span>
       </span>
-      <ChevronRight size={20} strokeWidth={2} absoluteStrokeWidth color="rgba(255,255,255,0.85)" className="shrink-0" />
+      <ChevronRight size={19} strokeWidth={2} absoluteStrokeWidth color="rgba(255,255,255,0.55)" className="shrink-0" />
     </button>
   );
 }
 
-/** 章の見出し（白い太字）と「すべて見る ›」（押せる高さは44pt。押すと沈んで › が右へ動く） */
+/** 章の見出し（控えめな白の字。影なし）と「すべて見る ›」（押せる高さは44pt。押すと沈んで › が右へ動く） */
 function SectionHead({ title, onMore, className = "" }: { title: string; onMore?: () => void; className?: string }) {
   return (
     <div className={`${className} flex min-h-[36px] flex-wrap items-center justify-between gap-x-[8px]`} style={{ marginBottom: 6, ...rise(140) }}>
-      <h2 className="max-w-full break-words font-bold leading-[1.3]" style={{ fontSize: 18.5, letterSpacing: 0.5, textShadow: SHADOW }}>
+      <h2 className="max-w-full break-words font-semibold leading-[1.3]" style={{ fontSize: 15, letterSpacing: 1.5, color: "rgba(255,255,255,0.62)" }}>
         {title}
       </h2>
       {onMore && (
-        <button onClick={onMore} className="press group -mr-[8px] flex shrink-0 items-center gap-[2px] rounded-full px-[8px] transition-[background-color,opacity] active:bg-white/15" style={{ minHeight: HIT, fontSize: 14, color: "rgba(255,255,255,0.92)", textShadow: SHADOW }}>
+        <button onClick={onMore} className="press group -mr-[8px] flex shrink-0 items-center gap-[2px] rounded-full px-[8px] transition-[background-color,opacity] active:bg-white/15" style={{ minHeight: HIT, fontSize: 14, color: "rgba(255,255,255,0.78)" }}>
           すべて見る
           <ChevronRight size={15} strokeWidth={2} absoluteStrokeWidth className="transition-transform duration-200 group-active:translate-x-[3px]" />
         </button>

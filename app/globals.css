@@ -220,7 +220,7 @@ body {
  * ぼかしが使えない端末と、「透明度を下げる」設定の端末では、白い字が写真の明暗に埋もれない濃い下地にする
  */
 :root {
-  --glass-light-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.12) 100%);
+  --glass-light-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.05) 100%);
   --glass-dark-bg: linear-gradient(180deg, rgba(34, 38, 50, 0.42) 0%, rgba(22, 26, 36, 0.5) 100%);
   --glass-nav-bg: rgba(20, 24, 32, 0.5);
 }

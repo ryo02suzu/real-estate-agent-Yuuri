@@ -3,7 +3,8 @@
 // スマホの下のメニューの「お気に入り」。ホームと同じ作り：画面いっぱいの写真（届いた富士山と湖の絵。public/favorites/fuji-*.webp。
 // 下のメニューの後ろまで敷くので、components/app/mobile-app.tsx が FavoritesBackdrop で画面のいちばん奥に置く）の上に、上から：
 // 見出し（お気に入り・件数）と右上のメニュー（≡）、絞り込みの欄（明るいすりガラス）、並べ方（新しい順・市区町村ごと。白い札が滑る）、
-// 富士山を見せる空き（絞り込みに触れている間・字が入っている間は詰める）、保存した物件（暗いすりガラスの一覧）、注意書き。
+// 富士山を見せる空き（絞り込みに触れている間・字が入っている間は詰める）、保存した物件（板は置かず、写真の下の暗いところに
+// 行を直接並べる。ホームの最近の検索と同じ）、注意書き。
 // 部品の色・すりガラス・字の影はホームと同じもの（components/app/home.tsx の LIGHT_GLASS・DARK_GLASS・SHADOW）。
 // 動き（app/globals.css の .fav-*）：開くと写真がふわっと落ち着き、上から順に浮き上がり、行は少しずつ遅れて現れる。
 // スクロールすると写真がゆっくり上へ寄って暗くなり、上に見出しの細いバーが出る（押すといちばん上へ）。
@@ -104,7 +105,8 @@ export function FavoritesBackdrop({ scroller, motion }: { scroller: RefObject<HT
           </div>
         </div>
       </div>
-      <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(5,14,32,0.36) 0%, rgba(5,14,32,0) 30%, rgba(0,0,0,0) 56%, rgba(3,8,18,0.42) 100%)" }} />
+      {/* 上は少し暗く（見出し）、下は一覧が乗る湖のあたりを暗く（ホームと同じく、板を置かずに字を読みやすくする） */}
+      <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(5,14,32,0.36) 0%, rgba(5,14,32,0) 30%, rgba(3,8,18,0) 52%, rgba(3,8,18,0.4) 66%, rgba(3,8,18,0.6) 82%, rgba(3,8,18,0.7) 100%)" }} />
       {/* スクロールするほど暗く（一覧が読みやすい）。絞り込みに触れている間も少し暗く */}
       <div className="fav-dim absolute inset-0" />
       <div className="fav-focus absolute inset-0" />
@@ -287,14 +289,14 @@ export function FavoritesPage({
       {/* 保存した物件（並べ方を変えたら作り直して、行が順に入れ替わる） */}
       <section key={byCity ? "city" : "new"} className="relative" style={{ padding: "0 19px 24px" }}>
         {favorites.length === 0 ? (
-          <div className="fav-rise flex flex-col items-center rounded-[24px] px-[24px] pb-[24px] pt-[26px] text-center" style={{ ...DARK_GLASS, ...delay(200) }}>
+          <div className="fav-rise flex flex-col items-center px-[16px] pb-[12px] pt-[6px] text-center" style={delay(200)}>
             <span className="fav-empty-star flex items-center justify-center rounded-full" style={{ width: 66, height: 66, background: "radial-gradient(circle, rgba(255,201,74,0.3) 0%, rgba(255,201,74,0) 70%)" }}>
               <Star size={30} strokeWidth={1.6} absoluteStrokeWidth color="#ffc94a" style={{ filter: "drop-shadow(0 0 8px rgba(255,196,74,0.6))" }} />
             </span>
-            <p className="mt-[10px] font-semibold leading-[1.4]" style={{ fontSize: 17 }}>
+            <p className="mt-[10px] font-medium leading-[1.4]" style={{ fontSize: 17, color: "rgba(255,255,255,0.95)" }}>
               保存した物件はまだありません
             </p>
-            <p className="mt-[6px] leading-[1.65]" style={{ fontSize: 13.5, color: SUB }}>
+            <p className="mt-[6px] leading-[1.65]" style={{ fontSize: 13.5, color: "rgba(255,255,255,0.62)" }}>
               物件を調べた画面の右上の ☆ を押すと、ここに並びます。履歴の行の ☆ からも保存できます。
             </p>
             <button onClick={onHome} className="press mt-[16px] flex items-center gap-[7px] rounded-full bg-white px-[20px] font-semibold" style={{ height: HIT, fontSize: 15, color: "#1b3f73" }}>
@@ -303,11 +305,11 @@ export function FavoritesPage({
             </button>
           </div>
         ) : list.length === 0 ? (
-          <div className="fav-rise rounded-[22px] px-[20px] py-[18px] text-center" style={DARK_GLASS}>
-            <p className="font-semibold" style={{ fontSize: 15.5 }}>
+          <div className="fav-rise px-[12px] py-[14px] text-center">
+            <p className="font-medium" style={{ fontSize: 15.5, color: "rgba(255,255,255,0.95)" }}>
               当てはまる物件がありません
             </p>
-            <p className="mt-[4px]" style={{ fontSize: 13, color: SUB }}>
+            <p className="mt-[4px]" style={{ fontSize: 13, color: "rgba(255,255,255,0.62)" }}>
               絞り込みの文字を変えてみてください。
             </p>
           </div>
@@ -316,15 +318,15 @@ export function FavoritesPage({
             <div key={g.label || "all"} style={{ marginTop: gi ? 16 : 0 }}>
               {g.label && (
                 <div className="fav-rise flex h-[34px] items-center justify-between px-[4px]" style={{ marginBottom: 6, ...delay(stagger ? base + gi * 60 : 0) }}>
-                  <h2 className="truncate font-bold leading-none" style={{ fontSize: 17.5, letterSpacing: 0.5, textShadow: SHADOW }}>
+                  <h2 className="truncate font-semibold leading-none" style={{ fontSize: 15, letterSpacing: 1.5, color: "rgba(255,255,255,0.62)" }}>
                     {g.label}
                   </h2>
-                  <span className="shrink-0" style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", textShadow: SHADOW }}>
+                  <span className="shrink-0" style={{ fontSize: 13, color: "rgba(255,255,255,0.55)" }}>
                     {g.items.length}件
                   </span>
                 </div>
               )}
-              <ul className="fav-rise overflow-hidden rounded-[22px]" style={{ ...DARK_GLASS, ...delay(stagger ? base + 20 + gi * 60 : 0) }}>
+              <ul className="fav-rise" style={delay(stagger ? base + 20 + gi * 60 : 0)}>
                 {g.items.map((f) => {
                   const key = favoriteKey(f);
                   const i = order.get(key) ?? 0;
@@ -378,7 +380,7 @@ function FavRow({
   return (
     <li className={`fav-row border-t border-white/[0.12] first:border-t-0 ${leaving ? "fav-leaving" : ""}`} style={style}>
       <div className="fav-row-in flex items-center">
-        <button onClick={onPick} aria-label={`${full}を開く`} className="flex min-h-[66px] min-w-0 flex-1 items-center gap-[13px] py-[9px] pl-[12px] pr-[2px] text-left active:bg-white/10">
+        <button onClick={onPick} aria-label={`${full}を開く`} className="flex min-h-[66px] min-w-0 flex-1 items-center gap-[13px] rounded-[12px] py-[9px] pl-[2px] pr-[2px] text-left transition-colors active:bg-white/10">
           <PhoneImg
             src={sceneSrc(sceneKey)}
             alt=""
@@ -388,16 +390,16 @@ function FavRow({
             style={{ objectPosition: `50% ${SCENES[sceneKey].y}%`, boxShadow: "0 0 0 1px rgba(255,255,255,0.2), 0 4px 12px rgba(0,0,0,0.28)" }}
           />
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-semibold leading-[1.3]" style={{ fontSize: 16 }}>
+            <span className="block truncate font-medium leading-[1.3]" style={{ fontSize: 16, color: "rgba(255,255,255,0.95)" }}>
               {city && town ? `${city}${town}` : full}
             </span>
-            <span className="mt-[3px] block truncate leading-[1.3]" style={{ fontSize: 13, color: SUB }}>
+            <span className="mt-[3px] block truncate leading-[1.3]" style={{ fontSize: 13, color: "rgba(255,255,255,0.58)" }}>
               {subLine(item, time)}
             </span>
           </span>
         </button>
         <button onClick={onDocs} aria-label="この物件の書類を作る" className="press flex shrink-0 items-center justify-center rounded-full active:bg-white/10" style={{ width: HIT, height: HIT }}>
-          <FileText size={20} strokeWidth={1.8} absoluteStrokeWidth color="rgba(255,255,255,0.9)" />
+          <FileText size={20} strokeWidth={1.8} absoluteStrokeWidth color="rgba(255,255,255,0.7)" />
         </button>
         <button onClick={onRelease} aria-label="お気に入りから外す" className="mr-[4px] flex shrink-0 items-center justify-center rounded-full active:bg-white/10" style={{ width: HIT, height: HIT }}>
           <Star size={21} strokeWidth={1.7} absoluteStrokeWidth color="#ffc94a" fill="#ffc94a" className={leaving ? "fav-star-off" : ""} style={{ filter: "drop-shadow(0 0 6px rgba(255,196,74,0.55))" }} />

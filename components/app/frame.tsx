@@ -81,7 +81,7 @@ export function ScaledInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={label}
-        className={`absolute left-0 top-1/2 bg-transparent font-medium outline-none placeholder:font-normal [&::-webkit-search-cancel-button]:hidden ${onPhoto ? "text-white placeholder:text-white/85" : "text-[#121a2b] placeholder:text-[#8d97a8]"}`}
+        className={`absolute left-0 top-1/2 bg-transparent outline-none placeholder:font-normal [&::-webkit-search-cancel-button]:hidden ${onPhoto ? "font-normal text-white placeholder:text-white/70" : "font-medium text-[#121a2b] placeholder:text-[#8d97a8]"}`}
         style={{ width: `calc(100% / ${k})`, fontSize: "calc(16px / var(--app-zoom, 1))", transform: `translateY(-50%) scale(${k})`, transformOrigin: "left center" }}
       />
     </div>
