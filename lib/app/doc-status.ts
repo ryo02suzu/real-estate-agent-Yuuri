@@ -43,11 +43,14 @@ export function useDocStatus(key: string | undefined): DocStatus | undefined {
   return key && s && s.key === key ? s : undefined;
 }
 
+/** 名前は2つまで並べ、残りは数で（幅の狭い画面で1行に収まるように） */
+const few = (names: string[]) => (names.length > 2 ? `${names.slice(0, 2).join("・")} ほか${names.length - 2}` : names.join("・"));
+
 /** カードの物件の名前の下の1行：「やること あと8件・確認の記録 3件・読み込み中（地価）」 */
 export function docStatusLine(s: DocStatus): string {
   const parts = [s.actionsTotal && !s.actionsLeft ? "やること すべて済み" : `やること あと${s.actionsLeft}件`, `確認の記録 ${s.records}件`];
-  if (s.pending.length) parts.push(`読み込み中（${s.pending.join("・")}）`);
-  else if (s.failed.length) parts.push(`読めなかったデータ：${s.failed.join("・")}`);
+  if (s.pending.length) parts.push(`読み込み中（${few(s.pending)}）`);
+  else if (s.failed.length) parts.push(`読めなかったデータ：${few(s.failed)}`);
   return parts.join("・");
 }
 
