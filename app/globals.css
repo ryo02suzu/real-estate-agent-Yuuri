@@ -152,6 +152,24 @@ body {
     background-color: #386fab;
   }
 }
+/*
+ * iPhone のホーム画面に追加したアプリ（iOS 26。上の時刻の帯を透かす black-translucent と viewport-fit=cover）では、
+ * 画面の高さ（100dvh・100%・下に付けた fixed）が、上の時刻の帯の高さ（約 60pt）だけ短く数えられる（WebKit の不具合
+ * https://bugs.webkit.org/show_bug.cgi?id=301994 ほか）。body が画面の下まで届かず、下に帯の色のすき間が出ていた。
+ * ホーム画面のアプリの iPhone だけ、高さを「100lvh（帯を含む画面の高さ）」と「100dvh＋上の帯の高さ」の小さいほうにする
+ * （不具合が直った iOS では 100dvh と同じ。帯の下から描く iOS では帯の高さが 0 になり、はみ出さない）。
+ * html も同じ高さにすると、画面に貼り付けた fixed（シート・地球の演出など）も下まで届く
+ */
+@media (max-width: 1023px) and (display-mode: standalone) {
+  @supports (-webkit-touch-callout: none) {
+    html {
+      min-height: min(100lvh, calc(100% + env(safe-area-inset-top)));
+    }
+    body {
+      height: min(100lvh, calc(100dvh + env(safe-area-inset-top)));
+    }
+  }
+}
 
 /*
  * スマホのホームの動き（components/app/home.tsx）。上から順に浮き上がって現れる（.home-rise。遅れは style の animation-delay）。
