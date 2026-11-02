@@ -118,7 +118,7 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
           <GCell
             label="面積（図面上）"
             value={parcels.status === "loading" ? <GFaint /> : area ? <span style={NUM}>約{areaLabel(area, roughArea)}㎡</span> : <GFaint>{parcels.status === "error" ? "読み込めず" : townCenter || offLot ? "場所を直すと出ます" : "登記で確認"}</GFaint>}
-            sub={area ? (roughArea ? `公図の形からの目安・約${Math.round(area / TSUBO)}坪` : `約${(area / TSUBO).toFixed(1)}坪・公簿は登記で確認`) : ""}
+            sub={area ? (roughArea ? `公図の形からの目安・約${Math.round(area / TSUBO)}坪` : parcels.status === "ok" && parcels.kind === "address" ? `住所の地点の筆（参考）・約${(area / TSUBO).toFixed(1)}坪` : `約${(area / TSUBO).toFixed(1)}坪・公簿は登記で確認`) : ""}
             onClick={parcel ? () => open("parcel") : undefined}
           />
           <GCell

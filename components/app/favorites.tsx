@@ -551,7 +551,7 @@ export function FavoritesPage({
         保存した物件はまだありません
       </p>
       <p className="mt-[5px] leading-[1.6]" style={{ fontSize: 13, color: "rgba(255,255,255,0.62)" }}>
-        物件を調べた画面の右上の ☆ を押すと、ここに並びます。履歴の行の ☆ からも保存できます。
+        物件を調べた画面の右上や下の操作バーの ☆ を押すと、ここに並びます。履歴の行の ☆ からも保存できます。
       </p>
       <button onClick={onHome} className="press mt-[11px] flex items-center gap-[7px] rounded-full bg-white px-[18px] font-semibold" style={{ height: HIT, fontSize: 15, color: "#1b3f73" }}>
         <Search size={17} strokeWidth={2.1} absoluteStrokeWidth />

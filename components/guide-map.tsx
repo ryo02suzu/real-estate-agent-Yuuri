@@ -103,7 +103,7 @@ function GuideMapPage({ result }: { result: Ok }) {
         <div className="min-w-0">
           <p className="text-[18px] font-bold leading-tight tracking-[0.3em]">案内図</p>
           <p className="mt-1 text-[14px] font-bold leading-snug">
-            {result.matchedAddress}
+            {result.matchedAddress.normalize("NFKC")}
             {found ? ` ${chibanLabel(found.chibanRaw)}${parcelMark(found)}` : <span className="text-[12px] font-normal"> 付近</span>}
           </p>
           {p && result.picked && (

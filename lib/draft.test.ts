@@ -199,11 +199,25 @@ describe("重説・物件概要の下書き", () => {
 });
 
 describe("住所の地点の筆", () => {
-  it("隣地がとても多い筆（地番の付いた公道など）は、物件の外の土地の可能性を添え、隣地は20筆まで", () => {
+  it("隣地がとても多い筆（地番の付いた公道など）は、物件の外の土地の可能性を添え、その筆の隣地（道沿いの筆）は物件の隣地として並べない", () => {
     const neighbors = Array.from({ length: 25 }, (_, i) => `渋谷区神南１丁目 ${i + 30}-1`);
     const text = draftText(buildDraft(base, { parcels: { target: "渋谷区神南１丁目 51-3", neighbors, reference: true, offLot: true } }));
     expect(text).toContain("所在（地番）：渋谷区神南１丁目 51-3（住所の地点にある筆（参考）。隣地がとても多く、道路など物件の外の土地の可能性があるので、公図で確認）【要確認】");
+    expect(text).toContain("隣地の地番：省略（この筆に接する筆は25筆）（住所の地点の筆が道路など物件の外の土地の可能性があるので、公図で物件の筆を確かめてから隣地を調べる）【要確認】");
+    expect(text).not.toContain("30-1");
+  });
+
+  it("ふつうの住所の地点の筆は、隣地を20筆まで並べる", () => {
+    const neighbors = Array.from({ length: 25 }, (_, i) => `渋谷区神南１丁目 ${i + 30}-1`);
+    const text = draftText(buildDraft(base, { parcels: { target: "渋谷区神南１丁目 51-3", neighbors, reference: true } }));
+    expect(text).toContain("所在（地番）：渋谷区神南１丁目 51-3（住所の地点にある筆（参考）。住居表示と地番は別のもの）【要確認】");
     expect(text).toContain("、ほか5筆（公図で確認）");
+  });
+
+  it("住所の全角の数字は半角にそろえる（地番と同じ幅で並ぶ）", () => {
+    const text = draftText(buildDraft({ ...base, matchedAddress: "東京都渋谷区神南一丁目１９番１１号" }, {}));
+    expect(text).toContain("所在（住所）：東京都渋谷区神南一丁目19番11号 付近");
+    expect(text).not.toContain("１９番");
   });
 });
 

@@ -358,6 +358,28 @@ describe("buildSummary の地番", () => {
     expect(plain).not.toContain("基盤地図情報");
   });
 
+  it("住所の地点の筆が道路などの可能性（隣地がとても多い）なら、その筆の隣地は物件の隣地として並べず、わけを書く", () => {
+    const m = findMunicipality("13113")!;
+    const result = {
+      status: "ok" as const,
+      lat: 35.6617,
+      lng: 139.7002,
+      matchedAddress: "東京都渋谷区神南一丁目１９番１１号",
+      town: "神南一丁目",
+      approximate: false,
+      municipality: m,
+      links: buildLinks(m, 35.6617, 139.7002),
+    };
+    const neighbors = Array.from({ length: 40 }, (_, i) => `渋谷区神南１丁目 ${i + 1}`);
+    const off = buildSummary(result, { parcels: { target: "渋谷区神南１丁目 100", neighbors, reference: true, offLot: true } });
+    // 住所の全角の数字は半角にそろえる
+    expect(off).toContain("【MICHILU の調査結果】東京都渋谷区神南一丁目19番11号 付近");
+    expect(off).toContain("【謄本・公図用の地番（住所の地点の筆・参考。道路など物件の外の土地の可能性）】\n・物件：渋谷区神南１丁目 100\n・隣地：省略（この筆に接する筆は40筆。公図で物件の筆を確かめてから）");
+    expect(off).not.toContain("神南１丁目 1、");
+    const ref = buildSummary(result, { parcels: { target: "渋谷区神南１丁目 100", neighbors: neighbors.slice(0, 3), reference: true } });
+    expect(ref).toContain("【謄本・公図用の地番（住所の地点の筆・参考）】\n・物件：渋谷区神南１丁目 100\n・隣地：渋谷区神南１丁目 1、渋谷区神南１丁目 2、渋谷区神南１丁目 3");
+  });
+
   it("市町村の地番参考図の筆は、参考図である旨と市町村ごとの出典を付ける", () => {
     const m = findMunicipality("12203")!;
     const result = {

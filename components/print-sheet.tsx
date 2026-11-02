@@ -127,7 +127,7 @@ function Memo({
         <div className="min-w-0">
           <p className="text-[10px] tracking-[0.1em] text-[#7a6a55]">道路種別・都市計画・災害リスクの調査メモ</p>
           <h1 className="text-[17px] font-bold leading-snug">
-            {result.matchedAddress}
+            {result.matchedAddress.normalize("NFKC")}
             {found ? ` ${chibanLabel(found.chibanRaw)}${parcelMark(found)}` : <span className="text-[13px] font-normal">{result.picked ? "（地図で選んだ地点）" : " 付近"}</span>}
           </h1>
         </div>
@@ -356,7 +356,14 @@ function Memo({
               </p>
               <p className="font-semibold">{lines.target ?? `${kuikiLabel(parcels.parcel.kuiki)} ${chibanLabel(parcels.parcel.chibanRaw)}`}</p>
               <p className="mt-1 text-[10px] text-[#7a6a55]">境界が接している筆（{lines.neighbors.length}）</p>
-              <p className="text-[10.5px]">{lines.neighbors.length ? neighborList(lines.neighbors) : "地図データの中には見つかりませんでした"}</p>
+              {/* 住所の地点の筆が道路などの可能性があるときは、その筆の隣地（道沿いの筆）を物件の隣地として並べない */}
+              <p className="text-[10.5px]">
+                {addressOffLot(parcels) === "large" && lines.neighbors.length
+                  ? "省略：住所の地点の筆が道路など物件の外の土地の可能性があるので、公図で物件の筆を確かめてから隣地を調べてください。"
+                  : lines.neighbors.length
+                    ? neighborList(lines.neighbors)
+                    : "地図データの中には見つかりませんでした"}
+              </p>
             </>
           ) : (
             <p className="text-[10.5px] text-[#7a6a55]">

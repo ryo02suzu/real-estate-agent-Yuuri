@@ -64,7 +64,8 @@ export function buildSummary(
 ): string {
   const m = result.municipality;
   const p = result.parcel;
-  const lines = [`【MICHILU の調査結果】${result.matchedAddress}${p && !result.picked ? ` ${chibanLabel(p.chibanRaw)}${parcelMark(p)}` : " 付近"}`];
+  // 住所の数字は半角にそろえる（国土地理院の住所は「１９番１１号」のように全角。画面の見出しと地番は半角）
+  const lines = [`【MICHILU の調査結果】${result.matchedAddress.normalize("NFKC")}${p && !result.picked ? ` ${chibanLabel(p.chibanRaw)}${parcelMark(p)}` : " 付近"}`];
   // 地図で選んだ地点・地番で探した筆は、その地点を地理院地図で開けるようにする
   if (result.picked || p) lines.push(`${result.picked ? "地図で選んだ地点" : "筆の位置"}：https://maps.gsi.go.jp/#18/${result.lat.toFixed(6)}/${result.lng.toFixed(6)}/`);
   // 問題になりそうな所と次にやることを、結果の前に
@@ -158,7 +159,9 @@ export function buildSummary(
   if (parcels && withParcels) {
     lines.push(`【謄本・公図用の地番${parcels.offLot ? "（住所の地点の筆・参考。道路など物件の外の土地の可能性）" : parcels.reference ? "（住所の地点の筆・参考）" : ""}${parcels.estimated ? `（公図から推定した位置・${estimatedNote(parcels.estimated)}）` : parcels.sanko ? `（地番参考図・${SANKO_NOTE}）` : ""}】`);
     if (parcels.target) lines.push(`・物件：${parcels.target}`);
-    if (parcels.neighbors.length) lines.push(`・隣地：${neighborList(parcels.neighbors)}`);
+    // 住所の地点の筆が道路などの可能性があるときは、その筆の隣地（道沿いの筆）を物件の隣地として書かない
+    if (parcels.neighbors.length && parcels.offLot) lines.push(`・隣地：省略（この筆に接する筆は${parcels.neighbors.length}筆。公図で物件の筆を確かめてから）`);
+    else if (parcels.neighbors.length) lines.push(`・隣地：${neighborList(parcels.neighbors)}`);
   }
   // 市町村の地番図（物件の場所で開く URL）。地図データに筆が無いときの確認先にもなる
   const chibanzu = chibanzuFor(m, result.lat, result.lng);

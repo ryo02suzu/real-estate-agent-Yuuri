@@ -1747,21 +1747,25 @@ function PropertyView({
     addressOffLot(data.parcels) === undefined
       ? shownParcel
       : undefined;
-  const lotNumber = lotParcel ? registryChiban(lotParcel.chibanRaw) : undefined;
-  const lotArea =
-    lotParcel && data.parcels.status === "ok" && data.parcels.kind !== "address"
-      ? parcelAreaM2(lotParcel)
-      : undefined;
+  // 住所で調べたときの筆は「住所の地点にある筆」で、物件の筆とは限らない（住居表示と地番は別もの。地点が隣の筆に
+  // 乗ることもある）。大きな見出しは住所のままにして、地番は参考の札で出す（面積も見出しには出さない）
+  const lotIsProperty = data.parcels.status === "ok" && data.parcels.kind !== "address";
+  const lotNumber = lotParcel && lotIsProperty ? registryChiban(lotParcel.chibanRaw) : undefined;
+  const refLot = lotParcel && !lotIsProperty ? registryChiban(lotParcel.chibanRaw) : undefined;
+  const lotArea = lotParcel && lotIsProperty ? parcelAreaM2(lotParcel) : undefined;
   const eyebrow = result.picked
     ? "地図で選んだ地点"
     : found
       ? "地番で調べた土地"
-      : lotNumber
-        ? "住所で調べた場所（住所の地点の筆）"
-        : "住所で調べた場所";
+      : "住所で調べた場所";
   const where = displayAddress(result.matchedAddress);
   const chips = (
     <>
+      {refLot && (
+        <HeroChip onClick={() => setDetail({ kind: "parcel" })} icon={<Landmark size={13} strokeWidth={2} absoluteStrokeWidth />}>
+          住所の地点の筆 {refLot}（参考）
+        </HeroChip>
+      )}
       {lotArea && (
         <HeroChip>
           約{areaLabel(lotArea, !!(lotParcel?.estimated || lotParcel?.sanko))}㎡

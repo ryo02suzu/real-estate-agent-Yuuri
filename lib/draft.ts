@@ -54,7 +54,8 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   const place: DraftRow[] = [
     {
       label: "所在（住所）",
-      value: `${result.matchedAddress}${found ? "" : " 付近"}`,
+      // 住所の数字は半角にそろえる（国土地理院の住所は「１９番１１号」のように全角。地番は半角）
+      value: `${result.matchedAddress.normalize("NFKC")}${found ? "" : " 付近"}`,
       note: result.picked ? "地図で選んだ地点" : result.approximate ? "番地まで見つからず、町の中心の位置" : undefined,
       check: result.approximate,
     },
@@ -82,7 +83,10 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
       check: true,
     });
   else place.push({ label: "所在（地番）", value: CHECK, note: "登記・公図で確認", check: true });
-  if (parcels?.neighbors.length) place.push({ label: "隣地の地番", value: neighborList(parcels.neighbors), note: "境界が接している筆（地図データから）" });
+  // 住所の地点の筆が道路などの可能性があるときは、その筆の隣地（道沿いの筆）を物件の隣地として書かない
+  if (parcels?.neighbors.length && parcels.offLot)
+    place.push({ label: "隣地の地番", value: `省略（この筆に接する筆は${parcels.neighbors.length}筆）`, note: "住所の地点の筆が道路など物件の外の土地の可能性があるので、公図で物件の筆を確かめてから隣地を調べる", check: true });
+  else if (parcels?.neighbors.length) place.push({ label: "隣地の地番", value: neighborList(parcels.neighbors), note: "境界が接している筆（地図データから）" });
   const chibanzu = chibanzuFor(m, result.lat, result.lng);
   if (chibanzu) place.push({ label: "地番の参考図", value: `${chibanzu.name}（${chibanzu.url}）`, note: CHIBANZU_NOTE });
   place.push({ label: "緯度・経度", value: `${result.lat.toFixed(6)}, ${result.lng.toFixed(6)}` });
