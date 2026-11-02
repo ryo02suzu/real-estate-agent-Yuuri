@@ -18,6 +18,9 @@ const eslintConfig = defineConfig([
     "public/draco/**",
     // ホームの街の焼き込み（ヘッドレスの Chromium で動かす道具。アプリには入らない）
     "scripts/city-bake/**",
+    // 外部 Agent Skills のサンプル/補助スクリプトはアプリのlint対象外
+    ".claude/skills/**",
+    ".agents/skills/**",
   ]),
 ]);
 

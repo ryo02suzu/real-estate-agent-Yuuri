@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-12",
+ "updated": "2026-11-02",
  "maps": {
   "08201": {
    "flood": "https://www.city.mito.lg.jp/site/saigaiinfo/4008.html",
@@ -129,8 +129,8 @@
    "dosha": "https://www.city.kamisu.ibaraki.jp/living/safety/1000876/1000879.html"
   },
   "08233": {
-   "flood": "https://www.city.namegata.ibaraki.jp/page/page008388.html",
-   "dosha": "https://www.city.namegata.ibaraki.jp/page/page008388.html"
+   "flood": "https://www.city.namegata.ibaraki.jp/bousai-anzen/page015392.html",
+   "dosha": "https://www.city.namegata.ibaraki.jp/bousai-anzen/page015392.html"
   },
   "08234": {
    "flood": "https://www.city.hokota.lg.jp/page/page000597.html",
@@ -334,8 +334,9 @@
    "dosha": "https://www.city.fujioka.gunma.jp/soshiki/somubu/chiikianzen/1/3/990.html"
   },
   "10210": {
-   "flood": "https://www.city.tomioka.lg.jp/www/contents/1558658747846/index.html",
-   "dosha": "https://www.city.tomioka.lg.jp/www/contents/1558658747846/index.html"
+   "flood": "https://www.city.tomioka.lg.jp/www/contents/1717466848853/index.html",
+   "naisui": "https://www.city.tomioka.lg.jp/www/contents/1717466848853/index.html",
+   "dosha": "https://www.city.tomioka.lg.jp/www/contents/1717466848853/index.html"
   },
   "10211": {
    "flood": "https://www.city.annaka.lg.jp/page/1445.html",
@@ -540,6 +541,7 @@
   },
   "11230": {
    "flood": "https://www.city.niiza.lg.jp/site/bousai/r03kouzui-dosyasaigai-hazardmap.html",
+   "naisui": "https://www.city.niiza.lg.jp/site/bousai/naisuihm.html",
    "dosha": "https://www.city.niiza.lg.jp/site/bousai/r03kouzui-dosyasaigai-hazardmap.html"
   },
   "11231": {
@@ -1017,6 +1019,7 @@
   },
   "13109": {
    "flood": "https://www.city.shinagawa.tokyo.jp/PC/bosai/bosai2/panfu/map/hpg000022947.html",
+   "naisui": "https://www.city.shinagawa.tokyo.jp/PC/bosai/bosai2/panfu/map/hpg000022947.html",
    "takashio": "https://www.city.shinagawa.tokyo.jp/PC/bosai/bosai2/panfu/map/hpg000022947.html",
    "tsunami": "https://www.city.shinagawa.tokyo.jp/PC/bosai/bosai2/panfu/map/hpg000022947.html",
    "dosha": "https://www.city.shinagawa.tokyo.jp/PC/bosai/bosai2/panfu/map/hpg000022947.html"
@@ -1070,7 +1073,7 @@
   },
   "13119": {
    "flood": "https://www.city.itabashi.tokyo.jp/bousai/bousai/map/1005633.html",
-   "naisui": "https://www.city.itabashi.tokyo.jp/bousai/bousai/map/1005633.html",
+   "naisui": "https://www.city.itabashi.tokyo.jp/bousai/bousai/map/1065493.html",
    "takashio": "https://www.city.itabashi.tokyo.jp/bousai/bousai/map/1026389.html",
    "dosha": "https://www.city.itabashi.tokyo.jp/bousai/bousai/map/1005634.html"
   },
