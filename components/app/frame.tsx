@@ -115,6 +115,7 @@ export function BottomNav({ active, onSelect, dark = false }: { active: NavKey; 
   return (
     <nav
       aria-label="画面の切り替え"
+      data-app-nav
       className={`app-touch relative shrink-0 overflow-hidden pb-[max(0px,calc(env(safe-area-inset-bottom)-12px))] ${dark ? "rounded-t-[calc(26px*var(--app-zoom,1))] border-t border-white/15 backdrop-blur-xl backdrop-saturate-150" : "border-t border-[#e6ebf2] bg-white/95 backdrop-blur"}`}
       style={dark ? { background: "var(--glass-nav-bg)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)" } : undefined}
     >

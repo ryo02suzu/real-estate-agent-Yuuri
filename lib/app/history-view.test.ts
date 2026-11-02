@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HistoryItem } from "../history";
-import { copyLabel, copyText, dayGroup, fullDate, groupByProperty, inRange, kindOf, markOf, matches, rangeCounts, recordsText, removedText, sections, stamp, when } from "./history-view";
+import { copyLabel, copyText, dayGroup, fullDate, groupByProperty, inRange, kindOf, markOf, matches, propertyCount, propertyKey, rangeCounts, recordsText, removedText, sections, stamp, when } from "./history-view";
 
 // 端末の時刻で数える（2026年11月1日（日）15:00 を「いま」にする）
 const at = (m: number, d: number, h = 12, mi = 0, y = 2026) => new Date(y, m - 1, d, h, mi).getTime();
@@ -31,10 +31,15 @@ describe("履歴のページの並べ方・絞り込み", () => {
     expect(markOf("松戸市", "")).toBeNull();
   });
 
-  it("日付の章は暦の日で数える", () => {
-    expect([A, C, D, E, F].map((h) => dayGroup(h.at, NOW))).toEqual(["今日", "昨日", "1週間以内", "1か月以内", "それより前"]);
+  it("日付の章は暦の日で数え、1か月より前は月ごと（年が違えば年も）", () => {
+    expect([A, C, D, E, F].map((h) => dayGroup(h.at, NOW))).toEqual(["今日", "昨日", "1週間以内", "1か月以内", "2025年3月"]);
     // 日付をまたいだ直後でも、昨日の夜は「昨日」
     expect(dayGroup(at(10, 31, 23, 59), at(11, 1, 0, 1))).toBe("昨日");
+    // 30日前までは「1か月以内」、31日前からは月の名前
+    expect(dayGroup(at(10, 2), NOW)).toBe("1か月以内");
+    expect(dayGroup(at(10, 1), NOW)).toBe("10月");
+    expect(dayGroup(at(9, 15), NOW)).toBe("9月");
+    expect(dayGroup(at(12, 20, 12, 0, 2025), NOW)).toBe("2025年12月");
   });
 
   it("行の日時：章の中では時刻か月日と曜日、市区町村ごとでは日も付ける", () => {
@@ -62,7 +67,7 @@ describe("履歴のページの並べ方・絞り込み", () => {
       ["今日", 2],
       ["1週間以内", 1],
       ["1か月以内", 1],
-      ["それより前", 1],
+      ["2025年3月", 1],
     ]);
     expect(sections(rows, true, NOW).map((s) => [s.label, s.rows.map((r) => r.item.at)])).toEqual([
       ["松戸市", [A.at]],
@@ -72,9 +77,18 @@ describe("履歴のページの並べ方・絞り込み", () => {
     ]);
   });
 
-  it("まとめて消す範囲：過去1時間・今日・今日と昨日・すべて", () => {
+  it("物件の数：同じ物件（信頼できる識別情報が同じ）は何度調べても1件。一覧の行の数と同じ", () => {
+    expect(propertyKey(A)).toBe(propertyKey(C));
+    expect(propertyKey(B)).not.toBe(propertyKey(E));
+    expect(propertyCount([A, B, C, D, E, F])).toBe(5);
+    expect(propertyCount([A, B, C, D, E, F])).toBe(groupByProperty([A, B, C, D, E, F]).length);
+    expect(propertyCount([])).toBe(0);
+  });
+
+  it("まとめて消す範囲：過去1時間・今日・今日と昨日・すべて（件数は物件の数）", () => {
     const list = [A, B, C, D, E, F];
-    expect(rangeCounts(list, NOW)).toEqual({ hour: 1, today: 2, twoDays: 3, all: 6 });
+    // 今日と昨日：A・B・C だが A と C は同じ物件なので 2件。すべて：6回の検索で 5件
+    expect(rangeCounts(list, NOW)).toEqual({ hour: 1, today: 2, twoDays: 2, all: 5 });
     expect(inRange(C, "today", NOW)).toBe(false);
     expect(inRange(C, "twoDays", NOW)).toBe(true);
     // 過去1時間は日付をまたいでも60分
@@ -94,8 +108,11 @@ describe("履歴のページの並べ方・絞り込み", () => {
     expect(recordsText({ all: [], partial: [] })).toBe("");
   });
 
-  it("消したあとの文", () => {
+  it("消したあとの文（物件の数で数える）", () => {
     expect(removedText([A])).toBe("「古ヶ崎四丁目」を消しました");
-    expect(removedText([A, B, C])).toBe("3件を消しました");
+    // 同じ物件の2回の検索をまとめて消したときは、その物件の名前
+    expect(removedText([A, C])).toBe("「古ヶ崎四丁目」を消しました");
+    expect(removedText([A, B, C])).toBe("2件を消しました");
+    expect(removedText([A, B, D])).toBe("3件を消しました");
   });
 });

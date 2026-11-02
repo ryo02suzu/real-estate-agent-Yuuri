@@ -808,6 +808,16 @@ body {
   .hist-pop {
     animation: hist-pop 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
   }
+  /* 上の細いバーの、いまの章（変わると下からふわっと入れ替わる） */
+  .hist-sub {
+    animation: hist-sub 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  }
+}
+@keyframes hist-sub {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 /* 長押し：行が少し沈んで明るくなる（そのあとシートが出る） */
 @keyframes hist-held {
@@ -1183,16 +1193,28 @@ body {
   html.vt-recent.vt-down::view-transition-group(vt-r0) {
     animation-delay: 36ms;
   }
+  /*
+   * 行と検索欄の中身（字）は、前のページの字が先に薄れてから次のページの字が出る（同時に重ねると、形の違う字が二重に見える）。
+   * 動く箱（group）は 0.56 秒で滑り続けるので、字だけが入れ替わる
+   */
   html.vt-recent::view-transition-old(vt-r0),
-  html.vt-recent::view-transition-new(vt-r0),
   html.vt-recent::view-transition-old(vt-r1),
-  html.vt-recent::view-transition-new(vt-r1),
   html.vt-recent::view-transition-old(vt-r2),
+  html.vt-recent::view-transition-old(vt-search) {
+    animation: vt-text-out 0.16s cubic-bezier(0.4, 0, 1, 1) both;
+  }
+  html.vt-recent::view-transition-new(vt-r0),
+  html.vt-recent::view-transition-new(vt-r1),
   html.vt-recent::view-transition-new(vt-r2),
-  html.vt-recent::view-transition-old(vt-search),
   html.vt-recent::view-transition-new(vt-search) {
-    animation-duration: 0.42s;
-    animation-timing-function: ease;
+    animation: vt-text-in 0.3s cubic-bezier(0, 0, 0.2, 1) 0.1s both;
+  }
+  /* 下のメニューは、ページと一緒に薄れたり寄ったりしない（選んでいる所の色だけが入れ替わる） */
+  html.vt-recent [data-app-nav] {
+    view-transition-name: app-nav;
+  }
+  html.vt-recent::view-transition-group(app-nav) {
+    animation-duration: 0.3s;
   }
   /* 一覧の板（暗いすりガラス ⇄ 白）は、行を除いた板だけの絵なので、箱いっぱいに合わせて形と色を変える */
   html.vt-recent::view-transition-old(vt-card),
@@ -1245,11 +1267,29 @@ body {
   html.vt-hist::view-transition-new(root) {
     animation-duration: 0.3s;
   }
+  /* 並べ方の切り替え：前の絵は出さず、次の画面の札（白い札が CSS の動きで滑っている）をそのまま見せる（重ねると札が2つに見える） */
+  html.vt-hist::view-transition-old(hist-sort) {
+    animation: none;
+    opacity: 0;
+  }
+  html.vt-hist::view-transition-new(hist-sort) {
+    animation: none;
+  }
 }
 @keyframes vt-recent-out {
   to {
     opacity: 0;
     transform: scale(1.03);
+  }
+}
+@keyframes vt-text-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-text-in {
+  from {
+    opacity: 0;
   }
 }
 @keyframes vt-recent-in {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { addHistory, clearHistory, loadHistory, removeHistory, restoreHistory } from "./history";
+import { addHistory, clearHistory, HISTORY_MAX, loadHistory, removeHistory, restoreHistory } from "./history";
 
 function memoryStorage() {
   const m = new Map<string, string>();
@@ -13,12 +13,20 @@ function memoryStorage() {
 describe("history", () => {
   beforeEach(() => vi.stubGlobal("localStorage", memoryStorage()));
 
-  it("新しい順に最大30件", () => {
-    for (let i = 1; i <= 32; i++) addHistory({ address: `住所${i}`, at: i });
+  it("新しい順に最大 HISTORY_MAX（200）件", () => {
+    expect(HISTORY_MAX).toBe(200);
+    for (let i = 1; i <= HISTORY_MAX + 2; i++) addHistory({ address: `住所${i}`, at: i });
     const got = loadHistory().map((h) => h.address);
-    expect(got).toHaveLength(30);
-    expect(got.slice(0, 3)).toEqual(["住所32", "住所31", "住所30"]);
+    expect(got).toHaveLength(HISTORY_MAX);
+    expect(got.slice(0, 3)).toEqual([`住所${HISTORY_MAX + 2}`, `住所${HISTORY_MAX + 1}`, `住所${HISTORY_MAX}`]);
     expect(got.at(-1)).toBe("住所3");
+  });
+
+  it("前の上限（30件）で保存された履歴も、そのまま読める", () => {
+    localStorage.setItem("michilu:history", JSON.stringify(Array.from({ length: 30 }, (_, i) => ({ address: `住所${30 - i}`, at: 30 - i }))));
+    expect(loadHistory()).toHaveLength(30);
+    addHistory({ address: "新しい住所", at: 31 });
+    expect(loadHistory()).toHaveLength(31);
   });
 
   it("同じ住所は先頭に移動して重複しない", () => {

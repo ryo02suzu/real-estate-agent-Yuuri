@@ -17,8 +17,13 @@ export type HistoryItem = {
 export const historyKey = (h: HistoryItem) => (h.ll ? h.ll.join(",") : h.address);
 
 const KEY = "michilu:history";
-/** 検索履歴の画面に出す数（ホームの「最近の検索」はこの先頭の3件） */
-const MAX = 30;
+/**
+ * 端末に残す検索の数（古いものから消える。ホームの「最近の検索」はこの先頭の3件、PC の検索履歴のシートは先頭の30件）。
+ * 忙しい週でも1〜2か月前に調べた物件までさかのぼれるように 200 件（前は30件で、1週間ほどで消えていた）。
+ * 1件は 200 バイトほどなので、200 件でも 40KB ほど（端末の保存の上限は 5MB ほど）
+ */
+export const HISTORY_MAX = 200;
+const MAX = HISTORY_MAX;
 
 export function loadHistory(): HistoryItem[] {
   try {
@@ -94,7 +99,7 @@ export function removeHistory(list: readonly HistoryItem[], items: readonly Hist
 
 /**
  * 消したものを戻す（「元に戻す」）。調べた日時の新しい順に並べ直すので、元の位置に戻る。
- * 消したあとに同じ検索をし直していたら、新しい方を残す。最大30件
+ * 消したあとに同じ検索をし直していたら、新しい方を残す。最大 HISTORY_MAX 件
  */
 export function restoreHistory(list: readonly HistoryItem[], items: readonly HistoryItem[]): HistoryItem[] {
   const map = new Map(list.map((h) => [historyKey(h), h]));

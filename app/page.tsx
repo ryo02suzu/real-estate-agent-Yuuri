@@ -17,6 +17,9 @@ import { GeocoderUnavailable, lookup, lookupPoint, MUNICIPALITIES, type LookupRe
 import { buildHash, pageUrl, readUrlState } from "@/lib/app/url";
 
 type Shown = { query: string; result: LookupResult };
+/** PC の検索履歴のシートに出す数（前の上限と同じ。PC の見た目は変えない） */
+const PC_HISTORY_ROWS = 30;
+
 /** いまの画面が、ホームから何画面進んだところか（pushState で積んだ数） */
 function historyDepth(): number {
   const d = (window.history.state as { depth?: unknown } | null)?.depth;
@@ -154,8 +157,9 @@ export default function Home() {
       <HelpSheet open={sheet === "help"} onClose={() => setSheet(null)} />
       <CitiesSheet open={sheet === "cities"} onClose={() => setSheet(null)} />
       <Sheet title="検索履歴" open={sheet === "history"} onClose={() => setSheet(null)}>
+        {/* PC の検索履歴は前と同じ30件まで（端末には 200 件まで残す。スマホの履歴のページはすべて出す） */}
         <HistoryList
-          items={history}
+          items={history.slice(0, PC_HISTORY_ROWS)}
           onSelect={(h) => {
             setSheet(null);
             void pickHistory(h);

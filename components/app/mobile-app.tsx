@@ -106,6 +106,7 @@ import {
   PAGE,
   SKY,
   useScreenHeight,
+  VT,
   type HomeMessage,
 } from "./home";
 import { setMotionSetting, useMotionSetting } from "./motion";
@@ -144,7 +145,7 @@ import {
 } from "./result-head";
 import { AccountPage, TabBanner } from "./tab-pages";
 import { HistoryBackdrop, HistoryPage, historyTop, HistoryUndoToast } from "./history";
-import { removedText } from "@/lib/app/history-view";
+import { propertyCount, removedText } from "@/lib/app/history-view";
 import {
   SHEET_KINDS,
   type FrontRoad,
@@ -155,6 +156,7 @@ import {
 } from "./types";
 import { reducedMotion } from "./tokens";
 import { useProperty, type Ok, type PropertyData } from "./use-property";
+import { fitNames, scrollArea } from "./vt";
 import { applyAppZoom } from "./zoom";
 
 type Shown = { query: string; result: LookupResult };
@@ -321,6 +323,11 @@ export function MobileApp(props: MobileAppProps) {
     }
     // 名前は動きの間だけ付ける（今の画面に付けてから、切り替える）
     flushSync(() => setMorph(true));
+    // 画面に収まっていない行・板・欄は名前を外す（スクロールで隠れていた所から飛んだり、下のメニューの上を通ったりしないように。
+    // 今日の行が多くて縦に長い板は、見えている所で切って滑らせる。components/app/vt.ts）
+    const sc = scroller.current;
+    const unclip = sc ? fitNames(sc, scrollArea(sc), [VT.card]) : () => {};
+    let unclipNew = () => {};
     const html = document.documentElement;
     // 向き（履歴へは上へ、ホームへは下へ。行の動き出す順を変える）
     const dir = p === "history" ? "vt-up" : "vt-down";
@@ -328,8 +335,12 @@ export function MobileApp(props: MobileAppProps) {
     const t = document.startViewTransition(() => {
       flushSync(() => setPage(p));
       scroller.current?.scrollTo(0, 0);
+      const next = scroller.current;
+      if (next) unclipNew = fitNames(next, scrollArea(next), [VT.card]);
     });
     const done = () => {
+      unclip();
+      unclipNew();
       html.classList.remove("vt-recent", dir);
       setMorph(false);
     };
@@ -621,7 +632,7 @@ export function MobileApp(props: MobileAppProps) {
         onInstall={() => setSheet("install")}
         onStorage={() => setSheet("storage")}
         standalone={standalone}
-        historyCount={history.length}
+        historyCount={propertyCount(history)}
         favoriteCount={favorites.length}
         banner={tabBanner}
       />
@@ -830,6 +841,12 @@ export function MobileApp(props: MobileAppProps) {
             // すべて見るを開いていたら、いつもの画面へ戻る
             setFavAll(false);
             scroller.current?.scrollTo(0, 0);
+          } else if (k === "history" && page === "history") {
+            // 履歴を見ているときにもう一度押したら、いちばん上へ滑って戻る
+            scroller.current?.scrollTo({
+              top: 0,
+              behavior: reducedMotion() ? "auto" : "smooth",
+            });
           } else if (
             // ホームの最近の検索 ⇄ 履歴は、行がつながる動きで行き来する
             (k === "history" && showHome) ||

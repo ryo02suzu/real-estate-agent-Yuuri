@@ -1,7 +1,7 @@
 // 履歴のページ（components/app/history.tsx）の、画面を持たない部分：絞り込み・同じ物件のまとめ・章（日付ごと・市区町村ごと）・
 // 消す範囲（過去1時間・今日・今日と昨日・すべて）・コピーする文・日時の書き方・絞り込みの文字に合う所。
 // お気に入り・書類・出力の一覧も、絞り込みと日時はここを使う（components/app/tab-pages.tsx から同じものを出している）
-import type { HistoryItem } from "../history";
+import { historyKey, type HistoryItem } from "../history";
 import { placeParts } from "./scene";
 
 /** 調べ方の種類（住所・地番・地図で選んだ場所） */
@@ -54,14 +54,18 @@ function daysAgo(t: number, now: number): number {
   return Math.round((dayStart(now) - dayStart(t)) / 86400000);
 }
 
-/** 日付ごとの章：「今日」「昨日」「1週間以内」「1か月以内」「それより前」 */
+/**
+ * 日付ごとの章：「今日」「昨日」「1週間以内」「1か月以内」、それより前は月ごと（「9月」。年が違えば「2025年12月」）。
+ * 履歴は 200 件まで残るので、古いものをひとまとめにせず月で分ける（Mac の Finder の「過去30日間」のあとと同じ分け方）
+ */
 export function dayGroup(t: number, now: number): string {
   const diff = daysAgo(t, now);
   if (diff <= 0) return "今日";
   if (diff === 1) return "昨日";
   if (diff < 7) return "1週間以内";
   if (diff < 31) return "1か月以内";
-  return "それより前";
+  const d = new Date(t);
+  return d.getFullYear() === new Date(now).getFullYear() ? `${d.getMonth() + 1}月` : `${d.getFullYear()}年${d.getMonth() + 1}月`;
 }
 
 const pad = (v: number) => String(v).padStart(2, "0");
@@ -92,6 +96,17 @@ export function stamp(t: number, now: number, withDay: boolean): string {
 export function fullDate(t: number): string {
   const d = new Date(t);
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${WEEK[d.getDay()]}）${hm(d)}`;
+}
+
+/**
+ * 物件の見分け（一覧の1行）：信頼できる識別情報（lib/property-id.ts）があればそれで、無ければ検索ごとに別の物件。
+ * 履歴のページの件数（見出し・章・札・消す範囲）は、この数（＝見えている行の数）で数える
+ */
+export const propertyKey = (h: HistoryItem) => (h.pid ? `p:${h.pid}` : `h:${historyKey(h)}`);
+
+/** 物件の数（同じ物件を何度調べても1件） */
+export function propertyCount(list: readonly HistoryItem[]): number {
+  return new Set(list.map(propertyKey)).size;
 }
 
 /** 同じ物件（信頼できる識別情報が同じ。lib/property-id.ts）をひとつの行にまとめたもの。item はいちばん新しい検索 */
@@ -166,10 +181,10 @@ export function inRange(h: HistoryItem, range: Range, now: number): boolean {
   return daysAgo(h.at, now) <= (range === "today" ? 0 : 1);
 }
 
-/** 範囲ごとの件数 */
+/** 範囲ごとの件数（その範囲に調べた物件の数。同じ物件を何度調べても1件。一覧の行・章の件数と同じ数え方） */
 export function rangeCounts(list: readonly HistoryItem[], now: number): Record<Range, number> {
   const c: Record<Range, number> = { hour: 0, today: 0, twoDays: 0, all: 0 };
-  for (const h of list) for (const r of RANGES) if (inRange(h, r.key, now)) c[r.key]++;
+  for (const r of RANGES) c[r.key] = propertyCount(list.filter((h) => inRange(h, r.key, now)));
   return c;
 }
 
@@ -199,9 +214,10 @@ export function recordsText(t: { all: string[]; partial: string[] }): string {
   return `確認済み：${names(t.all)}${t.partial.length ? `・一部：${names(t.partial)}` : ""}`;
 }
 
-/** 消したあとの「元に戻す」の文 */
+/** 消したあとの「元に戻す」の文（物件の数で数える。同じ物件の検索をまとめて消したときは、その物件の名前） */
 export function removedText(items: readonly HistoryItem[]): string {
-  if (items.length !== 1) return `${items.length}件を消しました`;
+  const n = propertyCount(items);
+  if (n !== 1) return `${n}件を消しました`;
   const { town, full } = placeParts(items[0]);
   return `「${town || full}」を消しました`;
 }

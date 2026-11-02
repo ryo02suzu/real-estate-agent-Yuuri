@@ -14,6 +14,7 @@
 // 動きを減らす設定では動かさない
 import { ChevronRight, ClipboardCopy, Clock3, ListChecks, Map as MapIcon, MapPin, Menu, Printer, ScrollText, Search, type LucideIcon } from "lucide-react";
 import { useRef, type CSSProperties, type ReactNode } from "react";
+import { propertyCount } from "@/lib/app/history-view";
 import { placeParts } from "@/lib/app/scene";
 import { dayPart } from "@/lib/app/sun";
 import { historyKey, type HistoryItem } from "@/lib/history";
@@ -329,7 +330,7 @@ export function DocsPage({
                 className="press group -mr-[8px] flex shrink-0 items-center gap-[2px] rounded-full px-[8px] transition-[background-color] active:bg-white/15"
                 style={{ minHeight: HIT, fontSize: 14, color: "rgba(255,255,255,0.78)", textShadow: SHADOW }}
               >
-                履歴（{history.length}件）
+                履歴（{propertyCount(history)}件）
                 <ChevronRight size={15} strokeWidth={2} absoluteStrokeWidth className="transition-transform duration-200 group-active:translate-x-[3px]" />
               </button>
             )}

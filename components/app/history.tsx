@@ -18,6 +18,7 @@
 // 並べ方・消す範囲・コピーする文・日時の書き方は lib/app/history-view.ts
 import { ArrowUpRight, Copy, FileText, Menu, MoreHorizontal, Search, Star, Trash2, X, type LucideIcon } from "lucide-react";
 import {
+  startTransition,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -33,7 +34,7 @@ import {
   type TouchEvent as ReactTouchEvent,
 } from "react";
 import { createPortal, flushSync } from "react-dom";
-import { copyLabel, copyText, fullDate, groupByProperty, inRange, KIND_LABEL, kindOf, markOf, matches, rangeCounts, RANGES, recordsText, sections, stamp, type Grouped, type Kind, type Range } from "@/lib/app/history-view";
+import { copyLabel, copyText, fullDate, groupByProperty, inRange, KIND_LABEL, kindOf, markOf, matches, propertyCount, rangeCounts, RANGES, recordsText, sections, stamp, type Grouped, type Kind, type Range, type Section } from "@/lib/app/history-view";
 import { placeParts } from "@/lib/app/scene";
 import { histPart, type HistPart } from "@/lib/app/sun";
 import { historyKey, type HistoryItem } from "@/lib/history";
@@ -50,6 +51,7 @@ import { useShrink } from "./sky";
 import { FavStar } from "./star";
 import { useNow } from "./tab-pages";
 import { reducedMotion } from "./tokens";
+import { clearNames, nameVisible, scrollArea } from "./vt";
 
 // ───────────────────────────── 背景 ─────────────────────────────
 
@@ -209,6 +211,26 @@ const ROW_W = 355;
 const FULL_AT = 0.56;
 /** 「元に戻す」を出しておく時間 */
 const UNDO_MS = 5000;
+/** 現れる動きを付ける行の数（初めの画面に入る分。履歴は 200 件まで残るので、画面の外の行まで動かさない） */
+const ENTER_ROWS = 14;
+/**
+ * 一度に描く行の数。履歴は 200 件まで残るので、初めは画面に入る分より少し多く描き、下へスクロールして終わりが近づいたら足していく
+ * （200 行を一度に描くと、開く・並べ替えるたびに一瞬止まるので）
+ */
+const PAGE_ROWS = 40;
+
+/** 章を、上から n 行までに切る（total は切る前のその章の行の数。章の見出しの件数に出す） */
+function cutSections(secs: readonly Section[], n: number): (Section & { total: number })[] {
+  const out: (Section & { total: number })[] = [];
+  let left = n;
+  for (const s of secs) {
+    if (left <= 0) break;
+    const rows = s.rows.slice(0, left);
+    left -= rows.length;
+    out.push({ label: s.label, rows, total: s.rows.length });
+  }
+  return out;
+}
 /** 現れるときの動きの遅れ */
 const delay = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
 /** 画面の拡大率（指の動き（画面の px）を絵の大きさ（pt）に直す） */
@@ -225,7 +247,11 @@ const KINDS: { key: Kind | "all"; label: string }[] = [
 
 /** 消す行の動き：遅れ（ms）と、なぞって消したか（左へ抜けてからたたむ） */
 type Leave = { delay: number; slid: boolean };
-type SheetState = { type: "row"; g: Grouped } | { type: "clear"; at: number } | null;
+/** 絞り込んで出ている物件（「履歴を消す…」で、これだけを消せる。text は絞り込みの説明） */
+type Narrowed = { rows: Grouped[]; text: string };
+/** 「履歴を消す…」のシートの中身（開いたときの時刻と、絞り込んで出ている物件。閉じる動きの間も同じものを出す） */
+type ClearState = { at: number; narrowed: Narrowed | null };
+type SheetState = { type: "row"; g: Grouped } | ({ type: "clear" } & ClearState) | null;
 
 /** 下から出す画面は document.body に出す（拡大・縮小している枠の外に置く） */
 const noop = () => () => {};
@@ -398,21 +424,34 @@ export function HistoryPage({
     removeRef.current = onRemove;
   });
 
-  // 調べ方の札の件数（絞り込みの文字に合うものの数）
+  // 調べ方の札の件数（絞り込みの文字に合う物件の数＝その札を選んだときに出る行の数。同じ物件を何度調べても1件）
   const counts = useMemo(() => {
-    const c: Record<Kind | "all", number> = { all: 0, address: 0, chiban: 0, map: 0 };
-    for (const h of history)
-      if (matches(h, q)) {
-        c.all++;
-        c[kindOf(h)]++;
-      }
-    return c;
+    const hit = history.filter((h) => matches(h, q));
+    const of = (k: Kind) => propertyCount(hit.filter((h) => kindOf(h) === k));
+    return { all: propertyCount(hit), address: of("address"), chiban: of("chiban"), map: of("map") } satisfies Record<Kind | "all", number>;
   }, [history, q]);
+  // 調べた物件の数（見出しのひとこと・上の細いバー。同じ物件はまとめて1件＝一覧の行の数）
+  const total = useMemo(() => propertyCount(history), [history]);
   // つながる動きの名前（行ごとに決まった番号）とホームの最近の検索の何番目か
   const index = useMemo(() => new Map(history.map((h, i) => [historyKey(h), i])), [history]);
   const list = history.filter((h) => (kind === "all" || kindOf(h) === kind) && matches(h, q));
   const rows = groupByProperty(list);
-  const secs = sections(rows, byCity, now);
+  // 描く行の数（下へスクロールして終わりが近づいたら足す。並べ方・絞り込みを変えても減らさない＝見ていた所が消えない）
+  const [limit, setLimit] = useState(PAGE_ROWS);
+  const secs = cutSections(sections(rows, byCity, now), limit);
+  const more = rows.length > limit;
+  const moreRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = moreRef.current;
+    const sc = root.current?.closest<HTMLElement>("[data-scroller]");
+    if (!more || !el || !sc) return;
+    // 終わりの目印が、画面の下の端から 900px 以内に来たら足す（足しても近ければ、作り直した監視がすぐもう一度足す）
+    const io = new IntersectionObserver((es) => {
+      if (es.some((e) => e.isIntersecting)) startTransition(() => setLimit((l) => l + PAGE_ROWS));
+    }, { root: sc, rootMargin: "0px 0px 900px 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [more, limit]);
   const filtering = typing || q.trim() !== "" || kind !== "all";
 
   // 横向き・キーボードで画面が低いときは、ホームと同じく余白を詰める
@@ -477,24 +516,45 @@ export function HistoryPage({
     );
   };
 
+  /** 絞り込んで出ている物件（文字か調べ方で絞っているときだけ） */
+  const narrowedNow = (): Narrowed | null => {
+    const t = q.trim();
+    if ((!t && kind === "all") || !rows.length) return null;
+    return { rows, text: [t && `「${t}」`, kind !== "all" && `${KIND_LABEL[kind]}で調べたもの`].filter(Boolean).join("・") };
+  };
+
   const copy = async (x: HistoryItem) => {
     const text = copyText(x);
     if (await writeClipboard(text)) onNotice(`${copyLabel(x)}をコピーしました：${text}`);
   };
 
-  /** 並べ方・調べ方を変える：行が新しい位置へ滑る（対応していない端末・動きを減らす設定では、そのまま切り替える） */
+  /**
+   * 並べ方・調べ方を変える：行が新しい位置へ滑り、並べ方の白い札が滑る（対応していない端末・動きを減らす設定では、そのまま切り替える）。
+   * 名前（view-transition-name）は、変える前と後で画面に収まっている行にだけ付ける（components/app/vt.ts。画面の外へ・外から動く行は、
+   * ほかの画面と一緒にふつうに重ねて入れ替える。名前の付いた行は動きの間いちばん手前に描かれ、下のメニューや上のバーの上を通るので）
+   */
+  const vtRun = useRef(0);
   const animateList = (apply: () => void) => {
     setOpenKey(null);
-    if (typeof document.startViewTransition !== "function" || reducedMotion()) {
+    const sc = scroller();
+    if (typeof document.startViewTransition !== "function" || reducedMotion() || !sc || !listRef.current) {
       apply();
       return;
     }
+    // 続けて押したときは、前の動きの後始末で今の動きの名前を外さない
+    const run = ++vtRun.current;
     flushSync(() => setListVt(true));
+    nameVisible(listRef.current, scrollArea(sc));
     const html = document.documentElement;
     html.classList.add("vt-hist");
-    const t = document.startViewTransition(() => flushSync(apply));
+    const t = document.startViewTransition(() => {
+      flushSync(apply);
+      nameVisible(listRef.current, scrollArea(sc));
+    });
     const done = () => {
+      if (run !== vtRun.current) return;
       html.classList.remove("vt-hist");
+      clearNames(listRef.current);
       setListVt(false);
     };
     t.finished.then(done, done);
@@ -502,6 +562,36 @@ export function HistoryPage({
   };
 
   const scroller = () => root.current?.closest<HTMLElement>("[data-scroller]");
+
+  // 上の細いバーに出す、いまの章（見出しがバーの下を通った、いちばん下の章。章の見出しに data-sec）。並べ方・絞り込みが変わったら数え直す
+  const [cur, setCur] = useState<string | null>(null);
+  const secKey = secs.map((s) => s.label).join("|");
+  useEffect(() => {
+    const sc = root.current?.closest<HTMLElement>("[data-scroller]");
+    if (!sc) return;
+    let frame = 0;
+    const apply = () => {
+      frame = 0;
+      const bar = root.current?.querySelector<HTMLElement>("[data-vt-cover]");
+      const edge = (bar ? bar.getBoundingClientRect().bottom : sc.getBoundingClientRect().top) + 1;
+      let label: string | null = null;
+      for (const el of listRef.current?.querySelectorAll<HTMLElement>("[data-sec]") ?? []) {
+        if (el.getBoundingClientRect().top >= edge) break;
+        label = el.dataset.sec ?? null;
+      }
+      setCur(label);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(apply);
+    };
+    // 置いた直後も（描き終わってから）数える
+    onScroll();
+    sc.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      sc.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, [secKey]);
   const toTop = () => scroller()?.scrollTo({ top: 0, behavior: reducedMotion() ? "auto" : "smooth" });
   /** 上の細いバーの虫めがね：いちばん上へ戻って、絞り込みの欄に入る（キーボードを出すため、押したその場で入る） */
   const toSearch = () => {
@@ -539,7 +629,6 @@ export function HistoryPage({
   };
 
   const rise = intro ? "hist-rise" : "";
-  const entries = (s: { rows: Grouped[] }) => s.rows.reduce((n, g) => n + g.members.length, 0);
   // 一覧の上からの順（行が少しずつ遅れて現れる）
   const orderOf = new Map(secs.flatMap((s) => s.rows).map((g, i) => [historyKey(g.item), i]));
 
@@ -555,13 +644,16 @@ export function HistoryPage({
       {/* スクロールすると上に出る細いバー（押すといちばん上へ。虫めがねで絞り込み） */}
       {history.length > 0 && (
         <div className="pointer-events-none sticky top-0 z-20 h-0">
-          <div className="hist-bar relative flex w-full items-center justify-center" style={{ height: 50, background: "linear-gradient(180deg, rgba(14,24,42,0.62) 0%, rgba(14,24,42,0.5) 100%)", borderBottom: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(20px) saturate(140%)", WebkitBackdropFilter: "blur(20px) saturate(140%)" }}>
+          <div data-vt-cover className="hist-bar relative flex w-full items-center justify-center" style={{ height: 50, background: "linear-gradient(180deg, rgba(14,24,42,0.62) 0%, rgba(14,24,42,0.5) 100%)", borderBottom: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(20px) saturate(140%)", WebkitBackdropFilter: "blur(20px) saturate(140%)" }}>
             <button onClick={toTop} className="flex h-full min-w-0 flex-1 items-center justify-center gap-[6px] px-[56px]" aria-label="いちばん上へ" tabIndex={-1}>
               <ClockBack size={15} stroke={1.9} color="rgba(255,255,255,0.85)" />
-              <span className="font-semibold" style={{ fontSize: 16.5, letterSpacing: 0.6 }}>
+              <span className="shrink-0 font-semibold" style={{ fontSize: 16.5, letterSpacing: 0.6 }}>
                 履歴
               </span>
-              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.62)" }}>{history.length}件</span>
+              {/* いまの章（バーの下を通った章の見出し。変わると下からふわっと入れ替わる）。章に入る前は件数 */}
+              <span key={cur ?? ""} className="hist-sub min-w-0 truncate" style={{ fontSize: 13, color: "rgba(255,255,255,0.62)" }}>
+                {cur ?? `${total}件`}
+              </span>
             </button>
             <button onClick={toSearch} aria-label="絞り込む" tabIndex={-1} className="press absolute right-[6px] top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full active:bg-white/15" style={{ width: HIT, height: HIT }}>
               <Search size={19} strokeWidth={1.9} absoluteStrokeWidth color="#fff" />
@@ -581,7 +673,7 @@ export function HistoryPage({
       <p className={`${rise} relative font-medium`} style={{ margin: `${compact ? 8 : 14}px 20px 0`, fontSize: 15.5, lineHeight: 1.6, letterSpacing: 1.6, textShadow: SHADOW, ...(intro ? delay(60) : {}) }}>
         {history.length ? (
           <>
-            調べた物件　{history.length}件
+            調べた物件　{total}件
             <br />
             この端末だけに残しています
           </>
@@ -699,15 +791,15 @@ export function HistoryPage({
         ) : (
           <>
             {/* いちばん上の章の見出しと、並べ方（日付・市区町村。白い札が滑る）。並べ方を変えても作り直さない（札が滑るように） */}
-            <div className={`${rise} flex min-h-[36px] items-center justify-between gap-x-[8px] pl-[4px]`} style={{ marginBottom: 6, ...(intro ? delay(150) : {}) }}>
-              <SectionLabel label={secs[0].label} count={entries(secs[0])} />
+            <div data-sec={secs[0].label} className={`${rise} flex min-h-[36px] items-center justify-between gap-x-[8px] pl-[4px]`} style={{ marginBottom: 6, ...(intro ? delay(150) : {}) }}>
+              <SectionLabel label={secs[0].label} count={secs[0].total} />
               <SortToggle byCity={byCity} onChange={(v) => v !== byCity && animateList(() => setByCity(v))} />
             </div>
             {secs.map((s, si) => (
               <div key={s.label} style={{ marginTop: si ? 18 : 0 }}>
                 {si > 0 && (
-                  <Rise on={intro && !listVt} ms={settled ? 0 : 200 + si * 60} className="flex min-h-[36px] items-center pl-[4px]" style={{ marginBottom: 6 }}>
-                    <SectionLabel label={s.label} count={entries(s)} />
+                  <Rise on={intro && !listVt} ms={settled ? 0 : 200 + si * 60} sec={s.label} className="flex min-h-[36px] items-center pl-[4px]" style={{ marginBottom: 6 }}>
+                    <SectionLabel label={s.label} count={s.total} />
                   </Rise>
                 )}
                 <Board on={intro && !listVt} ms={settled ? 0 : 180 + si * 60} vt={morph && si === 0 ? VT.card : undefined}>
@@ -727,9 +819,10 @@ export function HistoryPage({
                         fav={isFavorite(g.item)}
                         open={openKey === key}
                         leave={leaving.get(key)}
-                        enter={(intro || settled) && !listVt}
+                        enter={(intro || settled) && !listVt && i < ENTER_ROWS}
                         delayMs={settled || !intro ? 0 : 230 + Math.min(i, 9) * 45}
-                        vt={morph ? (ri !== undefined ? VT.row(ri) : undefined) : listVt ? `hist-${index.get(key) ?? i}` : undefined}
+                        vt={morph && ri !== undefined ? VT.row(ri) : undefined}
+                        vtName={`hist-${index.get(key) ?? i}`}
                         copyName={label}
                         onOpen={(o) => setOpenKey((k) => (o ? key : k === key ? null : k))}
                         onPick={() => onPick(g.item)}
@@ -746,24 +839,37 @@ export function HistoryPage({
                 </Board>
               </div>
             ))}
+            {/* 続きの目印（ここが近づいたら行を足す。足し終わるまで、下の「履歴を消す…」と一言は出さない） */}
+            {more && <div ref={moreRef} aria-hidden style={{ height: 120 }} />}
           </>
         )}
 
-        {history.length > 0 && (
+        {history.length > 0 && !more && (
           <div className={`${rise} mt-[18px] flex justify-center`} style={intro ? delay(300) : undefined}>
-            <button onClick={() => setSheet({ type: "clear", at: Date.now() })} className="press flex items-center gap-[7px] rounded-full px-[18px] font-semibold" style={{ ...LIGHT_GLASS, height: HIT, fontSize: 14.5, color: "rgba(255,255,255,0.92)" }}>
+            <button onClick={() => setSheet({ type: "clear", at: Date.now(), narrowed: narrowedNow() })} className="press flex items-center gap-[7px] rounded-full px-[18px] font-semibold" style={{ ...LIGHT_GLASS, height: HIT, fontSize: 14.5, color: "rgba(255,255,255,0.92)" }}>
               <Trash2 size={16} strokeWidth={1.9} absoluteStrokeWidth color="#ffb4a6" />
               履歴を消す…
             </button>
           </div>
         )}
-        <p className={`${rise} mt-[16px] px-[4px] leading-[1.6]`} style={{ fontSize: 11.5, color: "rgba(255,255,255,0.8)", textShadow: ON_PHOTO, ...(intro ? delay(320) : {}) }}>
-          履歴はこの端末の中だけにあり、サーバーには送りません。地図・データは参考情報です。MICHILUは判定をしません。最終確認は、必ず役所の窓口・公的な資料で行ってください。
-        </p>
+        {!more && (
+          <p className={`${rise} mt-[16px] px-[4px] leading-[1.6]`} style={{ fontSize: 11.5, color: "rgba(255,255,255,0.8)", textShadow: ON_PHOTO, ...(intro ? delay(320) : {}) }}>
+            履歴はこの端末の中だけにあり、サーバーには送りません。地図・データは参考情報です。MICHILUは判定をしません。最終確認は、必ず役所の窓口・公的な資料で行ってください。
+          </p>
+        )}
       </section>
 
       <BodyPortal>
-        <ClearSheet at={sheet?.type === "clear" ? sheet.at : null} history={history} onClose={() => setSheet(null)} onClear={clearRange} />
+        <ClearSheet
+          state={sheet?.type === "clear" ? sheet : null}
+          history={history}
+          onClose={() => setSheet(null)}
+          onClear={clearRange}
+          onClearNarrowed={(n) => {
+            setSheet(null);
+            removeRows(n.rows, "fade");
+          }}
+        />
         <RowSheet
           state={sheet?.type === "row" ? sheet.g : null}
           isFavorite={isFavorite}
@@ -813,11 +919,11 @@ function SectionLabel({ label, count }: { label: string; count: number }) {
   );
 }
 
-/** 置いたときだけ浮き上がる箱（あとで on が変わっても動き直さない） */
-function Rise({ on, ms, className = "", style, children }: { on: boolean; ms: number; className?: string; style?: CSSProperties; children: ReactNode }) {
+/** 置いたときだけ浮き上がる箱（あとで on が変わっても動き直さない）。sec は章の見出しの目印（上の細いバーに、いまの章を出す） */
+function Rise({ on, ms, sec, className = "", style, children }: { on: boolean; ms: number; sec?: string; className?: string; style?: CSSProperties; children: ReactNode }) {
   const [anim] = useState(on);
   return (
-    <div className={`${anim ? "hist-rise" : ""} ${className}`} style={{ ...(anim ? delay(ms) : {}), ...style }}>
+    <div data-sec={sec} className={`${anim ? "hist-rise" : ""} ${className}`} style={{ ...(anim ? delay(ms) : {}), ...style }}>
       {children}
     </div>
   );
@@ -836,7 +942,7 @@ function Board({ on, ms, vt, children }: { on: boolean; ms: number; vt?: string;
 /** 並べ方（日付・市区町村。白い札が滑る） */
 function SortToggle({ byCity, onChange }: { byCity: boolean; onChange: (byCity: boolean) => void }) {
   return (
-    <div role="radiogroup" aria-label="並べ方" className="relative flex shrink-0 rounded-full" style={{ ...LIGHT_GLASS, width: 156, height: 34, padding: 3 }}>
+    <div role="radiogroup" aria-label="並べ方" data-vt="hist-sort" className="relative flex shrink-0 rounded-full" style={{ ...LIGHT_GLASS, width: 156, height: 34, padding: 3 }}>
       <span aria-hidden className="fav-thumb absolute rounded-full" style={{ top: 3, bottom: 3, left: 3, width: "calc(50% - 3px)", transform: byCity ? "translateX(100%)" : "none" }} />
       {(
         [
@@ -889,6 +995,7 @@ function HistRow({
   enter,
   delayMs,
   vt,
+  vtName,
   copyName,
   onOpen,
   onPick,
@@ -907,7 +1014,10 @@ function HistRow({
   leave?: Leave;
   enter: boolean;
   delayMs: number;
+  /** つながる動き（ホームの最近の検索）の名前 */
   vt?: string;
+  /** 並べ方・調べ方を変えるときの名前（画面に見えているときだけ付ける。HistoryPage の animateList） */
+  vtName: string;
   copyName: string;
   onOpen: (open: boolean) => void;
   onPick: () => void;
@@ -1064,6 +1174,7 @@ function HistRow({
   return (
     <li
       data-row={rowKey}
+      data-vt={vtName}
       className={`hist-row border-t border-white/[0.12] first:border-t-0 ${entered ? "hist-enter" : ""} ${leave ? "hist-leaving" : ""}`}
       style={{ ...(entered ? delay(delayMs) : {}), transitionDelay: leave ? `${leave.delay}ms` : undefined, viewTransitionName: vt }}
     >
@@ -1210,17 +1321,46 @@ function RowSheet({
   );
 }
 
-/** 「履歴を消す…」のシート：消す範囲（過去1時間・今日・今日と昨日・すべて）と件数 */
-function ClearSheet({ at, history, onClose, onClear }: { at: number | null; history: HistoryItem[]; onClose: () => void; onClear: (r: Range, at: number) => void }) {
-  // 件数は開いたときの時刻で数える（閉じる動きの間も同じ数を出しておく）
-  const [last, setLast] = useState(at ?? 0);
-  if (at !== null && at !== last) setLast(at);
-  const t = at ?? last;
+/**
+ * 「履歴を消す…」のシート：消す範囲（過去1時間・今日・今日と昨日・すべて）と件数（物件の数）。絞り込んでいるときは、いちばん上に
+ * 「絞り込んだ物件」（いま一覧に出ている物件だけ）
+ */
+function ClearSheet({
+  state,
+  history,
+  onClose,
+  onClear,
+  onClearNarrowed,
+}: {
+  state: ClearState | null;
+  history: HistoryItem[];
+  onClose: () => void;
+  onClear: (r: Range, at: number) => void;
+  onClearNarrowed: (n: Narrowed) => void;
+}) {
+  // 件数は開いたときの時刻で数える（閉じる動きの間も同じ中身を出しておく）
+  const [last, setLast] = useState<ClearState>(state ?? { at: 0, narrowed: null });
+  if (state && state !== last) setLast(state);
+  const { at: t, narrowed } = state ?? last;
   const counts = rangeCounts(history, t);
   return (
-    <Sheet title="履歴を消す" open={at !== null} onClose={onClose}>
+    <Sheet title="履歴を消す" open={state !== null} onClose={onClose}>
       <p className="text-[13px] leading-[1.6] text-muted">消す範囲を選んでください。消したあと5秒のあいだは、下の「元に戻す」で戻せます。お気に入りと確認の記録は消えません。</p>
       <ul className="mt-2 divide-y divide-line">
+        {narrowed && (
+          <li>
+            <button onClick={() => onClearNarrowed(narrowed)} className="flex w-full items-center gap-3 py-3.5 text-left active:bg-mint/50">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mint text-brand">
+                <Search className="h-[17px] w-[17px]" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold text-ink">絞り込んだ物件</span>
+                <span className="mt-0.5 block truncate text-[12px] text-muted">{narrowed.text}</span>
+              </span>
+              <span className="shrink-0 text-[13px] text-muted">{narrowed.rows.length}件</span>
+            </button>
+          </li>
+        )}
         {RANGES.map((r) => {
           const n = counts[r.key];
           const danger = r.key === "all";

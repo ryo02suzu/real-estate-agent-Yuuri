@@ -185,9 +185,12 @@ export function HomeScreen({
     risen = true;
   }, []);
   const riseClass = first ? "home-rise" : "";
+  // ほかのページから来たときの小さな浮き上がりも、置いたときに決める（履歴からのつながる動きで来たときは付けない。
+  // 動きが終わって morph が外れたときに付けると、ホームの中身が一瞬消えて出直して見えるので）
+  const [pageIn] = useState(() => !first && !morph);
 
   return (
-    <div ref={root} className={`app-touch relative flex flex-col text-white ${first || morph ? "" : "page-in"}`} style={{ minHeight: screen }}>
+    <div ref={root} className={`app-touch relative flex flex-col text-white ${pageIn ? "page-in" : ""}`} style={{ minHeight: screen }}>
       {/* ロゴと右上のメニュー */}
       <div className="relative flex items-start justify-between" style={{ padding: "16px 18px 0 20px" }}>
         <PhoneImg src="/home/logo-mark-white.webp" alt="MICHILU" width={802} height={159} draggable={false} className={`${riseClass} block`} style={{ height: 30, width: "auto", marginTop: 6, filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.3))" }} />
