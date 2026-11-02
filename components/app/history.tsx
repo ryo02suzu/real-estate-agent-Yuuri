@@ -1,6 +1,6 @@
 "use client";
 
-// スマホの下のメニューの「履歴」。お気に入り・書類・出力と同じ作り：画面いっぱいの背景（届く背景の絵。届くまでは時間帯の色の仮の背景。
+// スマホの下のメニューの「履歴」。お気に入り・書類・出力と同じ作り：画面いっぱいの背景（届いた住宅街の絵。朝・昼・夕方・夜で切り替える。
 // 下のメニューの後ろまで敷くので、components/app/mobile-app.tsx が HistoryBackdrop で画面のいちばん奥に置く）の上に、
 // ホームと同じ位置に見出し「履歴」と右上のメニュー（≡）、2行のひとこと（件数）、ホームと同じ検索欄（絞り込み）、写真を見せる空き、
 // 調べた物件の一覧（日付ごと・市区町村ごとの章。すりガラスの板。行に写真は付けない）。一覧の初めの3行は、ホームの最近の検索と同じ高さに来る。
@@ -13,7 +13,8 @@
 // いちばん下の「履歴を消す…」で、過去1時間・今日・今日と昨日・すべてを選んで消せる。
 // 動き（app/globals.css の .hist-*）：開くと背景がふわっと落ち着き、上から順に浮き上がり、行は少しずつ遅れて現れる。並べ方・調べ方を
 // 変えると、行が新しい位置へ滑る（View Transitions。.vt-hist）。ホームの「最近の検索」の「すべて見る」から来たときは、行と板と検索欄が
-// 滑ってつながる（home.tsx の VT）。≡ の「動きの演出」がオンのときは、背景がごくゆっくり寄る。動きを減らす設定では、位置の動きを止める。
+// 滑ってつながる（home.tsx の VT）。≡ の「動きの演出」がオンのときは、背景がごくゆっくり寄り、朝日・夕日・月の光がゆっくり揺れる。
+// 動きを減らす設定では、位置の動きを止める。
 // 並べ方・消す範囲・コピーする文・日時の書き方は lib/app/history-view.ts
 import { ArrowUpRight, Copy, FileText, Menu, MoreHorizontal, Search, Star, Trash2, X, type LucideIcon } from "lucide-react";
 import {
@@ -34,12 +35,12 @@ import {
 import { createPortal, flushSync } from "react-dom";
 import { copyLabel, copyText, fullDate, groupByProperty, inRange, KIND_LABEL, kindOf, markOf, matches, rangeCounts, RANGES, recordsText, sections, stamp, type Grouped, type Kind, type Range } from "@/lib/app/history-view";
 import { placeParts } from "@/lib/app/scene";
-import { dayPart } from "@/lib/app/sun";
+import { histPart, type HistPart } from "@/lib/app/sun";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import { allRecords, recordsTopics, type PropertyRecords } from "@/lib/records";
 import { latestResume } from "@/lib/resume";
 import { Sheet } from "../sheet";
-import { partNow, useDayLayers, useLayerEntry, type DayPart } from "./day-photo";
+import { partNow, useDayLayers, useLayerEntry } from "./day-photo";
 import { BOARD, LABEL, placeSubLine } from "./favorites";
 import { PhoneImg, ScaledInput } from "./frame";
 import { DARK_GLASS, HIT, LIGHT_GLASS, RECENT, SHADOW, useScreenHeight, VT } from "./home";
@@ -53,54 +54,67 @@ import { reducedMotion } from "./tokens";
 // ───────────────────────────── 背景 ─────────────────────────────
 
 /**
- * 届いた背景の写真（時間帯ごと。lib/app/sun.ts の dayPart で昼・夕方・夜を切り替える）。無い時間帯は、近い時間帯の写真を使う。
- * ar は写真の縦横比（幅÷高さ）、x・y は写真が画面より大きいときに切る位置（0〜1）、bg は読み込むまでの地の色、
- * top は時刻・電池の帯の色（写真のいちばん上に、上の暗いぼかしを重ねた色）。
- * 写真が届いたら public/history/ に置いて、ここに足す（それまでは仮の背景 PLACEHOLDER）
+ * 背景の写真（届いた住宅街の絵 4 枚。同じ通りを同じ場所から写した 朝・昼・夕方・夜。public/history/。941 幅の webp で、写真の情報は消してある）。
+ * 太陽の高さで切り替える（lib/app/sun.ts の histPart。朝は日の出の約 15 分前から約 1 時間 30 分後まで。夕方・夜の境目は書類・出力と同じ）。
+ * 構図が同じなので、時間帯が変わるときに重ねると、同じ通りの時間が進んだように見える。
+ * ar は写真の縦横比（幅÷高さ）、x・y は写真が画面より大きいときに切る位置（0〜1。通りが真ん中、朝日・夕日・月が右に入る位置）、
+ * bg は読み込むまでの地の色、top は時刻・電池の帯の色（写真のいちばん上に shade を重ねた色）、shade は見出し・一覧・下のメニューのための
+ * 暗いぼかし（空の明るい朝・昼・夕方は、見出しの白い字が読めるよう左上を暗くする）、glow は朝日・夕日・月の光（≡ の「動きの演出」がオンの
+ * ときだけ、ゆっくり明るさが揺れる。x・y は写真の中の %、w は写真の幅に対する %）
  */
-type HistPhoto = { src: string; srcSet?: string; sizes?: string; ar: number; x: number; y: number; bg: string; top: string };
-const PHOTOS: Partial<Record<DayPart, HistPhoto>> = {};
-/** 写真の無い時間帯に使う、近い時間帯の順 */
-const NEAR: Record<DayPart, DayPart[]> = { day: ["day", "evening", "night"], evening: ["evening", "day", "night"], night: ["night", "evening", "day"] };
-function photoFor(part: DayPart): HistPhoto | undefined {
-  for (const p of NEAR[part]) {
-    const ph = PHOTOS[p];
-    if (ph) return ph;
-  }
-  return undefined;
-}
-
-/**
- * 写真が届くまでの仮の背景（時間帯の空の色の重ね。見出しの白い字が読める暗さ）。paint は絵、bg は地の色、top は時刻・電池の帯の色
- */
-const PLACEHOLDER: Record<DayPart, { bg: string; top: string; paint: string }> = {
+type HistPhoto = { src: string; ar: number; x: number; y: number; bg: string; top: string; shade: string; glow?: { x: number; y: number; w: number; bg: string } };
+/** 下の方（一覧・下のメニュー）の暗さ（どの写真も同じ） */
+const LOW = "rgba(0,0,0,0) 52%, rgba(3,8,18,0.32) 78%, rgba(3,8,18,0.46) 100%";
+const PHOTOS: Record<HistPart, HistPhoto> = {
+  /** 朝：右の木の向こうから朝日が差し、もやのかかった山並みと通学の人（1438×2576 を縮小）。空が明るいので左上を強めに暗くする */
+  morning: {
+    src: "/history/morning.webp",
+    ar: 941 / 1686,
+    x: 0.62,
+    y: 0.4,
+    bg: "#5f6466",
+    top: "#4f5a63",
+    shade: `radial-gradient(95% 30% at 22% 8%, rgba(12,26,46,0.5) 0%, rgba(12,26,46,0.22) 55%, rgba(12,26,46,0) 100%), linear-gradient(180deg, rgba(10,22,40,0.46) 0%, rgba(10,22,40,0.2) 16%, rgba(10,22,40,0.06) 28%, rgba(0,0,0,0) 40%, ${LOW})`,
+    // 写真に朝日の光の筋がもうあるので、光は控えめに（背の低い画面では朝日が検索欄の後ろに来る）
+    glow: { x: 96.5, y: 27, w: 48, bg: "radial-gradient(circle, rgba(255,236,190,0.38) 0%, rgba(255,214,150,0.14) 24%, rgba(255,200,130,0.04) 46%, rgba(255,200,130,0) 64%)" },
+  },
+  /** 昼：青空と夏の雲、日傘の人と自転車 */
   day: {
-    bg: "#34608f",
-    top: "#1f3f66",
-    paint:
-      "radial-gradient(85% 50% at 82% 4%, rgba(255,246,222,0.42) 0%, rgba(255,246,222,0) 62%), radial-gradient(70% 38% at 8% 64%, rgba(140,200,255,0.22) 0%, rgba(140,200,255,0) 70%), linear-gradient(180deg, #2a5688 0%, #4a80bb 32%, #6796c4 50%, #3e6389 70%, #1b2d45 100%)",
+    src: "/history/day.webp",
+    ar: 941 / 1672,
+    x: 0.5,
+    y: 0.4,
+    bg: "#4f6d8c",
+    top: "#3a5c80",
+    shade: `radial-gradient(95% 28% at 22% 8%, rgba(10,30,60,0.36) 0%, rgba(10,30,60,0.14) 55%, rgba(10,30,60,0) 100%), linear-gradient(180deg, rgba(8,22,44,0.38) 0%, rgba(8,22,44,0.14) 16%, rgba(0,0,0,0) 32%, ${LOW})`,
   },
+  /** 夕方：山の向こうへ沈む夕日（右）と、家へ帰る人たち */
   evening: {
-    bg: "#4a3b5c",
-    top: "#262b4a",
-    paint:
-      "radial-gradient(80% 40% at 22% 47%, rgba(255,196,128,0.5) 0%, rgba(255,150,100,0.16) 45%, rgba(255,140,90,0) 75%), linear-gradient(180deg, #262e55 0%, #4f4675 28%, #a8657d 46%, #d98f6e 57%, #6a4458 74%, #211a2b 100%)",
+    src: "/history/evening.webp",
+    ar: 941 / 1670,
+    x: 0.6,
+    y: 0.4,
+    bg: "#5a4a50",
+    top: "#4a4352",
+    shade: `radial-gradient(95% 28% at 22% 8%, rgba(20,18,40,0.32) 0%, rgba(20,18,40,0.12) 55%, rgba(20,18,40,0) 100%), linear-gradient(180deg, rgba(14,16,34,0.36) 0%, rgba(14,16,34,0.12) 16%, rgba(0,0,0,0) 32%, ${LOW})`,
+    glow: { x: 88, y: 22.3, w: 56, bg: "radial-gradient(circle, rgba(255,214,150,0.6) 0%, rgba(255,170,100,0.24) 20%, rgba(255,140,90,0.06) 45%, rgba(255,140,90,0) 65%)" },
   },
+  /** 夜：満月と、街灯・窓の明かりの通り */
   night: {
-    bg: "#0d1729",
-    top: "#0a1222",
-    paint:
-      "radial-gradient(58% 32% at 80% 15%, rgba(160,182,255,0.2) 0%, rgba(160,182,255,0) 70%), radial-gradient(90% 38% at 28% 80%, rgba(255,176,96,0.14) 0%, rgba(255,176,96,0) 70%), linear-gradient(180deg, #0a1427 0%, #12264a 42%, #172b4d 60%, #0a1222 100%)",
+    src: "/history/night.webp",
+    ar: 941 / 1672,
+    x: 0.6,
+    y: 0.4,
+    bg: "#151b24",
+    top: "#121922",
+    shade: `linear-gradient(180deg, rgba(5,14,32,0.34) 0%, rgba(5,14,32,0) 28%, ${LOW})`,
+    glow: { x: 81, y: 9.5, w: 26, bg: "radial-gradient(circle, rgba(232,240,255,0.55) 0%, rgba(205,220,255,0.24) 16%, rgba(190,205,255,0.08) 38%, rgba(190,205,255,0) 64%)" },
   },
 };
 
-/** 背景の上と下を少し暗くする（見出しの白い字と、一覧・下のメニューのため） */
-const SHADE = "linear-gradient(180deg, rgba(5,14,32,0.34) 0%, rgba(5,14,32,0) 28%, rgba(0,0,0,0) 52%, rgba(3,8,18,0.32) 78%, rgba(3,8,18,0.46) 100%)";
-
 /** 履歴のページの時刻・電池の帯の色（いまの時間帯の背景のいちばん上の色） */
 export function historyTop(): string {
-  const p = partNow(dayPart);
-  return photoFor(p)?.top ?? PLACEHOLDER[p].top;
+  return PHOTOS[partNow(histPart)].top;
 }
 
 /** スクロールで背景が寄りきるまでの量（px） */
@@ -113,7 +127,7 @@ const PARALLAX_RANGE = 360;
  */
 export function HistoryBackdrop({ scroller, motion }: { scroller: RefObject<HTMLElement | null>; motion: boolean }) {
   const box = useRef<HTMLDivElement>(null);
-  const { shown, layers, swapping, done } = useDayLayers(dayPart);
+  const { shown, layers, swapping, done } = useDayLayers(histPart);
   useEffect(() => {
     const el = box.current;
     const sc = scroller.current;
@@ -134,48 +148,40 @@ export function HistoryBackdrop({ scroller, motion }: { scroller: RefObject<HTML
     };
   }, [scroller]);
   return (
-    <div ref={box} aria-hidden data-part={shown} className={`hist-backdrop pointer-events-none absolute inset-0 overflow-hidden ${motion ? "hist-alive" : ""}`} style={{ background: photoFor(shown)?.bg ?? PLACEHOLDER[shown].bg }}>
+    <div ref={box} aria-hidden data-part={shown} className={`hist-backdrop pointer-events-none absolute inset-0 overflow-hidden ${motion ? "hist-alive" : ""}`} style={{ background: PHOTOS[shown].bg }}>
       {layers.map((p) => (
-        <HistScene key={p} part={p} swap={p === shown && swapping} onShown={done} />
+        <HistScene key={p} part={p} swap={p === shown && swapping} onShown={done} motion={motion} />
       ))}
-      <div className="absolute inset-0" style={{ background: SHADE }} />
       <div className="hist-dim absolute inset-0" />
       <div className="hist-focus absolute inset-0" />
     </div>
   );
 }
 
-/** 1枚の背景（写真か仮の背景）。写真は読み込めてから現れる（components/app/day-photo.ts の useLayerEntry） */
-function HistScene({ part, swap, onShown }: { part: DayPart; swap: boolean; onShown: () => void }) {
-  const p = photoFor(part);
-  const entry = useLayerEntry(swap, onShown);
-  const { onLoad } = entry;
-  // 仮の背景は読み込むものが無いので、すぐ現れる
-  useEffect(() => {
-    if (!p) onLoad();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 置いたときに1回だけ（onLoad は毎回作り直される）
-  }, [p]);
+/**
+ * 1枚の背景（写真と、その写真の暗いぼかし・朝日・夕日・月の光）。写真は読み込めてから現れる（components/app/day-photo.ts の useLayerEntry）。
+ * ぼかしは写真ごとに違うので、写真と一緒に重なって入れ替わる
+ */
+function HistScene({ part, swap, onShown, motion }: { part: HistPart; swap: boolean; onShown: () => void; motion: boolean }) {
+  const p = PHOTOS[part];
+  const { className, onLoad } = useLayerEntry(swap, onShown);
   return (
-    <div className={`absolute inset-0 ${entry.className}`}>
-      <div className="hist-stage" style={p ? ({ "--hist-ar": p.ar, "--hist-x": p.x, "--hist-y": p.y } as CSSProperties) : undefined}>
+    <div className={`absolute inset-0 ${className}`}>
+      <div className="hist-stage" style={{ "--hist-ar": p.ar, "--hist-x": p.x, "--hist-y": p.y } as CSSProperties}>
         <div className="hist-drift absolute inset-0">
-          {p ? (
-            <PhoneImg
-              src={p.src}
-              srcSet={p.srcSet}
-              sizes={p.sizes}
-              alt=""
-              draggable={false}
-              decoding="async"
-              onLoad={onLoad}
-              className="absolute inset-0 h-full w-full object-cover"
-              style={{ objectPosition: `${p.x * 100}% ${p.y * 100}%` }}
-            />
-          ) : (
-            <div className="absolute inset-0" style={{ background: PLACEHOLDER[part].paint }} />
-          )}
+          <PhoneImg
+            src={p.src}
+            alt=""
+            draggable={false}
+            decoding="async"
+            onLoad={onLoad}
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ objectPosition: `${p.x * 100}% ${p.y * 100}%` }}
+          />
+          {motion && p.glow && <span className="hist-glow" style={{ left: `${p.glow.x}%`, top: `${p.glow.y}%`, width: `${p.glow.w}%`, background: p.glow.bg }} />}
         </div>
       </div>
+      <div className="absolute inset-0" style={{ background: p.shade }} />
     </div>
   );
 }
@@ -751,7 +757,7 @@ export function HistoryPage({
             </button>
           </div>
         )}
-        <p className={`${rise} mt-[16px] px-[4px] leading-[1.6]`} style={{ fontSize: 11.5, color: "rgba(255,255,255,0.66)", textShadow: SHADOW, ...(intro ? delay(320) : {}) }}>
+        <p className={`${rise} mt-[16px] px-[4px] leading-[1.6]`} style={{ fontSize: 11.5, color: "rgba(255,255,255,0.8)", textShadow: ON_PHOTO, ...(intro ? delay(320) : {}) }}>
           履歴はこの端末の中だけにあり、サーバーには送りません。地図・データは参考情報です。MICHILUは判定をしません。最終確認は、必ず役所の窓口・公的な資料で行ってください。
         </p>
       </section>
@@ -790,11 +796,17 @@ export function HistoryPage({
 }
 
 /** 章の見出し（ホームの「最近の検索」と同じ控えめな白の字）と件数 */
+/**
+ * 写真の上にじかに置く字（章の見出し・下の一言）の影。朝・昼の明るい屋根や道の上でも読めるよう、字のまわりをぼかして暗くする
+ * （板を敷かずに、写真を隠さない）
+ */
+const ON_PHOTO = "0 1px 2px rgba(0,0,0,0.55), 0 0 10px rgba(0,0,0,0.45), 0 0 22px rgba(0,0,0,0.3)";
+
 function SectionLabel({ label, count }: { label: string; count: number }) {
   return (
-    <h2 className="flex min-w-0 items-baseline gap-[8px] font-semibold leading-[1.3]" style={{ ...LABEL, textShadow: SHADOW }}>
+    <h2 className="flex min-w-0 items-baseline gap-[8px] font-semibold leading-[1.3]" style={{ ...LABEL, color: "rgba(255,255,255,0.92)", textShadow: ON_PHOTO }}>
       <span className="truncate">{label}</span>
-      <span className="shrink-0 font-medium" style={{ fontSize: 12.5, letterSpacing: 0.4, color: "rgba(255,255,255,0.5)" }}>
+      <span className="shrink-0 font-medium" style={{ fontSize: 12.5, letterSpacing: 0.4, color: "rgba(255,255,255,0.78)" }}>
         {count}件
       </span>
     </h2>

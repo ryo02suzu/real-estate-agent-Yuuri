@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AFTERNOON_FROM, BASE, blend, dayPart, favPart, HOME_CAMERA, layerOpacity, light, overrideTime, PHOTO_ORDER, projectSun, solar } from "./sun";
+import { AFTERNOON_FROM, BASE, blend, dayPart, favPart, histPart, HOME_CAMERA, layerOpacity, light, MORNING_UNTIL, overrideTime, PHOTO_ORDER, projectSun, solar } from "./sun";
 
 // 国立天文台「こよみの計算」東京（35.6581, 139.7414）2026年の日の出入り・南中（分と 0.1° に丸めた値）
 const NAOJ = { lat: 35.6581, lng: 139.7414, utcOffset: 540 };
@@ -127,6 +127,38 @@ describe("favPart（お気に入りの写真の昼・昼と夕方のあいだ・
     expect(favPart(5.9, false)).toBe("evening");
     expect(favPart(-7, false)).toBe("night");
     expect(dayPart(10, false)).toBe("day");
+  });
+});
+
+describe("histPart（履歴の写真の朝・昼・夕方・夜）", () => {
+  const at = (ymd: string, hm: string) => {
+    const s = solar(jst(ymd, hm));
+    return histPart(s.altitude, s.rising);
+  };
+  it("11 月 1 日：夜 → 5:49 から朝 → 7:34 から昼 → 16:12 から夕方 → 17:15 から夜", () => {
+    expect(at("2026-11-01", "05:40")).toBe("night");
+    expect(at("2026-11-01", "05:55")).toBe("morning");
+    expect(at("2026-11-01", "07:30")).toBe("morning");
+    expect(at("2026-11-01", "07:40")).toBe("day");
+    expect(at("2026-11-01", "16:20")).toBe("evening");
+    expect(at("2026-11-01", "17:20")).toBe("night");
+  });
+  it("季節で朝の時刻が変わる（夏至は 4:11〜5:56、冬至は 6:33〜8:31）", () => {
+    expect(at("2026-06-21", "04:05")).toBe("night");
+    expect(at("2026-06-21", "04:20")).toBe("morning");
+    expect(at("2026-06-21", "06:00")).toBe("day");
+    expect(at("2026-12-22", "06:40")).toBe("morning");
+    expect(at("2026-12-22", "08:25")).toBe("morning");
+    expect(at("2026-12-22", "08:40")).toBe("day");
+  });
+  it("沈んでいく低い太陽は朝にしない。夕方・夜の境目は書類・出力（dayPart）と同じ", () => {
+    expect(histPart(10, true)).toBe("morning");
+    expect(histPart(MORNING_UNTIL, true)).toBe("day");
+    expect(histPart(-2, true)).toBe("morning");
+    expect(histPart(-4, true)).toBe("night");
+    expect(histPart(10, false)).toBe("day");
+    expect(histPart(5.9, false)).toBe("evening");
+    expect(histPart(-7, false)).toBe("night");
   });
 });
 

@@ -606,6 +606,16 @@ body {
     opacity: 0;
   }
 }
+@keyframes hist-glow {
+  from {
+    opacity: 0.45;
+    transform: translate(-50%, -50%) scale(0.94);
+  }
+  to {
+    opacity: 0.85;
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+}
 @keyframes docs-drift {
   to {
     transform: scale(1.05) translate(-0.6%, -0.4%);
@@ -666,6 +676,16 @@ body {
 .hist-dim {
   background: rgba(3, 8, 20, 0.55);
   opacity: calc(var(--hist-p, 0) * 0.8);
+}
+/* 朝日・夕日・月の光（≡ の「動きの演出」がオンのときだけ置く。写真の中の位置。明るさがゆっくり揺れる） */
+.hist-glow {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  mix-blend-mode: screen;
+  opacity: 0.6;
+  pointer-events: none;
 }
 .hist-focus {
   background: rgba(4, 10, 24, 0.32);
@@ -748,6 +768,9 @@ body {
   .hist-alive .hist-drift {
     animation: docs-drift 46s ease-in-out infinite alternate;
     transform-origin: 50% 42%;
+  }
+  .hist-alive .hist-glow {
+    animation: hist-glow 7.5s ease-in-out infinite alternate;
   }
   .hist-rise {
     animation: home-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;

@@ -1,5 +1,6 @@
-// 時間帯で背景の写真を切り替える仕組み（書類・出力 components/app/docs.tsx と、お気に入り components/app/favorites.tsx）。
-// 時間帯は太陽の高さで決める（lib/app/sun.ts。書類・出力は dayPart の昼・夕方・夜、お気に入りは favPart の昼・昼と夕方のあいだ・夕方・夜。
+// 時間帯で背景の写真を切り替える仕組み（書類・出力 components/app/docs.tsx、お気に入り components/app/favorites.tsx、履歴 components/app/history.tsx）。
+// 時間帯は太陽の高さで決める（lib/app/sun.ts。書類・出力は dayPart の昼・夕方・夜、お気に入りは favPart の昼・昼と夕方のあいだ・夕方・夜、
+// 履歴は histPart の朝・昼・夕方・夜。
 // URL の #t= で日時を固定していればその時刻）。空を入れ直すたび（1分ごと・戻ったとき・#t= が変わったとき。components/app/sky.tsx の useSkyClock）に見直す。
 // 時間帯が変わったら、前の写真の上に新しい写真をゆっくり重ねてから前のを外す（構図の違う写真なので、途中で混ぜたままにはしない）。
 // 現れ方は app/globals.css の .day-intro（初めて開いたとき：ふわっと落ち着く）と .day-swap（入れ替わり：ゆっくり重なる）

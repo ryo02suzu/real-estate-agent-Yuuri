@@ -134,6 +134,22 @@ export function favPart(altitude: number, rising: boolean): FavPart {
   return p === "day" && !rising && altitude < AFTERNOON_FROM ? "afternoon" : p;
 }
 
+/** 履歴のページの写真の時間帯（届いた住宅街の写真 4 枚：朝・昼・夕方・夜。同じ通りを同じ場所から写したもの） */
+export type HistPart = DayPart | "morning";
+
+/** 朝が終わる太陽の高さ（度。昇っていくとき。日の出の約 1 時間 30 分後） */
+export const MORNING_UNTIL = 16;
+
+/**
+ * 太陽の高さで、履歴のページの写真を選ぶ。書類・出力（dayPart）の昼のうち、太陽が昇っていく途中で +16° より低いあいだ
+ * （日の出の約 15 分前の −3° から、日の出の約 1 時間 30 分後まで）を朝にする。夕方・夜の境目は dayPart と同じ。
+ * 時刻は sun.test.ts（東京駅で 11 月 1 日・6 月 21 日・12 月 22 日）
+ */
+export function histPart(altitude: number, rising: boolean): HistPart {
+  const p = dayPart(altitude, rising);
+  return p === "day" && rising && altitude < MORNING_UNTIL ? "morning" : p;
+}
+
 /** 写真の重ね順（下から上）。components/app/sky.tsx はこの順に重ねる */
 export const PHOTO_ORDER = ["night", "twilight", "dawn", "golden", "day"] as const;
 
