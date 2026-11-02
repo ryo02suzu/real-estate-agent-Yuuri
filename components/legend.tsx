@@ -10,7 +10,7 @@ import { Sheet } from "./sheet";
 function Line({ color }: { color: string }) {
   return (
     <span
-      className="mt-[7px] inline-block h-[5px] w-5 shrink-0 rounded-full border border-black/10 [@media(max-height:720px)]:mt-[6px]"
+      className="mt-[7px] inline-block h-[5px] w-5 shrink-0 rounded-full border border-black/10 short:mt-[6px]"
       style={{ background: color }}
     />
   );
@@ -27,7 +27,7 @@ export function LegendList({ legend, compact }: { legend: LegendEntry[]; compact
             compact
               ? "text-[11px] leading-[1.55]"
               : // 背の低い画面では、項目の多い凡例（豊島区など）もシートに収まるよう詰める
-                "py-1.5 text-[12.5px] leading-[1.5] [@media(max-height:720px)]:py-1 [@media(max-height:720px)]:text-[12px] [@media(max-height:720px)]:leading-[1.4]"
+                "py-1.5 text-[12.5px] leading-[1.5] short:py-1 short:text-[12px] short:leading-[1.4]"
           } text-ink`}
         >
           <Line color={e.color} />

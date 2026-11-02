@@ -12,17 +12,18 @@ export function HistoryChips({ items, onSelect, onShowAll }: { items: HistoryIte
           <ClockIcon className="h-[18px] w-[18px] text-brand-light" />
           直近の検索履歴
         </h2>
-        <button onClick={onShowAll} className="flex items-center gap-0.5 text-[11px] tracking-[0.08em] text-muted hover:text-ink">
+        {/* mui-hit・mui-chips：スマホの新UIだけ、押せる範囲を 44px 以上に広げる（見た目は変えない。app/globals.css。PC には効かない） */}
+        <button onClick={onShowAll} className="mui-hit flex items-center gap-0.5 text-[11px] tracking-[0.08em] text-muted hover:text-ink">
           すべて見る
           <ChevronRightIcon className="h-3.5 w-3.5" />
         </button>
       </div>
-      <ul className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1.5">
+      <ul className="mui-chips no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1.5">
         {items.map((h) => (
           <li key={historyKey(h)} className="shrink-0">
             <button
               onClick={() => onSelect(h)}
-              className="flex max-w-[13rem] items-center gap-1.5 rounded-full border border-line/60 bg-white px-3 py-1.5 text-[11.5px] text-ink shadow-soft hover:bg-mint/60"
+              className="mui-hit flex max-w-[13rem] items-center gap-1.5 rounded-full border border-line/60 bg-white px-3 py-1.5 text-[11.5px] text-ink shadow-soft hover:bg-mint/60"
             >
               {/* 地図で選んだ地点は地図のアイコン */}
               {h.ll ? <MapIcon className="h-3.5 w-3.5 shrink-0 text-ink/70" /> : <PinIcon className="h-3.5 w-3.5 shrink-0 text-ink/70" />}

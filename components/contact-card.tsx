@@ -19,7 +19,7 @@ export function ContactCard({ contact, city, address }: { contact: Contact; city
       <h3 className="flex items-center gap-2 border-b border-line/70 pb-2 text-[13px] font-semibold text-ink">
         <PhoneIcon className="h-4 w-4 text-brand-light" />
         お問い合わせ先
-        <button onClick={() => setMemo(true)} className="ml-auto flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 text-[11px] font-normal text-brand">
+        <button onClick={() => setMemo(true)} className="mui-hit ml-auto flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 text-[11px] font-normal text-brand">
           <NoteIcon className="h-3.5 w-3.5" />
           窓口で聞くこと
         </button>
@@ -36,11 +36,11 @@ export function ContactCard({ contact, city, address }: { contact: Contact; city
         {contact.note && (
           <>
             <dt className="text-muted">備考</dt>
-            {/* スマホでは2行（背の低い画面・入りきらないときは1行）に省略し、タップで全文を出す（画面をスクロールさせない） */}
+            {/* スマホは省略せず全文を出す（パネルの中でスクロールして読む）。PC は背の低い窓だけ1行に省略し、タップで全文を出す */}
             <dd className="min-w-0">
               <button onClick={() => setNoteOpen(true)} className="flex w-full gap-1.5 text-left text-[#8a4f3a]">
                 <AlertIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span className="min-w-0 line-clamp-2 lg:line-clamp-none short:truncate">{contact.note}</span>
+                <span className="min-w-0 short:truncate">{contact.note}</span>
               </button>
             </dd>
           </>
@@ -111,8 +111,8 @@ function InquirySheet({ open, onClose, address, dept }: { open: boolean; onClose
   return (
     <Sheet title="窓口で聞くこと" open={open} onClose={onClose}>
       <p className="text-[12px] text-muted">{dept}</p>
-      <h4 className="mb-1.5 mt-4 text-[13px] font-semibold text-ink [@media(max-height:720px)]:mt-2.5 [@media(max-height:720px)]:mb-1">持っていくもの</h4>
-      <ul className="space-y-1 text-[13px] text-ink [@media(max-height:720px)]:space-y-0 [@media(max-height:720px)]:text-[12px]">
+      <h4 className="mb-1.5 mt-4 text-[13px] font-semibold text-ink short:mt-2.5 short:mb-1">持っていくもの</h4>
+      <ul className="space-y-1 text-[13px] text-ink short:space-y-0 short:text-[12px]">
         {BRING.map((b) => (
           <li key={b} className="flex gap-2">
             <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-light" />
@@ -120,8 +120,8 @@ function InquirySheet({ open, onClose, address, dept }: { open: boolean; onClose
           </li>
         ))}
       </ul>
-      <h4 className="mb-1.5 mt-4 text-[13px] font-semibold text-ink [@media(max-height:720px)]:mt-2.5 [@media(max-height:720px)]:mb-1">聞くこと</h4>
-      <ol className="space-y-1.5 text-[13px] text-ink [@media(max-height:720px)]:space-y-0.5 [@media(max-height:720px)]:text-[12px]">
+      <h4 className="mb-1.5 mt-4 text-[13px] font-semibold text-ink short:mt-2.5 short:mb-1">聞くこと</h4>
+      <ol className="space-y-1.5 text-[13px] text-ink short:space-y-0.5 short:text-[12px]">
         {ASK.map((a, i) => (
           <li key={a} className="flex gap-2">
             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-mint text-[11px] text-brand">{i + 1}</span>
@@ -129,7 +129,7 @@ function InquirySheet({ open, onClose, address, dept }: { open: boolean; onClose
           </li>
         ))}
       </ol>
-      <button onClick={copy} className="bg-gold mt-5 [@media(max-height:720px)]:mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-[14px] font-semibold text-white">
+      <button onClick={copy} className="bg-gold mt-5 short:mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-[14px] font-semibold text-white">
         <CopyIcon className="h-4 w-4" />
         {copied ? "コピーしました" : "FAX・メール用の依頼文をコピー"}
       </button>
