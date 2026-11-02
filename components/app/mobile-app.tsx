@@ -995,6 +995,8 @@ export function MobileApp(props: MobileAppProps) {
           forgetBack();
           setOpening(null);
           setHistRestore(snap);
+          // 物件のレポートのシートが開いたままほかのページへ移らない
+          if (k !== "home") setReport(false);
           if (k === "home" && page === "home") {
             if (shown) props.onHome();
             else scroller.current?.scrollTo({ top: 0, behavior: "smooth" });

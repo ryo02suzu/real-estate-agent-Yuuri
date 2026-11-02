@@ -40,7 +40,9 @@ export function ActionBar({ primary, secondary = [], hidden = false, dim = false
   );
   return (
     <div className="action-bar pointer-events-none absolute inset-x-0 bottom-0 flex justify-center" data-hidden={hidden ? "1" : "0"} data-dim={dim ? "1" : "0"} aria-hidden={hidden}>
-      <div className="pointer-events-auto relative" style={{ width: ART_W, zoom: ZOOM }}>
+      {/* 隠れている間（ほかのページ・文字を入れている間）は、指を受けない：下へ滑って下のメニューに重なるので、受けると見えないボタンが
+          押される（下のメニューの「検索」の所でレポートのシートが開き、「履歴」の所で★が切り替わっていた） */}
+      <div className={`relative ${hidden ? "pointer-events-none" : "pointer-events-auto"}`} style={{ width: ART_W, zoom: ZOOM }}>
         <div className="mx-[14px] mb-[10px] flex items-center gap-[6px] rounded-full p-[5px]" style={DARK_GLASS}>
           {primary &&
             (primary.href ? (
