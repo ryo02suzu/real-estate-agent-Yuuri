@@ -11,9 +11,9 @@ import { distanceText, kindText, priceText, type LandPriceHit } from "./roadmap/
 import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
 import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark, type Estimated } from "./roadmap/parcel";
 import type { NearbyRoad } from "./roadmap/road-read";
-import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
+import { schoolCredit, schoolGaps, schoolGapShort, schoolLine, type Schools } from "./roadmap/school";
 import { POI_NOTE, poiCredit, poiWalkText, type PoiWalk } from "./roadmap/poi";
-import { lineLabel, STATION_CREDIT, type StationWalk } from "./roadmap/walk";
+import { lineLabel, STATION_CREDIT, TO_LABEL, type StationWalk } from "./roadmap/walk";
 import { CHIBANZU_NOTE, chibanzuFor } from "./roadmap/chibanzu";
 import { HOUREI_CREDIT, HOUREI_LAWS, houreiAsOf, houreiCaution, houreiGroups, houreiNotesLine, houreiOffice, houreiOfficeAll, PREF_NAMES, type Hourei, type HoureiKind } from "./roadmap/hourei";
 import { isekiFor } from "./roadmap/iseki";
@@ -253,7 +253,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     outline.push({
       label: "交通",
       value: `${s.lines.map(lineLabel).join("・")}「${s.name}」駅 ${s.routed ? `徒歩約${s.minutes}分` : `直線約${(s.meters / 1000).toFixed(1)}km`}`,
-      note: s.routed ? `道路距離 約${Math.round(s.meters / 10) * 10}m・駅の出入口までではない目安` : "歩いて行ける範囲に駅なし・直線距離",
+      note: s.routed ? `道路距離 約${Math.round(s.meters / 10) * 10}m（${TO_LABEL[s.to ?? "platform"]}）・地図から出した目安` : "歩いて行ける範囲に駅なし・直線距離",
       check: true,
     });
   const y = zoning?.zoning.youto[0];
@@ -261,6 +261,9 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   if (zoning?.zoning.bouka) outline.push({ label: "防火指定", value: zoning.zoning.bouka });
   if (schools?.elementary) outline.push({ label: "小学校区", value: schoolLine(schools.elementary) });
   if (schools?.junior) outline.push({ label: "中学校区", value: schoolLine(schools.junior) });
+  // 出せなかった学校区は、確かめる先を【要確認】で
+  for (const g of schools ? schoolGaps(result.municipality.codes[0], schools) : [])
+    outline.push({ label: g.label, value: `${result.municipality.name}の教育委員会で確認`, note: `データなし（${schoolGapShort(g.why, result.municipality.name)}）`, check: true });
   const hit = building?.hit;
   if (hit) outline.push({ label: "建物（PLATEAU）", value: `${buildingSummary(hit.building)}${hit.building.height ? `・高さ約${hit.building.height.toFixed(1)}m` : ""}`, note: "登記・建築確認の内容とは異なることがある", check: true });
   const near = (landPrice ?? [])[0];

@@ -12,7 +12,7 @@ import { ratioHint } from "@/lib/app/ratio-hint";
 import type { Triage } from "@/lib/app/triage";
 import { usageShort } from "@/lib/roadmap/building";
 import { chibanLabel, kuikiLabelFrom, parcelMark, pickedChibanText } from "@/lib/roadmap/parcel";
-import { schoolShort } from "@/lib/roadmap/school";
+import { schoolGaps, schoolGapShort, schoolShort } from "@/lib/roadmap/school";
 import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
 import { addressOffLot, pickKey, registryNeighbors } from "../parcel-card";
 import { useCopy } from "../use-copy";
@@ -41,6 +41,11 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
   const roughArea = !!parcel && !!(parcel.estimated || parcel.sanko);
   const st = stations.status === "ok" ? stations.stations[0] : undefined;
   const school = schools.status === "ok" ? schools.schools.elementary : undefined;
+  // 小学校区が無いわけ（利用条件で出せない市・国のデータに無い市・地点の区域が無い）
+  const schoolWhy =
+    !school && (schools.status === "ok" || schools.status === "none")
+      ? schoolGaps(result.municipality.codes[0], schools.status === "ok" ? schools.schools : null).find((g) => g.key === "es")?.why
+      : undefined;
   const hit = building.status === "ok" ? building.result.hit : undefined;
   // 用途地域のデータに建ぺい率・容積率が無い市は、近くの同じ用途地域の地価公示などの値を参考に出す
   const hint = y && (!y.bcr || !y.far) && landPrice.status === "ok" ? ratioHint(y.name, landPrice.hits) : undefined;
@@ -120,8 +125,8 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
           <GCell
             label="小学校区"
             value={schools.status === "loading" ? <GFaint /> : school ? schoolShort(school.name) : <GFaint>{schools.status === "error" ? "読み込めず" : "データなし"}</GFaint>}
-            sub={school ? (school.walk ? `徒歩${school.walk.minutes}分` : school.owner ? `${school.owner}立` : "小学校区") : ""}
-            onClick={schools.status === "ok" ? () => open("schools") : undefined}
+            sub={school ? (school.walk ? `徒歩${school.walk.minutes}分` : school.owner ? `${school.owner}立` : "小学校区") : schoolWhy ? schoolGapShort(schoolWhy, result.municipality.name) : ""}
+            onClick={schools.status === "ok" || schools.status === "none" ? () => open("schools") : undefined}
           />
         </div>
       </section>

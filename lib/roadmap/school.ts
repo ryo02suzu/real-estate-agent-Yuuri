@@ -2,7 +2,7 @@
 // 地点を含む区域の学校名・設置者・所在地と、学校までの距離（道路をたどった徒歩の目安。たどれなければ直線）を出す。区域は市区町村の教育委員会の資料をもとにした令和5年度の
 // データで、見直されることがある。指定校は教育委員会で確かめるよう添える（市区町村によってはデータの利用条件でもそう求めている）
 import type { LngLat, Polygon } from "./parcel";
-import { SCHOOL_CREDIT } from "./school-data";
+import { SCHOOL_CREDIT, schoolGap, type SchoolKey } from "./school-data";
 import { ROAD_CREDIT, routedOk, walkMinutes, walkTo } from "./walk";
 import { inPolygon } from "./zoning";
 
@@ -120,4 +120,54 @@ export function schoolCredit(s: Schools): string {
 /** 短い名前（「戸塚第二小」）。スマホの狭い所に */
 export function schoolShort(name: string): string {
   return name.replace(/小学校$/, "小").replace(/中学校$/, "中");
+}
+
+// ---- 出せなかった学校区 ----
+
+/** 出せなかったわけ：terms 国のデータの利用条件で出せない市区町村・absent 国のデータに無い市区町村・outside 地点を含む区域がデータに無い */
+export type SchoolGapWhy = "terms" | "absent" | "outside";
+export type SchoolGapItem = { key: SchoolKey; label: "小学校区" | "中学校区"; why: SchoolGapWhy };
+
+/**
+ * 地点で出せなかった学校区（小学校区・中学校区）とわけ。muniCd は地点の市区町村（政令市は区のコードでもよい）。
+ * schools は地点で見つかった学校区（データの無い所では空か null）
+ */
+export function schoolGaps(muniCd: string, schools: Schools | null | undefined): SchoolGapItem[] {
+  const out: SchoolGapItem[] = [];
+  for (const [key, label, hit] of [
+    ["es", "小学校区", schools?.elementary],
+    ["jh", "中学校区", schools?.junior],
+  ] as const) {
+    if (hit) continue;
+    out.push({ key, label, why: schoolGap(muniCd, key) ?? "outside" });
+  }
+  return out;
+}
+
+/** 短いわけ（「利用条件で出せない市」「国のデータに無い市」「この地点の区域がデータに無い」）。市区町村の最後の字で「市・区・町・村」 */
+export function schoolGapShort(why: SchoolGapWhy, city: string): string {
+  const unit = /[市区町村]$/.test(city) ? city.slice(-1) : "市区町村";
+  return why === "terms" ? `利用条件で出せない${unit}` : why === "absent" ? `国のデータに無い${unit}` : "この地点の区域がデータに無い";
+}
+
+/**
+ * わけの説明（同じわけはまとめる）。「桐生市の小学校区は、国のデータ（国土数値情報）の利用条件で、このアプリには出せません。」
+ * 最後に「指定校は〇〇市の教育委員会で確かめてください。」
+ */
+export function schoolGapText(gaps: SchoolGapItem[], city: string): string {
+  if (!gaps.length) return "";
+  const parts: string[] = [];
+  for (const why of ["terms", "absent", "outside"] as const) {
+    const g = gaps.filter((x) => x.why === why);
+    if (!g.length) continue;
+    const what = g.length === 2 ? "小学校区・中学校区" : g[0].label;
+    parts.push(
+      why === "terms"
+        ? `${city}の${what}は、国のデータ（国土数値情報）の利用条件で、このアプリには出せません。`
+        : why === "absent"
+          ? `${city}の${what}は、国のデータ（国土数値情報）にありません。`
+          : `この地点を含む${what}が、国のデータ（国土数値情報）にありません（区域の境目や、区域の決まっていない所など）。`,
+    );
+  }
+  return `${parts.join("")}指定校は${city}の教育委員会で確かめてください。`;
 }

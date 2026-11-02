@@ -5,7 +5,7 @@ import { BUILDING_CREDIT } from "./roadmap/building-data";
 import { GROUND_NOTE, groundMaps, groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, hazardRows, wagamachiUrl, type Elevation, type HazardMaps, type HazardReport } from "./roadmap/hazard";
 import { asOfText, changeText, distanceText, kindText, priceText, type LandPriceHit } from "./roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
-import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
+import { schoolCredit, schoolGaps, schoolGapShort, schoolLine, type Schools } from "./roadmap/school";
 import { SCHOOL_DATA } from "./roadmap/school-data";
 import { POI_SOURCES, poiLine, type PoiWalk } from "./roadmap/poi";
 import { ROAD_CREDIT, STATION_CREDIT, stationLine, type StationWalk } from "./roadmap/walk";
@@ -146,10 +146,13 @@ export function buildSummary(
     lines.push("【周辺施設（徒歩の目安・道路距離 80m を1分）】");
     for (const w of pois) lines.push(`・${poiLine(w)}`);
   }
-  if (schools?.elementary || schools?.junior) {
+  // 出せなかった学校区（利用条件で出せない市・国のデータに無い市・地点の区域が無い）は、データなしと確かめる先を書く
+  const gaps = schools ? schoolGaps(m.codes[0], schools) : [];
+  if (schools && (schools.elementary || schools.junior || gaps.length)) {
     lines.push(`【学区（参考・${SCHOOL_DATA.edition}のデータ）】`);
     if (schools.elementary) lines.push(`・小学校：${schoolLine(schools.elementary)}`);
     if (schools.junior) lines.push(`・中学校：${schoolLine(schools.junior)}`);
+    for (const g of gaps) lines.push(`・${g.key === "es" ? "小学校" : "中学校"}：データなし（${schoolGapShort(g.why, m.name)}。${m.name}の教育委員会で確認）`);
   }
   const withParcels = !!parcels && (!!parcels.target || parcels.neighbors.length > 0);
   if (parcels && withParcels) {
@@ -180,7 +183,7 @@ export function buildSummary(
   if (hit) lines.push(`※建物の${BUILDING_CREDIT}。`);
   if (prices.length) lines.push(`※地価の${LAND_PRICE_CREDIT}。物件そのものの価格ではありません。`);
   if (schools?.elementary || schools?.junior) lines.push(`※学区の${schoolCredit(schools)}。学区は見直されることがあります。指定校は教育委員会で確認を。`);
-  if (stations?.length) lines.push(`※駅の${STATION_CREDIT}。駅の出入口までではないので、広告には実際の道路距離で。`);
+  if (stations?.length) lines.push(`※駅の${STATION_CREDIT}。徒歩は駅の出入口（分からない駅は駅舎・駅の位置・ホーム）までの地図上の目安なので、広告には実際の道路距離で。`);
   if (pois?.length)
     lines.push(`※周辺施設は${POI_SOURCES}を加工して作成${stations?.length ? "" : `。${ROAD_CREDIT}`}。施設の位置までの目安なので、広告には実際の道路距離と、施設が今もあるかを確かめて。`);
   return lines.join("\n");

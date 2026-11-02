@@ -14,6 +14,7 @@ import { asOfText, changeText, distanceText, kindText, landPriceRows, priceText,
 import { LIQ_CREDIT } from "@/lib/roadmap/liquefaction";
 import { POI_CREDIT, POI_KINDS, POI_ORDER, POI_SOURCES } from "@/lib/roadmap/poi";
 import { REINFOLIB_NOTE } from "@/lib/roadmap/reinfolib";
+import { schoolGaps } from "@/lib/roadmap/school";
 import { ROAD_RADIUS_M } from "@/lib/roadmap/road-read";
 import { BuildingDetail } from "../building-card";
 import { ContactCard } from "../contact-card";
@@ -22,7 +23,7 @@ import { LandPriceDetail } from "../land-price-card";
 import { LegendList } from "../legend";
 import { Notes } from "../notes";
 import { ParcelDetail, type ParcelPick } from "../parcel-card";
-import { SchoolDetail } from "../school-card";
+import { SchoolDetail, SchoolGapNote } from "../school-card";
 import { Sheet } from "../sheet";
 import { StationList } from "../station-card";
 import { ZoningDetail } from "../zoning-card";
@@ -152,7 +153,15 @@ export function DetailSheet({
       body = data.stations.status === "ok" ? data.stations.stations.length ? <StationList stations={data.stations.stations} /> : <p className="py-2 text-[13px] text-muted">近くに駅がありません。</p> : <Loading state={data.stations} />;
       break;
     case "schools":
-      body = data.schools.status === "ok" ? <SchoolDetail schools={data.schools.schools} /> : <Loading state={data.schools} />;
+      // 出せなかった学校区（利用条件で出せない市・国のデータに無い市・地点の区域が無い）は、わけと通学区域を探すリンクを出す
+      body =
+        data.schools.status === "ok" ? (
+          <SchoolDetail schools={data.schools.schools} gap={{ items: schoolGaps(result.municipality.codes[0], data.schools.schools), city: result.municipality.name }} />
+        ) : data.schools.status === "none" ? (
+          <SchoolGapNote items={schoolGaps(result.municipality.codes[0], null)} city={result.municipality.name} />
+        ) : (
+          <Loading state={data.schools} />
+        );
       break;
     case "building":
       body = data.building.status === "none" ? <Loading state={data.building} /> : <BuildingDetail state={data.building} />;

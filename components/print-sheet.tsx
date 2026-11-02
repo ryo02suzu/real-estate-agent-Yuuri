@@ -11,7 +11,7 @@ import { BUILDING_CREDIT } from "@/lib/roadmap/building-data";
 import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, HAZARD_TABLE_NOTE, hazardRows, wagamachiUrl } from "@/lib/roadmap/hazard";
 import { changeText, distanceText, kindText, priceText } from "@/lib/roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "@/lib/roadmap/land-price-data";
-import { schoolCredit, schoolLine } from "@/lib/roadmap/school";
+import { schoolCredit, schoolGaps, schoolGapShort, schoolLine } from "@/lib/roadmap/school";
 import { POI_SOURCES, poiWalkText } from "@/lib/roadmap/poi";
 import { STATION_CREDIT, stationLine } from "@/lib/roadmap/walk";
 import { KOZU_CREDIT } from "@/lib/roadmap/kozu-data";
@@ -190,11 +190,18 @@ function Memo({
               </dd>
             </>
           )}
-          {schools.status === "ok" && (
+          {(schools.status === "ok" || schools.status === "none") && (
             <>
               <dt className="text-[#7a6a55]">学区（参考）</dt>
               <dd>
-                {[schools.schools.elementary && `小学校：${schoolLine(schools.schools.elementary)}`, schools.schools.junior && `中学校：${schoolLine(schools.schools.junior)}`]
+                {[
+                  schools.status === "ok" && schools.schools.elementary && `小学校：${schoolLine(schools.schools.elementary)}`,
+                  schools.status === "ok" && schools.schools.junior && `中学校：${schoolLine(schools.schools.junior)}`,
+                  // 出せなかった学校区は、データなしとわけ・確かめる先
+                  ...schoolGaps(result.municipality.codes[0], schools.status === "ok" ? schools.schools : null).map(
+                    (g) => `${g.key === "es" ? "小学校" : "中学校"}：データなし（${schoolGapShort(g.why, result.municipality.name)}。教育委員会で確認）`,
+                  ),
+                ]
                   .filter(Boolean)
                   .join("　")}
               </dd>
@@ -467,7 +474,7 @@ function Memo({
           {bHit && `建物の${BUILDING_CREDIT}。`}
           {prices.length > 0 && `地価の${LAND_PRICE_CREDIT}（標準地・基準地の価格で、物件の価格ではありません）。`}
           {schools.status === "ok" && `学区の${schoolCredit(schools.schools)}（指定校は教育委員会で確認）。`}
-          {walks.length > 0 && `駅の${STATION_CREDIT}（徒歩は道路距離 80m を1分。駅の出入口までではない）。`}
+          {walks.length > 0 && `駅の${STATION_CREDIT}（徒歩は道路距離 80m を1分。駅の出入口（分からない駅は駅舎・駅の位置・ホーム）までの地図上の目安）。`}
           {facilities.length > 0 && `周辺施設は${POI_SOURCES}を加工して作成（施設の位置までの目安）。`}
           {(p || parcels.status === "ok") && `筆の${PARCEL_CREDIT}。`}
           {(p?.estimated || (parcels.status === "ok" && parcels.parcel.estimated)) && `${KOZU_CREDIT}。`}

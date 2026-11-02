@@ -1,14 +1,27 @@
 // 最寄り駅と徒歩の目安。物件の近くの駅（国土数値情報の鉄道データ。scripts/stations/build.py で public/data/ に置く）を選び、
-// 国土地理院のベクトルタイル（地理院地図Vector・z15）の道路中心線を道のりにして、物件から駅のホームの線までの道路距離を求める。
-// 徒歩の分数は不動産広告の決まり（道路距離 80m を1分、1分未満は切り上げ）で出すが、駅の出入口ではなく駅（ホーム）までの
-// 目安なので、広告に書くときは実際の道路距離で確かめる旨を添える。自前のサーバーは通さない（ブラウザから直接読む）
+// 国土地理院のベクトルタイル（地理院地図Vector・z15）の道路中心線を道のりにして、物件から駅の入口までの道路距離を求める。
+// 入口は OpenStreetMap の駅の出入口（無ければ駅舎の建物の中心、それも無ければ駅の点）。どれも無い駅だけ、ホームの線までで測り、
+// そう書く（ホームの端は入口から遠いことがあり、近い駅を取り違える。桐生と西桐生など）。
+// 徒歩の分数は不動産広告の決まり（道路距離 80m を1分、1分未満は切り上げ）で出すが、地図のデータから出した目安なので、
+// 広告に書くときは実際の道路距離で確かめる旨を添える。自前のサーバーは通さない（ブラウザから直接読む）
 import { VectorTile } from "@mapbox/vector-tile";
 import { PbfReader } from "pbf";
 import SOURCE from "./data/station-source.json";
 import type { LngLat } from "./parcel";
 
-/** 駅：名前、路線（[路線, 事業者]）、ホームの線の点 */
-export type Station = { n: string; l: [string, string][]; p: LngLat[] };
+/**
+ * 駅：名前、路線（[路線, 事業者]）、ホームの線の点、入口の点（e。OpenStreetMap）と、その種類（k。1 出入口・2 駅舎・3 駅の点）
+ */
+export type Station = { n: string; l: [string, string][]; p: LngLat[]; e?: LngLat[]; k?: 1 | 2 | 3 };
+
+/** どこまで測ったか（出入口・駅舎・駅の位置・ホーム） */
+export type StationTo = "entrance" | "building" | "station" | "platform";
+const TO: Record<1 | 2 | 3, StationTo> = { 1: "entrance", 2: "building", 3: "station" };
+/** 測る点（入口があれば入口、無ければホームの線） */
+const targetsOf = (s: Station): LngLat[] => (s.e?.length ? s.e : s.p);
+const toOf = (s: Station): StationTo => (s.e?.length && s.k ? TO[s.k] : "platform");
+/** 「出入口まで」「ホームまで」 */
+export const TO_LABEL: Record<StationTo, string> = { entrance: "出入口まで", building: "駅舎まで", station: "駅の位置まで", platform: "ホームまで" };
 export type StationWalk = {
   name: string;
   lines: [string, string][];
@@ -22,13 +35,15 @@ export type StationWalk = {
   routed: boolean;
   /** 駅の位置（いちばん近い出入口・ホームの点。地図の印） */
   at?: LngLat;
+  /** どこまで測ったか（出入口・駅舎・駅の位置・ホーム）。古いデータでは無い（ホーム） */
+  to?: StationTo;
 };
 
-export const STATION_DATA = { url: SOURCE.url, year: SOURCE.year };
+export const STATION_DATA = { url: SOURCE.url, year: SOURCE.year, doorsDate: SOURCE.doorsDate };
 /** 道のりの出典（駅・学校までの徒歩の目安） */
 export const ROAD_CREDIT = "道のりは地理院地図Vector（国土地理院）の道路中心線から求めた目安";
-/** 出典（CC BY 4.0 と国土地理院の出典表示のとおり、加工したことを書く） */
-export const STATION_CREDIT = `出典：「国土数値情報（鉄道データ）」（国土交通省、https://nlftp.mlit.go.jp/ksj/）を加工して作成（${SOURCE.year}年）。${ROAD_CREDIT}`;
+/** 出典（CC BY 4.0 と国土地理院の出典表示のとおり、加工したことを書く。駅の入口は OpenStreetMap） */
+export const STATION_CREDIT = `出典：「国土数値情報（鉄道データ）」（国土交通省、https://nlftp.mlit.go.jp/ksj/）を加工して作成（${SOURCE.year}年）。駅の出入口：© OpenStreetMap contributors（ODbL・${SOURCE.doorsDate}時点）。${ROAD_CREDIT}`;
 
 /** 調べる駅：直線でこの距離（m）までの駅を、近い順にこの数まで */
 const MAX_STRAIGHT = 2000;
@@ -50,10 +65,11 @@ export function lineLabel([line, op]: [string, string]): string {
   return `${company}${line}`;
 }
 
-/** 「菊名駅（東急東横線・JR横浜線）徒歩約8分（約610m）」 */
+/** 「菊名駅（東急東横線・JR横浜線）徒歩約8分（約610m）」。ホームまでで測った駅は「（ホームまで約610m）」 */
 export function stationLine(s: StationWalk): string {
   const dist = s.meters >= 1000 ? `${(s.meters / 1000).toFixed(1)}km` : `${Math.round(s.meters / 10) * 10}m`;
-  return `${s.name}駅（${s.lines.map(lineLabel).join("・")}）${s.routed ? `徒歩約${s.minutes}分（約${dist}）` : `直線約${dist}`}`;
+  const to = s.to === "platform" ? TO_LABEL.platform : "";
+  return `${s.name}駅（${s.lines.map(lineLabel).join("・")}）${s.routed ? `徒歩約${s.minutes}分（${to}約${dist}）` : `直線${to ? `（${to}）` : ""}約${dist}`}`;
 }
 
 // ---- 平面の座標（物件のまわり。経緯度をそのまま m にする） ----
@@ -71,7 +87,7 @@ export function nearbyStations(lat: number, lng: number, stations: Station[], ma
   const all: { station: Station; straight: number }[] = [];
   for (const s of stations) {
     let d = Infinity;
-    for (const p of s.p) {
+    for (const p of targetsOf(s)) {
       const [x, y] = xy(p);
       d = Math.min(d, Math.hypot(x, y));
     }
@@ -337,7 +353,7 @@ function roadTiles(pts: LngLat[]): [number, number][] {
 }
 
 /**
- * 物件から目的地（駅のホームの点・学校など）までの道路距離（m）。国土地理院の道路のタイルを読む（読んだタイルは駅と学校で使い回す）。
+ * 物件から目的地（駅の出入口・学校など）までの道路距離（m）。国土地理院の道路のタイルを読む（読んだタイルは駅と学校で使い回す）。
  * タイルが読めない・遠すぎる・道がつながらない目的地は入れない
  */
 export async function walkTo(lat: number, lng: number, targets: { id: number; points: LngLat[] }[]): Promise<Map<number, number>> {
@@ -362,15 +378,17 @@ export async function nearestStations(lat: number, lng: number): Promise<Station
   const near = nearbyStations(lat, lng, stations);
   if (!near.length) return [];
   // 歩いて行ける範囲に駅が無い（いちばん近い駅でも遠い）ときは、直線距離だけ
-  if (near[0].straight > MAX_STRAIGHT)
-    return [{ name: near[0].station.n, lines: near[0].station.l, meters: near[0].straight, minutes: walkMinutes(near[0].straight), straight: near[0].straight, routed: false, at: nearestPoint(near[0].station.p, lat, lng) }];
-  const dist = await walkTo(lat, lng, near.map((n, id) => ({ id, points: n.station.p })));
+  if (near[0].straight > MAX_STRAIGHT) {
+    const s = near[0].station;
+    return [{ name: s.n, lines: s.l, meters: near[0].straight, minutes: walkMinutes(near[0].straight), straight: near[0].straight, routed: false, at: nearestPoint(targetsOf(s), lat, lng), to: toOf(s) }];
+  }
+  const dist = await walkTo(lat, lng, near.map((n, id) => ({ id, points: targetsOf(n.station) })));
   return near
     .map((n, id) => {
       const d = dist.get(id);
       const routed = routedOk(d, n.straight);
       const meters = routed ? d : n.straight;
-      return { name: n.station.n, lines: n.station.l, meters, minutes: walkMinutes(meters), straight: n.straight, routed, at: nearestPoint(n.station.p, lat, lng) };
+      return { name: n.station.n, lines: n.station.l, meters, minutes: walkMinutes(meters), straight: n.straight, routed, at: nearestPoint(targetsOf(n.station), lat, lng), to: toOf(n.station) };
     })
     .sort((a, b) => Number(b.routed) - Number(a.routed) || a.meters - b.meters)
     .slice(0, 3);

@@ -7,7 +7,7 @@ import { ChevronRight, Cross, ShoppingCart, SquareArrowOutUpRight, Store } from 
 import type { ReactNode } from "react";
 import { livingScores, totalScore } from "@/lib/app/scores";
 import { POI_SOURCES, type PoiWalk } from "@/lib/roadmap/poi";
-import { schoolShort } from "@/lib/roadmap/school";
+import { schoolGaps, schoolGapShort, schoolShort } from "@/lib/roadmap/school";
 import { lineLabel } from "@/lib/roadmap/walk";
 import { G, GCard, GNote, GRow, NUM, TILE } from "./g-ui";
 import { AwardFill, CapFill, CutleryFill, PillIcon, TrainOutline, TreeFill } from "./icons";
@@ -58,7 +58,6 @@ export function AroundTab({ result, data, open, expand, mapApps, has3d }: TabPro
   const nearest = around.status === "ok" ? around.nearest : [];
   const st = stations.status === "ok" ? stations.stations : [];
   const e = schools.status === "ok" ? schools.schools.elementary : undefined;
-  const j = schools.status === "ok" ? schools.schools.junior : undefined;
 
   const scores = livingScores({
     stations: stations.status === "ok" ? stations.stations : undefined,
@@ -68,6 +67,7 @@ export function AroundTab({ result, data, open, expand, mapApps, has3d }: TabPro
   });
   const total = totalScore(scores);
   const loading = around.status === "loading";
+  const school = schoolRow(schools, result.municipality.codes[0], result.municipality.name);
 
   return (
     <div className="flex flex-col gap-[10px]">
@@ -88,12 +88,12 @@ export function AroundTab({ result, data, open, expand, mapApps, has3d }: TabPro
         <GRow
           icon={<CapFill size={19} color="#5ee0ae" />}
           iconBg="rgba(69,211,158,0.14)"
-          title={schools.status === "loading" ? "確認中…" : e ? schoolShort(e.name) : schools.status === "none" ? "学区データなし" : schools.status === "error" ? "学区を読み込めず" : "学区なし"}
-          sub={e ? `小学校区${j ? `・中学校区は${schoolShort(j.name)}` : ""}` : "学区（小学校・中学校）"}
+          title={school.title}
+          sub={school.sub}
           right={e ? (e.walk ? `徒歩${e.walk.minutes}分` : e.distance !== undefined ? `直線${metersText(e.distance)}` : undefined) : undefined}
           rightColor={e?.walk ? G.gold : G.sub}
           minH={56}
-          onClick={schools.status === "ok" ? () => open("schools") : undefined}
+          onClick={schools.status === "ok" || schools.status === "none" ? () => open("schools") : undefined}
         />
       </GCard>
 
@@ -129,9 +129,28 @@ export function AroundTab({ result, data, open, expand, mapApps, has3d }: TabPro
           <ChevronRight size={15} strokeWidth={2} absoluteStrokeWidth />
         </span>
       </GCard>
-      <GNote>施設：{POI_SOURCES}。駅・学区：国土数値情報。徒歩は道路距離80mを1分とした、施設・駅（ホーム）の位置までの目安です。今もあるかと実際の道のりは確かめてください。模型の印の色は、上の札と同じ種類です。</GNote>
+      <GNote>
+        施設：{POI_SOURCES}。駅・学区：国土数値情報（駅の出入口は © OpenStreetMap contributors）。徒歩は道路距離80mを1分とした、施設の位置・駅の出入口（分からない駅はホーム）までの目安です。今もあるかと実際の道のりは確かめてください。模型の印の色は、上の札と同じ種類です。
+      </GNote>
     </div>
   );
+}
+
+/**
+ * 学区の行の見出しと小さな字。小学校区が無い（利用条件で出せない市・国のデータに無い市・地点の区域が無い）ときは「学区なし」とは
+ * 書かず、データが無いことと確かめる先を書く（押すと、わけと通学区域を探すリンクのシート）
+ */
+function schoolRow(schools: TabProps["data"]["schools"], muniCd: string, city: string): { title: string; sub: string } {
+  const any = "学区（小学校・中学校）";
+  if (schools.status === "loading") return { title: "確認中…", sub: any };
+  if (schools.status === "error") return { title: "学区を読み込めず", sub: any };
+  const s = schools.status === "ok" ? schools.schools : null;
+  const e = s?.elementary;
+  const j = s?.junior;
+  if (e) return { title: schoolShort(e.name), sub: `小学校区・中学校区は${j ? schoolShort(j.name) : "データなし"}` };
+  if (j) return { title: "小学校区はデータなし", sub: `中学校区は${schoolShort(j.name)}・小学校は教育委員会で確認` };
+  const why = schoolGaps(muniCd, s).find((g) => g.key === "es")?.why ?? "outside";
+  return { title: "学区のデータなし", sub: `${schoolGapShort(why, city)}・教育委員会で確認` };
 }
 
 /** 街の模型が出せない端末の、施設の印の平らな地図 */

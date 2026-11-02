@@ -69,6 +69,22 @@ describe("buildSummary", () => {
     expect(text).not.toContain("地図で選んだ地点");
   });
 
+  it("学区のデータが無いときは「データなし（わけ）・教育委員会で確認」を書く（学区が無いとは書かない）", () => {
+    const kiryu = findMunicipality("10203")!;
+    const ok = { status: "ok" as const, lat: 36.413, lng: 139.327, matchedAddress: "群馬県桐生市元宿町", town: "元宿町", approximate: false, municipality: kiryu, links: buildLinks(kiryu, 36.413, 139.327) };
+    const junior = { kind: "中学校" as const, name: "中央中学校", owner: "桐生市", city: "10203" };
+    const text = buildSummary(ok, { schools: { junior } });
+    expect(text).toContain("・中学校：中央中学校（桐生市）");
+    expect(text).toContain("・小学校：データなし（国のデータに無い市。桐生市の教育委員会で確認）");
+    // 学区がまったく無い市（国のデータに無い）
+    const funabashi = findMunicipality("12204")!;
+    const none = buildSummary({ ...ok, matchedAddress: "千葉県船橋市本町", town: "本町", municipality: funabashi, links: buildLinks(funabashi, 35.7, 139.98) }, { schools: {} });
+    expect(none).toContain("・小学校：データなし（国のデータに無い市。船橋市の教育委員会で確認）");
+    expect(none).toContain("・中学校：データなし（国のデータに無い市。船橋市の教育委員会で確認）");
+    // 読み込み中・失敗（schools が無い）は何も書かない
+    expect(buildSummary(ok, {})).not.toContain("学区");
+  });
+
   it("地図で選んだ地点は、その地点を地理院地図で開く URL を添える", () => {
     const m = findMunicipality("11202")!;
     const text = buildSummary({

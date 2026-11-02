@@ -145,7 +145,8 @@ export function livingScores({ stations, pois, diningCount, schools }: ScoreInpu
     const parts = [minuteScore(nursery && minutesOf(nursery)), minuteScore(park && minutesOf(park)), ...(e ? [minuteScore(schoolMin)] : [])];
     const basis = [
       nursery ? `${nursery.label}：${nursery.name} ${way(nursery)}` : "歩いて行ける範囲に保育園・幼稚園がありません",
-      ...(e ? [`学区の小学校：${e.name}${e.walk ? ` 徒歩約${e.walk.minutes}分` : schoolMin ? ` 直線約${Math.round(e.distance! / 10) * 10}m` : ""}`] : []),
+      // 学区のデータが無い市区町村・地点では、小学校は点に入れず、そう書く
+      ...(e ? [`学区の小学校：${e.name}${e.walk ? ` 徒歩約${e.walk.minutes}分` : schoolMin ? ` 直線約${Math.round(e.distance! / 10) * 10}m` : ""}`] : schools ? ["学区の小学校：データが無いので、点に入れていません"] : []),
       park ? `公園：${park.name} ${way(park)}` : "歩いて行ける範囲に公園がありません",
     ];
     out.push({ key: "childcare", label: SCORE_LABELS.childcare, value: round1(parts.reduce((a, b) => a + b, 0) / parts.length), basis });

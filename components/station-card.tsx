@@ -1,11 +1,12 @@
 "use client";
 
 // 最寄り駅と徒歩の目安（lib/roadmap/walk.ts）。近い順に3駅まで、駅名・路線・徒歩の分数（道路距離 80m を1分）・道路距離。
-// 駅の出入口ではなく駅（ホーム）までの目安なので、広告に書くときは実際の道路距離で確かめる旨を添える。
+// 駅の出入口（OpenStreetMap。分からない駅は駅舎・駅の位置・ホーム）までの地図上の目安なので、広告に書くときは実際の道路距離で
+// 確かめる旨を添える。スマホの一覧は、どこまで測ったか（「出入口まで」「ホームまで」）も書く（PC の見た目は変えない）。
 // スマホのシートは、周辺施設（components/poi-card.tsx）があればタブで並べる
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
-import { lineLabel, nearestStations, STATION_CREDIT, type StationWalk } from "@/lib/roadmap/walk";
+import { lineLabel, nearestStations, STATION_CREDIT, TO_LABEL, type StationWalk } from "@/lib/roadmap/walk";
 import { Fact } from "./fact";
 import { ChevronRightIcon, TrainIcon } from "./icons";
 import { Notes } from "./notes";
@@ -125,7 +126,13 @@ export function StationList({ stations }: { stations: StationWalk[] }) {
             <p className="flex flex-wrap items-baseline gap-x-2 text-ink">
               <b className="text-[16px] font-semibold">{s.name}駅</b>
               <span className="text-[15px] font-semibold text-brand">{walkText(s)}</span>
-              {s.routed && <span className="text-[12px] text-muted">道路距離{distText(s.meters)}（直線{distText(s.straight)}）</span>}
+              {s.routed && (
+                <span className="text-[12px] text-muted">
+                  <span className="lg:hidden">{TO_LABEL[s.to ?? "platform"]}</span>
+                  <span className="hidden lg:inline">道路距離</span>
+                  {distText(s.meters)}（直線{distText(s.straight)}）
+                </span>
+              )}
             </p>
             <p className="text-[12.5px] leading-[1.6] text-muted">{s.lines.map(lineLabel).join("・")}</p>
           </li>
@@ -133,7 +140,7 @@ export function StationList({ stations }: { stations: StationWalk[] }) {
       </ul>
       <Notes lead="道路距離 80m を1分とした目安です。広告には実際の道路距離で。" source="国土数値情報（鉄道データ）（国土交通省）・地理院地図Vector">
         <p>
-          国土地理院の地図の道路をたどった、物件の地点から駅（ホームの位置）までの目安です（道路距離 80m を1分）。駅の出入口までの道のりや信号・歩道橋は含まないので、広告に書くときは実際の道路距離で確かめてください。
+          国土地理院の地図の道路をたどった、物件の地点から駅の出入口までの目安です（道路距離 80m を1分）。出入口の位置は OpenStreetMap のデータで、出入口が載っていない駅は駅舎か駅の位置、それも分からない駅はホームの位置までです。信号・歩道橋・地下通路は考えないので、広告に書くときは実際の道路距離で確かめてください。
           {stations.some((s) => !s.routed) && "「直線」は、歩いて行ける範囲（2km）に駅が無い・道がつながらないときの直線距離です。"}
         </p>
         <p>{STATION_CREDIT}</p>

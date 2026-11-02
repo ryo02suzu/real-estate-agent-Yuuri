@@ -137,7 +137,7 @@ export function AppSourcesSheet({ open, onClose }: { open: boolean; onClose: () 
     ["地価", `地価公示・都道府県地価調査（国土数値情報）${LAND_PRICE_DATA.edition}`],
     ...(DEALS_DATA.url ? ([["取引事例", `不動産情報ライブラリ（国土交通省）の取引価格・成約価格 ${DEALS_DATA.periods}。${DEALS_NOTE}`]] as [string, string][]) : []),
     ["学区", `小学校区・中学校区（国土数値情報）${SCHOOL_DATA.edition}`],
-    ["駅", `鉄道データ（国土数値情報）${STATION_DATA.year}年`],
+    ["駅", `鉄道データ（国土数値情報）${STATION_DATA.year}年。駅の出入口の位置は © OpenStreetMap contributors（ODbL）${STATION_DATA.doorsDate}時点`],
     ["周辺施設", `© OpenStreetMap contributors（ODbL）${POI_DATA.date}時点${HOSPITAL_SOURCE ? `。病院は${HOSPITAL_SOURCE}` : ""}`],
     ["ハザード", "重ねるハザードマップ（国土交通省・国土地理院）を開くたびに読む"],
     ["避難場所", "指定緊急避難場所データ（国土地理院）を開くたびに読む"],

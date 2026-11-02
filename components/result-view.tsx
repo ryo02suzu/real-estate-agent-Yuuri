@@ -607,7 +607,8 @@ export function loaded({
     hazard: hazard.status === "ok" ? hazard : undefined,
     building: building.status === "ok" ? building.result : undefined,
     landPrice: landPrice.status === "ok" ? landPrice.hits : undefined,
-    schools: schools.status === "ok" ? schools.schools : undefined,
+    // 学区のデータが無い所（none）は空にして渡す（共有の文・下書きに「データなし・教育委員会で確認」を書く）
+    schools: schools.status === "ok" ? schools.schools : schools.status === "none" ? {} : undefined,
     stations: stations?.status === "ok" ? stations.stations : undefined,
     pois: pois?.status === "ok" ? pois.pois : undefined,
   };

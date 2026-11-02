@@ -100,7 +100,14 @@ def allowed(year: int) -> dict[str, dict]:
         if not r[0] or str(r[0])[:2] not in PREFS:
             continue
         code = str(r[1]).zfill(5)
-        out[code] = {"es": ok(code, r[3], r[4], r[5]), "jh": ok(code, r[7], r[8], r[9]), "name": r[2]}
+        out[code] = {
+            "es": ok(code, r[3], r[4], r[5]),
+            "jh": ok(code, r[7], r[8], r[9]),
+            # 国のデータで公開しているか（「02公開不可」「03作成不可」は国のデータに無い）
+            "es_pub": str(r[3] or "").startswith("01"),
+            "jh_pub": str(r[7] or "").startswith("01"),
+            "name": r[2],
+        }
     return out
 
 
@@ -122,6 +129,11 @@ def build(year: int, out: str, work: str) -> dict:
     ok = allowed(year)
     skipped = sorted({f"{c} {v['name']}" for c, v in ok.items() if not (v["es"] and v["jh"])})
     log(f"入れない市区町村（小・中のどちらか）: {len(skipped)}: {', '.join(skipped)}")
+    # 小学校区・中学校区それぞれ、国のデータでは公開しているが利用条件で入れない市区町村（アプリは「利用条件で出せない」と書き、
+    # 公開していない・作っていない市区町村は「国のデータに無い」と書く）
+    skipped_by = {key: sorted(f"{c} {v['name']}" for c, v in ok.items() if v[f"{key}_pub"] and not v[key]) for key in ("es", "jh")}
+    # 小学校区・中学校区それぞれ、実際にタイルに入れた市区町村（アプリはここに無い市区町村を「データなし」と書く）
+    covered: dict[str, set[str]] = {"es": set(), "jh": set()}
     # 学校の位置（学校コード → 経度・緯度）
     where: dict[str, list[float]] = {}
     for pref in PREFS:
@@ -154,6 +166,7 @@ def build(year: int, out: str, work: str) -> dict:
                         counts["located"] += 1
                     fo.write(json.dumps({"type": "Feature", "geometry": f["geometry"], "properties": {k: v for k, v in props.items() if v is not None}}, ensure_ascii=False) + "\n")
                     counts[key] += 1
+                    covered[key].add(city)
     log(f"小学校区 {counts['es']}・中学校区 {counts['jh']}（学校の位置あり {counts['located']}）")
     tippecanoe = shutil.which("tippecanoe") or "tippecanoe"
     subprocess.run(
@@ -166,6 +179,8 @@ def build(year: int, out: str, work: str) -> dict:
     os.remove(seq)
     log(f"{out}: {os.path.getsize(out) / 1e6:.1f}MB")
     counts["skipped"] = skipped
+    counts["skipped_by"] = skipped_by
+    counts["covered"] = {k: " ".join(sorted(v)) for k, v in covered.items()}
     return counts
 
 
@@ -207,7 +222,16 @@ def main() -> None:
     era = f"令和{year - 2018}年度" if year >= 2019 else f"{year}年度"
     with open(a.source, "w", encoding="utf-8") as f:
         json.dump(
-            {"url": f"/{rel}", "edition": f"{era}（{year}年度）", "year": year, "counts": {k: v for k, v in counts.items() if k != "skipped"}, "excluded": counts["skipped"]},
+            {
+                "url": f"/{rel}",
+                "edition": f"{era}（{year}年度）",
+                "year": year,
+                "counts": {k: v for k, v in counts.items() if k not in ("skipped", "skipped_by", "covered")},
+                "excluded": counts["skipped"],
+                "excludedBy": counts["skipped_by"],
+                # 行政コードを空白でつないだもの（政令市は市のコード）
+                "covered": counts["covered"],
+            },
             f,
             ensure_ascii=False,
             indent=1,

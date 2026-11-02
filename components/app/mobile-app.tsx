@@ -1619,7 +1619,7 @@ function PropertyView({
     tab === "law" ? "用途地域：国土交通省 都市計画決定GISデータ" : "",
     tab === "hazard" ? "ハザード：重ねるハザードマップ（国土地理院）" : "",
     tab === "around"
-      ? "施設：© OpenStreetMap contributors・駅・学区：国土数値情報"
+      ? "施設・駅の出入口：© OpenStreetMap contributors・駅・学区：国土数値情報"
       : "",
     tab === "price" ? "地価：国土数値情報（地価公示・地価調査）" : "",
   ].filter(Boolean);

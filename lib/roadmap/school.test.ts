@@ -2,7 +2,8 @@ import { open, stat } from "node:fs/promises";
 import type { Source } from "pmtiles";
 import { describe, expect, it } from "vitest";
 import SRC from "./data/school-source.json";
-import { SCHOOL_ZOOM, schoolCredit, schoolDistanceText, schoolLine, schoolShort, schoolsAt, withSchoolWalks, type SchoolArea } from "./school";
+import { SCHOOL_ZOOM, schoolCredit, schoolDistanceText, schoolGaps, schoolGapShort, schoolGapText, schoolLine, schoolShort, schoolsAt, withSchoolWalks, type SchoolArea } from "./school";
+import { schoolGap, schoolSearchUrl } from "./school-data";
 import { schoolTileSource } from "./school-tiles";
 import { tileOf } from "./parcel";
 import type { LngLat } from "./parcel";
@@ -130,5 +131,54 @@ describe("アプリに入っている学区のタイル", () => {
 
   it("日光市は、旧今市市・旧藤原町は教育委員会に確かめるよう添える", async () => {
     expect((await schoolsAt(36.7199, 139.6982, src))?.elementary?.note).toContain("日光市教育委員会");
+  });
+
+  it("桐生市は小学校区が国のデータに無い（市が公開していない）ので、中学校区だけ。「学区なし」ではなく、わけを返す", async () => {
+    const r = await schoolsAt(36.413, 139.327, src);
+    expect(r?.elementary).toBeUndefined();
+    expect(r?.junior?.name).toBe("中央中学校");
+    expect(schoolGaps("10203", r)).toEqual([{ key: "es", label: "小学校区", why: "absent" }]);
+  });
+});
+
+describe("学区のデータが無い市区町村", () => {
+  it("小学校区・中学校区それぞれ、利用条件で出せない市（terms）と国のデータに無い市（absent）を見分ける", () => {
+    // 熊谷市は小・中とも利用条件（商用利用・再配布不可）で出せない。小田原市は使う前に市の確認が要る
+    expect([schoolGap("11202", "es"), schoolGap("11202", "jh")]).toEqual(["terms", "terms"]);
+    expect(schoolGap("14206", "jh")).toBe("terms");
+    // 桐生市の小学校区（市が公開していない）・上三川町の中学校区（作っていない）は国のデータに無い
+    expect([schoolGap("10203", "es"), schoolGap("10203", "jh")]).toEqual(["absent", null]);
+    expect([schoolGap("09301", "es"), schoolGap("09301", "jh")]).toEqual([null, "absent"]);
+    // 船橋市・品川区は国のデータに無い
+    expect(schoolGap("12204", "es")).toBe("absent");
+    expect(schoolGap("13109", "jh")).toBe("absent");
+    // 政令市は区のコードでも市で見る（横浜市鶴見区・川崎市川崎区）
+    expect(schoolGap("14101", "es")).toBeNull();
+    expect(schoolGap("14131", "jh")).toBeNull();
+    // 利用条件で出せない市区町村は、入れていない市区町村の一覧に入っている
+    for (const c of [...SRC.excludedBy.es, ...SRC.excludedBy.jh]) expect(SRC.excluded).toContain(c);
+  });
+
+  it("地点で出せなかった学校区と、わけの文", () => {
+    expect(schoolGaps("12204", null).map((g) => g.why)).toEqual(["absent", "absent"]);
+    // データのある市で、地点を含む区域が無い
+    expect(schoolGaps("13104", {})).toEqual([
+      { key: "es", label: "小学校区", why: "outside" },
+      { key: "jh", label: "中学校区", why: "outside" },
+    ]);
+    expect(schoolGapText(schoolGaps("11202", null), "熊谷市")).toBe(
+      "熊谷市の小学校区・中学校区は、国のデータ（国土数値情報）の利用条件で、このアプリには出せません。指定校は熊谷市の教育委員会で確かめてください。",
+    );
+    expect(schoolGapText([{ key: "es", label: "小学校区", why: "absent" }], "桐生市")).toBe(
+      "桐生市の小学校区は、国のデータ（国土数値情報）にありません。指定校は桐生市の教育委員会で確かめてください。",
+    );
+    expect(schoolGapText(schoolGaps("12204", null), "船橋市")).toBe("船橋市の小学校区・中学校区は、国のデータ（国土数値情報）にありません。指定校は船橋市の教育委員会で確かめてください。");
+    expect([schoolGapShort("terms", "青ヶ島村"), schoolGapShort("absent", "品川区"), schoolGapShort("outside", "新宿区")]).toEqual([
+      "利用条件で出せない村",
+      "国のデータに無い区",
+      "この地点の区域がデータに無い",
+    ]);
+    // 探すリンクは市区町村の名前だけ（住所は入れない）
+    expect(schoolSearchUrl("桐生市")).toBe(`https://www.google.com/search?q=${encodeURIComponent("桐生市 通学区域 教育委員会")}`);
   });
 });

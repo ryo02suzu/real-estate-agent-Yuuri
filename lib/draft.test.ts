@@ -121,16 +121,26 @@ describe("重説・物件概要の下書き", () => {
     const text = draftText(
       buildDraft(base, {
         stations: [
-          { name: "半蔵門", lines: [["半蔵門線", "東京メトロ"]], meters: 778, minutes: 10, straight: 603, routed: true },
+          { name: "半蔵門", lines: [["半蔵門線", "東京メトロ"]], meters: 778, minutes: 10, straight: 603, routed: true, to: "entrance" },
           { name: "九段下", lines: [["東西線", "東京メトロ"], ["新宿線", "都営"]], meters: 826, minutes: 11, straight: 649, routed: true },
           { name: "石原", lines: [["秩父本線", "秩父鉄道"]], meters: 3956, minutes: 50, straight: 3956, routed: false },
         ],
       }),
     );
-    expect(text).toContain("交通：東京メトロ半蔵門線「半蔵門」駅 徒歩約10分（道路距離 約780m・駅の出入口までではない目安）【要確認】");
-    expect(text).toContain("交通：東京メトロ東西線・都営新宿線「九段下」駅 徒歩約11分");
+    expect(text).toContain("交通：東京メトロ半蔵門線「半蔵門」駅 徒歩約10分（道路距離 約780m（出入口まで）・地図から出した目安）【要確認】");
+    // どこまで測ったかの無い古い結果は、ホームまでとして書く
+    expect(text).toContain("交通：東京メトロ東西線・都営新宿線「九段下」駅 徒歩約11分（道路距離 約830m（ホームまで）・地図から出した目安）【要確認】");
     expect(text).toContain("交通：秩父鉄道秩父本線「石原」駅 直線約4.0km（歩いて行ける範囲に駅なし・直線距離）【要確認】");
     expect(text).toContain("駅の出典：「国土数値情報（鉄道データ）」");
+  });
+
+  it("学区のデータが無い学校区は、教育委員会で確かめる行を【要確認】で入れる", () => {
+    const kiryu = findMunicipality("10203")!;
+    const junior = { kind: "中学校" as const, name: "中央中学校", owner: "桐生市", city: "10203" };
+    const text = draftText(buildDraft({ ...base, municipality: kiryu, links: buildLinks(kiryu, 36.413, 139.327) }, { schools: { junior } }));
+    expect(text).toContain("中学校区：中央中学校（桐生市）");
+    expect(text).toContain("小学校区：桐生市の教育委員会で確認（データなし（国のデータに無い市））【要確認】");
+    expect(draftText(buildDraft(base, {}))).not.toContain("小学校区");
   });
 
   it("市町村が地番図を公開していれば、物件の表示に地番の参考図の URL を入れる", () => {
@@ -147,7 +157,9 @@ describe("重説・物件概要の下書き", () => {
     const station = { name: "半蔵門", lines: [["半蔵門線", "東京メトロ"]] as [string, string][], meters: 778, minutes: 10, straight: 603, routed: true };
     const text = draftText(buildDraft(base, { landPrice: [land], stations: [station] }));
     const line = text.split("\n").find((l) => l.startsWith("国土数値情報の出典："))!;
-    expect(line).toMatch(/^国土数値情報の出典：「国土数値情報」（国土交通省、https:\/\/nlftp\.mlit\.go\.jp\/ksj\/）を加工して作成（地価：地価公示データ・都道府県地価調査データ（.+）／駅：鉄道データ（\d{4}年））。道のりは/);
+    expect(line).toMatch(
+      /^国土数値情報の出典：「国土数値情報」（国土交通省、https:\/\/nlftp\.mlit\.go\.jp\/ksj\/）を加工して作成（地価：地価公示データ・都道府県地価調査データ（.+）／駅：鉄道データ（\d{4}年））。駅の出入口：© OpenStreetMap contributors（ODbL・\d{4}-\d{2}-\d{2}時点）。道のりは/,
+    );
     expect(text).not.toContain("駅の出典：");
   });
 
