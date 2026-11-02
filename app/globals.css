@@ -465,6 +465,230 @@ html.launch-skip {
     mask-position: 100% 0;
   }
 }
+
+/*
+ * 長い版の壮大なオープニング（約4.5秒。html の data-grand：components/app/launch-city.js が街の光を描き始めたら付く。
+ * 描けない端末では付かず、上の約1.8秒の版になる）。時間割（秒）：
+ *   0〜1.9   光の道の街の上を、少し傾いて低く飛ぶ（地平線の一点から、光が道を伝って広がる。大通りを流れる車の光・星・地平線の光・
+ *            遠くの建物の光の柱）
+ *   1.9〜2.75 上がりながら真下を向くと、道の中から金色の M が走る（キャンバス。その M は画面の真ん中のロゴのマークにぴったり重なる）
+ *   2.68     M がロゴのマークに入れ替わり、光がはじけて輪が広がる（.launch-burst・.launch-ring。街にも M から光の波が広がる）。
+ *            続いて MICHILU の字が寄って並び、光の帯。街は最後の形のまま、ロゴの後ろにうっすら残る
+ *   3.48     幕が街の光と一緒に上がる（下の縁は夜明けの暖かい光）。夕焼けの街が奥から落ち着き、太陽の光が広がる（.home-sunflare）
+ *   3.56〜4.18 ロゴが左上の定位置へ。中身は 3.6 秒から順に現れる（--launch）
+ * 触れて飛ばしたとき（html.launch-skip）は、幕・街の光・ロゴはこの時間割のまま（位置が飛ばない）全体が 0.2 秒で消え、
+ * 中身・写真・下のメニューの遅れだけを外す（:not(.launch-skip)。data-grand は演出が終わるまで外さない。外すと幕の時計が
+ * 約1.8秒の版に戻り、その場で終わって、同じ指が下のボタンを押してしまう）
+ */
+html[data-launch="full"][data-grand]:not(.launch-skip) {
+  --launch: 3600ms;
+}
+.launch-canvas,
+.launch-burst,
+.launch-ring {
+  display: none;
+}
+@media (max-width: 1023px) {
+  html[data-launch="full"] .launch-canvas {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  html[data-launch="full"][data-grand] .launch {
+    animation-duration: 5.2s;
+  }
+  /* 街の光は、最後の形のままロゴの後ろにうっすら残り、幕と一緒に上がる（幕と同じ距離・同じ曲線。下の端は幕の裾へなじませる） */
+  html[data-launch="full"][data-grand] .launch-canvas {
+    -webkit-mask-image: linear-gradient(180deg, #000 80%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 80%, transparent 100%);
+    animation: launch-lift-canvas 0.72s cubic-bezier(0.6, 0, 0.22, 1) 3.48s forwards;
+  }
+  html[data-launch="full"][data-grand] .launch-veil {
+    background:
+      radial-gradient(60% 24% at 50% 33%, rgba(70, 128, 220, 0.18) 0%, rgba(70, 128, 220, 0) 100%),
+      linear-gradient(180deg, #050b17 0%, #081428 38%, #0c1c38 71.4%, rgba(96, 62, 74, 0.72) 76%, rgba(255, 142, 72, 0.4) 86%, rgba(255, 170, 96, 0) 100%);
+    animation: launch-lift 0.72s cubic-bezier(0.6, 0, 0.22, 1) 3.48s forwards;
+  }
+  html[data-launch="full"][data-grand] .launch-logo {
+    animation:
+      launch-fly 0.62s cubic-bezier(0.62, 0, 0.18, 1) 3.56s backwards,
+      launch-out 0.18s linear 4.18s forwards;
+  }
+  html[data-launch="full"][data-grand] .launch-m {
+    animation: launch-mark-in 0.36s ease-out 2.66s backwards;
+  }
+  html[data-launch="full"][data-grand] .launch-l {
+    animation-delay: calc(2.84s + (var(--i) + 3) * 30ms);
+  }
+  html[data-launch="full"][data-grand] .launch-glint {
+    animation: launch-glint 0.74s cubic-bezier(0.45, 0, 0.3, 1) 3.08s backwards;
+  }
+  html[data-launch="full"][data-grand] .launch-burst,
+  html[data-launch="full"][data-grand] .launch-ring {
+    display: block;
+    position: absolute;
+    left: 13.5%;
+    top: 50%;
+    aspect-ratio: 1;
+    border-radius: 9999px;
+    pointer-events: none;
+    opacity: 0;
+  }
+  html[data-launch="full"][data-grand] .launch-burst {
+    height: 620%;
+    background: radial-gradient(closest-side, rgba(255, 250, 236, 0.95) 0%, rgba(255, 214, 150, 0.6) 22%, rgba(255, 160, 80, 0.22) 50%, rgba(255, 150, 70, 0) 100%);
+    mix-blend-mode: screen;
+    animation: launch-burst 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) 2.68s backwards;
+  }
+  html[data-launch="full"][data-grand] .launch-ring {
+    height: 300%;
+    border: 1.5px solid rgba(255, 222, 170, 0.85);
+    box-shadow:
+      0 0 12px rgba(255, 200, 130, 0.6),
+      inset 0 0 10px rgba(255, 200, 130, 0.4);
+    animation: launch-ring 0.95s cubic-bezier(0.15, 0.7, 0.3, 1) 2.7s backwards;
+  }
+  html[data-launch="full"][data-grand]:not(.launch-skip) [data-app-nav] {
+    animation: launch-nav 0.7s var(--m-out) 3.66s backwards;
+  }
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  html[data-launch="full"][data-grand]:not(.launch-skip) .home-logo-in {
+    animation: launch-wait 4.18s linear backwards;
+  }
+  html[data-launch="full"][data-grand]:not(.launch-skip) .home-cam-first {
+    animation: launch-photo 1.6s cubic-bezier(0.22, 0.7, 0.18, 1) 3.45s backwards;
+  }
+  html[data-launch="full"][data-grand]:not(.launch-skip) .home-sunflare {
+    animation: sunflare 1.45s ease-out 3.66s backwards;
+  }
+  html[data-launch="full"][data-grand]:not(.launch-skip) .sf-streak {
+    animation: sf-streak 1.45s cubic-bezier(0.2, 0.7, 0.2, 1) 3.66s backwards;
+  }
+}
+@keyframes launch-lift-canvas {
+  to {
+    transform: translateY(-140%);
+  }
+}
+@keyframes launch-mark-in {
+  from {
+    opacity: 0;
+    filter: brightness(2.6) drop-shadow(0 0 6px rgba(255, 210, 140, 0.95));
+  }
+}
+@keyframes launch-burst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.12);
+  }
+  16% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.45);
+  }
+}
+@keyframes launch-ring {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2);
+  }
+  14% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(3.2);
+  }
+}
+
+/*
+ * ホームの写真の太陽の光（長い版のオープニングで、幕が上がるときだけ）。写真と同じ切り方の箱（.home-stage。写真の縦横比 1260:2237、
+ * 横は 62% の位置で切る）の中の、太陽の位置（86.35%・48.57%）に置く。写真と一緒に動く（.home-cam-first の箱の中）
+ */
+.home-backdrop {
+  container-type: size;
+}
+.home-stage {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+@supports (width: 1cqw) {
+  .home-stage {
+    inset: auto;
+    width: max(100cqw, calc(100cqh * 0.5633));
+    aspect-ratio: 0.5633;
+    left: calc((100cqw - max(100cqw, calc(100cqh * 0.5633))) * 0.62);
+    top: calc((100cqh - max(calc(100cqw / 0.5633), 100cqh)) * 0.5);
+  }
+}
+.home-sunflare {
+  position: absolute;
+  left: 86.35%;
+  top: 48.57%;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  mix-blend-mode: screen;
+}
+.home-sunflare > span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+}
+.sf-core {
+  width: 62cqw;
+  height: 62cqw;
+  background: radial-gradient(closest-side, rgba(255, 250, 236, 0.95) 0%, rgba(255, 216, 150, 0.62) 16%, rgba(255, 150, 70, 0.26) 44%, rgba(255, 120, 60, 0) 100%);
+}
+.sf-streak {
+  width: 170cqw;
+  height: 1.3cqw;
+  background: linear-gradient(90deg, rgba(255, 190, 120, 0) 0%, rgba(255, 220, 176, 0.8) 50%, rgba(255, 190, 120, 0) 100%);
+}
+.home-sunflare > .sf-g1 {
+  left: -20cqw;
+  top: -2.5cqw;
+  width: 10cqw;
+  height: 10cqw;
+  background: radial-gradient(closest-side, rgba(255, 200, 140, 0) 52%, rgba(255, 214, 160, 0.32) 80%, rgba(255, 200, 140, 0) 100%);
+}
+.home-sunflare > .sf-g2 {
+  left: -50cqw;
+  top: -6cqw;
+  width: 5.5cqw;
+  height: 5.5cqw;
+  background: radial-gradient(closest-side, rgba(170, 205, 255, 0.42) 0%, rgba(170, 205, 255, 0) 100%);
+}
+@keyframes sunflare {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  28% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+@keyframes sf-streak {
+  from {
+    transform: translate(-50%, -50%) scaleX(0.15);
+  }
+  to {
+    transform: translate(-50%, -50%) scaleX(1);
+  }
+}
 /*
  * スマホのホームの写真がごくゆっくり寄って戻る（.home-drift。動きの演出がオンのとき）。検索欄に触れている間は写真を少し暗くし、
  * 最近の検索を薄くする（.home-dim・.home-recent。:has で、触れている検索欄を見る）。components/app/home.tsx

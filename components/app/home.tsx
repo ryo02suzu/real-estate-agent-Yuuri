@@ -115,6 +115,15 @@ export function HomeBackdrop({ drift = false }: { drift?: boolean }) {
       <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(8,18,40,0.30) 0%, rgba(8,18,40,0) 26%, rgba(6,10,20,0) 47%, rgba(6,10,20,0.4) 63%, rgba(6,10,20,0.62) 80%, rgba(6,10,20,0.72) 100%)" }} />
       {/* 検索欄に触れている間は、写真を少し暗くして検索欄を目立たせる（app/globals.css の .home-dim） */}
       <div className="home-dim absolute inset-0" style={{ background: "rgba(4,10,24,0.42)" }} />
+      {/* 太陽の光（長い版のオープニングで、幕が上がるときだけ広がる。写真の太陽の位置 86.35%・48.57% に、写真と同じ切り方で置く） */}
+      <div className="home-stage">
+        <div className="home-sunflare">
+          <span className="sf-core" />
+          <span className="sf-streak" />
+          <span className="sf-ghost sf-g1" />
+          <span className="sf-ghost sf-g2" />
+        </div>
+      </div>
     </div>
   );
 }

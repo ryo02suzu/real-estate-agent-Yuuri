@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Jost, Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
+import { LAUNCH_CITY_SCRIPT } from "@/components/app/launch-city-script";
 import { LAUNCH_SCRIPT } from "@/components/app/launch-script";
 import { APP_ZOOM_SCRIPT } from "@/components/app/zoom";
 import { SKY_HEAD_SCRIPT } from "@/lib/app/sky-vars";
@@ -40,6 +41,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: SKY_HEAD_SCRIPT }} />
         {/* アプリを開いたときの演出の種類（スマホの幅だけ。最初に描く前に html の data-launch に入れる。components/app/launch-script.ts） */}
         <script dangerouslySetInnerHTML={{ __html: LAUNCH_SCRIPT }} />
+        {/* 長い版の「光の道の街」（React を待たずに、最初に描くときから動く。components/app/launch-city.js） */}
+        <script dangerouslySetInnerHTML={{ __html: LAUNCH_CITY_SCRIPT }} />
       </head>
       <body className="flex h-dvh flex-col overflow-hidden">{children}</body>
     </html>
