@@ -194,6 +194,14 @@ const md = (t: number) => {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 };
 
+/** 確認済みにした確認事項の数（書類・出力のページの「確認の記録 n件」） */
+export function recordsDoneCount(records: PropertyRecords | undefined): number {
+  if (!records) return 0;
+  let n = 0;
+  for (const recs of Object.values(records.items)) for (const r of Object.values(recs ?? {})) if (r.done) n++;
+  return n;
+}
+
 /** 共有の文・印刷に添える「あなたの確認の記録」（記録が無ければ空）。MICHILU の判定ではない旨を添える */
 export function recordLines(records: PropertyRecords | undefined): string[] {
   if (!records) return [];

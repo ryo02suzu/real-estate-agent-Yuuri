@@ -4,38 +4,33 @@
 // 太陽の高さで昼・夕方・夜に切り替えて敷く（lib/app/sun.ts の dayPart。開いている間に時間帯が変わったら、ゆっくり入れ替わる）。
 // 写真は下のメニューの後ろまで敷くので、components/app/mobile-app.tsx が DocsBackdrop で画面のいちばん奥に置く。
 // 上から：ホームと同じロゴの帯と右上のメニュー（≡）、ページの名前（DOCUMENTS・書類・出力。page-head.tsx）、写真を見せる空き、
-// 物件のカード（書類を作る物件と、作れる書類。いちばん使う「要注意点と次にやること」は横いっぱいの大きなボタン（すりガラスのまま少し明るく、
-// 金色のアイコン）、ほかの4つは小さなボタン）、
+// 物件のカード（書類を作る物件と調査の状態、作れる書類。いちばん使う「要注意点と次にやること」は横いっぱいの大きなボタン（すりガラスのまま少し明るく、
+// 金色のアイコン）、ほかの6つは調査の流れの順の小さなボタン 2段×3つ（役所・法務局で：照会文・地番の一覧、現地で：案内図、書類にする：調査メモ・重説の下書き・結果の文面。
+// 並びは doc-kinds.tsx））、
 // ほかの物件から作る（すりガラスの板に、画面に収まる数だけ。続きは履歴）、注意の一文。
 // 字・すりガラスはホームとお気に入りと同じ（白い字にごく薄い影、板は components/app/favorites.tsx の BOARD）。スクロールしない
 // （背の低い画面だけ、はみ出した分をスクロールできる）。
 // 動き（app/globals.css の .docs-*・.day-*）：開くと写真がふわっと落ち着き、上から順に浮き上がる。≡ の「動きの演出」がオンのときは、
 // 写真がごくゆっくり寄り、昼は窓の光、夕方は夕日とスタンド、夜はスタンドの明かりがゆっくり揺らぎ、夜はビルの屋上の赤い灯が点滅する。
 // 動きを減らす設定では動かさない
-import { ChevronRight, ClipboardCopy, Clock3, ListChecks, Map as MapIcon, MapPin, Printer, ScrollText, Search, type LucideIcon } from "lucide-react";
+import { ChevronRight, Clock3, MapPin, Search } from "lucide-react";
 import { useRef, type CSSProperties, type ReactNode } from "react";
+import { docMainSub, docStatusLine, useDocStatus } from "@/lib/app/doc-status";
 import { propertyCount } from "@/lib/app/history-view";
 import { placeParts } from "@/lib/app/scene";
 import { dayPart } from "@/lib/app/sun";
+import { favoriteKey } from "@/lib/favorites";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import { partNow, useDayLayers, useLayerEntry, type DayPart } from "./day-photo";
+import { DOCS, MAIN_DOC, type DocKind } from "./doc-kinds";
 import { BOARD, LABEL, placeSubLine } from "./favorites";
 import { PhoneImg } from "./frame";
 import { BrandBar, PageTitle } from "./page-head";
 import { HIT, SHADOW, useScreenHeight } from "./home";
 import { useNow, when } from "./tab-pages";
 
-/** 作れる書類（押すと、その書類をすぐ開く） */
-export type DocKind = "triage" | "memo" | "draft" | "guide" | "copy";
-/** いちばん使う書類（白い大きなボタン） */
-const MAIN_DOC = { kind: "triage" as const, Icon: ListChecks, title: "要注意点と次にやること", sub: "問題になりそうな所と、確かめる窓口" };
-/** ほかの書類（小さなボタン。名前の下に形を添える） */
-const DOCS: { kind: DocKind; Icon: LucideIcon; title: string; sub: string; label: string }[] = [
-  { kind: "memo", Icon: Printer, title: "調査メモ", sub: "A4・PDF", label: "調査メモ（A4に印刷・PDF）" },
-  { kind: "draft", Icon: ScrollText, title: "重説の下書き", sub: "物件概要つき", label: "重説の下書き（物件概要も一緒に）" },
-  { kind: "guide", Icon: MapIcon, title: "案内図", sub: "A4・PDF", label: "案内図（A4に印刷・PDF）" },
-  { kind: "copy", Icon: ClipboardCopy, title: "結果の文面", sub: "コピー用", label: "結果の文面（コピーして貼る）" },
-];
+/** 作れる書類の並びは components/app/doc-kinds.tsx（押すと、その書類をすぐ開く） */
+export type { DocKind };
 
 /**
  * 時間帯ごとの写真（届いた絵 941×1672）。x は縦長の画面で左右を切るときの位置（0 左 〜 1 右）：
@@ -161,10 +156,10 @@ function DocsScene({ part, swap, onShown }: { part: DayPart; swap: boolean; onSh
 const delay = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
 
 /**
- * いつもの画面の寸法（pt）：ひとことの下の端、物件のカード、一覧の見出し（上の余白込み）、行、注意の一文、下の余白。
- * 写真を見せる空きは、画面の高さの 2 割を残す（夕方の夕日・夜の東京タワーがカードに隠れない）
+ * いつもの画面の寸法（pt）：ひとことの下の端、物件のカード（6つのタイルの 2 段。status は調査の状態の行の分）、一覧の見出し（上の余白込み）、行、
+ * 注意の一文、下の余白。写真を見せる空きは、画面の高さの 2 割を残す（夕方の夕日・夜の東京タワーがカードに隠れない）
  */
-const LAYOUT = { head: 126, compactHead: 120, card: 227, listHead: 60, row: 63, note: 47, bottom: 16 };
+const LAYOUT = { head: 126, compactHead: 120, card: 294, status: 17, listHead: 60, row: 63, note: 47, bottom: 16 };
 
 /** 物件の名前（市区町村と町名。無ければ住所のまま） */
 function placeName(h: HistoryItem): string {
@@ -223,9 +218,12 @@ export function DocsPage({
   // 書類を作る物件：開いている物件、無ければ最近調べた物件
   const target = current ?? history[0];
   const others = history.filter((h) => !target || historyKey(h) !== historyKey(target));
+  // 開いている物件の調査の状態（要注意点・やることの残り・確認の記録。物件の画面が入れる）
+  const status = useDocStatus(current ? favoriteKey(current) : undefined);
   // 一覧に出す数：写真を見せる空きを残して、画面に収まるだけ（1〜3件）
   const h = screen ?? 760;
-  const room = h - (compact ? LAYOUT.compactHead : LAYOUT.head) - LAYOUT.card - LAYOUT.listHead - LAYOUT.note - LAYOUT.bottom - (compact ? 16 : Math.round(h * 0.2));
+  const card = LAYOUT.card + (status ? LAYOUT.status : 0);
+  const room = h - (compact ? LAYOUT.compactHead : LAYOUT.head) - card - LAYOUT.listHead - LAYOUT.note - LAYOUT.bottom - (compact ? 16 : Math.round(h * 0.2));
   const shown = others.slice(0, Math.min(3, Math.max(1, Math.floor(room / LAYOUT.row))));
 
   return (
@@ -263,6 +261,12 @@ export function DocsPage({
             <ChevronRight size={15} strokeWidth={2} absoluteStrokeWidth className="transition-transform duration-200 group-active:translate-x-[3px]" />
           </button>
         </div>
+        {/* 開いている物件の調査の状態（やることの残り・確認の記録・読み込み中）。横いっぱいに出す */}
+        {status && (
+          <p className="mt-[5px] truncate pl-[7px] leading-none" style={{ fontSize: 12, color: "rgba(255,255,255,0.72)" }}>
+            {docStatusLine(status)}
+          </p>
+        )}
         {/* まだ物件が無いときは、押すと「先にホームで調べて」の案内（mobile-app.tsx の makeDoc）。見た目も控えめに */}
         <div style={{ opacity: target ? 1 : 0.55 }}>
           {/*
@@ -279,26 +283,27 @@ export function DocsPage({
                 {MAIN_DOC.title}
               </span>
               <span className="mt-[3px] block truncate leading-[1.3]" style={{ fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
-                {MAIN_DOC.sub}
+                {docMainSub(status)}
               </span>
             </span>
             <ChevronRight size={18} strokeWidth={1.9} absoluteStrokeWidth color="rgba(255,255,255,0.75)" className="relative shrink-0" />
           </button>
-          <div className="mt-[8px] grid grid-cols-4 gap-[7px]">
+          {/* ほかの書類：調査の流れの順（上の段は役所・法務局・現地で使うもの、下の段は書類にまとめるもの） */}
+          <div className="mt-[8px] grid grid-cols-3 gap-[7px]">
             {DOCS.map((d) => (
               <button
                 key={d.kind}
                 onClick={() => onMake(d.kind)}
-                aria-label={d.label}
+                aria-label={`${d.title}（${d.short}）`}
                 className="press flex flex-col items-center justify-center rounded-[16px] px-[2px] text-center transition-[background-color] active:bg-white/20"
-                style={{ minHeight: 74, background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.13)" }}
+                style={{ minHeight: 68, background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.13)" }}
               >
-                <d.Icon size={21} strokeWidth={1.7} absoluteStrokeWidth color="#fff" />
-                <span className="mt-[7px] whitespace-nowrap font-medium leading-none" style={{ fontSize: 12, color: "rgba(255,255,255,0.95)" }}>
+                <d.Icon size={20} strokeWidth={1.7} absoluteStrokeWidth color="#fff" />
+                <span className="mt-[6px] whitespace-nowrap font-medium leading-none" style={{ fontSize: 12, color: "rgba(255,255,255,0.95)" }}>
                   {d.title}
                 </span>
-                <span className="mt-[5px] whitespace-nowrap leading-none" style={{ fontSize: 11, color: "rgba(255,255,255,0.58)" }}>
-                  {d.sub}
+                <span className="mt-[4px] whitespace-nowrap leading-none" style={{ fontSize: 10.5, color: "rgba(255,255,255,0.58)" }}>
+                  {d.short}
                 </span>
               </button>
             ))}

@@ -16,15 +16,15 @@ export const ASK = [
   "市道（公道）か私道か。私道なら所有者と通行・掘削の承諾の要否",
 ];
 
-/** FAX・メールで照会するときの依頼文 */
-export function buildInquiryText(address: string, dept: string): string {
+/** FAX・メールで照会するときの依頼文（chiban は物件の筆の地番が分かっているときだけ。分からなければ空欄にして書き足してもらう） */
+export function buildInquiryText(address: string, dept: string, chiban?: string): string {
   return [
     `${dept} 御中`,
     "",
     "いつもお世話になっております。下記の土地の前面道路について、建築基準法上の道路種別をご教示ください。",
     "",
     `所在地：${address}`,
-    "地番：",
+    `地番：${chiban ?? ""}`,
     "",
     "確認したい事項",
     ...ASK.map((a, i) => `${i + 1}. ${a}`),

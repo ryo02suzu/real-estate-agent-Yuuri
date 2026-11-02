@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { normalizeAddress, propertyId, propertyIdOf } from "./property-id";
-import { allRecords, loadRecords, mergeRecords, recordsSummary, removeRecord, topicProgress, writeRecord } from "./records";
+import { allRecords, loadRecords, mergeRecords, recordsDoneCount, recordsSummary, removeRecord, topicProgress, writeRecord } from "./records";
 
 // localStorage の代わり（vitest は node で動く）
 const store = new Map<string, string>();
@@ -69,6 +69,10 @@ describe("records（確認の記録）", () => {
     writeRecord(key, "y", "road", "kind", { done: true });
     expect(recordsSummary(loadRecords(key))).toMatchObject({ all: 1, partial: 1 });
     expect(recordsSummary(undefined)).toEqual({ all: 0, partial: 0, latest: undefined });
+    // 確認済みにした確認事項の数（確認済みを外したものは数えない）
+    writeRecord(key, "y", "road", "width", { done: false, note: "未" });
+    expect(recordsDoneCount(loadRecords(key))).toBe(2);
+    expect(recordsDoneCount(undefined)).toBe(0);
   });
   it("読み込みは足すだけで、同じ確認事項は新しい方を残す", () => {
     const key = "a:z";

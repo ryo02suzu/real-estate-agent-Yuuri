@@ -44,6 +44,7 @@ import { propertyIdOf } from "@/lib/property-id";
 import {
   loadRecords,
   recordLines,
+  recordsDoneCount,
   RECORDS_EVENT,
   type PropertyRecords,
   type RecordTopic,
@@ -65,6 +66,9 @@ import {
 } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { buildSummary } from "@/lib/summary";
+import { publishDocStatus } from "@/lib/app/doc-status";
+import { buildInquiryText } from "@/lib/inquiry";
+import { parcelListText } from "@/lib/parcel-list";
 import { parcelAreaM2, TSUBO_M2 } from "@/lib/app/area";
 import { DraftSheet } from "../draft-sheet";
 import { FullMap } from "../full-map";
@@ -89,7 +93,9 @@ import {
 } from "./app-sheets";
 import { DetailSheet } from "./detail-sheets";
 import { ART_W, BottomNav, ZOOM, type NavKey } from "./frame";
-import { DocsBackdrop, DocsPage, docsPhoto, docsTop, type DocKind } from "./docs";
+import { type DocKind } from "./doc-kinds";
+import { MemoSheet, TextDocSheet } from "./doc-sheets";
+import { DocsBackdrop, DocsPage, docsPhoto, docsTop } from "./docs";
 import {
   FavoritesBackdrop,
   FavoritesPage,
@@ -1330,6 +1336,10 @@ function PropertyView({
   const [triage, setTriage] = useState(false);
   const [draft, setDraft] = useState(false);
   const [guide, setGuide] = useState(false);
+  // 役所の照会文・謄本用の地番の一覧（文面のシート）・調査メモの印刷の確認（components/app/doc-sheets.tsx）
+  const [inquiry, setInquiry] = useState(false);
+  const [parcelsDoc, setParcelsDoc] = useState(false);
+  const [memo, setMemo] = useState(false);
   const [full, setFull] = useState<MapOpen | null>(null);
   // 見出しの「推定の位置」の説明を出しているか
   const [about, setAbout] = useState(false);
@@ -1365,35 +1375,66 @@ function PropertyView({
   const shareCopy = useCopy();
   const reportCopy = useCopy();
   const checklist = useChecklist(result);
-  // 共有の文の先頭に、要注意点と次にやること（済んだ印も）を入れる。外した項目は抜く
+  // 読み込めたデータ（文面・下書き・地番の一覧の入力）。共有の文の先頭に、要注意点と次にやること（済んだ印も）を入れる。
+  // レポートで外した項目は抜く（地番の一覧は外した項目に関係なく全部）
+  const loadedData = loaded({ ...data, landPrice: data.landPrice5 });
   const input = pickSections(
-    {
-      ...loaded({ ...data, landPrice: data.landPrice5 }),
-      triage: data.triage,
-      done: checklist.done,
-    },
+    { ...loadedData, triage: data.triage, done: checklist.done },
     off,
   );
   /** 共有・コピーの文（結果の文面と、あなたの確認の記録） */
   const summaryText = () =>
     [buildSummary(result, input), ...recordLines(records)].join("\n");
-  // 書類・出力のタイルで選んだ書類を、この物件の画面が出たらすぐ開く（印刷とコピーは押した操作の中でないと動かないので、レポートの画面から）
+  /** 書類を開く（レポートのシート・書類・出力のページから。コピー・印刷は開いたシートの中の、押した操作で呼ぶ） */
+  const openDoc = (kind: DocKind) => {
+    setReport(kind === "copy");
+    setTriage(kind === "triage");
+    setDraft(kind === "draft");
+    setGuide(kind === "guide");
+    setMemo(kind === "memo");
+    setInquiry(kind === "inquiry");
+    setParcelsDoc(kind === "parcels");
+  };
+  // 書類・出力のタイルで選んだ書類を、この物件の画面が出たらすぐ開く
   const myKey = favoriteKey(itemOf(query, result));
   useEffect(() => {
     if (!wanted || wanted.key !== myKey) return;
     const { kind } = wanted;
     queueMicrotask(() => {
-      if (kind === "triage") setTriage(true);
-      else if (kind === "draft") setDraft(true);
-      else if (kind === "guide") setGuide(true);
-      else setReport(true);
+      openDoc(kind);
       onWantedDone();
     });
+    // openDoc は状態を入れるだけ（毎回同じ）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wanted, myKey, onWantedDone, setReport]);
+  // 書類・出力のページに出す、この物件の調査の状態（lib/app/doc-status.ts）。数と文字だけを見て入れ直す
+  const actionsLeft = data.triage.actions.filter((a) => !checklist.done.has(a.id)).length;
+  const actionsTotal = data.triage.actions.length;
+  const pendingKey = data.triage.pending.join("・");
+  const failedKey = data.triage.failed.join("・");
+  const recordsDone = recordsDoneCount(records);
+  useEffect(() => {
+    publishDocStatus({
+      key: myKey,
+      headline: data.triage.headline,
+      pending: pendingKey ? pendingKey.split("・") : [],
+      failed: failedKey ? failedKey.split("・") : [],
+      actionsLeft,
+      actionsTotal,
+      records: recordsDone,
+    });
+  }, [myKey, data.triage.headline, pendingKey, failedKey, actionsLeft, actionsTotal, recordsDone]);
+  useEffect(() => () => publishDocStatus(undefined), []);
 
   const m = result.municipality;
   const p = result.parcel;
   const found = p && !result.picked ? p : undefined;
+  // 道路種別の照会文の宛先：分かっていれば道路種別の窓口（市区町村名を頭に）、無ければ建築の担当課
+  const inquiryDept = result.contact
+    ? /^(東京都|\S{2,3}県)\s/.test(result.contact.dept)
+      ? result.contact.dept
+      : `${m.name} ${result.contact.dept}`
+    : `${m.name} 建築指導の担当課`;
   const title = `${displayAddress(result.matchedAddress)}${found ? ` ${chibanLabel(found.chibanRaw)}` : ""}`;
   const longTab = TABS.find((t) => t.key === tab)?.long ?? "";
 
@@ -1618,6 +1659,8 @@ function PropertyView({
       behavior: reducedMotion() ? "auto" : "smooth",
     });
   };
+  // 共有の画面（LINE・メールなど）が出せる端末か（この画面は調べたあとにだけ描くので、サーバーの描画とは食い違わない）
+  const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
   const share = async () => {
     const text = summaryText();
     if (typeof navigator.share === "function") {
@@ -2078,26 +2121,11 @@ function PropertyView({
         <ReportSheet
           open={report}
           onClose={() => setReport(false)}
-          onTriage={() => {
-            setReport(false);
-            setTriage(true);
-          }}
+          onDoc={openDoc}
           triageSub={data.triage.headline}
-          onMemo={() => {
-            setReport(false);
-            // 押した操作の中で印刷を呼ぶ（iPhone はプリントの画面から PDF にもできる）
-            window.print();
-          }}
-          onDraft={() => {
-            setReport(false);
-            setDraft(true);
-          }}
-          onGuide={() => {
-            setReport(false);
-            setGuide(true);
-          }}
           onCopy={() => reportCopy.copy(summaryText())}
           copied={reportCopy.done}
+          onShare={canShare ? () => void share() : undefined}
           preview={summaryText()}
           off={off}
           onToggle={(k) =>
@@ -2131,6 +2159,36 @@ function PropertyView({
         triage={data.triage}
         open={triage}
         onClose={() => setTriage(false)}
+      />
+      {/* 役所の照会文：建築の担当課（分かっていれば窓口の名前）宛ての FAX・メールの依頼文。物件の筆の地番が分かっていれば入れる */}
+      <TextDocSheet
+        open={inquiry}
+        onClose={() => setInquiry(false)}
+        title="道路種別の照会文"
+        lead={`${inquiryDept} に FAX・メールで、前面道路の建築基準法上の種別を聞くときの依頼文です。会社名・担当者・電話を書き足して送ってください。${result.contact?.noPhoneInquiry ? "この市区町村は電話では答えてもらえません（窓口・FAX・メールで）。" : ""}住宅地図・公図の写し（物件に印）を添えると早く答えてもらえます。`}
+        text={buildInquiryText(result.matchedAddress.normalize("NFKC"), inquiryDept, found ? registryChiban(found.chibanRaw) : undefined)}
+        note="役所によって、照会の受け方（窓口のみ・FAX・メール・様式あり）が違います。先に電話か公式サイトで確かめてください。"
+      />
+      {/* 謄本・公図を取るときの地番の一覧（1行に1筆。法務局の窓口・登記情報提供サービスに） */}
+      <TextDocSheet
+        open={parcelsDoc}
+        onClose={() => setParcelsDoc(false)}
+        title="謄本・公図用の地番"
+        lead="物件の筆と、境界が接している筆の所在・地番です（地図データから。1行に1筆）。法務局の窓口・登記情報提供サービスで、この所在と地番を指定します。"
+        text={parcelListText(result, loadedData.parcels)}
+        note="筆の位置は地図データのもので、法務局の証明ではありません。住所で調べたときの筆は住所の地点にある筆（参考）なので、公図で物件の筆を確かめてください。"
+      />
+      <MemoSheet
+        open={memo}
+        onClose={() => setMemo(false)}
+        pending={data.triage.pending}
+        failed={data.triage.failed}
+        records={recordsDone}
+        onPrint={() => {
+          setMemo(false);
+          // 押した操作の中で印刷を呼ぶ（iPhone はプリントの画面から PDF にもできる）
+          window.print();
+        }}
       />
       <DraftSheet
         result={result}

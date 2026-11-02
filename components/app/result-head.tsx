@@ -130,8 +130,9 @@ export function PropertyHero({
             {title}
           </h1>
         )}
+        {/* 地番の見出しのときは住所の行、住所が見出しのときは同じ住所を繰り返さず「住所をコピー」だけ */}
         <button onClick={onCopy} aria-label="住所をコピー" className="pv-rise mt-[8px] flex max-w-full items-center gap-[6px] text-left leading-[1.3]" style={{ fontSize: 14, color: copied ? "#a6f0c6" : "rgba(255,255,255,0.92)", minHeight: 24 }}>
-          <span className="truncate font-medium">{copied ? "住所をコピーしました" : address}</span>
+          <span className="truncate font-medium">{copied ? "住所をコピーしました" : lot ? address : "住所をコピー"}</span>
           {copied ? <Check size={14} strokeWidth={2.4} absoluteStrokeWidth className="shrink-0" /> : <Copy size={13} strokeWidth={1.9} absoluteStrokeWidth className="shrink-0 opacity-80" />}
         </button>
         {chips && <div className="pv-rise mt-[8px] flex flex-wrap gap-[6px]">{chips}</div>}

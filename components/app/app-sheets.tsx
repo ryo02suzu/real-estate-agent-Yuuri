@@ -1,10 +1,12 @@
 "use client";
 
 // 「地図アプリで開く」と「レポートを作成」の選択（下から出る）。地図アプリには物件の座標だけを渡す（押したときだけ。自前のサーバーは通さない）。
-// レポートは、入れる項目を選びながら文面をその場で確かめられる（共有・コピー・重説の下書きに効く。印刷の調査メモは全項目）
-import { ChevronRight, ClipboardCopy, Compass, Crosshair, ExternalLink, FileText, ListChecks, Map as MapIcon, Navigation, Printer, Route, ScrollText } from "lucide-react";
+// レポートは、入れる項目を選びながら文面をその場で確かめられ（共有・コピー・重説の下書きに効く。印刷の調査メモは全項目）、
+// 作れる書類を調査の流れの順（役所・法務局で → 現地で → 書類にする。components/app/doc-kinds.tsx）に並べる
+import { ChevronRight, Compass, Crosshair, ExternalLink, Map as MapIcon, Navigation, Route, Share2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { Sheet } from "../sheet";
+import { DOC_GROUPS, MAIN_DOC, type DocDef, type DocKind } from "./doc-kinds";
 import type { Ok } from "./use-property";
 
 function Item({ icon, title, sub, href, onClick }: { icon: ReactNode; title: string; sub?: string; href?: string; onClick?: () => void }) {
@@ -102,27 +104,25 @@ export function pickSections<T extends object>(input: T, off: ReadonlySet<Sectio
 export function ReportSheet({
   open,
   onClose,
-  onTriage,
+  onDoc,
   triageSub,
-  onMemo,
-  onDraft,
-  onGuide,
   onCopy,
   copied,
+  onShare,
   preview,
   off,
   onToggle,
 }: {
   open: boolean;
   onClose: () => void;
-  /** 要注意点と次にやること（triageSub は「要注意 2件・要確認 5件」） */
-  onTriage: () => void;
+  /** 書類を開く（要注意点・照会文・地番の一覧・案内図・調査メモ・下書き。このシートは閉じてから。結果の文面はこのシートのまま） */
+  onDoc: (kind: DocKind) => void;
+  /** 「要注意 2件・要確認 5件」 */
   triageSub: string;
-  onMemo: () => void;
-  onDraft: () => void;
-  onGuide: () => void;
   onCopy: () => void;
   copied: boolean;
+  /** 共有の画面（LINE・メールなど。出せる端末だけ渡す） */
+  onShare?: () => void;
   /** いまの選択での文面 */
   preview: string;
   /** 外している項目 */
@@ -130,6 +130,7 @@ export function ReportSheet({
   onToggle: (k: SectionKey) => void;
 }) {
   if (!open) return null;
+  const icon = (d: DocDef) => <d.Icon className="h-[18px] w-[18px]" />;
   return (
     <div className="theme-navy">
       <Sheet title="レポートを作成" open onClose={onClose}>
@@ -147,13 +148,26 @@ export function ReportSheet({
         <pre className="mt-2 max-h-[150px] overflow-y-auto whitespace-pre-wrap rounded-xl bg-mint px-3 py-2 text-[11.5px] leading-[1.55] text-ink" style={{ fontFamily: "inherit" }} aria-label="文面のプレビュー">
           {preview}
         </pre>
+        {/* 書類は調査の流れの順（components/app/doc-kinds.tsx。書類・出力のページと同じ並び） */}
         <ul className="mt-2 divide-y divide-line">
-          <Item icon={<ListChecks className="h-[18px] w-[18px]" />} title="要注意点と次にやること" sub={`${triageSub}。窓口ごとの確認事項をチェックしながら進められます`} onClick={onTriage} />
-          <Item icon={<Printer className="h-[18px] w-[18px]" />} title="調査メモを印刷・PDF保存" sub="道路・法令・ハザード・地価・周辺環境をA4にまとめる（iPhoneはプリントの画面からPDFにできます）" onClick={onMemo} />
-          <Item icon={<ScrollText className="h-[18px] w-[18px]" />} title="重説・物件概要の下書き" sub="重要事項説明書・販売図面の欄の順に、コピーして使える下書き" onClick={onDraft} />
-          <Item icon={<FileText className="h-[18px] w-[18px]" />} title="案内図を印刷・PDF保存" sub="物件の場所の地図（A4）" onClick={onGuide} />
-          <Item icon={<ClipboardCopy className="h-[18px] w-[18px]" />} title={copied ? "コピーしました" : "結果の文面をコピー"} sub="メール・チャット・社内の報告にそのまま貼れる文" onClick={onCopy} />
+          <Item icon={icon(MAIN_DOC)} title={MAIN_DOC.action} sub={`${triageSub}。${MAIN_DOC.sub}`} onClick={() => onDoc("triage")} />
         </ul>
+        {DOC_GROUPS.map((g) => (
+          <section key={g.title} className="mt-1.5">
+            <h3 className="text-[11px] font-semibold tracking-[0.08em] text-muted">{g.title}</h3>
+            <ul className="divide-y divide-line">
+              {g.docs.map((d) =>
+                d.kind === "copy" ? (
+                  <Item key={d.kind} icon={icon(d)} title={copied ? "コピーしました" : "結果の文面をコピー"} sub={d.sub} onClick={onCopy} />
+                ) : (
+                  <Item key={d.kind} icon={icon(d)} title={d.action} sub={d.sub} onClick={() => onDoc(d.kind)} />
+                ),
+              )}
+              {/* 共有は「結果の文面」の組だけ（出せる端末だけ） */}
+              {onShare && g.docs.some((d) => d.kind === "copy") && <Item icon={<Share2 className="h-[18px] w-[18px]" />} title="結果の文面を共有" sub="LINE・メール・社内のチャットへ（同じ文面）" onClick={onShare} />}
+            </ul>
+          </section>
+        ))}
         <p className="mt-2 text-[11.5px] leading-[1.6] text-muted">どれも参考の資料です。重要事項説明などの最終確認は、役所の窓口・公的な資料で行ってください。</p>
       </Sheet>
     </div>
