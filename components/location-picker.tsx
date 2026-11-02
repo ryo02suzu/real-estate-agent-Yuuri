@@ -69,6 +69,8 @@ export function LocationPicker({
           fallback={<p className="p-6 text-center text-sm text-muted">この端末では地図を表示できません。住所で検索してください。</p>}
         />
 
+        {/* ホーム画面に追加したアプリ：時刻・電池の帯（白い字）の後ろを少し暗くする（明るい地図の上でも読めるように。Safari・PC では高さ 0） */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0" style={{ height: "calc(env(safe-area-inset-top) * 1.6)", background: "linear-gradient(180deg, rgba(8,16,30,0.5) 0%, rgba(8,16,30,0.28) 55%, rgba(8,16,30,0) 100%)" }} />
         {/* 上のガラスのバー：戻る・見出し */}
         <div className="pointer-events-none absolute inset-x-0 top-0 px-[12px]" style={{ paddingTop: "max(10px, env(safe-area-inset-top))" }}>
           <div className="pointer-events-auto flex h-[46px] items-center gap-[6px] rounded-full pl-[3px] pr-[16px] shadow-[0_6px_18px_rgba(20,45,85,0.16)]" style={GLASS}>

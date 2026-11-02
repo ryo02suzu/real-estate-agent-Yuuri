@@ -126,6 +126,16 @@
   }
 }
 
+/*
+ * スマホ（ホーム画面に追加したアプリ）：時刻・電池の帯の後ろまで画面が広がる（app/layout.tsx の black-translucent）ので、
+ * アプリの中身は帯の下から始める。帯の所は body の背景色（ページの上の色。components/app/mobile-app.tsx）。
+ * Safari・PC では env(safe-area-inset-top) が 0 なので変わらない
+ */
+@media (max-width: 1023px) {
+  body {
+    padding-top: env(safe-area-inset-top);
+  }
+}
 body {
   background: var(--background);
   color: var(--foreground);

@@ -157,6 +157,7 @@ import {
 import { reducedMotion } from "./tokens";
 import { useProperty, type Ok, type PropertyData } from "./use-property";
 import { fitNames, scrollArea } from "./vt";
+import { statusBarColor } from "@/lib/app/status-bar";
 import { applyAppZoom } from "./zoom";
 
 type Shown = { query: string; result: LookupResult };
@@ -448,33 +449,45 @@ export function MobileApp(props: MobileAppProps) {
   const flying = !!flight;
   const okLat = ok?.lat;
   const okLng = ok?.lng;
+  // 帯の色は3か所に入れる：theme-color（Android と iOS 18 までの Safari）、body の背景（iOS 26 の Safari は theme-color を使わず
+  // body の背景色で帯を塗る。ホーム画面に追加したアプリは、帯の所が body の上の余白（app/globals.css）になる。そこでは帯の字が白
+  // なので、明るい色は白い字が読める濃さまで暗くする。lib/app/status-bar.ts）
   useEffect(() => {
     const meta = document.querySelector<HTMLMetaElement>(
       'meta[name="theme-color"][media="(max-width: 1023px)"]',
     );
-    const set = () =>
-      meta?.setAttribute(
-        "content",
-        flying
-          ? FLIGHT_TOP
-          : showHome
-            ? HOME_TOP
-            : page === "favorites"
-              ? favoritesTop()
-              : page === "docs"
-                ? docsTop()
-                : page === "history"
-                  ? historyTop()
-                  : tabPage
-                    ? (skyTop() ?? SKY)
-                    : okLat !== undefined && okLng !== undefined
-                      ? sceneTop(propertyPartNow(okLat, okLng))
-                      : BAND_TOP,
-      );
+    const set = () => {
+      const color = flying
+        ? FLIGHT_TOP
+        : showHome
+          ? HOME_TOP
+          : page === "favorites"
+            ? favoritesTop()
+            : page === "docs"
+              ? docsTop()
+              : page === "history"
+                ? historyTop()
+                : tabPage
+                  ? (skyTop() ?? SKY)
+                  : okLat !== undefined && okLng !== undefined
+                    ? sceneTop(propertyPartNow(okLat, okLng))
+                    : BAND_TOP;
+      meta?.setAttribute("content", color);
+      document.body.style.backgroundColor = standalone
+        ? statusBarColor(color)
+        : color;
+    };
     set();
     addEventListener(SKY_EVENT, set);
     return () => removeEventListener(SKY_EVENT, set);
-  }, [showHome, tabPage, flying, page, okLat, okLng]);
+  }, [showHome, tabPage, flying, page, okLat, okLng, standalone]);
+  // PC の画面に切り替わったら、body の背景は元の色に戻す
+  useEffect(
+    () => () => {
+      document.body.style.backgroundColor = "";
+    },
+    [],
+  );
   // お気に入りのページを離れたら「元に戻す」はしまい、「すべて見る」も閉じる。履歴のページを離れたら、履歴の「元に戻す」もしまう
   useEffect(() => {
     if (page !== "favorites")

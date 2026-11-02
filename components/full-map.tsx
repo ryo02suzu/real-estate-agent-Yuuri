@@ -85,6 +85,8 @@ export function FullMap({
           // WebGL が使えない端末：静的な地図と、地理院地図への入口
           fallback={<MapPreview lat={result.lat} lng={result.lng} className="h-full rounded-none border-0" parcel={result.parcel} />}
         />
+        {/* ホーム画面に追加したアプリ：時刻・電池の帯（白い字）の後ろを少し暗くする（明るい地図の上でも読めるように。Safari・PC では高さ 0） */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0" style={{ height: "calc(env(safe-area-inset-top) * 1.6)", background: "linear-gradient(180deg, rgba(8,16,30,0.5) 0%, rgba(8,16,30,0.28) 55%, rgba(8,16,30,0) 100%)" }} />
         {/* 上のガラスのバー：戻る・住所 */}
         <div className="pointer-events-none absolute inset-x-0 top-0 px-[12px]" style={{ paddingTop: "max(10px, env(safe-area-inset-top))" }}>
           <div className="pointer-events-auto flex h-[46px] items-center gap-[6px] rounded-full pl-[3px] pr-[16px] shadow-[0_6px_18px_rgba(20,45,85,0.16)]" style={GLASS}>

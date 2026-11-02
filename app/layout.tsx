@@ -11,7 +11,9 @@ const jost = Jost({ weight: ["300", "400", "500"], subsets: ["latin"], display: 
 export const metadata: Metadata = {
   title: "MICHILU（ミチル）",
   description: "不動産のための道路情報チェック。住所から市町村の公式道路図をその場所で開きます。",
-  appleWebApp: { capable: true, title: "MICHILU", statusBarStyle: "default" },
+  // ホーム画面に追加したアプリ（iPhone）：時刻・電池の帯の後ろまで画面を広げ、帯の字は白（帯の所は body の上の余白で、ページの上の色。
+  // app/globals.css と components/app/mobile-app.tsx）。前は "default" で、帯が白いままだった
+  appleWebApp: { capable: true, title: "MICHILU", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {
