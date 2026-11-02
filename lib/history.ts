@@ -71,3 +71,39 @@ export function clearHistory(): void {
     // 何もしない
   }
 }
+
+/** 一覧を保存する。保存できたかを返す */
+function save(list: HistoryItem[]): boolean {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(list));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * いまの一覧（画面が持っている一覧。端末に保存できないときも、画面の一覧から消す）から、items を消して保存する。
+ * 消したあとの一覧と、保存できたかを返す（保存できなければ、開き直すと戻る）
+ */
+export function removeHistory(list: readonly HistoryItem[], items: readonly HistoryItem[]): { items: HistoryItem[]; saved: boolean } {
+  const drop = new Set(items.map(historyKey));
+  const next = list.filter((h) => !drop.has(historyKey(h)));
+  return { items: next, saved: save(next) };
+}
+
+/**
+ * 消したものを戻す（「元に戻す」）。調べた日時の新しい順に並べ直すので、元の位置に戻る。
+ * 消したあとに同じ検索をし直していたら、新しい方を残す。最大30件
+ */
+export function restoreHistory(list: readonly HistoryItem[], items: readonly HistoryItem[]): HistoryItem[] {
+  const map = new Map(list.map((h) => [historyKey(h), h]));
+  for (const h of items) {
+    const k = historyKey(h);
+    const mine = map.get(k);
+    if (!mine || h.at > mine.at) map.set(k, h);
+  }
+  const next = [...map.values()].sort((a, b) => b.at - a.at).slice(0, MAX);
+  save(next);
+  return next;
+}

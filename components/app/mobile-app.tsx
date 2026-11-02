@@ -142,7 +142,9 @@ import {
   TabSegments,
   type TabKey,
 } from "./result-head";
-import { AccountPage, HistoryPage, TabBanner } from "./tab-pages";
+import { AccountPage, TabBanner } from "./tab-pages";
+import { HistoryBackdrop, HistoryPage, historyTop, HistoryUndoToast } from "./history";
+import { removedText } from "@/lib/app/history-view";
 import {
   SHEET_KINDS,
   type FrontRoad,
@@ -183,7 +185,10 @@ export type MobileAppProps = {
   onPickAddress: (address: string) => void;
   onPickPoint: (lat: number, lng: number) => void;
   onPickHistory: (h: HistoryItem) => void;
-  onClearHistory: () => void;
+  /** 履歴から消す（行・期間）。端末に保存できたかを返す */
+  onRemoveHistory: (items: HistoryItem[]) => boolean;
+  /** 消した履歴を元に戻す */
+  onRestoreHistory: (items: HistoryItem[]) => void;
   /** 調査記録を読み込んだあと（履歴・お気に入りを端末から読み直す） */
   onReloadStores: () => void;
   onHome: () => void;
@@ -235,6 +240,11 @@ export function MobileApp(props: MobileAppProps) {
   const [undo, setUndo] = useState<{
     item: FavoriteItem;
     index: number;
+    key: number;
+  } | null>(null);
+  // 履歴から消した物件（下に「元に戻す」を出す。続けて消したら足していき、まとめて戻す。key は出し直すための印）
+  const [histUndo, setHistUndo] = useState<{
+    items: HistoryItem[];
     key: number;
   } | null>(null);
   // お気に入りの「すべて見る」を開いているか（ほかのページへ行ったら閉じる。下のメニューのお気に入りをもう一度押しても閉じる）
@@ -397,23 +407,26 @@ export function MobileApp(props: MobileAppProps) {
               ? favoritesTop()
               : page === "docs"
                 ? docsTop()
-                : tabPage
-                  ? (skyTop() ?? SKY)
-                  : okLat !== undefined && okLng !== undefined
-                    ? sceneTop(propertyPartNow(okLat, okLng))
-                    : BAND_TOP,
+                : page === "history"
+                  ? historyTop()
+                  : tabPage
+                    ? (skyTop() ?? SKY)
+                    : okLat !== undefined && okLng !== undefined
+                      ? sceneTop(propertyPartNow(okLat, okLng))
+                      : BAND_TOP,
       );
     set();
     addEventListener(SKY_EVENT, set);
     return () => removeEventListener(SKY_EVENT, set);
   }, [showHome, tabPage, flying, page, okLat, okLng]);
-  // お気に入りのページを離れたら「元に戻す」はしまい、「すべて見る」も閉じる
+  // お気に入りのページを離れたら「元に戻す」はしまい、「すべて見る」も閉じる。履歴のページを離れたら、履歴の「元に戻す」もしまう
   useEffect(() => {
     if (page !== "favorites")
       queueMicrotask(() => {
         setUndo(null);
         setFavAll(false);
       });
+    if (page !== "history") queueMicrotask(() => setHistUndo(null));
   }, [page]);
   // 調べ終わったら、降りる先を地球の演出に渡す（見つからない・候補から選ぶ・調べられなかったときは降りない）
   useEffect(() => {
@@ -518,9 +531,21 @@ export function MobileApp(props: MobileAppProps) {
         isFavorite={isFav}
         onToggleFavorite={toggleFav}
         onPick={pickRecent}
-        onClear={props.onClearHistory}
+        onDocs={openDocsFor}
+        onRemove={(items) => {
+          if (!props.onRemoveHistory(items))
+            setNotice(
+              "この端末に履歴を保存できないため、開き直すと戻ります。端末の空き容量と、プライベートブラウズでないことを確かめてください。",
+            );
+          setHistUndo((u) => ({
+            items: [...(u?.items ?? []), ...items],
+            key: Date.now(),
+          }));
+        }}
+        onNotice={flash}
         onHome={() => go("home")}
-        banner={tabBanner}
+        onMenu={() => setMenu(true)}
+        unread={unread}
         morph={morph}
       />
     );
@@ -635,6 +660,9 @@ export function MobileApp(props: MobileAppProps) {
         <FavoritesBackdrop scroller={scroller} motion={motionOn} />
       )}
       {page === "docs" && <DocsBackdrop motion={motionOn} />}
+      {page === "history" && (
+        <HistoryBackdrop scroller={scroller} motion={motionOn} />
+      )}
       {/* 物件の画面の街の模型（ほかのページを見ている間は隠して描かない。戻ったときに作り直さない） */}
       {ok && (
         <div
@@ -711,12 +739,15 @@ export function MobileApp(props: MobileAppProps) {
                 />
               </div>
             )}
-            {/* お気に入りと書類・出力は自分で上から順に浮き上がる（外の箱を動かすと、すりガラスの後ろがぼけない） */}
+            {/* お気に入り・書類・出力・履歴は自分で上から順に浮き上がる（外の箱を動かすと、すりガラスの後ろがぼけない） */}
             {tabPage && (
               <div
                 key={page}
                 className={
-                  page === "favorites" || page === "docs" || morph
+                  page === "favorites" ||
+                  page === "docs" ||
+                  page === "history" ||
+                  morph
                     ? undefined
                     : "page-in"
                 }
@@ -732,6 +763,36 @@ export function MobileApp(props: MobileAppProps) {
           ref={setBarSlot}
           className="pointer-events-none absolute inset-x-0 bottom-0 z-30"
         />
+        {/* 履歴のページのお知らせ（コピーしました など）と、消したあとの「元に戻す」（下のメニューのすぐ上に浮かせる。一覧はスクロールするので） */}
+        {page === "history" && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-[12px] z-40 flex justify-center">
+            <div
+              className="flex flex-col items-center gap-[8px] px-[16px]"
+              style={{ width: ART_W, zoom: ZOOM }}
+            >
+              <div className="pointer-events-auto w-full empty:hidden">
+                <TabBanner
+                  glass
+                  loading={loading && !offline}
+                  error={failure}
+                  notice={notice}
+                  onDismiss={() => setNotice(null)}
+                />
+              </div>
+              {histUndo && (
+                <HistoryUndoToast
+                  key={histUndo.key}
+                  text={removedText(histUndo.items)}
+                  onUndo={() => {
+                    props.onRestoreHistory(histUndo.items);
+                    setHistUndo(null);
+                  }}
+                  onClose={() => setHistUndo(null)}
+                />
+              )}
+            </div>
+          </div>
+        )}
         {/* お気に入りから外したあとの「元に戻す」（下のメニューのすぐ上） */}
         {undo && page === "favorites" && (
           <div className="pointer-events-none absolute inset-x-0 bottom-[12px] z-40 flex justify-center">
@@ -757,6 +818,7 @@ export function MobileApp(props: MobileAppProps) {
           showHome ||
           page === "favorites" ||
           page === "docs" ||
+          page === "history" ||
           (!!ok && page === "home")
         }
         active={page}

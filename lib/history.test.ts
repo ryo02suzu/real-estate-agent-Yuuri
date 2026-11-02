@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { addHistory, clearHistory, loadHistory } from "./history";
+import { addHistory, clearHistory, loadHistory, removeHistory, restoreHistory } from "./history";
 
 function memoryStorage() {
   const m = new Map<string, string>();
@@ -60,6 +60,45 @@ describe("history", () => {
     expect(loadHistory()).toEqual([]);
     expect(addHistory({ address: "A", at: 1 })).toEqual([{ address: "A", at: 1 }]);
     expect(() => clearHistory()).not.toThrow();
+  });
+
+  it("選んだものだけ消して、元に戻すと同じ位置に戻る", () => {
+    addHistory({ address: "A", at: 1 });
+    addHistory({ address: "B", at: 2 });
+    addHistory({ address: "C", at: 3, ll: [35.1, 139.1] });
+    const list = loadHistory();
+    const gone = [list[1], list[0]];
+    const r = removeHistory(list, gone);
+    expect(r.saved).toBe(true);
+    expect(r.items.map((h) => h.address)).toEqual(["A"]);
+    expect(loadHistory().map((h) => h.address)).toEqual(["A"]);
+    expect(restoreHistory(r.items, gone).map((h) => h.at)).toEqual([3, 2, 1]);
+    expect(loadHistory().map((h) => h.at)).toEqual([3, 2, 1]);
+  });
+
+  it("元に戻す前に同じ検索をし直していたら、新しい方を残す", () => {
+    addHistory({ address: "A", at: 1 });
+    const gone = loadHistory();
+    removeHistory(gone, gone);
+    const again = addHistory({ address: "A", at: 5, city: "越谷市" });
+    expect(restoreHistory(again, gone)).toEqual([{ address: "A", at: 5, city: "越谷市" }]);
+  });
+
+  it("端末に保存できなくても、画面の一覧からは消せる", () => {
+    vi.stubGlobal("localStorage", {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("blocked");
+      },
+      removeItem: () => {},
+    });
+    const list = [
+      { address: "B", at: 2 },
+      { address: "A", at: 1 },
+    ];
+    const r = removeHistory(list, [list[0]]);
+    expect(r).toEqual({ items: [{ address: "A", at: 1 }], saved: false });
+    expect(restoreHistory(r.items, [list[0]]).map((h) => h.address)).toEqual(["B", "A"]);
   });
 
   it("壊れたデータは無視する", () => {

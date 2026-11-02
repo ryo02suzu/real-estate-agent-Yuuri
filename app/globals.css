@@ -638,6 +638,174 @@ body {
   }
 }
 
+/*
+ * スマホの履歴のページ（components/app/history.tsx）。画面いっぱいの背景（届く背景の絵。届くまでは時間帯の色の仮の背景）と、
+ * ホーム・お気に入りと同じすりガラス。背景の箱（.hist-stage）は画面を覆う大きさにする（写真の縦横比 --hist-ar、切る位置 --hist-x・--hist-y。
+ * コンテナの単位が使えない古い端末は、画面いっぱいの箱に合わせるだけ）。スクロールした量（--hist-p。0〜1）で背景が上へ寄り
+ * （.hist-alive のとき）、暗くなる（.hist-dim）。絞り込みの欄に触れている間は少し暗くする（.hist-focus）。
+ * 行（.hist-row）は、なぞると前の面（.hist-front）が指について動き、なぞった分だけ後ろの操作（.hist-acts）が見える。
+ * 消すときは高さをたたむ（.hist-leaving）。現れる動き（.hist-rise・.hist-enter・.hist-chip・.hist-pop）は、すりガラスの箱そのものに付け、
+ * 終わったら外す（backwards）。動きを減らす設定では動かさない
+ */
+.hist-stage {
+  position: absolute;
+  inset: 0;
+}
+@supports (width: 1cqw) {
+  .hist-backdrop {
+    container-type: size;
+  }
+  .hist-stage {
+    inset: auto;
+    width: max(100cqw, calc(100cqh * var(--hist-ar, 0.5628)));
+    aspect-ratio: var(--hist-ar, 0.5628);
+    left: calc((100cqw - max(100cqw, calc(100cqh * var(--hist-ar, 0.5628)))) * var(--hist-x, 0.5));
+    top: calc((100cqh - max(calc(100cqw / var(--hist-ar, 0.5628)), 100cqh)) * var(--hist-y, 0.5));
+  }
+}
+.hist-dim {
+  background: rgba(3, 8, 20, 0.55);
+  opacity: calc(var(--hist-p, 0) * 0.8);
+}
+.hist-focus {
+  background: rgba(4, 10, 24, 0.32);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.theme-navy:has(.hist-search input:focus) .hist-focus {
+  opacity: 1;
+}
+.hist-bar {
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition:
+    opacity 0.25s ease,
+    transform 0.3s ease;
+}
+[data-compact] .hist-bar {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+/* 行：長押しで字を選ばない。消すときは高さを 0 へ（grid の 1fr → 0fr） */
+.hist-row {
+  display: grid;
+  grid-template-rows: 1fr;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.hist-row > .hist-row-in {
+  min-height: 0;
+  overflow: hidden;
+}
+.hist-row.hist-leaving {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  border-color: transparent;
+  pointer-events: none;
+}
+/* 前の面は横の動きだけ指で受け取る（縦のスクロールはブラウザに任せる） */
+.hist-front {
+  touch-action: pan-y;
+}
+/* なぞると見える操作（コピー・消す）。前の面が動いた分だけ広がり、大きくなぞると「消す」が全体に広がる */
+.hist-act {
+  display: flex;
+  min-width: 0;
+  flex-basis: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+/* 絞り込みの文字に合う所（金色の字に、うすい下線と下地） */
+.hist-mark {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: rgba(255, 205, 90, 0.16);
+  box-shadow: inset 0 -1.5px 0 rgba(255, 205, 90, 0.6);
+  color: #ffd979;
+}
+/* 小さな押せる所の、指の当たる範囲を広げる（見た目は変えない） */
+.hist-hit::after {
+  content: "";
+  position: absolute;
+  inset: -5px -2px;
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .hist-alive .hist-stage {
+    transform: translate3d(0, calc(var(--hist-p, 0) * -44px), 0) scale(calc(1 + var(--hist-p, 0) * 0.08));
+    will-change: transform;
+  }
+  .hist-alive .hist-drift {
+    animation: docs-drift 46s ease-in-out infinite alternate;
+    transform-origin: 50% 42%;
+  }
+  .hist-rise {
+    animation: home-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  }
+  .hist-enter {
+    animation: fav-row 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  }
+  .hist-row {
+    transition:
+      grid-template-rows 0.34s cubic-bezier(0.2, 0.7, 0.2, 1),
+      opacity 0.26s ease,
+      border-color 0.2s ease;
+  }
+  .hist-front,
+  .hist-acts {
+    transition:
+      transform 0.4s cubic-bezier(0.2, 0.9, 0.25, 1),
+      width 0.4s cubic-bezier(0.2, 0.9, 0.25, 1);
+  }
+  .hist-act {
+    transition:
+      flex-grow 0.22s ease,
+      padding 0.22s ease;
+  }
+  .hist-drag .hist-front,
+  .hist-drag .hist-acts {
+    transition: none;
+  }
+  .hist-held {
+    animation: hist-held 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .hist-chip {
+    animation: hist-chip 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  }
+  .hist-pop {
+    animation: hist-pop 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  }
+}
+/* 長押し：行が少し沈んで明るくなる（そのあとシートが出る） */
+@keyframes hist-held {
+  40% {
+    scale: 0.975;
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+}
+@keyframes hist-chip {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@keyframes hist-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
 @keyframes home-rise {
   from {
     opacity: 0;
@@ -1010,6 +1178,15 @@ body {
     animation-duration: 0.46s;
     animation-timing-function: ease;
   }
+  /* すりガラスの欄と板は、角を丸く切る（すりガラスの絵が四角いまま一瞬見えないように） */
+  html.vt-recent::view-transition-group(vt-search) {
+    border-radius: 9999px;
+    overflow: hidden;
+  }
+  html.vt-recent::view-transition-group(vt-card) {
+    border-radius: 22px;
+    overflow: hidden;
+  }
   /* 前と次のページが重なって見える時間を短くする（字が二重に見えないように） */
   html.vt-recent::view-transition-old(root) {
     animation: vt-recent-out 0.26s cubic-bezier(0.4, 0, 1, 1) both;
@@ -1030,6 +1207,20 @@ body {
   html.vt-fav::view-transition-old(vt-card),
   html.vt-fav::view-transition-new(vt-card) {
     height: 100%;
+  }
+}
+/*
+ * 履歴の並べ方・調べ方を変えたとき（components/app/history.tsx の animateList。html に .vt-hist が付いている間だけ）。
+ * 行（名前は hist-番号）は新しい位置へ 0.44 秒で滑り、消える行は薄れ、ほかの画面（章の見出し・板）はふつうの重ね合わせで入れ替える
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  html.vt-hist::view-transition-group(*) {
+    animation-duration: 0.44s;
+    animation-timing-function: cubic-bezier(0.22, 0.9, 0.24, 1);
+  }
+  html.vt-hist::view-transition-old(root),
+  html.vt-hist::view-transition-new(root) {
+    animation-duration: 0.3s;
   }
 }
 @keyframes vt-recent-out {

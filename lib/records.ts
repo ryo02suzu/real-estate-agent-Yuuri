@@ -177,6 +177,18 @@ export function recordsSummary(records: PropertyRecords | undefined): { all: num
   return { all, partial, latest };
 }
 
+/** 物件の記録の項目名（履歴の行の札・シート）：すべて確認した項目と、一部だけ確認した項目 */
+export function recordsTopics(records: PropertyRecords | undefined): { all: string[]; partial: string[] } {
+  const all: string[] = [];
+  const partial: string[] = [];
+  for (const t of RECORD_TOPICS) {
+    const p = topicProgress(records, t);
+    if (p.status === "all") all.push(RECORD_ITEMS[t].label);
+    else if (p.status === "partial") partial.push(RECORD_ITEMS[t].label);
+  }
+  return { all, partial };
+}
+
 const md = (t: number) => {
   const d = new Date(t);
   return `${d.getMonth() + 1}/${d.getDate()}`;

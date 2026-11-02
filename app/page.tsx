@@ -11,7 +11,7 @@ import { openDraft } from "@/components/draft-sheet";
 import { GuideMapSheet } from "@/components/guide-map";
 import { Sheet } from "@/components/sheet";
 import { favoriteKey, loadFavorites, removeFavorite, type FavoriteItem } from "@/lib/favorites";
-import { addHistory, clearHistory, loadHistory, type HistoryItem } from "@/lib/history";
+import { addHistory, clearHistory, loadHistory, removeHistory, restoreHistory, type HistoryItem } from "@/lib/history";
 import { propertyIdOf } from "@/lib/property-id";
 import { GeocoderUnavailable, lookup, lookupPoint, MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
 import { buildHash, pageUrl, readUrlState } from "@/lib/app/url";
@@ -261,10 +261,12 @@ export default function Home() {
       onPickAddress={(a) => search(a, false)}
       onPickPoint={(lat, lng) => void searchPoint(lat, lng)}
       onPickHistory={(h) => void pickHistory(h)}
-      onClearHistory={() => {
-        clearHistory();
-        setHistory([]);
+      onRemoveHistory={(items) => {
+        const r = removeHistory(history, items);
+        setHistory(r.items);
+        return r.saved;
       }}
+      onRestoreHistory={(items) => setHistory(restoreHistory(history, items))}
       onReloadStores={() => {
         setHistory(loadHistory());
         setFavorites(loadFavorites());
