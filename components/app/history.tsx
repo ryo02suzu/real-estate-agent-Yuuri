@@ -2,7 +2,7 @@
 
 // スマホの下のメニューの「履歴」。お気に入り・書類・出力と同じ作り：画面いっぱいの背景（届いた住宅街の絵。朝・昼・夕方・夜で切り替える。
 // 下のメニューの後ろまで敷くので、components/app/mobile-app.tsx が HistoryBackdrop で画面のいちばん奥に置く）の上に、
-// ホームと同じ位置に見出し「履歴」と右上のメニュー（≡）、2行のひとこと（件数）、ホームと同じ検索欄（絞り込み）、写真を見せる空き、
+// ホームと同じロゴの帯と右上のメニュー（≡）、ページの名前（HISTORY・履歴・件数。page-head.tsx）、ホームと同じ検索欄（絞り込み）、写真を見せる空き、
 // 調べた物件の一覧（日付ごと・市区町村ごとの章。すりガラスの板。行に写真は付けない）。一覧の初めの3行は、ホームの最近の検索と同じ高さに来る。
 // 一覧はスクロールでき、スクロールすると写真が上へ寄って暗くなり、上に細いバー（押すといちばん上へ・虫めがねで絞り込み）が出る。
 // 絞り込みの欄に触れている間・絞り込んでいる間は、調べ方の札（すべて・住所・地番・地図）が出て、一覧が検索欄のすぐ下へ滑り上がる
@@ -16,7 +16,7 @@
 // 滑ってつながる（home.tsx の VT）。≡ の「動きの演出」がオンのときは、背景がごくゆっくり寄り、朝日・夕日・月の光がゆっくり揺れる。
 // 動きを減らす設定では、位置の動きを止める。
 // 並べ方・消す範囲・コピーする文・日時の書き方は lib/app/history-view.ts
-import { ArrowUpRight, Copy, FileText, Menu, MoreHorizontal, Search, Star, Trash2, X, type LucideIcon } from "lucide-react";
+import { ArrowUpRight, Copy, FileText, MoreHorizontal, Search, Star, Trash2, X, type LucideIcon } from "lucide-react";
 import {
   startTransition,
   useEffect,
@@ -45,7 +45,8 @@ import { Sheet } from "../sheet";
 import { partNow, useDayLayers, useLayerEntry } from "./day-photo";
 import { BOARD, LABEL, placeSubLine } from "./favorites";
 import { PhoneImg, ScaledInput } from "./frame";
-import { DARK_GLASS, HIT, LIGHT_GLASS, RECENT, SHADOW, useScreenHeight, VT } from "./home";
+import { BrandBar, PageTitle } from "./page-head";
+import { DARK_GLASS, HIT, LIGHT_GLASS, RECENT, useScreenHeight, VT } from "./home";
 import { ClockBack } from "./icons";
 import { TABS, tabOf } from "./result-head";
 import { useShrink } from "./sky";
@@ -118,6 +119,11 @@ const PHOTOS: Record<HistPart, HistPhoto> = {
 /** 履歴のページの時刻・電池の帯の色（いまの時間帯の背景のいちばん上の色） */
 export function historyTop(): string {
   return PHOTOS[partNow(histPart)].top;
+}
+
+/** いまの時間帯の写真（開いてから先に読んでおく。components/app/mobile-app.tsx） */
+export function historyPhoto(): string {
+  return PHOTOS[partNow(histPart)].src;
 }
 
 /** スクロールで背景が寄りきるまでの量（px） */
@@ -664,13 +670,6 @@ export function HistoryPage({
   // 一覧の上からの順（行が少しずつ遅れて現れる）
   const orderOf = new Map(secs.flatMap((s) => s.rows).map((g, i) => [historyKey(g.item), i]));
 
-  const menuButton = (
-    <button onClick={onMenu} aria-label={unread ? "メニュー（新しいお知らせがあります）" : "メニュー"} className="press relative flex shrink-0 items-center justify-center rounded-full" style={{ ...LIGHT_GLASS, width: 46, height: 46, minWidth: HIT, minHeight: HIT }}>
-      <Menu size={22} strokeWidth={1.8} absoluteStrokeWidth color="#fff" />
-      {unread && <span className="absolute rounded-full border-2 border-white bg-[#f0263a]" style={{ right: 2, top: 2, width: 11, height: 11 }} />}
-    </button>
-  );
-
   return (
     <div ref={root} className="hist-page app-touch relative flex flex-col text-white" style={{ minHeight: screen }}>
       {/* スクロールすると上に出る細いバー（押すといちばん上へ。虫めがねで絞り込み） */}
@@ -694,29 +693,11 @@ export function HistoryPage({
         </div>
       )}
 
-      {/* 見出しと右上のメニュー（ホームのロゴと同じ位置） */}
-      <div className="relative flex items-start justify-between" style={{ padding: "16px 18px 0 20px" }}>
-        <h1 className={`${rise} hist-title truncate font-bold`} style={{ fontSize: 28, lineHeight: "34px", letterSpacing: 1.6, marginTop: 6, textShadow: SHADOW }}>
-          履歴
-        </h1>
-        {menuButton}
-      </div>
-      {/* ひとこと（ホームの「不動産の現場に、すぐ使える情報を。」と同じ位置・大きさ） */}
-      <p className={`${rise} hist-lead relative font-medium`} style={{ margin: `${compact ? 8 : 14}px 20px 0`, fontSize: 15.5, lineHeight: 1.6, letterSpacing: 1.6, textShadow: SHADOW, ...(intro ? delay(60) : {}) }}>
-        {history.length ? (
-          <>
-            調べた物件　{total}件
-            <br />
-            この端末だけに残しています
-          </>
-        ) : (
-          <>
-            調べた物件が、
-            <br />
-            ここに残ります。
-          </>
-        )}
-      </p>
+      {/* ロゴと右上のメニュー（4ページで同じ）と、ページの名前（components/app/page-head.tsx）。スクロールすると薄れて、上のバーに入れ替わる */}
+      <BrandBar onMenu={onMenu} unread={unread} logoClass="hist-title" />
+      {/* 名前は、ホームから行がつながってくるとき（morph）も下から現れる（前のページの名前が上へ抜けるのと入れ替わりに）。
+          物件から戻って、出たときの位置へ戻すときは出さない */}
+      <PageTitle en="HISTORY" ja="履歴" count={total} intro={!restore} className="hist-lead" style={{ marginTop: compact ? 8 : 14 }} />
 
       {history.length > 0 && (
         <form
@@ -738,8 +719,9 @@ export function HistoryPage({
         >
           {/* ホームの検索欄と同じ形・大きさ・すりガラス */}
           <div
-            className={`${rise} flex items-center rounded-full transition-[box-shadow] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.28)]`}
-            style={{ ...LIGHT_GLASS, height: "max(56px, 3.3em)", fontSize: 17, ...(intro ? delay(100) : {}), viewTransitionName: morph ? VT.search : undefined }}
+            data-vt-tab="vt-search"
+            className="flex items-center rounded-full transition-[box-shadow] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.28)]"
+            style={{ ...LIGHT_GLASS, height: "max(56px, 3.3em)", fontSize: 17, viewTransitionName: morph ? VT.search : undefined }}
           >
             <Search size={22} strokeWidth={1.9} absoluteStrokeWidth color="#fff" className="ml-[20px] shrink-0" />
             <ScaledInput value={q} onChange={setQ} inputRef={inputRef} size={17} className="ml-[13px] mr-[4px]" label="履歴を絞り込む" autoComplete="off" placeholder="町名・地番・市区町村でしぼる" onPhoto />

@@ -4,7 +4,7 @@
 // components/app/zoom.ts）、スマホの画面だけで読む画像、ロゴ、検索窓の入力欄、いちばん下のメニュー。
 // 検索する前のホームは components/app/home.tsx、物件の画面は components/app/mobile-app.tsx
 import { FileText, Search, Star } from "lucide-react";
-import type { CSSProperties, ImgHTMLAttributes, ReactNode, RefObject } from "react";
+import { useState, type CSSProperties, type ImgHTMLAttributes, type ReactNode, type RefObject } from "react";
 import { ClockBack } from "./icons";
 
 /** 絵の幅（pt）。この幅で描いて、画面の幅に合わせて拡大・縮小する */
@@ -98,11 +98,12 @@ const OFF = "#68738a";
 const ON_DARK = "#5aaeff";
 const OFF_DARK = "rgba(255,255,255,0.78)";
 /** iPhone のアプリの下のメニューと同じくらいの大きさ（アイコン約24pt・名前11pt） */
-const NAV: { key: NavKey; label: string; icon: (color: string, on: boolean) => ReactNode }[] = [
-  { key: "home", label: "検索", icon: (c, on) => <Search size={24} strokeWidth={on ? 2.1 : 1.7} absoluteStrokeWidth color={c} /> },
-  { key: "favorites", label: "お気に入り", icon: (c, on) => <Star size={24} strokeWidth={on ? 2 : 1.6} absoluteStrokeWidth color={c} fill={on ? c : "none"} /> },
-  { key: "history", label: "履歴", icon: (c, on) => <ClockBack size={24} stroke={on ? 2 : 1.6} color={c} /> },
-  { key: "docs", label: "書類・出力", icon: (c, on) => <FileText size={24} strokeWidth={on ? 2 : 1.6} absoluteStrokeWidth color={c} /> },
+// アイコンと名前は、ボタンの字の色（currentColor）で描く（選んだ所が変わると、色がゆっくり移る。app/globals.css の .nav-item）
+const NAV: { key: NavKey; label: string; icon: (on: boolean) => ReactNode }[] = [
+  { key: "home", label: "検索", icon: (on) => <Search size={24} strokeWidth={on ? 2.1 : 1.7} absoluteStrokeWidth color="currentColor" /> },
+  { key: "favorites", label: "お気に入り", icon: (on) => <Star size={24} strokeWidth={on ? 2 : 1.6} absoluteStrokeWidth color="currentColor" fill={on ? "currentColor" : "none"} /> },
+  { key: "history", label: "履歴", icon: (on) => <ClockBack size={24} stroke={on ? 2 : 1.6} color="currentColor" /> },
+  { key: "docs", label: "書類・出力", icon: (on) => <FileText size={24} strokeWidth={on ? 2 : 1.6} absoluteStrokeWidth color="currentColor" /> },
 ];
 
 /**
@@ -112,6 +113,11 @@ const NAV: { key: NavKey; label: string; icon: (color: string, on: boolean) => R
 export function BottomNav({ active, onSelect, dark = false }: { active: NavKey; onSelect: (key: NavKey) => void; dark?: boolean }) {
   const on = dark ? ON_DARK : ON;
   const off = dark ? OFF_DARK : OFF;
+  // 選んでいる所の下の線は1本で、押した所へ滑る（進む向きの先の端が先に動き、後ろの端が少し遅れて追いつく＝線が伸びて縮む）。
+  // 向きは前に選んでいた所との差（描く途中で決める。app/globals.css の .nav-mark）
+  const index = NAV.findIndex((n) => n.key === active);
+  const [mark, setMark] = useState({ index, dir: 0 });
+  if (mark.index !== index) setMark({ index, dir: Math.sign(index - mark.index) });
   return (
     <nav
       aria-label="画面の切り替え"
@@ -128,15 +134,32 @@ export function BottomNav({ active, onSelect, dark = false }: { active: NavKey; 
               onClick={() => onSelect(n.key)}
               aria-current={sel ? "page" : undefined}
               className="nav-item relative flex min-h-[58px] min-w-0 flex-col items-center justify-center gap-[4px] px-[3px] py-[8px] active:opacity-60"
+              style={{ color: sel ? on : off }}
             >
-              {n.icon(sel ? on : off, sel)}
-              <span className="max-w-full break-words text-center leading-[1.2]" style={{ fontSize: 11, color: sel ? on : off, fontWeight: sel ? 600 : 500 }}>
+              {n.icon(sel)}
+              <span className="max-w-full break-words text-center leading-[1.2]" style={{ fontSize: 11, fontWeight: sel ? 600 : 500 }}>
                 {n.label}
               </span>
-              {dark && sel && <span aria-hidden className="absolute rounded-full" style={{ bottom: 2, width: 34, height: 2.5, background: on }} />}
             </button>
           );
         })}
+        {dark && index >= 0 && (
+          <span
+            aria-hidden
+            className="nav-mark pointer-events-none absolute rounded-full"
+            style={
+              {
+                bottom: 2,
+                height: 2.5,
+                left: `calc(${index} * 25% + (25% - 34px) / 2)`,
+                right: `calc(${3 - index} * 25% + (25% - 34px) / 2)`,
+                background: on,
+                "--nav-l": mark.dir > 0 ? "70ms" : "0ms",
+                "--nav-r": mark.dir < 0 ? "70ms" : "0ms",
+              } as CSSProperties
+            }
+          />
+        )}
       </div>
     </nav>
   );

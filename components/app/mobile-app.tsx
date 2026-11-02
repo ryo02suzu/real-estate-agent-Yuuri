@@ -89,10 +89,11 @@ import {
 } from "./app-sheets";
 import { DetailSheet } from "./detail-sheets";
 import { ART_W, BottomNav, ZOOM, type NavKey } from "./frame";
-import { DocsBackdrop, DocsPage, docsTop, type DocKind } from "./docs";
+import { DocsBackdrop, DocsPage, docsPhoto, docsTop, type DocKind } from "./docs";
 import {
   FavoritesBackdrop,
   FavoritesPage,
+  favoritesPhoto,
   favoritesTop,
   UndoToast,
 } from "./favorites";
@@ -144,7 +145,8 @@ import {
   type TabKey,
 } from "./result-head";
 import { AccountPage, TabBanner } from "./tab-pages";
-import { HistoryBackdrop, HistoryPage, historyTop, HistoryUndoToast, type HistorySnapshot } from "./history";
+import { HistoryBackdrop, HistoryPage, historyPhoto, historyTop, HistoryUndoToast, type HistorySnapshot } from "./history";
+import { LaunchIntro } from "./launch";
 import { propertyCount, removedText } from "@/lib/app/history-view";
 import {
   SHEET_KINDS,
@@ -156,7 +158,7 @@ import {
 } from "./types";
 import { reducedMotion } from "./tokens";
 import { useProperty, type Ok, type PropertyData } from "./use-property";
-import { fitNames, scrollArea } from "./vt";
+import { clearShell, fitNames, nameShell, scrollArea } from "./vt";
 import { statusBarColor } from "@/lib/app/status-bar";
 import { applyAppZoom } from "./zoom";
 
@@ -198,6 +200,9 @@ export type MobileAppProps = {
 };
 
 type AppSheet = "help" | "cities" | "sources" | "install" | "storage" | null;
+
+/** ホームの最近の検索 ⇄ 履歴のつながる動き（morphTo）で、行・板・検索欄のほかに名前を付ける所（ロゴの帯・ページの名前） */
+const MORPH_SHELL: ReadonlySet<string> = new Set(["app-brand", "page-title"]);
 
 export function MobileApp(props: MobileAppProps) {
   const {
@@ -334,6 +339,18 @@ export function MobileApp(props: MobileAppProps) {
       });
   }, [error]);
 
+  // ほかの3ページの写真（いまの時間帯）を、開いて少ししてから先に読んでおく（初めてページを切り替えたとき、写真が遅れて出ないように）
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      for (const src of [favoritesPhoto(), historyPhoto(), docsPhoto()]) {
+        const img = new Image();
+        img.decoding = "async";
+        img.src = src;
+      }
+    }, 2600);
+    return () => clearTimeout(t);
+  }, []);
+
   const go = useCallback((p: NavKey) => {
     setPage(p);
     scroller.current?.scrollTo(0, 0);
@@ -357,6 +374,8 @@ export function MobileApp(props: MobileAppProps) {
     // 今日の行が多くて縦に長い板は、見えている所で切って滑らせる。components/app/vt.ts）
     const sc = scroller.current;
     const unclip = sc ? fitNames(sc, scrollArea(sc), [VT.card]) : () => {};
+    // ロゴの帯は止めたまま、ページの名前は入れ替える（ページの切り替えと同じ。tabTo）
+    const shell = sc ? nameShell(sc, scrollArea(sc), MORPH_SHELL) : new Set<string>();
     let unclipNew = () => {};
     const html = document.documentElement;
     // 向き（履歴へは上へ、ホームへは下へ。行の動き出す順を変える）
@@ -366,15 +385,61 @@ export function MobileApp(props: MobileAppProps) {
       flushSync(() => setPage(p));
       scroller.current?.scrollTo(0, 0);
       const next = scroller.current;
-      if (next) unclipNew = fitNames(next, scrollArea(next), [VT.card]);
+      if (next) {
+        unclipNew = fitNames(next, scrollArea(next), [VT.card]);
+        nameShell(next, scrollArea(next), shell);
+      }
     });
     const done = () => {
       unclip();
       unclipNew();
+      clearShell(scroller.current, shell);
       html.classList.remove("vt-recent", dir);
       setMorph(false);
     };
     // 動きが作れなかったときも、切り替えはそのまま（失敗を画面のエラーにしない）
+    t.finished.then(done, done);
+    t.ready.catch(() => {});
+  };
+
+  /** ページの上の帯・名前・検索欄のうち、そのページ（いまの開き方）にあるもの（tabTo で名前を付ける所） */
+  const shellOf = (k: NavKey): Set<string> => {
+    const home = k === "home" && !shown;
+    const fav = k === "favorites" && !favAll;
+    const s = new Set<string>();
+    if (home || fav || k === "history" || k === "docs") {
+      s.add("app-brand");
+      s.add("page-title");
+    }
+    if (home || fav || k === "history") s.add("vt-search");
+    return s;
+  };
+  /**
+   * 下のメニューでページを切り替える（View Transitions）：ロゴの帯と下のメニューは止めたまま、ページの名前は前の名前が上へ抜けて
+   * 次の名前が下から現れ、検索欄はすりガラスのまま字だけが入れ替わり、写真と中身はふわっと入れ替わる（中身はそれぞれのページの
+   * 現れる動きで、上から順に浮き上がる。app/globals.css の .vt-tab）。下のメニューの線は、押した所へ滑る（.nav-mark）。
+   * 同じページ・対応していない端末・動きを減らす設定では、そのまま切り替える（ページの現れる動きはそのまま）
+   */
+  const tabTo = (p: NavKey) => {
+    const sc = scroller.current;
+    if (p === page || typeof document.startViewTransition !== "function" || reducedMotion() || !sc) {
+      go(p);
+      return;
+    }
+    const html = document.documentElement;
+    // 次のページにもあるものだけに名前を付ける（片方のページにしか無いものは、写真や中身と一緒にふわっと入れ替える。
+    // 片方にしか無いものに名前を付けると、その絵が動きのあとまで残って見えることがある）
+    const shell = nameShell(sc, scrollArea(sc), shellOf(p));
+    html.classList.add("vt-tab");
+    const t = document.startViewTransition(() => {
+      flushSync(() => setPage(p));
+      sc.scrollTo(0, 0);
+      nameShell(sc, scrollArea(sc), shell);
+    });
+    const done = () => {
+      clearShell(sc, shell);
+      html.classList.remove("vt-tab");
+    };
     t.finished.then(done, done);
     t.ready.catch(() => {});
   };
@@ -745,6 +810,8 @@ export function MobileApp(props: MobileAppProps) {
         background: PAGE,
       }}
     >
+      {/* アプリを開いたときの演出（紺の幕とロゴ。終わったら外れる。components/app/launch.tsx） */}
+      <LaunchIntro />
       {/* ホーム・お気に入り・書類・出力は画面いっぱいの写真（下のメニューの後ろまで） */}
       {showHome && <HomeBackdrop drift={motionOn} />}
       {page === "favorites" && (
@@ -942,7 +1009,7 @@ export function MobileApp(props: MobileAppProps) {
             (k === "home" && page === "history" && !shown)
           )
             morphTo(k);
-          else go(k);
+          else tabTo(k);
         }}
       />
 

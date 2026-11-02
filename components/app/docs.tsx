@@ -3,7 +3,7 @@
 // スマホの下のメニューの「書類・出力」。画面いっぱいの写真（届いた机の写真 3 枚。public/docs/day・evening・night.webp）を、
 // 太陽の高さで昼・夕方・夜に切り替えて敷く（lib/app/sun.ts の dayPart。開いている間に時間帯が変わったら、ゆっくり入れ替わる）。
 // 写真は下のメニューの後ろまで敷くので、components/app/mobile-app.tsx が DocsBackdrop で画面のいちばん奥に置く。
-// 上から：ホームと同じ位置に見出し「書類・出力」と右上のメニュー（≡）、2行のひとこと、写真を見せる空き、
+// 上から：ホームと同じロゴの帯と右上のメニュー（≡）、ページの名前（DOCUMENTS・書類・出力。page-head.tsx）、写真を見せる空き、
 // 物件のカード（書類を作る物件と、作れる書類。いちばん使う「要注意点と次にやること」は横いっぱいの大きなボタン（すりガラスのまま少し明るく、
 // 金色のアイコン）、ほかの4つは小さなボタン）、
 // ほかの物件から作る（すりガラスの板に、画面に収まる数だけ。続きは履歴）、注意の一文。
@@ -12,7 +12,7 @@
 // 動き（app/globals.css の .docs-*・.day-*）：開くと写真がふわっと落ち着き、上から順に浮き上がる。≡ の「動きの演出」がオンのときは、
 // 写真がごくゆっくり寄り、昼は窓の光、夕方は夕日とスタンド、夜はスタンドの明かりがゆっくり揺らぎ、夜はビルの屋上の赤い灯が点滅する。
 // 動きを減らす設定では動かさない
-import { ChevronRight, ClipboardCopy, Clock3, ListChecks, Map as MapIcon, MapPin, Menu, Printer, ScrollText, Search, type LucideIcon } from "lucide-react";
+import { ChevronRight, ClipboardCopy, Clock3, ListChecks, Map as MapIcon, MapPin, Printer, ScrollText, Search, type LucideIcon } from "lucide-react";
 import { useRef, type CSSProperties, type ReactNode } from "react";
 import { propertyCount } from "@/lib/app/history-view";
 import { placeParts } from "@/lib/app/scene";
@@ -21,7 +21,8 @@ import { historyKey, type HistoryItem } from "@/lib/history";
 import { partNow, useDayLayers, useLayerEntry, type DayPart } from "./day-photo";
 import { BOARD, LABEL, placeSubLine } from "./favorites";
 import { PhoneImg } from "./frame";
-import { HIT, LIGHT_GLASS, SHADOW, useScreenHeight } from "./home";
+import { BrandBar, PageTitle } from "./page-head";
+import { HIT, SHADOW, useScreenHeight } from "./home";
 import { useNow, when } from "./tab-pages";
 
 /** 作れる書類（押すと、その書類をすぐ開く） */
@@ -103,6 +104,11 @@ const LIGHTS: Record<DayPart, { glows: { x: number; y: number; w: number; ar?: n
 /** 書類・出力のページの時刻・電池の帯の色（いまの時間帯の写真のいちばん上の色） */
 export function docsTop(): string {
   return PHOTOS[partNow(dayPart)].top;
+}
+
+/** いまの時間帯の写真（開いてから先に読んでおく。components/app/mobile-app.tsx） */
+export function docsPhoto(): string {
+  return PHOTOS[partNow(dayPart)].src;
 }
 
 /**
@@ -222,28 +228,11 @@ export function DocsPage({
   const room = h - (compact ? LAYOUT.compactHead : LAYOUT.head) - LAYOUT.card - LAYOUT.listHead - LAYOUT.note - LAYOUT.bottom - (compact ? 16 : Math.round(h * 0.2));
   const shown = others.slice(0, Math.min(3, Math.max(1, Math.floor(room / LAYOUT.row))));
 
-  const menuButton = (
-    <button onClick={onMenu} aria-label={unread ? "メニュー（新しいお知らせがあります）" : "メニュー"} className="press relative flex shrink-0 items-center justify-center rounded-full" style={{ ...LIGHT_GLASS, width: 46, height: 46, minWidth: HIT, minHeight: HIT }}>
-      <Menu size={22} strokeWidth={1.8} absoluteStrokeWidth color="#fff" />
-      {unread && <span className="absolute rounded-full border-2 border-white bg-[#f0263a]" style={{ right: 2, top: 2, width: 11, height: 11 }} />}
-    </button>
-  );
-
   return (
     <div ref={root} className="docs-page app-touch relative flex flex-col text-white" style={{ minHeight: screen }}>
-      {/* 見出しと右上のメニュー（ホームのロゴと同じ位置） */}
-      <div className="relative flex items-start justify-between" style={{ padding: "16px 18px 0 20px" }}>
-        <h1 className="docs-rise truncate font-bold" style={{ fontSize: 28, lineHeight: "34px", letterSpacing: 1.6, marginTop: 6, textShadow: SHADOW }}>
-          書類・出力
-        </h1>
-        {menuButton}
-      </div>
-      {/* ひとこと（ホームの「不動産の現場に、すぐ使える情報を。」と同じ位置・大きさ） */}
-      <p className="docs-rise relative font-medium" style={{ margin: `${compact ? 8 : 14}px 20px 0`, fontSize: 15.5, lineHeight: 1.6, letterSpacing: 1.6, textShadow: SHADOW, ...delay(60) }}>
-        {current ? "いま開いている物件の、" : target ? "調べた物件から、" : "物件を調べると、"}
-        <br />
-        参考の資料をすぐ作れます。
-      </p>
+      {/* ロゴと右上のメニュー（4ページで同じ）と、ページの名前（components/app/page-head.tsx） */}
+      <BrandBar onMenu={onMenu} unread={unread} />
+      <PageTitle en="DOCUMENTS" ja="書類・出力" style={{ marginTop: compact ? 8 : 14 }} />
 
       {/* 写真を見せる空き（画面の高さで伸び縮みする） */}
       <div className="min-h-[16px] flex-1" />

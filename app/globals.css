@@ -143,6 +143,15 @@ body {
   font-feature-settings: "palt"; /* 約物を詰めて見た目を整える */
   letter-spacing: 0.01em;
 }
+/*
+ * スマホの幅：時刻・電池の帯（body の上の余白）は、読み込みの途中からホームの写真の上の空の色にする（読み込めたら
+ * components/app/mobile-app.tsx がページごとの色に入れ替える。前は読み込みの間だけクリーム色の帯が出ていた）
+ */
+@media (max-width: 1023px) {
+  body {
+    background-color: #386fab;
+  }
+}
 
 /*
  * スマホのホームの動き（components/app/home.tsx）。上から順に浮き上がって現れる（.home-rise。遅れは style の animation-delay）。
@@ -151,7 +160,291 @@ body {
  */
 @media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
   .home-rise {
-    animation: home-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    animation: home-rise var(--m-slow) var(--m-out) backwards;
+    animation-delay: calc(var(--launch, 0ms) + var(--d, 0ms));
+  }
+  /* ロゴ：開いた最初の1回だけ浮き上がる。起動の演出（長い版）では、真ん中から飛んできたロゴ（.launch-logo）が着くまで隠す */
+  .home-logo-in {
+    animation: home-rise var(--m-slow) var(--m-out) backwards;
+    animation-delay: var(--launch, 0ms);
+  }
+  html[data-launch="full"] .home-logo-in {
+    animation: launch-wait 1.4s linear backwards;
+  }
+  /* 写真：ほかのページから戻ったときは、少し寄った所から落ち着く。起動の演出では奥から手前へ（長い版）・少し寄った所から（短い版） */
+  .home-cam {
+    transform-origin: 62% 58%;
+    animation: home-cam 1.3s var(--m-out) backwards;
+  }
+  html[data-launch="full"] .home-cam-first {
+    transform-origin: 62% 58%;
+    animation: launch-photo 1.6s cubic-bezier(0.22, 0.7, 0.18, 1) 0.8s backwards;
+  }
+  html[data-launch="quick"] .home-cam-first {
+    transform-origin: 62% 58%;
+    animation: home-cam 1.2s var(--m-out) backwards;
+  }
+}
+@keyframes home-cam {
+  from {
+    transform: scale(1.06);
+  }
+}
+@keyframes launch-photo {
+  from {
+    transform: scale(1.16) translateY(1.5%);
+  }
+}
+@keyframes launch-wait {
+  from,
+  to {
+    opacity: 0;
+  }
+}
+
+/*
+ * スマホの4ページの上の帯（components/app/page-head.tsx）：ページの名前が現れる動き（.pt-in。開いたとき・戻ったとき）。
+ * 細い線が左から伸び（.pt-rule）、英字が広い字間から締まり（.pt-en）、見出しは下の線から現れ（.pt-ja。箱の外は .pt-mask で隠す。
+ * ホームのひとことは1行ずつ .pt-ja2）、件数が浮き上がって数え上がる（.pt-count。数は page-head.tsx）。
+ * 起動の演出の間は、その分だけ遅れて始まる（--launch）
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .pt-in .pt-rule {
+    transform-origin: 0 50%;
+    animation: pt-rule 0.7s var(--m-out) backwards;
+    animation-delay: var(--launch, 0ms);
+  }
+  .pt-in .pt-en {
+    animation: pt-en 0.8s var(--m-out) backwards;
+    animation-delay: calc(var(--launch, 0ms) + 60ms);
+  }
+  .pt-in .pt-ja {
+    animation: pt-ja 0.72s cubic-bezier(0.16, 0.84, 0.24, 1) backwards;
+    animation-delay: calc(var(--launch, 0ms) + 90ms);
+  }
+  .pt-in .pt-ja2 {
+    animation-delay: calc(var(--launch, 0ms) + 170ms);
+  }
+  .pt-in .pt-count {
+    animation: pt-count 0.6s var(--m-out) backwards;
+    animation-delay: calc(var(--launch, 0ms) + 200ms);
+  }
+}
+@keyframes pt-rule {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+}
+@keyframes pt-en {
+  from {
+    opacity: 0;
+    letter-spacing: 0.72em;
+  }
+}
+@keyframes pt-ja {
+  from {
+    transform: translateY(108%);
+  }
+}
+@keyframes pt-count {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/*
+ * アプリを開いたときの演出（components/app/launch.tsx・launch-script.ts。html の data-launch が full か quick の間だけ。PC の幅では出さない）。
+ * 長い版（full）：紺の幕（.launch-veil）の真ん中で、ロゴのマークが左下から右上へ光で描かれ（.launch-m）、MICHILU の字が広い字間から
+ * 寄って並び（.launch-l。1文字ずつ）、光の帯がロゴを横切る（.launch-glint）。ロゴは左上の定位置（ホームのロゴと同じ位置・大きさ。
+ * 画面の拡大率 --app-zoom と、上の時刻の帯の高さから出す）へ飛び（.launch-logo）、同時に幕が上へ上がって街の写真が奥から落ち着き
+ * （.home-cam-first）、ひとこと・検索欄・最近の検索・下のメニューが順に現れる（--launch の分だけ遅れて始まる）。
+ * 着いたロゴは、ホームのロゴ（.home-logo-in）と入れ替わる。短い版（quick）：紺の幕がふわっと消え、中身が順に浮き上がる。
+ * 画面に触れたら、すぐ終わる（launch.tsx）
+ */
+html[data-launch="full"] {
+  --launch: 1000ms;
+}
+html[data-launch="quick"] {
+  --launch: 90ms;
+}
+.launch {
+  display: none;
+}
+@media (max-width: 1023px) {
+  html[data-launch="full"] .launch,
+  html[data-launch="quick"] .launch {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 95;
+    pointer-events: none;
+    animation: launch-end 2.5s linear forwards;
+  }
+  html[data-launch="quick"] .launch {
+    animation-duration: 1.25s;
+  }
+  .launch-veil {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 140%;
+    background:
+      radial-gradient(60% 24% at 50% 33%, rgba(70, 128, 220, 0.24) 0%, rgba(70, 128, 220, 0) 100%),
+      linear-gradient(180deg, #07101e 0%, #0a1830 38%, #0d1e3b 71.4%, rgba(13, 30, 59, 0) 100%);
+  }
+  html[data-launch="full"] .launch-veil {
+    /* 覆っている間は指を受け止める（触れると演出を終えるだけ。見えていないボタンは押さない。components/app/launch.tsx） */
+    pointer-events: auto;
+    animation: launch-lift 0.66s cubic-bezier(0.62, 0, 0.22, 1) 0.84s forwards;
+  }
+  html[data-launch="quick"] .launch-veil {
+    animation: launch-fade 0.5s ease-out forwards;
+  }
+  html[data-launch="full"] [data-app-nav] {
+    animation: launch-nav 0.7s var(--m-out) 1.06s backwards;
+  }
+  .launch-logo {
+    --lz: var(--app-zoom, 1);
+    --lw: calc(151.32px * var(--lz));
+    position: absolute;
+    left: calc((100vw - 393px * var(--lz)) / 2 + 20px * var(--lz));
+    top: calc(env(safe-area-inset-top, 0px) + 22px * var(--lz));
+    width: var(--lw);
+    height: calc(30px * var(--lz));
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.3));
+  }
+  html[data-launch="quick"] .launch-logo {
+    display: none;
+  }
+  html[data-launch="full"] .launch-logo {
+    /* 真ん中（少し上）で 1.5 倍から、定位置へ */
+    --dx: calc(50vw - (100vw - 393px * var(--lz)) / 2 - 95.66px * var(--lz));
+    --dy: calc(46dvh - env(safe-area-inset-top, 0px) - 37px * var(--lz));
+    animation:
+      launch-fly 0.62s cubic-bezier(0.62, 0, 0.18, 1) 0.78s backwards,
+      launch-out 0.18s linear 1.4s forwards;
+  }
+  .launch-m,
+  .launch-l,
+  .launch-glint {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background-image: url("/home/logo-mark-white.webp");
+    background-repeat: no-repeat;
+    background-size: var(--lw) 100%;
+  }
+  .launch-m {
+    left: 0;
+    width: 28%;
+    background-position: 0 0;
+    -webkit-mask-image: linear-gradient(62deg, #000 42%, transparent 58%);
+    mask-image: linear-gradient(62deg, #000 42%, transparent 58%);
+    -webkit-mask-size: 300% 100%;
+    mask-size: 300% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: 0 0;
+    mask-position: 0 0;
+  }
+  .launch-l {
+    background-position: calc(var(--x) * var(--lw) / -100) 0;
+  }
+  .launch-glint {
+    left: 0;
+    width: 100%;
+    background-position: 0 0;
+    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 9px rgba(140, 190, 255, 0.85));
+    -webkit-mask-image: linear-gradient(62deg, transparent 45%, #000 50%, transparent 55%);
+    mask-image: linear-gradient(62deg, transparent 45%, #000 50%, transparent 55%);
+    -webkit-mask-size: 300% 100%;
+    mask-size: 300% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: 0 0;
+    mask-position: 0 0;
+  }
+  html[data-launch="full"] .launch-m {
+    animation: launch-wipe 0.62s cubic-bezier(0.4, 0.15, 0.2, 1) 0.08s backwards;
+  }
+  html[data-launch="full"] .launch-l {
+    animation: launch-letter 0.74s var(--m-out) backwards;
+    animation-delay: calc(0.26s + (var(--i) + 3) * 28ms);
+  }
+  html[data-launch="full"] .launch-glint {
+    animation: launch-glint 0.74s cubic-bezier(0.45, 0, 0.3, 1) 0.5s backwards;
+  }
+}
+/* 触れて飛ばしたとき：幕とロゴは 0.2 秒で消え（その間も指は受け止める）、中身・写真・ロゴ・下のメニューは、すぐ終わりの形に */
+html.launch-skip {
+  --launch: 0ms;
+}
+@media (max-width: 1023px) {
+  html.launch-skip .launch {
+    pointer-events: auto;
+    opacity: 0;
+    transition: opacity 0.2s ease-out;
+  }
+  html.launch-skip .home-logo-in,
+  html.launch-skip .home-cam-first,
+  html.launch-skip [data-app-nav] {
+    animation: none;
+  }
+}
+@keyframes launch-end {
+  0%,
+  99.9% {
+    visibility: visible;
+  }
+  100% {
+    visibility: hidden;
+  }
+}
+@keyframes launch-lift {
+  to {
+    transform: translateY(-100%);
+  }
+}
+@keyframes launch-fade {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes launch-nav {
+  from {
+    transform: translateY(105%);
+  }
+}
+@keyframes launch-fly {
+  from {
+    transform: translate(var(--dx), var(--dy)) scale(1.5);
+  }
+}
+@keyframes launch-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes launch-wipe {
+  from {
+    -webkit-mask-position: 100% 0;
+    mask-position: 100% 0;
+  }
+}
+@keyframes launch-letter {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateX(calc(var(--i) * 7px * var(--lz)));
+  }
+}
+@keyframes launch-glint {
+  from {
+    -webkit-mask-position: 100% 0;
+    mask-position: 100% 0;
   }
 }
 /*
@@ -412,7 +705,7 @@ body {
     animation-iteration-count: infinite;
   }
   .fav-rise {
-    animation: home-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    animation: home-rise var(--m-slow) var(--m-out) backwards;
   }
   .fav-row {
     animation: fav-row 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
@@ -587,8 +880,24 @@ body {
   }
 }
 @media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  /* 写真が現れる動き：すぐ見えるようにして（0.5秒）、写真ごとに合うカメラの動きでゆっくり落ち着く（1.5秒）。
+     お気に入りは富士山が下から持ち上がる、履歴は街の上から少し引く、書類・出力は机の上を横へ流れて止まる */
   .day-intro {
-    animation: day-intro 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    animation:
+      day-fade 0.5s ease-out backwards,
+      day-cam 1.5s var(--m-out) backwards;
+  }
+  .fav-backdrop .day-intro {
+    transform-origin: 50% 40%;
+    animation-name: day-fade, fav-cam;
+  }
+  .hist-backdrop .day-intro {
+    transform-origin: 50% 42%;
+    animation-name: day-fade, hist-cam;
+  }
+  .docs-backdrop .day-intro {
+    transform-origin: 50% 45%;
+    animation-name: day-fade, docs-cam;
   }
   .day-swap {
     animation: day-swap 1.6s ease-in-out backwards;
@@ -610,16 +919,35 @@ body {
     animation-iteration-count: infinite;
   }
   .docs-rise {
-    animation: home-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    animation: home-rise var(--m-slow) var(--m-out) backwards;
   }
   .docs-row {
     animation: fav-row 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
   }
 }
-@keyframes day-intro {
+@keyframes day-fade {
   from {
     opacity: 0;
+  }
+}
+@keyframes day-cam {
+  from {
     transform: scale(1.06);
+  }
+}
+@keyframes fav-cam {
+  from {
+    transform: translateY(2.5%) scale(1.08);
+  }
+}
+@keyframes hist-cam {
+  from {
+    transform: scale(1.1);
+  }
+}
+@keyframes docs-cam {
+  from {
+    transform: translateX(-2.5%) scale(1.06);
   }
 }
 @keyframes day-swap {
@@ -886,7 +1214,7 @@ body {
 @keyframes home-rise {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -1199,8 +1527,18 @@ body {
   .tab-in {
     animation: page-fade 160ms ease-out both;
   }
+  .nav-item {
+    transition: color 0.3s ease;
+  }
   .nav-item > :first-child {
     transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  /* 下のメニューの選んでいる所の線（components/app/frame.tsx）：押した所へ滑る。進む向きの先の端が先に動き、後ろの端は少し遅れて
+     追いつく（--nav-l・--nav-r。線が伸びて縮む）。少しだけ行き過ぎて戻る */
+  .nav-mark {
+    transition:
+      left 0.46s cubic-bezier(0.3, 1.16, 0.4, 1) var(--nav-l, 0ms),
+      right 0.46s cubic-bezier(0.3, 1.16, 0.4, 1) var(--nav-r, 0ms);
   }
   .nav-item[aria-current="page"] > :first-child {
     transform: translateY(-2px);
@@ -1253,12 +1591,9 @@ body {
   html.vt-recent::view-transition-new(vt-search) {
     animation: vt-text-in 0.3s cubic-bezier(0, 0, 0.2, 1) 0.1s both;
   }
-  /* 下のメニューは、ページと一緒に薄れたり寄ったりしない（選んでいる所の色だけが入れ替わる） */
+  /* 下のメニューは、ページと一緒に薄れたり寄ったりしない（選んでいる所の色と線は、次のページの下のメニューの上で動く。.vt-tab と同じ） */
   html.vt-recent [data-app-nav] {
     view-transition-name: app-nav;
-  }
-  html.vt-recent::view-transition-group(app-nav) {
-    animation-duration: var(--m-base);
   }
   /* 一覧の板（暗いすりガラス ⇄ 白）は、行を除いた板だけの絵なので、箱いっぱいに合わせて形と色を変える */
   html.vt-recent::view-transition-old(vt-card),
@@ -1284,6 +1619,83 @@ body {
     animation: vt-recent-in var(--m-slow) var(--m-out) 0.05s both;
   }
 }
+/*
+ * 下のメニューでページを切り替えたとき（components/app/mobile-app.tsx の tabTo。html に .vt-tab が付いている間だけ）。
+ * ロゴの帯（app-brand）と下のメニュー（app-nav）は、次のページの絵をすぐ出す（4ページで同じなので止まって見える。下のメニューの
+ * 線と色は、その上で動く）。ページの名前（page-title）は前の名前が上へ抜け、次の名前は自分の動き（.pt-in）で下から現れる。
+ * 検索欄（vt-search。ホーム・お気に入り・履歴で同じ場所）は、すりガラスのまま字だけが入れ替わる。写真と中身は、前のページが
+ * 早めに薄れて次のページが現れる（中身は、それぞれのページの現れる動きで上から順に浮き上がる）。
+ * ホームの最近の検索 ⇄ 履歴のつながる動き（.vt-recent）でも、ロゴの帯・ページの名前・下のメニューは同じにする
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  html.vt-tab [data-app-nav] {
+    view-transition-name: app-nav;
+  }
+  /* 前のページは押した直後から薄れ始める（ゆっくり始まる曲線だと、押してから動くまでが遅く見える） */
+  html.vt-tab::view-transition-old(root) {
+    animation: vt-tab-out 0.24s cubic-bezier(0.2, 0, 0.4, 1) both;
+  }
+  html.vt-tab::view-transition-new(root) {
+    animation: vt-tab-in 0.38s var(--m-out) both;
+  }
+  html.vt-tab::view-transition-group(app-brand),
+  html.vt-recent::view-transition-group(app-brand),
+  html.vt-tab::view-transition-group(app-nav),
+  html.vt-recent::view-transition-group(app-nav),
+  html.vt-tab::view-transition-group(page-title),
+  html.vt-recent::view-transition-group(page-title),
+  html.vt-tab::view-transition-group(vt-search) {
+    animation: none;
+  }
+  html.vt-tab::view-transition-old(app-brand),
+  html.vt-recent::view-transition-old(app-brand),
+  html.vt-tab::view-transition-old(app-nav),
+  html.vt-recent::view-transition-old(app-nav) {
+    animation: none;
+    opacity: 0;
+  }
+  html.vt-tab::view-transition-new(app-brand),
+  html.vt-recent::view-transition-new(app-brand),
+  html.vt-tab::view-transition-new(app-nav),
+  html.vt-recent::view-transition-new(app-nav),
+  html.vt-tab::view-transition-new(page-title),
+  html.vt-recent::view-transition-new(page-title) {
+    animation: none;
+  }
+  /* 前の名前は、次の名前が下から出てくる前に抜けきる（重なって二重に見えないように） */
+  html.vt-tab::view-transition-old(page-title),
+  html.vt-recent::view-transition-old(page-title) {
+    animation: vt-title-out 0.2s cubic-bezier(0.3, 0, 0.5, 1) both;
+  }
+  /* 検索欄の字：前のページの字が先に薄れてから、次のページの字が出る（同時だと形の違う字が二重に見える） */
+  html.vt-tab::view-transition-old(vt-search) {
+    animation: vt-text-out 0.12s ease-out both;
+  }
+  html.vt-tab::view-transition-new(vt-search) {
+    animation: vt-text-in 0.26s ease-out 0.08s both;
+  }
+  html.vt-tab::view-transition-group(vt-search) {
+    border-radius: 9999px;
+    overflow: hidden;
+  }
+}
+@keyframes vt-tab-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-tab-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes vt-title-out {
+  to {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+
 /*
  * お気に入りのいつもの画面 ⇄ すべて見る（components/app/favorites.tsx の toAll。html に .vt-fav が付いている間だけ）。
  * 板・行・検索欄は相手の画面の同じものへ 0.5 秒で滑る。写真は同じなので、ほかの画面はふつうの重ね合わせで入れ替える（写真は動かない）

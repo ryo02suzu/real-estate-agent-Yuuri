@@ -8,7 +8,7 @@
 // まだ何も調べていないときは、最近の検索の代わりに「はじめての方へ」（住所と地番の例。押すとそのまま調べる）を出す。
 // 写真の上の字は白（読みやすいよう薄い影）。寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。
 // 縦は画面の高さに合わせ、検索欄と最近の検索のあいだの空きで伸び縮みする（背の低い画面でもスクロールせずに収まる）
-import { ArrowRight, Bell, ChevronRight, CircleHelp, Database, Download, LoaderCircle, Map as MapIcon, MapPin, MapPinned, Menu, Search, Smartphone, Sparkles, TriangleAlert, UserRound, X } from "lucide-react";
+import { ArrowRight, Bell, ChevronRight, CircleHelp, Database, Download, LoaderCircle, Map as MapIcon, MapPin, MapPinned, Search, Smartphone, Sparkles, TriangleAlert, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { monthDay, placeParts } from "@/lib/app/scene";
 import { MUNICIPALITIES } from "@/lib/roadmap";
@@ -16,6 +16,7 @@ import { historyKey, type HistoryItem } from "@/lib/history";
 import type { Resume } from "@/lib/resume";
 import { Sheet } from "../sheet";
 import { PhoneImg, ScaledInput } from "./frame";
+import { BrandBar, HomeLead } from "./page-head";
 import { TABS, tabOf } from "./result-head";
 import { PAGE } from "./tokens";
 
@@ -77,10 +78,15 @@ const EXAMPLES: { Icon: typeof Search; title: string; sub: string; query: string
 /** 検索欄の下に出す注意（空のまま調べた・通信できない） */
 export type HomeMessage = { text: string } | null;
 
-/** 現れるときの動きの遅れ（上から順に） */
-const rise = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
-/** 浮き上がる動きは開いた最初の1回だけ（下のメニューで戻ったときは短いフェード） */
+/**
+ * 現れるときの動きの遅れ（上から順に）。起動の演出の間は、その分だけ全体が遅れて始まる（app/globals.css の --launch。
+ * 開いた最初の1回だけ。components/app/launch.tsx）
+ */
+const rise = (ms: number): CSSProperties => ({ "--d": `${ms}ms` }) as CSSProperties;
+/** 浮き上がる動きは開いた最初の1回だけ（下のメニューで戻ったときは、ひとことと最近の検索だけが現れ直す） */
 let risen = false;
+/** ホームの写真を一度出したか（2回目からは、戻ったときの動き） */
+let backdropShown = false;
 
 /**
  * 画面いっぱいの写真（下のメニューの後ろまで敷く）。上と下を少し暗くして、白い字とメニューを読みやすくする。
@@ -88,8 +94,14 @@ let risen = false;
  * 縦長の画面では高さに合わせて左右を切るので、写真の幅は画面の高さの 56.3%（絵の縦横比）
  */
 export function HomeBackdrop({ drift = false }: { drift?: boolean }) {
+  // 開いた最初の1回は起動の演出（写真が奥から手前へ落ち着く。app/globals.css の .home-cam-first）、
+  // ほかのページから戻ったときは、写真が少し寄った所から落ち着く（.home-cam）
+  const [cam] = useState(() => (backdropShown ? "home-cam" : "home-cam-first"));
+  useEffect(() => {
+    backdropShown = true;
+  }, []);
   return (
-    <div aria-hidden className="home-backdrop pointer-events-none absolute inset-0 overflow-hidden" style={{ background: "#2a3a55" }}>
+    <div aria-hidden className={`home-backdrop ${cam} pointer-events-none absolute inset-0 overflow-hidden`} style={{ background: "#2a3a55" }}>
       <PhoneImg
         src="/home/sunset-1260.webp"
         srcSet="/home/sunset-900.webp 900w, /home/sunset-1260.webp 1260w, /home/sunset-1620.webp 1620w"
@@ -184,28 +196,21 @@ export function HomeScreen({
   useEffect(() => {
     risen = true;
   }, []);
-  const riseClass = first ? "home-rise" : "";
-  // ほかのページから来たときの小さな浮き上がりも、置いたときに決める（履歴からのつながる動きで来たときは付けない。
+  // ほかのページから来たときの動きも、置いたときに決める（履歴からのつながる動きで来たときは付けない。
   // 動きが終わって morph が外れたときに付けると、ホームの中身が一瞬消えて出直して見えるので）
   const [pageIn] = useState(() => !first && !morph);
+  // 戻ってきたときは、ひとことが1行ずつ現れ、最近の検索が上から順に浮き上がる（ロゴと検索欄はほかのページと同じ所なので動かさない）
+  const enter = pageIn;
+  const riseClass = first || enter ? "home-rise" : "";
 
   return (
-    <div ref={root} className={`app-touch relative flex flex-col text-white ${pageIn ? "page-in" : ""}`} style={{ minHeight: screen }}>
-      {/* ロゴと右上のメニュー */}
-      <div className="relative flex items-start justify-between" style={{ padding: "16px 18px 0 20px" }}>
-        <PhoneImg src="/home/logo-mark-white.webp" alt="MICHILU" width={802} height={159} draggable={false} className={`${riseClass} block`} style={{ height: 30, width: "auto", marginTop: 6, filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.3))" }} />
-        <button onClick={onMenu} aria-label={unread ? "メニュー（新しいお知らせがあります）" : "メニュー"} className="press relative flex items-center justify-center rounded-full" style={{ ...LIGHT_GLASS, width: 46, height: 46, minWidth: HIT, minHeight: HIT }}>
-          <Menu size={22} strokeWidth={1.8} absoluteStrokeWidth color="#fff" />
-          {unread && <span className="absolute rounded-full border-2 border-white bg-[#f0263a]" style={{ right: 2, top: 2, width: 11, height: 11 }} />}
-        </button>
-      </div>
+    <div ref={root} className="home-page app-touch relative flex flex-col text-white" style={{ minHeight: screen }}>
+      {/* ロゴと右上のメニュー（4ページで同じ。components/app/page-head.tsx）。起動の演出では、真ん中から飛んできたロゴと入れ替わる */}
+      <BrandBar onMenu={onMenu} unread={unread} logoClass={first ? "home-logo-in" : ""} />
 
-      {/* ひとこと */}
-      <p className={`${riseClass} relative font-medium`} style={{ margin: "14px 20px 0", fontSize: 15.5, lineHeight: 1.6, letterSpacing: 1.6, textShadow: SHADOW, ...rise(60) }}>
-        不動産の現場に、
-        <br />
-        すぐ使える情報を。
-      </p>
+      {/* ひとこと（ほかのページの名前と同じ場所・高さ。開いたとき・戻ったときは1行ずつ下から現れる。履歴から行がつながって
+          戻るときも、前のページの名前が上へ抜けるのと入れ替わりに現れる） */}
+      <HomeLead intro />
 
       {/* 住所・地番の検索欄（すりガラス） */}
       {/* 浮き上がる動きは、すりガラスの箱そのものに付ける（外の箱が動くと、後ろがぼけない） */}
@@ -220,7 +225,7 @@ export function HomeScreen({
           onSubmit();
         }}
       >
-        <div className={`${riseClass} flex items-center rounded-full transition-[box-shadow] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.28)]`} style={{ ...LIGHT_GLASS, height: "max(56px, 3.3em)", fontSize: 17, ...rise(100), viewTransitionName: morph ? VT.search : undefined }}>
+        <div data-vt-tab="vt-search" className={`${first ? "home-rise" : ""} flex items-center rounded-full transition-[box-shadow] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.28)]`} style={{ ...LIGHT_GLASS, height: "max(56px, 3.3em)", fontSize: 17, ...rise(110), viewTransitionName: morph ? VT.search : undefined }}>
           <Search size={22} strokeWidth={1.9} absoluteStrokeWidth color="#fff" className="ml-[20px] shrink-0" />
           <ScaledInput value={input} onChange={setInput} inputRef={inputRef} size={17} className="ml-[13px] mr-[4px]" label="住所・地番" autoComplete="off" placeholder="住所・地番で検索" onPhoto />
           {loading ? (
@@ -258,13 +263,13 @@ export function HomeScreen({
       <section className="home-recent relative" style={{ padding: "0 19px 22px" }}>
         {recent.length ? (
           <>
-            <SectionHead title="最近の検索" onMore={onHistory} className={riseClass} />
-            <ul className={riseClass} style={{ ...rise(160), viewTransitionName: morph ? VT.card : undefined }}>
+            <SectionHead title="最近の検索" onMore={onHistory} className={riseClass} style={rise(enter ? 90 : 140)} />
+            <ul style={{ viewTransitionName: morph ? VT.card : undefined }}>
               {recent.map((h, i) => {
                 const { city, town, full } = placeParts(h);
                 const resumed = resume && historyKey(h) === resume.historyKey;
                 return (
-                  <li key={historyKey(h)} className="border-t border-white/[0.12] first:border-t-0" style={morph ? { viewTransitionName: VT.row(i) } : undefined}>
+                  <li key={historyKey(h)} className={`${riseClass} border-t border-white/[0.12] first:border-t-0`} style={morph ? { viewTransitionName: VT.row(i) } : rise((enter ? 130 : 170) + i * 55)}>
                     <Row
                       Icon={Search}
                       title={city && town ? `${city}${town}` : full}
@@ -284,10 +289,10 @@ export function HomeScreen({
           </>
         ) : (
           <>
-            <SectionHead title="はじめての方へ" className={riseClass} />
-            <ul className={riseClass} style={rise(160)}>
-              {EXAMPLES.map((x) => (
-                <li key={x.query} className="border-t border-white/[0.12] first:border-t-0">
+            <SectionHead title="はじめての方へ" className={riseClass} style={rise(enter ? 90 : 140)} />
+            <ul>
+              {EXAMPLES.map((x, i) => (
+                <li key={x.query} className={`${riseClass} border-t border-white/[0.12] first:border-t-0`} style={rise((enter ? 130 : 170) + i * 55)}>
                   <Row Icon={x.Icon} title={x.title} sub={x.sub} label={`${x.title}（${x.sub}）`} onClick={() => onTry(x.query)} />
                 </li>
               ))}
@@ -322,9 +327,9 @@ function Row({ Icon, title, sub, label, onClick }: { Icon: typeof Search; title:
 }
 
 /** 章の見出し（控えめな白の字。影なし）と「すべて見る ›」（押せる高さは44pt。押すと沈んで › が右へ動く） */
-function SectionHead({ title, onMore, className = "" }: { title: string; onMore?: () => void; className?: string }) {
+function SectionHead({ title, onMore, className = "", style }: { title: string; onMore?: () => void; className?: string; style?: CSSProperties }) {
   return (
-    <div className={`${className} flex min-h-[36px] flex-wrap items-center justify-between gap-x-[8px]`} style={{ marginBottom: 6, ...rise(140) }}>
+    <div className={`${className} flex min-h-[36px] flex-wrap items-center justify-between gap-x-[8px]`} style={{ marginBottom: 6, ...style }}>
       <h2 className="max-w-full break-words font-semibold leading-[1.3]" style={{ fontSize: 15, letterSpacing: 1.5, color: "rgba(255,255,255,0.62)" }}>
         {title}
       </h2>

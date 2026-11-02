@@ -4,7 +4,7 @@
 // fuji-afternoon.webp、夕方は fuji-evening.webp、夜は fuji-night.webp。太陽の高さで切り替える。lib/app/sun.ts の favPart と
 // components/app/day-photo.ts。下のメニューの後ろまで
 // 敷くので、components/app/mobile-app.tsx が FavoritesBackdrop で画面のいちばん奥に置く）の上に、ふたつの画面：
-// ・いつもの画面（スクロールしない）：ホームと同じ位置に、見出し「お気に入り」と右上のメニュー（≡）、2行のひとこと（件数）、
+// ・いつもの画面（スクロールしない）：ホームと同じロゴの帯と右上のメニュー（≡）、ページの名前（FAVORITES・お気に入り・件数。page-head.tsx）、
 //   ホームと同じ検索欄（絞り込み）。その下は富士山の窓（富士山を隠さない）。富士山のふもとより下に「最近保存した物件　すべて見る ›」と、
 //   半透明のすりガラスの板に最近保存した物件を、入るだけ（新しく保存した順）。絞り込みの欄に触れている間は、
 //   一覧が検索欄のすぐ下へ滑り上がり（キーボードに隠れないように）、離すと富士山の下へ戻る。
@@ -18,7 +18,7 @@
 // ゆっくり上へ寄って暗くなり、上に見出しの細いバーが出る（押すといちばん上へ）。
 // ★を押すと星が抜けて行がたたまれ、下に「元に戻す」が出る（UndoToast。mobile-app.tsx が出す）。
 // 動きを減らす設定では、位置の動きを止める（すぐ切り替わる）
-import { ChevronLeft, ChevronRight, FileText, Menu, Search, Star, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, Search, Star, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import { placeParts } from "@/lib/app/scene";
@@ -26,6 +26,7 @@ import { favPart, type FavPart } from "@/lib/app/sun";
 import { favoriteKey, type FavoriteItem } from "@/lib/favorites";
 import { partNow, useDayLayers, useDayPart, useLayerEntry } from "./day-photo";
 import { PhoneImg, ScaledInput } from "./frame";
+import { BrandBar, PageTitle } from "./page-head";
 import { DARK_GLASS, HIT, LIGHT_GLASS, SHADOW, useScreenHeight, VT } from "./home";
 import { useShrink } from "./sky";
 import { matches, useNow, when } from "./tab-pages";
@@ -156,6 +157,11 @@ const FAV_PHOTOS: Record<FavPart, FavPhoto> = {
 /** お気に入りのページの時刻・電池の帯の色（いまの時間帯の写真のいちばん上の色） */
 export function favoritesTop(): string {
   return FAV_PHOTOS[partNow(favPart)].top;
+}
+
+/** いまの時間帯の写真（開いてから先に読んでおく。components/app/mobile-app.tsx） */
+export function favoritesPhoto(): string {
+  return FAV_PHOTOS[partNow(favPart)].src;
 }
 
 /** 富士山の頂を置く高さ：検索欄の下の端から、この分だけ下（pt） */
@@ -520,8 +526,9 @@ export function FavoritesPage({
     >
       {/* ホームの検索欄と同じ形・大きさ・すりガラス */}
       <div
-        className="fav-rise flex items-center rounded-full transition-[box-shadow] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.28)]"
-        style={{ ...LIGHT_GLASS, height: "max(56px, 3.3em)", fontSize: 17, ...delay(100), viewTransitionName: morph ? VT.search : undefined }}
+        data-vt-tab="vt-search"
+        className="flex items-center rounded-full transition-[box-shadow] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.28)]"
+        style={{ ...LIGHT_GLASS, height: "max(56px, 3.3em)", fontSize: 17, viewTransitionName: morph ? VT.search : undefined }}
       >
         <Search size={22} strokeWidth={1.9} absoluteStrokeWidth color="#fff" className="ml-[20px] shrink-0" />
         <ScaledInput value={q} onChange={setQ} inputRef={inputRef} size={17} className="ml-[13px] mr-[4px]" label="お気に入りを絞り込む" autoComplete="off" placeholder="町名・市区町村でしぼる" onPhoto />
@@ -534,13 +541,6 @@ export function FavoritesPage({
         )}
       </div>
     </form>
-  );
-
-  const menuButton = (
-    <button onClick={onMenu} aria-label={unread ? "メニュー（新しいお知らせがあります）" : "メニュー"} className="press relative flex shrink-0 items-center justify-center rounded-full" style={{ ...LIGHT_GLASS, width: 46, height: 46, minWidth: HIT, minHeight: HIT }}>
-      <Menu size={22} strokeWidth={1.8} absoluteStrokeWidth color="#fff" />
-      {unread && <span className="absolute rounded-full border-2 border-white bg-[#f0263a]" style={{ right: 2, top: 2, width: 11, height: 11 }} />}
-    </button>
   );
 
   // まだ無いとき：低いカード（富士山にかからないよう、星は見出しの横に）
@@ -575,29 +575,9 @@ export function FavoritesPage({
   if (!all)
     return (
       <div ref={root} className="fav-page app-touch relative flex flex-col overflow-hidden text-white" style={{ height: screen }}>
-        {/* 見出しと右上のメニュー（ホームのロゴと同じ位置） */}
-        <div className="relative flex items-start justify-between" style={{ padding: "16px 18px 0 20px" }}>
-          <h1 className="fav-rise truncate font-bold" style={{ fontSize: 28, lineHeight: "34px", letterSpacing: 1.6, marginTop: 6, textShadow: SHADOW }}>
-            お気に入り
-          </h1>
-          {menuButton}
-        </div>
-        {/* ひとこと（ホームの「不動産の現場に、すぐ使える情報を。」と同じ位置・大きさ） */}
-        <p className="fav-rise relative font-medium" style={{ margin: "14px 20px 0", fontSize: 15.5, lineHeight: 1.6, letterSpacing: 1.6, textShadow: SHADOW, ...delay(60) }}>
-          {favorites.length ? (
-            <>
-              保存した物件　{favorites.length}件
-              <br />
-              この端末だけに保存しています
-            </>
-          ) : (
-            <>
-              見返したい物件を、
-              <br />
-              ここに保存できます。
-            </>
-          )}
-        </p>
+        {/* ロゴと右上のメニュー（4ページで同じ）と、ページの名前（components/app/page-head.tsx） */}
+        <BrandBar onMenu={onMenu} unread={unread} />
+        <PageTitle en="FAVORITES" ja="お気に入り" count={favorites.length} intro={!morph} />
         {search}
         {/* 富士山の窓（画面の高さで伸び縮みする）。絞り込みの欄に触れている間はたたんで、一覧を検索欄のすぐ下へ */}
         {!typing && <div aria-hidden className="flex-1" />}

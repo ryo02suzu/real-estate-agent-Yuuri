@@ -66,3 +66,29 @@ export function clearNames(root: ParentNode | null): void {
     el.style.viewTransitionName = "";
   });
 }
+
+/**
+ * ページを切り替えるつながる動き（components/app/mobile-app.tsx の tabTo・morphTo）で名前を付ける所（data-vt-tab：ロゴの帯 app-brand・
+ * ページの名前 page-title・検索欄 vt-search）。area に収まっているものだけに付け、付けた名前を返す。
+ * only を渡すと、その名前の所だけを見る（ほかの所の名前には触らない。次のページでは、前のページで付けた名前だけに付ける：
+ * 前のページで見えていなかったロゴに次のページで名前を付けると、ふわっと出ずにいきなり現れるので）
+ */
+export function nameShell(root: ParentNode | null, area: Area, only?: ReadonlySet<string>): Set<string> {
+  const named = new Set<string>();
+  root?.querySelectorAll<HTMLElement>("[data-vt-tab]").forEach((el) => {
+    const name = el.dataset.vtTab ?? "";
+    if (!name || (only && !only.has(name))) return;
+    const ok = inside(el.getBoundingClientRect(), area);
+    el.style.viewTransitionName = ok ? name : "none";
+    if (ok) named.add(name);
+  });
+  return named;
+}
+
+/** nameShell で付けた名前を外す（動きが終わったら） */
+export function clearShell(root: ParentNode | null, names: ReadonlySet<string>): void {
+  root?.querySelectorAll<HTMLElement>("[data-vt-tab]").forEach((el) => {
+    const name = el.dataset.vtTab ?? "";
+    if (names.has(name) || el.style.viewTransitionName === "none") el.style.viewTransitionName = "";
+  });
+}
