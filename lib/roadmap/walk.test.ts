@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SRC from "./data/station-source.json";
 import type { LngLat } from "./parcel";
-import { lineLabel, nearbyStations, nearestStations, stationLine, walkDistances, walkMinutes, type Station } from "./walk";
+import { isCableOnly, lineLabel, nearbyStations, nearestStations, stationLine, walkDistances, walkMinutes, type Station } from "./walk";
 
 // 緯度 35.5・経度 139.6 のあたり。1m ≒ 経度 0.0000110・緯度 0.0000090
 const X = 139.6;
@@ -101,6 +101,18 @@ describe("アプリに入っている駅のデータ", () => {
     // ほとんどの駅に入口の点がある（無いのは関東の外の駅や、路面電車の停留場など）
     expect(STATIONS.filter((s) => s.e?.length).length / STATIONS.length).toBeGreaterThan(0.8);
     expect(SRC.doorsDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("檜原村の役場のあたり（2km 以内に駅が無い）は、山の上のケーブルカーの駅（御岳山）ではなく、ふつうの駅を直線の目安にする", () => {
+    const near = nearbyStations(35.7277, 139.1488, STATIONS);
+    expect(near).toHaveLength(1);
+    expect(near[0].straight).toBeGreaterThan(2000);
+    expect(near[0].station.n).not.toBe("御岳山");
+    expect(isCableOnly(near[0].station)).toBe(false);
+    // 箱根の強羅はケーブルカーと登山電車の駅なので、ケーブルカーだけの駅ではない
+    const goura = STATIONS.find((s) => s.n === "強羅")!;
+    expect(isCableOnly(goura)).toBe(false);
+    expect(isCableOnly(STATIONS.find((s) => s.n === "御岳山")!)).toBe(true);
   });
 
   it("桐生市元宿町のあたりは、西桐生より桐生が近い（ホームの端ではなく、駅舎・駅の位置まで測る）", () => {

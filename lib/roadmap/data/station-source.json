@@ -4,9 +4,9 @@
  "count": 2276,
  "doors": {
   "entrance": 1417,
-  "building": 331,
-  "node": 208,
-  "platform": 320
+  "building": 335,
+  "node": 205,
+  "platform": 319
  },
  "doorsDate": "2026-11-01"
 }

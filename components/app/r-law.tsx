@@ -10,7 +10,8 @@ import { parsePhones } from "@/lib/phone";
 import { houreiGroups } from "@/lib/roadmap/hourei";
 import { moridoValue } from "@/lib/roadmap/morido";
 import { tochiLine } from "@/lib/roadmap/tochi";
-import { YOUTO_COLORS } from "@/lib/roadmap/zoning";
+import { noCityPlanning } from "@/lib/roadmap/municipalities";
+import { noneLabel, YOUTO_COLORS, zoningArea } from "@/lib/roadmap/zoning";
 import { G, GCard, GCell, GFaint, GNote, GRow, NUM, TILE } from "./g-ui";
 import { AlertFill } from "./icons";
 import { pendingText } from "./r-ui";
@@ -37,7 +38,10 @@ export function LawTab({ result, data, open }: TabProps) {
     : [];
   const warnNotes = notes.filter((n) => n.warn);
   const plans = z?.others.filter((o) => o.layer === "chikukei") ?? [];
-  const area = !z ? undefined : z.tokei ? (z.senbiki ?? "都市計画区域") : z.jyuntoshi ? "準都市計画区域" : "都市計画区域外";
+  // 「指定なし」「都市計画区域外」と言えるのは、その市のデータにその種類があるときだけ（無ければ「データなし」。PC の行と同じ）
+  const st = zoning.status === "ok" ? zoning.st : undefined;
+  const outside = noCityPlanning(result.municipality);
+  const area = !z ? undefined : zoningArea(z, st, outside);
   const color = y ? (YOUTO_COLORS[y.code] ?? "#cccccc") : "rgba(255,255,255,0.25)";
 
   // その他の法令（押すと詳しい画面の該当のタブ）
@@ -45,7 +49,14 @@ export function LawTab({ result, data, open }: TabProps) {
   if (zoning.status === "ok") {
     const groups = zoning.hourei ? houreiGroups(zoning.hourei.hits) : [];
     if (zoning.morido) others.push({ label: "盛土規制法", value: moridoValue(zoning.morido), warn: !!zoning.morido.area, tab: 1 });
-    if (zoning.hourei) others.push({ label: "土砂災害等", value: groups.length ? groups.map((x) => x.kind).join("・") : "区域外", warn: groups.length > 0, tab: 1 });
+    // 国のデータに無い種類がある県（群馬の砂防指定地・埼玉の災害危険区域）は、「区域外」と言い切らない
+    if (zoning.hourei)
+      others.push({
+        label: "土砂災害等",
+        value: groups.length ? groups.map((x) => x.kind).join("・") : zoning.hourei.missing.length ? `区域外（${zoning.hourei.missing.join("・")}はデータなし）` : "区域外",
+        warn: groups.length > 0,
+        tab: 1,
+      });
     if (zoning.tochi) others.push({ label: "自然公園・農振・森林", value: tochiLine(zoning.tochi), warn: !!(zoning.tochi.park || zoning.tochi.agri || zoning.tochi.forest), tab: 1 });
     if (zoning.iseki) others.push({ label: "埋蔵文化財", value: zoning.iseki.map ? "遺跡地図で確認" : "教育委員会で確認", tab: 1 });
     others.push({ label: "上下水道・ガス", value: zoning.suido?.length ? "台帳の地図" : "担当で確認", tab: 2 });
@@ -66,7 +77,7 @@ export function LawTab({ result, data, open }: TabProps) {
               用途地域・都市計画
             </span>
             <span className="mt-[7px] block truncate font-bold leading-[1.3]" style={{ fontSize: 17, color: G.text }}>
-              {y ? z!.youto.map((o) => o.name.normalize("NFKC")).join("／") : z ? (z.senbiki === "市街化調整区域" ? "指定なし（調整区域）" : "指定なし") : pend}
+              {y ? z!.youto.map((o) => o.name.normalize("NFKC")).join("／") : z ? (z.senbiki === "市街化調整区域" ? "指定なし（調整区域）" : z.tokei || z.jyuntoshi ? noneLabel(st, "youto") : area) : pend}
             </span>
             <span className="mt-[3px] block truncate leading-[1.35]" style={{ fontSize: 12.5, color: G.sub }}>
               {area ?? ""}
@@ -108,8 +119,8 @@ export function LawTab({ result, data, open }: TabProps) {
       </button>
 
       <div className="grid grid-cols-2 gap-[8px]">
-        <GCell label="高度地区" value={z ? (z.koudoti ? "指定あり" : "指定なし") : pend} height={58} />
-        <GCell label="防火地域" value={z ? (z.bouka ?? "指定なし") : pend} height={58} />
+        <GCell label="高度地区" value={z ? (z.koudoti ? "指定あり" : noneLabel(st, "koudoti")) : pend} height={58} />
+        <GCell label="防火地域" value={z ? (z.bouka ?? noneLabel(st, "bouka")) : pend} height={58} />
       </div>
 
       {/* 建築時の注意点・その他の法令・問い合わせ先 */}

@@ -4,6 +4,8 @@
 import { hazardTotal } from "@/lib/app/hazard-level";
 import { RECORD_ITEMS, topicProgress, type PropertyRecords, type RecordTopic } from "@/lib/records";
 import { roadShort } from "@/lib/roadmap/road-read";
+import { noCityPlanning } from "@/lib/roadmap/municipalities";
+import { noneLabel, zoningArea } from "@/lib/roadmap/zoning";
 import type { StatusKey } from "./tokens";
 import type { Ok, PropertyData } from "./use-property";
 
@@ -68,7 +70,14 @@ export function topicStatuses(result: Ok, data: PropertyData, records: PropertyR
     else if (zoning.status === "ok") {
       const z = zoning.zoning;
       const y = z.youto[0];
-      const value = y ? `${z.youto.map((o) => o.name).join("／")}${y.bcr && y.far ? `・建ぺい${y.bcr}%・容積${y.far}%` : ""}` : z.senbiki === "市街化調整区域" ? "市街化調整区域（用途地域の指定なし）" : !z.tokei && !z.jyuntoshi ? "都市計画区域外" : "用途地域の指定なし";
+      // 「指定なし」「都市計画区域外」と言えるのは、その市のデータがあるときだけ
+      const value = y
+        ? `${z.youto.map((o) => o.name).join("／")}${y.bcr && y.far ? `・建ぺい${y.bcr}%・容積${y.far}%` : ""}`
+        : z.senbiki === "市街化調整区域"
+          ? "市街化調整区域（用途地域の指定なし）"
+          : !z.tokei && !z.jyuntoshi
+            ? zoningArea(z, zoning.st, noCityPlanning(m))
+            : `用途地域の${noneLabel(zoning.st, "youto")}`;
       push("zoning", { status: "auto", chip: "取得済み", value: `${value}（国のGISデータ・参考）`, hint: y && (!y.bcr || !y.far) ? "建ぺい率・容積率は都市計画図で確認" : "地区計画・高度地区の種類は都市計画図で確認" });
     } else push("zoning", { status: "unconfirmed", chip: "未確認", value: `${m.name}の用途地域は国のデータにありません`, hint });
   }

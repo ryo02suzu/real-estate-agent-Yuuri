@@ -177,21 +177,37 @@ export function statusFor(codes: string[], all: Record<string, ZoningStatus>): Z
 
 export type ZoningRow = { label: string; value: string; sub?: string; warn?: boolean; color?: string };
 
+/**
+ * 地点にその都市計画が無いときの言い方。「指定なし」と言えるのは、その市のデータにその種類があるときだけ。
+ * データが無ければ「データなし」（国のデータに入っていない防火地域・高度地区などを「指定なし」と言わない）
+ */
+export function noneLabel(st: ZoningStatus | undefined, l: ZoningLayer): "指定なし" | "データなし" {
+  return (st ? st.layers[l] : 0) === 0 ? "データなし" : "指定なし";
+}
+
+/**
+ * 地点の区域（市街化区域・市街化調整区域・都市計画区域・準都市計画区域・都市計画区域外）。「都市計画区域外」と言えるのは、
+ * その市の都市計画区域のデータがあるときか、市区町村に都市計画区域が無いと分かっているとき（outside。スマホだけ渡す）。
+ * どちらでもなければ「データなし」
+ */
+export function zoningArea(z: Zoning, st: ZoningStatus | undefined, outside = false): string {
+  const flag = (l: ZoningLayer) => (st ? st.layers[l] : 0);
+  if (z.tokei) {
+    if (z.senbiki) return z.senbiki;
+    if (flag("senbiki") === -1) return "都市計画区域（区域区分なし）";
+    return "都市計画区域";
+  }
+  if (z.jyuntoshi) return "準都市計画区域";
+  return (st && flag("tokei") === 1) || outside ? "都市計画区域外" : "データなし";
+}
+
 /** 画面に出す行（区域・用途地域・建ぺい率と容積率・防火・高度地区・地区計画・そのほか・都市計画道路・用途地域の境目） */
 export function zoningRows(z: Zoning, st: ZoningStatus | undefined): ZoningRow[] {
-  const flag = (l: ZoningLayer) => (st ? st.layers[l] : 0);
-  // 「指定なし」と言えるのは、その市のデータがあるときだけ。データが無ければ「データなし」
-  const none = (l: ZoningLayer) => (flag(l) === 0 ? "データなし" : "指定なし");
+  const none = (l: ZoningLayer) => noneLabel(st, l);
   const rows: ZoningRow[] = [];
   const y = z.youto[0];
 
-  let area: string;
-  if (z.tokei) {
-    if (z.senbiki) area = z.senbiki;
-    else if (flag("senbiki") === -1) area = "都市計画区域（区域区分なし）";
-    else area = "都市計画区域";
-  } else if (z.jyuntoshi) area = "準都市計画区域";
-  else area = st && flag("tokei") === 1 ? "都市計画区域外" : "データなし";
+  const area = zoningArea(z, st);
   rows.push({ label: "区域", value: area, warn: area === "市街化調整区域" });
 
   if (y) {

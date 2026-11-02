@@ -8,7 +8,7 @@
 新幹線の路線は通勤・通学の案内に使わないので、路線の一覧から外す（新幹線だけの駅は入れない）。
 
 徒歩の分数は、不動産の広告の決まりどおり駅の出入口までの道路距離で出したいので、OpenStreetMap（関東の切り出し）から
-駅の入口の点（e）を足す（--osm）。入口の点が無い駅は、駅舎の建物の中心、それも無ければ駅の点（同じ名前）。どれも無い駅は
+駅の入口の点（e）を足す（--osm）。入口の点が無い駅は、駅舎の建物の輪郭の点、それも無ければ駅の点（同じ名前）。どれも無い駅は
 ホームの線の点（p）で測る（アプリはそのとき「ホームまで」と書く）。k は入口の点の種類（1 出入口・2 駅舎・3 駅の点）。
 入口の点は、いちばん近いホームの駅のものとする（250m まで）。
 
@@ -154,12 +154,13 @@ def osm_doors(pbf: str) -> dict:
         def way(self, w):
             if w.tags.get("building") != "train_station":
                 return
-            pts = []
+            # 駅舎の輪郭の点（中心ではなく）。線路をまたぐ駅舎（橋上駅）の中心は線路の上で、反対側の道から測ってしまうので、
+            # 輪郭の点のうち物件側の点まで測れるようにする
+            seen = set()
             for nd in w.nodes:
-                if nd.location.valid():
-                    pts.append((nd.lon, nd.lat))
-            if pts:
-                out["building"].append((sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts), w.tags.get("name") or ""))
+                if nd.location.valid() and (nd.lon, nd.lat) not in seen:
+                    seen.add((nd.lon, nd.lat))
+                    out["building"].append((nd.lon, nd.lat, w.tags.get("name") or ""))
 
     H().apply_file(pbf, locations=True, idx="flex_mem")
     log(f"OpenStreetMap：出入口 {len(out['entrance'])}・駅舎 {len(out['building'])}・駅の点 {len(out['node'])}")

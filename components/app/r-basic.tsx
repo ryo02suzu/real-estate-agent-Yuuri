@@ -13,7 +13,8 @@ import type { Triage } from "@/lib/app/triage";
 import { usageShort } from "@/lib/roadmap/building";
 import { chibanLabel, kuikiLabelFrom, parcelMark, pickedChibanText } from "@/lib/roadmap/parcel";
 import { schoolGaps, schoolGapShort, schoolShort } from "@/lib/roadmap/school";
-import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
+import { noCityPlanning } from "@/lib/roadmap/municipalities";
+import { noneLabel, YOUTO_COLORS, youtoShort, zoningArea } from "@/lib/roadmap/zoning";
 import { addressOffLot, pickKey, registryNeighbors } from "../parcel-card";
 import { useCopy } from "../use-copy";
 import { G, GCard, GCell, GFaint, GHead, GPill, NUM, TILE, TILE_GOLD, TILE_WARN } from "./g-ui";
@@ -31,6 +32,7 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
   const { zoning, parcels, building, stations, schools, landPrice } = data;
   const parcel = parcels.status === "ok" ? parcels.parcel : undefined;
   const z = zoning.status === "ok" ? zoning.zoning : undefined;
+  const zst = zoning.status === "ok" ? zoning.st : undefined;
   const y = z?.youto[0];
   // 番地まで見つからず町の中心を出しているときは、地点の筆・建物は物件と関係ないので出さない
   const townCenter = parcels.status === "none" && parcels.approximate;
@@ -82,7 +84,16 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
         <div className="grid grid-cols-2 gap-[8px]">
           <GCell
             label="用途地域"
-            value={y ? <ZoneChip name={y.name} code={y.code} /> : z ? (z.senbiki === "市街化調整区域" ? "指定なし（調整区域）" : !z.tokei && !z.jyuntoshi ? "都市計画区域外" : "指定なし") : <GFaint>{pendingText(zoning.status)}</GFaint>}
+            value={
+              y ? (
+                <ZoneChip name={y.name} code={y.code} />
+              ) : z ? (
+                // 「指定なし」「都市計画区域外」と言えるのは、その市のデータがあるときだけ（PC の行と同じ）
+                z.senbiki === "市街化調整区域" ? "指定なし（調整区域）" : !z.tokei && !z.jyuntoshi ? zoningArea(z, zst, noCityPlanning(result.municipality)) : noneLabel(zst, "youto")
+              ) : (
+                <GFaint>{pendingText(zoning.status)}</GFaint>
+              )
+            }
             sub={bcr || far ? `建ぺい${bcr ?? "―"}・容積${far ?? "―"}` : z ? (z.senbiki ?? "都市計画で確認") : ""}
             onClick={() => go("law")}
           />
@@ -208,7 +219,7 @@ function TriageCard({ triage, checklist, onAll }: { triage: Triage; checklist: T
               <b className="font-semibold">確認中…</b>
             ) : (
               <>
-                <b className="font-bold">{warns.length ? `要注意 ${warns.length}` : "要注意なし"}</b>
+                <b className="font-bold">{`要注意 ${warns.length}`}</b>
                 <span style={{ color: G.sub }}>・要確認 {checks.length}</span>
               </>
             )}

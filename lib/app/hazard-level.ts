@@ -70,7 +70,8 @@ function doshaCard(r: KindReport | undefined): HazardCardInfo {
   }
   const near = nearestNear(r.hits);
   if (near?.near) return { kind: "dosha", title, chip: "注意", tone: "caution", lines: [`区域の外ですが、${meters(near.near.distance)}先に${near.layer.name}の${near.near.cls.label}があります。`] };
-  return { kind: "dosha", title, chip: "区域外", tone: "out", lines: ["土砂災害警戒区域には指定されていません。"] };
+  // 指定は都県が進めていて、国のデータに入るまで間があることがあるので、「指定されていない」とは言い切らない
+  return { kind: "dosha", title, chip: "区域外", tone: "out", lines: ["国のデータでは、土砂災害警戒区域・特別警戒区域の外です。"] };
 }
 
 /** 洪水・内水・高潮・津波・土砂災害のカード（画面の並び順） */

@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
+import { findMunicipality, noCityPlanning } from "./municipalities";
 import type { LngLat, Polygon } from "./parcel";
 import STATUS from "./data/zoning-status.json";
 import {
+  noneLabel,
   ratioLabel,
   statusFor,
   youtoShort,
+  zoningArea,
   zoningChips,
   zoningFrom,
   zoningRows,
+  type Zoning,
   type ZoningFeature,
   type ZoningLayer,
   type ZoningStatus,
@@ -170,5 +174,32 @@ describe("市区町村のデータの有無", () => {
   it("関東1都6県の市区町村の大半が載っている", () => {
     expect(Object.keys(all).length).toBeGreaterThan(280);
     expect(Object.keys(all).every((k) => /^(08|09|10|11|12|13|14)\d{3}$/.test(k))).toBe(true);
+  });
+});
+
+describe("データの無い種類を「指定なし」と言わない（スマホの札も PC の行も同じ）", () => {
+  const all = STATUS as Record<string, ZoningStatus>;
+  const base = { youto: [], youtoNear: [], tokei: true, jyuntoshi: false, others: [] } as unknown as Zoning;
+
+  it("防火・高度地区のデータが無い市は「データなし」、ある市は「指定なし」", () => {
+    // 中央区は高度地区のデータが国の GIS に無い。千代田区はある
+    expect(noneLabel(statusFor(["13102"], all), "koudoti")).toBe("データなし");
+    expect(noneLabel(statusFor(["13101"], all), "koudoti")).toBe("指定なし");
+    // 君津市は防火・準防火のデータが無い
+    expect(noneLabel(statusFor(["12225"], all), "bouka")).toBe("データなし");
+    // 市のデータが一覧に無ければ「データなし」
+    expect(noneLabel(undefined, "bouka")).toBe("データなし");
+  });
+
+  it("「都市計画区域外」は、都市計画区域のデータがあるか、市区町村に都市計画区域が無いと分かっているときだけ", () => {
+    const out = { ...base, tokei: false } as Zoning;
+    expect(zoningArea(out, statusFor(["13101"], all))).toBe("都市計画区域外");
+    expect(zoningArea(out, undefined)).toBe("データなし");
+    expect(zoningArea(out, undefined, true)).toBe("都市計画区域外");
+    expect(zoningArea({ ...base, senbiki: "市街化調整区域" } as Zoning, undefined)).toBe("市街化調整区域");
+    // 長瀞町（全域が都市計画区域外・県条例で接道）、檜原村（coverage: outside）、千代田区
+    expect(noCityPlanning(findMunicipality("11363")!)).toBe(true);
+    expect(noCityPlanning(findMunicipality("13307")!)).toBe(true);
+    expect(noCityPlanning(findMunicipality("13101")!)).toBe(false);
   });
 });

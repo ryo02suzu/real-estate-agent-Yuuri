@@ -583,7 +583,7 @@ export function triageOf(input: TriageInput): Triage {
   const failed = PENDING_LABELS.filter(([k]) => (input[k] as { status?: string } | undefined)?.status === "error").map(([, l]) => l);
   const warns = issues.filter((i) => i.level === "warn").length;
   const checks = issues.length - warns;
-  const headline = pending.length && !issues.length ? "確認中" : `${warns ? `要注意 ${warns}件` : "要注意なし"}・要確認 ${checks}件${pending.length ? "（確認中あり）" : ""}`;
+  const headline = pending.length && !issues.length ? "確認中" : `要注意 ${warns}件・要確認 ${checks}件${pending.length ? "（確認中あり）" : ""}`;
   return { issues, actions: buildActions(input, issues), pending, failed, headline };
 }
 

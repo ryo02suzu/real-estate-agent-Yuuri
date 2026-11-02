@@ -65,6 +65,15 @@ export type Municipality = {
 
 export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI];
 
+/**
+ * 市区町村に都市計画区域が無い（全域が都市計画区域外）と分かっているか。coverage が outside か、注記にそう書いてある町村
+ * （長瀞町・清川村・嬬恋村のように、県や村の条例で接道の決まりがあるので coverage は outside ではない所）。
+ * 都市計画のデータ（国の GIS）に無い町村で「都市計画区域外」と言ってよいかに使う
+ */
+export function noCityPlanning(m: Municipality): boolean {
+  return m.coverage === "outside" || /全域が都市計画区域外/.test(m.note ?? "");
+}
+
 export function findMunicipality(muniCd: string): Municipality | undefined {
   return MUNICIPALITIES.find((m) => m.codes.includes(muniCd));
 }

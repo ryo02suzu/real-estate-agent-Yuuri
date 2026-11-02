@@ -216,7 +216,8 @@ function CatCell({ title, icon, poi, loading, noData, onClick }: { title: string
         </span>
       </span>
       <span className="mt-[5px] block truncate font-semibold leading-[1.15]" style={{ fontSize: 13.5, color: poi ? G.text : G.faint }}>
-        {poi ? shortName(poi.name) : loading ? "確認中…" : noData ? "準備中" : "近くになし"}
+        {/* 施設は OpenStreetMap にあるものだけ（載っていない店もある）ので、「無い」とは言い切らない */}
+        {poi ? shortName(poi.name) : loading ? "確認中…" : noData ? "準備中" : "データになし"}
       </span>
       <span className="mt-[3px] block truncate leading-none" style={{ fontSize: 10.5, color: poi?.routed ? G.gold : G.faint, minHeight: 11 }}>
         {poi ? `${walkText(poi)}・${metersText(wayMeters(poi))}` : loading ? "" : "約1.2km以内"}
