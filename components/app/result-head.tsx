@@ -67,6 +67,7 @@ export function PropertyHero({
   chips,
   more,
   onBack,
+  backLabel = "ホームに戻る",
   favorite,
   onFavorite,
   onShare,
@@ -87,6 +88,8 @@ export function PropertyHero({
   /** 札を押したときの説明（推定の位置など） */
   more?: ReactNode;
   onBack: () => void;
+  /** 戻るボタンの読み上げの名前（履歴から開いたときは「履歴に戻る」） */
+  backLabel?: string;
   favorite: boolean;
   onFavorite: () => void;
   onShare: () => void;
@@ -97,7 +100,7 @@ export function PropertyHero({
   return (
     <>
       <div ref={topRef} className="pv-top relative z-[2] flex items-center gap-[10px] px-[14px] pt-[8px]">
-        <Round onClick={onBack} label="ホームに戻る">
+        <Round onClick={onBack} label={backLabel}>
           <ChevronLeft size={24} strokeWidth={2} absoluteStrokeWidth color="#fff" />
         </Round>
         <span className="flex-1" />

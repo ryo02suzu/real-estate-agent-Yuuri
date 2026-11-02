@@ -38,7 +38,7 @@ import {
   toggleFavoriteChecked,
   type FavoriteItem,
 } from "@/lib/favorites";
-import type { HistoryItem } from "@/lib/history";
+import { historyKey, type HistoryItem } from "@/lib/history";
 import { webglAvailable } from "@/lib/map-style";
 import { propertyIdOf } from "@/lib/property-id";
 import {
@@ -144,7 +144,7 @@ import {
   type TabKey,
 } from "./result-head";
 import { AccountPage, TabBanner } from "./tab-pages";
-import { HistoryBackdrop, HistoryPage, historyTop, HistoryUndoToast } from "./history";
+import { HistoryBackdrop, HistoryPage, historyTop, HistoryUndoToast, type HistorySnapshot } from "./history";
 import { propertyCount, removedText } from "@/lib/app/history-view";
 import {
   SHEET_KINDS,
@@ -234,6 +234,22 @@ export function MobileApp(props: MobileAppProps) {
   );
   const [flightTarget, setFlightTarget] = useState<FlightTarget>(null);
   const flightFrom = useRef<unknown>(undefined);
+  // 履歴のページから物件を開いたとき：物件の画面から戻る先を履歴にする（backTo）。開いたときの履歴の絞り込み・並べ方・位置（histSnap）は、
+  // 戻ったときに HistoryPage へ渡して元に戻す（histRestore）。調べている間は、押した行に「調べています」を出す（opening）。
+  // 下のメニューなどで、ほかのページへ自分で移ったら、戻る先は消す
+  const backTo = useRef<"history" | null>(null);
+  const [fromHistory, setFromHistory] = useState(false);
+  const histSnap = useRef<HistorySnapshot | null>(null);
+  const [histRestore, setHistRestore] = useState<HistorySnapshot | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
+  /** 物件の画面の戻るボタンの読み上げの名前 */
+  const backLabel = fromHistory ? "履歴に戻る" : "ホームに戻る";
+  /** 戻る先（履歴）を消す */
+  const forgetBack = () => {
+    backTo.current = null;
+    histSnap.current = null;
+    setFromHistory(false);
+  };
   // 地球の演出が消え始めた（宇宙の背景も一緒に消す）
   const [leaving, setLeaving] = useState(false);
   // 降りたあと、物件の画面がふわっと出る間
@@ -282,6 +298,18 @@ export function MobileApp(props: MobileAppProps) {
     ? `${shown.query}|${shown.result.status}|${"lat" in shown.result ? `${shown.result.lat},${shown.result.lng}` : ""}`
     : "";
   useEffect(() => {
+    // 履歴から開いた物件から戻った（物件の画面が閉じた）ときは、出たときの履歴へ戻る（絞り込み・位置は HistoryPage が戻す）
+    if (!resultKey && backTo.current === "history") {
+      const snap = histSnap.current;
+      backTo.current = null;
+      histSnap.current = null;
+      queueMicrotask(() => {
+        setHistRestore(snap);
+        setFromHistory(false);
+        setPage("history");
+      });
+      return;
+    }
     queueMicrotask(() => setPage("home"));
     scroller.current?.scrollTo(0, 0);
   }, [resultKey]);
@@ -321,7 +349,8 @@ export function MobileApp(props: MobileAppProps) {
       go(p);
       return;
     }
-    // 名前は動きの間だけ付ける（今の画面に付けてから、切り替える）
+    // 名前は動きの間だけ付ける（今の画面に付けてから、切り替える）。履歴は、いちばん上のいつもの形で開く
+    setHistRestore(null);
     flushSync(() => setMorph(true));
     // 画面に収まっていない行・板・欄は名前を外す（スクロールで隠れていた所から飛んだり、下のメニューの上を通ったりしないように。
     // 今日の行が多くて縦に長い板は、見えている所で切って滑らせる。components/app/vt.ts）
@@ -359,8 +388,23 @@ export function MobileApp(props: MobileAppProps) {
     });
   };
   const pickRecent = (h: HistoryItem) => {
+    forgetBack();
     if (page === "home" && !shown) takeOff(h.address.replace(/^地番\s*/, ""));
     setPage("home");
+    onPickHistory(h);
+  };
+  /**
+   * 履歴のページで行を押した：地球から降りる（動きの演出がオンのとき。ホームから調べたときと同じ）。降りないときは、押した行に
+   * 「調べています」を出して、調べ終わるまで履歴のまま（終わったら物件の画面へ。下の札にも「調べています」）。
+   * 物件の画面から戻ると、出たときの履歴（絞り込み・並べ方・位置）へ戻る
+   */
+  const openFromHistory = (h: HistoryItem, snap: HistorySnapshot) => {
+    backTo.current = "history";
+    histSnap.current = snap;
+    setFromHistory(true);
+    setHistRestore(null);
+    if (takeOff(h.address.replace(/^地番\s*/, ""))) setPage("home");
+    else setOpening(historyKey(h));
     onPickHistory(h);
   };
   /** 物件の画面の「戻る」。検索する前のホームに戻る */
@@ -368,13 +412,14 @@ export function MobileApp(props: MobileAppProps) {
     setPage("home");
     props.onHome();
   };
-  /** ホームから調べるとき、地球から飛ぶ（動きの演出がオンで、動きを減らす設定でなく、WebGL が使えるときだけ） */
-  const takeOff = (label: string) => {
-    if (!motionOn || reducedMotion() || !webglAvailable()) return;
+  /** ホーム・履歴から調べるとき、地球から飛ぶ（動きの演出がオンで、動きを減らす設定でなく、WebGL が使えるときだけ）。飛んだかを返す */
+  const takeOff = (label: string): boolean => {
+    if (!motionOn || reducedMotion() || !webglAvailable()) return false;
     flightFrom.current = shown;
     setFlightTarget(null);
     setLeaving(false);
     setFlight({ key: Date.now(), label });
+    return true;
   };
   /** ホームの検索。住所も地番も同じ欄（地番かどうかは調べるときに見分ける。lib/roadmap の splitChiban） */
   const submitHome = () => {
@@ -437,7 +482,11 @@ export function MobileApp(props: MobileAppProps) {
         setUndo(null);
         setFavAll(false);
       });
-    if (page !== "history") queueMicrotask(() => setHistUndo(null));
+    if (page !== "history")
+      queueMicrotask(() => {
+        setHistUndo(null);
+        setHistRestore(null);
+      });
   }, [page]);
   // 調べ終わったら、降りる先を地球の演出に渡す（見つからない・候補から選ぶ・調べられなかったときは降りない）
   useEffect(() => {
@@ -453,6 +502,21 @@ export function MobileApp(props: MobileAppProps) {
       );
     } else if (error && !loading) queueMicrotask(() => setFlightTarget("none"));
   }, [flight, shown, error, loading]);
+  // 履歴から開いた物件（地球から降りないとき）を調べ終わったら、物件の画面へ。調べられなかったら履歴のまま（下の札にわけが出る）
+  useEffect(() => {
+    if (!opening || loading) return;
+    queueMicrotask(() => {
+      setOpening(null);
+      if (error) {
+        backTo.current = null;
+        histSnap.current = null;
+        setFromHistory(false);
+        return;
+      }
+      setPage("home");
+      scroller.current?.scrollTo(0, 0);
+    });
+  }, [opening, loading, error]);
   // ホームを開いている間に、地球の演出の部品と、はじめに見える地球の絵を先に読んでおく（押してからの待ちを減らす）
   useEffect(() => {
     if (!showHome || !motionOn || reducedMotion()) return;
@@ -541,7 +605,9 @@ export function MobileApp(props: MobileAppProps) {
         history={history}
         isFavorite={isFav}
         onToggleFavorite={toggleFav}
-        onPick={pickRecent}
+        onPick={openFromHistory}
+        opening={opening}
+        restore={histRestore}
         onDocs={openDocsFor}
         onRemove={(items) => {
           if (!props.onRemoveHistory(items))
@@ -645,6 +711,7 @@ export function MobileApp(props: MobileAppProps) {
         onPick={props.onPickAddress}
         onMap={openMap}
         onBack={backHome}
+        backLabel={backLabel}
         banner={
           <Banner
             loading={loading && !offline}
@@ -739,6 +806,7 @@ export function MobileApp(props: MobileAppProps) {
                   onPickPoint={onPickPoint}
                   onFix={openMap}
                   onBack={backHome}
+                  backLabel={backLabel}
                   wanted={wanted}
                   onWantedDone={wantedDone}
                   scroller={scroller}
@@ -834,6 +902,14 @@ export function MobileApp(props: MobileAppProps) {
         }
         active={page}
         onSelect={(k) => {
+          // 履歴から開いた物件を見ているときに「履歴」を押したら、出たときの履歴（絞り込み・位置）へ戻る。ほかへ移ったら戻る先は消す
+          const snap =
+            k === "history" && backTo.current === "history"
+              ? histSnap.current
+              : null;
+          forgetBack();
+          setOpening(null);
+          setHistRestore(snap);
           if (k === "home" && page === "home") {
             if (shown) props.onHome();
             else scroller.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -1090,6 +1166,7 @@ function PropertyView({
   onPickPoint,
   onFix,
   onBack,
+  backLabel,
   wanted,
   onWantedDone,
   scroller,
@@ -1117,6 +1194,8 @@ function PropertyView({
   onPickPoint: (lat: number, lng: number) => void;
   onFix: () => void;
   onBack: () => void;
+  /** 戻るボタンの読み上げの名前（履歴から開いたときは「履歴に戻る」） */
+  backLabel: string;
   /** 書類・出力のタイルで選んだ書類（この物件のものならすぐ開く） */
   wanted: { kind: DocKind; key: string } | null;
   onWantedDone: () => void;
@@ -1683,7 +1762,7 @@ function PropertyView({
         >
           <button
             onClick={onBack}
-            aria-label="ホームに戻る"
+            aria-label={backLabel}
             className="press flex size-[44px] shrink-0 items-center justify-center rounded-full"
           >
             <ChevronLeft
@@ -1793,6 +1872,7 @@ function PropertyView({
             ) : undefined
           }
           onBack={onBack}
+          backLabel={backLabel}
           favorite={favorite}
           onFavorite={onFavorite}
           onShare={share}

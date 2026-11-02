@@ -36,6 +36,7 @@ import {
 import { createPortal, flushSync } from "react-dom";
 import { copyLabel, copyText, fullDate, groupByProperty, inRange, KIND_LABEL, kindOf, markOf, matches, propertyCount, rangeCounts, RANGES, recordsText, sections, stamp, type Grouped, type Kind, type Range, type Section } from "@/lib/app/history-view";
 import { placeParts } from "@/lib/app/scene";
+import { settleFrom, type Settle } from "@/lib/app/settle";
 import { histPart, type HistPart } from "@/lib/app/sun";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import { allRecords, recordsTopics, type PropertyRecords } from "@/lib/records";
@@ -245,6 +246,12 @@ const KINDS: { key: Kind | "all"; label: string }[] = [
   { key: "map", label: "地図" },
 ];
 
+/**
+ * 物件を開いたときの履歴のページのようす（物件の画面から戻ったとき、このとおりに戻す。components/app/mobile-app.tsx が持つ）：
+ * 絞り込みの文字・調べ方・並べ方・描いていた行の数・スクロールした位置（画面の px）・開いた行
+ */
+export type HistorySnapshot = { q: string; kind: Kind | "all"; byCity: boolean; limit: number; scroll: number; key: string };
+
 /** 消す行の動き：遅れ（ms）と、なぞって消したか（左へ抜けてからたたむ） */
 type Leave = { delay: number; slid: boolean };
 /** 絞り込んで出ている物件（「履歴を消す…」で、これだけを消せる。text は絞り込みの説明） */
@@ -329,7 +336,7 @@ function placeList(sec: HTMLElement | null, sp: HTMLElement | null, o: PlaceOpts
     from += new DOMMatrixReadOnly(getComputedStyle(sec).transform).m42 / z;
     memo.anim.cancel();
   }
-  memo.anim = sec.animate([{ transform: `translateY(${from}px)` }, { transform: "translateY(0)" }], { duration: 480, easing: "cubic-bezier(0.22, 0.9, 0.24, 1)" });
+  memo.anim = sec.animate([{ transform: `translateY(${from}px)` }, { transform: "translateY(0)" }], { duration: 500, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
 }
 
 /**
@@ -369,11 +376,14 @@ export function HistoryPage({
   onMenu,
   unread,
   morph = false,
+  opening = null,
+  restore = null,
 }: {
   history: HistoryItem[];
   isFavorite: (h: HistoryItem) => boolean;
   onToggleFavorite: (h: HistoryItem) => void;
-  onPick: (h: HistoryItem) => void;
+  /** 物件を開く（いまの履歴のページのようすを添える。物件の画面から戻ったときに、このとおりに戻す） */
+  onPick: (h: HistoryItem, snap: HistorySnapshot) => void;
   /** その物件の書類を作る（レポートの画面） */
   onDocs: (h: HistoryItem) => void;
   /** 履歴から消す（行がたたまれてから呼ぶ。「元に戻す」は mobile-app.tsx が出す） */
@@ -386,6 +396,10 @@ export function HistoryPage({
   unread: boolean;
   /** ホームの最近の検索とつながる動きの間（いちばん上の板・検索欄・最近の3件の行に、ホームと同じ名前を付ける。home.tsx の VT） */
   morph?: boolean;
+  /** 開いている途中の行（historyKey。地球から降りないときは、調べ終わるまでその行に「調べています」を出す） */
+  opening?: string | null;
+  /** 物件の画面から戻ったとき：開いたときのようす（絞り込み・並べ方・位置）に戻し、開いた行を一瞬光らせる */
+  restore?: HistorySnapshot | null;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -394,9 +408,10 @@ export function HistoryPage({
   const screen = useScreenHeight(root);
   useShrink(root, BAR_AT);
   const now = useNow();
-  const [q, setQ] = useState("");
-  const [kind, setKind] = useState<Kind | "all">("all");
-  const [byCity, setByCity] = useState(false);
+  // 物件の画面から戻ったときは、開いたときの絞り込み・調べ方・並べ方から（置いたときに決める）
+  const [q, setQ] = useState(() => restore?.q ?? "");
+  const [kind, setKind] = useState<Kind | "all">(() => restore?.kind ?? "all");
+  const [byCity, setByCity] = useState(() => restore?.byCity ?? false);
   // 絞り込みの欄に触れている間（離したあと少し待つ。行や札を押した指の下で一覧が動かないように）
   const [typing, setTyping] = useState(false);
   const typingTimer = useRef(0);
@@ -408,8 +423,9 @@ export function HistoryPage({
   const [sheet, setSheet] = useState<SheetState>(null);
   // 並べ方・調べ方を変えるときの、行が滑る動きの間（行に名前を付ける）
   const [listVt, setListVt] = useState(false);
-  // 開いたときだけ上から順に浮き上がる（ホームの最近の検索からつながる動きで来たときは、つながる動きだけ）。少したったら、あとから出る行はすぐ出す
-  const [intro] = useState(!morph);
+  // 開いたときだけ上から順に浮き上がる（ホームの最近の検索からつながる動きで来たときは、つながる動きだけ。物件の画面から戻ったときは
+  // 浮き上がらず、出たときの位置にそのまま戻る）。少したったら、あとから出る行はすぐ出す
+  const [intro] = useState(!morph && !restore);
   const [settled, setSettled] = useState(false);
   useEffect(() => {
     const t = window.setTimeout(() => setSettled(true), 900);
@@ -437,7 +453,7 @@ export function HistoryPage({
   const list = history.filter((h) => (kind === "all" || kindOf(h) === kind) && matches(h, q));
   const rows = groupByProperty(list);
   // 描く行の数（下へスクロールして終わりが近づいたら足す。並べ方・絞り込みを変えても減らさない＝見ていた所が消えない）
-  const [limit, setLimit] = useState(PAGE_ROWS);
+  const [limit, setLimit] = useState(() => Math.max(PAGE_ROWS, restore?.limit ?? 0));
   const secs = cutSections(sections(rows, byCity, now), limit);
   const more = rows.length > limit;
   const moreRef = useRef<HTMLDivElement>(null);
@@ -458,6 +474,17 @@ export function HistoryPage({
   const compact = screen !== undefined && screen < 520;
   // 写真を見せる空き：初めの3行がホームの最近の検索と同じく画面の下の端に。絞り込んでいる間は、検索欄（と札）のすぐ下
   usePlacement(listRef, spacerRef, { filtering, screen: screen ?? 700, top: compact ? LAYOUT.compactSearchBottom : LAYOUT.searchBottom, hold: leaving.size > 0 });
+  // 物件の画面から戻ったとき：出たときのスクロールの位置へ（行を置いたあと、描く前に）。開いた行は一瞬光らせる（どこから来たか分かるように）
+  useLayoutEffect(() => {
+    const sc = root.current?.closest<HTMLElement>("[data-scroller]");
+    if (restore && sc) sc.scrollTop = restore.scroll;
+  }, [restore]);
+  const [flashKey, setFlashKey] = useState<string | null>(() => restore?.key ?? null);
+  useEffect(() => {
+    if (!flashKey) return;
+    const t = window.setTimeout(() => setFlashKey(null), 1400);
+    return () => clearTimeout(t);
+  }, [flashKey]);
 
   // 行を開いている間は、スクロールしたり、ほかの所を押したりしたら閉じる
   useEffect(() => {
@@ -562,6 +589,11 @@ export function HistoryPage({
   };
 
   const scroller = () => root.current?.closest<HTMLElement>("[data-scroller]");
+  /** 物件を開く（いまのようすを添えて。物件の画面から戻ったときに、このとおりに戻す）。開いている途中は、ほかの行を押しても開かない */
+  const pick = (h: HistoryItem) => {
+    if (opening) return;
+    onPick(h, { q, kind, byCity, limit, scroll: scroller()?.scrollTop ?? 0, key: historyKey(h) });
+  };
 
   // 上の細いバーに出す、いまの章（見出しがバーの下を通った、いちばん下の章。章の見出しに data-sec）。並べ方・絞り込みが変わったら数え直す
   const [cur, setCur] = useState<string | null>(null);
@@ -664,13 +696,13 @@ export function HistoryPage({
 
       {/* 見出しと右上のメニュー（ホームのロゴと同じ位置） */}
       <div className="relative flex items-start justify-between" style={{ padding: "16px 18px 0 20px" }}>
-        <h1 className={`${rise} truncate font-bold`} style={{ fontSize: 28, lineHeight: "34px", letterSpacing: 1.6, marginTop: 6, textShadow: SHADOW }}>
+        <h1 className={`${rise} hist-title truncate font-bold`} style={{ fontSize: 28, lineHeight: "34px", letterSpacing: 1.6, marginTop: 6, textShadow: SHADOW }}>
           履歴
         </h1>
         {menuButton}
       </div>
       {/* ひとこと（ホームの「不動産の現場に、すぐ使える情報を。」と同じ位置・大きさ） */}
-      <p className={`${rise} relative font-medium`} style={{ margin: `${compact ? 8 : 14}px 20px 0`, fontSize: 15.5, lineHeight: 1.6, letterSpacing: 1.6, textShadow: SHADOW, ...(intro ? delay(60) : {}) }}>
+      <p className={`${rise} hist-lead relative font-medium`} style={{ margin: `${compact ? 8 : 14}px 20px 0`, fontSize: 15.5, lineHeight: 1.6, letterSpacing: 1.6, textShadow: SHADOW, ...(intro ? delay(60) : {}) }}>
         {history.length ? (
           <>
             調べた物件　{total}件
@@ -825,7 +857,9 @@ export function HistoryPage({
                         vtName={`hist-${index.get(key) ?? i}`}
                         copyName={label}
                         onOpen={(o) => setOpenKey((k) => (o ? key : k === key ? null : k))}
-                        onPick={() => onPick(g.item)}
+                        onPick={() => pick(g.item)}
+                        busy={opening === key}
+                        flash={flashKey === key}
                         onFav={() => onToggleFavorite(g.item)}
                         onCopy={() => {
                           setOpenKey(null);
@@ -879,7 +913,7 @@ export function HistoryPage({
           onClose={() => setSheet(null)}
           onPick={(x) => {
             setSheet(null);
-            onPick(x);
+            pick(x);
           }}
           onFav={(x) => onToggleFavorite(x)}
           onDocs={(x) => {
@@ -996,6 +1030,8 @@ function HistRow({
   delayMs,
   vt,
   vtName,
+  busy = false,
+  flash = false,
   copyName,
   onOpen,
   onPick,
@@ -1018,6 +1054,10 @@ function HistRow({
   vt?: string;
   /** 並べ方・調べ方を変えるときの名前（画面に見えているときだけ付ける。HistoryPage の animateList） */
   vtName: string;
+  /** この行の物件を調べている途中（☆の所に回る印、2行目に「調べています」） */
+  busy?: boolean;
+  /** 物件の画面から戻ってきた行（一瞬光る） */
+  flash?: boolean;
   copyName: string;
   onOpen: (open: boolean) => void;
   onPick: () => void;
@@ -1028,6 +1068,8 @@ function HistRow({
 }) {
   const [dx, setDx] = useState(0);
   const [drag, setDrag] = useState(false);
+  // 指を離したあとの止まり方（離した速さから。null はいつもの止まり方）
+  const [settle, setSettle] = useState<Settle | null>(null);
   const [full, setFull] = useState(false);
   const [held, setHeld] = useState(false);
   // 現れる動きは置いたときに決める（あとで変わっても動き直さない）
@@ -1054,6 +1096,7 @@ function HistRow({
     if (!open && !drag && !leave && dx !== 0) {
       setDx(0);
       setFull(false);
+      setSettle(null);
     }
   }
   // なぞって消した行は、行ごと左へ抜けてから（後ろの「消す」が広がって）たたまれる
@@ -1069,12 +1112,20 @@ function HistRow({
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     heldTouch.current = false;
     if (leave || (e.pointerType === "mouse" && e.button !== 0)) return;
-    gesture.current = { id: e.pointerId, x: e.clientX, y: e.clientY, from: dx, cur: dx, mode: "wait", lx: e.clientX, lt: e.timeStamp, v: 0 };
+    // 動いている途中（開く・閉じる途中）の行は、いま見えている位置からつかむ（止まる先の位置からだと、指を動かした瞬間に跳ぶ）
+    let from = dx;
+    try {
+      const m = new DOMMatrixReadOnly(getComputedStyle(e.currentTarget).transform);
+      if (Number.isFinite(m.m41)) from = m.m41;
+    } catch {
+      // 読めなければ止まる先の位置から
+    }
+    gesture.current = { id: e.pointerId, x: e.clientX, y: e.clientY, from, cur: from, mode: "wait", lx: e.clientX, lt: e.timeStamp, v: 0 };
     clearTimeout(holdTimer.current);
     if (e.pointerType !== "mouse")
       holdTimer.current = window.setTimeout(() => {
         const s = gesture.current;
-        if (!s || s.mode !== "wait" || s.from !== 0) return;
+        if (!s || s.mode !== "wait" || Math.abs(s.from) > 1) return;
         s.mode = "hold";
         heldTouch.current = true;
         setHeld(true);
@@ -1108,8 +1159,9 @@ function HistRow({
         return;
       } else return;
     }
+    // 指の速さ（pt/ms）。1回ごとの揺れをならす
     const dt = e.timeStamp - s.lt;
-    if (dt > 0) s.v = (e.clientX - s.lx) / z / dt;
+    if (dt > 0) s.v = 0.65 * ((e.clientX - s.lx) / z / dt) + 0.35 * s.v;
     s.lx = e.clientX;
     s.lt = e.timeStamp;
     let x = s.from + mx;
@@ -1128,13 +1180,18 @@ function HistRow({
     if (s.mode !== "swipe") return;
     suppressUntil.current = performance.now() + 450;
     setDrag(false);
+    // 指を止めてから離したら、速さは 0
+    const v = e.timeStamp - s.lt > 90 ? 0 : s.v;
     if (-s.cur > ROW_W * FULL_AT && e.type !== "pointercancel") {
+      setSettle(settleFrom(s.cur, -ROW_W, v));
       onRemove(true);
       return;
     }
     // 速く左へ払ったら開く、右へ払ったら戻す。ゆっくりなら半分を越えたかで決める
-    const opening = s.v < 0.4 && (s.v < -0.4 || -s.cur > OPEN_W / 2);
-    setDx(opening ? -OPEN_W : 0);
+    const opening = v < 0.4 && (v < -0.4 || -s.cur > OPEN_W / 2);
+    const to = opening ? -OPEN_W : 0;
+    setSettle(settleFrom(s.cur, to, v));
+    setDx(to);
     setFull(false);
     onOpen(opening);
   };
@@ -1154,6 +1211,7 @@ function HistRow({
     if (dx !== 0 && !leave) {
       e.preventDefault();
       e.stopPropagation();
+      setSettle(null);
       setDx(0);
       setFull(false);
       onOpen(false);
@@ -1175,10 +1233,10 @@ function HistRow({
     <li
       data-row={rowKey}
       data-vt={vtName}
-      className={`hist-row border-t border-white/[0.12] first:border-t-0 ${entered ? "hist-enter" : ""} ${leave ? "hist-leaving" : ""}`}
+      className={`hist-row border-t border-white/[0.12] first:border-t-0 ${entered ? "hist-enter" : ""} ${leave ? "hist-leaving" : ""} ${busy ? "hist-busy" : ""} ${flash ? "hist-back" : ""}`}
       style={{ ...(entered ? delay(delayMs) : {}), transitionDelay: leave ? `${leave.delay}ms` : undefined, viewTransitionName: vt }}
     >
-      <div className={`hist-row-in relative ${drag ? "hist-drag" : ""}`}>
+      <div className={`hist-row-in relative ${drag ? "hist-drag" : ""}`} style={settle ? ({ "--sw-dur": `${settle.dur}s`, "--sw-ease": settle.ease } as CSSProperties) : undefined}>
         {/* 後ろの操作（なぞった分だけ見える。指で操作するもの。キーボード・読み上げは「その他の操作」のシートから） */}
         <div aria-hidden className="hist-acts absolute inset-y-0 right-0 flex overflow-hidden" style={{ width: reveal }}>
           <button tabIndex={-1} onClick={onCopy} className="hist-act" style={{ background: "#3d7bf2", flexGrow: full ? 0.0001 : 1 }}>
@@ -1204,12 +1262,12 @@ function HistRow({
             if (!leave) onMore();
           }}
         >
-          <button onClick={onPick} onKeyDown={onKeyDown} aria-label={`${title}を開く（${sub}）`} className="flex min-h-[62px] min-w-0 flex-1 flex-col justify-center py-[9px] pl-[18px] pr-[4px] text-left outline-none transition-colors active:bg-white/10 focus-visible:shadow-[inset_0_0_0_2px_rgba(255,255,255,0.75)]">
+          <button onClick={onPick} onKeyDown={onKeyDown} aria-label={`${title}を開く（${sub}）`} aria-busy={busy || undefined} className="flex min-h-[62px] min-w-0 flex-1 flex-col justify-center py-[9px] pl-[18px] pr-[4px] text-left outline-none transition-colors active:bg-white/10 focus-visible:shadow-[inset_0_0_0_2px_rgba(255,255,255,0.75)]">
             <span className="block w-full truncate font-medium leading-[1.3]" style={{ fontSize: 16, color: "rgba(255,255,255,0.95)" }}>
               {marked(title, q)}
             </span>
-            <span className="mt-[3px] block w-full truncate leading-[1.3]" style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>
-              {marked(sub, q)}
+            <span className="mt-[3px] block w-full truncate leading-[1.3]" style={{ fontSize: 13, color: busy ? "rgba(190,224,255,0.95)" : "rgba(255,255,255,0.6)" }}>
+              {busy ? "調べています…" : marked(sub, q)}
             </span>
             {pills.length > 0 && <span className="mt-[5px] flex flex-wrap gap-[4px]">{pills}</span>}
           </button>
@@ -1217,9 +1275,16 @@ function HistRow({
           <button onClick={onMore} aria-label={`その他の操作（${copyName}のコピー・書類・消す）`} className="sr-only focus-visible:not-sr-only focus-visible:mr-[2px] focus-visible:flex focus-visible:size-[36px] focus-visible:shrink-0 focus-visible:items-center focus-visible:justify-center focus-visible:rounded-full focus-visible:bg-white/15">
             <MoreHorizontal size={18} strokeWidth={2} absoluteStrokeWidth color="#fff" />
           </button>
-          <button onClick={onFav} aria-label={fav ? "お気に入りから外す" : "お気に入りに保存"} aria-pressed={fav} className="mr-[6px] flex shrink-0 items-center justify-center rounded-full outline-none active:bg-white/10 focus-visible:shadow-[inset_0_0_0_2px_rgba(255,255,255,0.75)]" style={{ width: HIT, height: HIT }}>
-            <FavStar on={fav} size={21} stroke={1.7} off="rgba(255,255,255,0.72)" />
-          </button>
+          {busy ? (
+            // 調べている途中は、☆の所に回る印（押せない）
+            <span role="status" aria-label="調べています" className="mr-[6px] flex shrink-0 items-center justify-center" style={{ width: HIT, height: HIT }}>
+              <span className="size-[20px] animate-spin rounded-full border-2 border-white/25 border-t-white" />
+            </span>
+          ) : (
+            <button onClick={onFav} aria-label={fav ? "お気に入りから外す" : "お気に入りに保存"} aria-pressed={fav} className="mr-[6px] flex shrink-0 items-center justify-center rounded-full outline-none active:bg-white/10 focus-visible:shadow-[inset_0_0_0_2px_rgba(255,255,255,0.75)]" style={{ width: HIT, height: HIT }}>
+              <FavStar on={fav} size={21} stroke={1.7} off="rgba(255,255,255,0.72)" />
+            </button>
+          )}
         </div>
       </div>
     </li>

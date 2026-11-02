@@ -8,13 +8,14 @@
 export type Area = { top: number; bottom: number };
 
 /**
- * スクロールする所（data-scroller）の見えている範囲。上に重なっている細いバー（data-vt-cover。スクロールして出ているときだけ）の分は除く
+ * スクロールする所（data-scroller）の見えている範囲。上に重なっている細いバー（data-vt-cover。少しでも見えているときだけ）の分は除く
  */
 export function scrollArea(scroller: HTMLElement): Area {
   const r = scroller.getBoundingClientRect();
   let top = r.top;
   scroller.querySelectorAll<HTMLElement>("[data-vt-cover]").forEach((bar) => {
-    if (!bar.closest("[data-compact]")) return;
+    // バーはスクロールに合わせて少しずつ出るので、少しでも見えていれば、その下から
+    if (parseFloat(getComputedStyle(bar).opacity) < 0.05) return;
     const b = bar.getBoundingClientRect();
     if (b.height > 0) top = Math.max(top, b.bottom);
   });

@@ -10,10 +10,10 @@ import { TileMap } from "./tile-map";
 import { NAVY } from "./ui";
 
 /** 上の欄（戻る・見出し・副題） */
-function Top({ title, sub, onBack }: { title: string; sub?: string; onBack: () => void }) {
+function Top({ title, sub, onBack, backLabel = "ホームに戻る" }: { title: string; sub?: string; onBack: () => void; backLabel?: string }) {
   return (
     <div className="flex items-center pl-[4px] pr-[16px]" style={{ height: 56 }}>
-      <button onClick={onBack} aria-label="ホームに戻る" className="press flex size-[44px] shrink-0 items-center justify-center rounded-full active:bg-[#e6ecf4]">
+      <button onClick={onBack} aria-label={backLabel} className="press flex size-[44px] shrink-0 items-center justify-center rounded-full active:bg-[#e6ecf4]">
         <ArrowLeft size={23} strokeWidth={2} absoluteStrokeWidth color={HEAD} />
       </button>
       <div className="min-w-0 flex-1 pl-[4px]">
@@ -48,11 +48,11 @@ function Empty({ icon, title, body, children }: { icon: ReactNode; title: string
 const DISCLAIMER = "地図・データは参考情報です。MICHILUは判定をしません。重要事項説明などの最終確認は、必ず役所の窓口・公的な資料で行ってください。";
 
 /** 住所が見つからない・候補が複数・未対応の市区町村 */
-export function NotOkPage({ query, result, onPick, onMap, onBack, banner }: { query: string; result: Exclude<LookupResult, { status: "ok" }>; onPick: (address: string) => void; onMap: () => void; onBack: () => void; banner?: ReactNode }) {
+export function NotOkPage({ query, result, onPick, onMap, onBack, backLabel, banner }: { query: string; result: Exclude<LookupResult, { status: "ok" }>; onPick: (address: string) => void; onMap: () => void; onBack: () => void; backLabel?: string; banner?: ReactNode }) {
   if (result.status === "not_found")
     return (
       <>
-        <Top title="住所が見つかりませんでした" sub={`「${query}」`} onBack={onBack} />
+        <Top title="住所が見つかりませんでした" sub={`「${query}」`} onBack={onBack} backLabel={backLabel} />
         {banner}
         <div className="px-[16px] pt-[8px]">
           <Empty icon={<TriangleAlert size={30} strokeWidth={1.6} absoluteStrokeWidth color="#c99700" />} title="入れ方を変えると見つかることがあります" body="都道府県・市区町村から入力してください。建物名や部屋番号は外すと見つかりやすくなります。地番は「松戸市古ヶ崎四丁目3556-1」のように、町名のあとに地番を続けます。">
@@ -67,7 +67,7 @@ export function NotOkPage({ query, result, onPick, onMap, onBack, banner }: { qu
   if (result.status === "choose")
     return (
       <>
-        <Top title="当てはまる場所が複数あります" sub="物件の場所を選んでください" onBack={onBack} />
+        <Top title="当てはまる場所が複数あります" sub="物件の場所を選んでください" onBack={onBack} backLabel={backLabel} />
         {banner}
         <div className="px-[16px] pt-[8px]">
           <ul className={`overflow-hidden ${CARD}`}>
@@ -92,7 +92,7 @@ export function NotOkPage({ query, result, onPick, onMap, onBack, banner }: { qu
   const city = shortAddress(result.matchedAddress).match(/^.+?[市区町村]/)?.[0] ?? "";
   return (
     <>
-      <Top title={`${shortAddress(result.matchedAddress)} 付近`} sub={city ? `${city}は対応エリアの外です` : "対応エリアの外です"} onBack={onBack} />
+      <Top title={`${shortAddress(result.matchedAddress)} 付近`} sub={city ? `${city}は対応エリアの外です` : "対応エリアの外です"} onBack={onBack} backLabel={backLabel} />
       {banner}
       <div className="px-[16px] pt-[8px]">
         <div className={`overflow-hidden ${CARD}`}>

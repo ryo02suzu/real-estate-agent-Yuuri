@@ -225,6 +225,17 @@ body {
   --glass-nav-bg: rgba(20, 24, 32, 0.5);
   /* お気に入りの物件を乗せる板（字が読みやすいよう、ホームの一覧より少し濃い） */
   --glass-board-bg: linear-gradient(180deg, rgba(26, 32, 46, 0.5) 0%, rgba(18, 22, 34, 0.58) 100%);
+  /*
+   * 動きの速さと曲線（履歴のページと、そこへつながる動きで使う。ほかのページもこの値にそろえていく）。
+   * 速さは3つ：押した反応・小さな出入り（fast）、ふつうの出入り・閉じる・たたむ（base）、画面のつながり・大きく動くもの（slow）。
+   * 曲線は3つ：止まるとき（out。すっと出て、ゆっくり止まる）、消えるとき（in）、少しはずむ（pop。札・小さな印）
+   */
+  --m-fast: 0.2s;
+  --m-base: 0.34s;
+  --m-slow: 0.5s;
+  --m-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --m-in: cubic-bezier(0.4, 0, 1, 1);
+  --m-pop: cubic-bezier(0.3, 1.25, 0.4, 1);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   :root {
@@ -690,23 +701,45 @@ body {
 .hist-focus {
   background: rgba(4, 10, 24, 0.32);
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity var(--m-base) ease;
 }
 .theme-navy:has(.hist-search input:focus) .hist-focus {
   opacity: 1;
 }
+/*
+ * 上の細いバーと大きな見出し：スクロールした量（--scroll。components/app/sky.tsx の useShrink が書く）に合わせて、
+ * 大きな見出し「履歴」とひとことが薄れていき、入れ替わりにバーが出る（指の動きにそのままついてくる。iPhone の「設定」「メール」と同じ）。
+ * 押せるのはバーが出きってから（data-compact）
+ */
 .hist-bar {
-  opacity: 0;
-  transform: translateY(-6px);
+  opacity: clamp(0, calc((var(--scroll, 0) - 56) / 40), 1);
   pointer-events: none;
-  transition:
-    opacity 0.25s ease,
-    transform 0.3s ease;
 }
 [data-compact] .hist-bar {
-  opacity: 1;
-  transform: none;
   pointer-events: auto;
+}
+.hist-title {
+  opacity: clamp(0, calc(1 - var(--scroll, 0) / 50), 1);
+}
+.hist-lead {
+  opacity: clamp(0, calc(1 - (var(--scroll, 0) - 6) / 50), 1);
+}
+/* 物件の画面から戻ってきた行：一瞬明るくなって、ゆっくり戻る（どこから来たか分かるように） */
+.hist-back > .hist-row-in {
+  animation: hist-back 1.3s ease-out both;
+}
+@keyframes hist-back {
+  0%,
+  25% {
+    background-color: rgba(255, 255, 255, 0.16);
+  }
+  100% {
+    background-color: rgba(255, 255, 255, 0);
+  }
+}
+/* 物件を調べている途中の行 */
+.hist-busy > .hist-row-in {
+  background-color: rgba(255, 255, 255, 0.08);
 }
 /* 行：長押しで字を選ばない。消すときは高さを 0 へ（grid の 1fr → 0fr） */
 .hist-row {
@@ -773,44 +806,45 @@ body {
     animation: hist-glow 7.5s ease-in-out infinite alternate;
   }
   .hist-rise {
-    animation: home-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    animation: home-rise var(--m-slow) var(--m-out) backwards;
   }
   .hist-enter {
-    animation: fav-row 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    animation: fav-row var(--m-slow) var(--m-out) backwards;
   }
   .hist-row {
     transition:
-      grid-template-rows 0.34s cubic-bezier(0.2, 0.7, 0.2, 1),
-      opacity 0.26s ease,
-      border-color 0.2s ease;
+      grid-template-rows var(--m-base) var(--m-out),
+      opacity var(--m-fast) ease,
+      border-color var(--m-fast) ease;
   }
+  /* なぞったあと：離した速さを引き継いで止まる（--sw-dur・--sw-ease は行ごとに history.tsx の settleFrom が決める。無ければいつもの止まり方） */
   .hist-front,
   .hist-acts {
     transition:
-      transform 0.4s cubic-bezier(0.2, 0.9, 0.25, 1),
-      width 0.4s cubic-bezier(0.2, 0.9, 0.25, 1);
+      transform var(--sw-dur, var(--m-base)) var(--sw-ease, var(--m-out)),
+      width var(--sw-dur, var(--m-base)) var(--sw-ease, var(--m-out));
   }
   .hist-act {
     transition:
-      flex-grow 0.22s ease,
-      padding 0.22s ease;
+      flex-grow var(--m-fast) var(--m-out),
+      padding var(--m-fast) var(--m-out);
   }
   .hist-drag .hist-front,
   .hist-drag .hist-acts {
     transition: none;
   }
   .hist-held {
-    animation: hist-held 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: hist-held var(--m-base) var(--m-out);
   }
   .hist-chip {
-    animation: hist-chip 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+    animation: hist-chip var(--m-base) var(--m-pop) backwards;
   }
   .hist-pop {
-    animation: hist-pop 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+    animation: hist-pop var(--m-base) var(--m-out) backwards;
   }
   /* 上の細いバーの、いまの章（変わると下からふわっと入れ替わる） */
   .hist-sub {
-    animation: hist-sub 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+    animation: hist-sub var(--m-fast) var(--m-out) backwards;
   }
 }
 @keyframes hist-sub {
@@ -1181,8 +1215,8 @@ body {
  */
 @media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
   html.vt-recent::view-transition-group(*) {
-    animation-duration: 0.56s;
-    animation-timing-function: cubic-bezier(0.22, 0.9, 0.24, 1);
+    animation-duration: var(--m-slow);
+    animation-timing-function: var(--m-out);
   }
   /* 行は、動く向きの先頭の行から少しずつ遅れて動き出す（上へ＝履歴へは上の行から、下へ＝ホームへは下の行から。追いついて重ならない） */
   html.vt-recent.vt-up::view-transition-group(vt-r1),
@@ -1201,7 +1235,7 @@ body {
   html.vt-recent::view-transition-old(vt-r1),
   html.vt-recent::view-transition-old(vt-r2),
   html.vt-recent::view-transition-old(vt-search) {
-    animation: vt-text-out 0.16s cubic-bezier(0.4, 0, 1, 1) both;
+    animation: vt-text-out 0.16s var(--m-in) both;
   }
   html.vt-recent::view-transition-new(vt-r0),
   html.vt-recent::view-transition-new(vt-r1),
@@ -1214,7 +1248,7 @@ body {
     view-transition-name: app-nav;
   }
   html.vt-recent::view-transition-group(app-nav) {
-    animation-duration: 0.3s;
+    animation-duration: var(--m-base);
   }
   /* 一覧の板（暗いすりガラス ⇄ 白）は、行を除いた板だけの絵なので、箱いっぱいに合わせて形と色を変える */
   html.vt-recent::view-transition-old(vt-card),
@@ -1234,10 +1268,10 @@ body {
   }
   /* 前と次のページが重なって見える時間を短くする（字が二重に見えないように） */
   html.vt-recent::view-transition-old(root) {
-    animation: vt-recent-out 0.26s cubic-bezier(0.4, 0, 1, 1) both;
+    animation: vt-recent-out 0.26s var(--m-in) both;
   }
   html.vt-recent::view-transition-new(root) {
-    animation: vt-recent-in 0.46s cubic-bezier(0.2, 0.8, 0.2, 1) 0.05s both;
+    animation: vt-recent-in var(--m-slow) var(--m-out) 0.05s both;
   }
 }
 /*
@@ -1260,12 +1294,12 @@ body {
  */
 @media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
   html.vt-hist::view-transition-group(*) {
-    animation-duration: 0.44s;
-    animation-timing-function: cubic-bezier(0.22, 0.9, 0.24, 1);
+    animation-duration: var(--m-slow);
+    animation-timing-function: var(--m-out);
   }
   html.vt-hist::view-transition-old(root),
   html.vt-hist::view-transition-new(root) {
-    animation-duration: 0.3s;
+    animation-duration: var(--m-base);
   }
   /* 並べ方の切り替え：前の絵は出さず、次の画面の札（白い札が CSS の動きで滑っている）をそのまま見せる（重ねると札が2つに見える） */
   html.vt-hist::view-transition-old(hist-sort) {
