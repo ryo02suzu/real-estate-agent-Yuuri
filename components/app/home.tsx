@@ -1,7 +1,8 @@
 "use client";
 
-// スマホのホーム（検索する前の画面）。届いたデザインのとおり、画面いっぱいの夕焼けの街の写真（public/home/sunset-*.webp。届いた背景の絵。
-// 下のメニューの後ろまで敷くので、写真は components/app/mobile-app.tsx が HomeBackdrop で画面の一番奥に置く）の上に、上から：
+// スマホのホーム（検索する前の画面）。届いたデザインのとおり、画面いっぱいの街の写真（時間帯で 朝・昼・夕方・夕方と夜のあいだ・夜 の
+// 5 枚を切り替える。components/app/home-photo.ts。下のメニューの後ろまで敷くので、写真は components/app/mobile-app.tsx が
+// HomeBackdrop で画面の一番奥に置く）の上に、上から：
 // ロゴ（今までのマークと MICHILU の白い版）と右上のメニュー（≡。地図で選ぶ・お知らせ・使い方・データ・アプリ・アカウント。HomeMenu）、
 // 「不動産の現場に、／すぐ使える情報を。」、住所・地番の検索欄（すりガラス。キーボードの「検索」か、字を入れると出る → で調べる）、
 // 写真の街並みを見せる空き、最近の検索（暗いすりガラスの一覧に3件。続きは履歴のページ）。
@@ -11,19 +12,20 @@
 import { ArrowRight, Bell, ChevronRight, CircleHelp, Database, Download, LoaderCircle, Map as MapIcon, MapPin, MapPinned, Search, Smartphone, Sparkles, TriangleAlert, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { monthDay, placeParts } from "@/lib/app/scene";
+import { homePart, type HomePart } from "@/lib/app/sun";
 import { MUNICIPALITIES } from "@/lib/roadmap";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import type { Resume } from "@/lib/resume";
 import { Sheet } from "../sheet";
-import { PhoneImg, ScaledInput } from "./frame";
+import { SWAP_MS, useDayPart } from "./day-photo";
+import { ScaledInput } from "./frame";
+import { HOME_PHOTO_EVENT, homePhoto } from "./home-photo";
 import { BrandBar, HomeLead } from "./page-head";
 import { TABS, tabOf } from "./result-head";
 import { PAGE } from "./tokens";
 
 /** 時刻・電池の帯の色（下のメニューのページで、空の変数 --sky-top が入る前の値。app/layout.tsx の themeColor と同じ） */
 export const SKY = "#e6eff9";
-/** ホームの時刻・電池の帯の色（写真のいちばん上の空の色） */
-export const HOME_TOP = "#386fab";
 export { PAGE };
 
 /**
@@ -89,9 +91,11 @@ let risen = false;
 let backdropShown = false;
 
 /**
- * 画面いっぱいの写真（下のメニューの後ろまで敷く）。上と下を少し暗くして、白い字とメニューを読みやすくする。
- * 写真は届いた絵（3764×6684）を幅 900・1260・1620 に縮めた 3 枚から、画面に合う大きさを端末が選ぶ（1620 で Pro Max の画面と同じ細かさ）。
- * 縦長の画面では高さに合わせて左右を切るので、写真の幅は画面の高さの 56.3%（絵の縦横比）
+ * 画面いっぱいの写真（下のメニューの後ろまで敷く）。時間帯で 5 枚を切り替える（components/app/home-photo.ts）。
+ * いま出す写真は html の data-home で決まり、app/globals.css の .home-photo が背景として出す（写真ごとの暗いぼかしも一緒）。
+ * 表示中に時間帯が変わったら、新しい写真を読み込んでから上にゆっくり重ね（.day-swap。動きを減らす設定ではすぐ）、重なりきったら
+ * data-home を変えて外す（useHomeSwap）。縦長の画面では高さに合わせて左右を切るので、写真の幅は画面の高さの 56.3%（絵の縦横比）。
+ * その上に、上と下を少し暗くして、白い字とメニューを読みやすくする
  */
 export function HomeBackdrop({ drift = false }: { drift?: boolean }) {
   // 開いた最初の1回は起動の演出（写真が奥から手前へ落ち着く。app/globals.css の .home-cam-first）、
@@ -100,22 +104,20 @@ export function HomeBackdrop({ drift = false }: { drift?: boolean }) {
   useEffect(() => {
     backdropShown = true;
   }, []);
+  const swap = useHomeSwap();
   return (
-    <div aria-hidden className={`home-backdrop ${cam} pointer-events-none absolute inset-0 overflow-hidden`} style={{ background: "#2a3a55" }}>
-      <PhoneImg
-        src="/home/sunset-1260.webp"
-        srcSet="/home/sunset-900.webp 900w, /home/sunset-1260.webp 1260w, /home/sunset-1620.webp 1620w"
-        sizes="(min-aspect-ratio: 9/16) 100vw, 56.3vh"
-        alt=""
-        draggable={false}
-        className={`absolute inset-0 h-full w-full object-cover ${drift ? "home-drift" : ""}`}
-        style={{ objectPosition: "62% 50%" }}
-      />
+    <div aria-hidden className={`home-backdrop ${cam} pointer-events-none absolute inset-0 overflow-hidden`}>
+      {/* 写真（≡ の「動きの演出」がオンなら、ごくゆっくり寄って戻る。入れ替わりの写真も一緒に動く） */}
+      <div className={`absolute inset-0 ${drift ? "home-drift" : ""}`}>
+        <div className="home-photo" />
+        {swap && <div key={swap} className="home-photo day-swap" data-part={swap} />}
+      </div>
       {/* 上は少し暗く（ロゴと字）、下は最近の検索が乗るところを夜景に溶けるように暗く（板を置かずに字を読みやすくする） */}
       <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(8,18,40,0.30) 0%, rgba(8,18,40,0) 26%, rgba(6,10,20,0) 47%, rgba(6,10,20,0.4) 63%, rgba(6,10,20,0.62) 80%, rgba(6,10,20,0.72) 100%)" }} />
       {/* 検索欄に触れている間は、写真を少し暗くして検索欄を目立たせる（app/globals.css の .home-dim） */}
       <div className="home-dim absolute inset-0" style={{ background: "rgba(4,10,24,0.42)" }} />
-      {/* 太陽の光（長い版のオープニングで、幕が上がるときだけ広がる。写真の太陽の位置 86.35%・48.57% に、写真と同じ切り方で置く） */}
+      {/* 太陽・月の光（長い版のオープニングで、幕が上がるときだけ広がる。写真の太陽・月の位置に、写真と同じ切り方で置く。
+          位置と、出すかどうか（太陽・月が写っていない昼・夕方と夜のあいだは出さない）は app/globals.css の data-home ごと） */}
       <div className="home-stage">
         <div className="home-sunflare">
           <span className="sf-core" />
@@ -126,6 +128,51 @@ export function HomeBackdrop({ drift = false }: { drift?: boolean }) {
       </div>
     </div>
   );
+}
+
+/**
+ * 表示中に時間帯が変わったときに、上に重ねる写真（重ねていないときは null）。置いたとき（開いたとき・ほかのページから戻ったとき）は、
+ * <head> で決めた時間帯（html の data-home）と違っていれば、そのまま合わせる（重ねない）
+ */
+function useHomeSwap(): HomePart | null {
+  const part = useDayPart(homePart);
+  const [swap, setSwap] = useState<HomePart | null>(null);
+  const placed = useRef(false);
+  useEffect(() => {
+    const html = document.documentElement;
+    if (!placed.current) {
+      placed.current = true;
+      if (html.dataset.home !== part) {
+        html.dataset.home = part;
+        dispatchEvent(new Event(HOME_PHOTO_EVENT));
+      }
+      return;
+    }
+    if (html.dataset.home === part) return;
+    // 新しい写真を読み込めてから重ねる（読めなかったときも重ねる。読み込むまでの地の色の上に出る）
+    let gone = false;
+    const img = new Image();
+    img.src = homePhoto(part);
+    img
+      .decode()
+      .catch(() => undefined)
+      .then(() => {
+        if (!gone) setSwap(part);
+      });
+    return () => {
+      gone = true;
+    };
+  }, [part]);
+  useEffect(() => {
+    if (!swap) return;
+    const t = window.setTimeout(() => {
+      document.documentElement.dataset.home = swap;
+      dispatchEvent(new Event(HOME_PHOTO_EVENT));
+      setSwap(null);
+    }, SWAP_MS + 80);
+    return () => clearTimeout(t);
+  }, [swap]);
+  return swap;
 }
 
 /** 画面の高さ（pt。拡大・縮小の前の値）。スクロールする箱の高さを拡大率で割る */

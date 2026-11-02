@@ -5,7 +5,7 @@
 // （Hydration の問題が出ない）、夜に開いても昼の空が一瞬出ない
 import { AERO_SEASON, airFrom, RH_NORMAL, type Air } from "./air";
 import { ATMOS, CLEAN_AIR, dirFromAltAz, exposureFor, radiance, skyColor, type AirParams, type Vec3 } from "./atmosphere";
-import { blend, HOME_CAMERA, layerOpacity, light, lightX, overrideTime, PHOTO_ORDER, projectSun, solar, type Camera, type Light } from "./sun";
+import { blend, HOME_CAMERA, layerOpacity, light, lightX, MORNING_UNTIL, overrideTime, PHOTO_ORDER, projectSun, solar, SUNSET_AT, type Camera, type Light } from "./sun";
 import { currentWeather, lightsLevel, type Weather } from "./weather";
 
 /** 空の変数の名前と意味 */
@@ -162,7 +162,9 @@ export function applySky(at: Date = overrideTime(location.hash) ?? new Date(), e
 /**
  * <head> で最初に描く前に実行する文字列。SunCalc は読めないので、NOAA の簡単な式で太陽の高度（大気差込み）・方位と昇っているかを出し、
  * sun.ts の blend・light と同じ混ぜ方で変数を入れる（同じ結果になることは lib/app/sun.test.ts で確かめる）。
- * 太陽本体の位置はここでは入れない（表示のあとの applySky が入れる）
+ * 太陽本体の位置はここでは入れない（表示のあとの applySky が入れる）。
+ * ホームの写真の時間帯（sun.ts の homePart と同じ境目）も最初に決めて html の data-home に入れ、スマホの幅なら、その写真を先に読み始める
+ * （app/globals.css がこれを見てホームの写真を出す。夜に開いても昼の写真が一瞬出ない。components/app/home.tsx）
  */
 export const SKY_HEAD_SCRIPT = `(function(){try{
 var V=${JSON.stringify(SKY_VARS)},P=Math.PI/180,RHN=${JSON.stringify(RH_NORMAL)},AS=${JSON.stringify(AERO_SEASON)},AR=1,GL=1,A=${JSON.stringify({ Re: ATMOS.Re, Ra: ATMOS.Ra, h0: ATMOS.h0, bR: ATMOS.betaR, HR: ATMOS.HR, bM: ATMOS.betaM, HM: ATMOS.HM, bg: ATMOS.bgMie, g: ATMOS.g, mE: ATMOS.mieExt, bO: ATMOS.betaO, sun: ATMOS.sun, ek: ATMOS.exposureKnots, msC: ATMOS.msColor, msS: ATMOS.msStrength, msL: ATMOS.msLow, msH: ATMOS.msHigh, msW: ATMOS.msLowWeight, nZ: ATMOS.nightZenith, nH: ATMOS.nightHorizon, nF: ATMOS.nightHorizonFalloff, tb: ATMOS.twilightBlue, ts: ATMOS.twilightStrength, N: ATMOS.samples, NL: ATMOS.lightSamples })},CAM=${JSON.stringify(HOME_CAMERA)};
@@ -208,6 +210,8 @@ if(!up){if(a>=0){b.day=ss(0,10,a);b.golden=1-b.day}else if(a>=-6){b.golden=ss(-6
 else if(a>=0){b.day=ss(0,10,a);b.dawn=1-b.day}else if(a>=-6){b.dawn=ss(-6,0,a);b.night=1-b.dawn}else b.night=1;return b}
 function hex(c){var s="#";for(var i=0;i<3;i++){var v=Math.round(Math.min(255,Math.max(0,c[i]))).toString(16);s+=(v.length<2?"0":"")+v}return s}
 function at(){var m=location.hash.replace(/^#/,"").match(/(?:^|&)t=([^&]+)/);if(m){var v=decodeURIComponent(m[1]),d=new Date(/[zZ]|[+-]\\d\\d:?\\d\\d$/.test(v)?v:v+(v.length<=10?"T12:00":"")+"+09:00");if(!isNaN(d.getTime()))return d}return new Date()}
+var hs=sun(at()),ha0=hs[0],hp=hs[1]?(ha0>=${MORNING_UNTIL}?"day":ha0>=-3?"morning":"night"):(ha0>=6?"day":ha0>=${SUNSET_AT}?"evening":ha0>=-6?"dusk":"night");document.documentElement.dataset.home=hp;
+if(typeof matchMedia==="function"&&typeof Image==="function"&&matchMedia("(max-width: 1023px)").matches){var hi=new Image();hi.fetchPriority="high";hi.src="/home/"+hp+".webp"}
 var d0=at(),s=sun(d0),a=s[0],up=s[1],az=s[2],b=blend(a,up),sd=sdir(a,az),hy=1-2*CAM.horizon,W=weather();air(W,d0);var X=meter(sd,a),top=cloudy(skyc(vdir(0,1),sd,a,X),W.cloud),md=cloudy(skyc(vdir(0,(1+hy)/2),sd,a,X),W.cloud),hz=cloudy(skyc(vdir(0,hy+0.04),sd,a,X),W.cloud);
 var jh=(((d0.getTime()+32400000)%86400000)+86400000)%86400000/3600000,lightsV=ss(4,-6,a)*occ(jh);
 var lum=(0.2126*top[0]+0.7152*top[1]+0.0722*top[2])/255,dark=lum<0.42;

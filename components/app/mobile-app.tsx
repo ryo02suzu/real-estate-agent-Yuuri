@@ -99,8 +99,8 @@ import {
 } from "./favorites";
 import { prefetchFlight, SPACE_BACKGROUND } from "./flight-space";
 import type { FlightTarget } from "./globe-flight";
+import { HOME_PHOTO_EVENT, homeTop } from "./home-photo";
 import {
-  HOME_TOP,
   HomeBackdrop,
   HomeMenu,
   HomeScreen,
@@ -525,7 +525,7 @@ export function MobileApp(props: MobileAppProps) {
       const color = flying
         ? FLIGHT_TOP
         : showHome
-          ? HOME_TOP
+          ? homeTop()
           : page === "favorites"
             ? favoritesTop()
             : page === "docs"
@@ -544,7 +544,12 @@ export function MobileApp(props: MobileAppProps) {
     };
     set();
     addEventListener(SKY_EVENT, set);
-    return () => removeEventListener(SKY_EVENT, set);
+    // ホームの写真が時間帯で入れ替わりきったら、帯もその写真の色に（components/app/home.tsx）
+    addEventListener(HOME_PHOTO_EVENT, set);
+    return () => {
+      removeEventListener(SKY_EVENT, set);
+      removeEventListener(HOME_PHOTO_EVENT, set);
+    };
   }, [showHome, tabPage, flying, page, okLat, okLng, standalone]);
   // PC の画面に切り替わったら、body の背景は元の色に戻す
   useEffect(

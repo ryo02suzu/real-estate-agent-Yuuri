@@ -150,6 +150,23 @@ export function histPart(altitude: number, rising: boolean): HistPart {
   return p === "day" && rising && altitude < MORNING_UNTIL ? "morning" : p;
 }
 
+/** ホームの写真の時間帯（届いた街の写真 5 枚：朝・昼・夕方・夕方と夜のあいだ・夜。同じ街を同じ場所から写したもの） */
+export type HomePart = HistPart | "dusk";
+
+/** 夕方が終わる太陽の高さ（度。沈んでいくとき。太陽が地平線の下に沈みきったころ） */
+export const SUNSET_AT = -1;
+
+/**
+ * 太陽の高さで、ホームの写真を選ぶ。朝・昼・夜の境目は履歴（histPart）と同じで、夕方（沈む太陽が +6° より低い）を、
+ * 太陽が沈みきる −1° までの「夕方」（夕日が見える写真）と、そこから −6°（市民薄明の終わり。日の入りの約 30 分後）までの
+ * 「夕方と夜のあいだ」（日が沈んで明かりが点いた写真）に分ける（東京駅で 11 月 1 日なら 夕方 16:12〜・あいだ 16:50〜・夜 17:15〜）。
+ * 最初に描く前の <head> の計算（lib/app/sky-vars.ts の SKY_HEAD_SCRIPT）も同じ境目
+ */
+export function homePart(altitude: number, rising: boolean): HomePart {
+  const p = histPart(altitude, rising);
+  return p === "evening" && altitude < SUNSET_AT ? "dusk" : p;
+}
+
 /** 写真の重ね順（下から上）。components/app/sky.tsx はこの順に重ねる */
 export const PHOTO_ORDER = ["night", "twilight", "dawn", "golden", "day"] as const;
 

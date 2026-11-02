@@ -145,11 +145,27 @@ body {
 }
 /*
  * スマホの幅：時刻・電池の帯（body の上の余白）は、読み込みの途中からホームの写真の上の空の色にする（読み込めたら
- * components/app/mobile-app.tsx がページごとの色に入れ替える。前は読み込みの間だけクリーム色の帯が出ていた）
+ * components/app/mobile-app.tsx がページごとの色に入れ替える。前は読み込みの間だけクリーム色の帯が出ていた）。
+ * ホームの写真は時間帯で変わるので、<head> で決めた時間帯（html の data-home）の写真の色にする（components/app/home-photo.ts の HOME_TOP と同じ）
  */
 @media (max-width: 1023px) {
   body {
     background-color: #386fab;
+  }
+  html[data-home="morning"] body {
+    background-color: #466995;
+  }
+  html[data-home="day"] body {
+    background-color: #37619a;
+  }
+  html[data-home="evening"] body {
+    background-color: #486183;
+  }
+  html[data-home="dusk"] body {
+    background-color: #0f162c;
+  }
+  html[data-home="night"] body {
+    background-color: #0c1322;
   }
 }
 /*
@@ -474,7 +490,8 @@ html.launch-skip {
  *   1.9〜2.75 上がりながら真下を向くと、道の中から金色の M が走る（キャンバス。その M は画面の真ん中のロゴのマークにぴったり重なる）
  *   2.68     M がロゴのマークに入れ替わり、光がはじけて輪が広がる（.launch-burst・.launch-ring。街にも M から光の波が広がる）。
  *            続いて MICHILU の字が寄って並び、光の帯。街は最後の形のまま、ロゴの後ろにうっすら残る
- *   3.48     幕が街の光と一緒に上がる（下の縁は夜明けの暖かい光）。夕焼けの街が奥から落ち着き、太陽の光が広がる（.home-sunflare）
+ *   3.48     幕が街の光と一緒に上がる（下の縁は、その時間帯の写真に合う色の光）。その時間帯の街の写真が奥から落ち着き、
+ *            朝・夕方は太陽の光、夜は月の光が広がる（.home-sunflare）
  *   3.56〜4.18 ロゴが左上の定位置へ。中身は 3.6 秒から順に現れる（--launch）
  * 触れて飛ばしたとき（html.launch-skip）は、幕・街の光・ロゴはこの時間割のまま（位置が飛ばない）全体が 0.2 秒で消え、
  * 中身・写真・下のメニューの遅れだけを外す（:not(.launch-skip)。data-grand は演出が終わるまで外さない。外すと幕の時計が
@@ -510,6 +527,22 @@ html[data-launch="full"][data-grand]:not(.launch-skip) {
       radial-gradient(60% 24% at 50% 33%, rgba(70, 128, 220, 0.18) 0%, rgba(70, 128, 220, 0) 100%),
       linear-gradient(180deg, #050b17 0%, #081428 38%, #0c1c38 71.4%, rgba(96, 62, 74, 0.72) 76%, rgba(255, 142, 72, 0.4) 86%, rgba(255, 170, 96, 0) 100%);
     animation: launch-lift 0.72s cubic-bezier(0.6, 0, 0.22, 1) 3.48s forwards;
+  }
+  /* 幕の下の縁の光は、その時間帯の写真に合わせる（朝・夕方は暖かい光、昼は明るい青、夕方と夜のあいだは紫がかった青、夜は深い青） */
+  html[data-launch="full"][data-grand][data-home="day"] .launch-veil {
+    background:
+      radial-gradient(60% 24% at 50% 33%, rgba(70, 128, 220, 0.18) 0%, rgba(70, 128, 220, 0) 100%),
+      linear-gradient(180deg, #050b17 0%, #081428 38%, #0c1c38 71.4%, rgba(52, 92, 150, 0.72) 76%, rgba(150, 196, 255, 0.36) 86%, rgba(170, 210, 255, 0) 100%);
+  }
+  html[data-launch="full"][data-grand][data-home="dusk"] .launch-veil {
+    background:
+      radial-gradient(60% 24% at 50% 33%, rgba(70, 128, 220, 0.18) 0%, rgba(70, 128, 220, 0) 100%),
+      linear-gradient(180deg, #050b17 0%, #081428 38%, #0c1c38 71.4%, rgba(58, 54, 96, 0.72) 76%, rgba(160, 118, 190, 0.32) 86%, rgba(170, 130, 200, 0) 100%);
+  }
+  html[data-launch="full"][data-grand][data-home="night"] .launch-veil {
+    background:
+      radial-gradient(60% 24% at 50% 33%, rgba(70, 128, 220, 0.18) 0%, rgba(70, 128, 220, 0) 100%),
+      linear-gradient(180deg, #050b17 0%, #081428 38%, #0c1c38 71.4%, rgba(18, 30, 58, 0.72) 76%, rgba(90, 130, 205, 0.26) 86%, rgba(100, 140, 210, 0) 100%);
   }
   html[data-launch="full"][data-grand] .launch-logo {
     animation:
@@ -607,11 +640,82 @@ html[data-launch="full"][data-grand]:not(.launch-skip) {
 }
 
 /*
- * ホームの写真の太陽の光（長い版のオープニングで、幕が上がるときだけ）。写真と同じ切り方の箱（.home-stage。写真の縦横比 1260:2237、
- * 横は 62% の位置で切る）の中の、太陽の位置（86.35%・48.57%）に置く。写真と一緒に動く（.home-cam-first の箱の中）
+ * ホームの写真の太陽・月の光（長い版のオープニングで、幕が上がるときだけ）。写真と同じ切り方の箱（.home-stage。写真の縦横比 941:1672、
+ * 横は 62% の位置で切る）の中の、太陽・月の位置（写真ごと。朝日 75.3%・30.1%、夕日 82.1%・29.7%、月 79.5%・12.7%）に置く。
+ * 太陽も月も写っていない昼・夕方と夜のあいだは出さない。写真と一緒に動く（.home-cam-first の箱の中）
+ */
+/*
+ * ホームの写真（時間帯で 5 枚。components/app/home-photo.ts）。html の data-home（<head> で決める）の写真を背景として出し、
+ * 表示中に時間帯が変わったときは、新しい写真（data-part）を上に重ねる（components/app/home.tsx の useHomeSwap）。
+ * 写真の上に、写真ごとのぼかしを重ねる（背景の前の層）：上の端は時刻・電池の帯の色（写真の上の空の色）から写真へなじませ
+ * （帯と写真の境目に線が出ないように）、空の明るい朝・昼は左上（ロゴ・ひとこと）を少し暗くする。いちばん後ろの層が写真
+ * （画面より横長なら 62% の位置で左右を切る）。
+ * PC の幅では読み込まない（ホームは出ないが、最初の HTML にはある）
  */
 .home-backdrop {
   container-type: size;
+  background-color: #2a3a55;
+}
+.home-photo {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size:
+    100% 100%,
+    cover;
+  background-position:
+    0 0,
+    62% 50%;
+}
+html[data-home="morning"] .home-photo:not([data-part]),
+html[data-home="day"] .home-photo:not([data-part]),
+.home-photo[data-part="morning"],
+.home-photo[data-part="day"] {
+  background-size:
+    100% 100%,
+    100% 100%,
+    cover;
+  background-position:
+    0 0,
+    0 0,
+    62% 50%;
+}
+@media (max-width: 1023px) {
+  html[data-home="morning"] .home-backdrop {
+    background-color: #5b6f86;
+  }
+  html[data-home="day"] .home-backdrop {
+    background-color: #5d7a96;
+  }
+  html[data-home="evening"] .home-backdrop {
+    background-color: #5d5f6a;
+  }
+  html[data-home="dusk"] .home-backdrop {
+    background-color: #1c2232;
+  }
+  html[data-home="night"] .home-backdrop {
+    background-color: #12171f;
+  }
+  html[data-home="morning"] .home-photo:not([data-part]),
+  .home-photo[data-part="morning"] {
+    background-image: linear-gradient(180deg, rgb(97, 143, 195) 0, rgba(97, 143, 195, 0.6) 22px, rgba(97, 143, 195, 0) 64px), radial-gradient(90% 26% at 20% 11%, rgba(12, 26, 46, 0.3) 0%, rgba(12, 26, 46, 0.12) 55%, rgba(12, 26, 46, 0) 100%), url("/home/morning.webp");
+  }
+  html[data-home="day"] .home-photo:not([data-part]),
+  .home-photo[data-part="day"] {
+    background-image: linear-gradient(180deg, rgb(75, 131, 203) 0, rgba(75, 131, 203, 0.6) 22px, rgba(75, 131, 203, 0) 64px), radial-gradient(90% 26% at 20% 11%, rgba(10, 30, 60, 0.26) 0%, rgba(10, 30, 60, 0.1) 55%, rgba(10, 30, 60, 0) 100%), url("/home/day.webp");
+  }
+  html[data-home="evening"] .home-photo:not([data-part]),
+  .home-photo[data-part="evening"] {
+    background-image: linear-gradient(180deg, rgb(99, 131, 171) 0, rgba(99, 131, 171, 0.6) 22px, rgba(99, 131, 171, 0) 64px), url("/home/evening.webp");
+  }
+  html[data-home="dusk"] .home-photo:not([data-part]),
+  .home-photo[data-part="dusk"] {
+    background-image: linear-gradient(180deg, rgb(18, 24, 46) 0, rgba(18, 24, 46, 0.6) 22px, rgba(18, 24, 46, 0) 64px), url("/home/dusk.webp");
+  }
+  html[data-home="night"] .home-photo:not([data-part]),
+  .home-photo[data-part="night"] {
+    background-image: linear-gradient(180deg, rgb(14, 20, 31) 0, rgba(14, 20, 31, 0.6) 22px, rgba(14, 20, 31, 0) 64px), url("/home/night.webp");
+  }
 }
 .home-stage {
   position: absolute;
@@ -621,20 +725,32 @@ html[data-launch="full"][data-grand]:not(.launch-skip) {
 @supports (width: 1cqw) {
   .home-stage {
     inset: auto;
-    width: max(100cqw, calc(100cqh * 0.5633));
-    aspect-ratio: 0.5633;
-    left: calc((100cqw - max(100cqw, calc(100cqh * 0.5633))) * 0.62);
-    top: calc((100cqh - max(calc(100cqw / 0.5633), 100cqh)) * 0.5);
+    width: max(100cqw, calc(100cqh * 0.5628));
+    aspect-ratio: 0.5628;
+    left: calc((100cqw - max(100cqw, calc(100cqh * 0.5628))) * 0.62);
+    top: calc((100cqh - max(calc(100cqw / 0.5628), 100cqh)) * 0.5);
   }
 }
 .home-sunflare {
   position: absolute;
-  left: 86.35%;
-  top: 48.57%;
+  left: 82.1%;
+  top: 29.7%;
   width: 0;
   height: 0;
   opacity: 0;
   mix-blend-mode: screen;
+}
+html[data-home="morning"] .home-sunflare {
+  left: 75.3%;
+  top: 30.1%;
+}
+html[data-home="night"] .home-sunflare {
+  left: 79.5%;
+  top: 12.7%;
+}
+html[data-home="day"] .home-sunflare,
+html[data-home="dusk"] .home-sunflare {
+  display: none;
 }
 .home-sunflare > span {
   position: absolute;
@@ -666,6 +782,16 @@ html[data-launch="full"][data-grand]:not(.launch-skip) {
   width: 5.5cqw;
   height: 5.5cqw;
   background: radial-gradient(closest-side, rgba(170, 205, 255, 0.42) 0%, rgba(170, 205, 255, 0) 100%);
+}
+/* 夜は月の光：小さく、青白く。横に伸びる光と小さな光の輪は出さない */
+html[data-home="night"] .sf-core {
+  width: 26cqw;
+  height: 26cqw;
+  background: radial-gradient(closest-side, rgba(240, 246, 255, 0.9) 0%, rgba(205, 220, 255, 0.42) 22%, rgba(180, 200, 255, 0.12) 52%, rgba(180, 200, 255, 0) 100%);
+}
+html[data-home="night"] .sf-streak,
+html[data-home="night"] .sf-ghost {
+  display: none;
 }
 @keyframes sunflare {
   0% {
@@ -788,6 +914,18 @@ html[data-launch="full"][data-grand]:not(.launch-skip) {
     --glass-dark-bg: linear-gradient(180deg, rgba(40, 44, 54, 0.78) 0%, rgba(28, 32, 42, 0.84) 100%);
     --glass-nav-bg: rgba(22, 26, 34, 0.82);
     --glass-board-bg: linear-gradient(180deg, rgba(40, 44, 54, 0.82) 0%, rgba(28, 32, 42, 0.88) 100%);
+  }
+}
+/*
+ * ホームの朝・夕方の写真は、太陽がちょうど検索欄の後ろに来る。白い字が明るい光に埋もれないよう、検索欄のすりガラスだけ少し紺を足す
+ * （ぼかしが使える端末だけ。使えない端末と「透明度を下げる」設定は、下の濃い下地のまま）
+ */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  @media (max-width: 1023px) and (prefers-reduced-transparency: no-preference) {
+    html[data-home="morning"] .home-search,
+    html[data-home="evening"] .home-search {
+      --glass-light-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.05) 100%), rgba(16, 30, 58, 0.26);
+    }
   }
 }
 @media (prefers-reduced-transparency: reduce) {

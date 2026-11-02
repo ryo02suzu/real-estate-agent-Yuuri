@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AFTERNOON_FROM, BASE, blend, dayPart, favPart, histPart, HOME_CAMERA, layerOpacity, light, MORNING_UNTIL, overrideTime, PHOTO_ORDER, projectSun, solar } from "./sun";
+import { AFTERNOON_FROM, BASE, blend, dayPart, favPart, histPart, HOME_CAMERA, homePart, layerOpacity, light, MORNING_UNTIL, overrideTime, PHOTO_ORDER, projectSun, solar, SUNSET_AT } from "./sun";
 
 // 国立天文台「こよみの計算」東京（35.6581, 139.7414）2026年の日の出入り・南中（分と 0.1° に丸めた値）
 const NAOJ = { lat: 35.6581, lng: 139.7414, utcOffset: 540 };
@@ -162,6 +162,46 @@ describe("histPart（履歴の写真の朝・昼・夕方・夜）", () => {
   });
 });
 
+describe("homePart（ホームの写真の朝・昼・夕方・夕方と夜のあいだ・夜）", () => {
+  const at = (ymd: string, hm: string) => {
+    const s = solar(jst(ymd, hm));
+    return homePart(s.altitude, s.rising);
+  };
+  it("11 月 1 日：夜 → 5:49 朝 → 7:34 昼 → 16:12 夕方 → 16:50 夕方と夜のあいだ → 17:15 夜", () => {
+    expect(at("2026-11-01", "05:40")).toBe("night");
+    expect(at("2026-11-01", "05:55")).toBe("morning");
+    expect(at("2026-11-01", "07:40")).toBe("day");
+    expect(at("2026-11-01", "16:20")).toBe("evening");
+    expect(at("2026-11-01", "16:45")).toBe("evening");
+    expect(at("2026-11-01", "16:55")).toBe("dusk");
+    expect(at("2026-11-01", "17:10")).toBe("dusk");
+    expect(at("2026-11-01", "17:20")).toBe("night");
+  });
+  it("季節で時刻が変わる（夏至は 夕方と夜のあいだ 19:04〜19:34、冬至は 16:36〜17:03）", () => {
+    expect(at("2026-06-21", "19:00")).toBe("evening");
+    expect(at("2026-06-21", "19:10")).toBe("dusk");
+    expect(at("2026-06-21", "19:40")).toBe("night");
+    expect(at("2026-12-22", "16:30")).toBe("evening");
+    expect(at("2026-12-22", "16:40")).toBe("dusk");
+    expect(at("2026-12-22", "17:05")).toBe("night");
+  });
+  it("太陽が沈みきる −1° までは夕方、そこから −6° までは夕方と夜のあいだ。朝・昼・夜の境目は履歴（histPart）と同じ", () => {
+    expect(homePart(SUNSET_AT, false)).toBe("evening");
+    expect(homePart(SUNSET_AT - 0.1, false)).toBe("dusk");
+    expect(homePart(-5.9, false)).toBe("dusk");
+    expect(homePart(-6.1, false)).toBe("night");
+    // 昇るときは夕方と夜のあいだにしない（日の出前の薄明るい時間は、履歴と同じく夜から朝へ）
+    expect(homePart(-2, true)).toBe("morning");
+    expect(homePart(-4, true)).toBe("night");
+    for (const rising of [true, false])
+      for (let alt = -30; alt <= 90; alt += 0.25) {
+        const h = homePart(alt, rising);
+        const p = histPart(alt, rising);
+        expect(h === "dusk" ? "evening" : h).toBe(p);
+      }
+  });
+});
+
 describe("blend（写真の混ぜ方）", () => {
   it("合計は常に 1 で、負にならない", () => {
     for (const rising of [true, false])
@@ -281,6 +321,9 @@ describe("SKY_HEAD_SCRIPT（最初に描く前の簡単な計算）", () => {
     const vm = await import("node:vm");
     let worst = 0;
     let worstColor = 0;
+    // ホームの写真の時間帯が homePart と違った回数（0 のはず）と、比べた回数
+    let homeMismatch = 0;
+    let homeTotal = 0;
     for (let k = 0; k < 365; k += 3)
       for (const hm of ["04:30", "05:30", "06:30", "09:00", "12:00", "15:30", "16:30", "17:30", "18:30", "19:30", "23:00"]) {
         const d = new Date(jst("2026-01-01", hm).getTime() + k * 86400e3);
@@ -294,6 +337,12 @@ describe("SKY_HEAD_SCRIPT（最初に描く前の簡単な計算）", () => {
           decodeURIComponent,
         };
         vm.runInNewContext(SKY_HEAD_SCRIPT, ctx);
+        // ホームの写真の時間帯（html の data-home）。境目（+16°・−3°・+6°・−1°・−6°）のすぐ近くでは、わずかな高度の差で分かれてよい
+        const sv = solar(d);
+        if ([MORNING_UNTIL, -3, 6, SUNSET_AT, -6].every((b) => Math.abs(sv.altitude - b) > 0.15)) {
+          homeTotal++;
+          if (ctx.document.documentElement.dataset.home !== homePart(sv.altitude, sv.rising)) homeMismatch++;
+        }
         const ref = skyValues(d).vars;
         for (const key of ["--sky-day", "--sky-golden", "--sky-twilight", "--sky-dawn", "--sky-night", "--sky-l-night", "--sky-l-twilight", "--sky-l-dawn", "--sky-l-golden", "--sky-l-day", "--sky-lights"]) worst = Math.max(worst, Math.abs(Number(store[key]) - Number(ref[key])));
         // 帯の色（大気の式）は、太陽の位置のわずかな差で 1〜2 だけ違ってよい
@@ -309,5 +358,7 @@ describe("SKY_HEAD_SCRIPT（最初に描く前の簡単な計算）", () => {
       }
     expect(worst).toBeLessThan(0.05);
     expect(worstColor).toBeLessThanOrEqual(3);
+    expect(homeTotal).toBeGreaterThan(1000);
+    expect(homeMismatch).toBe(0);
   }, 30000);
 });
