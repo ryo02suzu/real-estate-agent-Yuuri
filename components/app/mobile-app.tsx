@@ -136,6 +136,7 @@ import { InstallSheet, useStandalone } from "./install";
 import { useFixedScreen } from "./no-bounce";
 import { RecordSheet } from "./record-sheet";
 import { TodoSheet } from "./todo-sheet";
+import { setLandingSource } from "./flight-handoff";
 import { SenderInline, SenderSheet } from "./sender-editor";
 import { useSitePhotos } from "./site-photos";
 import { Expand } from "./research";
@@ -1408,6 +1409,8 @@ function PropertyView({
   const scene = useRef<PropertyScene | null>(null);
   // 大きく見る画面に渡す模型（描くときに ref を読まないよう、できたときに覚えておく）
   const [sceneApi, setSceneApi] = useState<PropertyScene | null>(null);
+  // 地球から降りる演出が、最後の見え方を模型の着地の見え方にそろえられるよう、模型の見え方を出す関数を置く
+  useEffect(() => (sceneApi ? setLandingSource(() => sceneApi.introFrame()) : undefined), [sceneApi]);
   // 謄本・公図の請求に貼る地番：押して選んだ筆（概要の「隣の土地」・地番の詳しい画面・街の模型・拡大した地図で同じものを選ぶ）。
   // 地番は登記の地番。物件ごとに空から（この画面は物件ごとに作り直す）
   const [picked, setPicked] = useState<Neighbor[]>([]);

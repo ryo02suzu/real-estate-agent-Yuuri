@@ -1,9 +1,10 @@
 // 検索したときの「地球から土地までズーム」の、宇宙の背景と先読み（軽い部品だけ。地図の部品は components/app/globe-flight.tsx で、
 // 使うときに読む）。宇宙の背景は components/app/mobile-app.tsx が押した瞬間に出し、その上に地球の地図が重なる
 
+import { flightMood, LOOKS, NASA_DAY, NASA_NIGHT } from "./flight-look";
+
 /** 遠くの地球の絵（NASA GIBS の Blue Marble。地形と海底の陰影つき。ズーム 8 まで） */
-export const NASA_TILES =
-  "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg";
+export const NASA_TILES = NASA_DAY;
 
 /** 宇宙（中ほどが少し明るい紺から黒へ）と星（決まった並び。毎回同じ空） */
 export const SPACE_BACKGROUND = (() => {
@@ -35,17 +36,19 @@ const FIRST_TILES: [number, number, number][] = [
 const WORKER_FILES = ["maplibre-gl-worker.mjs", "maplibre-gl-shared.mjs"];
 
 let warmed = false;
-/** 地球の演出の部品・地図の裏方のファイル（約 0.5MB。はじめて飛ぶときの待ちのいちばん大きいところ）・はじめに見える地球の絵を、
- *  先に読んでおく（1回だけ。端末に残るので、飛ぶときは読み直さずに済む） */
+/** 地球の演出の部品・地図の裏方のファイル（約 0.5MB。はじめて飛ぶときの待ちのいちばん大きいところ）・はじめに見える地球の絵
+ *  （夕方のあと・夜は街明かりの絵も）を、先に読んでおく（1回だけ。端末に残るので、飛ぶときは読み直さずに済む） */
 export function prefetchFlight(): void {
   if (warmed) return;
   warmed = true;
   void import("./globe-flight").then(({ MAPLIBRE_VERSION }) => {
     for (const f of WORKER_FILES) void fetch(`/maplibre/${MAPLIBRE_VERSION}/${f}`).catch(() => {});
   });
-  for (const [z, x, y] of FIRST_TILES) {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = NASA_TILES.replace("{z}", String(z)).replace("{x}", String(x)).replace("{y}", String(y));
-  }
+  const sets = LOOKS[flightMood()].lights > 0 ? [NASA_TILES, NASA_NIGHT] : [NASA_TILES];
+  for (const tiles of sets)
+    for (const [z, x, y] of FIRST_TILES) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = tiles.replace("{z}", String(z)).replace("{x}", String(x)).replace("{y}", String(y));
+    }
 }

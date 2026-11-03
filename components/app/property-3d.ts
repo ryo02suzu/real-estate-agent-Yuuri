@@ -91,6 +91,11 @@ export type PropertyScene = {
   onCamera(cb: ((v: CameraView) => void) | null): void;
   /** 全画面で直前に押した所（1回で消える） */
   takeTap(): FreeTap | null;
+  /**
+   * 着地の最初の見え方（真上から）の、画面の上での土地の位置（px。画面の左上から）・1px の長さ（m）・地図の向き（度。北が上で 0、
+   * 時計回り）。地球から降りる演出（components/app/globe-flight.tsx）が、最後をこの見え方にそろえて、模型へ溶けるように入れ替える
+   */
+  introFrame(): { x: number; y: number; mpp: number; bearing: number } | null;
   dispose(): void;
 };
 
@@ -1920,6 +1925,14 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
       const t = freeTapOut;
       freeTapOut = null;
       return t;
+    },
+    introFrame: () => {
+      const p = presets.intro;
+      if (!p || W <= 1 || H <= 1) return null;
+      const r = host.getBoundingClientRect();
+      // 真上から見たときの画面の縦の長さ（m）÷ 画面の縦（px）。地図の向きは、カメラの上の向き（方位）を北からの角度に直したもの
+      const mpp = (2 * p.dist * Math.tan((camera.fov * Math.PI) / 360)) / H;
+      return { x: r.left + W / 2, y: r.top + (viewY || layout.centerY || H * 0.42), mpp, bearing: ((-p.azim * 180) / Math.PI + 360) % 360 };
     },
     setPicked: (keys) => {
       picked = new Set(keys);
