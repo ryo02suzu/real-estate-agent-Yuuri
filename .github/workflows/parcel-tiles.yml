@@ -134,7 +134,12 @@ jobs:
       - name: 関東1都6県を1つにまとめて R2 に置く
         run: |
           mkdir -p work
-          aws s3 cp "s3://$R2_BUCKET/parcels/$YEAR/" work/ --recursive --exclude "*" --include "pref-*.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+          # R2 からの読み込みが途中で切れることがある（速度不足で接続が閉じる）。3回までやり直す
+          for i in 1 2 3; do
+            aws s3 cp "s3://$R2_BUCKET/parcels/$YEAR/" work/ --recursive --exclude "*" --include "pref-*.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors && break
+            [ "$i" -lt 3 ] || exit 1
+            echo "読み込みに失敗。$((i * 30)) 秒後にやり直す"; sleep $((i * 30))
+          done
           ls -la work
           [ "$(ls work/pref-*.pmtiles | wc -l)" -eq 7 ] || { echo "::error::都県のタイルがそろっていません"; exit 1; }
           tile-join -q --force --no-tile-size-limit -o "work/kanto-$YEAR.pmtiles" \
