@@ -6,7 +6,8 @@
 import { Building, ChevronDown, ChevronRight, House, LandPlot, Trees } from "lucide-react";
 import { useState } from "react";
 import { TSUBO_M2 } from "@/lib/app/area";
-import { DEAL_KIND_LABEL, DEALS_CREDIT, DEALS_DATA, DEALS_NOTE, dealKind, dealSummary, totalText, unitPrice, type DealKind, type DealRecord } from "@/lib/roadmap/deals";
+import { DEAL_CHIP, DEAL_KIND_NOTE, dealFacts, dealRoad, dealTitle, dealWhen } from "@/lib/app/deal-view";
+import { DEALS_CREDIT, DEALS_DATA, DEALS_NOTE, dealKind, dealSummary, totalText, unitPrice, type DealKind, type DealRecord } from "@/lib/roadmap/deals";
 import { distanceText, type LandPriceHit, type LandUsage } from "@/lib/roadmap/land-price";
 import { G, GHead, GNote, GStat, NUM, TILE } from "./g-ui";
 import { HoldHeight } from "./hold-height";
@@ -50,6 +51,7 @@ export function DealsSection({ result, data, open }: TabProps) {
 
       <section>
         <GHead title="公的な価格の事例" note="地価公示・地価調査" />
+        <Lead>国（地価公示・1月1日時点）と都県（地価調査・7月1日時点）が毎年出す、決まった地点の標準的な土地の価格です。実際に売買された価格ではありません。</Lead>
         <div className="no-scrollbar -mx-[14px] flex gap-[6px] overflow-x-auto px-[14px] pb-[2px]">
           <Chip label="すべて" on={kind === "all"} onClick={() => setKind("all")} />
           <Chip label="地価公示" on={kind === "公示"} onClick={() => setKind("公示")} />
@@ -165,28 +167,48 @@ function Transactions({ data, town }: { data: TabProps["data"]; town: string }) 
   return (
     <section>
       <GHead title="実際の取引事例" note={`${where}・${periodShort(DEALS_DATA.periods)}`} />
+      <Lead>国が集めた、実際に売買された価格です。「取引」は買った人へのアンケート、「成約」は不動産会社の成約の記録（レインズ）から。場所は町（地区）までで、番地は分かりません。</Lead>
       <div className="no-scrollbar -mx-[14px] flex gap-[6px] overflow-x-auto px-[14px] pb-[2px]">
         {KIND_FILTERS.map((k) => (
-          <Chip key={k} label={k === "all" ? "すべて" : DEAL_KIND_LABEL[k]} on={kind === k} onClick={() => setKind(k)} />
+          <Chip key={k} label={k === "all" ? "すべて" : DEAL_CHIP[k]} on={kind === k} onClick={() => setKind(k)} />
         ))}
         {d.town.length > 0 && <Chip label={scope === "town" ? `${d.city}全体にする` : "同じ町だけ"} on={false} onClick={() => setScope((v) => (v === "town" ? "city" : "town"))} drop />}
       </div>
-      <div className="mt-[8px] grid grid-cols-3 gap-[8px]">
+      {/* 選んだ種類の一言。どの種類の文も同じ枠に重ねて、いちばん長い文の高さを取っておく（選んでも大きさが変わらない） */}
+      <p className="mt-[6px] grid px-[2px] leading-[1.45]" style={{ fontSize: 11.5, color: G.sub }}>
+        {KIND_FILTERS.map((k) => (
+          <span key={k} aria-hidden={k !== kind} className={`col-start-1 row-start-1 ${k === kind ? "" : "invisible"}`}>
+            {k === "all" ? "土地だけ・戸建てなど（土地と建物）・マンション（1部屋）の売買が混ざっています。種類で絞ると比べやすくなります。" : `${DEAL_CHIP[k]}：${DEAL_KIND_NOTE[k]}`}
+          </span>
+        ))}
+      </p>
+      <div className="mt-[6px] grid grid-cols-3 gap-[8px]">
         <GStat label="事例の件数" value={`${base.length}件`} note={periodShort(DEALS_DATA.periods)} />
-        <GStat label="土地の単価" value={sum.land ? `${man(sum.land)}万` : "―"} unit={sum.land ? "円/㎡" : undefined} note={sum.land ? `中央値・坪 約${manYen(sum.land * TSUBO_M2)}` : "土地の事例なし"} />
+        <GStat label="土地だけの単価" value={sum.land ? `${man(sum.land)}万` : "―"} unit={sum.land ? "円/㎡" : undefined} note={sum.land ? `中央値・坪 約${manYen(sum.land * TSUBO_M2)}` : "土地だけの事例なし"} />
         <GStat label="マンション" value={sum.mansion ? `${man(sum.mansion)}万` : "―"} unit={sum.mansion ? "円/㎡" : undefined} note="中央値・専有面積あたり" />
       </div>
       {/* 種類の絞り込みで事例が減っても、一覧の板の大きさは変えない */}
       <HoldHeight className="mt-[8px] overflow-hidden rounded-[18px]" style={TILE} resetKey={town}>
-        {list.length === 0 && <Msg>条件に合う事例がありません。</Msg>}
-        {list.slice(0, limit).map((r, i) => (
-          <TxRow key={`${r.pe}|${r.d}|${r.p}|${i}`} r={r} />
-        ))}
-        {list.length > limit && (
-          <button onClick={() => setLimit((v) => v + 10)} className="flex h-[44px] w-full items-center justify-center border-t border-white/10 font-semibold active:bg-white/5" style={{ fontSize: 13.5, color: "#fff" }}>
-            さらに{Math.min(10, list.length - limit)}件を見る（全{list.length}件）
-          </button>
-        )}
+        {/* 種類ごとの一覧を同じ枠に重ね、いちばん高い一覧の高さにそろえる（種類を選んでも板の大きさが変わらない） */}
+        <div className="grid">
+          {KIND_FILTERS.map((kk) => {
+            const rows = kk === kind ? list : base.filter((r) => kk === "all" || dealKind(r.t) === kk);
+            const on = kk === kind;
+            return (
+              <div key={kk} aria-hidden={!on} inert={!on} className={`col-start-1 row-start-1 min-w-0 ${on ? "" : "pointer-events-none invisible"}`}>
+                {rows.length === 0 && <Msg>条件に合う事例がありません。</Msg>}
+                {rows.slice(0, limit).map((r, i) => (
+                  <TxRow key={`${r.pe}|${r.d}|${r.p}|${i}`} r={r} />
+                ))}
+                {rows.length > limit && (
+                  <button onClick={() => setLimit((v) => v + 10)} className="flex h-[44px] w-full items-center justify-center border-t border-white/10 font-semibold active:bg-white/5" style={{ fontSize: 13.5, color: "#fff" }}>
+                    さらに{Math.min(10, rows.length - limit)}件を見る（全{rows.length}件）
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </HoldHeight>
       <GNote className="mt-[6px]">
         {DEALS_CREDIT}（{DEALS_DATA.periods}）。{DEALS_NOTE}。事例の場所は町（地区）までです。
@@ -195,38 +217,68 @@ function Transactions({ data, town }: { data: TabProps["data"]; town: string }) 
   );
 }
 
+/** 実際の取引の1件：何の売買か（戸建て・土地だけ・中古マンション）・広さ・築年数・時期・前面道路と、総額・単価 */
 function TxRow({ r }: { r: DealRecord }) {
   const k = dealKind(r.t);
   const Icon = KIND_ICON[k];
   const unit = unitPrice(r);
   const sale = r.k === "成約";
+  const facts = dealFacts(r);
+  const road = dealRoad(r);
   return (
-    <div className="flex w-full items-center gap-[10px] border-t border-white/10 px-[12px] py-[9px] first:border-t-0" style={{ minHeight: 64 }}>
-      <span className="flex shrink-0 items-center justify-center rounded-[10px]" style={{ width: 38, height: 38, background: "rgba(255,255,255,0.1)" }}>
+    <div className="flex w-full items-start gap-[10px] border-t border-white/10 px-[12px] py-[10px] first:border-t-0" style={{ minHeight: 64 }}>
+      <span className="mt-[2px] flex shrink-0 items-center justify-center rounded-[10px]" style={{ width: 38, height: 38, background: "rgba(255,255,255,0.1)" }}>
         <Icon size={19} strokeWidth={1.8} absoluteStrokeWidth color="#fff" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-semibold leading-[1.3]" style={{ fontSize: 14.5, color: G.text }}>
-          {(r.m ?? "") + (r.d ?? "")}
-          <span className="ml-[6px] rounded-[4px] px-[4px] py-[2px] font-bold" style={{ fontSize: 10, background: sale ? "rgba(116,187,255,0.18)" : "rgba(255,201,74,0.18)", color: sale ? "#cfe5ff" : "#ffe2a3" }}>
+        <span className="block font-semibold leading-[1.3]" style={{ fontSize: 14.5, color: G.text }}>
+          {dealTitle(r)}
+          <span className="ml-[6px] inline-block rounded-[4px] px-[4px] py-[2px] align-[2px] font-bold leading-none" style={{ fontSize: 10, background: sale ? "rgba(116,187,255,0.18)" : "rgba(255,201,74,0.18)", color: sale ? "#cfe5ff" : "#ffe2a3" }}>
             {sale ? "成約" : "取引"}
           </span>
         </span>
-        <span className="mt-[2px] block truncate leading-[1.3]" style={{ fontSize: 12, color: G.faint }}>
-          {DEAL_KIND_LABEL[k]}・{r.pe ?? "時期不明"}
-          {r.by ? `・${r.by}築` : ""}
-          {r.a ? `・${k === "mansion" ? "専有" : ""}${r.a.toLocaleString("ja-JP", { maximumFractionDigits: 1 })}㎡` : r.as ? `・${r.as}` : ""}
-          {r.rc || r.br ? `・前面道路 ${[r.dir, r.rc, r.br ? `${r.br}m` : ""].filter(Boolean).join(" ")}` : ""}
-        </span>
+        {/* 広さ・築年数（1つずつは途中で折り返さない） */}
+        {facts.length > 0 && <Parts list={facts} className="mt-[3px] leading-[1.45]" style={{ fontSize: 12.5, color: G.text }} />}
+        <Parts list={[(r.m ?? "") + (r.d ?? ""), dealWhen(r.pe), road].filter(Boolean)} className="mt-[2px] leading-[1.4]" style={{ fontSize: 11.5, color: G.faint }} />
       </span>
       <span className="shrink-0 text-right">
         <span className="block whitespace-nowrap font-semibold leading-none" style={{ fontSize: 15, color: G.text, ...NUM }}>
           {totalText(r.p)}
         </span>
-        <span className="mt-[4px] block whitespace-nowrap leading-none" style={{ fontSize: 11, color: G.faint }}>
-          {unit ? `${yen(unit)}円/㎡` : r.fa ? `延床${r.fa.toLocaleString("ja-JP", { maximumFractionDigits: 0 })}㎡` : ""}
-        </span>
+        {unit && (
+          <span className="mt-[4px] block whitespace-nowrap leading-none" style={{ fontSize: 11, color: G.faint }}>
+            {yen(unit)}円/㎡
+          </span>
+        )}
+        {unit && (
+          <span className="mt-[3px] block whitespace-nowrap leading-none" style={{ fontSize: 11, color: G.faint }}>
+            坪 約{manYen(unit * TSUBO_M2)}
+          </span>
+        )}
       </span>
     </div>
+  );
+}
+
+/** 「・」でつないだ項目。1つの項目は途中で改行しない（「延床 / 100㎡」のように割れないように） */
+function Parts({ list, className, style }: { list: string[]; className?: string; style?: React.CSSProperties }) {
+  return (
+    <span className={`block ${className ?? ""}`} style={style}>
+      {list.map((x, i) => (
+        <span key={i} className="inline-block whitespace-nowrap">
+          {x}
+          {i < list.length - 1 ? "・" : ""}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** 一覧の上の一言の説明 */
+function Lead({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mb-[6px] px-[2px] leading-[1.5]" style={{ fontSize: 11.5, color: G.sub }}>
+      {children}
+    </p>
   );
 }
