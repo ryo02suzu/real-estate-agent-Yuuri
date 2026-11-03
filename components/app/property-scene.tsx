@@ -121,7 +121,8 @@ async function loadLots(origin: Origin, target: Parcel | undefined, neighborKeys
       if (!shape.fills.length || !nearOrigin(boundsOf(shape), 330)) continue;
       const neighbor = neighborKeys.has(key) && /^\d/.test(f.chiban);
       const reg = `${f.kuiki}|${registryChiban(f.chiban)}`;
-      lots.push({ ...shape, neighbor, ...(neighbor ? { key: reg } : {}) });
+      // 地番は登記の地番（道路・水路は「道-12」のまま）。全画面で筆を押したときに出す
+      lots.push({ ...shape, neighbor, ...(neighbor ? { key: reg } : {}), kuiki: f.kuiki, chiban: /^\d/.test(f.chiban) ? registryChiban(f.chiban) : f.chiban });
       if (neighbor) {
         const at = labelPoint(shape);
         const area = shape.fills.reduce((s, fl) => s + ringArea(fl.outer), 0);
@@ -235,6 +236,8 @@ export type BackdropProps = {
   hazard: HazardPick;
   /** 見えているか（ほかのページを見ている間・シートが模型を覆いきった間は描かない） */
   visible: boolean;
+  /** 全画面でハザードマップの色を出している（ハザードのタブを開いていなくても読む） */
+  hazLayer?: boolean;
   /** 模型ができた（null は作れなかった・消えた）。物件の画面が指の操作と割り付けを渡す */
   onReady: (api: PropertyScene | null) => void;
   /** 模型が出せない（平らな地図にした） */
@@ -248,7 +251,7 @@ export type BackdropProps = {
 };
 
 /** 物件の画面のいちばん奥（空・街の模型・札・影） */
-export function PropertyBackdrop({ result, data, tab, motion, hold, neighbors, picked, hazard, visible, onReady, onFlat, onFront, flatCenter, boxRef }: BackdropProps) {
+export function PropertyBackdrop({ result, data, tab, motion, hold, neighbors, picked, hazard, visible, hazLayer, onReady, onFlat, onFront, flatCenter, boxRef }: BackdropProps) {
   const host = useRef<HTMLDivElement>(null);
   const labelBox = useRef<HTMLDivElement>(null);
   const [api, setApi] = useState<PropertyScene | null>(null);
@@ -420,7 +423,7 @@ export function PropertyBackdrop({ result, data, tab, motion, hold, neighbors, p
 
   // ハザードマップの色と水の高さ（ハザードのタブを開いてから読む）
   const [hazOpened, setHazOpened] = useState(tab === "hazard");
-  if (tab === "hazard" && !hazOpened) setHazOpened(true);
+  if ((tab === "hazard" || hazLayer) && !hazOpened) setHazOpened(true);
   const hazReport = data.hazard.status === "ok" ? data.hazard.report : undefined;
   const depthLabel = hazReport && hazard !== "dosha" ? classAt(hazReport, hazard)?.label : undefined;
   useEffect(() => {

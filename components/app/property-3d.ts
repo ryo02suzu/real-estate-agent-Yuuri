@@ -17,8 +17,17 @@ export type SceneTab = "basic" | "road" | "law" | "hazard" | "around" | "price";
 export type ScenePart = "day" | "evening" | "night";
 /** 建物・道路・水と、調べた土地（無ければ地点だけ）。front は土地に接する道路（town.roads の番号） */
 export type SceneBase = { town: TownModel; target: SceneShape | null; center: XZ; front: number[] };
-/** まわりの筆（neighbor は隣の土地。key は隣の土地の「地番区域|登記の地番」で、たたいて選ぶときに使う） */
-export type SceneLot = SceneShape & { neighbor: boolean; key?: string };
+/**
+ * まわりの筆（neighbor は隣の土地。key は隣の土地の「地番区域|登記の地番」で、たたいて選ぶときに使う）。
+ * kuiki・chiban は全画面で筆を押したときに出す（地番は登記の地番。道路・水路は「道-12」のまま）
+ */
+export type SceneLot = SceneShape & { neighbor: boolean; key?: string; kuiki?: string; chiban?: string };
+/** 全画面で押した所：物件の筆・隣の筆・まわりの筆・道路・水路・地面（at は押した地面の点） */
+export type FreeTap = { kind: "target" | "neighbor" | "lot" | "road" | "water" | "ground"; key?: string; kuiki?: string; chiban?: string; at: XZ; center: XZ };
+/** 全画面のカメラ（方位は北0の時計回りのラジアン。away は物件から離れたか） */
+export type CameraView = { azim: number; polar: number; dist: number; away: boolean };
+/** 全画面で出すもの：筆の線・隣の土地・用途地域の色・ハザードマップの色・前の道路の光 */
+export type FreeLayers = { lots: boolean; nb: boolean; zone: boolean; haz: boolean; road: boolean };
 export type SceneZone = { fill: SceneFill; color: string };
 export type ScenePin = { at: XZ; color: string; tabs: SceneTab[]; size?: number };
 /** 駅といちばん近い地価の地点（光の道）、施設の印、地価の柱（高さは m） */
@@ -47,6 +56,8 @@ export type PropertyScene = {
   setNeighbors(on: boolean): void;
   /** 選んだ隣の土地（SceneLot の key）。模型では濃い金色に塗り、札にチェックを付ける */
   setPicked(keys: string[]): void;
+  /** 隣の土地をひと息だけ光らせる（配置図・札で押したとき。隣の土地を出していなければ何もしない） */
+  flashNeighbor(key: string): void;
   /** ハザードの種類を変えた：地面に敷く絵（無ければ消す）と、水の高さ（m。0 で水なし） */
   setHazard(image: HTMLCanvasElement | null, bounds: { x0: number; z0: number; x1: number; z1: number } | null, depth: number): void;
   setLayout(l: SceneLayout): void;
@@ -65,6 +76,21 @@ export type PropertyScene = {
   takeNeighborTap(): string | null;
   /** 2本指のトラックパッド（ctrl＋ホイール）で寄る */
   wheel(e: WheelEvent): void;
+  /**
+   * 全画面（自由に動かす）にする・戻す。frame は上下の操作の帯の高さ（px。土地はそのあいだの真ん中へ動く）。
+   * 全画面では 1本指でずらす・2本指で拡大と回転・2本指の上下で傾ける・2回たたいて寄る。押した筆は takeTap で受け取る
+   */
+  setFree(on: boolean, frame?: { top: number; bottom: number; avoid?: ScreenRect[] }): void;
+  setLayers(l: FreeLayers): void;
+  /** 物件へ戻る・北を上に・真上から（平面）／斜めから（立体）・寄る（f < 1）／引く */
+  recenter(): void;
+  northUp(): void;
+  setPlanView(on: boolean): void;
+  zoomBy(f: number): void;
+  /** カメラが動いたら知らせる（方位の針・平面の切り替えに使う）。null で止める */
+  onCamera(cb: ((v: CameraView) => void) | null): void;
+  /** 全画面で直前に押した所（1回で消える） */
+  takeTap(): FreeTap | null;
   dispose(): void;
 };
 
@@ -126,11 +152,15 @@ const AMBIENT_MS = 20_000;
 /** 寄れる範囲（m） */
 const MIN_DIST = 45;
 const MAX_DIST = 1400;
+/** 全画面で寄れる範囲（m）と、物件から離れられる距離（m。街の模型を作った範囲の中） */
+const FREE_MIN = 16;
+const FREE_MAX = 900;
+const FREE_REACH = 340;
 
 type Tween = { start: number; dur: number; e: (t: number) => number; update: (t: number) => void; done?: () => void };
 type Cam = { tx: number; ty: number; tz: number; dist: number; polar: number; azim: number };
 type Preset = { t: [number, number, number]; dist: number; polar: number; azim: number };
-type Fade = "front" | "zone" | "flood" | "gauge" | "nb" | "route" | "pins" | "bars" | "haz" | "lots";
+type Fade = "front" | "zone" | "flood" | "gauge" | "nb" | "route" | "pins" | "bars" | "haz" | "lots" | "grid";
 
 /** 使い終わったら捨てる物の袋（作り直す部品ごと） */
 class Bag {
@@ -362,9 +392,9 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
   }
 
   // ---- 材料ごとの部品（届くたびに作り直す）
-  const groups = { base: new THREE.Group(), lots: new THREE.Group(), zones: new THREE.Group(), marks: new THREE.Group() };
-  const bags = { base: new Bag(), lots: new Bag(), zones: new Bag(), marks: new Bag() };
-  scene.add(groups.base, groups.lots, groups.zones, groups.marks);
+  const groups = { base: new THREE.Group(), lots: new THREE.Group(), zones: new THREE.Group(), marks: new THREE.Group(), sel: new THREE.Group() };
+  const bags = { base: new Bag(), lots: new Bag(), zones: new Bag(), marks: new Bag(), sel: new Bag() };
+  scene.add(groups.base, groups.lots, groups.zones, groups.marks, groups.sel);
   const M: {
     road?: T.MeshStandardMaterial;
     water?: T.MeshStandardMaterial;
@@ -385,6 +415,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
     nb?: T.LineBasicMaterial;
     nbFill?: T.MeshBasicMaterial;
     nbPick?: T.MeshBasicMaterial;
+    nbFlash?: T.MeshBasicMaterial;
     route?: T.ShaderMaterial;
     priceRoute?: T.ShaderMaterial;
     bar?: T.MeshBasicMaterial;
@@ -394,6 +425,8 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
   const parts: { line?: T.Mesh; glow?: T.Mesh; fill?: T.Group; curtain?: T.Mesh; pulse?: T.Mesh; flood?: T.Mesh; gauge?: T.Group; haz?: T.Mesh; bldg: T.Mesh[]; edgeCount: number; center: T.Vector3 } = { bldg: [], edgeCount: 0, center: new THREE.Vector3() };
   // 隣の土地（たたいて選ぶ）：形と面。選んだ土地の key
   let nbLots: { key: string; fills: SceneShape["fills"]; meshes: T.Mesh[] }[] = [];
+  // まわりの筆（全画面で押した筆を見分ける）：地番と面と範囲
+  let allLots: { key: string; kuiki: string; chiban: string; neighbor: boolean; fills: SceneShape["fills"]; box: [number, number, number, number] }[] = [];
   let picked = new Set<string>();
   let base: SceneBase | null = null;
   let marks: SceneMarks | null = null;
@@ -417,7 +450,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
   let sunDir = { az: 160, alt: 40 };
   let touched = false;
   let ambientUntil = 0;
-  const fade: Record<Fade, number> = { front: 0, zone: 0, flood: 0, gauge: 0, nb: 0, route: 0, pins: 0, bars: 0, haz: 0, lots: 0 };
+  const fade: Record<Fade, number> = { front: 0, zone: 0, flood: 0, gauge: 0, nb: 0, route: 0, pins: 0, bars: 0, haz: 0, lots: 0, grid: 1 };
   const cur: Record<string, number | T.Color> = {};
   const tweens = new Set<Tween>();
   const fadeTw: Partial<Record<Fade, Tween>> = {};
@@ -768,6 +801,8 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
     const np: number[] = [];
     M.nbFill = bag.keep(new THREE.MeshBasicMaterial({ color: col("#ffd27a"), transparent: true, opacity: 0, depthWrite: false }));
     M.nbPick = bag.keep(new THREE.MeshBasicMaterial({ color: col("#ffd36b"), transparent: true, opacity: 0, depthWrite: false }));
+    M.nbFlash = bag.keep(new THREE.MeshBasicMaterial({ color: col("#fff4cf"), transparent: true, opacity: 0, depthWrite: false }));
+    flashing = null;
     const byKey = new Map<string, { key: string; fills: SceneShape["fills"]; meshes: T.Mesh[] }>();
     for (const lot of lots) {
       const arr = lot.neighbor ? np : lp;
@@ -785,6 +820,24 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
       }
     }
     nbLots = [...byKey.values()].filter((n) => n.key);
+    // 全画面で押した筆を見分けるための一覧（同じ地番の区画・タイルで分かれた部分は1つに）
+    const every = new Map<string, (typeof allLots)[number]>();
+    for (const lot of lots) {
+      if (!lot.chiban) continue;
+      const k = lot.key ?? `${lot.kuiki ?? ""}|${lot.chiban}`;
+      const e = every.get(k) ?? { key: k, kuiki: lot.kuiki ?? "", chiban: lot.chiban, neighbor: lot.neighbor, fills: [], box: [Infinity, Infinity, -Infinity, -Infinity] as [number, number, number, number] };
+      for (const f of lot.fills) {
+        e.fills.push(f);
+        for (const [x, z] of f.outer) {
+          e.box[0] = Math.min(e.box[0], x);
+          e.box[1] = Math.min(e.box[1], z);
+          e.box[2] = Math.max(e.box[2], x);
+          e.box[3] = Math.max(e.box[3], z);
+        }
+      }
+      every.set(k, e);
+    }
+    allLots = [...every.values()];
     // 隣の土地が届いたら、隣の土地を見る向き・距離を決め直す（出しているときは、自分で動かしていなければ合わせ直す）
     updatePresets();
     if (arrived && !touched && nbOn && tab === "basic") applyPreset("nb", true, 1200);
@@ -868,6 +921,49 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
     // 駅・地価の地点が後から届いたら、見ているタブの向きを合わせ直す（自分で動かしたあとは動かさない）
     if (arrived && !touched && (tab === "around" || tab === "price") && JSON.stringify(presets[tab] ?? null) !== before) applyPreset(tab, true, 1600);
     invalidate();
+  }
+
+  // ---- 隣の土地を光らせる（白い金色がふわっと満ちて引く。終わったら選んだ／選んでいない色へ戻す）
+  let flashing: { key: string; tw: Tween | null } | null = null;
+  function endFlash() {
+    if (!flashing) return;
+    const n = nbLots.find((x) => x.key === flashing!.key);
+    if (n && M.nbPick && M.nbFill) for (const m of n.meshes) m.material = picked.has(n.key) ? M.nbPick : M.nbFill;
+    if (flashing.tw) tweens.delete(flashing.tw);
+    flashing = null;
+    invalidate();
+  }
+  function flashNeighbor(key: string) {
+    endFlash();
+    const n = nbLots.find((x) => x.key === key);
+    const mat = M.nbFlash;
+    if (!n || !mat || fade.nb < 0.5) return;
+    for (const m of n.meshes) m.material = mat;
+    const lbl = labels.find((l) => l.key === `nb:${key}`);
+    if (lbl) {
+      lbl.el.classList.remove("pv-flash");
+      void lbl.el.offsetWidth;
+      lbl.el.classList.add("pv-flash");
+    }
+    flashing = { key, tw: null };
+    const base = () => fade.lots * fade.nb;
+    if (still()) {
+      mat.opacity = base() * 0.6;
+      invalidate();
+      window.setTimeout(endFlash, 700);
+      return;
+    }
+    flashing.tw = tween({
+      dur: 1150,
+      ease: (t) => t,
+      update: (t) => {
+        // すっと満ちて（0.18 秒）、ゆっくり引く
+        const k = t < 0.16 ? t / 0.16 : 1 - (t - 0.16) / 0.84;
+        mat.opacity = base() * (0.12 + 0.68 * Math.max(0, k));
+      },
+      done: endFlash,
+    });
+    wake();
   }
 
   // ---- 隣の土地の札：選んだ土地はチェック付きの金色（幅が変わるので測り直す）
@@ -1060,14 +1156,276 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
   const ptrs = new Map<number, { x: number; y: number }>();
   let inertia = 0;
   let idleAt = performance.now();
+
+  // ---- 全画面（自由に動かす）：1本指でずらす・2本指で拡大と回転・2本指の上下で傾ける・2回たたいて寄る
+  let free = false;
+  let freeFrame: { top: number; bottom: number; avoid?: ScreenRect[] } = { top: 0, bottom: 0 };
+  let layers: FreeLayers = { lots: true, nb: true, zone: false, haz: false, road: true };
+  /** 土地を置く高さ（px）。いつもは見出しとシートのあいだ（layout.centerY）、全画面では画面の真ん中へ動かす */
+  let viewY = 0;
+  let viewTw: Tween | null = null;
+  let planView = false;
+  let camCb: ((v: CameraView) => void) | null = null;
+  let lastCam = "";
+  let freeTapOut: FreeTap | null = null;
+  let gest: { d: number; ang: number; my: number; dist: number; azim: number; polar: number } | null = null;
+  let panStart: { x: number; y: number; tx: number; tz: number; id: number } | null = null;
+  let panLast: { t: number; tx: number; tz: number } | null = null;
+  const panVel = { x: 0, z: 0 };
+  /** 地面の上で 1px が何 m か（見ている所のあたり） */
+  const metersPerPx = () => (2 * cam.dist * Math.tan((camera.fov * Math.PI) / 360)) / Math.max(1, H);
+  /** 物件から離れすぎない（街の模型を作った範囲の中） */
+  function keepNear() {
+    const c = parts.center;
+    const dx = cam.tx - c.x;
+    const dz = cam.tz - c.z;
+    const d = Math.hypot(dx, dz);
+    if (d > FREE_REACH) {
+      cam.tx = c.x + (dx / d) * FREE_REACH;
+      cam.tz = c.z + (dz / d) * FREE_REACH;
+      panVel.x = panVel.z = 0;
+    }
+  }
+  function applyFreeFades() {
+    fadeTo("front", layers.road ? 1 : 0, 500);
+    fadeTo("zone", layers.zone ? 0.42 : 0, 500);
+    fadeTo("route", 0, 400);
+    fadeTo("pins", 1, 400);
+    fadeTo("bars", 0, 400);
+    fadeTo("nb", layers.nb ? 1 : 0, 500);
+    fadeTo("grid", layers.lots ? 1 : 0, 500);
+    fadeTo("haz", layers.haz && M.haz?.map ? 0.78 : 0, 600);
+    fadeTo("gauge", 0, 400);
+    fadeTo("flood", 0, 500);
+  }
+  /** 全画面の見はじめ・物件に戻るときの向き（物件が真ん中、少し斜めから） */
+  function freeView(): Cam {
+    const c = parts.center;
+    return { tx: c.x, ty: 0, tz: c.z, dist: 230, polar: planView ? 0.03 : 0.86, azim: cam.azim };
+  }
+  /** 土地を置く高さを、いつもの所 ⇄ 全画面の真ん中へ動かす */
+  function tweenView() {
+    const from = viewY || layout.centerY || H * 0.42;
+    const to = free ? (freeFrame.top + (H - freeFrame.bottom)) / 2 : layout.centerY || H * 0.42;
+    if (viewTw) tweens.delete(viewTw);
+    viewTw = tween({
+      dur: 620,
+      ease: E.inOut,
+      update: (t) => {
+        viewY = lerp(from, to, t);
+        setView();
+      },
+      done: () => (viewTw = null),
+    });
+  }
+  function setFree(on: boolean, frame?: { top: number; bottom: number; avoid?: ScreenRect[] }) {
+    if (frame) freeFrame = frame;
+    if (on === free) {
+      if (on) tweenView();
+      return;
+    }
+    free = on;
+    endFlash();
+    ptrs.clear();
+    drag = null;
+    pinch = null;
+    gest = null;
+    panStart = null;
+    tap = null;
+    inertia = 0;
+    panVel.x = panVel.z = 0;
+    tweenView();
+    if (on) {
+      touched = true;
+      moveCam({ ...freeView(), dist: clamp(cam.dist, 170, 320) }, true, 900);
+      applyFreeFades();
+    } else {
+      clearSelection();
+      planView = false;
+      fadeTo("grid", 1, 400);
+      sceneForTab(tab, true);
+      touched = false;
+      applyPreset(nbOn && tab === "basic" ? "nb" : tab, true, 900);
+    }
+    wake();
+    invalidate();
+  }
+  // 押した筆を白い線と薄い面で示す（物件の筆は青）
+  function clearSelection() {
+    groups.sel.clear();
+    bags.sel.dispose();
+    invalidate();
+  }
+  function selectFills(fills: SceneShape["fills"], target: boolean) {
+    clearSelection();
+    if (!fills.length) return;
+    const bag = bags.sel;
+    const color = col(target ? "#9fd0ff" : "#ffffff");
+    const lineM = bag.keep(new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false, depthTest: false }));
+    const fillM = bag.keep(new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false }));
+    const arr: number[] = [];
+    for (const f of fills)
+      for (const ring of [f.outer, ...f.holes])
+        for (let i = 0; i < ring.length; i++) {
+          const a = ring[i];
+          const b = ring[(i + 1) % ring.length];
+          arr.push(a[0], 0.14, a[1], b[0], 0.14, b[1]);
+        }
+    const lines = new THREE.LineSegments(lineGeo(bag, arr), lineM);
+    lines.renderOrder = 6;
+    groups.sel.add(lines);
+    for (const f of fills) groups.sel.add(flat(bag, new THREE.ShapeGeometry(shapeOf(f)), fillM, 0.11));
+    tween({
+      dur: 900,
+      ease: E.out,
+      update: (t) => {
+        lineM.opacity = Math.min(1, t * 2.2);
+        fillM.opacity = 0.42 * (1 - t) + 0.16 * t;
+      },
+    });
+  }
+  /** 全画面で押した所（札を押したらその土地。建物を押したらその足もとの土地） */
+  function hitFree(e: PointerEvent): FreeTap | null {
+    const r = canvas.getBoundingClientRect();
+    const sx = e.clientX - r.left;
+    const sy = e.clientY - r.top;
+    const center: XZ = [parts.center.x, parts.center.z];
+    for (const l of labels) {
+      if (!l.on || !l.box || sx < l.box.l || sx > l.box.r || sy < l.box.t || sy > l.box.b) continue;
+      if (l.key === "lot") return { kind: "target", at: center, center };
+      if (l.key.startsWith("nb:")) {
+        const k = l.key.slice(3);
+        const lot = allLots.find((x) => x.key === k);
+        if (lot) return { kind: "neighbor", key: k, kuiki: lot.kuiki, chiban: lot.chiban, at: [l.pos.x, l.pos.z], center };
+      }
+    }
+    ray.setFromCamera(new THREE.Vector2((sx / r.width) * 2 - 1, -(sy / r.height) * 2 + 1), camera);
+    const b = parts.bldg.length ? ray.intersectObjects(parts.bldg, false)[0] : undefined;
+    const p = b ? b.point : ray.ray.intersectPlane(tapPlane, tapAt);
+    if (!p) return null;
+    const at: XZ = [p.x, p.z];
+    if (base?.target?.fills.some((f) => inFill(at, f))) return { kind: "target", at, center };
+    for (const lot of allLots) {
+      if (at[0] < lot.box[0] || at[0] > lot.box[2] || at[1] < lot.box[1] || at[1] > lot.box[3]) continue;
+      if (!lot.fills.some((f) => inFill(at, f))) continue;
+      const kind = lot.neighbor ? "neighbor" : /^道/.test(lot.chiban) ? "road" : /^水/.test(lot.chiban) ? "water" : "lot";
+      return { kind, key: lot.key, kuiki: lot.kuiki, chiban: lot.chiban, at, center };
+    }
+    return { kind: "ground", at, center };
+  }
+  /** 2回たたいた所へ寄る（たたいた所が指の下に残るよう、寄るぶん見る所もそちらへ） */
+  function zoomAt(e: PointerEvent, f: number) {
+    const r = canvas.getBoundingClientRect();
+    ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+    const p = ray.ray.intersectPlane(tapPlane, tapAt);
+    const tx = p ? lerp(cam.tx, p.x, 1 - f) : cam.tx;
+    const tz = p ? lerp(cam.tz, p.z, 1 - f) : cam.tz;
+    moveCam({ ...cam, tx, tz, dist: clamp(cam.dist * f, FREE_MIN, FREE_MAX) }, true, 420);
+  }
+  function freeDown(e: PointerEvent) {
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (camTween) {
+      tweens.delete(camTween);
+      camTween = null;
+    }
+    panVel.x = panVel.z = 0;
+    const now = performance.now();
+    if (ptrs.size === 1) {
+      panStart = { x: e.clientX, y: e.clientY, tx: cam.tx, tz: cam.tz, id: e.pointerId };
+      panLast = { t: now, tx: cam.tx, tz: cam.tz };
+      tap = { x: e.clientX, y: e.clientY, t: now };
+    } else if (ptrs.size === 2) {
+      const [a, b] = [...ptrs.values()];
+      gest = { d: Math.hypot(a.x - b.x, a.y - b.y), ang: Math.atan2(b.y - a.y, b.x - a.x), my: (a.y + b.y) / 2, dist: cam.dist, azim: cam.azim, polar: cam.polar };
+      panStart = null;
+      tap = null;
+    }
+    idleAt = now;
+    wake();
+  }
+  function freeMove(e: PointerEvent) {
+    if (!ptrs.has(e.pointerId)) return;
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (gest && ptrs.size >= 2) {
+      const [a, b] = [...ptrs.values()];
+      cam.dist = clamp(gest.dist * (gest.d / Math.max(20, Math.hypot(a.x - b.x, a.y - b.y))), FREE_MIN, FREE_MAX);
+      let da = Math.atan2(b.y - a.y, b.x - a.x) - gest.ang;
+      while (da > Math.PI) da -= 2 * Math.PI;
+      while (da < -Math.PI) da += 2 * Math.PI;
+      cam.azim = gest.azim - da;
+      // 2本指を上へ動かすと寝かせる（斜めから見る）、下へ動かすと真上へ
+      if (!planView) cam.polar = clamp(gest.polar - ((a.y + b.y) / 2 - gest.my) * 0.0055, 0.03, 1.3);
+    } else if (panStart && e.pointerId === panStart.id) {
+      const dx = e.clientX - panStart.x;
+      const dy = e.clientY - panStart.y;
+      if (tap && Math.hypot(dx, dy) > 8) tap = null;
+      const k = metersPerPx();
+      const kf = k / Math.max(0.3, Math.cos(cam.polar));
+      const ca = Math.cos(cam.azim);
+      const sa = Math.sin(cam.azim);
+      // 画面の右は地面の (cos, -sin)、画面の上（奥）は (-sin, -cos)。指と一緒に地面が動く
+      cam.tx = panStart.tx - ca * dx * k - sa * dy * kf;
+      cam.tz = panStart.tz + sa * dx * k - ca * dy * kf;
+      keepNear();
+      const now = performance.now();
+      if (panLast) {
+        const dt = Math.max(1, now - panLast.t);
+        panVel.x = clamp(lerp(panVel.x, (cam.tx - panLast.tx) / dt, 0.5), -3, 3);
+        panVel.z = clamp(lerp(panVel.z, (cam.tz - panLast.tz) / dt, 0.5), -3, 3);
+      }
+      panLast = { t: now, tx: cam.tx, tz: cam.tz };
+    }
+    idleAt = performance.now();
+    invalidate();
+  }
+  function freeUp(e: PointerEvent, cancelled: boolean) {
+    if (!ptrs.has(e.pointerId)) return;
+    ptrs.delete(e.pointerId);
+    const now = performance.now();
+    if (ptrs.size < 2) gest = null;
+    if (ptrs.size === 1) {
+      // 2本指のあと、残った指でそのままずらせる
+      const [id, q] = [...ptrs.entries()][0];
+      panStart = { x: q.x, y: q.y, tx: cam.tx, tz: cam.tz, id };
+      panLast = { t: now, tx: cam.tx, tz: cam.tz };
+      panVel.x = panVel.z = 0;
+    } else if (ptrs.size === 0) {
+      // 止めてから離したら滑らせない
+      if (cancelled || still() || !panLast || now - panLast.t > 90) panVel.x = panVel.z = 0;
+      panStart = null;
+      panLast = null;
+      if (!cancelled && tap && now - tap.t < 350) {
+        if (now - lastTap < 320) {
+          zoomAt(e, 0.5);
+          lastTap = 0;
+        } else {
+          lastTap = now;
+          const hit = hitFree(e);
+          freeTapOut = hit;
+          if (hit?.kind === "target") {
+            selectFills(base?.target?.fills ?? [], true);
+            pulse();
+          } else if (hit && hit.kind !== "ground") selectFills(allLots.find((l) => l.key === hit.key)?.fills ?? [], false);
+          else clearSelection();
+        }
+      }
+      tap = null;
+    }
+    wake();
+    invalidate();
+  }
   function applyPreset(name: SceneTab | "intro" | "nb", animate = true, dur = 1400) {
     const p = presets[name];
     if (!p) return;
+    moveCam({ tx: p.t[0], ty: p.t[1], tz: p.t[2], dist: p.dist, polar: p.polar, azim: p.azim }, animate, dur);
+  }
+  /** カメラを to へ（向きは近い回り方で）。animate しないときや動きを減らす設定では、すぐ */
+  function moveCam(target: Cam, animate = true, dur = 1400) {
     const from = { ...cam };
-    let az = p.azim;
+    let az = target.azim;
     while (az - from.azim > Math.PI) az -= 2 * Math.PI;
     while (az - from.azim < -Math.PI) az += 2 * Math.PI;
-    const to: Cam = { tx: p.t[0], ty: p.t[1], tz: p.t[2], dist: p.dist, polar: p.polar, azim: az };
+    const to: Cam = { ...target, azim: az };
     if (camTween) tweens.delete(camTween);
     camTween = null;
     if (!animate || still()) {
@@ -1096,9 +1454,9 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
     if (cam.polar < 0.06) camera.up.set(-Math.sin(cam.azim), 0, -Math.cos(cam.azim));
     camera.lookAt(cam.tx, cam.ty, cam.tz);
   }
-  /** 土地を画面の centerY の高さに置く（カメラの向きはそのまま、写す範囲だけずらす） */
+  /** 土地を画面の centerY の高さに置く（カメラの向きはそのまま、写す範囲だけずらす。全画面では画面の真ん中へ動かす） */
   function setView() {
-    const y = layout.centerY || H * 0.42;
+    const y = viewY || layout.centerY || H * 0.42;
     camera.setViewOffset(W, H, 0, H / 2 - y, W, H);
     camera.updateProjectionMatrix();
   }
@@ -1208,11 +1566,11 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
   function applyFades() {
     if (M.front) M.front.uniforms.uA.value = fade.front;
     for (const m of zoneMats) m.opacity = fade.zone;
-    for (const p of pinMats) p.m.opacity = p.tabs.includes(tab) ? fade.pins : 0;
+    for (const p of pinMats) p.m.opacity = p.tabs.includes(tab) || (free && p.tabs.includes("around")) ? fade.pins : 0;
     if (M.route) M.route.uniforms.uA.value = fade.route;
     if (M.priceRoute) M.priceRoute.uniforms.uA.value = fade.bars * 2;
     if (M.bar) M.bar.opacity = fade.bars;
-    if (M.lot) M.lot.opacity = fade.lots * ((cur.lotA as number) ?? 0.2) * (1 - fade.zone * 0.5);
+    if (M.lot) M.lot.opacity = fade.lots * fade.grid * ((cur.lotA as number) ?? 0.2) * (1 - fade.zone * 0.5);
     if (M.nb) M.nb.opacity = fade.lots * fade.nb * 0.9;
     if (M.nbFill) M.nbFill.opacity = fade.lots * fade.nb * 0.12;
     if (M.nbPick) M.nbPick.opacity = fade.lots * fade.nb * 0.42;
@@ -1231,12 +1589,19 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
 
   // ---- 札（並びの順に置き、先に置いた札・見出しの字・上のボタン・シートに重なる札は隠す）
   const v3 = new THREE.Vector3();
+  /** 全画面で出す札：いつもの札・隣の土地・前の道路・用途地域・ハザード（出しているとき）・駅と施設 */
+  const freeWant = (tabs: SceneLabel["tabs"]) =>
+    tabs === "all" ||
+    (tabs === "nb"
+      ? layers.nb && fade.nb > 0.5
+      : (tabs.includes("road") && layers.road) || (tabs.includes("law") && layers.zone) || (tabs.includes("hazard") && layers.haz && fade.haz > 0.3) || tabs.includes("around"));
   function placeLabels() {
-    const placed: ScreenRect[] = [...layout.avoid];
+    const L = free ? { avoid: freeFrame.avoid ?? [], cover: 0, topLimit: freeFrame.top, sheetTop: H - freeFrame.bottom } : layout;
+    const placed: ScreenRect[] = [...L.avoid];
     const hit = (p: ScreenRect, q: ScreenRect) => p.l < q.r && p.r > q.l && p.t < q.b && p.b > q.t;
     for (const l of labels) {
-      const want = arrived && (l.tabs === "all" || (l.tabs === "nb" ? nbOn && tab === "basic" && fade.nb > 0.5 : l.tabs.includes(tab)));
-      let vis = want && layout.cover < 0.6;
+      const want = arrived && (free ? freeWant(l.tabs) : l.tabs === "all" || (l.tabs === "nb" ? nbOn && tab === "basic" && fade.nb > 0.5 : l.tabs.includes(tab)));
+      let vis = want && L.cover < 0.6;
       if (vis) {
         v3.copy(l.pos).project(camera);
         const x = ((v3.x + 1) / 2) * W;
@@ -1248,7 +1613,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
         // 端からはみ出す札は、端の内側へずらす（点が画面の外なら隠す）
         const cx = clamp(x, l.w / 2 + 8, W - l.w / 2 - 8);
         const box = { l: cx - l.w / 2 - 3, t: y - l.h - 3, r: cx + l.w / 2 + 3, b: y + 3 };
-        if (v3.z > 1 || x < 0 || x > W || box.t < layout.topLimit || box.b > layout.sheetTop - 4) vis = false;
+        if (v3.z > 1 || x < 0 || x > W || box.t < L.topLimit || box.b > L.sheetTop - 4) vis = false;
         else if (placed.some((p) => hit(box, p))) vis = false;
         else {
           placed.push(box);
@@ -1293,12 +1658,22 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
         tw.done?.();
       }
     }
-    const active = tweens.size > 0 || !!drag || !!pinch || Math.abs(inertia) > 0.00005;
-    // 着いたあとのゆっくりした動き（光の揺らぎ・流れ・回転）は、触ってから AMBIENT_MS の間だけ
-    const ambient = !still() && arrived && layout.cover < 0.95 && t < ambientUntil;
+    const panning = free && !panStart && Math.hypot(panVel.x, panVel.z) > 0.00002;
+    const active = tweens.size > 0 || !!drag || !!pinch || !!gest || !!panStart || panning || Math.abs(inertia) > 0.00005;
+    // 着いたあとのゆっくりした動き（光の揺らぎ・流れ・回転）は、触ってから AMBIENT_MS の間だけ（全画面では回さない）
+    const ambient = !still() && arrived && (free || layout.cover < 0.95) && t < ambientUntil;
+    if (panning) {
+      // 離したあとも少し滑って止まる
+      cam.tx += panVel.x * dt;
+      cam.tz += panVel.z * dt;
+      const k = Math.pow(0.9, dt / 16);
+      panVel.x *= k;
+      panVel.z *= k;
+      keepNear();
+    }
     if (ambient) {
       U.time.value = t / 1000;
-      if (!active && t - idleAt > 4500) cam.azim += dt * 0.00004;
+      if (!free && !active && t - idleAt > 4500) cam.azim += dt * 0.00004;
       const k = 0.5 + 0.5 * Math.sin(t / 1100);
       if (M.glow) M.glow.opacity = (0.3 + 0.18 * k) * ((cur.glow as number) ?? 1);
       if (M.fill) M.fill.opacity = 0.09 + 0.04 * k;
@@ -1314,6 +1689,15 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
       renderer.render(scene, camera);
       placeLabels();
       dirty = false;
+      if (camCb) {
+        const c = parts.center;
+        const away = Math.hypot(cam.tx - c.x, cam.tz - c.z) > 30;
+        const sig = `${cam.azim.toFixed(3)}|${cam.polar.toFixed(3)}|${Math.round(cam.dist)}|${away}`;
+        if (sig !== lastCam) {
+          lastCam = sig;
+          camCb({ azim: cam.azim, polar: cam.polar, dist: cam.dist, away });
+        }
+      }
     }
     if (visible && (active || ambient || dirty)) {
       running = true;
@@ -1409,7 +1793,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
     setNeighbors: (on) => {
       if (on === nbOn) return;
       nbOn = on;
-      if (tab === "basic") sceneForTab("basic");
+      if (tab === "basic" && !free) sceneForTab("basic");
     },
     setHazard: (image, bounds, depth) => {
       floodDepth = depth;
@@ -1426,13 +1810,19 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
         }
         M.haz.needsUpdate = true;
       }
-      if (tab === "hazard") sceneForTab("hazard", true);
+      if (free) applyFreeFades();
+      else if (tab === "hazard") sceneForTab("hazard", true);
       invalidate();
     },
     setLayout: (l) => {
+      // 全画面の間は、シートが下へ動いて測り直した値を使わない（戻るときに、入る前の高さへ戻す）
+      if (free) return;
       const moved = l.centerY !== layout.centerY;
       layout = l;
-      if (moved) setView();
+      if (moved && !viewTw) {
+        viewY = l.centerY;
+        setView();
+      }
       invalidate();
     },
     setVisible: (v) => {
@@ -1449,6 +1839,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
       invalidate();
     },
     pointerDown: (e) => {
+      if (free) return freeDown(e);
       if (!arrived) return;
       ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (ptrs.size === 1) {
@@ -1470,6 +1861,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
       wake();
     },
     pointerMove: (e) => {
+      if (free) return freeMove(e);
       if (!ptrs.has(e.pointerId)) return;
       ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pinch && ptrs.size === 2) {
@@ -1492,8 +1884,8 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
       idleAt = performance.now();
       invalidate();
     },
-    pointerUp: (e) => endPointer(e, false),
-    pointerCancel: (e) => endPointer(e, true),
+    pointerUp: (e) => (free ? freeUp(e, false) : endPointer(e, false)),
+    pointerCancel: (e) => (free ? freeUp(e, true) : endPointer(e, true)),
     takeLotTap: () => {
       const hit = performance.now() - lotTapAt < 800;
       lotTapAt = 0;
@@ -1504,19 +1896,44 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
       nbTap = null;
       return key;
     },
+    flashNeighbor,
+    setFree,
+    setLayers: (l) => {
+      layers = l;
+      if (free) applyFreeFades();
+      wake();
+      invalidate();
+    },
+    recenter: () => moveCam({ ...freeView(), dist: 230 }, true, 900),
+    northUp: () => moveCam({ ...cam, azim: 0 }, true, 700),
+    setPlanView: (on) => {
+      planView = on;
+      moveCam({ ...cam, polar: on ? 0.03 : 0.86 }, true, 800);
+    },
+    zoomBy: (f) => moveCam({ ...cam, dist: clamp(cam.dist * f, FREE_MIN, FREE_MAX) }, true, 380),
+    onCamera: (cb) => {
+      camCb = cb;
+      lastCam = "";
+      invalidate();
+    },
+    takeTap: () => {
+      const t = freeTapOut;
+      freeTapOut = null;
+      return t;
+    },
     setPicked: (keys) => {
       picked = new Set(keys);
-      if (M.nbPick && M.nbFill) for (const n of nbLots) for (const m of n.meshes) m.material = picked.has(n.key) ? M.nbPick : M.nbFill;
+      if (M.nbPick && M.nbFill) for (const n of nbLots) if (n.key !== flashing?.key) for (const m of n.meshes) m.material = picked.has(n.key) ? M.nbPick : M.nbFill;
       for (const l of labels) markPicked(l);
       invalidate();
     },
     wheel: (e) => {
-      if (!arrived) return;
+      if (!arrived && !free) return;
       if (camTween) {
         tweens.delete(camTween);
         camTween = null;
       }
-      cam.dist = clamp(cam.dist * (1 + e.deltaY * 0.01), MIN_DIST, MAX_DIST);
+      cam.dist = free ? clamp(cam.dist * (1 + e.deltaY * 0.01), FREE_MIN, FREE_MAX) : clamp(cam.dist * (1 + e.deltaY * 0.01), MIN_DIST, MAX_DIST);
       touched = true;
       idleAt = performance.now();
       wake();

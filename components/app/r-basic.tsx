@@ -11,7 +11,8 @@ import { parcelAreaM2 } from "@/lib/app/area";
 import { ratioHint } from "@/lib/app/ratio-hint";
 import type { Triage } from "@/lib/app/triage";
 import { usageShort } from "@/lib/roadmap/building";
-import { chibanLabel, kuikiLabelFrom, parcelMark, pickedChibanText } from "@/lib/roadmap/parcel";
+import { bySide, sideText } from "@/lib/app/neighbor-plan";
+import { chibanLabel, kuikiLabelFrom, parcelMark, pickedChibanText, type Neighbor } from "@/lib/roadmap/parcel";
 import { schoolGaps, schoolGapShort, schoolShort } from "@/lib/roadmap/school";
 import { noCityPlanning } from "@/lib/roadmap/municipalities";
 import { noneLabel, YOUTO_COLORS, youtoShort, zoningArea } from "@/lib/roadmap/zoning";
@@ -19,6 +20,7 @@ import { addressOffLot, pickKey, registryNeighbors } from "../parcel-card";
 import { useCopy } from "../use-copy";
 import { G, GCard, GCell, GFaint, GHead, GPill, NUM, TILE, TILE_GOLD, TILE_WARN } from "./g-ui";
 import { CoinStack } from "./icons";
+import { NeighborPlanSkeleton, NeighborPlanView } from "./neighbor-plan";
 import { PropertyMap } from "./property-map";
 import { displayAddress, manYen, pendingText, yen } from "./r-ui";
 import { Expand, ResearchCard } from "./research";
@@ -28,7 +30,7 @@ import type { TabProps } from "./types";
 
 const TSUBO = 400 / 121;
 
-export function BasicTab({ result, data, go, open, expand, mapApps, statuses, record, triage, checklist, has3d, neighbors, setNeighbors, pick }: TabProps) {
+export function BasicTab({ result, data, go, open, expand, mapApps, statuses, record, triage, checklist, has3d, neighbors, setNeighbors, pick, motion }: TabProps) {
   const { zoning, parcels, building, stations, schools, landPrice } = data;
   const parcel = parcels.status === "ok" ? parcels.parcel : undefined;
   const z = zoning.status === "ok" ? zoning.zoning : undefined;
@@ -170,7 +172,7 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
         <ChevronRight size={18} strokeWidth={1.8} absoluteStrokeWidth color={G.chevron} className="shrink-0" />
       </GCard>
 
-      <NeighborsCard data={data} open={open} has3d={has3d} neighbors={neighbors} setNeighbors={setNeighbors} pick={pick} />
+      <NeighborsCard data={data} open={open} has3d={has3d} neighbors={neighbors} setNeighbors={setNeighbors} pick={pick} motion={motion} />
 
       <ResearchCard statuses={statuses} summary={statusSummary(statuses)} onTopic={record} />
 
@@ -272,20 +274,33 @@ function TriageCard({ triage, checklist, onAll }: { triage: Triage; checklist: T
 }
 
 /**
- * 隣の土地（謄本・公図を取るときの隣地。地番のある筆）。札を押して選ぶと、選んだ地番だけを「、」区切りでコピーできる
- * （地番の詳しい画面・街の模型・拡大した地図で選んだものと同じ）。街の模型があれば、金色の線と地番の札で出せ、模型の土地をたたいても選べる
+ * 隣の土地（謄本・公図を取るときの隣地。地番のある筆）。北が上の配置図（components/app/neighbor-plan.tsx）に、物件の筆と隣の筆・道路を描き、
+ * 札には方角を付けて北から時計回りに並べる。札か図の筆を押すと選び（もう一度押すと外す）、選んだ地番だけを「、」区切りでコピーできる
+ * （地番の詳しい画面・街の模型・拡大した地図で選んだものと同じ）。押した筆は図と街の模型で光り、下の行に方角と接する長さを出す
  */
-function NeighborsCard({ data, open, has3d, neighbors, setNeighbors, pick }: Pick<TabProps, "data" | "open" | "has3d" | "neighbors" | "setNeighbors" | "pick">) {
+function NeighborsCard({ data, open, has3d, neighbors, setNeighbors, pick, motion }: Pick<TabProps, "data" | "open" | "has3d" | "neighbors" | "setNeighbors" | "pick"> & { motion: boolean }) {
   const copied = useCopy();
+  const [focus, setFocus] = useState<string | null>(null);
   const info = data.parcels;
   // 住所の地点の筆が道路・水路や、隣地のとても多い筆（物件の土地ではなさそう）のときは出さない
   if (info.status !== "ok" || !/^\d/.test(info.parcel.chibanRaw) || addressOffLot(info) !== undefined) return null;
-  const list = registryNeighbors(info);
+  const plan = pick.plan;
+  const sides = plan?.status === "ok" ? plan.sides : undefined;
+  // 方角が分かれば北から時計回り（同じ方角は接する長さの長い順）
+  const list = bySide(registryNeighbors(info).map((n) => ({ n, side: sides?.get(pickKey(n)) ?? null }))).map((x) => x.n);
   const roads = info.neighbors.filter((n) => !/^\d/.test(n.chiban)).length;
   const base = info.parcel.kuiki;
   const chosen = new Set(pick.list.map(pickKey));
   const text = pickedChibanText(pick.list, base);
   const SHOW = 12;
+  const tap = (n: Neighbor) => {
+    pick.toggle(n);
+    pick.flash?.(n);
+    setFocus(pickKey(n));
+  };
+  const focused = focus ? list.find((n) => pickKey(n) === focus) : undefined;
+  const focusSide = focused ? sides?.get(pickKey(focused)) : undefined;
+  const roadSides = plan?.status === "ok" ? plan.roads : [];
   return (
     <div className="rounded-[18px] transition-[background,border-color] duration-300" style={neighbors ? TILE_GOLD : TILE}>
       <div className="flex items-center gap-[10px] px-[13px] pt-[11px]">
@@ -304,18 +319,65 @@ function NeighborsCard({ data, open, has3d, neighbors, setNeighbors, pick }: Pic
           </button>
         )}
       </div>
+      {/* 配置図（北が上）。図の筆を押しても選べる */}
+      {plan && plan.status !== "none" && list.length > 0 && (
+        <div className="px-[13px] pt-[10px]">
+          {plan.status === "ok" ? (
+            <NeighborPlanView
+              plan={plan}
+              picked={chosen}
+              flash={pick.flashed}
+              motion={motion}
+              onTap={(l) => {
+                const n = list.find((x) => pickKey(x) === l.key);
+                if (n) tap(n);
+              }}
+            />
+          ) : (
+            <NeighborPlanSkeleton />
+          )}
+          {/* 押した筆の方角と接する長さ（無ければ図の見方） */}
+          <p className="mt-[7px] min-h-[17px] truncate leading-[1.4]" style={{ fontSize: 11.5, color: focusSide ? G.text : G.faint }}>
+            {focused && focusSide ? (
+              <>
+                <b className="font-semibold" style={{ ...NUM, color: "#ffe2a3" }}>
+                  {focused.kuiki === base ? focused.chiban : `${kuikiLabelFrom(focused.kuiki, base)} ${focused.chiban}`}
+                </b>
+                ：{sideText(focusSide)}
+                <span style={{ color: G.faint }}>（地図データの目安）</span>
+              </>
+            ) : (
+              "北が上。青が物件、金色が隣の筆。図か札を押すと選べます"
+            )}
+          </p>
+          {roadSides.length > 0 && (
+            <p className="truncate leading-[1.4]" style={{ fontSize: 11.5, color: G.sub }}>
+              接する{roadSides.some((r) => r.kind === "road") ? (roadSides.some((r) => r.kind === "water") ? "道路・水路" : "道路") : "水路"}の筆：
+              {roadSides.map((r) => `${r.side!.dir} ${r.kind === "water" && roadSides.some((x) => x.kind === "road") ? "水路 " : ""}${r.side!.length < 1.2 ? "角" : `約${r.side!.length < 10 ? r.side!.length.toFixed(1) : Math.round(r.side!.length)}m`}`).join("・")}
+              <span style={{ color: G.faint }}>（地図データの目安）</span>
+            </p>
+          )}
+        </div>
+      )}
       <div className="flex flex-wrap gap-[6px] px-[13px] pb-[10px] pt-[10px]">
         {list.slice(0, SHOW).map((n) => {
           const on = chosen.has(pickKey(n));
+          const side = sides?.get(pickKey(n));
           return (
             <button
               key={`${n.kuiki}|${n.chiban}`}
-              onClick={() => pick.toggle(n)}
+              onClick={() => tap(n)}
               aria-pressed={on}
-              className="press flex items-center gap-[3px] rounded-full px-[9px] py-[3px] transition-colors duration-200"
+              aria-label={`${side ? `${side.dir}側の` : ""}${n.chiban}${on ? "（選択中）" : ""}`}
+              className="press flex items-center gap-[4px] rounded-full px-[9px] py-[3px] transition-colors duration-200"
               style={{ fontSize: 12.5, ...NUM, background: on ? "#ffd36b" : neighbors ? "rgba(255,201,74,0.16)" : "rgba(255,255,255,0.07)", border: `1px solid ${on ? "#ffd36b" : neighbors ? "rgba(255,201,74,0.45)" : "rgba(255,255,255,0.1)"}`, color: on ? "#2a1a04" : neighbors ? "#ffe2a3" : G.text, fontWeight: on ? 600 : 400 }}
             >
               {on && <Check size={11} strokeWidth={3} absoluteStrokeWidth />}
+              {side && (
+                <span className="font-medium" style={{ fontSize: 10.5, opacity: on ? 0.75 : 0.62 }}>
+                  {side.dir}
+                </span>
+              )}
               {n.kuiki === base ? n.chiban : `${kuikiLabelFrom(n.kuiki, base)} ${n.chiban}`}
             </button>
           );
@@ -338,10 +400,8 @@ function NeighborsCard({ data, open, has3d, neighbors, setNeighbors, pick }: Pic
               <span className="line-clamp-2 break-all" style={{ color: G.text }}>
                 {text}
               </span>
-            ) : neighbors ? (
-              "札か模型の土地を押して選ぶと、地番だけを「、」区切りでコピーできます"
             ) : (
-              "札を押して選ぶと、地番だけを「、」区切りでコピーできます"
+              "選んだ地番だけを「、」区切りでコピーできます"
             )}
           </p>
           {text ? (

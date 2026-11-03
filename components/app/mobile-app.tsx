@@ -8,6 +8,8 @@
 import {
   ChevronLeft,
   CircleHelp,
+  Hand,
+  Maximize2,
   FileText,
   Landmark,
   Info,
@@ -110,6 +112,7 @@ import {
   HomeBackdrop,
   HomeMenu,
   HomeScreen,
+  LIGHT_GLASS,
   PAGE,
   SKY,
   useScreenHeight,
@@ -139,8 +142,10 @@ import { LawTab } from "./r-law";
 import { PriceTab } from "./r-price";
 import { RoadTab } from "./r-road";
 import { BAND_TOP, displayAddress, WARN } from "./r-ui";
-import { sceneTop, type PropertyScene } from "./property-3d";
+import { sceneTop, type PropertyScene, type FreeLayers } from "./property-3d";
 import { PropertyBackdrop, propertyPartNow } from "./property-scene";
+import { NeighborPlanSkeleton, NeighborPlanView, useNeighborPlan } from "./neighbor-plan";
+import { BigModel } from "./big-model";
 import {
   HeroChip,
   PlaceBanner,
@@ -1143,6 +1148,9 @@ function useOffline(): boolean {
 }
 
 /** お気に入りに保存する形（検索履歴と同じ。地図で選んだ地点は座標で調べ直す） */
+/** ハザードの種類の短い名前（大きく見る画面の札） */
+const HAZ_NAMES: Record<HazardPick, string> = { flood: "洪水", naisui: "内水", takashio: "高潮", tsunami: "津波", dosha: "土砂" };
+
 function itemOf(query: string, r: Ok): HistoryItem {
   return {
     address: r.picked ? r.matchedAddress : query,
@@ -1349,6 +1357,8 @@ function PropertyView({
   const [has3d, setHas3d] = useState(true);
   const [front, setFront] = useState<FrontRoad[] | null>(null);
   const scene = useRef<PropertyScene | null>(null);
+  // 大きく見る画面に渡す模型（描くときに ref を読まないよう、できたときに覚えておく）
+  const [sceneApi, setSceneApi] = useState<PropertyScene | null>(null);
   // 謄本・公図の請求に貼る地番：押して選んだ筆（概要の「隣の土地」・地番の詳しい画面・街の模型・拡大した地図で同じものを選ぶ）。
   // 地番は登記の地番。物件ごとに空から（この画面は物件ごとに作り直す）
   const [picked, setPicked] = useState<Neighbor[]>([]);
@@ -1360,6 +1370,12 @@ function PropertyView({
         : [...cur, { kuiki: n.kuiki, chiban: registryChiban(n.chiban) }],
     );
   };
+  // 隣の土地の配置図の材料（隣の筆の方角と接する長さ）と、押した筆を光らせる印（配置図と街の模型）
+  const plan = useNeighborPlan(result.lat, result.lng, data.parcels);
+  const [flashed, setFlashed] = useState<{ key: string; n: number } | null>(null);
+  // 街の模型を大きく見る（全画面で自由に動かす。components/app/big-model.tsx）と、そのときの表示
+  const [big, setBig] = useState(false);
+  const [bigLayers, setBigLayers] = useState<FreeLayers>({ lots: true, nb: true, zone: false, haz: false, road: true });
   const pick: ParcelPick = {
     list: picked,
     toggle: togglePick,
@@ -1368,6 +1384,31 @@ function PropertyView({
       setDetail(null);
       setFull({ parcels: true });
     },
+    plan,
+    flashed,
+    flash: (n) => {
+      const key = pickKey(n);
+      setFlashed((f) => ({ key, n: (f?.n ?? 0) + 1 }));
+      scene.current?.flashNeighbor(key);
+    },
+    renderPlan: () =>
+      plan.status === "ok" ? (
+        <NeighborPlanView
+          plan={plan}
+          tone="light"
+          picked={new Set(picked.map(pickKey))}
+          flash={flashed}
+          motion={motion}
+          onTap={(l) => {
+            const n = { kuiki: l.kuiki, chiban: l.chiban };
+            togglePick(n);
+            setFlashed((f) => ({ key: l.key, n: (f?.n ?? 0) + 1 }));
+            scene.current?.flashNeighbor(l.key);
+          }}
+        />
+      ) : plan.status === "loading" ? (
+        <NeighborPlanSkeleton tone="light" />
+      ) : null,
   };
   // レポートに入れない項目（レポートの画面で選ぶ）
   const [off, setOff] = useState<ReadonlySet<SectionKey>>(() => new Set());
@@ -1520,6 +1561,64 @@ function PropertyView({
       placeScene.current = () => {};
     };
   }, [scroller]);
+  // 初めて模型を見たときだけ「横になぞると回せます」（触るか、少し経ったら消す）
+  const [rotHint, setRotHint] = useState(false);
+  const seenRot = () => {
+    setRotHint(false);
+    try {
+      localStorage.setItem("michilu:hint:rotate", "1");
+    } catch {
+      // 残せなくても続ける
+    }
+  };
+  useEffect(() => {
+    if (!has3d) return;
+    let seen = true;
+    try {
+      seen = localStorage.getItem("michilu:hint:rotate") === "1";
+    } catch {
+      // 読めなければ出さない
+    }
+    if (seen) return;
+    const a = window.setTimeout(() => setRotHint(true), 3400);
+    const b = window.setTimeout(seenRot, 9400);
+    return () => {
+      clearTimeout(a);
+      clearTimeout(b);
+    };
+  }, [has3d]);
+  // 街の模型を大きく見る：シートは下へ、見出しは上へ消え、模型が画面いっぱいに広がって指で自由に動かせる
+  const enterBig = () => {
+    const s = scene.current;
+    if (!s) return;
+    seenRot();
+    if ((scroller.current?.scrollTop ?? 0) > 0) scroller.current?.scrollTo({ top: 0 });
+    setDetail(null);
+    // 開いていたタブに合わせて、最初に出すものを決める（法令は用途地域、ハザードはハザードマップの色）
+    const l: FreeLayers = { lots: true, nb: true, zone: tab === "law", haz: tab === "hazard", road: tab !== "hazard" };
+    setBigLayers(l);
+    s.setLayers(l);
+    s.setFree(true, { top: 120, bottom: 170 });
+    document.documentElement.dataset.pvBig = "1";
+    setBig(true);
+  };
+  const exitBig = useCallback(() => {
+    delete document.documentElement.dataset.pvBig;
+    setBig(false);
+    scene.current?.setFree(false);
+    // シートが戻りきってから、模型の割り付けを測り直す
+    window.setTimeout(() => placeScene.current(), 700);
+  }, []);
+  // ほかのページへ移ったら閉じる。物件の画面を離れるときも印を外す
+  useEffect(() => {
+    if (barHidden && big) queueMicrotask(exitBig);
+  }, [barHidden, big, exitBig]);
+  useEffect(
+    () => () => {
+      delete document.documentElement.dataset.pvBig;
+    },
+    [],
+  );
   // 見出しの上で指を横になぞると模型が回り、2本指で寄る（縦はいつものスクロール。ボタンの上は触らない）
   const onHeroPointer = (e: React.PointerEvent<HTMLDivElement>) => {
     const s = scene.current;
@@ -1527,6 +1626,7 @@ function PropertyView({
     const ev = e.nativeEvent;
     if (e.type === "pointerdown") {
       if ((e.target as Element).closest("button, a")) return;
+      if (rotHint) seenRot();
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
       } catch {
@@ -1694,6 +1794,7 @@ function PropertyView({
     hazard: hazPick,
     setHazard: setHazPick,
     front,
+    motion,
   };
 
   // 下部操作バー：いま見ているタブの主役（概要＝レポート、道路＝市町村の道路種別の図か問い合わせ先、法令＝都市計画のくわしい話、
@@ -1868,9 +1969,11 @@ function PropertyView({
             neighbors={neighbors}
             picked={picked}
             hazard={hazPick}
-            visible={!barHidden && !covered}
+            visible={big || (!barHidden && !covered)}
+            hazLayer={big && bigLayers.haz}
             onReady={(api) => {
               scene.current = api;
+              setSceneApi(api);
               if (api) placeScene.current();
             }}
             onFlat={() => setHas3d(false)}
@@ -2014,6 +2117,24 @@ function PropertyView({
           topRef={topRef}
           textRef={textRef}
         />
+        {/* 街の模型を大きく見る（模型が出せない端末は、平らな地図を大きく） */}
+        <button
+          onClick={has3d ? enterBig : () => setFull({})}
+          aria-label={has3d ? "街の模型を大きく見る（指で自由に動かせる）" : "地図を大きく見る"}
+          className="pv-bigbtn press absolute bottom-[44px] right-[14px] z-[3] flex h-[36px] items-center gap-[6px] rounded-full pl-[11px] pr-[13px] font-semibold text-white"
+          style={{ ...LIGHT_GLASS, fontSize: 12.5, textShadow: "none" }}
+        >
+          <Maximize2 size={15} strokeWidth={2} absoluteStrokeWidth />
+          {has3d ? "大きく見る" : "地図を大きく"}
+        </button>
+        {rotHint && (
+          <div className="pv-rothint pointer-events-none absolute bottom-[44px] left-[14px] z-[3] flex">
+            <span className="flex items-center gap-[7px] rounded-full px-[14px] py-[8px] font-semibold text-white" style={{ background: "rgba(10,16,30,0.62)", border: "1px solid rgba(255,255,255,0.2)", fontSize: 12.5 }}>
+              <Hand size={16} strokeWidth={2} absoluteStrokeWidth className="pv-rothand" />
+              横になぞると回せます
+            </span>
+          </div>
+        )}
         <p
           className="pv-credit pointer-events-none absolute bottom-[10px] right-[12px] max-w-[300px] text-right leading-[1.35]"
           style={{
@@ -2154,6 +2275,28 @@ function PropertyView({
           />
         )}
       </Portal>
+      <BigModel
+        open={big}
+        scene={sceneApi}
+        lot={lotNumber}
+        where={where}
+        area={lotArea ? `約${areaLabel(lotArea, !!(lotParcel?.estimated || lotParcel?.sanko))}㎡（目安）` : undefined}
+        layers={bigLayers}
+        onLayers={(l) => {
+          setBigLayers(l);
+          scene.current?.setLayers(l);
+        }}
+        hazardName={HAZ_NAMES[hazPick]}
+        pick={pick}
+        onClose={exitBig}
+        onMap={() => setFull({})}
+        onParcel={() => setDetail({ kind: "parcel" })}
+        onSearch={(q) => {
+          exitBig();
+          onPick(q);
+        }}
+        motion={motion}
+      />
       <TriageSheet
         result={result}
         triage={data.triage}

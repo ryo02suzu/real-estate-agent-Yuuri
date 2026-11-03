@@ -54,4 +54,6 @@ export type TabProps = {
   setHazard: (k: HazardPick) => void;
   /** 土地に接する道路（地理院の地図データ） */
   front: FrontRoad[] | null;
+  /** 動きの演出がオンか（≡ の設定。動きを減らす設定は CSS が見る） */
+  motion: boolean;
 };

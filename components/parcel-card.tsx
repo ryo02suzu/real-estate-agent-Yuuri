@@ -20,6 +20,7 @@ import { Notes } from "./notes";
 import { Sheet } from "./sheet";
 import { Tabs } from "./tabs";
 import { useCopy } from "./use-copy";
+import type { NeighborPlan } from "./app/neighbor-plan";
 
 type Ok = Extract<LookupResult, { status: "ok" }>;
 
@@ -105,6 +106,14 @@ export type ParcelPick = {
   set: (list: Neighbor[]) => void;
   /** 拡大した地図を、筆・地番を出して開く（地図をタップして選べる） */
   onMap?: () => void;
+  /** スマホ：隣の土地の配置図の材料（隣の筆の方角と接する長さ。components/app/neighbor-plan.tsx） */
+  plan?: NeighborPlan;
+  /** スマホ：押した筆を、配置図と街の模型で光らせる */
+  flash?: (n: Neighbor) => void;
+  /** スマホ：光らせている筆（n は押した回数。同じ筆をもう一度押しても光り直す） */
+  flashed?: { key: string; n: number } | null;
+  /** スマホ：地番の詳しい画面に出す配置図（白いシート用） */
+  renderPlan?: () => React.ReactNode;
 };
 
 export const pickKey = (n: Neighbor) => `${n.kuiki}|${registryChiban(n.chiban)}`;
@@ -410,8 +419,17 @@ function NeighborPicker({ info, numbered, roads, pick }: { info: Extract<ParcelI
   const all = numbered.length > 0 && numbered.every((n) => chosen.has(pickKey(n)));
   const text = pickedChibanText(pick.list, base);
   const label = (n: Neighbor) => (n.kuiki === base ? registryChiban(n.chiban) : `${kuikiLabelFrom(n.kuiki, base)} ${registryChiban(n.chiban)}`);
+  // 配置図があれば、隣の筆に方角を付けて北から時計回りに並べる（スマホ）
+  const sides = pick.plan?.status === "ok" ? pick.plan.sides : undefined;
+  const order = (n: Neighbor) => {
+    const d = sides?.get(pickKey(n))?.dir;
+    return d ? ["北", "北東", "東", "南東", "南", "南西", "西", "北西"].indexOf(d) : 99;
+  };
+  const sorted = sides ? [...numbered].sort((a, b) => order(a) - order(b)) : numbered;
+  const plan = pick.renderPlan?.();
   return (
     <>
+      {plan && <div className="mt-3 dense:mt-2">{plan}</div>}
       <div className="mt-3 flex items-center gap-2 dense:mt-2">
         <p className="min-w-0 flex-1 text-[12px] text-muted">
           境界が接している筆（{numbered.length}）{numbered.length > 0 && "。押して選ぶ"}
@@ -427,8 +445,17 @@ function NeighborPicker({ info, numbered, roads, pick }: { info: Extract<ParcelI
       </div>
       {numbered.length > 0 ? (
         <div className="mt-1 flex flex-wrap gap-1">
-          {numbered.map((n) => (
-            <PickChip key={pickKey(n)} label={label(n)} on={chosen.has(pickKey(n))} onClick={() => pick.toggle(n)} />
+          {sorted.map((n) => (
+            <PickChip
+              key={pickKey(n)}
+              label={label(n)}
+              pre={sides?.get(pickKey(n))?.dir}
+              on={chosen.has(pickKey(n))}
+              onClick={() => {
+                pick.toggle(n);
+                pick.flash?.(n);
+              }}
+            />
           ))}
         </div>
       ) : (
@@ -461,8 +488,8 @@ function NeighborPicker({ info, numbered, roads, pick }: { info: Extract<ParcelI
   );
 }
 
-/** 選べる地番の札（選ぶと塗りつぶしてチェック） */
-function PickChip({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
+/** 選べる地番の札（選ぶと塗りつぶしてチェック）。pre は頭に付ける方角（スマホの配置図から） */
+function PickChip({ label, on, onClick, pre }: { label: string; on: boolean; onClick: () => void; pre?: string }) {
   return (
     <button
       onClick={onClick}
@@ -470,6 +497,7 @@ function PickChip({ label, on, onClick }: { label: string; on: boolean; onClick:
       className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[13px] leading-[1.5] dense:py-0.5 denser:px-2 denser:text-[12.5px] ${on ? "border-brand bg-brand font-semibold text-white" : "border-line text-ink"}`}
     >
       {on && <Check className="h-3 w-3 shrink-0" strokeWidth={3} />}
+      {pre && <span className={`text-[11px] font-medium ${on ? "text-white/75" : "text-muted"}`}>{pre}</span>}
       {label}
     </button>
   );
