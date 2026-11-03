@@ -107,6 +107,8 @@ class Boundaries:
 
         self.tol = tolerance_deg
         geoms: dict[str, list] = {}
+        # 相対パス（work-n03.zip）だと fiona が「!」の前後を分けられず開けないので、絶対パスにする
+        zip_path = os.path.abspath(zip_path)
         with zipfile.ZipFile(zip_path) as z:
             shp = next(n for n in z.namelist() if n.lower().endswith(".shp"))
         with fiona.open(f"zip://{zip_path}!{shp}") as src:
