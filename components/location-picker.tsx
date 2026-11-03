@@ -1,7 +1,8 @@
 "use client";
 
 // スマホの「地図で場所を選ぶ」画面（全画面）。地図を動かして中央の印を物件に合わせ、「この場所で調べる」。
-// 住所が番地まで見つからないときや、地番しか分からない土地で使う。開くときに作り、閉じたら外す。
+// 住所が番地まで見つからないときや、地番しか分からない土地で使う。ホームの「現在地で調べる」からは、現在地（青い点）のまわりで開く。
+// 開くときに作り、閉じたら外す。
 // 見た目はホームと同じ系統：地図の上に浮かぶガラスのバー（戻る・見出し）と、下のガラスの板（町名・地番・紺のボタン）。
 // 町名は地図を止めて少し待ってから入れ替わる。板の中の町名は、結果の画面の見出しへつながる（view-transition）
 import { ArrowLeft, Crosshair, LoaderCircle } from "lucide-react";
@@ -18,12 +19,15 @@ type Center = { lat: number; lng: number; zoom: number; parcel?: string };
 
 export function LocationPicker({
   start,
+  here,
   busy = false,
   onClose,
   onPick,
 }: {
   /** 最初に表示する地点（無ければ関東全体） */
   start?: { lat: number; lng: number };
+  /** 現在地から開いたとき（ホームの「現在地で調べる」）。青い点と誤差の円を出し、見出しと案内を変える。位置は送らない（町名は国土地理院に聞く） */
+  here?: { lat: number; lng: number; accuracy?: number };
   /** 「この場所で調べる」を押して読んでいる間（板に「調べています…」。読み終わると結果の帯につながる） */
   busy?: boolean;
   onClose: () => void;
@@ -60,11 +64,12 @@ export function LocationPicker({
 
   const zoomedIn = !!center && center.zoom >= MIN_ZOOM;
   return (
-    <div className="app-touch fixed inset-0 z-50 flex flex-col bg-[#e8eef5]" role="dialog" aria-modal="true" aria-label="地図で物件の場所を選ぶ">
+    <div className="picker-map app-touch fixed inset-0 z-50 flex flex-col bg-[#e8eef5]" role="dialog" aria-modal="true" aria-label="地図で物件の場所を選ぶ">
       <div className="relative min-h-0 flex-1">
         <MapPanel
           mode="crosshair"
           point={start}
+          me={here}
           onCenter={(lat, lng, zoom, parcel) => setCenter({ lat, lng, zoom, parcel })}
           fallback={<p className="p-6 text-center text-sm text-muted">この端末では地図を表示できません。住所で検索してください。</p>}
         />
@@ -78,7 +83,7 @@ export function LocationPicker({
               <ArrowLeft size={22} strokeWidth={2} absoluteStrokeWidth color={HEAD} />
             </button>
             <span className="min-w-0 flex-1 truncate font-semibold leading-none" style={{ fontSize: 15, color: HEAD }}>
-              地図で物件の場所を選ぶ
+              {here ? "現在地のまわりで物件を選ぶ" : "地図で物件の場所を選ぶ"}
             </span>
           </div>
         </div>
@@ -87,7 +92,11 @@ export function LocationPicker({
         <div className="absolute inset-x-0 bottom-0 px-[12px]" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
           <div className="rounded-[22px] px-[14px] pb-[12px] pt-[12px] shadow-[0_14px_34px_rgba(20,48,95,0.18)]" style={{ ...GLASS, viewTransitionName: "place-panel" }}>
             <p className="leading-none" style={{ fontSize: 12, color: LIGHT }}>
-              {zoomedIn ? "地図を動かして、印の先を物件に合わせてください" : "地図を拡大して、物件の場所に印を合わせてください"}
+              {here && zoomedIn
+                ? `青い点が現在地${here.accuracy ? `（誤差 約${Math.max(5, Math.round(here.accuracy / 5) * 5)}m）` : ""}。印を物件に合わせて`
+                : zoomedIn
+                  ? "地図を動かして、印の先を物件に合わせてください"
+                  : "地図を拡大して、物件の場所に印を合わせてください"}
             </p>
             <p className="mt-[8px] flex h-[24px] items-center gap-[8px] font-semibold leading-none" style={{ fontSize: 16, color: TEXT, viewTransitionName: "place-title" }}>
               <span className="min-w-0 truncate">{zoomedIn ? place || "…" : "　"}</span>

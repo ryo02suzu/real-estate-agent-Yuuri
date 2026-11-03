@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { normalizeAddress, propertyId, propertyIdOf } from "./property-id";
-import { allRecords, loadRecords, mergeRecords, recordsDoneCount, recordsSummary, removeRecord, topicProgress, writeRecord } from "./records";
+import { allRecords, loadRecords, mergeRecords, recordsDoneCount, recordsSummary, removeRecord, topicProgress, writeRecord, recordLines } from "./records";
 
 // localStorage の代わり（vitest は node で動く）
 const store = new Map<string, string>();
@@ -86,5 +86,16 @@ describe("records（確認の記録）", () => {
     // 古い方は上書きしない
     expect(mergeRecords([{ ...old, updatedAt: 0 }]).added).toBe(0);
     expect(loadRecords(key).items.road?.kind.note).toBe("新しい");
+  });
+  it("共有の文の記録の行は、確かめた答えを先に、状態・方法・出典をかっこで", () => {
+    const at = new Date(2026, 10, 3).getTime();
+    const lines = recordLines({
+      key: "k",
+      label: "",
+      updatedAt: at,
+      items: { road: { kind: { done: true, method: "電話", source: "松戸市 建築指導課", note: "42条2項", at }, width: { done: false, note: "3.6m", at } }, parcel: { boundary: { done: true, method: "現地", at } } },
+    });
+    expect(lines.slice(2)).toEqual(["・道路／道路種別：42条2項（確認済み 11/3・電話・松戸市 建築指導課）", "・道路／幅員：3.6m（未確認）", "・地番・土地／境界・越境：確認済み 11/3・現地"]);
+    expect(recordLines(undefined)).toEqual([]);
   });
 });

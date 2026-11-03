@@ -1,4 +1,5 @@
 // 役所の窓口で道路種別を確認するときのメモ。持ち物・聞くこと・FAX／メールの依頼文
+import { senderLines, type Sender } from "./sender";
 
 /** 窓口へ持っていくもの */
 export const BRING = [
@@ -16,8 +17,11 @@ export const ASK = [
   "市道（公道）か私道か。私道なら所有者と通行・掘削の承諾の要否",
 ];
 
-/** FAX・メールで照会するときの依頼文（chiban は物件の筆の地番が分かっているときだけ。分からなければ空欄にして書き足してもらう） */
-export function buildInquiryText(address: string, dept: string, chiban?: string): string {
+/**
+ * FAX・メールで照会するときの依頼文（chiban は物件の筆の地番が分かっているときだけ。分からなければ空欄にして書き足してもらう）。
+ * sender は差出人（lib/sender.ts。入っていない所は空欄）
+ */
+export function buildInquiryText(address: string, dept: string, chiban?: string, sender?: Sender): string {
   return [
     `${dept} 御中`,
     "",
@@ -32,8 +36,6 @@ export function buildInquiryText(address: string, dept: string, chiban?: string)
     "住宅地図・公図の写しを添付します。",
     "お手数をおかけしますが、よろしくお願いいたします。",
     "",
-    "会社名：",
-    "担当者：",
-    "電話：",
+    ...senderLines(sender),
   ].join("\n");
 }

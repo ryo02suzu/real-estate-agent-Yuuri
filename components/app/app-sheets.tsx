@@ -1,10 +1,11 @@
 "use client";
 
 // 「地図アプリで開く」と「レポートを作成」の選択（下から出る）。地図アプリには物件の座標だけを渡す（押したときだけ。自前のサーバーは通さない）。
-// レポートは、入れる項目を選びながら文面をその場で確かめられ（共有・コピー・重説の下書きに効く。印刷の調査メモは全項目）、
-// 作れる書類を調査の流れの順（役所・法務局で → 現地で → 書類にする。components/app/doc-kinds.tsx）に並べる
-import { ChevronRight, Compass, Crosshair, ExternalLink, Map as MapIcon, Navigation, Route, Share2 } from "lucide-react";
-import type { ReactNode } from "react";
+// レポートは1画面で書類を選ぶ：上に要注意点と次にやること（進みの輪）、その下に作れる書類のタイルを調査の流れの順
+// （役所・法務局で → 現地で → 書類にする。components/app/doc-kinds.tsx）で、それぞれの状態（宛先・筆の数・要確認の数など）と一緒に。
+// 「結果の文面」は同じシートの次の画面で、入れる項目を選びながら吹き出しの形で文面を確かめ、コピー・共有する（効くのは文面だけ）
+import { Check, ChevronLeft, ChevronRight, ClipboardCopy, Compass, Crosshair, ExternalLink, ListChecks, Map as MapIcon, Navigation, Route, Share2 } from "lucide-react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { Sheet } from "../sheet";
 import { DOC_GROUPS, MAIN_DOC, type DocDef, type DocKind } from "./doc-kinds";
 import type { Ok } from "./use-property";
@@ -101,24 +102,38 @@ export function pickSections<T extends object>(input: T, off: ReadonlySet<Sectio
   return out as T;
 }
 
+/** 書類のタイルの状態の行（宛先・筆の数・要確認の数など）。tone で頭の点の色 */
+export type DocStatus = { text: string; tone?: "ok" | "warn" | "busy" | "muted" };
+
+const TONE_DOT: Record<NonNullable<DocStatus["tone"]>, string> = { ok: "#1f8f5a", warn: "#d08a16", busy: "#5f7da8", muted: "#a3afc0" };
+/** タイルの右上の、調査の流れの段（components/app/doc-kinds.tsx の組） */
+const STEP_OF: Partial<Record<DocKind, string>> = { inquiry: "役所で", parcels: "法務局で", guide: "現地で", memo: "書類", draft: "書類", copy: "共有" };
+
 export function ReportSheet({
   open,
   onClose,
   onDoc,
-  triageSub,
+  todo,
+  status,
+  startText,
   onCopy,
   copied,
   onShare,
   preview,
   off,
   onToggle,
+  motion,
 }: {
   open: boolean;
   onClose: () => void;
-  /** 書類を開く（要注意点・照会文・地番の一覧・案内図・調査メモ・下書き。このシートは閉じてから。結果の文面はこのシートのまま） */
+  /** 書類を開く（要注意点・照会文・地番の一覧・案内図・調査メモ・下書き。このシートは閉じてから。結果の文面はこのシートの次の画面） */
   onDoc: (kind: DocKind) => void;
-  /** 「要注意 2件・要確認 5件」 */
-  triageSub: string;
+  /** 要注意点と次にやることの進み（済んだやること・要注意・要確認の数） */
+  todo: { left: number; total: number; warns: number; checks: number; pending: boolean };
+  /** 書類ごとの状態の行 */
+  status: Partial<Record<DocKind, DocStatus>>;
+  /** はじめから結果の文面の画面で開く（書類・出力のページで「結果の文面」を選んだとき） */
+  startText?: boolean;
   onCopy: () => void;
   copied: boolean;
   /** 共有の画面（LINE・メールなど。出せる端末だけ渡す） */
@@ -128,48 +143,153 @@ export function ReportSheet({
   /** 外している項目 */
   off: ReadonlySet<SectionKey>;
   onToggle: (k: SectionKey) => void;
+  /** 動きの演出（≡ の設定） */
+  motion: boolean;
 }) {
   if (!open) return null;
-  const icon = (d: DocDef) => <d.Icon className="h-[18px] w-[18px]" />;
+  return <ReportBody onClose={onClose} onDoc={onDoc} todo={todo} status={status} startText={startText} onCopy={onCopy} copied={copied} onShare={onShare} preview={preview} off={off} onToggle={onToggle} motion={motion} />;
+}
+
+function ReportBody({
+  onClose,
+  onDoc,
+  todo,
+  status,
+  startText,
+  onCopy,
+  copied,
+  onShare,
+  preview,
+  off,
+  onToggle,
+  motion,
+}: Omit<Parameters<typeof ReportSheet>[0], "open">) {
+  // 書類を選ぶ画面 → 結果の文面の画面（同じシートの中で横に送る）
+  const [step, setStep] = useState<"docs" | "text">(startText ? "text" : "docs");
+  const [moved, setMoved] = useState(false);
+  const go = (s: "docs" | "text") => {
+    setMoved(true);
+    setStep(s);
+  };
+  const done = todo.total - todo.left;
+  const tiles = DOC_GROUPS.flatMap((g) => g.docs);
   return (
     <div className="theme-navy">
-      <Sheet title="レポートを作成" open onClose={onClose}>
-        <p className="text-[12.5px] leading-[1.6] text-muted">入れる項目を選ぶと、共有・コピーの文面と重説の下書きがその場で変わります（印刷の調査メモは全項目）。</p>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {REPORT_SECTIONS.map((s) => {
-            const on = !off.has(s.key);
-            return (
-              <button key={s.key} onClick={() => onToggle(s.key)} aria-pressed={on} className="press h-[30px] rounded-full px-3 text-[12.5px] font-semibold transition-colors" style={{ background: on ? "#133664" : "#eef2f7", color: on ? "#fff" : "#6b7890" }}>
-                {s.label}
+      <Sheet title={step === "docs" ? "レポートを作成" : "結果の文面"} open onClose={onClose}>
+        <div key={step} className="rp-pane" data-dir={moved ? (step === "text" ? "r" : "l") : undefined} data-motion={motion ? "1" : "0"}>
+          {step === "docs" ? (
+            <>
+              {/* いちばん使う：要注意点と次にやること（進みの輪と、あと何件） */}
+              <button onClick={() => onDoc("triage")} className="rp-in press relative flex w-full items-center gap-3 overflow-hidden rounded-[20px] px-4 py-3.5 text-left text-white" style={{ background: "linear-gradient(135deg, #1b4280 0%, #0f2f5f 58%, #0a2248 100%)", "--i": 0 } as CSSProperties}>
+                <MiniRing done={done} total={todo.total} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15.5px] font-bold leading-[1.35]">{MAIN_DOC.action}</span>
+                  <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-white/80">
+                    <span>{todo.total && !todo.left ? "すべて済み" : `あと${todo.left}件／${todo.total}件`}</span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="size-[6px] rounded-full bg-[#ff9c80]" />
+                      要注意 {todo.warns}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="size-[6px] rounded-full bg-[#ffcb6b]" />
+                      要確認 {todo.checks}
+                    </span>
+                    {todo.pending && <span className="text-white/60">確認中あり</span>}
+                  </span>
+                </span>
+                <ChevronRight className="h-5 w-5 shrink-0 text-white/70" />
               </button>
-            );
-          })}
+              <p className="rp-in mt-3.5 text-[12px] leading-[1.5] text-muted" style={{ "--i": 1 } as CSSProperties}>
+                調査の流れの順（役所・法務局 → 現地 → 書類）。押すと開きます。
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {tiles.map((d, i) => (
+                  <DocTile key={d.kind} doc={d} index={i + 2} status={status[d.kind]} onClick={() => (d.kind === "copy" ? go("text") : onDoc(d.kind))} />
+                ))}
+              </div>
+              <p className="mt-3 text-[11.5px] leading-[1.6] text-muted">どれも参考の資料です。重要事項説明などの最終確認は、役所の窓口・公的な資料で行ってください。</p>
+            </>
+          ) : (
+            <>
+              <button onClick={() => go("docs")} className="press -ml-1.5 inline-flex h-[34px] items-center gap-0.5 pr-2 text-[14px] font-semibold" style={{ color: "#133664" }}>
+                <ChevronLeft className="h-5 w-5" />
+                書類を選ぶ
+              </button>
+              <p className="mt-1 text-[12.5px] leading-[1.6] text-muted">入れる項目を選ぶと、文面がその場で変わります（調査メモ・重説の下書きはいつも全部）。</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {REPORT_SECTIONS.map((s) => {
+                  const on = !off.has(s.key);
+                  return (
+                    <button key={s.key} onClick={() => onToggle(s.key)} aria-pressed={on} className="press inline-flex h-[32px] items-center gap-1 rounded-full px-3 text-[13px] font-semibold transition-colors duration-150" style={{ background: on ? "#133664" : "#eef2f7", color: on ? "#fff" : "#6b7890" }}>
+                      {on && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                      {s.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-3 flex items-baseline justify-between text-[11.5px] text-muted">
+                <span>貼るとこう見えます</span>
+                <span className="tabular-nums">{preview.length}文字</span>
+              </p>
+              {/* 文面のプレビュー：チャットの吹き出しの形で */}
+              <div className="mt-1 flex justify-end">
+                <pre className="rp-bubble max-h-[min(42dvh,360px)] w-[92%] overflow-y-auto whitespace-pre-wrap [overflow-wrap:anywhere] rounded-[20px] rounded-br-[6px] px-3.5 py-3 text-[12.5px] leading-[1.6] text-ink shadow-[0_2px_10px_rgba(20,45,85,0.08)]" style={{ fontFamily: "inherit", background: "#e7effa" }} aria-label="文面のプレビュー">
+                  {preview}
+                </pre>
+              </div>
+              <div className={`mt-3 grid gap-2 ${onShare ? "grid-cols-2" : "grid-cols-1"}`}>
+                <button onClick={onCopy} className="press flex h-[50px] items-center justify-center gap-2 rounded-[16px] text-[15px] font-bold text-white transition-colors duration-200" style={{ background: copied ? "#1f8f5a" : "#133664" }}>
+                  {copied ? <Check key="done" className="td-bump h-5 w-5" strokeWidth={3} /> : <ClipboardCopy className="h-[18px] w-[18px]" />}
+                  {copied ? "コピーしました" : "コピー"}
+                </button>
+                {onShare && (
+                  <button onClick={onShare} className="press flex h-[50px] items-center justify-center gap-2 rounded-[16px] text-[15px] font-bold" style={{ background: "#e3ebf6", color: "#133664" }}>
+                    <Share2 className="h-[18px] w-[18px]" />
+                    共有
+                  </button>
+                )}
+              </div>
+              <p className="mt-2 text-[11.5px] leading-[1.6] text-muted">LINE・メール・社内のチャットへそのまま貼れます。あなたの確認の記録（書いた結果）も最後に入ります。</p>
+            </>
+          )}
         </div>
-        <pre className="mt-2 max-h-[150px] overflow-y-auto whitespace-pre-wrap rounded-xl bg-mint px-3 py-2 text-[11.5px] leading-[1.55] text-ink" style={{ fontFamily: "inherit" }} aria-label="文面のプレビュー">
-          {preview}
-        </pre>
-        {/* 書類は調査の流れの順（components/app/doc-kinds.tsx。書類・出力のページと同じ並び） */}
-        <ul className="mt-2 divide-y divide-line">
-          <Item icon={icon(MAIN_DOC)} title={MAIN_DOC.action} sub={`${triageSub}。${MAIN_DOC.sub}`} onClick={() => onDoc("triage")} />
-        </ul>
-        {DOC_GROUPS.map((g) => (
-          <section key={g.title} className="mt-1.5">
-            <h3 className="text-[11px] font-semibold tracking-[0.08em] text-muted">{g.title}</h3>
-            <ul className="divide-y divide-line">
-              {g.docs.map((d) =>
-                d.kind === "copy" ? (
-                  <Item key={d.kind} icon={icon(d)} title={copied ? "コピーしました" : "結果の文面をコピー"} sub={d.sub} onClick={onCopy} />
-                ) : (
-                  <Item key={d.kind} icon={icon(d)} title={d.action} sub={d.sub} onClick={() => onDoc(d.kind)} />
-                ),
-              )}
-              {/* 共有は「結果の文面」の組だけ（出せる端末だけ） */}
-              {onShare && g.docs.some((d) => d.kind === "copy") && <Item icon={<Share2 className="h-[18px] w-[18px]" />} title="結果の文面を共有" sub="LINE・メール・社内のチャットへ（同じ文面）" onClick={onShare} />}
-            </ul>
-          </section>
-        ))}
-        <p className="mt-2 text-[11.5px] leading-[1.6] text-muted">どれも参考の資料です。重要事項説明などの最終確認は、役所の窓口・公的な資料で行ってください。</p>
       </Sheet>
     </div>
+  );
+}
+
+/** 書類のタイル（印・名前・状態の行。右上に調査の流れの段） */
+function DocTile({ doc: d, index, status, onClick }: { doc: DocDef; index: number; status?: DocStatus; onClick: () => void }) {
+  const tone = status?.tone ?? "muted";
+  return (
+    <button onClick={onClick} className="rp-in press flex min-h-[96px] min-w-0 flex-col rounded-[18px] bg-[#f4f7fb] p-3 text-left" style={{ "--i": index } as CSSProperties}>
+      <span className="flex w-full items-start justify-between gap-1">
+        <span className="flex size-[34px] items-center justify-center rounded-full" style={{ background: "#e3ebf6", color: "#133664" }}>
+          <d.Icon className="h-[17px] w-[17px]" strokeWidth={2.2} />
+        </span>
+        {STEP_OF[d.kind] && <span className="rounded-full bg-white px-2 py-[2px] text-[10.5px] font-semibold text-[#6b7890]">{STEP_OF[d.kind]}</span>}
+      </span>
+      <span className="mt-2 block text-[14.5px] font-bold leading-[1.3] text-ink">{d.title}</span>
+      <span className="mt-1 flex w-full min-w-0 items-center gap-1.5 text-[11.5px] leading-[1.4] text-muted">
+        {tone === "busy" ? <span className="td-spin size-[9px] shrink-0 rounded-full border-[1.5px] border-[#5f7da8]/30 border-t-[#5f7da8]" /> : <span className="size-[7px] shrink-0 rounded-full" style={{ background: TONE_DOT[tone] }} />}
+        <span className="min-w-0 truncate">{status?.text ?? d.short}</span>
+      </span>
+    </button>
+  );
+}
+
+/** 進みの小さな輪（要注意点と次にやることのカード） */
+function MiniRing({ done, total }: { done: number; total: number }) {
+  const r = 17;
+  const c = 2 * Math.PI * r;
+  const all = total > 0 && done === total;
+  return (
+    <span className="relative flex size-[44px] shrink-0 items-center justify-center" aria-hidden>
+      <svg viewBox="0 0 44 44" className="absolute inset-0 size-full -rotate-90">
+        <circle cx="22" cy="22" r={r} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="4.5" />
+        <circle className="td-ring" cx="22" cy="22" r={r} fill="none" stroke={all ? "#4fd18b" : "#fff"} strokeWidth="4.5" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - (total ? done / total : 0))} />
+      </svg>
+      {all ? <Check className="h-5 w-5" strokeWidth={3} color="#4fd18b" /> : <ListChecks className="h-[18px] w-[18px]" />}
+    </span>
   );
 }

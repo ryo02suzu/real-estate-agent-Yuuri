@@ -212,8 +212,9 @@ export function recordLines(records: PropertyRecords | undefined): string[] {
     for (const s of RECORD_ITEMS[t].subs) {
       const r = recs[s.id];
       if (!r) continue;
-      const detail = [r.method, r.source, r.note].filter(Boolean).join("・");
-      lines.push(`・${RECORD_ITEMS[t].label}／${s.label}：${r.done ? `確認済み（${md(r.at)}）` : "未確認"}${detail ? ` ${detail}` : ""}`);
+      // 確かめた答え（メモ）を先に、確認の状態・方法・出典をかっこで
+      const state = [r.done ? `確認済み ${md(r.at)}` : "未確認", r.method, r.source].filter(Boolean).join("・");
+      lines.push(`・${RECORD_ITEMS[t].label}／${s.label}：${r.note ? `${r.note}（${state}）` : state}`);
     }
   }
   return lines.length ? ["", "【あなたの確認の記録】（この端末に残した記録。MICHILU の判定ではありません）", ...lines] : [];

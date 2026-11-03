@@ -9,7 +9,7 @@
 // まだ何も調べていないときは、最近の検索の代わりに「はじめての方へ」（住所と地番の例。押すとそのまま調べる）を出す。
 // 写真の上の字は白（読みやすいよう薄い影）。寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。
 // 縦は画面の高さに合わせ、検索欄と最近の検索のあいだの空きで伸び縮みする（背の低い画面でもスクロールせずに収まる）
-import { ArrowRight, Bell, ChevronRight, CircleHelp, Database, Download, LoaderCircle, Map as MapIcon, MapPin, MapPinned, Search, Smartphone, Sparkles, TriangleAlert, UserRound, X } from "lucide-react";
+import { ArrowRight, Bell, Building2, ChevronRight, CircleHelp, Database, Download, LoaderCircle, LocateFixed, Map as MapIcon, MapPin, MapPinned, Search, Smartphone, Sparkles, TriangleAlert, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { monthDay, placeParts } from "@/lib/app/scene";
 import { homePart, type HomePart } from "@/lib/app/sun";
@@ -219,6 +219,8 @@ export function HomeScreen({
   inputRef,
   resume,
   morph = false,
+  onHere,
+  locating = false,
 }: {
   input: string;
   setInput: (v: string) => void;
@@ -241,6 +243,10 @@ export function HomeScreen({
   resume?: Resume;
   /** 履歴のページへつながる動きの間（一覧の板・行・検索欄に、履歴のページと同じ名前を付ける。VT） */
   morph?: boolean;
+  /** 現在地で調べる（検索欄が空のとき、右の端に出す。位置は端末の中だけで使い、地図で物件を選んでから調べる） */
+  onHere?: () => void;
+  /** 現在地を取っている間 */
+  locating?: boolean;
 }) {
   const recent = history.slice(0, RECENT);
   const root = useRef<HTMLDivElement>(null);
@@ -289,6 +295,12 @@ export function HomeScreen({
               <LoaderCircle size={18} strokeWidth={2} absoluteStrokeWidth className="animate-spin" />
               調べています
             </span>
+          ) : !input && onHere ? (
+            // 現在地で調べる（現地に着いたとき。押すと現在地のまわりの地図が開き、物件を選んで調べる）
+            <button type="button" onClick={onHere} disabled={locating} aria-label={locating ? "現在地を確かめています" : "現在地で調べる"} className="press mr-[8px] flex shrink-0 items-center gap-[6px] rounded-full bg-white/[0.16] pl-[10px] pr-[12px] font-semibold" style={{ height: 38, fontSize: 13 }}>
+              {locating ? <LoaderCircle size={17} strokeWidth={2.2} absoluteStrokeWidth className="animate-spin" /> : <LocateFixed size={17} strokeWidth={2.2} absoluteStrokeWidth color="#fff" />}
+              現在地
+            </button>
           ) : (
             input && (
               <>
@@ -410,6 +422,7 @@ export function HomeMenu({
   onCities,
   onSources,
   onStorage,
+  onSender,
   onInstall,
   standalone,
   onMore,
@@ -429,6 +442,8 @@ export function HomeMenu({
   onSources: () => void;
   /** 調査記録の書き出し・読み込み */
   onStorage: () => void;
+  /** 書類の差出人（会社名・担当者。照会文・調査メモ・案内図に入れる） */
+  onSender?: () => void;
   /** ホーム画面に追加 */
   onInstall: () => void;
   standalone: boolean;
@@ -457,6 +472,7 @@ export function HomeMenu({
         { Icon: MapPin, title: "対応している市区町村", sub: "関東1都6県", right: String(MUNICIPALITIES.length), run: onCities },
         { Icon: Database, title: "データの出典と時点", sub: "国・自治体の公開データ", run: onSources },
         { Icon: Download, title: "調査記録の書き出し・読み込み", sub: "機種変更・データ消失への備え", run: onStorage },
+        ...(onSender ? [{ Icon: Building2, title: "書類の差出人", sub: "照会文・調査メモ・案内図に入れる会社名・担当者", run: onSender }] : []),
       ],
     },
     {

@@ -587,15 +587,15 @@ export function triageOf(input: TriageInput): Triage {
   return { issues, actions: buildActions(input, issues), pending, failed, headline };
 }
 
-/** 共有の文・印刷に出す行 */
-export function triageLines(t: Triage, done: ReadonlySet<string> = new Set()): string[] {
+/** 共有の文・印刷に出す行。extra は次にやることの1つの下に足す行（スマホの一覧のコピーで、確かめた結果を添える） */
+export function triageLines(t: Triage, done: ReadonlySet<string> = new Set(), extra?: (a: Action) => string[]): string[] {
   const lines: string[] = [];
   lines.push(`【要注意点】${t.headline}`);
   for (const i of t.issues) lines.push(`${i.level === "warn" ? "▲" : "・"}${i.title}${i.confirm ? `（${i.confirm}）` : ""}`);
   if (!t.issues.length) lines.push(t.pending.length ? `・${t.pending.join("・")}を確認中` : "・データで見つかった注意はありません（確かめる所は下の「次にやること」）");
   if (t.failed.length) lines.push(`・読めなかったデータ：${t.failed.join("・")}`);
   lines.push("【次にやること】");
-  for (const a of t.actions) lines.push(`${done.has(a.id) ? "☑" : "□"}${a.title}：${a.where}${a.phone ? ` ${a.phone}` : ""}`, ...a.what.map((w) => `  ・${w}`));
+  for (const a of t.actions) lines.push(`${done.has(a.id) ? "☑" : "□"}${a.title}：${a.where}${a.phone ? ` ${a.phone}` : ""}`, ...a.what.map((w) => `  ・${w}`), ...(extra?.(a) ?? []));
   return lines;
 }
 

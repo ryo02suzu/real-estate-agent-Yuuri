@@ -3,6 +3,7 @@
 // 書類のシート（スマホ）。文面を見せてコピー・共有する「文面のシート」（窓口の照会文・地番の一覧）と、調査メモを印刷する前に
 // 中身と読み込みの状態を確かめるシート。コピー・共有・印刷は押した操作の中で呼ぶ（iPhone の Safari はそうでないと動かない）。
 // どれも document.body に出す（物件の画面の枠の外。見た目は body の .theme-navy に従う）
+import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { CopyIcon, PrintIcon, ShareIcon } from "../icons";
 import { Sheet } from "../sheet";
@@ -12,17 +13,17 @@ const PRIMARY = "flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gr
 const SECONDARY = "flex shrink-0 items-center justify-center gap-1.5 rounded-2xl border border-line bg-white px-4 py-2.5 text-[14px] font-semibold text-brand dense:py-2";
 
 /** 文面のシート：文面を見せて、コピー（と、できる端末では共有） */
-export function TextDocSheet({ open, onClose, title, lead, text, note }: { open: boolean; onClose: () => void; title: string; lead: string; text: string; note?: string }) {
+export function TextDocSheet({ open, onClose, title, lead, text, note, extra }: { open: boolean; onClose: () => void; title: string; lead: string; text: string; note?: string; extra?: ReactNode }) {
   if (!open) return null;
   return createPortal(
     <Sheet title={title} open onClose={onClose}>
-      <TextDocBody lead={lead} text={text} note={note} />
+      <TextDocBody lead={lead} text={text} note={note} extra={extra} />
     </Sheet>,
     document.body,
   );
 }
 
-function TextDocBody({ lead, text, note }: { lead: string; text: string; note?: string }) {
+function TextDocBody({ lead, text, note, extra }: { lead: string; text: string; note?: string; extra?: ReactNode }) {
   const copy = useCopy();
   // 共有の画面（LINE・メールなど）が出せる端末だけ「共有」を出す（この部品は開いたときだけ描くので、サーバーの描画とは食い違わない）
   const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
@@ -37,6 +38,8 @@ function TextDocBody({ lead, text, note }: { lead: string; text: string; note?: 
   return (
     <div className="text-ink">
       <p className="text-[12px] leading-[1.6] text-muted dense:leading-[1.5] denser:text-[11.5px]">{lead}</p>
+      {/* 文面の前に入れる欄（照会文の差出人など） */}
+      {extra}
       <pre className="mt-2 max-h-[46vh] overflow-y-auto whitespace-pre-wrap rounded-xl bg-mint px-3 py-2 text-[12px] leading-[1.55] text-ink dense:max-h-[38vh]" style={{ fontFamily: "inherit" }} aria-label="文面">
         {text}
       </pre>
@@ -58,13 +61,13 @@ function TextDocBody({ lead, text, note }: { lead: string; text: string; note?: 
 }
 
 /** 調査メモの印刷：入るもの・読み込みの状態を見せてから印刷（iPhone はプリントの画面から PDF にできる） */
-export function MemoSheet({ open, onClose, pending, failed, records, onPrint }: { open: boolean; onClose: () => void; pending: string[]; failed: string[]; records: number; onPrint: () => void }) {
+export function MemoSheet({ open, onClose, pending, failed, records, photos = 0, onPrint }: { open: boolean; onClose: () => void; pending: string[]; failed: string[]; records: number; photos?: number; onPrint: () => void }) {
   if (!open) return null;
   return createPortal(
     <Sheet title="調査メモ（A4）" open onClose={onClose}>
       <div className="text-ink">
         <p className="text-[12px] leading-[1.6] text-muted dense:leading-[1.5]">
-          道路種別・都市計画・法令・ハザード・地番・建物・地価・駅・学区・周辺の施設と、要注意点と次にやること、あなたの確認の記録（{records}件）を A4（1〜2枚）にまとめます。窓口へ持っていくメモ・社内の報告に。
+          道路種別・都市計画・法令・ハザード・地番・建物・地価・駅・学区・周辺の施設と、要注意点と次にやること、あなたの確認の記録（{records}件）{photos > 0 && `・現地の写真（${Math.min(photos, 6)}枚）`}を A4（1〜2枚）にまとめます。窓口へ持っていくメモ・社内の報告に。
         </p>
         <ul className="mt-2 space-y-1 text-[12px] leading-[1.5]">
           {pending.length > 0 ? (

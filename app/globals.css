@@ -2698,3 +2698,334 @@ html[data-home="night"] .sf-ghost {
     stroke-dashoffset: 0;
   }
 }
+
+/*
+ * 要注意点と次にやること（スマホ。components/app/todo-sheet.tsx）。開くと行が上から順に現れ（.td-in。--i が順番）、
+ * 進みの輪が伸びる。丸を押すと弾んで印が描かれ、行の名前に線が引かれる。切り替えの白い丸は滑り、切り替えた中身は横から入る。
+ * 問題から飛んだ先の行は光り、全部済んだら紺の板に光が走る。動きを減らす設定では動かさない（≡ の動きの演出を切ると行の現れ方だけ止める）
+ */
+.td-in {
+  animation: td-in 440ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(min(var(--i, 0), 14) * 26ms + 40ms);
+}
+[data-motion="0"] .td-in {
+  animation: none;
+}
+@keyframes td-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.td-pane[data-dir="r"] {
+  animation: td-pane-r 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.td-pane[data-dir="l"] {
+  animation: td-pane-l 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes td-pane-r {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+}
+@keyframes td-pane-l {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+}
+.td-seg-pill {
+  transition: transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.td-ring {
+  transition:
+    stroke-dashoffset 900ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    stroke 300ms ease;
+}
+.td-ring-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  box-shadow: 0 0 0 3px rgba(79, 209, 139, 0.75);
+  animation: td-ring-pulse 900ms ease-out forwards;
+  pointer-events: none;
+}
+@keyframes td-ring-pulse {
+  from {
+    opacity: 1;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+.td-cheer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 28%, rgba(255, 255, 255, 0.26) 48%, transparent 68%);
+  transform: translateX(-100%);
+  animation: td-cheer 1100ms cubic-bezier(0.2, 0.8, 0.2, 1) 120ms forwards;
+  pointer-events: none;
+}
+@keyframes td-cheer {
+  to {
+    transform: translateX(100%);
+  }
+}
+.td-bump {
+  display: inline-block;
+  animation: td-bump 380ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes td-bump {
+  40% {
+    transform: scale(1.22);
+  }
+}
+.td-box {
+  position: relative;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease;
+}
+.td-tick {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 280ms cubic-bezier(0.2, 0.8, 0.2, 1) 70ms;
+}
+.td-box[data-on="1"] .td-tick {
+  stroke-dashoffset: 0;
+}
+.td-pop {
+  animation: td-pop 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes td-pop {
+  0% {
+    transform: scale(0.78);
+  }
+  55% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.td-burst {
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  border: 2px solid #1f8f5a;
+  animation: td-burst 560ms ease-out forwards;
+  pointer-events: none;
+}
+@keyframes td-burst {
+  from {
+    opacity: 0.65;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.95);
+  }
+}
+.td-strike {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 58%;
+  background-size: 0% 1.5px;
+  transition:
+    background-size 380ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 200ms ease;
+}
+.td-strike[data-on="1"] {
+  background-size: 100% 1.5px;
+}
+.td-chev {
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.td-chev[data-open="1"] {
+  transform: rotate(180deg);
+}
+.td-flash {
+  animation: td-flash 1600ms ease-out forwards;
+}
+@keyframes td-flash {
+  0%,
+  30% {
+    background: rgba(245, 165, 36, 0.24);
+  }
+  100% {
+    background: rgba(245, 165, 36, 0);
+  }
+}
+.td-saved {
+  animation: td-saved 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes td-saved {
+  45% {
+    transform: scale(1.03);
+  }
+}
+.td-spin {
+  animation: td-spin 0.9s linear infinite;
+}
+@keyframes td-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .td-in,
+  .td-pane[data-dir],
+  .td-bump,
+  .td-pop,
+  .td-flash,
+  .td-saved,
+  .td-spin {
+    animation: none;
+  }
+  .td-burst,
+  .td-cheer,
+  .td-ring-pulse {
+    display: none;
+  }
+  .td-seg-pill,
+  .td-ring,
+  .td-tick,
+  .td-strike,
+  .td-chev {
+    transition: none;
+  }
+}
+
+/*
+ * レポートを作成（スマホ。components/app/app-sheets.tsx）。開くと要注意点のカードと書類のタイルが少しずつ大きくなって順に現れ
+ * （.rp-in。--i が順番）、「結果の文面」へは横に送り、戻るときは逆向き（.rp-pane）。動きを減らす設定では動かさない
+ */
+.rp-in {
+  animation: rp-in 460ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 34ms + 30ms);
+}
+[data-motion="0"] .rp-in {
+  animation: none;
+}
+@keyframes rp-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.965);
+  }
+}
+.rp-pane[data-dir="r"] {
+  animation: td-pane-r 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.rp-pane[data-dir="l"] {
+  animation: td-pane-l 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.rp-pane[data-dir="r"] .rp-in,
+.rp-pane[data-dir="l"] .rp-in {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rp-in,
+  .rp-pane[data-dir] {
+    animation: none;
+  }
+}
+
+/* 地図の現在地（スマホの「現在地で調べる」と、地図で選ぶ画面の「現在地」。components/live-map.tsx）：青い点・脈打つ輪・誤差の円 */
+.map-me {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+}
+.map-me-acc {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--acc, 0px);
+  height: var(--acc, 0px);
+  transform: translate(-50%, -50%);
+  border-radius: 9999px;
+  background: rgba(10, 132, 255, 0.1);
+  border: 1px solid rgba(10, 132, 255, 0.3);
+  transition:
+    width 200ms ease,
+    height 200ms ease;
+}
+.map-me-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: rgba(10, 132, 255, 0.38);
+  animation: map-me-pulse 2.2s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+}
+.map-me-dot {
+  position: absolute;
+  inset: 3px;
+  border-radius: 9999px;
+  background: #0a84ff;
+  border: 3px solid #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.32);
+}
+@keyframes map-me-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  to {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-me-pulse {
+    display: none;
+  }
+  .map-me-acc {
+    transition: none;
+  }
+}
+
+/* 現地の写真メモ（components/app/site-photos.tsx）：小さな写真が順に現れ、押すと暗い画面に大きく開く。送ると次の写真が少し寄って現れる */
+.sp-in {
+  animation: sp-in 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(min(var(--i, 0), 11) * 30ms);
+}
+@keyframes sp-in {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+}
+.sp-lb {
+  animation: sp-lb 220ms ease both;
+}
+@keyframes sp-lb {
+  from {
+    opacity: 0;
+  }
+}
+.sp-zoom {
+  animation: sp-zoom 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes sp-zoom {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-in,
+  .sp-lb,
+  .sp-zoom {
+    animation: none;
+  }
+}
+
+/* 地図で選ぶ画面（スマホ。components/location-picker.tsx）：地図の右下の拡大・縮小・縮尺・出典の印を、下のガラスの板の上に出す（板に重ならないように） */
+.picker-map .maplibregl-ctrl-bottom-right,
+.picker-map .maplibregl-ctrl-bottom-left {
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 136px);
+}

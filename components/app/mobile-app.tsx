@@ -69,6 +69,10 @@ import {
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { buildSummary } from "@/lib/summary";
 import { publishDocStatus } from "@/lib/app/doc-status";
+import { dataHints } from "@/lib/app/todo";
+import { confirmedItems } from "@/lib/app/confirmed";
+import { hasSender, useSender } from "@/lib/sender";
+import { buildDraft } from "@/lib/draft";
 import { buildInquiryText } from "@/lib/inquiry";
 import { parcelListText } from "@/lib/parcel-list";
 import { parcelAreaM2, TSUBO_M2 } from "@/lib/app/area";
@@ -84,13 +88,15 @@ import {
 } from "../parcel-card";
 import { PrintSheet } from "../print-sheet";
 import { copyText, loaded } from "../result-view";
-import { TriageSheet, useChecklist } from "../triage-sheet";
+import { useChecklist } from "../triage-sheet";
 import { useCopy } from "../use-copy";
 import { ActionBar, type BarAction } from "./action-bar";
 import {
   MapAppsSheet,
   pickSections,
+  REPORT_SECTIONS,
   ReportSheet,
+  type DocStatus,
   type SectionKey,
 } from "./app-sheets";
 import { DetailSheet } from "./detail-sheets";
@@ -129,6 +135,9 @@ import {
 import { InstallSheet, useStandalone } from "./install";
 import { useFixedScreen } from "./no-bounce";
 import { RecordSheet } from "./record-sheet";
+import { TodoSheet } from "./todo-sheet";
+import { SenderInline, SenderSheet } from "./sender-editor";
+import { useSitePhotos } from "./site-photos";
 import { Expand } from "./research";
 import { SKY_EVENT, skyTop, useShrink, useSkyClock } from "./sky";
 import { FavStar } from "./star";
@@ -210,7 +219,7 @@ export type MobileAppProps = {
   onHome: () => void;
 };
 
-type AppSheet = "help" | "cities" | "sources" | "install" | "storage" | null;
+type AppSheet = "help" | "cities" | "sources" | "install" | "storage" | "sender" | null;
 
 /** ホームの最近の検索 ⇄ 履歴のつながる動き（morphTo）で、行・板・検索欄のほかに名前を付ける所（ロゴの帯・ページの名前） */
 const MORPH_SHELL: ReadonlySet<string> = new Set(["app-brand", "page-title"]);
@@ -233,8 +242,12 @@ export function MobileApp(props: MobileAppProps) {
   const [sheet, setSheet] = useState<AppSheet>(null);
   const [picker, setPicker] = useState<{
     start?: { lat: number; lng: number };
+    /** 現在地から開いたとき（青い点） */
+    here?: { lat: number; lng: number; accuracy?: number };
     busy?: boolean;
   } | null>(null);
+  // 現在地を取っている間（ホームの検索欄の「現在地」）
+  const [locating, setLocating] = useState(false);
   // 地図で選んで読んでいる間（読み終わったら地図を閉じ、板が結果の帯につながる）
   const sawLoading = useRef(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -463,6 +476,34 @@ export function MobileApp(props: MobileAppProps) {
           ? { lat: r.lat, lng: r.lng }
           : undefined,
     });
+  };
+  /**
+   * 現在地で調べる：端末の位置（GPS）を取り、現在地のまわりの地図を開く（印を物件に合わせてから調べる。GPS は数十m ずれるので、
+   * いきなり調べない）。位置は端末の中だけで使い、町名・地番は国土地理院の地図から読む（自前のサーバーには送らない）
+   */
+  const findHere = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setNotice("この端末では現在地を使えません。住所か地図で調べてください。");
+      return;
+    }
+    setNotice(null);
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setLocating(false);
+        const here = { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy };
+        setPicker({ start: here, here });
+      },
+      (e) => {
+        setLocating(false);
+        setNotice(
+          e.code === e.PERMISSION_DENIED
+            ? "位置情報の利用が許可されていません。端末の設定（Safari なら 設定 → プライバシー → 位置情報サービス）で、このサイトを許可してください。"
+            : "現在地を取れませんでした。屋外や電波のよい所で、もう一度お試しください。",
+        );
+      },
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 30_000 },
+    );
   };
   const pickRecent = (h: HistoryItem) => {
     forgetBack();
@@ -791,6 +832,7 @@ export function MobileApp(props: MobileAppProps) {
         unread={unread}
         onInstall={() => setSheet("install")}
         onStorage={() => setSheet("storage")}
+        onSender={() => setSheet("sender")}
         standalone={standalone}
         historyCount={propertyCount(history)}
         favoriteCount={favorites.length}
@@ -876,6 +918,8 @@ export function MobileApp(props: MobileAppProps) {
                 unread={unread}
                 inputRef={inputRef}
                 resume={resume}
+                onHere={findHere}
+                locating={locating}
               />
             )}
             {/* 物件の画面は、検索履歴などのページを見ているあいだも残す（戻ったときに読み直さない・タブもそのまま） */}
@@ -1045,6 +1089,7 @@ export function MobileApp(props: MobileAppProps) {
           open={sheet === "sources"}
           onClose={() => setSheet(null)}
         />
+        <SenderSheet open={sheet === "sender"} onClose={() => setSheet(null)} />
         <StorageSheet
           open={sheet === "storage"}
           onClose={() => setSheet(null)}
@@ -1093,6 +1138,7 @@ export function MobileApp(props: MobileAppProps) {
           onCities={() => setSheet("cities")}
           onSources={() => setSheet("sources")}
           onStorage={() => setSheet("storage")}
+          onSender={() => setSheet("sender")}
           onInstall={() => setSheet("install")}
           standalone={standalone}
           onMore={() => go("account")}
@@ -1102,10 +1148,11 @@ export function MobileApp(props: MobileAppProps) {
         {picker && (
           <LocationPicker
             start={picker.start}
+            here={picker.here}
             busy={picker.busy}
             onClose={() => setPicker(null)}
             onPick={(lat, lng) => {
-              setPicker({ start: picker.start, busy: true });
+              setPicker({ start: picker.start, here: picker.here, busy: true });
               setPage("home");
               onPickPoint(lat, lng);
             }}
@@ -1342,6 +1389,8 @@ function PropertyView({
   const statuses = topicStatuses(result, data, records);
   const [mapApps, setMapApps] = useState(false);
   const [triage, setTriage] = useState(false);
+  // レポートのシートを結果の文面の画面で開くか（書類・出力のページで「結果の文面」を選んだとき）
+  const [reportText, setReportText] = useState(false);
   const [draft, setDraft] = useState(false);
   const [guide, setGuide] = useState(false);
   // 役所の照会文・謄本用の地番の一覧（文面のシート）・調査メモの印刷の確認（components/app/doc-sheets.tsx）
@@ -1416,6 +1465,10 @@ function PropertyView({
   const shareCopy = useCopy();
   const reportCopy = useCopy();
   const checklist = useChecklist(result);
+  // 書類の差出人（照会文・調査メモ・案内図に入れる。端末の中だけ）
+  const sender = useSender();
+  // 現地の写真メモ（端末の中だけ。撮影場所などの情報は消して保存。調査メモに入れる）
+  const photos = useSitePhotos(pid);
   // 読み込めたデータ（文面・下書き・地番の一覧の入力）。共有の文の先頭に、要注意点と次にやること（済んだ印も）を入れる。
   // レポートで外した項目は抜く（地番の一覧は外した項目に関係なく全部）
   const loadedData = loaded({ ...data, landPrice: data.landPrice5 });
@@ -1429,12 +1482,42 @@ function PropertyView({
   /** 書類を開く（レポートのシート・書類・出力のページから。コピー・印刷は開いたシートの中の、押した操作で呼ぶ） */
   const openDoc = (kind: DocKind) => {
     setReport(kind === "copy");
+    setReportText(kind === "copy");
     setTriage(kind === "triage");
     setDraft(kind === "draft");
     setGuide(kind === "guide");
     setMemo(kind === "memo");
     setInquiry(kind === "inquiry");
     setParcelsDoc(kind === "parcels");
+  };
+  /** 重説の下書きの入力（いつも全部の項目。あなたが確かめた結果を入れる） */
+  const draftInput = () => ({ ...loadedData, confirmed: confirmedItems(records) });
+  /** レポートのシートの、書類ごとの状態の行（シートを開いているときだけ作る） */
+  const reportStatus = (): Partial<Record<DocKind, DocStatus>> => {
+    const pl = loadedData.parcels;
+    const rows = buildDraft(result, draftInput()).flatMap((x) => x.rows);
+    const checks = rows.filter((r) => r.check).length;
+    const conf = rows.filter((r) => r.confirmed).length;
+    const { pending, failed } = data.triage;
+    return {
+      inquiry: { text: `宛先：${inquiryDept}`, tone: "ok" },
+      parcels:
+        data.parcels.status === "loading"
+          ? { text: "地番を読み込み中", tone: "busy" }
+          : !pl?.target
+            ? { text: "地番がわかりません", tone: "muted" }
+            : pl.offLot
+              ? { text: "住所の地点の筆（参考）", tone: "warn" }
+              : { text: pl.neighbors.length ? `物件の筆＋隣地 ${pl.neighbors.length}筆` : "物件の筆", tone: pl.reference ? "warn" : "ok" },
+      guide: { text: "詳細図と広域図を A4 に", tone: "ok" },
+      memo: pending.length
+        ? { text: `${pending.slice(0, 2).join("・")}を読み込み中`, tone: "busy" }
+        : failed.length
+          ? { text: `読めないデータ ${failed.length}つ`, tone: "warn" }
+          : { text: recordsDone ? `データそろった・記録${recordsDone}件` : "データがそろいました", tone: "ok" },
+      draft: checks ? { text: `要確認 ${checks}${conf ? `・確認済み ${conf}` : "か所"}`, tone: "warn" } : { text: conf ? `確認済み ${conf}・要確認なし` : "要確認なし", tone: "ok" },
+      copy: { text: `${REPORT_SECTIONS.length - off.size}項目を入れる`, tone: "ok" },
+    };
   };
   // 書類・出力のタイルで選んだ書類を、この物件の画面が出たらすぐ開く
   const myKey = favoriteKey(itemOf(query, result));
@@ -2241,9 +2324,21 @@ function PropertyView({
         />
         <ReportSheet
           open={report}
-          onClose={() => setReport(false)}
+          onClose={() => {
+            setReport(false);
+            setReportText(false);
+          }}
           onDoc={openDoc}
-          triageSub={data.triage.headline}
+          todo={{
+            left: actionsLeft,
+            total: actionsTotal,
+            warns: data.triage.issues.filter((i) => i.level === "warn").length,
+            checks: data.triage.issues.filter((i) => i.level === "check").length,
+            pending: data.triage.pending.length > 0,
+          }}
+          status={report ? reportStatus() : {}}
+          startText={reportText}
+          motion={motion}
           onCopy={() => reportCopy.copy(summaryText())}
           copied={reportCopy.done}
           onShare={canShare ? () => void share() : undefined}
@@ -2297,19 +2392,33 @@ function PropertyView({
         }}
         motion={motion}
       />
-      <TriageSheet
-        result={result}
-        triage={data.triage}
+      {/* 要注意点と次にやること（スマホ。行き先ごと・その場で結果を書く。PC は components/triage-sheet.tsx のまま） */}
+      <TodoSheet
         open={triage}
         onClose={() => setTriage(false)}
+        result={result}
+        triage={data.triage}
+        done={checklist.done}
+        onToggle={checklist.toggle}
+        pid={pid}
+        label={title}
+        records={records}
+        onRecords={setRecords}
+        hints={dataHints(
+          data.zoning.status === "ok" ? data.zoning.zoning : undefined,
+          data.roads.status === "ok" ? data.roads.roads : undefined,
+        )}
+        motion={motion}
+        photos={photos}
       />
       {/* 役所の照会文：建築の担当課（分かっていれば窓口の名前）宛ての FAX・メールの依頼文。物件の筆の地番が分かっていれば入れる */}
       <TextDocSheet
         open={inquiry}
         onClose={() => setInquiry(false)}
         title="道路種別の照会文"
-        lead={`${inquiryDept} に FAX・メールで、前面道路の建築基準法上の種別を聞くときの依頼文です。会社名・担当者・電話を書き足して送ってください。${result.contact?.noPhoneInquiry ? "この市区町村は電話では答えてもらえません（窓口・FAX・メールで）。" : ""}住宅地図・公図の写し（物件に印）を添えると早く答えてもらえます。`}
-        text={buildInquiryText(result.matchedAddress.normalize("NFKC"), inquiryDept, found ? registryChiban(found.chibanRaw) : undefined)}
+        lead={`${inquiryDept} に FAX・メールで、前面道路の建築基準法上の種別を聞くときの依頼文です。${hasSender(sender) ? "最後に差出人が入ります。" : "差出人（会社名・担当者・電話）を入れると、最後に入ります。"}${result.contact?.noPhoneInquiry ? "この市区町村は電話では答えてもらえません（窓口・FAX・メールで）。" : ""}住宅地図・公図の写し（物件に印）を添えると早く答えてもらえます。`}
+        text={buildInquiryText(result.matchedAddress.normalize("NFKC"), inquiryDept, found ? registryChiban(found.chibanRaw) : undefined, sender)}
+        extra={<SenderInline />}
         note="役所によって、照会の受け方（窓口のみ・FAX・メール・様式あり）が違います。先に電話か公式サイトで確かめてください。"
       />
       {/* 謄本・公図を取るときの地番の一覧（1行に1筆。法務局の窓口・登記情報提供サービスに） */}
@@ -2327,20 +2436,23 @@ function PropertyView({
         pending={data.triage.pending}
         failed={data.triage.failed}
         records={recordsDone}
+        photos={photos.items.length}
         onPrint={() => {
           setMemo(false);
           // 押した操作の中で印刷を呼ぶ（iPhone はプリントの画面から PDF にもできる）
           window.print();
         }}
       />
+      {/* 重説の下書き：いつも全部の項目で。あなたが確かめた結果（確認の記録）を対応する欄に「確認済み」で入れる（PC は入れない） */}
       <DraftSheet
         result={result}
-        input={input}
+        input={draftInput()}
         open={draft}
         onClose={() => setDraft(false)}
       />
       <GuideMapSheet
         result={result}
+        sender={sender}
         open={guide}
         onClose={() => setGuide(false)}
       />
@@ -2357,6 +2469,8 @@ function PropertyView({
         pois={data.pois}
         triage={data.triage}
         records={records}
+        sender={sender}
+        photos={photos.items.map((x) => x.url)}
       />
     </div>
   );

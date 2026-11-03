@@ -230,6 +230,8 @@ export type LiveMapProps = {
    * 吹き出しに「ここで調べる」と並べて出す）。地番は登記の地番
    */
   parcelPick?: { has: (kuiki: string, chiban: string) => boolean; toggle: (kuiki: string, chiban: string) => void };
+  /** 現在地（スマホの「現在地で調べる」。青い点と誤差の円を出す。位置は端末の中だけで使い、送らない） */
+  me?: { lat: number; lng: number; accuracy?: number };
 };
 
 /** 濃さを変えるレイヤとその不透明度の属性（ハザードのタイルはこれに加えて raster-opacity） */
@@ -278,6 +280,7 @@ export default function LiveMap({
   initialLandPrice,
   overlayOpacity,
   parcelPick,
+  me,
 }: LiveMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -286,6 +289,9 @@ export default function LiveMap({
   const [loaded, setLoaded] = useState(false);
   const [basemap, setBasemap] = useState<Basemap>("pale");
   const [locating, setLocating] = useState(false);
+  // 地図の「現在地」で取れた位置（青い点を出す。渡された現在地があればそちら）
+  const [located, setLocated] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
+  const meRef = useRef<Marker | null>(null);
   // 筆界と地番（登記所備付地図）・用途地域の塗り分けと都市計画道路・道路種別を表示するか（道路種別は読める市だけ）
   const [shown, setShown] = useState<Record<Overlay, boolean>>(() => ({ parcels: false, zoning: false, roads: false, buildings: false, landPrice: false, ...initial }));
   // 道路種別は読める市だけ、建物は PLATEAU のタイルがあるときだけ
@@ -596,6 +602,47 @@ export default function LiveMap({
     if (map.getZoom() < 15 || !map.getBounds().contains([lng, lat])) map.flyTo({ center: [lng, lat], zoom: 17, duration: 1200 });
   }, [lat, lng, mode]);
 
+  // 現在地の青い点（脈打つ輪と、誤差の円。誤差の円はズームに合わせて大きさを変える）。指は地図に通す
+  const here = me ?? located;
+  const hereLat = here?.lat;
+  const hereLng = here?.lng;
+  const hereAcc = here?.accuracy;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (hereLat === undefined || hereLng === undefined) {
+      meRef.current?.remove();
+      meRef.current = null;
+      return;
+    }
+    if (!meRef.current) {
+      const el = document.createElement("div");
+      el.className = "map-me";
+      el.setAttribute("role", "img");
+      el.setAttribute("aria-label", "現在地");
+      el.innerHTML = '<span class="map-me-acc"></span><span class="map-me-pulse"></span><span class="map-me-dot"></span>';
+      meRef.current = new Marker({ element: el }).setLngLat([hereLng, hereLat]).addTo(map);
+    } else meRef.current.setLngLat([hereLng, hereLat]);
+    const el = meRef.current.getElement();
+    const size = () => {
+      // 誤差（m）を画面の大きさに（地図の1画素の長さ。緯度で変わる）
+      const mpp = (40075016.686 * Math.cos((hereLat * Math.PI) / 180)) / (512 * 2 ** map.getZoom());
+      el.style.setProperty("--acc", `${Math.min(600, Math.max(0, ((hereAcc ?? 0) * 2) / mpp))}px`);
+    };
+    size();
+    map.on("zoom", size);
+    return () => {
+      map.off("zoom", size);
+    };
+  }, [hereLat, hereLng, hereAcc]);
+  useEffect(
+    () => () => {
+      meRef.current?.remove();
+      meRef.current = null;
+    },
+    [],
+  );
+
   // 住所で調べ直したら（同じ住所でも）、地図を動かしていても物件の場所へ戻る
   const lastFocus = useRef(focusKey);
   useEffect(() => {
@@ -811,6 +858,7 @@ export default function LiveMap({
     navigator.geolocation.getCurrentPosition(
       (p) => {
         setLocating(false);
+        setLocated({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy });
         mapRef.current?.flyTo({ center: [p.coords.longitude, p.coords.latitude], zoom: 18, duration: 900 });
       },
       () => setLocating(false),

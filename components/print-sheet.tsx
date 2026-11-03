@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- 端末の中に保存した現地の写真（blob の URL）をそのまま印刷に並べるため */
 
 // 印刷・PDF 保存用の「調査メモ」。画面（地図・パネル・シート）は印刷せず、これだけを A4 に出す（app/globals.css の @media print）。
 // 役所調査に持っていけるよう、地図の URL・色の見方・都市計画・地番・問い合わせ先・窓口で聞くことと、回答を書き込む欄をまとめる
@@ -36,6 +37,7 @@ import type { RoadsState } from "./nearby-roads";
 import type { Triage } from "@/lib/app/triage";
 import { checklistKey, loadDone } from "@/lib/checklist";
 import { RECORD_ITEMS, RECORD_TOPICS, type PropertyRecords } from "@/lib/records";
+import { senderShort, type Sender } from "@/lib/sender";
 import { addressOffLot, parcelLines, type ParcelInfo } from "./parcel-card";
 import type { ZoningState } from "./zoning-card";
 
@@ -65,6 +67,10 @@ export function PrintSheet(props: {
   triage?: Triage;
   /** あなたの確認の記録（端末に残したもの） */
   records?: PropertyRecords;
+  /** 書類の差出人（スマホで入れたとき。右上に出す） */
+  sender?: Sender;
+  /** 現地の写真（スマホの写真メモ。端末の中の画像の URL。6枚まで並べる） */
+  photos?: string[];
 }) {
   // document.body に出す（画面の作りの外に置き、印刷では画面の作りを丸ごと隠す）。サーバーでは何も出さない
   const client = useSyncExternalStore(
@@ -89,6 +95,8 @@ function Memo({
   pois,
   triage,
   records,
+  sender,
+  photos,
 }: {
   result: Ok;
   zoning: ZoningState;
@@ -102,6 +110,8 @@ function Memo({
   pois: PoiState;
   triage?: Triage;
   records?: PropertyRecords;
+  sender?: Sender;
+  photos?: string[];
 }) {
   const walks = stations.status === "ok" ? stations.stations : [];
   const facilities = pois.status === "ok" ? pois.pois : [];
@@ -132,6 +142,11 @@ function Memo({
           </h1>
         </div>
         <p className="shrink-0 text-right text-[10px] leading-[1.5] text-[#7a6a55]">
+          {senderShort(sender).map((l) => (
+            <span key={l} className="block font-semibold text-[#1d1b18]">
+              {l}
+            </span>
+          ))}
           調べた日時 {date}
           <br />
           MICHILU（michilu.vercel.app）
@@ -140,6 +155,18 @@ function Memo({
 
       {triage && <TriageBlock triage={triage} done={loadDone(checklistKey(result.lat, result.lng))} />}
       {records && <RecordsBlock records={records} />}
+      {photos && photos.length > 0 && (
+        <section className="mt-2.5 break-inside-avoid">
+          <h2 className="mb-1 border-l-[3px] border-[#9a7442] pl-1.5 text-[12.5px] font-bold">
+            現地の写真 <span className="text-[10px] font-normal text-[#7a6a55]">{photos.length > 6 ? `${photos.length}枚のうち6枚` : `${photos.length}枚`}（この端末で撮った写真。撮影場所などの情報は消してあります）</span>
+          </h2>
+          <div className="grid grid-cols-3 gap-1.5">
+            {photos.slice(0, 6).map((u, i) => (
+              <img key={u} src={u} alt={`現地の写真 ${i + 1}`} className="aspect-[4/3] w-full rounded object-cover" />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 物件：場所の表と地図 */}
       <section className="mt-2.5 flex gap-4">
@@ -518,7 +545,11 @@ function RecordsBlock({ records }: { records: PropertyRecords }) {
               <td className="w-[5.5em] py-0.5 text-[#7a6a55]">{topic}</td>
               <td className="w-[10em] py-0.5">{sub}</td>
               <td className="w-[6em] py-0.5">{r.done ? `確認済み ${md(r.at)}` : "未確認"}</td>
-              <td className="py-0.5">{[r.method, r.source, r.note].filter(Boolean).join("・")}</td>
+              <td className="py-0.5">
+                {/* 確かめた答え（メモ）を先に太字で、方法・出典はかっこで（PC はこの記録を渡さないので出ない） */}
+                {r.note && <b className="font-semibold">{r.note}</b>}
+                {(r.method || r.source) && <span className="text-[#7a6a55]">{r.note ? "（" : ""}{[r.method, r.source].filter(Boolean).join("・")}{r.note ? "）" : ""}</span>}
+              </td>
             </tr>
           ))}
         </tbody>

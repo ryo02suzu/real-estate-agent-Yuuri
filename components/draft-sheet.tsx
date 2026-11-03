@@ -49,6 +49,8 @@ function DraftBody({ sections }: { sections: DraftSection[] }) {
   const part = useCopy();
   const s = sections[Math.min(tab, sections.length - 1)];
   const checks = sections.reduce((n, x) => n + x.rows.filter((r) => r.check).length, 0);
+  // あなたが確かめた結果を入れた欄の数（スマホの「次にやること」で書いたとき。PC は入れないので出ない）
+  const confirmed = sections.reduce((n, x) => n + x.rows.filter((r) => r.confirmed).length, 0);
   return (
     <div className="text-ink">
       <p className="text-[11px] leading-[1.6] text-muted dense:leading-[1.5] denser:text-[10.5px] densest:leading-[1.4]">
@@ -56,6 +58,7 @@ function DraftBody({ sections }: { sections: DraftSection[] }) {
         <span className="densest:hidden">重説・販売図面の欄の順に並べた参考の下書きです（法令上の判断はしません）。</span>
         <b className="font-semibold text-[#8a4f3a]">要確認（{checks}）</b>は役所・法務局・現地で<span className="densest:hidden">確かめてください。</span>
         <span className="hidden densest:inline">確認。法令の判断はしません</span>
+        {confirmed > 0 && <b className="ml-1 font-semibold text-[#1f8f5a]">確認済み（{confirmed}）は、あなたが確かめた結果です。</b>}
       </p>
       <button
         onClick={() => all.copy(draftText(sections))}
@@ -101,6 +104,7 @@ function DraftBody({ sections }: { sections: DraftSection[] }) {
                 <dd className="min-w-0">
                   <span className={r.value === "要確認" ? "font-semibold text-[#8a4f3a]" : ""}>{r.value}</span>
                   {r.check && r.value !== "要確認" && <span className="ml-1 whitespace-nowrap rounded bg-[#f6e4dc] px-1 text-[10px] text-[#8a4f3a]">要確認</span>}
+                  {r.confirmed && <span className="ml-1 whitespace-nowrap rounded bg-[#e3f5ec] px-1 text-[10px] font-semibold text-[#1f8f5a]">確認済み</span>}
                   {r.note &&
                     (/^https?:/.test(r.note) ? (
                       // URL は画面では「開く」だけ（コピーした文には URL が入る）
@@ -108,7 +112,8 @@ function DraftBody({ sections }: { sections: DraftSection[] }) {
                         開く
                       </a>
                     ) : (
-                      <Note text={r.note} />
+                      // 確かめた結果の欄は「確認済み」の印を付けたので、注の頭の「確認済み」は省く（コピーした文には入る）
+                      <Note text={r.confirmed ? r.note.replace(/^確認済み /, "") : r.note} />
                     ))}
                 </dd>
               </Fragment>

@@ -5,9 +5,10 @@
 // PLATEAU の街。components/app/sky.tsx の SkyPhotos）、その帯に重ねるすりガラスのカード（そのページでいちばん使う操作）、白い角丸の一覧。
 // 字は端末の標準の字（app/globals.css の .theme-navy）。大きさは iPhone の段階：帯の見出し28pt太字、章の見出し17pt太字、
 // 行の名前15.5pt中太字、説明12.5pt、押せる所は44pt以上。寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）
-import { Bell, ChevronRight, CircleHelp, Database, Download, Info, LoaderCircle, LogIn, MapPin, Smartphone, Star, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Bell, Building2, ChevronRight, CircleHelp, Database, Download, Info, LoaderCircle, LogIn, MapPin, Smartphone, Star, TriangleAlert, type LucideIcon } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { MUNICIPALITIES } from "@/lib/roadmap";
+import { hasSender, senderShort, useSender } from "@/lib/sender";
 import { AURORA, DARK_GLASS, GLOW, PAGE } from "./home";
 import { ClockBack } from "./icons";
 import { NEWS } from "./news";
@@ -116,6 +117,7 @@ export function AccountPage({
   unread,
   onInstall,
   onStorage,
+  onSender,
   standalone,
   historyCount,
   favoriteCount,
@@ -131,6 +133,8 @@ export function AccountPage({
   onInstall: () => void;
   /** 調査記録の書き出し・読み込み（データの保存について） */
   onStorage: () => void;
+  /** 書類の差出人（会社名・担当者。照会文・調査メモ・案内図に入れる） */
+  onSender?: () => void;
   standalone: boolean;
   historyCount: number;
   favoriteCount: number;
@@ -209,6 +213,7 @@ export function AccountPage({
           />
           <Row icon={icon(Smartphone)} title="ホーム画面に追加" sub={standalone ? "追加したアプリで開いています" : "ブラウザの枠なしで、アプリのように使う"} right={standalone ? "追加済み" : undefined} rightColor={LIGHT} minH={52} onClick={onInstall} />
           <Row icon={icon(Download)} title="調査記録の書き出し・読み込み" sub="機種変更・データ消失への備え。保存の仕組みも" minH={52} onClick={onStorage} />
+          {onSender && <SenderRow icon={icon(Building2)} onClick={onSender} />}
         </div>
       </section>
       <Note className="mt-[12px] px-[4px]">
@@ -216,4 +221,10 @@ export function AccountPage({
       </Note>
     </TabScreen>
   );
+}
+
+/** その他の「書類の差出人」の行（入れた会社名・担当者を2行目に） */
+function SenderRow({ icon, onClick }: { icon: ReactNode; onClick: () => void }) {
+  const s = useSender();
+  return <Row icon={icon} title="書類の差出人" sub={hasSender(s) ? senderShort(s).join("・") : "照会文・調査メモ・案内図に入れる会社名・担当者"} minH={52} onClick={onClick} />;
 }
