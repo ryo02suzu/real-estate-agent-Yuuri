@@ -20,7 +20,7 @@ import { addProtocol, getVersion, Map as MapLibreMap, setWorkerUrl } from "mapli
 import { LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cloudPainter, type CloudPainter } from "./flight-clouds";
-import { bearingTo, centerFor, distanceKm, landingFrame, zoomForMpp } from "./flight-handoff";
+import { bearingTo, centerFor, distanceKm, landingFrame, zoomForMpp, type LandingFrame } from "./flight-handoff";
 import { DEM_PROTOCOL, flightMood, flightStyle, GSI_PHOTO, gsiToTerrarium, hazeBackground, LOOKS, terrainExaggeration, type FlightMood } from "./flight-look";
 
 // 描画のワーカーは public/maplibre/<版>/ に置いてある（scripts/copy-maplibre-worker.mjs）
@@ -36,9 +36,10 @@ const JAPAN: [number, number] = [137.6, 36.0];
 const FUJI = { lat: 35.3606, lng: 138.7274 };
 /**
  * 動きの長さ（ミリ秒）。descend は日本の上空から山並みの上まで（雲を抜ける）、settle は真上から土地を見るまで（模型の着地の見え方に
- * そろえる）、sharpen は写真がそろうのを待つ長さの上限、ring は印が光る間
+ * そろえる）、sharpen は写真がそろうのを待つ長さの上限、ring は印が光る間。模型の見え方が降り始めにまだ無かったとき（模型の周りの
+ * 建物・道路を読んでいる）は、印が光ったあと最大 waitModel 待ち、届いたら adjust でそこへ滑らせてから消える
  */
-const T = { firstTiles: 1000, turn: 1600, descend: 2100, settle: 1700, sharpen: 900, ring: 800, fade: 450, giveUp: 14000 };
+const T = { firstTiles: 1000, turn: 1600, descend: 2100, settle: 1700, sharpen: 900, ring: 800, adjust: 600, waitModel: 1400, fade: 450, giveUp: 14000 };
 
 /**
  * 重さの選び方。#fx=lite／#fx=full で決められる（確かめる用）。決めていなければ、地球が日本へ回る間の描く速さで決める
@@ -348,24 +349,44 @@ export default function GlobeFlight({
       m.off("move", onMove);
       if (done.current) return;
       if (terrainOn) m.setTerrain(null);
+      /** 降りきったところ（模型の着地の見え方。まだ無いときは真上・北が上・画面の上から 42%） */
+      const endOf = (frame: LandingFrame | null) => {
+        const box = m.getContainer().getBoundingClientRect();
+        const e = frame
+          ? { zoom: zoomForMpp(frame.mpp, target.lat), bearing: frame.bearing, x: frame.x - box.left, y: frame.y - box.top }
+          : { zoom: FALLBACK.zoom, bearing: FALLBACK.bearing, x: box.width / 2, y: box.height * FALLBACK.y };
+        const c = centerFor(target, e.x - box.width / 2, e.y - box.height / 2, e.bearing, e.zoom);
+        return { center: [c.lng, c.lat] as [number, number], zoom: e.zoom, pitch: 0, bearing: e.bearing };
+      };
       const frame = landingFrame();
-      const box = m.getContainer().getBoundingClientRect();
-      const end = frame
-        ? { zoom: zoomForMpp(frame.mpp, target.lat), bearing: frame.bearing, x: frame.x - box.left, y: frame.y - box.top }
-        : { zoom: FALLBACK.zoom, bearing: FALLBACK.bearing, x: box.width / 2, y: box.height * FALLBACK.y };
-      const c = centerFor(target, end.x - box.width / 2, end.y - box.height / 2, end.bearing, end.zoom);
-      m.easeTo({ center: [c.lng, c.lat], zoom: end.zoom, pitch: 0, bearing: end.bearing, duration: T.settle, easing: easeInOut, essential: true });
+      m.easeTo({ ...endOf(frame), duration: T.settle, easing: easeInOut, essential: true });
       m.once("moveend", () => {
         if (done.current) return;
-        // 写真がそろうのを少し待ってから、印を光らせる（模型と重なるので、地図はもう動かさない）
+        // 写真がそろうのを少し待ってから、印を光らせる（印は土地に付いていく）
         let shown = false;
+        const track = () => {
+          const p = m.project(here);
+          setRing({ x: p.x, y: p.y });
+        };
         const land = () => {
           if (shown || done.current) return;
           shown = true;
-          const p = m.project(here);
-          setRing({ x: p.x, y: p.y });
+          track();
+          m.on("move", track);
           setStage("land");
-          later(T.ring, () => finish(true));
+          // 模型の見え方がそろっていれば、印が光ったら消える（模型と重なるので、地図はもう動かさない）。降り始めにまだ無かったときは、
+          // 届くのを少し待ち、届いたらそこへ滑らせてから消える。届かなければ、そのまま消える（模型は自分の着地をする）
+          const t0 = performance.now();
+          const wait = () => {
+            if (done.current) return;
+            const late = frame ? null : landingFrame();
+            if (late) {
+              m.easeTo({ ...endOf(late), duration: T.adjust, easing: easeInOut, essential: true });
+              later(T.adjust + 200, () => finish(true));
+            } else if (!frame && performance.now() - t0 < T.waitModel) later(150, wait);
+            else finish(true);
+          };
+          later(T.ring, wait);
         };
         m.once("idle", land);
         later(T.sharpen, land);
