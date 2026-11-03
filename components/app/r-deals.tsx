@@ -9,6 +9,7 @@ import { TSUBO_M2 } from "@/lib/app/area";
 import { DEAL_KIND_LABEL, DEALS_CREDIT, DEALS_DATA, DEALS_NOTE, dealKind, dealSummary, totalText, unitPrice, type DealKind, type DealRecord } from "@/lib/roadmap/deals";
 import { distanceText, type LandPriceHit, type LandUsage } from "@/lib/roadmap/land-price";
 import { G, GHead, GNote, GStat, NUM, TILE } from "./g-ui";
+import { HoldHeight } from "./hold-height";
 import { manYen, yen } from "./r-ui";
 import type { TabProps } from "./types";
 
@@ -19,7 +20,7 @@ const RANGES = [1000, 2000, 4000];
 
 function Chip({ label, on, onClick, drop }: { label: string; on: boolean; onClick: () => void; drop?: boolean }) {
   return (
-    <button onClick={onClick} aria-pressed={on} className="press flex h-[34px] shrink-0 items-center gap-[3px] rounded-full px-[12px] font-semibold leading-none transition-colors duration-200" style={on ? { fontSize: 12.5, background: "rgba(255,255,255,0.94)", color: "#1b3f73", boxShadow: "0 4px 14px rgba(5,15,35,0.22)" } : { fontSize: 12.5, color: "rgba(255,255,255,0.9)", ...TILE }}>
+    <button onClick={onClick} aria-pressed={on} className="press flex h-[34px] shrink-0 items-center gap-[3px] rounded-full px-[12px] font-semibold leading-none transition-colors duration-200" style={on ? { fontSize: 12.5, background: "rgba(255,255,255,0.94)", color: "#1b3f73", boxShadow: "0 4px 14px rgba(5,15,35,0.22)", border: "1px solid rgba(255,255,255,0.94)" } : { fontSize: 12.5, color: "rgba(255,255,255,0.9)", ...TILE }}>
       {label}
       {drop && <ChevronDown size={14} strokeWidth={2} absoluteStrokeWidth />}
     </button>
@@ -62,14 +63,15 @@ export function DealsSection({ result, data, open }: TabProps) {
           <GStat label={mixed ? "平均単価（用途混在）" : "平均単価"} value={avg ? `${man(avg)}万` : "―"} unit={avg ? "円/㎡" : undefined} note={avg ? (mixed ? "用途で絞ると比べやすい" : `坪 約${manYen(avg * TSUBO_M2)}`) : undefined} />
           <GStat label="前年比の平均" value={avgChange === undefined ? "―" : `${avgChange >= 0 ? "+" : ""}${avgChange.toFixed(1)}%`} note="同じ地点の前年比" />
         </div>
-        <div className="mt-[8px] overflow-hidden rounded-[18px]" style={TILE}>
+        {/* 絞り込みで地点が減っても、一覧の板の大きさは変えない（components/app/hold-height.tsx） */}
+        <HoldHeight className="mt-[8px] overflow-hidden rounded-[18px]" style={TILE} resetKey={result.matchedAddress}>
           {lp.status === "loading" && <Msg>地点を確認しています…</Msg>}
           {lp.status === "error" && <Msg>地価のデータを読み込めませんでした。</Msg>}
           {lp.status === "ok" && list.length === 0 && <Msg>条件に合う地点がありません。絞り込みを変えてください。</Msg>}
           {list.map((h) => (
             <DealRow key={`${h.kind}|${h.no}`} hit={h} onClick={() => open("deal", all.indexOf(h))} />
           ))}
-        </div>
+        </HoldHeight>
         <GNote className="mt-[8px]">出典：国土数値情報（地価公示・都道府県地価調査）。標準地・基準地はその地域の標準的な土地の価格です。{result.municipality.name}周辺の事例です。</GNote>
       </section>
     </div>
@@ -174,7 +176,8 @@ function Transactions({ data, town }: { data: TabProps["data"]; town: string }) 
         <GStat label="土地の単価" value={sum.land ? `${man(sum.land)}万` : "―"} unit={sum.land ? "円/㎡" : undefined} note={sum.land ? `中央値・坪 約${manYen(sum.land * TSUBO_M2)}` : "土地の事例なし"} />
         <GStat label="マンション" value={sum.mansion ? `${man(sum.mansion)}万` : "―"} unit={sum.mansion ? "円/㎡" : undefined} note="中央値・専有面積あたり" />
       </div>
-      <div className="mt-[8px] overflow-hidden rounded-[18px]" style={TILE}>
+      {/* 種類の絞り込みで事例が減っても、一覧の板の大きさは変えない */}
+      <HoldHeight className="mt-[8px] overflow-hidden rounded-[18px]" style={TILE} resetKey={town}>
         {list.length === 0 && <Msg>条件に合う事例がありません。</Msg>}
         {list.slice(0, limit).map((r, i) => (
           <TxRow key={`${r.pe}|${r.d}|${r.p}|${i}`} r={r} />
@@ -184,7 +187,7 @@ function Transactions({ data, town }: { data: TabProps["data"]; town: string }) 
             さらに{Math.min(10, list.length - limit)}件を見る（全{list.length}件）
           </button>
         )}
-      </div>
+      </HoldHeight>
       <GNote className="mt-[6px]">
         {DEALS_CREDIT}（{DEALS_DATA.periods}）。{DEALS_NOTE}。事例の場所は町（地区）までです。
       </GNote>

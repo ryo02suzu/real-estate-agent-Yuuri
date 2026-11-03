@@ -3,11 +3,16 @@
 // 「地図アプリで開く」と「レポートを作成」の選択（下から出る）。地図アプリには物件の座標だけを渡す（押したときだけ。自前のサーバーは通さない）。
 // レポートは1画面で書類を選ぶ：上に要注意点と次にやること（進みの輪）、その下に作れる書類のタイルを調査の流れの順
 // （役所・法務局で → 現地で → 書類にする。components/app/doc-kinds.tsx）で、それぞれの状態（宛先・筆の数・要確認の数など）と一緒に。
-// 「結果の文面」は同じシートの次の画面で、入れる項目を選びながら吹き出しの形で文面を確かめ、コピー・共有する（効くのは文面だけ）
+// 「結果の文面」は同じシートの次の画面で、「要点」か「詳しく」と入れる項目を選びながら、読みやすい形で中身を確かめてコピー・共有する
+// （効くのは文面だけ）。どちらの画面もシートの高さは同じ（components/app/doc-sheets.tsx の DOC_BODY。選んでも大きさが変わらない）
 import { Check, ChevronLeft, ChevronRight, ClipboardCopy, Compass, Crosshair, ExternalLink, ListChecks, Map as MapIcon, Navigation, Route, Share2 } from "lucide-react";
 import { useState, type CSSProperties, type ReactNode } from "react";
+import { docText, type Doc } from "@/lib/app/doc";
+import type { ReportDetail } from "@/lib/app/report";
 import { Sheet } from "../sheet";
 import { DOC_GROUPS, MAIN_DOC, type DocDef, type DocKind } from "./doc-kinds";
+import { DOC_BODY, DOC_PANE } from "./doc-sheets";
+import { DocView } from "./doc-view";
 import type { Ok } from "./use-property";
 
 function Item({ icon, title, sub, href, onClick }: { icon: ReactNode; title: string; sub?: string; href?: string; onClick?: () => void }) {
@@ -119,7 +124,9 @@ export function ReportSheet({
   onCopy,
   copied,
   onShare,
-  preview,
+  doc,
+  detail,
+  onDetail,
   off,
   onToggle,
   motion,
@@ -138,8 +145,11 @@ export function ReportSheet({
   copied: boolean;
   /** 共有の画面（LINE・メールなど。出せる端末だけ渡す） */
   onShare?: () => void;
-  /** いまの選択での文面 */
-  preview: string;
+  /** いまの選択での文面の中身（lib/app/report.ts） */
+  doc: Doc;
+  /** 要点だけか、詳しくか */
+  detail: ReportDetail;
+  onDetail: (d: ReportDetail) => void;
   /** 外している項目 */
   off: ReadonlySet<SectionKey>;
   onToggle: (k: SectionKey) => void;
@@ -147,7 +157,7 @@ export function ReportSheet({
   motion: boolean;
 }) {
   if (!open) return null;
-  return <ReportBody onClose={onClose} onDoc={onDoc} todo={todo} status={status} startText={startText} onCopy={onCopy} copied={copied} onShare={onShare} preview={preview} off={off} onToggle={onToggle} motion={motion} />;
+  return <ReportBody onClose={onClose} onDoc={onDoc} todo={todo} status={status} startText={startText} onCopy={onCopy} copied={copied} onShare={onShare} doc={doc} detail={detail} onDetail={onDetail} off={off} onToggle={onToggle} motion={motion} />;
 }
 
 function ReportBody({
@@ -159,7 +169,9 @@ function ReportBody({
   onCopy,
   copied,
   onShare,
-  preview,
+  doc,
+  detail,
+  onDetail,
   off,
   onToggle,
   motion,
@@ -173,85 +185,100 @@ function ReportBody({
   };
   const done = todo.total - todo.left;
   const tiles = DOC_GROUPS.flatMap((g) => g.docs);
+  const length = docText(doc).length;
   return (
     <div className="theme-navy">
       <Sheet title={step === "docs" ? "レポートを作成" : "結果の文面"} open onClose={onClose}>
-        <div key={step} className="rp-pane" data-dir={moved ? (step === "text" ? "r" : "l") : undefined} data-motion={motion ? "1" : "0"}>
-          {step === "docs" ? (
-            <>
-              {/* いちばん使う：要注意点と次にやること（進みの輪と、あと何件） */}
-              <button onClick={() => onDoc("triage")} className="rp-in press relative flex w-full items-center gap-3 overflow-hidden rounded-[20px] px-4 py-3.5 text-left text-white" style={{ background: "linear-gradient(135deg, #1b4280 0%, #0f2f5f 58%, #0a2248 100%)", "--i": 0 } as CSSProperties}>
-                <MiniRing done={done} total={todo.total} />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15.5px] font-bold leading-[1.35]">{MAIN_DOC.action}</span>
-                  <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-white/80">
-                    <span>{todo.total && !todo.left ? "すべて済み" : `あと${todo.left}件／${todo.total}件`}</span>
-                    <span className="inline-flex items-center gap-1">
-                      <span className="size-[6px] rounded-full bg-[#ff9c80]" />
-                      要注意 {todo.warns}
+        <div className={DOC_BODY}>
+          <div key={step} className="rp-pane flex min-h-0 flex-1 flex-col" data-dir={moved ? (step === "text" ? "r" : "l") : undefined} data-motion={motion ? "1" : "0"}>
+            {step === "docs" ? (
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+                {/* いちばん使う：要注意点と次にやること（進みの輪と、あと何件） */}
+                <button onClick={() => onDoc("triage")} className="rp-in press relative flex w-full items-center gap-3 overflow-hidden rounded-[20px] px-4 py-3.5 text-left text-white" style={{ background: "linear-gradient(135deg, #1b4280 0%, #0f2f5f 58%, #0a2248 100%)", "--i": 0 } as CSSProperties}>
+                  <MiniRing done={done} total={todo.total} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15.5px] font-bold leading-[1.35]">{MAIN_DOC.action}</span>
+                    <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-white/80">
+                      <span>{todo.total && !todo.left ? "すべて済み" : `あと${todo.left}件／${todo.total}件`}</span>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="size-[6px] rounded-full bg-[#ff9c80]" />
+                        要注意 {todo.warns}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="size-[6px] rounded-full bg-[#ffcb6b]" />
+                        要確認 {todo.checks}
+                      </span>
+                      {todo.pending && <span className="text-white/60">確認中あり</span>}
                     </span>
-                    <span className="inline-flex items-center gap-1">
-                      <span className="size-[6px] rounded-full bg-[#ffcb6b]" />
-                      要確認 {todo.checks}
-                    </span>
-                    {todo.pending && <span className="text-white/60">確認中あり</span>}
                   </span>
-                </span>
-                <ChevronRight className="h-5 w-5 shrink-0 text-white/70" />
-              </button>
-              <p className="rp-in mt-3.5 text-[12px] leading-[1.5] text-muted" style={{ "--i": 1 } as CSSProperties}>
-                調査の流れの順（役所・法務局 → 現地 → 書類）。押すと開きます。
-              </p>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                {tiles.map((d, i) => (
-                  <DocTile key={d.kind} doc={d} index={i + 2} status={status[d.kind]} onClick={() => (d.kind === "copy" ? go("text") : onDoc(d.kind))} />
-                ))}
-              </div>
-              <p className="mt-3 text-[11.5px] leading-[1.6] text-muted">どれも参考の資料です。重要事項説明などの最終確認は、役所の窓口・公的な資料で行ってください。</p>
-            </>
-          ) : (
-            <>
-              <button onClick={() => go("docs")} className="press -ml-1.5 inline-flex h-[34px] items-center gap-0.5 pr-2 text-[14px] font-semibold" style={{ color: "#133664" }}>
-                <ChevronLeft className="h-5 w-5" />
-                書類を選ぶ
-              </button>
-              <p className="mt-1 text-[12.5px] leading-[1.6] text-muted">入れる項目を選ぶと、文面がその場で変わります（調査メモ・重説の下書きはいつも全部）。</p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {REPORT_SECTIONS.map((s) => {
-                  const on = !off.has(s.key);
-                  return (
-                    <button key={s.key} onClick={() => onToggle(s.key)} aria-pressed={on} className="press inline-flex h-[32px] items-center gap-1 rounded-full px-3 text-[13px] font-semibold transition-colors duration-150" style={{ background: on ? "#133664" : "#eef2f7", color: on ? "#fff" : "#6b7890" }}>
-                      {on && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-                      {s.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="mt-3 flex items-baseline justify-between text-[11.5px] text-muted">
-                <span>貼るとこう見えます</span>
-                <span className="tabular-nums">{preview.length}文字</span>
-              </p>
-              {/* 文面のプレビュー：チャットの吹き出しの形で */}
-              <div className="mt-1 flex justify-end">
-                <pre className="rp-bubble max-h-[min(42dvh,360px)] w-[92%] overflow-y-auto whitespace-pre-wrap [overflow-wrap:anywhere] rounded-[20px] rounded-br-[6px] px-3.5 py-3 text-[12.5px] leading-[1.6] text-ink shadow-[0_2px_10px_rgba(20,45,85,0.08)]" style={{ fontFamily: "inherit", background: "#e7effa" }} aria-label="文面のプレビュー">
-                  {preview}
-                </pre>
-              </div>
-              <div className={`mt-3 grid gap-2 ${onShare ? "grid-cols-2" : "grid-cols-1"}`}>
-                <button onClick={onCopy} className="press flex h-[50px] items-center justify-center gap-2 rounded-[16px] text-[15px] font-bold text-white transition-colors duration-200" style={{ background: copied ? "#1f8f5a" : "#133664" }}>
-                  {copied ? <Check key="done" className="td-bump h-5 w-5" strokeWidth={3} /> : <ClipboardCopy className="h-[18px] w-[18px]" />}
-                  {copied ? "コピーしました" : "コピー"}
+                  <ChevronRight className="h-5 w-5 shrink-0 text-white/70" />
                 </button>
-                {onShare && (
-                  <button onClick={onShare} className="press flex h-[50px] items-center justify-center gap-2 rounded-[16px] text-[15px] font-bold" style={{ background: "#e3ebf6", color: "#133664" }}>
-                    <Share2 className="h-[18px] w-[18px]" />
-                    共有
-                  </button>
-                )}
+                <p className="rp-in mt-3.5 text-[12px] leading-[1.5] text-muted" style={{ "--i": 1 } as CSSProperties}>
+                  調査の流れの順（役所・法務局 → 現地 → 書類）。押すと開きます。
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {tiles.map((d, i) => (
+                    <DocTile key={d.kind} doc={d} index={i + 2} status={status[d.kind]} onClick={() => (d.kind === "copy" ? go("text") : onDoc(d.kind))} />
+                  ))}
+                </div>
+                <p className="mt-3 text-[11.5px] leading-[1.6] text-muted">どれも参考の資料です。重要事項説明などの最終確認は、役所の窓口・公的な資料で行ってください。</p>
               </div>
-              <p className="mt-2 text-[11.5px] leading-[1.6] text-muted">LINE・メール・社内のチャットへそのまま貼れます。あなたの確認の記録（書いた結果）も最後に入ります。</p>
-            </>
-          )}
+            ) : (
+              <>
+                <div className="flex shrink-0 items-center justify-between gap-2">
+                  <button onClick={() => go("docs")} className="press -ml-1.5 inline-flex h-[34px] items-center gap-0.5 pr-2 text-[14px] font-semibold" style={{ color: "#133664" }}>
+                    <ChevronLeft className="h-5 w-5" />
+                    書類を選ぶ
+                  </button>
+                  {/* 要点だけ（上司・同僚への一報）か、詳しく（社内の記録・報告書の元） */}
+                  <div role="radiogroup" aria-label="文面の長さ" className="flex h-[34px] shrink-0 rounded-full bg-[#eef2f7] p-[3px]">
+                    {(
+                      [
+                        ["short", "要点"],
+                        ["full", "詳しく"],
+                      ] as const
+                    ).map(([k, label]) => (
+                      <button key={k} role="radio" aria-checked={detail === k} onClick={() => onDetail(k)} className="press min-w-[64px] rounded-full px-3 text-[13px] font-bold transition-colors duration-150" style={detail === k ? { background: "#fff", color: "#133664", boxShadow: "0 1px 3px rgba(20,45,85,0.18)" } : { color: "#6b7890" }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* 入れる項目（1行。横にすべらせる） */}
+                <div className="-mx-5 mt-2 flex shrink-0 gap-1.5 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="入れる項目">
+                  {REPORT_SECTIONS.map((s) => {
+                    const on = !off.has(s.key);
+                    return (
+                      <button key={s.key} onClick={() => onToggle(s.key)} aria-pressed={on} className="press inline-flex h-[32px] shrink-0 items-center gap-1 rounded-full px-3 text-[13px] font-semibold transition-colors duration-150" style={{ background: on ? "#133664" : "#eef2f7", color: on ? "#fff" : "#6b7890" }}>
+                        <Check className={`h-3.5 w-3.5 ${on ? "" : "opacity-0"}`} strokeWidth={3} />
+                        {s.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 flex shrink-0 items-baseline justify-between text-[11.5px] text-muted">
+                  <span>{detail === "short" ? "要点だけ（上司・同僚への一報に）" : "詳しく（社内の記録・報告書の元に）"}</span>
+                  <span className="tabular-nums">{length.toLocaleString("ja-JP")}文字</span>
+                </p>
+                <div className={`${DOC_PANE} mt-1`} aria-label="文面の中身">
+                  <DocView doc={doc} />
+                </div>
+                <div className={`mt-2.5 grid shrink-0 gap-2 ${onShare ? "grid-cols-[1fr_auto]" : "grid-cols-1"}`}>
+                  <button onClick={onCopy} className="press flex h-[48px] items-center justify-center gap-2 rounded-[16px] text-[15px] font-bold text-white transition-colors duration-200" style={{ background: copied ? "#1f8f5a" : "#133664" }}>
+                    {copied ? <Check key="done" className="td-bump h-5 w-5" strokeWidth={3} /> : <ClipboardCopy className="h-[18px] w-[18px]" />}
+                    {copied ? "コピーしました" : "コピー"}
+                  </button>
+                  {onShare && (
+                    <button onClick={onShare} className="press flex h-[48px] items-center justify-center gap-2 rounded-[16px] px-5 text-[15px] font-bold" style={{ background: "#e3ebf6", color: "#133664" }}>
+                      <Share2 className="h-[18px] w-[18px]" />
+                      共有
+                    </button>
+                  )}
+                </div>
+                <p className="mt-2 shrink-0 text-[11px] leading-[1.55] text-muted [@media(max-height:720px)]:hidden">LINE・メール・チャットに貼ると、見出し（■）と行の形のまま読めます。確認した結果（あなたの記録）も入ります。</p>
+              </>
+            )}
+          </div>
         </div>
       </Sheet>
     </div>

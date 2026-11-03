@@ -71,6 +71,10 @@ export function PrintSheet(props: {
   sender?: Sender;
   /** 現地の写真（スマホの写真メモ。端末の中の画像の URL。6枚まで並べる） */
   photos?: string[];
+  /** 筆の面積の目安（スマホ。「約770㎡（約233坪）」） */
+  area?: string;
+  /** 2枚目を窓口で書き込む確認メモにする（スマホ） */
+  form?: boolean;
 }) {
   // document.body に出す（画面の作りの外に置き、印刷では画面の作りを丸ごと隠す）。サーバーでは何も出さない
   const client = useSyncExternalStore(
@@ -97,6 +101,8 @@ function Memo({
   records,
   sender,
   photos,
+  area,
+  form,
 }: {
   result: Ok;
   zoning: ZoningState;
@@ -112,6 +118,8 @@ function Memo({
   records?: PropertyRecords;
   sender?: Sender;
   photos?: string[];
+  area?: string;
+  form?: boolean;
 }) {
   const walks = stations.status === "ok" ? stations.stations : [];
   const facilities = pois.status === "ok" ? pois.pois : [];
@@ -194,6 +202,15 @@ function Memo({
                 </dd>
               </>
             )
+          )}
+          {area && (
+            <>
+              <dt className="text-[#7a6a55]">面積（目安）</dt>
+              <dd>
+                {area}
+                <span className="text-[10px] text-[#7a6a55]">（地図上の目安。登記の地積で確認）</span>
+              </dd>
+            </>
           )}
           {bHit && (
             <>
@@ -476,6 +493,9 @@ function Memo({
         </Block>
       )}
 
+      {form ? (
+        <CounterForm where={dept ?? `${m.name}の建築の担当課`} place={`${result.matchedAddress.normalize("NFKC")}${found ? ` ${chibanLabel(found.chibanRaw)}` : ""}`} />
+      ) : (
       <Block title="窓口で聞くこと・回答メモ">
         <ol className="space-y-1">
           {ASK.map((a, i) => (
@@ -492,6 +512,7 @@ function Memo({
           <span className="w-[40%] border-b border-[#b9ad9b] pb-0.5">確認した日：</span>
         </p>
       </Block>
+      )}
 
       <footer className="mt-3 border-t border-[#d8ccb8] pt-1.5 text-[8.5px] leading-[1.55] text-[#7a6a55]">
         <p>
@@ -516,6 +537,51 @@ function Memo({
         </p>
       </footer>
     </div>
+  );
+}
+
+/** 2枚目：窓口で書き込む確認メモ（スマホの調査メモ。道路種別に○を付ける・幅員・後退・位置指定・公道か私道か・ほかの制限） */
+function CounterForm({ where, place }: { where: string; place: string }) {
+  const rows: [string, string[]][] = [
+    ["道路の種別", ["□42条1項1号　□1項2号　□1項3号　□1項4号　□1項5号　□42条2項　□43条2項　□建築基準法上の道路ではない　□その他（　　　　　）"]],
+    ["幅員・境界", ["認定幅員　　　　m　／　現況幅員　　　　m", "道路境界　□確定　□未確定（　　　　　　　　　　）"]],
+    ["セットバック", ["□要（道路中心線から　　　m・後退距離　　　m）　□不要", "道路中心線　□確定　□未確定"]],
+    ["位置指定道路", ["指定番号　　　　　　　　指定年月日　　　　　　　　", "指定図面の写し　□もらった　□もらえない"]],
+    ["公道・私道", ["□公道（管理者：　　　　　　　）　□私道（所有者：　　　　　　　）"]],
+    ["ほかの制限", ["都市計画道路・地区計画・建築協定・がけの規定・壁面線 など：", ""]],
+  ];
+  return (
+    <section className="print-page-break mt-3 break-inside-avoid">
+      <h2 className="border-b-2 border-[#9a7442] pb-1 text-[15px] font-bold">窓口での確認メモ</h2>
+      <p className="mt-1 text-[10.5px] text-[#5d5143]">
+        物件：{place}　／　窓口：{where}
+      </p>
+      <table className="mt-2 w-full border-collapse text-[11px]">
+        <tbody>
+          {rows.map(([label, lines]) => (
+            <tr key={label} className="border-b border-[#d8ccb8] align-top">
+              <th className="w-[8.5em] py-2 pr-2 text-left font-semibold">{label}</th>
+              <td className="py-2">
+                {lines.map((l, i) => (
+                  <p key={i} className={`min-h-[1.9em] ${l ? "" : "border-b border-dotted border-[#b9ad9b]"}`}>
+                    {l}
+                  </p>
+                ))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-3 text-[11px] font-semibold">メモ</p>
+      {Array.from({ length: 6 }, (_, i) => (
+        <p key={i} className="h-[2.1em] border-b border-dotted border-[#b9ad9b]" />
+      ))}
+      <p className="mt-4 flex gap-6 text-[11px] text-[#5d5143]">
+        <span className="flex-1 border-b border-[#b9ad9b] pb-0.5">対応した窓口・担当者：</span>
+        <span className="w-[40%] border-b border-[#b9ad9b] pb-0.5">確認した日：　　年　　月　　日</span>
+      </p>
+      <p className="mt-2 text-[9.5px] text-[#7a6a55]">持っていくもの：{BRING.join("・")}</p>
+    </section>
   );
 }
 

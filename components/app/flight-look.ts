@@ -135,8 +135,8 @@ export function flightStyle(mood: FlightMood, opts: { terrain: boolean }): Style
           "raster-fade-duration": 250,
         },
       },
-      // 夜の街明かり：遠くでは地球をおおい、写真に替わるところ（ズーム 9〜13）では光のにじみとして残してから消える（夜の地面は暗いので、
-      // 明かりの絵を濃いめに重ねても街の明かりが浮かぶ）
+      // 夜の街明かり：宇宙から見る間は地球をおおい、近づく（ズーム 7〜9.5）と薄くして、道路の光（ズーム 8 から）に引きつぐ
+      // （NASA の絵はズーム 8 までの粗い絵なので、近くまで濃く残すと大きな光のしみになる）
       ...(L.lights > 0
         ? [
             {
@@ -144,7 +144,7 @@ export function flightStyle(mood: FlightMood, opts: { terrain: boolean }): Style
               type: "raster" as const,
               source: "lights",
               paint: {
-                "raster-opacity": ["interpolate", ["linear"], ["zoom"], 8, L.lights, 9.3, L.lights * 0.82, 11.5, L.lights * 0.45, 13.5, 0] as unknown as number,
+                "raster-opacity": ["interpolate", ["linear"], ["zoom"], 7, L.lights, 8.5, L.lights * 0.35, 9.5, L.lights * 0.12, 11.5, 0] as unknown as number,
                 "raster-contrast": 0.22,
                 "raster-saturation": 0.15,
                 "raster-fade-duration": 250,

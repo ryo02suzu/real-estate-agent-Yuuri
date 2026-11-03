@@ -61,6 +61,8 @@ export function RecordSheet({
 
   return (
     <Sheet title={`${item.label}の確認を記録`} open onClose={onClose}>
+      {/* 確認事項を開いても（方法・出典・メモの欄が出ても）シートの大きさが変わらないよう、はじめから高さを取っておく */}
+      <div className="min-h-[min(78dvh,680px)]">
       {status && (
         <div className="rounded-2xl bg-mint px-4 py-3">
           <div className="flex items-center gap-2">
@@ -129,6 +131,7 @@ export function RecordSheet({
             ? "保存しました（この端末の中だけ。MICHILU のサーバーには送りません）。"
             : "記録はこの端末の中だけに残ります。機種変更に備えた書き出しは「その他」の「調査記録の書き出し・読み込み」から。"}
       </p>
+      </div>
     </Sheet>
   );
 }

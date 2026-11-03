@@ -29,7 +29,9 @@ import {
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { buildTodo, defaultMethod, fieldValue, mergeNote, RESULT_FIELDS, resultChips, withUnit, type ResultField, type TodoGroupKey, type TodoItem } from "@/lib/app/todo";
-import { TRIAGE_NOTE, triageLines, type Action, type Issue, type Triage } from "@/lib/app/triage";
+import { docText } from "@/lib/app/doc";
+import { todoDoc } from "@/lib/app/report";
+import { TRIAGE_NOTE, type Action, type Issue, type Triage } from "@/lib/app/triage";
 import { METHODS, writeRecord, type Method, type PropertyRecords } from "@/lib/records";
 import { Sheet } from "../sheet";
 import { useCopy } from "../use-copy";
@@ -171,7 +173,7 @@ function TodoBody({ result, triage, done, onToggle, pid, label, records, onRecor
   };
   useEffect(() => {
     if (!flash) return;
-    const el = root.current?.querySelector<HTMLElement>(`[data-todo-row="${flash.id}"]`);
+    const el = root.current?.querySelector<HTMLElement>(`[role="tabpanel"] [data-todo-row="${flash.id}"]`);
     el?.scrollIntoView({
       block: "start",
       behavior: reducedMotion() ? "auto" : "smooth",
@@ -182,16 +184,109 @@ function TodoBody({ result, triage, done, onToggle, pid, label, records, onRecor
     setTimeout(() => setOpenId((cur) => (cur === id ? null : cur)), reducedMotion() ? 300 : 950);
   };
 
-  const copyText = () =>
-    [
-      result.matchedAddress,
-      ...triageLines(triage, done, (a) => {
-        const r = resultChips(a.id, records);
-        return r.length ? [`  → 確かめた結果：${r.join("・")}`] : [];
-      }),
-    ].join("\n");
+  // コピーする文：ほかの書類と同じ形（■ 見出し・▲ 注意・□ やること・字下げの細かい点。lib/app/doc.ts）。確かめた結果も添える
+  const copyText = () => docText(todoDoc(result, triage, done, new Date(), (a) => resultChips(a.id, records)));
 
-  let index = 0;
+  /** タブの中身（which：次にやること・問題になりそうな所）。index は順に浮き上がる動きの順番 */
+  const renderPane = (which: Tab) => {
+    let index = 0;
+    return which === "todo" ? (
+      <div className="space-y-4 pt-1">
+        {groups.map((g) => {
+          const Icon = GROUP_ICON[g.key];
+          const gDone = g.items.filter((i) => done.has(i.action.id)).length;
+          const all = gDone === g.items.length;
+          return (
+            <section key={g.key}>
+              <div className="td-in mb-2 flex items-center gap-2.5 px-0.5" style={{ "--i": index++ } as CSSProperties}>
+                <span className="flex size-[30px] shrink-0 items-center justify-center rounded-full" style={{ background: "#e8eef7", color: NAVY }}>
+                  <Icon size={16} strokeWidth={2.2} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-bold leading-[1.3]">{g.title}</span>
+                  <span className="block truncate text-[12px] leading-[1.4] text-muted">{g.sub}</span>
+                </span>
+                <span
+                  className="flex h-[24px] shrink-0 items-center gap-1 rounded-full px-2 text-[12px] font-semibold transition-colors duration-300"
+                  style={all ? { background: STATUS.confirmed.bg, color: GREEN } : { background: "#eef2f7", color: "#5f6f86" }}
+                >
+                  {all && <Check size={13} strokeWidth={3} />}
+                  {gDone}/{g.items.length}
+                </span>
+              </div>
+              <ul className="overflow-hidden rounded-[18px] bg-[#f4f7fb]">
+                {g.items.map((item) => (
+                  <TodoRow
+                    key={item.action.id}
+                    item={item}
+                    index={index++}
+                    done={done.has(item.action.id)}
+                    open={openId === item.action.id}
+                    gen={gen}
+                    pop={popped === item.action.id}
+                    flash={flash?.id === item.action.id ? flash.n : 0}
+                    records={records}
+                    hints={hints}
+                    pid={pid}
+                    label={label}
+                    onToggle={toggle}
+                    onOpen={toggleRow}
+                    onRecords={onRecords}
+                    onSaved={saved}
+                    photos={item.action.id === "site" ? photos : undefined}
+                  />
+                ))}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
+    ) : (
+      <div className="pt-1">
+        {!triage.issues.length ? (
+          <div className="td-in flex flex-col items-center px-4 py-8 text-center">
+            <span
+              className="flex size-12 items-center justify-center rounded-full"
+              style={{
+                background: triage.pending.length ? "#eef2f7" : STATUS.confirmed.bg,
+                color: triage.pending.length ? NAVY : GREEN,
+              }}
+            >
+              {triage.pending.length ? <span className="td-spin size-5 rounded-full border-2 border-[#133664]/25 border-t-[#133664]" /> : <Check size={22} strokeWidth={3} />}
+            </span>
+            <p className="mt-3 text-[15px] font-semibold">{triage.pending.length ? `${triage.pending.join("・")}を確認しています` : "データで見つかった注意はありません"}</p>
+            <p className="mt-1 text-[13px] leading-[1.6] text-muted">確かめる所は「次にやること」にまとめています。</p>
+          </div>
+        ) : (
+          [warns, checks].map((list) =>
+            list.length ? (
+              <section key={list[0].level} className="mb-4">
+                <h3
+                  className="td-in mb-2 flex items-center gap-1.5 px-0.5 text-[13px] font-bold"
+                  style={
+                    {
+                      color: LEVEL[list[0].level].color,
+                      "--i": index++,
+                    } as CSSProperties
+                  }
+                >
+                  {LEVEL[list[0].level].label}
+                  <span className="font-semibold text-muted">{list.length}件</span>
+                  <span className="ml-1 text-[11.5px] font-normal text-muted">{list[0].level === "warn" ? "データで制限・危険が見つかった所" : "データだけでは分からない所"}</span>
+                </h3>
+                <ul className="space-y-2">
+                  {list.map((i) => {
+                    const a = byId.get(linked.get(i.id) ?? "");
+                    return <IssueCard key={i.id} issue={i} index={index++} action={a} actionDone={!!a && done.has(a.id)} onJump={jump} />;
+                  })}
+                </ul>
+              </section>
+            ) : null,
+          )
+        )}
+      </div>
+    );
+  };
   return (
     <div ref={root} className="text-ink" data-motion={motion ? "1" : "0"}>
       <Summary done={total - left} total={total} left={left} warns={warns.length} checks={checks.length} pending={triage.pending} failed={triage.failed} cheer={cheer} />
@@ -212,103 +307,14 @@ function TodoBody({ result, triage, done, onToggle, pid, label, records, onRecor
         </div>
       </div>
 
-      <div key={tab} role="tabpanel" aria-label={tab === "todo" ? "次にやること" : "問題になりそうな所"} className="td-pane" data-dir={dir ?? undefined}>
-        {tab === "todo" ? (
-          <div className="space-y-4 pt-1">
-            {groups.map((g) => {
-              const Icon = GROUP_ICON[g.key];
-              const gDone = g.items.filter((i) => done.has(i.action.id)).length;
-              const all = gDone === g.items.length;
-              return (
-                <section key={g.key}>
-                  <div className="td-in mb-2 flex items-center gap-2.5 px-0.5" style={{ "--i": index++ } as CSSProperties}>
-                    <span className="flex size-[30px] shrink-0 items-center justify-center rounded-full" style={{ background: "#e8eef7", color: NAVY }}>
-                      <Icon size={16} strokeWidth={2.2} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[15px] font-bold leading-[1.3]">{g.title}</span>
-                      <span className="block truncate text-[12px] leading-[1.4] text-muted">{g.sub}</span>
-                    </span>
-                    <span
-                      className="flex h-[24px] shrink-0 items-center gap-1 rounded-full px-2 text-[12px] font-semibold transition-colors duration-300"
-                      style={all ? { background: STATUS.confirmed.bg, color: GREEN } : { background: "#eef2f7", color: "#5f6f86" }}
-                    >
-                      {all && <Check size={13} strokeWidth={3} />}
-                      {gDone}/{g.items.length}
-                    </span>
-                  </div>
-                  <ul className="overflow-hidden rounded-[18px] bg-[#f4f7fb]">
-                    {g.items.map((item) => (
-                      <TodoRow
-                        key={item.action.id}
-                        item={item}
-                        index={index++}
-                        done={done.has(item.action.id)}
-                        open={openId === item.action.id}
-                        gen={gen}
-                        pop={popped === item.action.id}
-                        flash={flash?.id === item.action.id ? flash.n : 0}
-                        records={records}
-                        hints={hints}
-                        pid={pid}
-                        label={label}
-                        onToggle={toggle}
-                        onOpen={toggleRow}
-                        onRecords={onRecords}
-                        onSaved={saved}
-                        photos={item.action.id === "site" ? photos : undefined}
-                      />
-                    ))}
-                  </ul>
-                </section>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="pt-1">
-            {!triage.issues.length ? (
-              <div className="td-in flex flex-col items-center px-4 py-8 text-center">
-                <span
-                  className="flex size-12 items-center justify-center rounded-full"
-                  style={{
-                    background: triage.pending.length ? "#eef2f7" : STATUS.confirmed.bg,
-                    color: triage.pending.length ? NAVY : GREEN,
-                  }}
-                >
-                  {triage.pending.length ? <span className="td-spin size-5 rounded-full border-2 border-[#133664]/25 border-t-[#133664]" /> : <Check size={22} strokeWidth={3} />}
-                </span>
-                <p className="mt-3 text-[15px] font-semibold">{triage.pending.length ? `${triage.pending.join("・")}を確認しています` : "データで見つかった注意はありません"}</p>
-                <p className="mt-1 text-[13px] leading-[1.6] text-muted">確かめる所は「次にやること」にまとめています。</p>
-              </div>
-            ) : (
-              [warns, checks].map((list) =>
-                list.length ? (
-                  <section key={list[0].level} className="mb-4">
-                    <h3
-                      className="td-in mb-2 flex items-center gap-1.5 px-0.5 text-[13px] font-bold"
-                      style={
-                        {
-                          color: LEVEL[list[0].level].color,
-                          "--i": index++,
-                        } as CSSProperties
-                      }
-                    >
-                      {LEVEL[list[0].level].label}
-                      <span className="font-semibold text-muted">{list.length}件</span>
-                      <span className="ml-1 text-[11.5px] font-normal text-muted">{list[0].level === "warn" ? "データで制限・危険が見つかった所" : "データだけでは分からない所"}</span>
-                    </h3>
-                    <ul className="space-y-2">
-                      {list.map((i) => {
-                        const a = byId.get(linked.get(i.id) ?? "");
-                        return <IssueCard key={i.id} issue={i} index={index++} action={a} actionDone={!!a && done.has(a.id)} onJump={jump} />;
-                      })}
-                    </ul>
-                  </section>
-                ) : null,
-              )
-            )}
-          </div>
-        )}
+      {/* タブを変えてもシートの高さが変わらないよう、もう一方の中身を見えないまま同じ枠に重ね、長い方の高さにそろえる */}
+      <div className="grid">
+        <div key={tab} role="tabpanel" aria-label={tab === "todo" ? "次にやること" : "問題になりそうな所"} className="td-pane col-start-1 row-start-1 min-w-0" data-dir={dir ?? undefined}>
+          {renderPane(tab)}
+        </div>
+        <div aria-hidden inert className="pointer-events-none invisible col-start-1 row-start-1 min-w-0">
+          {renderPane(tab === "todo" ? "issues" : "todo")}
+        </div>
       </div>
 
       <p className="mt-4 text-[11.5px] leading-[1.6] text-muted">{TRIAGE_NOTE}</p>

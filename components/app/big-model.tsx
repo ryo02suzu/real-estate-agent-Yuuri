@@ -354,7 +354,8 @@ function Overlay({
                   className="press flex h-[36px] shrink-0 items-center gap-[5px] rounded-full px-[13px] font-semibold transition-colors duration-200"
                   style={{ ...(on ? {} : DARK_GLASS), fontSize: 12.5, color: on ? "#2a1a04" : "#fff", background: on ? "#ffd36b" : undefined, border: on ? "1px solid #ffd36b" : undefined }}
                 >
-                  {on && <Check size={13} strokeWidth={2.6} absoluteStrokeWidth />}
+                  {/* 押しても札の幅が変わらない（並びがずれない）よう、印の場所はいつも取っておく */}
+                  <Check size={13} strokeWidth={2.6} absoluteStrokeWidth className={on ? "" : "opacity-0"} />
                   {c.key === "haz" ? `ハザード（${hazardName}）` : c.label}
                 </button>
               );

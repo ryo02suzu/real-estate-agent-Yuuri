@@ -11,6 +11,7 @@ import { classAt, hazardCards, hazardTotal, type HazardCardInfo, type Tone } fro
 import { depthFloor } from "@/lib/app/town-model";
 import { groupHazardMaps, HAZARD_MAP_LABELS, HAZARDS, hazardTileUrl, wagamachiUrl } from "@/lib/roadmap/hazard";
 import { G, GBadge, GCard, GNote, GPill, GRow, NUM, TILE, TILE_BLUE } from "./g-ui";
+import { HoldHeight } from "./hold-height";
 import { Gauge, Landslide, Liquefaction, Quake, RainCloud, Runner, WavesFill } from "./icons";
 import { PropertyMap } from "./property-map";
 import { metersText } from "./shared";
@@ -100,8 +101,10 @@ export function HazardTab({ result, data, open, expand, has3d, hazard: shown, se
         </div>
       )}
 
-      {/* 選んだ種類の読み取り（深さの目盛りと凡例） */}
-      <div className="flex gap-[14px] rounded-[18px] px-[13px] py-[12px]" style={shown === "dosha" ? TILE : TILE_BLUE}>
+      {/* 選んだ種類の読み取り（深さの目盛りと凡例）。種類を変えても板の大きさが変わらない（下の印の並びが動かない）よう、
+          いちど広がった高さより縮めない（components/app/hold-height.tsx） */}
+      <HoldHeight className="rounded-[18px]" style={shown === "dosha" ? TILE : TILE_BLUE} resetKey={result.matchedAddress}>
+      <div className="flex gap-[14px] px-[13px] py-[12px]">
         {range && <DepthGauge range={range} />}
         <div className="min-w-0 flex-1">
           <p className="flex items-center justify-between gap-[8px] leading-none">
@@ -141,6 +144,7 @@ export function HazardTab({ result, data, open, expand, has3d, hazard: shown, se
           )}
         </div>
       </div>
+      </HoldHeight>
 
       {/* 種類ごとの印（押すと地面の色と読み取りを切り替える） */}
       <div className="grid grid-cols-2 gap-[8px]">

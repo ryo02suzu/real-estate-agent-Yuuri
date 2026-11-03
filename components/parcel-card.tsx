@@ -474,7 +474,8 @@ function NeighborPicker({ info, numbered, roads, pick }: { info: Extract<ParcelI
       )}
       <div className="mt-3 dense:mt-2">
         <PickCopy text={text} count={chosen.size} />
-        <p className="mt-1 break-all text-[11.5px] leading-[1.5] text-muted">
+        {/* 選ぶ数で行が増えて板の大きさが変わらないよう、3行分の高さを取っておく（長いときは3行で切る。コピーする文は全部） */}
+        <p className="mt-1 line-clamp-3 min-h-[4.5em] break-all text-[11.5px] leading-[1.5] text-muted">
           {text ? `コピーする文：${text}` : "地番の数字だけを「、」でつないでコピーします（町が違う筆は町の名前も付けます）。"}
         </p>
         {pick.onMap && (
@@ -496,7 +497,8 @@ function PickChip({ label, on, onClick, pre }: { label: string; on: boolean; onC
       aria-pressed={on}
       className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[13px] leading-[1.5] dense:py-0.5 denser:px-2 denser:text-[12.5px] ${on ? "border-brand bg-brand font-semibold text-white" : "border-line text-ink"}`}
     >
-      {on && <Check className="h-3 w-3 shrink-0" strokeWidth={3} />}
+      {/* 選んでも札の幅が変わらない（並びが折り返し直さない）よう、印の場所はいつも取っておく */}
+      <Check className={`h-3 w-3 shrink-0 ${on ? "" : "opacity-0"}`} strokeWidth={3} />
       {pre && <span className={`text-[11px] font-medium ${on ? "text-white/75" : "text-muted"}`}>{pre}</span>}
       {label}
     </button>

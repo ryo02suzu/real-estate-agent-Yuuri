@@ -372,7 +372,8 @@ function NeighborsCard({ data, open, has3d, neighbors, setNeighbors, pick, motio
               className="press flex items-center gap-[4px] rounded-full px-[9px] py-[3px] transition-colors duration-200"
               style={{ fontSize: 12.5, ...NUM, background: on ? "#ffd36b" : neighbors ? "rgba(255,201,74,0.16)" : "rgba(255,255,255,0.07)", border: `1px solid ${on ? "#ffd36b" : neighbors ? "rgba(255,201,74,0.45)" : "rgba(255,255,255,0.1)"}`, color: on ? "#2a1a04" : neighbors ? "#ffe2a3" : G.text, fontWeight: on ? 600 : 400 }}
             >
-              {on && <Check size={11} strokeWidth={3} absoluteStrokeWidth />}
+              {/* 選んでも札の幅が変わらない（並びが折り返し直さず、板の高さが変わらない）よう、印の場所はいつも取っておく */}
+              <Check size={11} strokeWidth={3} absoluteStrokeWidth className={on ? "" : "opacity-0"} />
               {side && (
                 <span className="font-medium" style={{ fontSize: 10.5, opacity: on ? 0.75 : 0.62 }}>
                   {side.dir}
@@ -395,7 +396,8 @@ function NeighborsCard({ data, open, has3d, neighbors, setNeighbors, pick, motio
       </div>
       {list.length > 0 && (
         <div className="flex items-center gap-[8px] border-t px-[13px] py-[9px]" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-          <p className="min-w-0 flex-1 leading-[1.4]" style={{ fontSize: 11.5, color: text ? G.sub : G.faint }}>
+          {/* 選んだ数で1行・2行と変わって板の高さが動かないよう、2行分の高さを取っておく */}
+          <p className="flex min-h-[2.8em] min-w-0 flex-1 items-center leading-[1.4]" style={{ fontSize: 11.5, color: text ? G.sub : G.faint }}>
             {text ? (
               <span className="line-clamp-2 break-all" style={{ color: G.text }}>
                 {text}

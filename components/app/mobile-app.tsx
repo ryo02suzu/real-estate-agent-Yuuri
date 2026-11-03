@@ -45,7 +45,6 @@ import { webglAvailable } from "@/lib/map-style";
 import { propertyIdOf } from "@/lib/property-id";
 import {
   loadRecords,
-  recordLines,
   recordsDoneCount,
   RECORDS_EVENT,
   type PropertyRecords,
@@ -67,14 +66,15 @@ import {
   type Neighbor,
 } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
-import { buildSummary } from "@/lib/summary";
+import { buildReport, type ReportDetail } from "@/lib/app/report";
+import { docText } from "@/lib/app/doc";
+import { inquiryLetter } from "@/lib/app/inquiry-letter";
+import { parcelDoc } from "@/lib/app/parcel-doc";
 import { publishDocStatus } from "@/lib/app/doc-status";
 import { dataHints } from "@/lib/app/todo";
 import { confirmedItems } from "@/lib/app/confirmed";
-import { hasSender, useSender } from "@/lib/sender";
+import { useSender } from "@/lib/sender";
 import { buildDraft } from "@/lib/draft";
-import { buildInquiryText } from "@/lib/inquiry";
-import { parcelListText } from "@/lib/parcel-list";
 import { parcelAreaM2, TSUBO_M2 } from "@/lib/app/area";
 import { DraftSheet } from "../draft-sheet";
 import { FullMap } from "../full-map";
@@ -102,7 +102,7 @@ import {
 import { DetailSheet } from "./detail-sheets";
 import { ART_W, BottomNav, ZOOM, type NavKey } from "./frame";
 import { type DocKind } from "./doc-kinds";
-import { MemoSheet, TextDocSheet } from "./doc-sheets";
+import { DocSheet, InquirySheet, MemoSheet } from "./doc-sheets";
 import { DocsBackdrop, DocsPage, docsPhoto, docsTop } from "./docs";
 import {
   FavoritesBackdrop,
@@ -1165,6 +1165,8 @@ export function MobileApp(props: MobileAppProps) {
 }
 
 /** 検索したときの「地球から土地までズーム」（地図の部品と一緒に、使うときだけ読む。components/app/globe-flight.tsx） */
+/** 結果の文面の長さ（要点・詳しく）を覚える鍵 */
+const DETAIL_KEY = "michilu:report-detail";
 const GlobeFlight = dynamic(() => import("./globe-flight"), { ssr: false });
 /** 降りたあと、物件の画面がふわっと出る間（app/globals.css の .flight-arrive は 0.6 秒。少し長めに待ってから外す） */
 const ARRIVE_MS = 700;
@@ -1392,6 +1394,22 @@ function PropertyView({
   const [triage, setTriage] = useState(false);
   // レポートのシートを結果の文面の画面で開くか（書類・出力のページで「結果の文面」を選んだとき）
   const [reportText, setReportText] = useState(false);
+  // 結果の文面の長さ（要点・詳しく。端末に覚える）
+  const [reportLen, setReportLenState] = useState<ReportDetail>(() => {
+    try {
+      return localStorage.getItem(DETAIL_KEY) === "full" ? "full" : "short";
+    } catch {
+      return "short";
+    }
+  });
+  const setReportLen = (d: ReportDetail) => {
+    setReportLenState(d);
+    try {
+      localStorage.setItem(DETAIL_KEY, d);
+    } catch {
+      // 保存できない端末では、開いている間だけ覚える
+    }
+  };
   const [draft, setDraft] = useState(false);
   const [guide, setGuide] = useState(false);
   // 役所の照会文・謄本用の地番の一覧（文面のシート）・調査メモの印刷の確認（components/app/doc-sheets.tsx）
@@ -1479,9 +1497,10 @@ function PropertyView({
     { ...loadedData, triage: data.triage, done: checklist.done },
     off,
   );
-  /** 共有・コピーの文（結果の文面と、あなたの確認の記録） */
-  const summaryText = () =>
-    [buildSummary(result, input), ...recordLines(records)].join("\n");
+  /** 結果の文面の中身（要点・詳しく。あなたの確認の記録も入る。lib/app/report.ts） */
+  const reportDoc = () => buildReport(result, input, { detail: reportLen, date: new Date(), area: lotAreaText, records });
+  /** 共有・コピーの文 */
+  const summaryText = () => docText(reportDoc());
   /** 書類を開く（レポートのシート・書類・出力のページから。コピー・印刷は開いたシートの中の、押した操作で呼ぶ） */
   const openDoc = (kind: DocKind) => {
     setReport(kind === "copy");
@@ -1983,6 +2002,9 @@ function PropertyView({
   const lotNumber = lotParcel && lotIsProperty ? registryChiban(lotParcel.chibanRaw) : undefined;
   const refLot = lotParcel && !lotIsProperty ? registryChiban(lotParcel.chibanRaw) : undefined;
   const lotArea = lotParcel && lotIsProperty ? parcelAreaM2(lotParcel) : undefined;
+  // 書類に入れる面積の目安（推定の位置・参考図の筆は丸める）
+  const lotRough = !!(lotParcel?.estimated || lotParcel?.sanko);
+  const lotAreaText = lotArea ? `約${areaLabel(lotArea, lotRough)}㎡（約${lotRough ? Math.round(lotArea / TSUBO_M2) : (lotArea / TSUBO_M2).toFixed(1)}坪）` : undefined;
   const eyebrow = result.picked
     ? "地図で選んだ地点"
     : found
@@ -2345,7 +2367,9 @@ function PropertyView({
           onCopy={() => reportCopy.copy(summaryText())}
           copied={reportCopy.done}
           onShare={canShare ? () => void share() : undefined}
-          preview={summaryText()}
+          doc={reportDoc()}
+          detail={reportLen}
+          onDetail={setReportLen}
           off={off}
           onToggle={(k) =>
             setOff((cur) => {
@@ -2414,23 +2438,23 @@ function PropertyView({
         motion={motion}
         photos={photos}
       />
-      {/* 役所の照会文：建築の担当課（分かっていれば窓口の名前）宛ての FAX・メールの依頼文。物件の筆の地番が分かっていれば入れる */}
-      <TextDocSheet
+      {/* 役所の照会文：建築の担当課（分かっていれば窓口の名前）宛ての、日付・差出人・記・回答欄つきの依頼文（FAX は A4 で印刷）。
+          物件の筆の地番が分かっていれば入れる */}
+      <InquirySheet
         open={inquiry}
         onClose={() => setInquiry(false)}
-        title="道路種別の照会文"
-        lead={`${inquiryDept} に FAX・メールで、前面道路の建築基準法上の種別を聞くときの依頼文です。${hasSender(sender) ? "最後に差出人が入ります。" : "差出人（会社名・担当者・電話）を入れると、最後に入ります。"}${result.contact?.noPhoneInquiry ? "この市区町村は電話では答えてもらえません（窓口・FAX・メールで）。" : ""}住宅地図・公図の写し（物件に印）を添えると早く答えてもらえます。`}
-        text={buildInquiryText(result.matchedAddress.normalize("NFKC"), inquiryDept, found ? registryChiban(found.chibanRaw) : undefined, sender)}
+        lead={`${inquiryDept} あての照会文です。メールは「コピー」して本文に、FAX は「印刷・PDF」で A4 にして送れます。${result.contact?.noPhoneInquiry ? "この市区町村は電話では答えてもらえません。" : ""}`}
+        letter={inquiryLetter({ address: result.matchedAddress, chiban: found ? registryChiban(found.chibanRaw) : undefined, dept: inquiryDept, sender, date: new Date() })}
         extra={<SenderInline />}
-        note="役所によって、照会の受け方（窓口のみ・FAX・メール・様式あり）が違います。先に電話か公式サイトで確かめてください。"
+        note="役所によって照会の受け方（窓口のみ・FAX・メール・決まった様式）が違います。先に電話か公式サイトで確かめてください。住宅地図・公図の写し（物件に印）を添えると早く答えてもらえます。"
       />
-      {/* 謄本・公図を取るときの地番の一覧（1行に1筆。法務局の窓口・登記情報提供サービスに） */}
-      <TextDocSheet
+      {/* 謄本・公図を取るときの地番の一覧（1筆ずつ□付き。請求するもの・請求のしかたも） */}
+      <DocSheet
         open={parcelsDoc}
         onClose={() => setParcelsDoc(false)}
         title="謄本・公図用の地番"
-        lead="物件の筆と、境界が接している筆の所在・地番です（地図データから。1行に1筆）。法務局の窓口・登記情報提供サービスで、この所在と地番を指定します。"
-        text={parcelListText(result, loadedData.parcels)}
+        lead="物件の筆と、境界が接している筆です（地図データから）。法務局の窓口・登記情報提供サービスで、所在と地番を1筆ずつ指定します。"
+        doc={parcelDoc(result, loadedData.parcels, new Date())}
         note="筆の位置は地図データのもので、法務局の証明ではありません。住所で調べたときの筆は住所の地点にある筆（参考）なので、公図で物件の筆を確かめてください。"
       />
       <MemoSheet
@@ -2452,6 +2476,7 @@ function PropertyView({
         input={draftInput()}
         open={draft}
         onClose={() => setDraft(false)}
+        tidy
       />
       <GuideMapSheet
         result={result}
@@ -2474,6 +2499,8 @@ function PropertyView({
         records={records}
         sender={sender}
         photos={photos.items.map((x) => x.url)}
+        area={lotAreaText}
+        form
       />
     </div>
   );
