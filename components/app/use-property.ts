@@ -3,7 +3,7 @@
 // スマホの新しい見た目（紺）で、1つの物件について読むデータをまとめる。今までの部品の読み込み（用途地域・筆・道路・ハザード・建物・地価・
 // 学区・駅）に、周辺環境の画面で使う施設（地図の印と飲食店の数）と、ハザードの画面の指定緊急避難場所を足す。
 // どれもブラウザから国・自治体・OpenStreetMap のデータを直接読み、物件の住所を自前のサーバーに送らない
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { LookupResult } from "@/lib/roadmap";
 import { withRetry } from "@/lib/retry";
 import { dealCity, dealsInTown, DEALS_DATA, loadDeals, type DealRecord } from "@/lib/roadmap/deals";
@@ -12,6 +12,7 @@ import { facilitiesNear, withNationalHospitals } from "@/lib/roadmap/facilities"
 import { nearbyPois, nearestOf, POI_DATA, POI_EXTRA, POI_ORDER, type Poi, type PoiWalk } from "@/lib/roadmap/poi";
 import { pmtilesPoiSource } from "@/lib/roadmap/poi-tiles";
 import { routedOk, walkMinutes, walkTo } from "@/lib/roadmap/walk";
+import { ratioHint } from "@/lib/app/ratio-hint";
 import { HAS_DINING_DATA } from "@/lib/app/scores";
 import { useBuilding } from "../building-card";
 import { useHazard } from "../hazard-card";
@@ -165,8 +166,13 @@ export function useProperty(result: Ok) {
   // 共有の文面・下書き・調査メモには、今までどおり生活環境の種類だけ（飲食店は入れない）
   const pois: PoiState = around.status === "ok" ? { status: "ok", pois: around.nearest.filter((p) => POI_ORDER.includes(p.kind)) } : around;
   const landPrice5 = landPrice.status === "ok" ? { ...landPrice, hits: landPrice.hits.slice(0, 5) } : landPrice;
+  // 都市計画のデータに建ぺい率・容積率が無い市で、画面に（参考）として出す近くの同じ用途地域の地点の値（要注意点の文にも入れる）
+  const ratioRef = useMemo(() => {
+    const y = zoning.status === "ok" ? zoning.zoning.youto[0] : undefined;
+    return y && (!y.bcr || !y.far) && landPrice.status === "ok" ? ratioHint(y.name, landPrice.hits) : undefined;
+  }, [zoning, landPrice]);
   // この物件で問題になりそうな所と、次にやること（読み込みの状態が変わるたびに出し直す）
-  const triage = useTriage(result, { zoning, parcels, roads, hazard, building, liq, zousei, rireki });
+  const triage = useTriage(result, { zoning, parcels, roads, hazard, building, liq, zousei, rireki, ratioRef });
   return { zoning, parcels, roads, hazard, building, landPrice, landPrice5, schools, stations, around, pois, evac, deals, liq, zousei, rireki, triage };
 }
 

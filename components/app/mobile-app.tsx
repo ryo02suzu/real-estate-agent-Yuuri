@@ -1591,6 +1591,9 @@ function PropertyView({
   // 見出し（街の模型が見える所）の高さ：画面の 60%（背の低い画面でも 330pt）
   const heroH = Math.round(Math.max(330, (screenH ?? 760) * 0.6));
   const heroBox = useRef<HTMLDivElement>(null);
+  /** 右下の「大きく見る」と出典（模型の札をここに重ねない） */
+  const bigBtn = useRef<HTMLButtonElement>(null);
+  const creditBox = useRef<HTMLParagraphElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -1630,7 +1633,12 @@ function PropertyView({
         sheetTop,
         topLimit: Math.max(top.bottom - box.top, y > 4 ? bar : 0) + 4,
         // 見出しの字の行ごとの四角（字の右の空いた所には札を出せる）
-        avoid: [...(textRef.current?.children ?? [])].map((c) => {
+        avoid: [
+          ...(textRef.current?.children ?? []),
+          ...[bigBtn.current, creditBox.current].filter(
+            (c): c is HTMLButtonElement | HTMLParagraphElement => !!c,
+          ),
+        ].map((c) => {
           const r = c.getBoundingClientRect();
           return {
             l: r.left - box.left - 8,
@@ -1752,7 +1760,15 @@ function PropertyView({
       scene.current.wheel(e);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
+    // 2本指を置いている間は、画面をスクロールさせない（2本指の上下の動きを模型の移動に使う。1本指の縦はいつものスクロール）
+    const onTouch = (e: TouchEvent) => {
+      if (e.touches.length >= 2 && e.cancelable) e.preventDefault();
+    };
+    el.addEventListener("touchmove", onTouch, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchmove", onTouch);
+    };
   }, []);
   // 再開のために、開いているタブ・シートと止まったときのスクロール位置を残す（この物件の鍵があるときだけ）
   const detailKind = detail?.kind;
@@ -2043,25 +2059,27 @@ function PropertyView({
       )}
     </>
   );
-  // 出典（模型に使っているもの。タブで変わる）
-  const credit = [
-    has3d
-      ? "地図：国土地理院ベクトルタイル（建物の高さは目安）"
-      : "地図：地理院タイル",
-    lotParcel
-      ? lotParcel.sanko
-        ? "筆：市町村の地番参考図"
-        : lotParcel.estimated
-          ? "筆：登記所備付地図データ（法務省）から推定した位置"
-          : "筆：登記所備付地図データ（法務省）を加工"
-      : "",
-    tab === "law" ? "用途地域：国土交通省 都市計画決定GISデータ" : "",
-    tab === "hazard" ? "ハザード：重ねるハザードマップ（国土地理院）" : "",
-    tab === "around"
-      ? "施設・駅の出入口：© OpenStreetMap contributors・駅・学区：国土数値情報"
-      : "",
-    tab === "price" ? "地価：国土数値情報（地価公示・地価調査）" : "",
-  ].filter(Boolean);
+  // 出典（模型に使っているもの。タブで変わる）。どのタブの出典も同じ枠に重ねて、いちばん長いタブの高さを取っておく
+  // （タブを変えても、上の「大きく見る」ボタンが動かず、出典の字とも重ならないように）
+  const creditFor = (t: TabKey) =>
+    [
+      has3d
+        ? "地図：国土地理院ベクトルタイル（建物の高さは目安）"
+        : "地図：地理院タイル",
+      lotParcel
+        ? lotParcel.sanko
+          ? "筆：市町村の地番参考図"
+          : lotParcel.estimated
+            ? "筆：登記所備付地図データ（法務省）から推定した位置"
+            : "筆：登記所備付地図データ（法務省）を加工"
+        : "",
+      t === "law" ? "用途地域：国土交通省 都市計画決定GISデータ" : "",
+      t === "hazard" ? "ハザード：重ねるハザードマップ（国土地理院）" : "",
+      t === "around"
+        ? "施設・駅の出入口：© OpenStreetMap contributors・駅・学区：国土数値情報"
+        : "",
+      t === "price" ? "地価：国土数値情報（地価公示・地価調査）" : "",
+    ].filter(Boolean);
 
   return (
     <div ref={root} className="pv-page relative text-white">
@@ -2225,16 +2243,42 @@ function PropertyView({
           topRef={topRef}
           textRef={textRef}
         />
-        {/* 街の模型を大きく見る（模型が出せない端末は、平らな地図を大きく） */}
-        <button
-          onClick={has3d ? enterBig : () => setFull({})}
-          aria-label={has3d ? "街の模型を大きく見る（指で自由に動かせる）" : "地図を大きく見る"}
-          className="pv-bigbtn press absolute bottom-[44px] right-[14px] z-[3] flex h-[36px] items-center gap-[6px] rounded-full pl-[11px] pr-[13px] font-semibold text-white"
-          style={{ ...LIGHT_GLASS, fontSize: 12.5, textShadow: "none" }}
-        >
-          <Maximize2 size={15} strokeWidth={2} absoluteStrokeWidth />
-          {has3d ? "大きく見る" : "地図を大きく"}
-        </button>
+        {/* 右下：街の模型を大きく見る（模型が出せない端末は、平らな地図を大きく）と、その下に出典。ボタンは出典の枠の上に積むので重ならない */}
+        <div className="pointer-events-none absolute bottom-[10px] right-[12px] z-[3] flex flex-col items-end gap-[7px]">
+          <button
+            ref={bigBtn}
+            onClick={has3d ? enterBig : () => setFull({})}
+            aria-label={has3d ? "街の模型を大きく見る（指で自由に動かせる）" : "地図を大きく見る"}
+            className="pv-bigbtn press pointer-events-auto flex h-[36px] items-center gap-[6px] rounded-full pl-[11px] pr-[13px] font-semibold text-white"
+            style={{ ...LIGHT_GLASS, fontSize: 12.5, textShadow: "none" }}
+          >
+            <Maximize2 size={15} strokeWidth={2} absoluteStrokeWidth />
+            {has3d ? "大きく見る" : "地図を大きく"}
+          </button>
+          <p
+            ref={creditBox}
+            className="pv-credit grid max-w-[300px] text-right leading-[1.35]"
+            style={{
+              fontSize: 9,
+              color: "rgba(255,255,255,0.62)",
+              textShadow: "0 1px 2px rgba(0,0,0,0.6)",
+            }}
+          >
+            {TABS.map(({ key }) => (
+              <span
+                key={key}
+                aria-hidden={key !== tab}
+                className={`col-start-1 row-start-1 ${key === tab ? "" : "invisible"}`}
+              >
+                {creditFor(key).map((c) => (
+                  <span key={c} className="block">
+                    {c}
+                  </span>
+                ))}
+              </span>
+            ))}
+          </p>
+        </div>
         {rotHint && (
           <div className="pv-rothint pointer-events-none absolute bottom-[44px] left-[14px] z-[3] flex">
             <span className="flex items-center gap-[7px] rounded-full px-[14px] py-[8px] font-semibold text-white" style={{ background: "rgba(10,16,30,0.62)", border: "1px solid rgba(255,255,255,0.2)", fontSize: 12.5 }}>
@@ -2243,20 +2287,6 @@ function PropertyView({
             </span>
           </div>
         )}
-        <p
-          className="pv-credit pointer-events-none absolute bottom-[10px] right-[12px] max-w-[300px] text-right leading-[1.35]"
-          style={{
-            fontSize: 9,
-            color: "rgba(255,255,255,0.62)",
-            textShadow: "0 1px 2px rgba(0,0,0,0.6)",
-          }}
-        >
-          {credit.map((c) => (
-            <span key={c} className="block">
-              {c}
-            </span>
-          ))}
-        </p>
       </div>
 
       {/* すりガラスのシート（タブの切り替えと中身） */}

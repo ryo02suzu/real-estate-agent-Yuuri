@@ -97,7 +97,8 @@ export function buildingNotes({ zoning: z, morido, hourei, tochi, roads, buildin
     base.push({ icon: "fire", title: "防火地域での建築制限", body: "階数3以上か延べ面積100㎡超は耐火建築物等、それ以外は準耐火建築物等にする必要があります（建築基準法61条）。" });
   else if (z.bouka === "準防火地域")
     base.push({ icon: "fire", title: "準防火地域での建築制限", body: "地上4階以上か延べ1,500㎡超は耐火建築物等、地上3階か延べ500㎡超は準耐火建築物等にする必要があります（建築基準法61条）。" });
-  else if (z.tokei || z.jyuntoshi) base.push({ icon: "fire", title: "防火の指定", body: "防火地域・準防火地域の指定はありません。屋根の不燃化が要る法22条区域かは市で確認してください。" });
+  // 指定が無いときの題は「指定あり」と読まれないように、確かめることを題にする
+  else if (z.tokei || z.jyuntoshi) base.push({ icon: "fire", title: "法22条区域かの確認", body: "防火地域・準防火地域の指定はありません（都市計画のデータ）。屋根の不燃化などが要る法22条区域かは市で確認してください。" });
 
   // 容積率（前面道路の幅による上限。建築基準法52条2項）と建ぺい率の緩和（53条）
   if (y?.far) {

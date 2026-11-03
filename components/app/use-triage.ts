@@ -26,6 +26,8 @@ export type TriageSources = {
   liq?: Loaded<Liquefaction | null>;
   zousei?: Loaded<Zousei>;
   rireki?: Loaded<RirekiRecord[]>;
+  /** スマホだけ：建ぺい率・容積率の（参考）の値（lib/app/triage.ts の TriageInput.ratioRef） */
+  ratioRef?: TriageInput["ratioRef"];
 };
 
 /** 筆の状態を、隣地の地番（登記の地番）の並びにして渡す */
@@ -35,11 +37,11 @@ function parcelsOf(info: ParcelInfo): TriageInput["parcels"] {
 }
 
 export function triageFrom(result: Ok, s: TriageSources): Triage {
-  return triageOf({ result, zoning: s.zoning, parcels: parcelsOf(s.parcels), roads: s.roads, hazard: s.hazard, building: s.building, liq: s.liq, zousei: s.zousei, rireki: s.rireki });
+  return triageOf({ result, zoning: s.zoning, parcels: parcelsOf(s.parcels), roads: s.roads, hazard: s.hazard, building: s.building, liq: s.liq, zousei: s.zousei, rireki: s.rireki, ratioRef: s.ratioRef });
 }
 
 /** 読み込みの状態が変わったときだけ出し直す */
 export function useTriage(result: Ok, s: TriageSources): Triage {
-  const { zoning, parcels, roads, hazard, building, liq, zousei, rireki } = s;
-  return useMemo(() => triageFrom(result, { zoning, parcels, roads, hazard, building, liq, zousei, rireki }), [result, zoning, parcels, roads, hazard, building, liq, zousei, rireki]);
+  const { zoning, parcels, roads, hazard, building, liq, zousei, rireki, ratioRef } = s;
+  return useMemo(() => triageFrom(result, { zoning, parcels, roads, hazard, building, liq, zousei, rireki, ratioRef }), [result, zoning, parcels, roads, hazard, building, liq, zousei, rireki, ratioRef]);
 }

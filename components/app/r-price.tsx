@@ -7,6 +7,7 @@
 import { Map as MapIcon } from "lucide-react";
 import { useState } from "react";
 import { parcelAreaM2, TSUBO_M2 } from "@/lib/app/area";
+import { refLandPoint, usageForZone } from "@/lib/app/ratio-hint";
 import { asOfText, changeText, distanceText, kindText, type LandPriceHit } from "@/lib/roadmap/land-price";
 import { G, GBadge, GNote, GPill, GStat, NUM, TILE, TILE_GOLD } from "./g-ui";
 import { DealsSection } from "./r-deals";
@@ -22,11 +23,13 @@ export function okuText(v: number): string {
 
 export function PriceTab(props: TabProps) {
   const { data, expand } = props;
-  const { landPrice, parcels } = data;
+  const { landPrice, parcels, zoning } = data;
   const hits = landPrice.status === "ok" ? landPrice.hits : [];
-  const top = hits[0];
+  // 参考の地点は、物件の用途地域に合う用途（住宅地・商業地など）の、いちばん近い地点（無ければいちばん近い地点）
+  const youto = zoning.status === "ok" ? zoning.zoning.youto[0]?.name : undefined;
+  const { top, matched } = refLandPoint(hits, youto);
   const near = hits.filter((h) => h.distance <= 2000);
-  // 平均と幅は、いちばん近い地点と用途（住宅地・商業地など）が同じ 2km 以内の地点だけで出す（商業地と住宅地を混ぜると意味のない値になる）
+  // 平均と幅は、参考の地点と用途（住宅地・商業地など）が同じ 2km 以内の地点だけで出す（商業地と住宅地を混ぜると意味のない値になる）
   const sameAll = near.filter((h) => h.usage === top?.usage);
   const avg = sameAll.length ? sameAll.reduce((s, h) => s + h.price, 0) / sameAll.length : undefined;
   // 幅は近い6地点
@@ -37,7 +40,11 @@ export function PriceTab(props: TabProps) {
   // 公図から推定した筆・市の地番参考図の筆は、形から測った面積が地積と大きく違うことがあるので計算しない
   const own = parcels.status === "ok" && parcels.kind !== "address";
   const rough = !!parcel && !!(parcel.estimated || parcel.sanko);
-  const area = own && parcel && !rough && /^\d/.test(parcel.chibanRaw) ? parcelAreaM2(parcel) : undefined;
+  const want = usageForZone(youto);
+  // 建物が共同住宅（マンション）なら、筆は敷地全体なので掛けない（部屋の価格の目安にならない）
+  const condo = data.building.status === "ok" && /共同住宅/.test(data.building.result.hit?.building.usage ?? "");
+  // 物件の用途地域と用途が違う地点（近くに同じ用途の地点が無いとき）の単価は、面積に掛けない
+  const area = own && parcel && !rough && !condo && /^\d/.test(parcel.chibanRaw) && (matched || !want) ? parcelAreaM2(parcel) : undefined;
 
   return (
     <div className="flex flex-col gap-[10px]">
@@ -80,7 +87,7 @@ export function PriceTab(props: TabProps) {
             <GStat
               label="地価×面積"
               value={area ? `約${okuText(area * top.price)}` : "―"}
-              note={area ? `${Math.round(area).toLocaleString("ja-JP")}㎡×上の単価` : parcels.status === "loading" ? "筆を確認中…" : rough ? "推定の筆は対象外" : "地番か地図で調べると出ます"}
+              note={area ? `${Math.round(area).toLocaleString("ja-JP")}㎡×上の単価` : parcels.status === "loading" ? "筆を確認中…" : rough ? "推定の筆は対象外" : condo ? "マンションの敷地は対象外" : !matched && want ? `近くに${want}の地点なし` : "地番か地図で調べると出ます"}
               small
             />
           </div>
@@ -101,7 +108,9 @@ export function PriceTab(props: TabProps) {
             </div>
           )}
           <GNote>
-            出典：国土数値情報（地価公示・地価調査）。地域の標準的な土地の価格で、物件そのものの価格・査定ではありません。平均と幅は{top.usage}の地点だけ。
+            出典：国土数値情報（地価公示・地価調査）。地域の標準的な土地の価格で、物件そのものの価格・査定ではありません。
+            {matched ? `物件の用途地域に合う${top.usage}の地点のうち、いちばん近い地点です。` : want ? `2km以内に${want}の地点が無いため、いちばん近い${top.usage}の地点を出しています（用途が違うので、比べるときは注意）。` : ""}
+            平均と幅は{top.usage}の地点だけ。
             {area ? "「地価×面積」は、筆の形から測った図面上の面積に上の地点の単価を掛けた目安です（地積は登記で、価格は個別の条件で変わります）。" : ""}
           </GNote>
         </>

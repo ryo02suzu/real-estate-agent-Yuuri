@@ -8,7 +8,7 @@
 import { Check, ChevronRight, Copy, Eye, EyeOff, ListChecks, Map as MapIcon, SquareArrowOutUpRight, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { parcelAreaM2 } from "@/lib/app/area";
-import { ratioHint } from "@/lib/app/ratio-hint";
+import { ratioHint, refLandPoint } from "@/lib/app/ratio-hint";
 import type { Triage } from "@/lib/app/triage";
 import { usageShort } from "@/lib/roadmap/building";
 import { bySide, sideText } from "@/lib/app/neighbor-plan";
@@ -51,11 +51,14 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
       ? schoolGaps(result.municipality.codes[0], schools.status === "ok" ? schools.schools : null).find((g) => g.key === "es")?.why
       : undefined;
   const hit = building.status === "ok" ? building.result.hit : undefined;
+  // 建物が共同住宅（マンション）なら、筆の面積は敷地全体（部屋の面積ではない）
+  const condo = !!hit && /共同住宅/.test(hit.building.usage ?? "");
   // 用途地域のデータに建ぺい率・容積率が無い市は、近くの同じ用途地域の地価公示などの値を参考に出す
   const hint = y && (!y.bcr || !y.far) && landPrice.status === "ok" ? ratioHint(y.name, landPrice.hits) : undefined;
   const bcr = y?.bcr ? `${y.bcr}%` : hint ? `${hint.bcr}%（参考）` : undefined;
   const far = y?.far ? `${y.far}%` : hint ? `${hint.far}%（参考）` : undefined;
-  const top = landPrice.status === "ok" ? landPrice.hits[0] : undefined;
+  // 土地の参考価格：物件の用途地域に合う用途（住宅地・商業地など）の、いちばん近い地点
+  const top = landPrice.status === "ok" ? refLandPoint(landPrice.hits, y?.name).top : undefined;
   // 筆の出どころ（地番で探した・地図で選んだ・住所の地点）
   const parcelSub = parcel
     ? `${parcels.status === "ok" && parcels.kind === "chiban" ? "地番で探した筆" : parcels.status === "ok" && parcels.kind === "picked" ? "地図で選んだ地点の筆" : offLot ? "住所の地点の筆（道路などの可能性）" : "住所の地点の筆（参考）"}${result.parcelOthers ? `・同じ地番がほかに${result.parcelOthers}件` : ""}`
@@ -118,7 +121,7 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
             onClick={() => open("parcel")}
           />
           <GCell
-            label="面積（図面上）"
+            label={condo ? "敷地全体の面積（図面上）" : "面積（図面上）"}
             value={parcels.status === "loading" ? <GFaint /> : area ? <span style={NUM}>約{areaLabel(area, roughArea)}㎡</span> : <GFaint>{parcels.status === "error" ? "読み込めず" : townCenter || offLot ? "場所を直すと出ます" : "登記で確認"}</GFaint>}
             sub={area ? (roughArea ? `公図の形からの目安・約${Math.round(area / TSUBO)}坪` : parcels.status === "ok" && parcels.kind === "address" ? `住所の地点の筆（参考）・約${(area / TSUBO).toFixed(1)}坪` : `約${(area / TSUBO).toFixed(1)}坪・公簿は登記で確認`) : ""}
             onClick={parcel ? () => open("parcel") : undefined}
@@ -151,7 +154,7 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
         </span>
         <span className="min-w-0 flex-1 py-[9px]">
           <span className="block truncate leading-none" style={{ fontSize: 11.5, color: G.faint }}>
-            土地の参考価格（{top ? (top.kind === "公示" ? "公示地価" : "基準地価") : "公示地価"}）
+            土地の参考価格（{top ? `${top.kind === "公示" ? "公示地価" : "基準地価"}・${top.usage}` : "公示地価"}）
           </span>
           {top ? (
             <span className="mt-[6px] block truncate leading-none" style={{ fontSize: 17, color: G.text, ...NUM }}>

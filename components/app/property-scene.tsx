@@ -26,6 +26,7 @@ import { KIND_STYLE, metersText } from "./shared";
 import { SKY_EVENT } from "./sky-event";
 import { TileMap } from "./tile-map";
 import { reducedMotion } from "./tokens";
+import { refLandPoint } from "@/lib/app/ratio-hint";
 import type { FrontRoad, HazardPick } from "./types";
 import type { Ok, PropertyData } from "./use-property";
 
@@ -447,7 +448,8 @@ export function PropertyBackdrop({ result, data, tab, motion, hold, neighbors, p
     const st = stations.status === "ok" ? stations.stations[0] : undefined;
     const stAt = st?.at ? toLocal(st.at[0], st.at[1]) : null;
     const hits = landPrice.status === "ok" ? landPrice.hits : [];
-    const top = hits[0];
+    // 相場のタブと同じ地点（物件の用途地域に合う用途の、いちばん近い地点）
+    const top = refLandPoint(hits, zoning.status === "ok" ? zoning.zoning.youto[0]?.name : undefined).top;
     const topAt = top && top.distance < 3000 ? toLocal(top.point[0], top.point[1]) : null;
     const pins: ScenePin[] = [];
     const labels: SceneLabel[] = [];

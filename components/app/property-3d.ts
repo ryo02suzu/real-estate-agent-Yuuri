@@ -1153,7 +1153,6 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
 
   // ---- カメラ
   let drag: { x: number; y: number; az: number; po: number; t: number; vx: number; id: number } | null = null;
-  let pinch: { d: number; dist: number } | null = null;
   let tap: { x: number; y: number; t: number } | null = null;
   let lastTap = 0;
   let lotTapAt = 0;
@@ -1173,10 +1172,94 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
   let camCb: ((v: CameraView) => void) | null = null;
   let lastCam = "";
   let freeTapOut: FreeTap | null = null;
-  let gest: { d: number; ang: number; my: number; dist: number; azim: number; polar: number } | null = null;
+  /**
+   * 2本指の操作。地図アプリと同じ感覚にする：指のあいだの真ん中の下の地面が指についてくる（ずらす）、ひねると指と同じ向きに回る、
+   * 広げる・すぼめると寄る・引く。全画面では、2本指をそろえて上下になぞると傾ける（mode が決まるまでは "?"）
+   */
+  let gest: {
+    a0: { x: number; y: number };
+    b0: { x: number; y: number };
+    d: number;
+    ang: number;
+    mid: { x: number; y: number };
+    dist: number;
+    azim: number;
+    polar: number;
+    tx: number;
+    tz: number;
+    /** 指の真ん中の下の地面（動かしている間、この点を指の下に保つ） */
+    anchor: T.Vector3 | null;
+    mode: "?" | "map" | "tilt";
+  } | null = null;
   let panStart: { x: number; y: number; tx: number; tz: number; id: number } | null = null;
   let panLast: { t: number; tx: number; tz: number } | null = null;
   const panVel = { x: 0, z: 0 };
+  /** 画面の点（clientX・Y）の下の地面（高さ 0 の面）。空を指しているときは null */
+  const groundAt = (x: number, y: number, out = new THREE.Vector3()) => {
+    const r = canvas.getBoundingClientRect();
+    placeCamera();
+    camera.updateMatrixWorld();
+    ray.setFromCamera(new THREE.Vector2(((x - r.left) / Math.max(1, r.width)) * 2 - 1, -((y - r.top) / Math.max(1, r.height)) * 2 + 1), camera);
+    const p = ray.ray.intersectPlane(tapPlane, out);
+    // 遠すぎる点（地平線のあたり）は、少しの指の動きで大きく飛ぶので使わない
+    return p && Math.hypot(p.x - cam.tx, p.z - cam.tz) < cam.dist * 4 ? p : null;
+  };
+  /** 2本指を置いた */
+  function gestStart() {
+    const [a, b] = [...ptrs.values()];
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    gest = { a0: { ...a }, b0: { ...b }, d: Math.hypot(a.x - b.x, a.y - b.y), ang: Math.atan2(b.y - a.y, b.x - a.x), mid, dist: cam.dist, azim: cam.azim, polar: cam.polar, tx: cam.tx, tz: cam.tz, anchor: null, mode: "?" };
+    gest.anchor = groundAt(mid.x, mid.y, new THREE.Vector3());
+  }
+  /** 2本指を動かした。tilt：上下にそろえてなぞると傾けるか（全画面だけ）。min・max：寄れる範囲 */
+  function gestMove(tilt: boolean, min: number, max: number) {
+    if (!gest) return;
+    const g = gest;
+    const [a, b] = [...ptrs.values()];
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    let da = Math.atan2(b.y - a.y, b.x - a.x) - g.ang;
+    while (da > Math.PI) da -= 2 * Math.PI;
+    while (da < -Math.PI) da += 2 * Math.PI;
+    if (g.mode === "?") {
+      // 少し動いてから決める：2本の指が同じ向きに上下へ動き、間の長さと角度がほとんど変わらなければ「傾ける」
+      const ay = a.y - g.a0.y;
+      const by = b.y - g.b0.y;
+      const ax = a.x - g.a0.x;
+      const bx = b.x - g.b0.x;
+      const moved = Math.max(Math.hypot(ax, ay), Math.hypot(bx, by));
+      if (moved < 10) return;
+      const side = Math.abs(Math.cos(g.ang)) > 0.6;
+      const shove = tilt && side && ay * by > 0 && Math.abs(ay) > 8 && Math.abs(by) > 8 && Math.abs(ax) + Math.abs(bx) < (Math.abs(ay) + Math.abs(by)) * 0.6 && Math.abs(d - g.d) < g.d * 0.12 && Math.abs(da) < 0.12;
+      g.mode = shove ? "tilt" : "map";
+    }
+    if (g.mode === "tilt") {
+      // 2本指を上へ動かすと寝かせる（斜めから見る）、下へ動かすと真上へ
+      cam.polar = clamp(g.polar - (mid.y - g.mid.y) * 0.0055, 0.03, 1.3);
+      return;
+    }
+    // 寄る・回る（ひねった向きと同じ向きに地図が回る）を先に決めて、指の真ん中の下に最初の地面の点を戻す（ずらす）
+    cam.dist = clamp(g.dist * (g.d / Math.max(20, d)), min, max);
+    cam.azim = g.azim + da;
+    cam.tx = g.tx;
+    cam.tz = g.tz;
+    const now = g.anchor ? groundAt(mid.x, mid.y, tapAt) : null;
+    if (g.anchor && now) {
+      cam.tx += g.anchor.x - now.x;
+      cam.tz += g.anchor.z - now.z;
+    } else {
+      // 地面が取れない（空を指している）ときは、画面の動きをそのまま地面の動きにする
+      const k = metersPerPx();
+      const kf = k / Math.max(0.3, Math.cos(cam.polar));
+      const ca = Math.cos(cam.azim);
+      const sa = Math.sin(cam.azim);
+      const dx = mid.x - g.mid.x;
+      const dy = mid.y - g.mid.y;
+      cam.tx = g.tx - ca * dx * k - sa * dy * kf;
+      cam.tz = g.tz + sa * dx * k - ca * dy * kf;
+    }
+    keepNear();
+  }
   /** 地面の上で 1px が何 m か（見ている所のあたり） */
   const metersPerPx = () => (2 * cam.dist * Math.tan((camera.fov * Math.PI) / 360)) / Math.max(1, H);
   /** 物件から離れすぎない（街の模型を作った範囲の中） */
@@ -1233,7 +1316,6 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
     endFlash();
     ptrs.clear();
     drag = null;
-    pinch = null;
     gest = null;
     panStart = null;
     tap = null;
@@ -1340,8 +1422,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
       panLast = { t: now, tx: cam.tx, tz: cam.tz };
       tap = { x: e.clientX, y: e.clientY, t: now };
     } else if (ptrs.size === 2) {
-      const [a, b] = [...ptrs.values()];
-      gest = { d: Math.hypot(a.x - b.x, a.y - b.y), ang: Math.atan2(b.y - a.y, b.x - a.x), my: (a.y + b.y) / 2, dist: cam.dist, azim: cam.azim, polar: cam.polar };
+      gestStart();
       panStart = null;
       tap = null;
     }
@@ -1352,14 +1433,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
     if (!ptrs.has(e.pointerId)) return;
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (gest && ptrs.size >= 2) {
-      const [a, b] = [...ptrs.values()];
-      cam.dist = clamp(gest.dist * (gest.d / Math.max(20, Math.hypot(a.x - b.x, a.y - b.y))), FREE_MIN, FREE_MAX);
-      let da = Math.atan2(b.y - a.y, b.x - a.x) - gest.ang;
-      while (da > Math.PI) da -= 2 * Math.PI;
-      while (da < -Math.PI) da += 2 * Math.PI;
-      cam.azim = gest.azim - da;
-      // 2本指を上へ動かすと寝かせる（斜めから見る）、下へ動かすと真上へ
-      if (!planView) cam.polar = clamp(gest.polar - ((a.y + b.y) / 2 - gest.my) * 0.0055, 0.03, 1.3);
+      gestMove(!planView, FREE_MIN, FREE_MAX);
     } else if (panStart && e.pointerId === panStart.id) {
       const dx = e.clientX - panStart.x;
       const dy = e.clientY - panStart.y;
@@ -1664,7 +1738,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
       }
     }
     const panning = free && !panStart && Math.hypot(panVel.x, panVel.z) > 0.00002;
-    const active = tweens.size > 0 || !!drag || !!pinch || !!gest || !!panStart || panning || Math.abs(inertia) > 0.00005;
+    const active = tweens.size > 0 || !!drag || !!gest || !!panStart || panning || Math.abs(inertia) > 0.00005;
     // 着いたあとのゆっくりした動き（光の揺らぎ・流れ・回転）は、触ってから AMBIENT_MS の間だけ（全画面では回さない）
     const ambient = !still() && arrived && (free || layout.cover < 0.95) && t < ambientUntil;
     if (panning) {
@@ -1747,7 +1821,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
   const endPointer = (e: PointerEvent, cancelled: boolean) => {
     if (!ptrs.has(e.pointerId)) return;
     ptrs.delete(e.pointerId);
-    if (ptrs.size < 2) pinch = null;
+    if (ptrs.size < 2) gest = null;
     if (drag && ptrs.size === 0) {
       inertia = still() || cancelled ? 0 : clamp(drag.vx, -0.004, 0.004) * 16;
       drag = null;
@@ -1852,8 +1926,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
         tap = { x: e.clientX, y: e.clientY, t: performance.now() };
       }
       if (ptrs.size === 2) {
-        const [a, b] = [...ptrs.values()];
-        pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), dist: cam.dist };
+        gestStart();
         drag = null;
         tap = null;
       }
@@ -1869,9 +1942,8 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
       if (free) return freeMove(e);
       if (!ptrs.has(e.pointerId)) return;
       ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pinch && ptrs.size === 2) {
-        const [a, b] = [...ptrs.values()];
-        cam.dist = clamp(pinch.dist * (pinch.d / Math.max(20, Math.hypot(a.x - b.x, a.y - b.y))), MIN_DIST, MAX_DIST);
+      if (gest && ptrs.size === 2) {
+        gestMove(false, MIN_DIST, MAX_DIST);
         touched = true;
       } else if (drag && e.pointerId === drag.id) {
         const dx = e.clientX - drag.x;

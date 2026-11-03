@@ -29,6 +29,7 @@ import { zoningRows, type Zoning, type ZoningStatus } from "../roadmap/zoning";
 import { ZONING_CREDIT } from "../roadmap/zoning-data";
 import { RECORD_ITEMS, RECORD_TOPICS, type PropertyRecords } from "../records";
 import { compactParcels, half, jaDate, type Doc, type DocItem, type DocSection } from "./doc";
+import { ratioHint } from "./ratio-hint";
 import { TRIAGE_NOTE, type Action, type Triage } from "./triage";
 
 type Ok = Extract<LookupResult, { status: "ok" }>;
@@ -139,7 +140,14 @@ export function buildReport(result: Ok, input: ReportInput, opts: ReportOptions)
     if (youto) outline.push({ label: "用途地域", text: `${half(youto.value)}${area && area.value !== "データなし" ? `（${area.value}）` : ""}`, tone: area?.warn ? "warn" : undefined });
     else if (area) outline.push({ label: "区域", text: area.value, tone: area.warn ? "warn" : undefined });
     const bf = zv("建ぺい率・容積率");
-    if (bf) outline.push({ label: "建ぺい率・容積率", text: bf.value === "データなし" ? "データなし（市で確認）" : bf.value.replace(" ・ ", "・"), tone: bf.value === "データなし" ? "check" : undefined });
+    // 都市計画のデータに無いときは、画面の（参考）と同じ、近くの同じ用途地域の地点の値を添える（画面と文面で食い違わないように）
+    const hint = bf?.value === "データなし" ? ratioHint(zoning.zoning.youto[0]?.name, landPrice ?? []) : undefined;
+    if (bf)
+      outline.push({
+        label: "建ぺい率・容積率",
+        text: bf.value === "データなし" ? (hint ? `都市計画のデータになし（参考：約${Math.round(hint.distance)}m先の同じ用途地域の${hint.label}は ${hint.bcr}%・${hint.far}%）` : "データなし（市で確認）") : bf.value.replace(" ・ ", "・"),
+        tone: bf.value === "データなし" ? "check" : undefined,
+      });
     const fire = zv("防火・準防火");
     const height = zv("高度地区");
     if (fire || height) outline.push({ label: "防火・高度", text: [fire && `防火 ${fire.value}`, height && `高度地区 ${height.value}`].filter(Boolean).join("／") });

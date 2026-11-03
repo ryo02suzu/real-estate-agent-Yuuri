@@ -64,6 +64,6 @@ describe("法令・規制の一般的なルールの目安", () => {
     });
     expect(notes.slice(0, 5).map((n) => n.title)).toEqual(["市街化調整区域", "都市計画道路が近い", "用途地域の境目", "地区計画の区域", "建物の建築年"]);
     expect(notes.find((n) => n.title === "容積率の上限")!.body).toContain("幅×0.4（住居系）");
-    expect(notes.find((n) => n.title === "防火の指定")!.body).toContain("法22条区域");
+    expect(notes.find((n) => n.title === "法22条区域かの確認")!.body).toContain("指定はありません");
   });
 });

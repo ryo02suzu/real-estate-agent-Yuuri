@@ -38,6 +38,11 @@ export type TriageInput = {
   liq?: State<{ value: Liquefaction | null }>;
   zousei?: State<{ value: Zousei }>;
   rireki?: State<{ value: RirekiRecord[] }>;
+  /**
+   * 都市計画のデータに建ぺい率・容積率が無いとき、画面に「（参考）」で出している近くの同じ用途地域の地点の値（スマホだけが渡す。
+   * 「データに無い」と「60%（参考）」が食い違って見えないよう、同じ注意の中で言う）
+   */
+  ratioRef?: { bcr: number; far: number; distance: number; label: string };
 };
 
 /** 要注意：データで制限・危険が見つかった。要確認：データが無い・参考なので、確かめないと分からない */
@@ -215,7 +220,7 @@ function hazardIssues(report: HazardReport): Issue[] {
 }
 
 /** 都市計画・法令の注意 */
-function zoningIssues(result: Ok, z: Zoning, st: ZoningStatus | undefined, morido?: Morido, hourei?: Hourei, tochi?: Tochi): Issue[] {
+function zoningIssues(result: Ok, z: Zoning, st: ZoningStatus | undefined, morido?: Morido, hourei?: Hourei, tochi?: Tochi, ratioRef?: TriageInput["ratioRef"]): Issue[] {
   const out: Issue[] = [];
   const m = result.municipality;
   const flag = (l: keyof ZoningStatus["layers"]) => (st ? st.layers[l] : 0);
@@ -239,7 +244,19 @@ function zoningIssues(result: Ok, z: Zoning, st: ZoningStatus | undefined, morid
     out.push({ id: "chikukei", level: "warn", topic: "zoning", title: `地区計画${p.name ? `「${p.name}」` : ""}の区域`, detail: "用途・高さ・壁面の位置・最低敷地面積などに独自のルールがあることがあります。", confirm: "市の地区計画の図書で" });
   if (z.bouka === "防火地域") out.push({ id: "bouka", level: "warn", topic: "zoning", title: "防火地域", detail: "階数3以上か延べ面積100㎡超は耐火建築物等にする必要があり、建築費に効きます（建築基準法61条）。" });
   if (z.koudoti) out.push({ id: "koudoti", level: "check", topic: "zoning", title: "高度地区の指定", detail: "建物の高さの上限や北側の斜線が加わります。種類（第1種・第2種など）はデータに無いので、都市計画図で確かめます。", confirm: "市の都市計画図で" });
-  if (y && (!y.bcr || !y.far)) out.push({ id: "ratio", level: "check", topic: "zoning", title: "建ぺい率・容積率がデータに無い", detail: "市のデータに数値が入っていません。都市計画図・窓口で確かめてください。", confirm: "市の都市計画の担当で" });
+  if (y && (!y.bcr || !y.far))
+    out.push(
+      ratioRef
+        ? {
+            id: "ratio",
+            level: "check",
+            topic: "zoning",
+            title: "建ぺい率・容積率は都市計画のデータに無い",
+            detail: `${m.name}の都市計画のデータに数値が入っていません。画面の「${ratioRef.bcr}%・${ratioRef.far}%（参考）」は、${meters(ratioRef.distance)}先の同じ用途地域の${ratioRef.label}の値です。この土地の値は都市計画図・窓口で確かめてください。`,
+            confirm: "市の都市計画の担当で",
+          }
+        : { id: "ratio", level: "check", topic: "zoning", title: "建ぺい率・容積率がデータに無い", detail: "市のデータに数値が入っていません。都市計画図・窓口で確かめてください。", confirm: "市の都市計画の担当で" },
+    );
   if ((z.tokei || z.jyuntoshi) && !y && z.senbiki !== "市街化調整区域" && flag("youto") === 0)
     out.push({ id: "youto-nodata", level: "check", topic: "zoning", title: "用途地域のデータが無い", detail: `${m.name}の用途地域は国のデータにありません。都市計画図で確かめてください。`, confirm: "市の都市計画図で" });
 
@@ -567,7 +584,7 @@ export function triageOf(input: TriageInput): Triage {
     issues.push(...roadIssues(input.roads.roads));
     if (!input.roads.roads.length && result.municipality.coverage !== "none") issues.push({ id: "road-none", level: "check", topic: "road", title: "50m以内に道路種別のデータが無い", detail: "市の地図データに、物件のまわりの道路の種別が入っていません。地図を直接見るか、窓口で確かめます。", confirm: "市の地図・建築指導の窓口で" });
   } else if (input.roads.status === "error") issues.push({ id: "road-error", level: "check", topic: "road", title: "道路種別のデータを読めなかった", detail: "市の地図データを読み込めませんでした。市の地図を直接開いて確かめてください。" });
-  if (input.zoning.status === "ok") issues.push(...zoningIssues(result, input.zoning.zoning, input.zoning.st, input.zoning.morido, input.zoning.hourei, input.zoning.tochi));
+  if (input.zoning.status === "ok") issues.push(...zoningIssues(result, input.zoning.zoning, input.zoning.st, input.zoning.morido, input.zoning.hourei, input.zoning.tochi, input.ratioRef));
   else if (input.zoning.status === "error") issues.push({ id: "zoning-error", level: "check", topic: "zoning", title: "都市計画のデータを読めなかった", detail: "用途地域・建ぺい率・容積率・防火地域などを読み込めませんでした。市の都市計画図で確かめてください。", confirm: "市の都市計画図で" });
   if (input.hazard.status === "ok") issues.push(...hazardIssues(input.hazard.report));
   else if (input.hazard.status === "error") issues.push({ id: "hazard-error", level: "check", topic: "hazard", title: "ハザードのデータを読めなかった", detail: "国のハザードマップのデータを読み込めませんでした。市区町村のハザードマップで確かめてください。", confirm: "市区町村のハザードマップで" });

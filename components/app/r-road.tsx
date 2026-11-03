@@ -27,7 +27,7 @@ const COVER_STEPS: { key: string; label: string }[] = [
 /** 窓口で確かめること（どの物件でも聞くこと） */
 const ASK = ["前の道路が、建築基準法のどの道路か（種別）", "道路の幅（幅員）と、道路の中心から下がる（後退）必要があるか", "道路との境界（官民境界）が決まっているか"];
 
-export function RoadTab({ result, data, open, front }: TabProps) {
+export function RoadTab({ result, data, open, front, pick }: TabProps) {
   const m = result.municipality;
   const roads = data.roads;
   const list = roads.status === "ok" ? roads.roads.slice(0, 3) : [];
@@ -36,6 +36,17 @@ export function RoadTab({ result, data, open, front }: TabProps) {
   const contact = result.contact;
   const phones = contact?.phone ? parsePhones(contact.phone) : [];
   const dept = contact ? (/^(東京都|\S{2,3}県)\s/.test(contact.dept) ? contact.dept : `${m.name} ${contact.dept}`) : "";
+  // 幅員：市の地図のデータに幅員があればそれを出す。無いときは「記録なし」と書き、同じ向きで土地に接する道路の
+  // 国土地理院の地図の幅の区分（地図の描き分けの目安。測った幅員ではない）を添える（「現地で確認」と書いた横に幅が出て食い違って見えないように）
+  const gsiWidth = (dir: string) => front?.find((f) => f.direction === dir && f.width)?.width;
+  const widthText = (r: { width?: string; direction: string }) => {
+    if (r.width) return `幅員 ${r.width}`;
+    const g = gsiWidth(r.direction);
+    return g ? `幅員の記録なし（地図の幅の区分は ${g}）` : "幅員の記録なし";
+  };
+  // 地番の地図で土地に接する水路の筆（上に道路があっても、建築基準法の道路とは限らない）
+  const plan = pick.plan;
+  const waterSides = plan?.status === "ok" ? [...new Set(plan.roads.filter((r) => r.kind === "water" && r.side).map((r) => r.side!.dir))] : [];
 
   return (
     <div className="flex flex-col gap-[10px]">
@@ -57,8 +68,8 @@ export function RoadTab({ result, data, open, front }: TabProps) {
                 <span className="block truncate font-semibold leading-[1.3]" style={{ fontSize: 15.5, color: G.text }}>
                   {r.direction}側・{r.short}
                 </span>
-                <span className="mt-[2px] block truncate leading-[1.35]" style={{ fontSize: 12, color: G.sub }}>
-                  約{Math.max(1, Math.round(r.distance))}m・{r.width ? `幅員 ${r.width}` : "幅員は現地で確認"}
+                <span className="mt-[2px] block leading-[1.35]" style={{ fontSize: 12, color: G.sub }}>
+                  約{Math.max(1, Math.round(r.distance))}m・{widthText(r)}
                 </span>
               </span>
             </li>
@@ -87,8 +98,8 @@ export function RoadTab({ result, data, open, front }: TabProps) {
         {/* 国土地理院の地図の道路（土地に接する道路の幅の区分） */}
         {front && front.length > 0 && (
           <div className="mt-[6px] rounded-[12px] px-[10px] py-[8px]" style={{ background: "rgba(0,0,0,0.16)" }}>
-            <p className="leading-none" style={{ fontSize: 11, color: G.faint }}>
-              国土地理院の地図で土地に接する道路
+            <p className="leading-[1.35]" style={{ fontSize: 11, color: G.faint }}>
+              国土地理院の地図で土地に接する道路（幅の区分は地図の描き分けの目安で、測った幅員ではありません）
             </p>
             <p className="mt-[6px] flex flex-wrap gap-x-[12px] gap-y-[4px] leading-[1.35]" style={{ fontSize: 13, color: G.text }}>
               {front.map((f, i) => (
@@ -99,6 +110,12 @@ export function RoadTab({ result, data, open, front }: TabProps) {
               ))}
             </p>
           </div>
+        )}
+        {/* 地番の地図で接する水路の筆（道路の地図とは別のデータ） */}
+        {waterSides.length > 0 && (
+          <p className="mt-[6px] rounded-[12px] px-[10px] py-[8px] leading-[1.45]" style={{ fontSize: 12, color: "#ffd9a0", background: "rgba(0,0,0,0.16)" }}>
+            地番の地図では、{waterSides.join("・")}側に接しているのは水路の筆です。水路の上を道路として使っていても、建築基準法の道路とは限りません（窓口で確認）。
+          </p>
         )}
         {/* 市町村の道路種別の図がネットでどこまで見られるか */}
         <div className="mt-[12px] flex gap-[6px]" aria-label={COVER[m.coverage] ?? COVER.none}>
