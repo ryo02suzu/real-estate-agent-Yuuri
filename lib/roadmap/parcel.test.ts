@@ -73,6 +73,10 @@ describe("地番区域と町の名前", () => {
   it("市区町村は郡・区の書き方の違いを吸収する", () => {
     expect(cityMatches("西多摩郡瑞穂町", "瑞穂町")).toBe(true);
     expect(cityMatches("さいたま市見沼区", "さいたま市 見沼区")).toBe(true);
+    // 法務省のデータに残っている合併前の名前は、今の市として比べる
+    expect(cityMatches("北埼玉郡騎西町", "加須市")).toBe(true);
+    expect(cityMatches("勢多郡富士見村", "前橋市")).toBe(true);
+    expect(cityMatches("北埼玉郡騎西町", "久喜市")).toBe(false);
     expect(cityMatches("熊谷市", "深谷市")).toBe(false);
   });
 
@@ -118,6 +122,32 @@ function fakeSource(tiles: Record<string, { kuiki: string; chiban: string; polyg
 
 describe("筆の探索", () => {
   const K = "熊谷市_下奈良___";
+
+  it("同じ地番区域・地番でも、離れた区画は1つの筆にまとめず別の候補にする（地番参考図の同じ地番の別の土地）", async () => {
+    // 間に1タイルおいて離れた所に同じ「下奈良 391-3」。代表点に近い方を筆にし、遠い方は「ほかにもある」に数える
+    const src = fakeSource({
+      [`${SX},${SY}`]: [{ kuiki: K, chiban: "391-3", polygon: box(SX, SY, 0.2, 0.3, 0.3, 0.2) }],
+      [`${SX + 2},${SY}`]: [{ kuiki: K, chiban: "391-3", polygon: box(SX + 2, SY, 0.2, 0.3, 0.3, 0.2) }],
+    });
+    const r = await searchParcel({ city: "熊谷市", town: "下奈良", chiban: "391-3" }, START, src, { batch: 20 });
+    expect(r.status).toBe("found");
+    if (r.status !== "found") return;
+    expect(r.parcel.kuiki).toBe(K);
+    expect(r.parcel.pieces.map((p) => p.tile)).toEqual([[SX, SY]]);
+    expect(r.others).toBe(1);
+  });
+
+  it("隣り合うタイルにまたがる1つの筆は、1つのまま（つながる区画はまとめる）", async () => {
+    const src = fakeSource({
+      [`${SX},${SY}`]: [{ kuiki: K, chiban: "391-3", polygon: box(SX, SY, 0.7, 0.3, 0.3, 0.2) }],
+      [`${SX + 1},${SY}`]: [{ kuiki: K, chiban: "391-3", polygon: box(SX + 1, SY, 0, 0.3, 0.3, 0.2) }],
+    });
+    const r = await searchParcel({ city: "熊谷市", town: "下奈良", chiban: "391-3" }, START, src, { batch: 20 });
+    expect(r.status).toBe("found");
+    if (r.status !== "found") return;
+    expect(r.parcel.pieces).toHaveLength(2);
+    expect(r.others).toBe(0);
+  });
 
   it("近い地番の方へ広げて見つけ、筆の中の点を返す", async () => {
     const src = fakeSource({

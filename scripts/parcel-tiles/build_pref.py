@@ -14,12 +14,15 @@ MIERUNE の mojxml（mojxml2ogr）で筆のポリゴンにする。地番区域�
 """
 import argparse
 import json
+import re
 import os
 import shutil
 import subprocess
 import sys
 import time
+import unicodedata
 import urllib.request
+import zipfile
 
 import fiona
 
@@ -44,17 +47,22 @@ def log(*a):
 
 
 def list_zips(pref: str, year: str) -> list[tuple[str, str, int]]:
-    """都県の地図XMLの zip（名前・URL・大きさ）。名前は「11105-0300-2026.zip」（市区町村コード-法務局-年）"""
+    """都県の地図XMLの zip（名前・URL・大きさ）。名前は「11105-0300-2025.zip」（市区町村コード-法務局-年）。
+    year が「latest」なら、zip 名の年が一番新しいもの"""
     req = urllib.request.Request(f"{CKAN}?fq=organization:{ORGS[pref]}&rows=1000", headers=UA)
     with urllib.request.urlopen(req, timeout=120) as r:
         data = json.load(r)
-    out = {}
+    found: dict[str, dict[str, tuple[str, str, int]]] = {}
     for pkg in data["result"]["results"]:
         for res in pkg["resources"]:
             name = res.get("name") or ""
-            if name.endswith(f"-{year}.zip"):
-                out[name] = (name, res["url"], int(res.get("size") or 0))
-    return sorted(out.values())
+            m = re.fullmatch(r"\d{5}-\d{4}-(\d{4})\.zip", name)
+            if m:
+                found.setdefault(m.group(1), {})[name] = (name, res["url"], int(res.get("size") or 0))
+    if not found:
+        return []
+    y = max(found) if year == "latest" else year
+    return sorted(found.get(y, {}).values())
 
 
 def download(url: str, path: str) -> None:
@@ -71,13 +79,91 @@ def download(url: str, path: str) -> None:
             time.sleep(10 * 2**attempt)
 
 
-def append_features(fgb: str, out) -> int:
-    """mojxml2ogr の出力から、地番区域と地番だけの GeoJSON の行を書き足す"""
+# 法務省のデータに残っている合併前の市町村名 → 今の市（市区町村の境界と照らすときに読み替える。lib/roadmap/parcel.ts の OLD_CITY と同じ）
+OLD_CITY = {
+    "勢多郡富士見村": "前橋市",
+    "南埼玉郡白岡町": "白岡市",
+    "北埼玉郡北川辺町": "加須市",
+    "北埼玉郡騎西町": "加須市",
+    "北埼玉郡大利根町": "加須市",
+    "北葛飾郡栗橋町": "久喜市",
+    "下都賀郡岩舟町": "栃木市",
+    "山武郡大網白里町": "大網白里市",
+}
+
+
+def city_key(s: str) -> str:
+    return unicodedata.normalize("NFKC", s or "").replace(" ", "").replace("ヶ", "ケ").replace("ヵ", "ケ")
+
+
+class Boundaries:
+    """市区町村の境界（国土数値情報 N03 の zip）。別の市区町村の中に置かれた筆（任意座標の図が公共座標として入っているなど。
+    2026年版の関東で約1万5千筆）を外すのに使う。市区町村名 → 境界（「西多摩郡瑞穂町」「瑞穂町」「さいたま市見沼区」のどの書き方でも引ける）"""
+
+    def __init__(self, zip_path: str, tolerance_deg: float = 0.02):
+        import shapely
+        from shapely.geometry import shape
+        from shapely.prepared import prep
+
+        self.tol = tolerance_deg
+        geoms: dict[str, list] = {}
+        with zipfile.ZipFile(zip_path) as z:
+            shp = next(n for n in z.namelist() if n.lower().endswith(".shp"))
+        with fiona.open(f"zip://{zip_path}!{shp}") as src:
+            for f in src:
+                p = f["properties"]
+                parts = [city_key(p.get(k)) for k in ("N03_003", "N03_004", "N03_005") if p.get(k)]
+                g = shape(f.geometry)
+                # 「西多摩郡瑞穂町」「さいたま市見沼区」と、郡・市を省いた「瑞穂町」「見沼区」、政令市だけの「さいたま市」
+                for name in {"".join(parts), "".join(parts[1:]), parts[0] if len(parts) > 1 else ""}:
+                    if name:
+                        geoms.setdefault(name, []).append(g)
+        self.prepared = {k: prep(shapely.unary_union(v)) for k, v in geoms.items()}
+        self.loose = {k: shapely.unary_union(v).buffer(tolerance_deg) for k, v in geoms.items()}
+        self.loose_prepared = {k: prep(v) for k, v in self.loose.items()}
+        self.cache: dict[str, str | None] = {}
+
+    def key_for(self, kuiki_city: str) -> str | None:
+        """地番区域の市区町村名に合う境界の名前（無ければ None：確かめない）"""
+        if kuiki_city in self.cache:
+            return self.cache[kuiki_city]
+        k = city_key(OLD_CITY.get(city_key(kuiki_city), kuiki_city))
+        found = k if k in self.prepared else next((n for n in self.prepared if n and (k.endswith(n) or n.endswith(k)) and len(n) >= 3), None)
+        self.cache[kuiki_city] = found
+        return found
+
+    def outside(self, kuiki_city: str, geom) -> bool:
+        """筆が、その市区町村の境界から約2km より外にあるか（境界のすぐ近くの筆は外さない）"""
+        name = self.key_for(kuiki_city)
+        if not name:
+            return False
+        c = geom.representative_point()
+        if self.prepared[name].contains(c):
+            return False
+        return not self.loose_prepared[name].contains(c)
+
+
+def append_features(fgb: str, out, boundaries: "Boundaries | None" = None, dropped: dict | None = None) -> int:
+    """mojxml2ogr の出力から、地番区域と地番だけの GeoJSON の行を書き足す（別の市区町村の中に置かれた筆は外す）"""
     n = 0
     with fiona.open(fgb) as src:
         for f in src:
             p = f["properties"]
+            city = p.get("市区町村名") or ""
             kuiki = "_".join(p.get(k) or "" for k in ("市区町村名", "大字名", "丁目名", "小字名", "予備名"))
+            if boundaries is not None:
+                from shapely.geometry import shape
+
+                try:
+                    if boundaries.outside(city, shape(f.geometry)):
+                        if dropped is not None:
+                            d = dropped.setdefault(city, {"n": 0, "ex": []})
+                            d["n"] += 1
+                            if len(d["ex"]) < 3:
+                                d["ex"].append(f"{kuiki}|{p.get('地番') or ''}")
+                        continue
+                except Exception:
+                    pass
             feat = {"type": "Feature", "properties": {"地番区域": kuiki, "地番": p.get("地番") or ""}, "geometry": f.geometry.__geo_interface__}
             out.write(json.dumps(feat, ensure_ascii=False, separators=(",", ":")) + "\n")
             n += 1
@@ -91,7 +177,10 @@ def main() -> None:
     ap.add_argument("--out", required=True, help="出力する .pmtiles")
     ap.add_argument("--work", default="work", help="作業用のディレクトリ（zip などを一時的に置く）")
     ap.add_argument("--only", nargs="*", help="この市区町村コードで始まる zip だけ（試すとき用）")
+    ap.add_argument("--boundary", help="市区町村の境界（国土数値情報 N03 の zip）。あれば、別の市区町村の中に置かれた筆を外す")
     a = ap.parse_args()
+    boundaries = Boundaries(a.boundary) if a.boundary else None
+    dropped: dict = {}
 
     os.makedirs(a.work, exist_ok=True)
     zips = list_zips(a.pref, a.year)
@@ -111,11 +200,15 @@ def main() -> None:
             download(url, zp)
             # 任意座標系・地区外は入れない（位置が合わない／筆ではない）
             subprocess.run(["mojxml2ogr", fgb, zp], check=True, stdout=subprocess.DEVNULL)
-            n = append_features(fgb, out)
+            n = append_features(fgb, out, boundaries, dropped)
             total += n
             os.remove(zp)
             os.remove(fgb)
             log(f"[{i}/{len(zips)}] {name} {size / 1e6:.0f}MB → {n} 筆 ({time.time() - t:.0f}s)")
+    if dropped:
+        log(f"別の市区町村の中に置かれていた筆を外した: {sum(d['n'] for d in dropped.values())} 件")
+        for city, d in sorted(dropped.items(), key=lambda kv: -kv[1]["n"]):
+            log(f"  {city}: {d['n']} 件（例 {' / '.join(d['ex'])}）")
     log(f"筆 {total} 件 → tippecanoe")
 
     # z16 は全ての筆を入れる（地番検索に使う）。z14・15 は表示用で、混んだタイルは間引いてよい

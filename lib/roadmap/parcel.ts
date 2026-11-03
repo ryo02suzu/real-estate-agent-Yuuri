@@ -138,9 +138,21 @@ export function kuikiParts(kuiki: string): { city: string; town: string; koaza: 
   return { city: cityKey(city), town: townKey(oaza + chome), koaza };
 }
 
-/** 地番区域の市区町村（「西多摩郡瑞穂町」）が、国土地理院の名前（「瑞穂町」「さいたま市 見沼区」）と同じか */
+/** 法務省の地図データに残っている合併前の市町村の名前 → 今の市（地番区域の市区町村名を比べるときに読み替える） */
+const OLD_CITY: Record<string, string> = {
+  勢多郡富士見村: "前橋市",
+  南埼玉郡白岡町: "白岡市",
+  北埼玉郡北川辺町: "加須市",
+  北埼玉郡騎西町: "加須市",
+  北埼玉郡大利根町: "加須市",
+  北葛飾郡栗橋町: "久喜市",
+  下都賀郡岩舟町: "栃木市",
+  山武郡大網白里町: "大網白里市",
+};
+
+/** 地番区域の市区町村（「西多摩郡瑞穂町」「北埼玉郡騎西町」）が、国土地理院の名前（「瑞穂町」「加須市」「さいたま市 見沼区」）と同じか */
 export function cityMatches(kuikiCity: string, city: string): boolean {
-  const k = cityKey(kuikiCity);
+  const k = cityKey(OLD_CITY[kuikiCity.normalize("NFKC").replace(/\s/g, "")] ?? kuikiCity);
   const c = cityKey(city);
   return !!c && (k === c || k.endsWith(c));
 }
@@ -201,6 +213,33 @@ export async function searchParcel(
   // 町の筆を見つけてから、地番の数字が近づかないまま読んだ回数（3回続いたら、この先には無いとみなす）
   let stale = 0;
 
+  /**
+   * 同じ地番区域・地番でも、つながっていない離れた区画は別の候補にする（市町村の地番参考図には、別の土地に同じ地番が付いた
+   * 筆が同じ地番区域で入っていることがある。全部を1つの筆にまとめると、面積・位置・隣地が間違う）。
+   * 候補の鍵は「地番区域」か「地番区域␀番号」。新しい区画は、隣り合うタイルに区画のある候補に入れ、2つ以上の候補をつなぐなら1つに合わせる
+   */
+  const groupOf = (kuiki: string, x: number, y: number): string => {
+    const near: string[] = [];
+    for (const [k, ps] of hits) if (groupKuiki(k) === kuiki && ps.some((p) => Math.abs(p.tile[0] - x) <= 1 && Math.abs(p.tile[1] - y) <= 1)) near.push(k);
+    if (!near.length) {
+      let n = 0;
+      while (hits.has(n ? `${kuiki}\u0000${n}` : kuiki)) n++;
+      return n ? `${kuiki}\u0000${n}` : kuiki;
+    }
+    const [first, ...rest] = near;
+    for (const k of rest) {
+      hits.set(first, [...hits.get(first)!, ...hits.get(k)!]);
+      for (const c of raws.get(k) ?? []) raws.get(first)!.add(c);
+      hits.delete(k);
+      raws.delete(k);
+      raw.delete(k);
+      rank.delete(k);
+      estimated.delete(k);
+      sanko.delete(k);
+    }
+    return first;
+  };
+
   const visit = async (tiles: [number, number][]) => {
     const got = await Promise.all(tiles.map(([x, y]) => source.tile(x, y)));
     tiles.forEach(([x, y], i) => {
@@ -211,22 +250,23 @@ export async function searchParcel(
         // 地図データの「51-3W2」（同じ地番の土地の分かれた区画）も「51-3」として探す
         const c = registryChiban(normalizeChiban(f.chiban));
         if (c === want) {
+          const g = groupOf(f.kuiki, x, y);
           // 同じ筆が別のデータにもあれば（法務省の地図データ → 地番参考図 → 推定の位置の順に使う）、形を混ぜない
           const r = sourceRank(f);
-          const had = rank.get(f.kuiki);
+          const had = rank.get(g);
           if (had !== undefined && had < r) continue;
           if (had !== undefined && had > r) {
-            hits.delete(f.kuiki);
-            raws.delete(f.kuiki);
-            estimated.delete(f.kuiki);
-            sanko.delete(f.kuiki);
+            hits.delete(g);
+            raws.delete(g);
+            estimated.delete(g);
+            sanko.delete(g);
           }
-          rank.set(f.kuiki, r);
-          hits.set(f.kuiki, [...(hits.get(f.kuiki) ?? []), { polygons: f.polygons(), tile: [x, y] }]);
-          raw.set(f.kuiki, f.chiban);
-          raws.set(f.kuiki, (raws.get(f.kuiki) ?? new Set<string>()).add(f.chiban));
-          if (f.estimated) estimated.set(f.kuiki, f.estimated);
-          if (f.sanko) sanko.set(f.kuiki, f.sanko);
+          rank.set(g, r);
+          hits.set(g, [...(hits.get(g) ?? []), { polygons: f.polygons(), tile: [x, y] }]);
+          raw.set(g, f.chiban);
+          raws.set(g, (raws.get(g) ?? new Set<string>()).add(f.chiban));
+          if (f.estimated) estimated.set(g, f.estimated);
+          if (f.sanko) sanko.set(g, f.sanko);
           continue;
         }
         const b = baseNumber(c);
@@ -259,37 +299,41 @@ export async function searchParcel(
   }
   if (!hits.size) return townSeen ? { status: "not_found", similar: [...similar].sort(compareChiban) } : { status: "no_map" };
 
-  // 同じ地番が複数の地番区域にあれば（小字違いなど）、市区町村が合うもの、次に代表点に近いものを選ぶ
+  // 同じ地番が複数の地番区域にあれば（小字違いなど）や、同じ地番区域でも離れた区画なら、市区町村が合うもの、次に代表点に近いものを選ぶ
   const ranked = [...hits.entries()].sort(
     ([ka, pa], [kb, pb]) =>
-      Number(cityMatches(kuikiParts(kb).city, q.city)) - Number(cityMatches(kuikiParts(ka).city, q.city)) ||
+      Number(cityMatches(kuikiParts(groupKuiki(kb)).city, q.city)) - Number(cityMatches(kuikiParts(groupKuiki(ka)).city, q.city)) ||
       tileDist(pa, sx, sy) - tileDist(pb, sx, sy),
   );
-  const [kuiki, pieces] = ranked[0];
+  const [group, pieces] = ranked[0];
+  const kuiki = groupKuiki(group);
   // 筆がタイルの端にかかっていれば、隣のタイルの続きも集める。地番の後ろに印のある筆（二重地番など）は、まわりのタイルの同じ筆の区画も
   for (let round = 0; round < 3; round++) {
-    const marked = [...raws.get(kuiki)!].some(hasPieceMark);
+    const marked = [...raws.get(group)!].some(hasPieceMark);
     const more = [...neighborsToComplete(pieces), ...(marked ? aroundTiles(pieces) : [])].filter(([x, y]) => !seen.has(`${x},${y}`));
     if (!more.length) break;
-    const before = hits.get(kuiki)!.length;
+    const before = hits.get(group)!.length;
     await visit(more);
-    pieces.push(...hits.get(kuiki)!.slice(before));
+    pieces.push(...hits.get(group)!.slice(before));
   }
   return {
     status: "found",
     parcel: {
       kuiki,
       chiban: want,
-      chibanRaw: raw.get(kuiki)!,
-      ...(raws.get(kuiki)!.size > 1 ? { chibanRaws: [...raws.get(kuiki)!].sort(byPieceMark) } : {}),
+      chibanRaw: raw.get(group)!,
+      ...(raws.get(group)!.size > 1 ? { chibanRaws: [...raws.get(group)!].sort(byPieceMark) } : {}),
       pieces,
       point: interiorPoint(pieces),
-      ...(estimated.has(kuiki) ? { estimated: estimated.get(kuiki) } : {}),
-      ...(sanko.has(kuiki) ? { sanko: sanko.get(kuiki) } : {}),
+      ...(estimated.has(group) ? { estimated: estimated.get(group) } : {}),
+      ...(sanko.has(group) ? { sanko: sanko.get(group) } : {}),
     },
     others: ranked.length - 1,
   };
 }
+
+/** 候補の鍵（「地番区域␀番号」）から地番区域 */
+const groupKuiki = (key: string) => key.split("\u0000")[0];
 
 /** 筆のデータの順（小さいほど先に使う）：法務省の地図データ、市町村の地番参考図、公図から推定した位置 */
 const sourceRank = (f: ParcelFeature) => (f.sanko ? 1 : f.estimated ? 2 : 0);
