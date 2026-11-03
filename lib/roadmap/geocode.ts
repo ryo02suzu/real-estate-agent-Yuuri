@@ -61,7 +61,7 @@ export function isApproximate(input: string, matchedAddress: string): boolean {
 }
 
 /** 住所の番号（丁目・番地・号）を数の並びにする（「丸の内一丁目9番」→ [1, 9]）。郵便番号は外し、漢数字の丁目も数える */
-function addressNumbers(a: string): number[] {
+export function addressNumbers(a: string): number[] {
   const s = a
     .normalize("NFKC")
     .replace(/〒?\s*\d{3}-\d{4}/g, "")
@@ -77,60 +77,6 @@ export function partialMatch(input: string, matchedAddress: string): boolean {
   const a = addressNumbers(input).slice(0, 3);
   const b = addressNumbers(matchedAddress);
   return b.length > 0 && a.length > b.length;
-}
-
-/** 町名の書き方の揺れ（送り仮名の「り」、「ノ」「ヶ」など）を除いた形。「南大通」と「南大通り」を同じと見る */
-const looseTown = (t: string) => t.replace(/[りリのノヶケがガ之ッツ]/g, "");
-
-/**
- * 番地まで書いたのに町・市までしか一致しなかったとき、国土地理院が返した正式な名前に合わせた書き方を1つ作る。
- * 住所検索は町名を文字どおりに照合するので、「南大通1-2-3」（正式は南大通り）は町まで、
- * 「宇都宮南大通り1-2-3」（市が抜け）は市までしか一致しない。作れなければ null
- */
-export function retryQuery(input: string, matchedAddress: string): string | null {
-  const q = input.normalize("NFKC").replace(/\s+/g, "");
-  const m = matchedAddress.normalize("NFKC").match(/^(.+?[都道府県])?(.+?[市区町村])(.*)$/);
-  const at = q.search(/[0-9]|[一二三四五六七八九十]+丁目/);
-  if (!m || at <= 0) return null;
-  const [, pref = "", city, town] = m;
-  const place = q.slice(0, at);
-  const num = q.slice(at);
-  if (!town) {
-    // 市までの一致：市の名前の「市・区・町・村」が抜けていれば足す（「宇都宮南大通り」→「宇都宮市南大通り」）
-    const stem = city.slice(0, -1);
-    if (stem.length < 2 || place.includes(city) || !place.includes(stem)) return null;
-    return q.replace(stem, city);
-  }
-  // 町までの一致：入力の町名が正式な町名の書き方違いなら、正式な町名に番地をつなげる（丁目まで一致していれば番地が無いだけ）
-  if (/丁目$|[0-9]/.test(town) || place.includes(town)) return null;
-  const typed = place.replace(pref, "").replace(city, "").replace(city.slice(0, -1), "");
-  if (!typed || looseTown(typed) !== looseTown(town)) return null;
-  return `${pref}${city}${town}${num}`;
-}
-
-/**
- * 番地まで書いたのに町・市の中心にしか当たらなかったとき、正式な名前で最大2回探し直す（市を足す → 町名を直す）。
- * 探し直した結果が同じ場所の中で、より細かく一致したときだけ使う
- */
-export async function refineCandidates(
-  input: string,
-  candidates: GeocodeResult[],
-  search: (q: string) => Promise<GeocodeResult[]> = geocodeCandidates,
-): Promise<GeocodeResult[]> {
-  let best = candidates;
-  let q = input;
-  for (let i = 0; i < 2; i++) {
-    const top = best[0];
-    if (!top || !isApproximate(q, top.matchedAddress)) break;
-    const next = retryQuery(q, top.matchedAddress);
-    if (!next) break;
-    const got = await search(next);
-    const hit = got[0]?.matchedAddress;
-    if (!hit || hit === top.matchedAddress || !hit.startsWith(top.matchedAddress)) break;
-    best = got;
-    q = next;
-  }
-  return best;
 }
 
 export type ReverseResult = {

@@ -67,7 +67,12 @@ export function NotOkPage({ query, result, onPick, onMap, onBack, backLabel, ban
   if (result.status === "choose")
     return (
       <>
-        <Top title="当てはまる場所が複数あります" sub="物件の場所を選んでください" onBack={onBack} backLabel={backLabel} />
+        <Top
+          title={result.near ? "近い名前の町が複数あります" : "当てはまる場所が複数あります"}
+          sub={result.near ? `「${query}」の町名を直して探します。物件の場所を選んでください` : "物件の場所を選んでください"}
+          onBack={onBack}
+          backLabel={backLabel}
+        />
         {banner}
         <div className="px-[16px] pt-[8px]">
           <ul className={`overflow-hidden ${CARD}`}>

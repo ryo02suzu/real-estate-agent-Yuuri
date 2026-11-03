@@ -43,6 +43,8 @@ export type TriageInput = {
    * 「データに無い」と「60%（参考）」が食い違って見えないよう、同じ注意の中で言う）
    */
   ratioRef?: { bcr: number; far: number; distance: number; label: string };
+  /** 入れた町名が見つからず、別の町・市区町村の中心を出している（スマホだけが渡す。lib/roadmap/address-fix.ts） */
+  townMiss?: { typed: string; found: string; kind: "town" | "city" };
 };
 
 /** 要注意：データで制限・危険が見つかった。要確認：データが無い・参考なので、確かめないと分からない */
@@ -301,6 +303,16 @@ function placeIssues(input: TriageInput): Issue[] {
       title: `地番 ${r.chiban} が見つからない`,
       detail: r.reason === "not_found" ? `${PARCEL_DATA.edition}の地図に見つかりません。分筆・合筆で地番が変わったか、小字が違う可能性があります。${r.similar.length ? `近い地番：${r.similar.slice(0, 4).join("・")}。` : ""}` : r.reason === "no_map" ? "この地域は登記所の地図データがありません。" : "地図データを読み込めませんでした。",
       confirm: "法務局の公図・登記で地番と位置を",
+    });
+  } else if (input.townMiss) {
+    const tm = input.townMiss;
+    out.push({
+      id: "approximate",
+      level: "check",
+      topic: "place",
+      title: `町名「${tm.typed}」が見つからず、${tm.kind === "city" ? `${tm.found}の中心` : `「${tm.found}」`}を表示`,
+      detail: `入れた町名は国土地理院の住所にありませんでした。${tm.kind === "city" ? "市区町村の中心" : "名前の近い別の町"}のデータ（用途地域・ハザードなど）を出しているので、物件の場所のものではありません。町名を確かめて入れ直すか、地図で物件の場所を選んでください。`,
+      confirm: "町名を確かめて入れ直す・「場所を直す」",
     });
   } else if (result.approximate) out.push({ id: "approximate", level: "check", topic: "place", title: "番地が見つからず、町の中心を表示", detail: "この地点のデータ（用途地域・ハザードなど）は物件の場所のものではないことがあります。地図で物件の場所を選び直してください。", confirm: "「場所を直す」で物件の位置を" });
   if (parcels.status === "ok") {

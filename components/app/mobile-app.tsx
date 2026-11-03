@@ -56,7 +56,7 @@ import {
   saveResume,
   type Resume,
 } from "@/lib/resume";
-import type { LookupResult } from "@/lib/roadmap";
+import type { AddressFix, LookupResult } from "@/lib/roadmap";
 import { partialMatch } from "@/lib/roadmap/geocode";
 import { groupHazardMaps, wagamachiUrl } from "@/lib/roadmap/hazard";
 import {
@@ -157,6 +157,7 @@ import { PropertyBackdrop, propertyPartNow } from "./property-scene";
 import { NeighborPlanSkeleton, NeighborPlanView, useNeighborPlan } from "./neighbor-plan";
 import { BigModel } from "./big-model";
 import {
+  FixNote,
   HeroChip,
   PlaceBanner,
   PropertyHero,
@@ -183,7 +184,8 @@ import { clearShell, fitNames, nameShell, scrollArea } from "./vt";
 import { statusBarColor } from "@/lib/app/status-bar";
 import { applyAppZoom } from "./zoom";
 
-type Shown = { query: string; result: LookupResult };
+/** literal：書き間違いを直した住所を、入れたとおりに探し直した（そのときの直し） */
+type Shown = { query: string; result: LookupResult; literal?: AddressFix };
 
 const noop = () => () => {};
 /** 下から出す画面は document.body に出す（拡大・縮小している枠の外に置く） */
@@ -209,6 +211,8 @@ export type MobileAppProps = {
   setFavorites: (f: FavoriteItem[]) => void;
   onSearch: () => void;
   onPickAddress: (address: string) => void;
+  /** 書き間違いを直して出した住所を、直さずに入れたとおりに探す */
+  onLiteral?: (fix: AddressFix) => void;
   onPickPoint: (lat: number, lng: number) => void;
   onPickHistory: (h: HistoryItem) => void;
   /** 履歴から消す（行・期間）。端末に保存できたかを返す */
@@ -935,6 +939,8 @@ export function MobileApp(props: MobileAppProps) {
                   setReport={setReport}
                   query={shown!.query}
                   result={ok}
+                  literal={shown!.literal}
+                  onLiteral={props.onLiteral}
                   loading={loading}
                   error={error}
                   offline={offline}
@@ -1326,6 +1332,8 @@ function PropertyView({
   sceneSlot,
   motion,
   hold,
+  literal,
+  onLiteral,
 }: {
   report: boolean;
   setReport: (open: boolean) => void;
@@ -1361,6 +1369,10 @@ function PropertyView({
   motion: boolean;
   /** 地球からのズームの演出が出ている間は、模型の着地を待つ（演出が消え始めたら降りる） */
   hold: boolean;
+  /** 書き間違いを直した住所を、入れたとおりに探し直した（そのときの直し） */
+  literal?: AddressFix;
+  /** 直して出した住所を、入れたとおりに探す */
+  onLiteral?: (fix: AddressFix) => void;
 }) {
   const data = useProperty(result);
   // 物件の鍵（筆 → 地図の地点 → 住所。lib/property-id.ts）。確認の記録と再開はこの鍵で
@@ -2213,6 +2225,14 @@ function PropertyView({
           onCopy={() => addr.copy(copyText(result))}
           copied={addr.done}
           chips={chips}
+          note={
+            // 住所の書き間違いを直して出した（「南大道り」→「南大通り」で表示）／入れたとおりに探したあと
+            literal ? (
+              <FixNote literal from={literal.from} to={literal.to} onSwitch={literal.query ? () => onPick(literal.query!) : undefined} />
+            ) : result.fix ? (
+              <FixNote from={result.fix.from} to={result.fix.to} onSwitch={result.fix.query && onLiteral ? () => onLiteral(result.fix!) : undefined} />
+            ) : undefined
+          }
           more={
             lotParcel && (lotParcel.estimated || lotParcel.sanko) ? (
               <Expand open={about}>
@@ -2618,6 +2638,12 @@ function PlaceNote({
         )}
       </>
     );
+  } else if (result.miss) {
+    // 入れた町名が見つからず、別の町・市区町村の中心に当たった（黙って別の町を出さない）
+    const m = result.miss;
+    warn = true;
+    short = m.kind === "city" ? `町名「${m.typed}」が見つからず、${m.found}の中心を表示` : `町名「${m.typed}」が見つからず、「${m.found}」を表示`;
+    text = `入れた町名「${m.typed}」は、国土地理院の住所にありませんでした。${m.kind === "city" ? `${m.found}の中心` : `名前の近い別の町「${m.found}」${approximate ? "の中心" : ""}`}を出しています。町名を確かめて入れ直すか、「場所を直す」で物件の場所を選んでください。`;
   } else if (approximate) {
     warn = true;
     short = "番地が見つからず、町の中心を表示しています";

@@ -13,10 +13,11 @@ import { Sheet } from "@/components/sheet";
 import { favoriteKey, loadFavorites, removeFavorite, type FavoriteItem } from "@/lib/favorites";
 import { addHistory, clearHistory, loadHistory, removeHistory, restoreHistory, type HistoryItem } from "@/lib/history";
 import { propertyIdOf } from "@/lib/property-id";
-import { GeocoderUnavailable, lookup, lookupPoint, MUNICIPALITIES, type LookupResult } from "@/lib/roadmap";
+import { GeocoderUnavailable, lookup, lookupPoint, MUNICIPALITIES, type AddressFix, type LookupResult } from "@/lib/roadmap";
 import { buildHash, pageUrl, readUrlState } from "@/lib/app/url";
 
-type Shown = { query: string; result: LookupResult };
+/** literal：書き間違いを直した住所を、入れたとおりに探し直した（そのときの直し。スマホで「直した住所で探す」に使う） */
+type Shown = { query: string; result: LookupResult; literal?: AddressFix };
 /** PC の検索履歴のシートに出す数（前の上限と同じ。PC の見た目は変えない） */
 const PC_HISTORY_ROWS = 30;
 
@@ -49,17 +50,23 @@ export default function Home() {
   const [focus, setFocus] = useState(0);
   const desktop = useDesktop();
 
-  /** 住所（q）か、地図で選んだ地点（ll）で調べて結果を出す */
-  const run = useCallback(async (target: { q: string } | { ll: [number, number] }, push: boolean) => {
+  /**
+   * 住所（q）か、地図で選んだ地点（ll）で調べて結果を出す。literal は、書き間違いを直さずに入れたとおりに探す
+   * （スマホの「入れたとおりに探す」。履歴には残さない）
+   */
+  const run = useCallback(async (target: { q: string; literal?: AddressFix } | { ll: [number, number] }, push: boolean) => {
     setLoading(true);
     setError(null);
     try {
-      const result = "q" in target ? await lookup(target.q) : await lookupPoint(...target.ll);
-      const query = "q" in target ? target.q : result.status === "ok" || result.status === "unsupported" ? result.matchedAddress : "";
-      setInput(query);
-      setShown({ query, result });
+      const literal = "q" in target ? target.literal : undefined;
+      const result = "q" in target ? await lookup(target.q, { exact: !!literal }) : await lookupPoint(...target.ll);
+      // 書き間違いを直して見つけたら、履歴・URL には直した住所を残す（次に開くと直さずに一度で見つかる）
+      const fixed = result.status === "ok" ? result.fix?.query : undefined;
+      const query = "q" in target ? (fixed ?? target.q) : result.status === "ok" || result.status === "unsupported" ? result.matchedAddress : "";
+      setInput("q" in target ? target.q : query);
+      setShown({ query, result, ...(literal ? { literal } : {}) });
       if ("q" in target) setFocus((n) => n + 1);
-      if (result.status === "ok" || result.status === "unsupported") {
+      if (!literal && (result.status === "ok" || result.status === "unsupported")) {
         setHistory(
           addHistory({
             address: query,
@@ -74,7 +81,7 @@ export default function Home() {
       }
       // 端末の「戻る」でひとつ前の画面に戻れるよう、結果画面を履歴に積む。物件は URL の「#」の後ろに入れる
       // （「#」以降はサーバーに送られないので、リロード・共有リンクでも住所が外に出ない。lib/app/url.ts）
-      const url = pageUrl(window.location, buildHash("q" in target ? { q: target.q } : { ll: target.ll }, window.location.hash));
+      const url = pageUrl(window.location, buildHash("q" in target ? { q: query } : { ll: target.ll }, window.location.hash));
       // depth: ホームから何画面進んだか（ロゴで一度にホームへ戻るのに使う）
       if (push) window.history.pushState({ ...window.history.state, depth: historyDepth() + 1 }, "", url);
       window.scrollTo(0, 0);
@@ -263,6 +270,7 @@ export default function Home() {
       setFavorites={setFavorites}
       onSearch={() => search(input, true)}
       onPickAddress={(a) => search(a, false)}
+      onLiteral={(fix) => void run({ q: fix.input, literal: fix }, false)}
       onPickPoint={(lat, lng) => void searchPoint(lat, lng)}
       onPickHistory={(h) => void pickHistory(h)}
       onRemoveHistory={(items) => {

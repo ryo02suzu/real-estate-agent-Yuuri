@@ -172,7 +172,7 @@ export function useProperty(result: Ok) {
     return y && (!y.bcr || !y.far) && landPrice.status === "ok" ? ratioHint(y.name, landPrice.hits) : undefined;
   }, [zoning, landPrice]);
   // この物件で問題になりそうな所と、次にやること（読み込みの状態が変わるたびに出し直す）
-  const triage = useTriage(result, { zoning, parcels, roads, hazard, building, liq, zousei, rireki, ratioRef });
+  const triage = useTriage(result, { zoning, parcels, roads, hazard, building, liq, zousei, rireki, ratioRef, townMiss: result.miss });
   return { zoning, parcels, roads, hazard, building, landPrice, landPrice5, schools, stations, around, pois, evac, deals, liq, zousei, rireki, triage };
 }
 
