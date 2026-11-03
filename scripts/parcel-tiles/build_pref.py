@@ -92,6 +92,19 @@ OLD_CITY = {
 }
 
 
+# 位置がずれた地図（市区町村コード・地図名）。全部の筆の点検で見つけ、国土地理院のデータで裏取りしたもの（scripts/parcel-tiles/misplaced-sheets.json）
+SHEETS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "misplaced-sheets.json")
+
+
+def load_skip_sheets(path: str = SHEETS_FILE) -> dict[tuple[str, str], str]:
+    """外す地図 {(市区町村コード, 地図名): 町}。地図名が「*」ならその市区町村コードのデータ全部。法務省が直して地図名が変われば、何も外さなくなる"""
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    return {(s["code"], s["sheet"]): s["town"] for s in data["sheets"]}
+
+
 def city_key(s: str) -> str:
     return unicodedata.normalize("NFKC", s or "").replace(" ", "").replace("ヶ", "ケ").replace("ヵ", "ケ")
 
@@ -145,14 +158,28 @@ class Boundaries:
         return not self.loose_prepared[name].contains(c)
 
 
-def append_features(fgb: str, out, boundaries: "Boundaries | None" = None, dropped: dict | None = None) -> int:
-    """mojxml2ogr の出力から、地番区域と地番だけの GeoJSON の行を書き足す（別の市区町村の中に置かれた筆は外す）"""
+def append_features(
+    fgb: str,
+    out,
+    boundaries: "Boundaries | None" = None,
+    dropped: dict | None = None,
+    skip_sheets: dict | None = None,
+    skipped: dict | None = None,
+) -> int:
+    """mojxml2ogr の出力から、地番区域と地番だけの GeoJSON の行を書き足す
+    （位置がずれた地図の筆と、別の市区町村の中に置かれた筆は外す）"""
     n = 0
     with fiona.open(fgb) as src:
         for f in src:
             p = f["properties"]
             city = p.get("市区町村名") or ""
             kuiki = "_".join(p.get(k) or "" for k in ("市区町村名", "大字名", "丁目名", "小字名", "予備名"))
+            sheet = (p.get("市区町村コード") or "", p.get("地図名") or "")
+            if skip_sheets and (sheet in skip_sheets or (sheet[0], "*") in skip_sheets):
+                key = sheet if sheet in skip_sheets else (sheet[0], "*")
+                if skipped is not None:
+                    skipped[key] = skipped.get(key, 0) + 1
+                continue
             if boundaries is not None:
                 from shapely.geometry import shape
 
@@ -183,6 +210,8 @@ def main() -> None:
     a = ap.parse_args()
     boundaries = Boundaries(a.boundary) if a.boundary else None
     dropped: dict = {}
+    skip_sheets = load_skip_sheets()
+    skipped: dict = {}
 
     os.makedirs(a.work, exist_ok=True)
     zips = list_zips(a.pref, a.year)
@@ -202,11 +231,15 @@ def main() -> None:
             download(url, zp)
             # 任意座標系・地区外は入れない（位置が合わない／筆ではない）
             subprocess.run(["mojxml2ogr", fgb, zp], check=True, stdout=subprocess.DEVNULL)
-            n = append_features(fgb, out, boundaries, dropped)
+            n = append_features(fgb, out, boundaries, dropped, skip_sheets, skipped)
             total += n
             os.remove(zp)
             os.remove(fgb)
             log(f"[{i}/{len(zips)}] {name} {size / 1e6:.0f}MB → {n} 筆 ({time.time() - t:.0f}s)")
+    if skipped:
+        log(f"位置がずれた地図の筆を外した: {sum(skipped.values())} 件（{len(skipped)} 枚）")
+        for (code, sheet), k in sorted(skipped.items()):
+            log(f"  {code} {skip_sheets[(code, sheet)]} 地図 {sheet}: {k} 件")
     if dropped:
         log(f"別の市区町村の中に置かれていた筆を外した: {sum(d['n'] for d in dropped.values())} 件")
         for city, d in sorted(dropped.items(), key=lambda kv: -kv[1]["n"]):

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import KOZU_SOURCE from "./data/kozu-source.json";
 import { lookup } from "./index";
@@ -506,5 +507,29 @@ describe("地番参考図のある市町村", () => {
     expect(sankoCovers("小川町")).toBe(true);
     expect(sankoCovers("松戸市")).toBe(false);
     expect(sankoCovers("横浜市港北区")).toBe(false);
+  });
+});
+
+describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-sheets.json）", () => {
+  // タイルを作るとき（build_pref.py）に外す地図。書き方を間違えると何も外れないか、正しい地図まで外れる
+  const data = JSON.parse(readFileSync(new URL("../../scripts/parcel-tiles/misplaced-sheets.json", import.meta.url), "utf8")) as {
+    sheets: { code: string; sheet: string; town: string; parcels: number; reason: string }[];
+  };
+  it("どれも 1都6県の5桁の市区町村コード・地図名・町・筆の数・理由がある。同じ地図は1回だけ", () => {
+    expect(data.sheets.length).toBeGreaterThan(0);
+    const keys = new Set<string>();
+    for (const s of data.sheets) {
+      expect(s.code).toMatch(/^(0[89]|1[0-4])\d{3}$/);
+      expect(s.sheet.trim()).not.toBe("");
+      expect(s.town.trim()).not.toBe("");
+      expect(s.parcels).toBeGreaterThan(0);
+      expect(s.reason.length).toBeGreaterThan(20);
+      const key = `${s.code}|${s.sheet}`;
+      expect(keys.has(key)).toBe(false);
+      keys.add(key);
+    }
+  });
+  it("市区町村のデータ全部（*）を外すのは、合併前の古いデータだけ（今の市区町村のデータを丸ごと消さない）", () => {
+    for (const s of data.sheets.filter((x) => x.sheet === "*")) expect(s.town).toMatch(/合併前/);
   });
 });
