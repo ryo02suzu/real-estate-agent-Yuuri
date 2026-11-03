@@ -85,26 +85,61 @@ export function dealCity(codes: string[], address: string, cities = DEALS_DATA.c
 
 const KANJI: Record<string, string> = { 一: "1", 二: "2", 三: "3", 四: "4", 五: "5", 六: "6", 七: "7", 八: "8", 九: "9", 十: "10" };
 
-/** 「神南一丁目」「神南１丁目」→「神南」（地区名と比べる形） */
+/**
+ * 「神南一丁目」「神南１丁目」→「神南」、「大字指扇」→「指扇」、「大津町字五浦」→「大津町五浦」（地区名と町名を比べる形）。
+ * 不動産情報ライブラリの地区名は「大字」が付くことが多く、国土地理院の町名には付かない。ヶ・ヵは「ケ」にそろえる。
+ * 丁目を外すと空になる町（「八丁目」）はそのまま
+ */
 export function townKey(name: string): string {
-  return name
+  const s = name
     .normalize("NFKC")
-    .replace(/[0-9一二三四五六七八九十]+丁目$/, "")
-    .replace(/[一二三四五六七八九十]/g, (c) => KANJI[c] ?? c)
-    .replace(/\s/g, "");
+    .replace(/\s/g, "")
+    .replace(/^大字/, "")
+    .replace(/^字/, "")
+    .replace(/([町村])字/, "$1")
+    .replace(/[ヶヵ]/g, "ケ");
+  const noChome = s.replace(/[0-9一二三四五六七八九十]+丁目$/, "");
+  return (noChome || s).replace(/[一二三四五六七八九十]/g, (c) => KANJI[c] ?? c);
 }
 
-/** 同じ町（地区）の事例。町名が無い・合わなければ空 */
+/**
+ * 地区名が町名より粗いか：「磯原町」と町「磯原町磯原」（町のあとに小字）、「下妻」と町「下妻乙」（甲乙丙丁・いろはの1字）。
+ * 「本町」と「本町田」のような別の町は同じと見ない
+ */
+function coarserThan(district: string, town: string): boolean {
+  if (district.length < 2 || district === town || !town.startsWith(district)) return false;
+  const rest = town.slice(district.length);
+  return /^[甲乙丙丁戊いろはにほへとイロハニホヘト]$/.test(rest) || (/[町村]$/.test(district) && rest.length >= 2);
+}
+
+/** 同じ町（地区）の事例。町名が無い・合わなければ空。ぴったりの地区名が無ければ、町名より粗い地区名（coarserThan）で */
 export function dealsInTown(records: DealRecord[], town: string): DealRecord[] {
   const key = townKey(town);
   if (!key) return [];
-  return records.filter((r) => r.d && townKey(r.d) === key);
+  const exact = records.filter((r) => r.d && townKey(r.d) === key);
+  if (exact.length) return exact;
+  return records.filter((r) => r.d && coarserThan(townKey(r.d), key));
 }
 
-/** m² 単価。土地は単価の欄、無ければ総額 ÷ 面積（中古マンションは専有面積あたり） */
+/**
+ * 面積の欄の上限の印。不動産情報ライブラリは大きな土地の面積を数で出さず、宅地の「2,000㎡以上」を 9999、
+ * 農地・林地の「5,000㎡以上」を 8888 で返す（延床面積の 9999 も「2,000㎡以上」、間口の 9999.9 は「50m以上」）。
+ * 数のまま出すと「9,999㎡」の土地に見えるので、文字で出す
+ */
+export function areaCap(a: number | undefined): string | undefined {
+  if (a === 9999) return "2,000㎡以上";
+  if (a === 8888) return "5,000㎡以上";
+  return undefined;
+}
+
+/** 数として使える面積（上限の印は除く） */
+export const areaOf = (r: DealRecord): number | undefined => (r.a !== undefined && r.a > 0 && !areaCap(r.a) ? r.a : undefined);
+
+/** m² 単価。土地は単価の欄、無ければ総額 ÷ 面積（中古マンションは専有面積あたり）。面積が上限の印なら出さない */
 export function unitPrice(r: DealRecord): number | undefined {
   if (r.u) return r.u;
-  if (r.a && (r.t.includes("土地") && !r.t.includes("建物") ? true : r.t.includes("マンション"))) return Math.round(r.p / r.a);
+  const a = areaOf(r);
+  if (a && (r.t.includes("土地") && !r.t.includes("建物") ? true : r.t.includes("マンション"))) return Math.round(r.p / a);
   return undefined;
 }
 

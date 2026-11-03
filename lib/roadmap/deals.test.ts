@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { code5, DEALS_DATA, dealCity, dealFile, dealKind, dealsInTown, dealSummary, median, totalText, townKey, unitPrice, type DealRecord } from "./deals";
+import { areaCap, code5, DEALS_DATA, dealCity, dealFile, dealKind, dealsInTown, dealSummary, median, totalText, townKey, unitPrice, type DealRecord } from "./deals";
 
 const rec = (o: Partial<DealRecord>): DealRecord => ({ k: "取引", t: "宅地(土地)", c: "13113", p: 85_000_000, ...o });
 
@@ -9,12 +9,25 @@ describe("取引事例（不動産情報ライブラリ）", () => {
     expect(townKey("神南１丁目")).toBe("神南");
     expect(townKey("古ケ崎四丁目")).toBe("古ケ崎");
     expect(townKey("青木")).toBe("青木");
+    // 不動産情報ライブラリの地区名の「大字」、小字の「字」、ヶ・ヵ。丁目を外すと空になる町はそのまま
+    expect(townKey("大字指扇")).toBe("指扇");
+    expect(townKey("大津町字五浦")).toBe(townKey("大津町五浦一丁目"));
+    expect(townKey("中郷町汐見ヶ丘")).toBe(townKey("中郷町汐見ケ丘"));
+    expect(townKey("八丁目")).toBe("8丁目");
+    expect(townKey("壱丁目東")).toBe("壱丁目東");
   });
 
   it("同じ町の事例だけ", () => {
     const rs = [rec({ d: "神南" }), rec({ d: "宇田川町" }), rec({})];
     expect(dealsInTown(rs, "神南一丁目")).toHaveLength(1);
     expect(dealsInTown(rs, "")).toEqual([]);
+    // ぴったりの地区名が無いとき：町名より粗い地区名（町のあとの小字、甲乙丙丁・いろはの1字）は同じ町。別の町は違う
+    const coarse = [rec({ d: "磯原町" }), rec({ d: "下妻" }), rec({ d: "本町" }), rec({ d: "日本橋" })];
+    expect(dealsInTown(coarse, "磯原町磯原")).toEqual([coarse[0]]);
+    expect(dealsInTown(coarse, "下妻乙")).toEqual([coarse[1]]);
+    expect(dealsInTown(coarse, "本町田")).toEqual([]);
+    expect(dealsInTown(coarse, "日本橋小網町")).toEqual([]);
+    expect(dealsInTown([rec({ d: "本町田" }), rec({ d: "本町" })], "本町田")).toHaveLength(1);
   });
 
   it("政令市は住所の区のファイルを選ぶ。データの無い市区町村は選ばない", () => {
@@ -29,6 +42,13 @@ describe("取引事例（不動産情報ライブラリ）", () => {
     expect(unitPrice(rec({ a: 100 }))).toBe(850_000);
     expect(unitPrice(rec({ t: "中古マンション等", p: 60_000_000, a: 60 }))).toBe(1_000_000);
     expect(unitPrice(rec({ t: "宅地(土地と建物)", a: 100 }))).toBeUndefined();
+    // 面積の上限の印（9999＝2,000㎡以上、8888＝5,000㎡以上）では単価を計算しない
+    expect(unitPrice(rec({ t: "宅地(土地)", p: 36_000_000, a: 9999 }))).toBeUndefined();
+    expect(unitPrice(rec({ t: "宅地(土地)", p: 36_000_000, a: 9999, u: 13_000 }))).toBe(13_000);
+    expect(unitPrice(rec({ t: "林地", p: 1_000_000, a: 8888 }))).toBeUndefined();
+    expect(areaCap(9999)).toBe("2,000㎡以上");
+    expect(areaCap(8888)).toBe("5,000㎡以上");
+    expect(areaCap(260)).toBeUndefined();
   });
 
   it("件数と単価の中央値", () => {

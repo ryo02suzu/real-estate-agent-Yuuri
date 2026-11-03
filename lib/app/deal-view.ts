@@ -1,7 +1,7 @@
 // 実際の取引事例（不動産情報ライブラリ）の1件を、何の売買か・広さ・築年数が一目で分かる言葉にする（スマホの相場のタブ）。
 // 「宅地(土地と建物)」は戸建てだけでなく、アパート・店舗つきの建物の売買も入るので、建物の用途（Use）で言い分ける
 import { TSUBO_M2 } from "./area";
-import { dealKind, type DealKind, type DealRecord } from "../roadmap/deals";
+import { areaCap, areaOf, dealKind, type DealKind, type DealRecord } from "../roadmap/deals";
 
 /** 絞り込みの札の名前 */
 export const DEAL_CHIP: Record<DealKind, string> = { land: "土地だけ", house: "戸建てなど", mansion: "マンション", other: "そのほか" };
@@ -60,16 +60,59 @@ const tsubo = (v: number) => (v / TSUBO_M2).toFixed(1);
 export function dealFacts(r: DealRecord): string[] {
   const k = dealKind(r.t);
   const out: string[] = [];
-  const area = r.a ? `${sqm(r.a)}㎡（約${tsubo(r.a)}坪）` : r.as;
+  // 面積の上限の印（9999・8888）は「2,000㎡以上」のように文字で。数のまま出すと「9,999㎡」の土地に見える
+  const a = areaOf(r);
+  const area = a ? `${sqm(a)}㎡（約${tsubo(a)}坪）` : (areaCap(r.a) ?? r.as);
   if (k === "mansion") {
     if (area) out.push(`専有 ${area}`);
     if (r.fp) out.push(r.fp.normalize("NFKC"));
   } else if (area) out.push(`土地 ${area}`);
-  if (k === "house" && r.fa) out.push(`建物 延床${sqm(r.fa)}㎡（約${tsubo(r.fa)}坪）`);
+  if (k === "house" && r.fa) out.push(r.fa === 9999 ? "建物 延床2,000㎡以上" : `建物 延床${sqm(r.fa)}㎡（約${tsubo(r.fa)}坪）`);
   const built = k === "land" ? undefined : builtText(r);
   if (built) out.push(built);
   if (k !== "land" && r.s) out.push(r.s.normalize("NFKC"));
   if (r.rn && k !== "land") out.push(r.rn.normalize("NFKC"));
+  return out;
+}
+
+/** 取引の事情（価格が相場と違うことがある）：「調停・競売等」→「競売・調停など」。無ければ undefined */
+export function dealCaveat(r: DealRecord): string | undefined {
+  const v = r.rm?.normalize("NFKC").trim();
+  if (!v) return undefined;
+  if (/競売|調停/.test(v)) return "競売・調停など";
+  if (/関係者/.test(v)) return "身内・関係者の取引";
+  if (/私道/.test(v)) return "私道を含む";
+  if (/隣地/.test(v)) return "隣地の買い増し";
+  if (/瑕疵|古屋|他の権利/.test(v)) return v.replace(/[、，]/g, "・");
+  return v.replace(/[、，]/g, "・");
+}
+
+/** 土地の形と間口（土地だけ・戸建てなど）：「ほぼ長方形」「間口 4m」。マンションには無い */
+export function dealLand(r: DealRecord): string[] {
+  if (dealKind(r.t) === "mansion") return [];
+  const out: string[] = [];
+  if (r.sh) out.push(r.sh.normalize("NFKC"));
+  if (r.fg !== undefined && r.fg !== "") {
+    const fg = String(r.fg).normalize("NFKC").trim();
+    // 9999.9 は「50m以上」の印（データは 49.9m までを数で持つ）
+    if (/^\d+(\.\d+)?$/.test(fg)) out.push(Number(fg) >= 9999 ? "間口 50m以上" : `間口 ${Number(fg)}m`);
+    else out.push(`間口 ${fg}`);
+  }
+  return out;
+}
+
+/** 建ぺい率（30〜100%）・容積率（50〜1300%）として、ありうる値か（データには 160% のような記録違いが少しある） */
+const okRatio = (cr: number | undefined, fr: number | undefined) => ({ cr: cr !== undefined && cr >= 30 && cr <= 100 ? cr : undefined, fr: fr !== undefined && fr >= 50 && fr <= 1300 ? fr : undefined });
+
+/** 都市計画（用途地域・建ぺい率・容積率）と買ったあとの使い道（どれも売買の時点の記録） */
+export function dealPlan(r: DealRecord): string[] {
+  const out: string[] = [];
+  if (r.cp) out.push(r.cp.normalize("NFKC"));
+  const { cr, fr } = okRatio(r.cr, r.fr);
+  if (cr !== undefined && fr !== undefined) out.push(`建ぺい率${cr}%・容積率${fr}%`);
+  else if (cr !== undefined) out.push(`建ぺい率${cr}%`);
+  else if (fr !== undefined) out.push(`容積率${fr}%`);
+  if (r.pu) out.push(`買ったあとの使い道：${r.pu.normalize("NFKC")}`);
   return out;
 }
 

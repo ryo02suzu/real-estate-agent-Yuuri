@@ -6,7 +6,7 @@
 import { Building, ChevronDown, ChevronRight, House, LandPlot, Trees } from "lucide-react";
 import { useState } from "react";
 import { TSUBO_M2 } from "@/lib/app/area";
-import { DEAL_CHIP, DEAL_KIND_NOTE, dealFacts, dealRoad, dealTitle, dealWhen } from "@/lib/app/deal-view";
+import { DEAL_CHIP, DEAL_KIND_NOTE, dealCaveat, dealFacts, dealLand, dealPlan, dealRoad, dealTitle, dealWhen } from "@/lib/app/deal-view";
 import { DEALS_CREDIT, DEALS_DATA, DEALS_NOTE, dealKind, dealSummary, totalText, unitPrice, type DealKind, type DealRecord } from "@/lib/roadmap/deals";
 import { distanceText, type LandPriceHit, type LandUsage } from "@/lib/roadmap/land-price";
 import { G, GHead, GNote, GStat, NUM, TILE } from "./g-ui";
@@ -211,7 +211,7 @@ function Transactions({ data, town }: { data: TabProps["data"]; town: string }) 
         </div>
       </HoldHeight>
       <GNote className="mt-[6px]">
-        {DEALS_CREDIT}（{DEALS_DATA.periods}）。{DEALS_NOTE}。事例の場所は町（地区）までです。
+        {DEALS_CREDIT}（{DEALS_DATA.periods}）。{DEALS_NOTE}。事例の場所は町（地区）までです。土地の形・間口・用途地域・建ぺい率・容積率・買ったあとの使い道は、売買の時点の申告・記録で、今の指定と違うことがあります。
       </GNote>
     </section>
   );
@@ -225,6 +225,9 @@ function TxRow({ r }: { r: DealRecord }) {
   const sale = r.k === "成約";
   const facts = dealFacts(r);
   const road = dealRoad(r);
+  // 土地の形・間口・用途地域・建ぺい率・容積率・買ったあとの使い道（売買の時点の記録）
+  const detail = [...dealLand(r), ...dealPlan(r)];
+  const caveat = dealCaveat(r);
   return (
     <div className="flex w-full items-start gap-[10px] border-t border-white/10 px-[12px] py-[10px] first:border-t-0" style={{ minHeight: 64 }}>
       <span className="mt-[2px] flex shrink-0 items-center justify-center rounded-[10px]" style={{ width: 38, height: 38, background: "rgba(255,255,255,0.1)" }}>
@@ -236,9 +239,17 @@ function TxRow({ r }: { r: DealRecord }) {
           <span className="ml-[6px] inline-block rounded-[4px] px-[4px] py-[2px] align-[2px] font-bold leading-none" style={{ fontSize: 10, background: sale ? "rgba(116,187,255,0.18)" : "rgba(255,201,74,0.18)", color: sale ? "#cfe5ff" : "#ffe2a3" }}>
             {sale ? "成約" : "取引"}
           </span>
+          {/* 取引の事情（競売・身内どうし・私道を含む など）：相場と違う価格になりやすいので、はっきり出す */}
+          {caveat && (
+            <span className="ml-[4px] inline-block whitespace-nowrap rounded-[4px] px-[4px] py-[2px] align-[2px] font-bold leading-none" style={{ fontSize: 10, background: "rgba(255,138,101,0.2)", color: "#ffc9b8" }}>
+              {caveat}
+            </span>
+          )}
         </span>
         {/* 広さ・築年数（1つずつは途中で折り返さない） */}
         {facts.length > 0 && <Parts list={facts} className="mt-[3px] leading-[1.45]" style={{ fontSize: 12.5, color: G.text }} />}
+        {/* 土地の形・間口・用途地域・建ぺい率・容積率・買ったあとの使い道 */}
+        {detail.length > 0 && <Parts list={detail} className="mt-[2px] leading-[1.45]" style={{ fontSize: 12, color: G.sub }} />}
         <Parts list={[(r.m ?? "") + (r.d ?? ""), dealWhen(r.pe), road].filter(Boolean)} className="mt-[2px] leading-[1.4]" style={{ fontSize: 11.5, color: G.faint }} />
       </span>
       <span className="shrink-0 text-right">
