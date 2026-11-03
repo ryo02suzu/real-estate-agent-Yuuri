@@ -3,6 +3,12 @@
 // 同じ町の事例を出す。事例には番地が無く、町（地区）までの場所なので、物件との距離は分からない
 import SOURCE from "./data/deals-source.json";
 
+/** 市区町村コードを5桁に（API は茨城県・栃木県の「08201」「09201」を、先頭の0の無い「8201」「9201」で返す） */
+export const code5 = (code: string) => code.padStart(5, "0");
+
+/** データの置き場の市区町村（ファイル名のコード → 「東京都渋谷区」。前のデータは茨城県・栃木県が先頭の0なし） */
+const FILES = SOURCE.cities as Record<string, string>;
+
 export const DEALS_DATA = {
   /** 市区町村ごとの JSON を置いた場所（空ならまだデータが無い。API キーの登録待ち） */
   url: process.env.NEXT_PUBLIC_DEALS_URL || SOURCE.url,
@@ -10,9 +16,16 @@ export const DEALS_DATA = {
   asOf: SOURCE.asOf,
   /** 事例の取引時点の範囲（「2024年第3四半期〜2026年第2四半期」） */
   periods: SOURCE.periods,
-  /** データのある市区町村（コード → 「東京都渋谷区」） */
-  cities: SOURCE.cities as Record<string, string>,
+  /** データのある市区町村（5桁のコード → 「東京都渋谷区」） */
+  cities: Object.fromEntries(Object.entries(FILES).map(([c, name]) => [code5(c), name])) as Record<string, string>,
 };
+
+/** 5桁のコードの市区町村のファイル名（「09201」→ 置き場にあるのが「9201.json」なら「9201」） */
+export function dealFile(code: string, files: Record<string, string> = FILES): string {
+  if (files[code]) return code;
+  const short = code.replace(/^0/, "");
+  return files[short] ? short : code;
+}
 
 /** API の利用約款で、サービスに表示するよう求められている文 */
 export const DEALS_NOTE = "このサービスは、国土交通省不動産情報ライブラリのAPI機能を使用していますが、提供情報の最新性、正確性、完全性等が保証されたものではありません";
@@ -129,7 +142,7 @@ export function totalText(yen: number): string {
 /** ブラウザで市区町村のファイルを読む（無ければ null） */
 export async function loadDeals(code: string, base = DEALS_DATA.url): Promise<DealFile | null> {
   if (!base) return null;
-  const res = await fetch(`${base.replace(/\/$/, "")}/${code}.json`);
+  const res = await fetch(`${base.replace(/\/$/, "")}/${dealFile(code)}.json`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return (await res.json()) as DealFile;

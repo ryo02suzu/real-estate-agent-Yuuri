@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dealCity, dealKind, dealsInTown, dealSummary, median, totalText, townKey, unitPrice, type DealRecord } from "./deals";
+import { code5, DEALS_DATA, dealCity, dealFile, dealKind, dealsInTown, dealSummary, median, totalText, townKey, unitPrice, type DealRecord } from "./deals";
 
 const rec = (o: Partial<DealRecord>): DealRecord => ({ k: "取引", t: "宅地(土地)", c: "13113", p: 85_000_000, ...o });
 
@@ -42,5 +42,25 @@ describe("取引事例（不動産情報ライブラリ）", () => {
     expect(totalText(68_000_000)).toBe("6,800万円");
     expect(totalText(125_000_000)).toBe("1.25億円");
     expect(totalText(300_000_000)).toBe("3億円");
+  });
+});
+
+describe("茨城県・栃木県の市区町村コード（先頭の0）", () => {
+  it("API が先頭の0を落としたコードも、5桁のコードで見つかる", () => {
+    expect(code5("9201")).toBe("09201");
+    expect(code5("13113")).toBe("13113");
+    // 前のデータは「9201.json」の名前で置いてある
+    const files = { "9201": "栃木県宇都宮市", "13113": "東京都渋谷区", "08201": "茨城県水戸市" };
+    expect(dealFile("09201", files)).toBe("9201");
+    expect(dealFile("13113", files)).toBe("13113");
+    expect(dealFile("08201", files)).toBe("08201");
+    const cities = Object.fromEntries(Object.entries(files).map(([c, n]) => [code5(c), n]));
+    expect(dealCity(["09201"], "栃木県宇都宮市南大通り一丁目2番3号", cities)).toBe("09201");
+  });
+  it("今のデータでも、宇都宮市・水戸市の事例がある", () => {
+    if (!DEALS_DATA.url) return;
+    expect(DEALS_DATA.cities["09201"]).toBe("栃木県宇都宮市");
+    expect(DEALS_DATA.cities["08201"]).toBe("茨城県水戸市");
+    expect(Object.keys(DEALS_DATA.cities).every((c) => c.length === 5)).toBe(true);
   });
 });

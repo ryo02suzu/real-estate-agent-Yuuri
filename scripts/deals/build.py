@@ -92,7 +92,8 @@ def normalize(row: dict):
         "k": kind,
         "t": row.get("Type"),
         "r": row.get("Region"),
-        "c": row.get("MunicipalityCode"),
+        # 茨城県・栃木県は API が先頭の0を落とす（「09201」→「9201」）ので、5桁にそろえる
+        "c": str(row.get("MunicipalityCode")).zfill(5) if row.get("MunicipalityCode") else None,
         "m": row.get("Municipality"),
         "d": row.get("DistrictName"),
         "dc": row.get("DistrictCode"),
@@ -188,6 +189,8 @@ def self_test():
     r = normalize(row)
     assert r == {"k": "取引", "t": "宅地(土地)", "r": "住宅地", "c": "13113", "m": "渋谷区", "d": "神南", "p": 85000000, "a": 80, "u": 1060000, "br": 6, "cr": 80, "fr": 500, "pe": "2024年第3四半期"}, r
     assert normalize({**row, "Area": "2000㎡以上"})["as"] == "2000㎡以上"
+    assert normalize({**row, "MunicipalityCode": "9201"})["c"] == "09201"
+    assert normalize({**row, "MunicipalityCode": 8201})["c"] == "08201"
     assert normalize({**row, "PriceCategory": "成約価格情報"})["k"] == "成約"
     assert normalize({**row, "TradePrice": ""}) is None
     assert rows_of({"status": "OK", "data": [row]}) == [row] and rows_of([row]) == [row]
