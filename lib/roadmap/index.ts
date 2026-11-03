@@ -1,5 +1,5 @@
 import GSI_CODES from "./data/gsi-muni-codes.json";
-import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, needsChoice, reverseGeocode, type GeocodeResult } from "./geocode";
+import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, needsChoice, refineCandidates, reverseGeocode, type GeocodeResult } from "./geocode";
 import { buildLinks, findMunicipality, resolveContact, type Contact, type Municipality, type ResolvedLink } from "./municipalities";
 import { parcelAt, searchParcel, splitChiban, townFromAddress, type Parcel, type ParcelSource } from "./parcel";
 import { pmtilesParcelSource } from "./parcel-tiles";
@@ -42,13 +42,16 @@ export type LookupResult =
 export async function lookup(address: string, { parcels = pmtilesParcelSource }: { parcels?: ParcelSource } = {}): Promise<LookupResult> {
   const chiban = splitChiban(address);
   // 「地番」の語は外して調べる（国土地理院が番地まで持っていれば、その位置から筆を探せる）
-  const candidates = await geocodeCandidates(chiban?.explicit ? `${chiban.body}${chiban.chiban}` : address);
+  const query = chiban?.explicit ? `${chiban.body}${chiban.chiban}` : address;
+  let candidates = await geocodeCandidates(query);
   if (candidates.length === 0) {
     // 住所検索がどの住所にも0件を返しているとき（障害など）は「見つからない」ではない
     if (!(await geocoderAlive())) throw new GeocoderUnavailable("住所検索が応答していません");
     return { status: "not_found" };
   }
   if (needsChoice(address, candidates)) return { status: "choose", candidates: candidates.slice(0, 15) };
+  // 「南大通1-2-3」（正式は南大通り）・「宇都宮南大通り…」（市が抜け）で町・市の中心に当たったら、正式な名前で探し直す
+  candidates = await refineCandidates(query, candidates);
   let geo = candidates[0];
   // 「地番」と明示したのに住居表示の街区（「217番」）に当たったら、地番と取り違えないよう町の代表点から探す
   if (chiban?.explicit && isJukyo(geo.matchedAddress)) geo = (await geocodeCandidates(chiban.body))[0] ?? geo;
