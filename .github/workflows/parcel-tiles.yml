@@ -170,8 +170,9 @@ jobs:
           cache: npm
       - name: アプリの置き場所を書き換え、テストが通れば main に入れる
         run: |
-          # 版の表示：法務省の年度版（zip 名の年）と、作った日
-          printf '{\n "url": "%s",\n "edition": "%s年版（%s作成）"\n}\n' "$URL" "$YEAR" "$(date '+%Y年%-m月')" > lib/roadmap/data/parcel-source.json
+          # 版の表示は法務省の年度版（毎年4月公開）。公図から推定した筆（kozu-source.json）と同じ書き方にそろえる
+          # （同じ版なら下書きで版を1回だけ書くため）
+          printf '{\n "url": "%s",\n "edition": "%s年4月公開版"\n}\n' "$URL" "$YEAR" > lib/roadmap/data/parcel-source.json
           if git diff --quiet; then echo "変更なし"; exit 0; fi
           npm ci
           npm test
