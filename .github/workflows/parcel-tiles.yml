@@ -106,7 +106,13 @@ jobs:
       - name: 都県のタイルを作る
         run: python3 scripts/parcel-tiles/build_pref.py --pref ${{ matrix.pref }} --year "$YEAR" --out "work/pref-${{ matrix.pref }}.pmtiles" --work work --boundary work-n03.zip
       - name: R2 に置く
-        run: aws s3 cp "work/pref-${{ matrix.pref }}.pmtiles" "s3://$R2_BUCKET/parcels/$YEAR/pref-${{ matrix.pref }}.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+        run: |
+          # R2 への書き込みも、送り終えたあと返事が来ないまま時間切れになることがある。3回までやり直す
+          for i in 1 2 3; do
+            aws s3 cp "work/pref-${{ matrix.pref }}.pmtiles" "s3://$R2_BUCKET/parcels/$YEAR/pref-${{ matrix.pref }}.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors && break
+            [ "$i" -lt 3 ] || exit 1
+            echo "書き込みに失敗。$((i * 30)) 秒後にやり直す"; sleep $((i * 30))
+          done
 
   merge:
     needs: [check, build]
@@ -147,8 +153,12 @@ jobs:
             -A '<a href="https://front.geospatial.jp/moj-chizu-xml-readme/">「登記所備付地図データ」（法務省）</a>を加工して作成' \
             work/pref-*.pmtiles
           ls -la "work/kanto-$YEAR.pmtiles"
-          aws s3 cp "work/kanto-$YEAR.pmtiles" "s3://$R2_BUCKET/parcels/kanto-$YEAR.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
-            --content-type application/octet-stream --cache-control "public, max-age=86400"
+          for i in 1 2 3; do
+            aws s3 cp "work/kanto-$YEAR.pmtiles" "s3://$R2_BUCKET/parcels/kanto-$YEAR.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
+              --content-type application/octet-stream --cache-control "public, max-age=86400" && break
+            [ "$i" -lt 3 ] || exit 1
+            echo "書き込みに失敗。$((i * 30)) 秒後にやり直す"; sleep $((i * 30))
+          done
       - name: ブラウザから範囲指定で読めるようにする（CORS）
         run: |
           cat > cors.json <<'JSON'
