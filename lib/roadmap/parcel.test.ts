@@ -513,9 +513,9 @@ describe("地番参考図のある市町村", () => {
 describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-sheets.json）", () => {
   // タイルを作るとき（build_pref.py）に外す地図。書き方を間違えると何も外れないか、正しい地図まで外れる
   const data = JSON.parse(readFileSync(new URL("../../scripts/parcel-tiles/misplaced-sheets.json", import.meta.url), "utf8")) as {
-    sheets: { code: string; sheet: string; town: string; parcels: number; reason: string }[];
+    sheets: { code: string; sheet: string; town: string; parcels: number; reason: string; oaza?: string; chome?: string; chiban?: string[] }[];
   };
-  it("どれも 1都6県の5桁の市区町村コード・地図名・町・筆の数・理由がある。同じ地図は1回だけ", () => {
+  it("どれも 1都6県の5桁の市区町村コード・地図名・町・筆の数・理由がある。同じ決まりは1回だけ（町・地番で絞るときも）", () => {
     expect(data.sheets.length).toBeGreaterThan(0);
     const keys = new Set<string>();
     for (const s of data.sheets) {
@@ -524,7 +524,15 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(s.town.trim()).not.toBe("");
       expect(s.parcels).toBeGreaterThan(0);
       expect(s.reason.length).toBeGreaterThan(20);
-      const key = `${s.code}|${s.sheet}`;
+      // 町・地番まで絞るとき：大字名・丁目名は空でない文字、地番は重ならない空でない一覧
+      if (s.oaza !== undefined) expect(s.oaza.trim()).not.toBe("");
+      if (s.chome !== undefined) expect(s.chome.trim()).not.toBe("");
+      if (s.chiban !== undefined) {
+        expect(s.chiban.length).toBeGreaterThan(0);
+        expect(new Set(s.chiban).size).toBe(s.chiban.length);
+        expect(s.chiban.length).toBe(s.parcels);
+      }
+      const key = `${s.code}|${s.sheet}|${s.oaza ?? ""}|${s.chome ?? ""}|${(s.chiban ?? []).join(",")}`;
       expect(keys.has(key)).toBe(false);
       keys.add(key);
     }
