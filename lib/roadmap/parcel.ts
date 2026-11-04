@@ -346,8 +346,10 @@ export async function parcelAt(lat: number, lng: number, source: ParcelSource): 
     .map((f) => ({ f, polygons: f.polygons() }))
     .filter(({ polygons }) => polygons.some(([outer, ...holes]) => inRing(p, outer) && !holes.some((h) => inRing(p, h))));
   if (!hits.length) return null;
+  // 同じデータの中で地番のある筆と、地番の無い形（「無地番-2」「長狭物不明-18」「道-5」など）が重なっていれば、地番のある筆を出す
+  // （法務省の地図データには、地番の無い形がふつうの筆にかぶさって入っている所がある。福生市武蔵野台・羽村市神明台など）
+  let hit = hits.find(({ f }) => sourceRank(f) === sourceRank(hits[0].f) && /^\d/.test(f.chiban)) ?? hits[0];
   // 登記所の地図が筆界未定地の所に、市町村の地番参考図の地番の付いた筆があれば、そちらを出す（筆界未定地だったことも添える）
-  let hit = hits[0];
   const undetermined = /^筆界未定/.test(hit.f.chiban) && !hit.f.sanko && !hit.f.estimated;
   const ref = undetermined ? hits.find(({ f }) => f.sanko && /^\d/.test(f.chiban)) : undefined;
   if (ref) hit = ref;

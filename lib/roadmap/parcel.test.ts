@@ -215,6 +215,27 @@ describe("地点の筆", () => {
     expect((await parcelAt(at(0.75, 0.3).lat, at(0.75, 0.3).lng, src))?.chibanRaw).toBe("道-5");
   });
 
+  it("地番の無い形（無地番・長狭物・道）がふつうの筆にかぶさっていれば、地番のある筆を出す", async () => {
+    const [w, s, e, n] = tileBounds(SX, SY);
+    const at = (fx: number, fy: number) => ({ lat: s + (n - s) * fy, lng: w + (e - w) * fx });
+    const src = fakeSource({
+      [`${SX},${SY}`]: [
+        { kuiki: "福生市_武蔵野台_１丁目__", chiban: "無地番-2", polygon: box(SX, SY, 0.1, 0.1, 0.5, 0.5) },
+        { kuiki: "福生市_武蔵野台_１丁目__", chiban: "33-8", polygon: box(SX, SY, 0.2, 0.2, 0.1, 0.1) },
+        { kuiki: "羽村市_神明台_１丁目__", chiban: "長狭物不明-20", polygon: box(SX, SY, 0.7, 0.1, 0.2, 0.6) },
+        { kuiki: "羽村市_神明台_１丁目__", chiban: "道-3", polygon: box(SX, SY, 0.7, 0.4, 0.25, 0.1) },
+        { kuiki: "羽村市_神明台_１丁目__", chiban: "44", polygon: box(SX, SY, 0.75, 0.5, 0.2, 0.3) },
+      ],
+    });
+    const chibanAt = async (fx: number, fy: number) => (await parcelAt(at(fx, fy).lat, at(fx, fy).lng, src))?.chibanRaw;
+    expect(await chibanAt(0.25, 0.25)).toBe("33-8");
+    expect(await chibanAt(0.8, 0.6)).toBe("44");
+    // 地番のある筆の無い所は、地番の無い形のまま（並びが先の形）
+    expect(await chibanAt(0.5, 0.5)).toBe("無地番-2");
+    expect(await chibanAt(0.8, 0.2)).toBe("長狭物不明-20");
+    expect(await chibanAt(0.8, 0.45)).toBe("長狭物不明-20");
+  });
+
   it("公図から推定した位置の筆のタイルを合わせて読み、推定の印（確かさ）を付ける", async () => {
     const [w, s, e, n] = tileBounds(SX, SY);
     const at = (fx: number, fy: number) => ({ lat: s + (n - s) * fy, lng: w + (e - w) * fx });
