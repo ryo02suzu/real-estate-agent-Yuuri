@@ -187,47 +187,80 @@ class Boundaries:
         return not self.loose_prepared[name].contains(c)
 
 
-def _crossings(x: float, y: float, ring: list) -> int:
-    """点 (x, y) から右へ伸ばした線が、輪の線を横切る回数"""
-    n = 0
+def _winding(x: float, y: float, ring: list) -> int:
+    """輪の線が点 (x, y) のまわりを回る数（左回りを＋）。点から右へ伸ばした線を、下から上へ横切れば＋1、上から下へなら−1"""
+    w = 0
     for a, b in zip(ring, ring[1:]):
         x1, y1, x2, y2 = a[0], a[1], b[0], b[1]
-        if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / (y2 - y1) + x1:
-            n += 1
-    return n
+        if y1 <= y < y2 and (x2 - x1) * (y - y1) - (x - x1) * (y2 - y1) > 0:
+            w += 1
+        elif y2 <= y < y1 and (x2 - x1) * (y - y1) - (x - x1) * (y2 - y1) < 0:
+            w -= 1
+    return w
 
 
-def valid_geometry(geom: dict) -> dict:
-    """外周の線が自分と交わる正しくない形を、アプリと同じ「偶奇」の決まり（その場所から外へ向かって線を
-    奇数回横切るなら中）で、正しい形（穴のある形・いくつかの部分）に直す。
-    法務省の地図データには、区画のまわりを回る道路の筆を1本の線で外側と内側をつないで描いたものがあり
-    （横浜市泉区ゆめが丘 101-35・印西市牧の原 3-137 など）、そのままタイルにすると内側の区画まで塗られて、
-    中の筆を押したのに道路の地番が出る。shapely の make_valid は線の回り方によって外側の部分まで塗ることがあり
-    （土浦市中村南１丁目 1401-63 が隣の 26筆の上まで広がった）使わない。線を交わる所で切って面に分け、
-    偶奇で中になる面だけをつなぐ。直せないとき・面が残らないときは元のまま"""
+def valid_geometry(geom: dict, others=None) -> dict:
+    """外周の線が自分と交わる正しくない形を、正しい形（穴のある形・いくつかの部分）に直す。
+    部分ごとに、外周を左回り・穴を右回りにそろえ、線を交わる所で切って面に分け、面ごとに線がまわりを回る数（巻き数）を数える。
+    巻き数が奇数の面は中、0 の面は外（アプリの「偶奇」の判定と同じ）。2重に囲まれた面（巻き数が 0 でない偶数）は、
+    ほかの筆で半分より多く埋まっていれば穴、そうでなければこの筆の一部にする（others(面) がその近くのほかの筆の形を返す。
+    others が無ければ穴）。部分どうしはつなぐ。
+    - 法務省の地図データには、区画のまわりを回る道路の筆を1本の線で外側と内側をつないで描いたものがあり
+      （横浜市泉区ゆめが丘 101-35・印西市牧の原 3-137 など）、そのままタイルにすると内側の区画まで塗られて、
+      中の筆を押したのに道路の地番が出る（内側は2重に囲まれ、ほかの筆で埋まっている → 穴）。
+    - 線が同じ所を2回なぞった細い帯（稲敷市堀之内 457-11 の幅 0.4m ほどの帯）は、ほかの筆が無いのでこの筆の一部。
+    - shapely の make_valid は線の回り方によって外側（巻き数 0）の部分まで塗ることがあり
+      （土浦市中村南１丁目 1401-63 が隣の 26筆の上まで広がった）使わない。
+    直せないとき・面が残らないときは元のまま"""
     from shapely.geometry import LineString, mapping, shape
+    from shapely.geometry.polygon import orient
     from shapely.ops import polygonize, unary_union
 
     try:
         g = shape(geom)
         if g.is_valid:
             return geom
-        rings = []
-        for part in getattr(g, "geoms", [g]):
-            rings.append(list(part.exterior.coords))
-            rings += [list(r.coords) for r in part.interiors]
-        rings = [r for r in rings if len(r) >= 4]
         keep = []
-        for face in polygonize(unary_union([LineString(r) for r in rings])):
-            p = face.representative_point()
-            if sum(_crossings(p.x, p.y, r) for r in rings) % 2:
-                keep.append(face)
+        for part in getattr(g, "geoms", [g]):
+            part = orient(part, 1.0)
+            rings = [list(part.exterior.coords)] + [list(r.coords) for r in part.interiors]
+            rings = [r for r in rings if len(r) >= 4]
+            for face in polygonize(unary_union([LineString(r) for r in rings])):
+                p = face.representative_point()
+                w = sum(_winding(p.x, p.y, r) for r in rings)
+                if w % 2:
+                    keep.append(face)
+                elif w != 0 and others is not None:
+                    near = [o for o in others(face) if o.is_valid and o.intersects(face)]
+                    if not near or face.intersection(unary_union(near)).area <= 0.5 * face.area:
+                        keep.append(face)
         fixed = unary_union(keep) if keep else None
         if fixed is None or fixed.is_empty or fixed.geom_type not in ("Polygon", "MultiPolygon") or not fixed.is_valid:
             return geom
         return mapping(fixed)
     except Exception:
         return geom
+
+
+class _Neighbors:
+    """同じ元データ（市区町村の fgb）のほかの筆の形。正しくない形を直すときに初めて必要になったら全部読み、近くの筆を返す
+    （位置がずれた地図として外す筆は入れない）"""
+
+    def __init__(self, fgb: str, skip_sheets: dict[str, list[dict]] | None = None):
+        self.fgb, self.skip_sheets, self.geoms, self.tree = fgb, skip_sheets, None, None
+
+    def near(self, index: int, area) -> list:
+        from shapely import STRtree
+        from shapely.geometry import Polygon, shape
+
+        if self.tree is None:
+            self.geoms = []
+            with fiona.open(self.fgb) as src:
+                for f in src:
+                    skip = self.skip_sheets and skip_rule(self.skip_sheets, f["properties"]) is not None
+                    self.geoms.append(Polygon() if skip else shape(f.geometry))
+            self.tree = STRtree(self.geoms)
+        return [self.geoms[j] for j in self.tree.query(area) if j != index]
 
 
 def append_features(
@@ -241,8 +274,9 @@ def append_features(
     """mojxml2ogr の出力から、地番区域と地番だけの GeoJSON の行を書き足す
     （位置がずれた地図の筆と、別の市区町村の中に置かれた筆は外す）"""
     n = 0
+    nb = _Neighbors(fgb, skip_sheets)
     with fiona.open(fgb) as src:
-        for f in src:
+        for i, f in enumerate(src):
             p = f["properties"]
             city = p.get("市区町村名") or ""
             kuiki = "_".join(p.get(k) or "" for k in ("市区町村名", "大字名", "丁目名", "小字名", "予備名"))
@@ -264,7 +298,7 @@ def append_features(
                         continue
                 except Exception:
                     pass
-            feat = {"type": "Feature", "properties": {"地番区域": kuiki, "地番": p.get("地番") or ""}, "geometry": valid_geometry(f.geometry.__geo_interface__)}
+            feat = {"type": "Feature", "properties": {"地番区域": kuiki, "地番": p.get("地番") or ""}, "geometry": valid_geometry(f.geometry.__geo_interface__, lambda face, i=i: nb.near(i, face))}
             out.write(json.dumps(feat, ensure_ascii=False, separators=(",", ":")) + "\n")
             n += 1
     return n
