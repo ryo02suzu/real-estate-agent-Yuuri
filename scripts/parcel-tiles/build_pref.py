@@ -187,6 +187,29 @@ class Boundaries:
         return not self.loose_prepared[name].contains(c)
 
 
+def valid_geometry(geom: dict) -> dict:
+    """外周の線が自分と交わる正しくない形を、正しい形（穴のある形・いくつかの部分）に直す。
+    法務省の地図データには、区画のまわりを回る道路の筆を1本の線で外側と内側をつないで描いたものがあり
+    （横浜市泉区ゆめが丘 101-35・印西市牧の原 3-137 など）、そのままタイルにすると内側の区画まで塗られて、
+    中の筆を押したのに道路の地番が出る。直せないとき・面の部分が残らないときは元のまま"""
+    from shapely.geometry import mapping, shape
+    from shapely.validation import make_valid
+
+    try:
+        g = shape(geom)
+        if g.is_valid:
+            return geom
+        fixed = make_valid(g)
+        parts = [x for x in getattr(fixed, "geoms", [fixed]) if x.geom_type in ("Polygon", "MultiPolygon") and not x.is_empty]
+        if not parts:
+            return geom
+        from shapely.ops import unary_union
+
+        return mapping(unary_union(parts))
+    except Exception:
+        return geom
+
+
 def append_features(
     fgb: str,
     out,
@@ -221,7 +244,7 @@ def append_features(
                         continue
                 except Exception:
                     pass
-            feat = {"type": "Feature", "properties": {"地番区域": kuiki, "地番": p.get("地番") or ""}, "geometry": f.geometry.__geo_interface__}
+            feat = {"type": "Feature", "properties": {"地番区域": kuiki, "地番": p.get("地番") or ""}, "geometry": valid_geometry(f.geometry.__geo_interface__)}
             out.write(json.dumps(feat, ensure_ascii=False, separators=(",", ":")) + "\n")
             n += 1
     return n
