@@ -47,7 +47,16 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # 管理設定だけが exact / deniedModels を強制できる。使い捨ての runner に配置する。
+      # Claude が別ブランチへ移動しても検査できるよう、監査コードを先に退避する。
+      - name: モデル制限を準備
+        run: |
+          python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+          sudo install -d -m 0755 /etc/claude-code
+          sudo install -m 0644 .github/claude-managed-settings.json /etc/claude-code/managed-settings.json
+          install -m 0500 .github/scripts/verify_claude_models.py "$RUNNER_TEMP/verify_claude_models.py"
       - uses: anthropics/claude-code-action@v1
+        id: claude_run
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # 開発の指定モデルはOpus 5.5/Fable 5.1のみ。Sonnet/Haikuへ切り替えない。
@@ -79,3 +88,10 @@ jobs:
             --fallback-model claude-fable-5-1
             --effort max
             --allowedTools "Bash(npm run lint:*),Bash(npm run typecheck:*),Bash(npm test:*),Bash(npm run build:*),Bash(npx vitest run:*)"
+      # 実使用に禁止モデルが混じったとき、成功した Claude 応答でもジョブを失敗させる。
+      # 会話本文・住所・トークンをログや artifact に出さない。
+      - name: 実際に使用したモデルを検査
+        if: ${{ always() && steps.claude_run.outcome != 'skipped' }}
+        env:
+          CLAUDE_EXECUTION_FILE: ${{ steps.claude_run.outputs.execution_file }}
+        run: python3 "$RUNNER_TEMP/verify_claude_models.py" "$CLAUDE_EXECUTION_FILE"
