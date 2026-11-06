@@ -12,7 +12,7 @@ import { ratioHint, refLandPoint } from "@/lib/app/ratio-hint";
 import type { Triage } from "@/lib/app/triage";
 import { usageShort } from "@/lib/roadmap/building";
 import { bySide, sideText } from "@/lib/app/neighbor-plan";
-import { chibanLabel, kuikiLabelFrom, parcelMark, pickedChibanText, type Neighbor } from "@/lib/roadmap/parcel";
+import { chibanLabel, isLotChiban, kuikiLabelFrom, parcelMark, pickedChibanText, type Neighbor } from "@/lib/roadmap/parcel";
 import { schoolGaps, schoolGapShort, schoolShort } from "@/lib/roadmap/school";
 import { noCityPlanning } from "@/lib/roadmap/municipalities";
 import { noneLabel, YOUTO_COLORS, youtoShort, zoningArea } from "@/lib/roadmap/zoning";
@@ -40,7 +40,7 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
   const townCenter = parcels.status === "none" && parcels.approximate;
   // 住所の地点の筆が、隣地のとても多い筆（地番の付いた公道など）なら、その面積は物件の土地のものではないので出さない
   const offLot = addressOffLot(parcels) === "large";
-  const area = parcel && /^\d/.test(parcel.chibanRaw) && !offLot ? parcelAreaM2(parcel) : undefined;
+  const area = parcel && isLotChiban(parcel.chibanRaw) && !offLot ? parcelAreaM2(parcel) : undefined;
   // 公図から推定した筆・市の地番参考図の筆は、形から測った面積が地積と大きく違うことがあるので、10㎡単位の目安にする
   const roughArea = !!parcel && !!(parcel.estimated || parcel.sanko);
   const st = stations.status === "ok" ? stations.stations[0] : undefined;
@@ -286,12 +286,12 @@ function NeighborsCard({ data, open, has3d, neighbors, setNeighbors, pick, motio
   const [focus, setFocus] = useState<string | null>(null);
   const info = data.parcels;
   // 住所の地点の筆が道路・水路や、隣地のとても多い筆（物件の土地ではなさそう）のときは出さない
-  if (info.status !== "ok" || !/^\d/.test(info.parcel.chibanRaw) || addressOffLot(info) !== undefined) return null;
+  if (info.status !== "ok" || !isLotChiban(info.parcel.chibanRaw) || addressOffLot(info) !== undefined) return null;
   const plan = pick.plan;
   const sides = plan?.status === "ok" ? plan.sides : undefined;
   // 方角が分かれば北から時計回り（同じ方角は接する長さの長い順）
   const list = bySide(registryNeighbors(info).map((n) => ({ n, side: sides?.get(pickKey(n)) ?? null }))).map((x) => x.n);
-  const roads = info.neighbors.filter((n) => !/^\d/.test(n.chiban)).length;
+  const roads = info.neighbors.filter((n) => !isLotChiban(n.chiban)).length;
   const base = info.parcel.kuiki;
   const chosen = new Set(pick.list.map(pickKey));
   const text = pickedChibanText(pick.list, base);

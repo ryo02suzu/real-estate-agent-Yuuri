@@ -60,6 +60,7 @@ import type { AddressFix, LookupResult } from "@/lib/roadmap";
 import { partialMatch } from "@/lib/roadmap/geocode";
 import { groupHazardMaps, wagamachiUrl } from "@/lib/roadmap/hazard";
 import {
+  isLotChiban,
   chibanLabel,
   chibanQueryOf,
   registryChiban,
@@ -2020,7 +2021,7 @@ function PropertyView({
     data.parcels.status === "ok" ? data.parcels.parcel : undefined;
   const lotParcel =
     shownParcel &&
-    /^\d/.test(shownParcel.chibanRaw) &&
+    isLotChiban(shownParcel.chibanRaw) &&
     addressOffLot(data.parcels) === undefined
       ? shownParcel
       : undefined;

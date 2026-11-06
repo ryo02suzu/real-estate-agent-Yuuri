@@ -10,7 +10,7 @@ import { withRetry } from "@/lib/retry";
 import type { LookupResult } from "@/lib/roadmap";
 import type { ChibanzuLink } from "@/lib/roadmap/chibanzu";
 import { KOZU_DATA } from "@/lib/roadmap/kozu-data";
-import { adjacentParcels, chibanLabel, hasPieceMark, kuikiLabel, kuikiLabelFrom, parcelAt, parcelMark, pickedChibanText, registryChiban, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
+import { adjacentParcels, chibanLabel, hasPieceMark, isLotChiban, kuikiLabel, kuikiLabelFrom, parcelAt, parcelMark, pickedChibanText, registryChiban, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
 import { SANKO_CITIES, sankoSource } from "@/lib/roadmap/sanko-data";
@@ -73,7 +73,7 @@ export function registryNeighbors(info: Extract<ParcelInfo, { status: "ok" }>): 
   const seen = new Set([self]);
   const out: Neighbor[] = [];
   for (const n of info.neighbors) {
-    if (!/^\d/.test(n.chiban)) continue;
+    if (!isLotChiban(n.chiban)) continue;
     const key = `${n.kuiki}|${registryChiban(n.chiban)}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -122,7 +122,7 @@ export const pickKey = (n: Neighbor) => `${n.kuiki}|${registryChiban(n.chiban)}`
 export function parcelLines(info: Extract<ParcelInfo, { status: "ok" }>): { target?: string; neighbors: string[] } {
   const line = (r: { kuiki: string; chiban: string }) => `${kuikiLabel(r.kuiki)} ${registryChiban(r.chiban)}`;
   const target = { kuiki: info.parcel.kuiki, chiban: info.parcel.chibanRaw };
-  return { target: /^\d/.test(target.chiban) ? line(target) : undefined, neighbors: registryNeighbors(info).map(line) };
+  return { target: isLotChiban(target.chiban) ? line(target) : undefined, neighbors: registryNeighbors(info).map(line) };
 }
 
 /**
@@ -168,7 +168,7 @@ export function ParcelButton({
     );
   }
   const chiban =
-    onOpen && info.status === "ok" && info.kind !== "address" && /^\d/.test(info.parcel.chibanRaw) ? `${chibanLabel(info.parcel.chibanRaw)}${parcelMark(info.parcel)}` : undefined;
+    onOpen && info.status === "ok" && info.kind !== "address" && isLotChiban(info.parcel.chibanRaw) ? `${chibanLabel(info.parcel.chibanRaw)}${parcelMark(info.parcel)}` : undefined;
   return (
     <>
       {tile ? (
@@ -217,7 +217,7 @@ export function ParcelButton({
 /** 要点のマスの値：「3556-1（参考）」、地番の無い道路などは「隣地 12筆」 */
 function TileChiban({ info }: { info: Extract<ParcelInfo, { status: "ok" }> }) {
   const p = info.parcel;
-  if (!/^\d/.test(p.chibanRaw)) return <>隣地 {registryNeighbors(info).length}筆</>;
+  if (!isLotChiban(p.chibanRaw)) return <>隣地 {registryNeighbors(info).length}筆</>;
   return (
     <>
       <span className="shrink-0 whitespace-nowrap">{chibanLabel(p.chibanRaw)}</span>
@@ -284,7 +284,7 @@ const KIND_LABEL: Record<ParcelKind, string> = {
 export function ParcelDetail({ info, chibanzu, pick }: { info: Extract<ParcelInfo, { status: "ok" }>; chibanzu?: ChibanzuLink; pick?: ParcelPick }) {
   const { parcel, kind, neighbors } = info;
   const numbered = registryNeighbors(info);
-  const roads = [...new Set(neighbors.filter((n) => !/^\d/.test(n.chiban)).map((n) => chibanLabel(n.chiban)))];
+  const roads = [...new Set(neighbors.filter((n) => !isLotChiban(n.chiban)).map((n) => chibanLabel(n.chiban)))];
   const { target, neighbors: near } = parcelLines(info);
   const lines = [...(target ? [target] : []), ...near];
   const town = kuikiLabel(parcel.kuiki);
@@ -382,7 +382,7 @@ function Row({ kuiki, chiban, strong, hideTown }: { kuiki: string; chiban: strin
         {chibanLabel(chiban)}
       </span>
       {/* 地番の無い道路・水路は請求できないのでコピーを出さない */}
-      {/^\d/.test(chiban) && (
+      {isLotChiban(chiban) && (
         <button onClick={() => copy(`${kuikiLabel(kuiki)} ${registryChiban(chiban)}`)} className="flex shrink-0 items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[12px] text-brand">
           <CopyIcon className="h-3 w-3" />
           {done ? "コピー済" : "コピー"}

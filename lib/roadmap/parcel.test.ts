@@ -15,6 +15,7 @@ import {
   adjacentParcels,
   neighborList,
   pickedChibanText,
+  isLotChiban,
   registryChiban,
   chibanQueryOf,
   parcelAt,
@@ -39,6 +40,20 @@ describe("地番の入力", () => {
     expect(splitChiban("熊谷市下奈良391の3")?.chiban).toBe("391-3");
     expect(splitChiban("熊谷市下奈良391ー3")?.chiban).toBe("391-3");
     expect(splitChiban("川口市青木2丁目217-8")).toMatchObject({ body: "川口市青木2丁目", chiban: "217-8" });
+  });
+
+  it("地番の頭の甲乙丙・イロハ・番外は地番の一部（取手市白山３丁目乙987番1 など）", () => {
+    expect(splitChiban("取手市白山3丁目乙987番1")).toMatchObject({ body: "取手市白山3丁目", chiban: "乙987-1" });
+    expect(splitChiban("下妻市下妻字栗山乙283番6")).toMatchObject({ body: "下妻市下妻字栗山", chiban: "乙283-6" });
+    expect(splitChiban("土浦市中村南4丁目番外26番203")).toMatchObject({ body: "土浦市中村南4丁目", chiban: "番外26-203" });
+    // 半角カナは全角にそろえる（筆の地番も比べるときに同じにそろえる）
+    expect(splitChiban("常総市大生郷町ｲ533")).toMatchObject({ body: "常総市大生郷町", chiban: "イ533" });
+    expect(splitChiban("熊谷市下奈良391番地3")).toMatchObject({ body: "熊谷市下奈良", chiban: "391-3" });
+  });
+
+  it("地番のある筆か（甲乙丙・イロハ・番外つきも地番。道・水・無地番・長狭物・筆界未定地・白地・市道は違う）", () => {
+    for (const c of ["391-3", "甲35-1", "乙1906", "丙993", "丁1146-2", "戊1342", "番外24-753", "ｲ533", "ﾛ9-10", "乙乙1412", "甲乙166-1", "51-3W1", "100V1"]) expect(isLotChiban(c), c).toBe(true);
+    for (const c of ["道-1", "水-154", "無地番-2", "長狭物不明-18", "筆界未定地-152", "白地-06095", "市道-15-444", "河川-1", "県道-1", "道34", "官有地-1", "除外地-2023020914", ""]) expect(isLotChiban(c), c).toBe(false);
   });
 
   it("「地番」と書いてあれば explicit", () => {
@@ -230,6 +245,14 @@ describe("地点の筆", () => {
     const chibanAt = async (fx: number, fy: number) => (await parcelAt(at(fx, fy).lat, at(fx, fy).lng, src))?.chibanRaw;
     expect(await chibanAt(0.25, 0.25)).toBe("33-8");
     expect(await chibanAt(0.8, 0.6)).toBe("44");
+    // 甲乙つきの地番も地番のある筆（取手市白山３丁目乙987番1 のような所）
+    const src2 = fakeSource({
+      [`${SX},${SY}`]: [
+        { kuiki: "取手市_白山_３丁目__", chiban: "無地番-1", polygon: box(SX, SY, 0.1, 0.1, 0.5, 0.5) },
+        { kuiki: "取手市_白山_３丁目__", chiban: "乙987-1", polygon: box(SX, SY, 0.2, 0.2, 0.1, 0.1) },
+      ],
+    });
+    expect((await parcelAt(at(0.25, 0.25).lat, at(0.25, 0.25).lng, src2))?.chibanRaw).toBe("乙987-1");
     // 地番のある筆の無い所は、地番の無い形のまま（並びが先の形）
     expect(await chibanAt(0.5, 0.5)).toBe("無地番-2");
     expect(await chibanAt(0.8, 0.2)).toBe("長狭物不明-20");

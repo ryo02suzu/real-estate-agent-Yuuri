@@ -14,7 +14,7 @@ import { dayPart, overrideTime, solar } from "@/lib/app/sun";
 import { buildTown, decodeTownTile, depthFloor, directionOf, frontRoads, localOf, metersPerPixel, nearestOnLine, rankText, townSeams, townTiles, townTileUrl, type Origin, type RawTown, type TownModel, type XZ } from "@/lib/app/town-model";
 import { webglAvailable } from "@/lib/map-style";
 import { HAZARDS, hazardTileUrl } from "@/lib/roadmap/hazard";
-import { PARCEL_ZOOM, registryChiban, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
+import { isLotChiban, PARCEL_ZOOM, registryChiban, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
 import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
 import { YOUTO_COLORS, youtoShort, ZONING_ZOOM } from "@/lib/roadmap/zoning";
 import { pmtilesZoningSource } from "@/lib/roadmap/zoning-tiles";
@@ -120,10 +120,10 @@ async function loadLots(origin: Origin, target: Parcel | undefined, neighborKeys
       if (self.has(key)) continue;
       const shape = shapeOf([{ polygons: f.polygons(), rect }], toLocal);
       if (!shape.fills.length || !nearOrigin(boundsOf(shape), 330)) continue;
-      const neighbor = neighborKeys.has(key) && /^\d/.test(f.chiban);
+      const neighbor = neighborKeys.has(key) && isLotChiban(f.chiban);
       const reg = `${f.kuiki}|${registryChiban(f.chiban)}`;
       // 地番は登記の地番（道路・水路は「道-12」のまま）。全画面で筆を押したときに出す
-      lots.push({ ...shape, neighbor, ...(neighbor ? { key: reg } : {}), kuiki: f.kuiki, chiban: /^\d/.test(f.chiban) ? registryChiban(f.chiban) : f.chiban });
+      lots.push({ ...shape, neighbor, ...(neighbor ? { key: reg } : {}), kuiki: f.kuiki, chiban: isLotChiban(f.chiban) ? registryChiban(f.chiban) : f.chiban });
       if (neighbor) {
         const at = labelPoint(shape);
         const area = shape.fills.reduce((s, fl) => s + ringArea(fl.outer), 0);
@@ -536,7 +536,7 @@ export function PropertyBackdrop({ result, data, tab, motion, hold, neighbors, p
       labels.push({ key: "lp", title: `${top.kind === "公示" ? "公示地価" : "基準地価"} ${top.price.toLocaleString("ja-JP")}円/㎡`, sub: `${top.bearing}へ${metersText(top.distance)}`, color: "#ffd27a", kind: "big", at: [at[0], far ? 6 : 8 + (52 * top.price) / max + 4, at[1]], tabs: ["price"] });
     }
     // 調べた土地の札と隣の土地の札は最後に（重なったら、タブの札を先に出す）
-    const lot = parcel && /^\d/.test(parcel.chibanRaw) ? registryChiban(parcel.chibanRaw) : null;
+    const lot = parcel && isLotChiban(parcel.chibanRaw) ? registryChiban(parcel.chibanRaw) : null;
     labels.push({ key: "lot", title: lot ?? (result.picked ? "選んだ地点" : "調べた場所"), kind: "lot", at: [c[0], 3, c[1]], tabs: "all" });
     for (const n of nbLabels) labels.push({ key: `nb:${n.key}`, title: n.chiban, kind: "nb", at: [n.at[0], 0.6, n.at[1]], tabs: "nb" });
     api.setMarks({ station: stAt, price: topAt, pins, bars });

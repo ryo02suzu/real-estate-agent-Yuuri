@@ -45,7 +45,7 @@ import { pmtilesBuildingSource } from "@/lib/roadmap/building-tiles";
 import { HAZARD_KINDS, HAZARD_LAYERS, hazardAt, hazardPointLabel, HAZARDS, type HazardKind } from "@/lib/roadmap/hazard";
 import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
 import { LAND_USAGE_COLORS, landPriceSummary, usageFromCode } from "@/lib/roadmap/land-price";
-import { chibanLabel, kuikiLabel, registryChiban } from "@/lib/roadmap/parcel";
+import { chibanLabel, isLotChiban, kuikiLabel, registryChiban } from "@/lib/roadmap/parcel";
 import { readRoadShapes, type RoadRead } from "@/lib/roadmap/road-read";
 import { sheetName, type SheetHit } from "@/lib/roadmap/sheets";
 import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
@@ -529,7 +529,7 @@ export default function LiveMap({
           const f = map.queryRenderedFeatures([e.point.x, e.point.y], { layers: PARCEL_PICK_LAYERS })[0];
           const kuiki = String(f?.properties?.地番区域 ?? "");
           const chiban = registryChiban(String(f?.properties?.地番 ?? ""));
-          if (kuiki && /^\d/.test(chiban)) {
+          if (kuiki && isLotChiban(chiban)) {
             let on = pp.has(kuiki, chiban);
             const sel = document.createElement("button");
             sel.type = "button";

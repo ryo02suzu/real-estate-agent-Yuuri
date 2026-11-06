@@ -4,6 +4,7 @@
 //  (c) 地図で選んだ地点の座標が同じ（小数5桁＝約1m） → ll:緯度,経度
 // 確認の記録（lib/records.ts）・済んだ印・履歴のまとめはこの鍵で結びつける
 
+import { isLotChiban } from "./roadmap/parcel";
 const KANJI_NUM: Record<string, number> = { 〇: 0, 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
 
 /** 「四丁目」→「4丁目」、「十二丁目」→「12丁目」 */
@@ -50,7 +51,7 @@ export type IdSource = {
 /** 調べた結果から物件の鍵を作る（筆が見つかっていれば筆、地図で選んだ地点なら座標、それ以外は住所） */
 export function propertyIdOf(query: string, r: { town: string; lat: number; lng: number; picked?: true; parcel?: { chibanRaw: string }; municipality: { codes?: readonly string[] } }): string {
   const code = r.municipality.codes?.[0];
-  if (r.parcel && code && /^\d/.test(r.parcel.chibanRaw)) return propertyId({ muniCd: code, town: r.town, chiban: r.parcel.chibanRaw });
+  if (r.parcel && code && isLotChiban(r.parcel.chibanRaw)) return propertyId({ muniCd: code, town: r.town, chiban: r.parcel.chibanRaw });
   if (r.picked) return propertyId({ ll: [r.lat, r.lng] });
   return propertyId({ address: query });
 }

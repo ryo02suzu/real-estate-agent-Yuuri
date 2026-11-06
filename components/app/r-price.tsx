@@ -4,6 +4,7 @@
 // 近くの地価公示・地価調査から土地の相場の目安（最寄りの地点の価格・前年比・周辺の平均と幅・価格の推移の線）、図面上の面積から出した
 // 土地の概算、路線価の地図、その下に取引事例（components/app/r-deals.tsx。前の版の「取引」タブ）。
 // どれも物件そのものの価格・査定ではない（「目安」と書く）
+import { isLotChiban } from "@/lib/roadmap/parcel";
 import { Map as MapIcon } from "lucide-react";
 import { useState } from "react";
 import { parcelAreaM2, TSUBO_M2 } from "@/lib/app/area";
@@ -44,7 +45,7 @@ export function PriceTab(props: TabProps) {
   // 建物が共同住宅（マンション）なら、筆は敷地全体なので掛けない（部屋の価格の目安にならない）
   const condo = data.building.status === "ok" && /共同住宅/.test(data.building.result.hit?.building.usage ?? "");
   // 物件の用途地域と用途が違う地点（近くに同じ用途の地点が無いとき）の単価は、面積に掛けない
-  const area = own && parcel && !rough && !condo && /^\d/.test(parcel.chibanRaw) && (matched || !want) ? parcelAreaM2(parcel) : undefined;
+  const area = own && parcel && !rough && !condo && isLotChiban(parcel.chibanRaw) && (matched || !want) ? parcelAreaM2(parcel) : undefined;
 
   return (
     <div className="flex flex-col gap-[10px]">

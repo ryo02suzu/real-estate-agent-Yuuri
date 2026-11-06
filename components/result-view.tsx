@@ -5,7 +5,7 @@ import { showHazardOnMap, showLandPriceOnMap } from "@/lib/map-style";
 import type { LookupResult, Municipality, ResolvedLink } from "@/lib/roadmap";
 import { chibanzuFor } from "@/lib/roadmap/chibanzu";
 import type { HazardKind } from "@/lib/roadmap/hazard";
-import { chibanLabel, chibanQueryOf, kuikiLabel, parcelMark, registryChiban } from "@/lib/roadmap/parcel";
+import { chibanLabel, chibanQueryOf, isLotChiban, kuikiLabel, parcelMark, registryChiban } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { sheetName } from "@/lib/roadmap/sheets";
 import type { DraftInput } from "@/lib/draft";
@@ -362,7 +362,7 @@ function useFit(ref: React.RefObject<HTMLDivElement | null>) {
 /** 「住所コピー」で写す文字。地番で探した筆は地番まで（地図システムの住所検索に貼る） */
 export function copyText(result: Extract<LookupResult, { status: "ok" }>): string {
   const p = result.parcel;
-  return p && !result.picked && /^\d/.test(p.chibanRaw) ? `${result.matchedAddress}${registryChiban(p.chibanRaw)}` : result.matchedAddress;
+  return p && !result.picked && isLotChiban(p.chibanRaw) ? `${result.matchedAddress}${registryChiban(p.chibanRaw)}` : result.matchedAddress;
 }
 
 /** 見出し（「検索地点」など）と住所の2行 */

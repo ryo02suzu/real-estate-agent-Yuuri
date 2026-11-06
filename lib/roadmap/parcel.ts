@@ -72,6 +72,19 @@ export type ParcelSearch =
 const DASH = "[‐‑–—―−ー－-]";
 
 /**
+ * 登記の地番の頭に付くことのある文字。茨城・千葉などには「甲35-1」「乙1906」「丙993」「丁1146-2」「番外24-753」「ｲ533」のように
+ * 甲乙丙丁戊・イロハ・番外の付いた地番がふつうにある（取手市白山３丁目乙987番1 など。地価公示の所在にもそのまま書かれる）
+ */
+const LOT_PREFIX = "(?:番外|[甲乙丙丁戊己庚辛壬癸]{1,2}|[ｲﾛﾊﾆﾎﾍﾄﾁﾘﾇﾙｦイロハニホヘトチリヌルヲ]|仮)";
+const LOT_CHIBAN = new RegExp(`^${LOT_PREFIX}?-?\\d`);
+
+/**
+ * 地番のある筆（登記の土地）の地番か。数字で始まるもののほか、甲乙丙丁戊・イロハ・番外の付いたものも地番。
+ * 「道-5」「水-154」「無地番-2」「長狭物不明-18」「筆界未定地-1」「白地-06095」「市道-15」などの地番の無い形は違う
+ */
+export const isLotChiban = (chiban: string): boolean => LOT_CHIBAN.test(chiban);
+
+/**
  * 入力の末尾の地番を取り出す（「熊谷市下奈良391番地3」→ 本体「熊谷市下奈良」と地番「391-3」）。
  * 「1-2-3」「2番3号」のような住居表示は地番とみなさない。「地番」と書いてあれば explicit
  */
@@ -80,12 +93,13 @@ export function splitChiban(input: string): { body: string; chiban: string; expl
   const explicit = /地番/.test(s);
   s = s.replace(/[(（]?\s*地番\s*[)）]?\s*[:：]?/g, " ").replace(/\s+/g, " ").trim();
   if (/号$/.test(s)) return null;
-  const m = s.match(new RegExp(`^(.*?)(\\d+)(?:\\s*(?:番地の?|番の?|の|${DASH})\\s*(\\d+))?\\s*(?:番地?)?$`));
+  // 地番の頭の甲乙丙・イロハ・番外（「白山3丁目乙987番1」）は地番の一部として取り出す
+  const m = s.match(new RegExp(`^(.*?)(${LOT_PREFIX}?)(\\d+)(?:\\s*(?:番地の?|番の?|の|${DASH})\\s*(\\d+))?\\s*(?:番地?)?$`));
   if (!m) return null;
   const body = m[1].trim();
   // 前にも番号が続く（「1-2-3」「1丁目2番3」）のは住居表示
   if (!body || new RegExp(`(\\d|${DASH}|番)$`).test(body)) return null;
-  return { body, chiban: m[3] ? `${m[2]}-${m[3]}` : m[2], explicit };
+  return { body, chiban: `${m[2]}${m[3]}${m[4] ? `-${m[4]}` : ""}`, explicit };
 }
 
 /**
@@ -353,19 +367,19 @@ export async function parcelAt(lat: number, lng: number, source: ParcelSource): 
   if (!hits.length) return null;
   // 同じデータの中で地番のある筆と、地番の無い形（「無地番-2」「長狭物不明-18」「道-5」など）が重なっていれば、地番のある筆を出す
   // （法務省の地図データには、地番の無い形がふつうの筆にかぶさって入っている所がある。福生市武蔵野台・羽村市神明台など）
-  let hit = hits.find(({ f }) => sourceRank(f) === sourceRank(hits[0].f) && /^\d/.test(f.chiban)) ?? hits[0];
+  let hit = hits.find(({ f }) => sourceRank(f) === sourceRank(hits[0].f) && isLotChiban(f.chiban)) ?? hits[0];
   // 登記所の地図が筆界未定地の所に、市町村の地番参考図の地番の付いた筆があれば、そちらを出す（筆界未定地だったことも添える）
   const undetermined = /^筆界未定/.test(hit.f.chiban) && !hit.f.sanko && !hit.f.estimated;
-  const ref = undetermined ? hits.find(({ f }) => f.sanko && /^\d/.test(f.chiban)) : undefined;
+  const ref = undetermined ? hits.find(({ f }) => f.sanko && isLotChiban(f.chiban)) : undefined;
   if (ref) hit = ref;
   const { f, polygons } = hit;
   // 同じデータの中で、この地点を含む地番のある筆がほかにもあれば候補にする（二重地番などの同じ筆の区画と、地番の無い形は除く）。
   // 正しい地図では筆は重ならないので、古い地図と新しい地図が両方入っている所など、データでは決められない所の印（要確認）
-  const overlaps = /^\d/.test(f.chiban)
+  const overlaps = isLotChiban(f.chiban)
     ? [
         ...new Map(
           hits
-            .filter(({ f: g }) => g !== f && sourceRank(g) === sourceRank(f) && /^\d/.test(g.chiban) && !(g.kuiki === f.kuiki && registryChiban(g.chiban) === registryChiban(f.chiban)))
+            .filter(({ f: g }) => g !== f && sourceRank(g) === sourceRank(f) && isLotChiban(g.chiban) && !(g.kuiki === f.kuiki && registryChiban(g.chiban) === registryChiban(f.chiban)))
             .map(({ f: g }) => [`${g.kuiki}|${registryChiban(g.chiban)}`, { kuiki: g.kuiki, chiban: registryChiban(g.chiban) }] as const),
         ).values(),
       ]
@@ -503,7 +517,7 @@ export function pickedChibanText(picked: readonly Neighbor[], baseKuiki: string)
   const list: Neighbor[] = [];
   for (const n of picked) {
     const chiban = registryChiban(n.chiban);
-    if (!/^\d/.test(chiban) || seen.has(`${n.kuiki}|${chiban}`)) continue;
+    if (!isLotChiban(chiban) || seen.has(`${n.kuiki}|${chiban}`)) continue;
     seen.add(`${n.kuiki}|${chiban}`);
     list.push({ kuiki: n.kuiki, chiban });
   }
@@ -615,7 +629,7 @@ export async function adjacentParcels(target: Parcel, source: ParcelSource, tole
     }
   }
   // 地番のある筆が先、地番の無い道路・水路はあと
-  const numbered = (n: Neighbor) => (/^\d/.test(n.chiban) ? 0 : 1);
+  const numbered = (n: Neighbor) => (isLotChiban(n.chiban) ? 0 : 1);
   return out.sort((a, b) => numbered(a) - numbered(b) || a.kuiki.localeCompare(b.kuiki) || compareChiban(a.chiban, b.chiban));
 }
 

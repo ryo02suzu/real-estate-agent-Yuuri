@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { bySide, clipShape, edgePath, fillPath, planLabelAt, planWindow, scaleBar, sideOf, type Side } from "@/lib/app/neighbor-plan";
 import { labelPoint, shapeOf, tileRect, type Rect, type SceneShape } from "@/lib/app/scene-lots";
 import { localOf, townTiles, type XZ } from "@/lib/app/town-model";
-import { PARCEL_ZOOM, registryChiban, type Neighbor, type ParcelPiece } from "@/lib/roadmap/parcel";
+import { isLotChiban, PARCEL_ZOOM, registryChiban, type Neighbor, type ParcelPiece } from "@/lib/roadmap/parcel";
 import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
 import { addressOffLot, pickKey, type ParcelInfo } from "../parcel-card";
 
@@ -48,7 +48,7 @@ const merge = (a: SceneShape, b: SceneShape): SceneShape => ({ fills: [...a.fill
  * 配置図の材料を読む（物件の画面で1回。読めなければ none）。隣の筆の方角は、地図データの形から計算した目安
  */
 export function useNeighborPlan(lat: number, lng: number, info: ParcelInfo): NeighborPlan {
-  const ok = info.status === "ok" && /^\d/.test(info.parcel.chibanRaw) && addressOffLot(info) === undefined ? info : undefined;
+  const ok = info.status === "ok" && isLotChiban(info.parcel.chibanRaw) && addressOffLot(info) === undefined ? info : undefined;
   const key = ok ? `${lat},${lng}|${ok.parcel.kuiki}|${ok.parcel.chibanRaw}|${ok.neighbors.length}` : "";
   const [state, setState] = useState<{ key: string; plan: NeighborPlan } | null>(null);
   useEffect(() => {

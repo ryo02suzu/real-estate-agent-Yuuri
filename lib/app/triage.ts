@@ -11,7 +11,7 @@ import { HOUREI_LAWS, houreiGroups, houreiOffice, houreiOfficeAll, PREF_NAMES, t
 import { isekiFor } from "../roadmap/iseki";
 import type { Liquefaction } from "../roadmap/liquefaction";
 import { moridoAuthority, type Morido } from "../roadmap/morido";
-import { hasPieceMark, kuikiLabel, kuikiLabelFrom, neighborList, registryChiban, type Parcel } from "../roadmap/parcel";
+import { hasPieceMark, isLotChiban, kuikiLabel, kuikiLabelFrom, neighborList, registryChiban, type Parcel } from "../roadmap/parcel";
 import { PARCEL_DATA } from "../roadmap/parcel-data";
 import type { RirekiRecord } from "../roadmap/rireki";
 import { roadShort, type NearbyRoad } from "../roadmap/road-read";
@@ -428,7 +428,7 @@ function buildActions(input: TriageInput, issues: Issue[]): Action[] {
   // 3. 法務局：謄本・公図（地番が分かっていれば、物件と隣地）
   {
     const p = input.parcels.status === "ok" ? input.parcels : undefined;
-    const numbered = p && /^\d/.test(p.parcel.chibanRaw) ? `${kuikiLabel(p.parcel.kuiki)} ${registryChiban(p.parcel.chibanRaw)}` : undefined;
+    const numbered = p && isLotChiban(p.parcel.chibanRaw) ? `${kuikiLabel(p.parcel.kuiki)} ${registryChiban(p.parcel.chibanRaw)}` : undefined;
     const what = [
       numbered ? `登記事項証明書（土地）：${p?.kind === "address" ? `住所の地点の筆 ${numbered}（参考。物件の筆かを確認）` : numbered}。所有者・地目・地積・抵当権` : "登記事項証明書（土地・建物）：所有者・地目・地積・抵当権（地番は売主・公図で確認）",
       "公図：筆の形・接道・隣地との位置関係。公図と地図のずれ",
