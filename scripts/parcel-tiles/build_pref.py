@@ -14,6 +14,7 @@ MIERUNE の mojxml（mojxml2ogr）で筆のポリゴンにする。地番区域�
 """
 import argparse
 import json
+import math
 import re
 import os
 import shutil
@@ -99,6 +100,7 @@ SHEETS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "misplace
 def load_skip_sheets(path: str = SHEETS_FILE) -> dict[str, list[dict]]:
     """外す筆の決まり（市区町村コードごと）。sheet（地図名）が「*」ならその市区町村コードのデータ全部。
     oaza（大字名）・chome（丁目名）があればその町の筆だけ、chiban（地番の一覧）があればその地番の筆だけ外す。
+    shift（east・north：m）があれば外さず、その量だけ動かす（日本測地系と世界測地系の取り違えで約460mずれた地図）。
     法務省が直して地図名が変われば、何も外さなくなる"""
     if not os.path.exists(path):
         return {}
@@ -114,6 +116,8 @@ def load_skip_sheets(path: str = SHEETS_FILE) -> dict[str, list[dict]]:
                 "chome": s.get("chome"),
                 "chiban": set(s["chiban"]) if s.get("chiban") else None,
                 "town": s["town"],
+                # 測地系の取り違えで約460mずれた地図を、正しい位置に動かす量（東 m・北 m。外さない）
+                "shift": s.get("shift"),
             }
         )
     return rules
@@ -187,6 +191,19 @@ class Boundaries:
         return not self.loose_prepared[name].contains(c)
 
 
+def shifted_geometry(geom: dict, shift: dict) -> dict:
+    """形の座標を、東へ shift["east"] m・北へ shift["north"] m 動かす（緯度ごとに度に直す。地図1枚の中では誤差 0.1m 未満）"""
+    east, north = float(shift["east"]), float(shift["north"])
+
+    def move(coords):
+        if coords and isinstance(coords[0], (int, float)):
+            lon, lat = coords[0], coords[1]
+            return [lon + east / (111320.0 * math.cos(math.radians(lat))), lat + north / 111320.0, *coords[2:]]
+        return [move(c) for c in coords]
+
+    return {"type": geom["type"], "coordinates": move(geom["coordinates"])}
+
+
 def _winding(x: float, y: float, ring: list) -> int:
     """輪の線が点 (x, y) のまわりを回る数（左回りを＋）。点から右へ伸ばした線を、下から上へ横切れば＋1、上から下へなら−1"""
     w = 0
@@ -257,8 +274,11 @@ class _Neighbors:
             self.geoms = []
             with fiona.open(self.fgb) as src:
                 for f in src:
-                    skip = self.skip_sheets and skip_rule(self.skip_sheets, f["properties"]) is not None
-                    self.geoms.append(Polygon() if skip else shape(f.geometry))
+                    r = skip_rule(self.skip_sheets, f["properties"]) if self.skip_sheets else None
+                    if r is not None and r.get("shift"):
+                        self.geoms.append(shape(shifted_geometry(f.geometry.__geo_interface__, r["shift"])))
+                    else:
+                        self.geoms.append(Polygon() if r is not None else shape(f.geometry))
             self.tree = STRtree(self.geoms)
         return [self.geoms[j] for j in self.tree.query(area) if j != index]
 
@@ -270,9 +290,10 @@ def append_features(
     dropped: dict | None = None,
     skip_sheets: dict[str, list[dict]] | None = None,
     skipped: dict | None = None,
+    shifted: dict | None = None,
 ) -> int:
     """mojxml2ogr の出力から、地番区域と地番だけの GeoJSON の行を書き足す
-    （位置がずれた地図の筆と、別の市区町村の中に置かれた筆は外す）"""
+    （位置がずれた地図の筆と、別の市区町村の中に置かれた筆は外す。測地系の取り違えの地図は正しい位置に動かす）"""
     n = 0
     nb = _Neighbors(fgb, skip_sheets)
     with fiona.open(fgb) as src:
@@ -281,7 +302,12 @@ def append_features(
             city = p.get("市区町村名") or ""
             kuiki = "_".join(p.get(k) or "" for k in ("市区町村名", "大字名", "丁目名", "小字名", "予備名"))
             rule = skip_rule(skip_sheets, p) if skip_sheets else None
-            if rule is not None:
+            geom = f.geometry.__geo_interface__
+            if rule is not None and rule.get("shift"):
+                geom = shifted_geometry(geom, rule["shift"])
+                if shifted is not None:
+                    shifted[rule["i"]] = shifted.get(rule["i"], 0) + 1
+            elif rule is not None:
                 if skipped is not None:
                     skipped[rule["i"]] = skipped.get(rule["i"], 0) + 1
                 continue
@@ -289,7 +315,7 @@ def append_features(
                 from shapely.geometry import shape
 
                 try:
-                    if boundaries.outside(city, shape(f.geometry)):
+                    if boundaries.outside(city, shape(geom)):
                         if dropped is not None:
                             d = dropped.setdefault(city, {"n": 0, "ex": []})
                             d["n"] += 1
@@ -298,7 +324,7 @@ def append_features(
                         continue
                 except Exception:
                     pass
-            feat = {"type": "Feature", "properties": {"地番区域": kuiki, "地番": p.get("地番") or ""}, "geometry": valid_geometry(f.geometry.__geo_interface__, lambda face, i=i: nb.near(i, face))}
+            feat = {"type": "Feature", "properties": {"地番区域": kuiki, "地番": p.get("地番") or ""}, "geometry": valid_geometry(geom, lambda face, i=i: nb.near(i, face))}
             out.write(json.dumps(feat, ensure_ascii=False, separators=(",", ":")) + "\n")
             n += 1
     return n
@@ -317,6 +343,7 @@ def main() -> None:
     dropped: dict = {}
     skip_sheets = load_skip_sheets()
     skipped: dict = {}
+    shifted: dict = {}
 
     os.makedirs(a.work, exist_ok=True)
     zips = list_zips(a.pref, a.year)
@@ -336,7 +363,7 @@ def main() -> None:
             download(url, zp)
             # 任意座標系・地区外は入れない（位置が合わない／筆ではない）
             subprocess.run(["mojxml2ogr", fgb, zp], check=True, stdout=subprocess.DEVNULL)
-            n = append_features(fgb, out, boundaries, dropped, skip_sheets, skipped)
+            n = append_features(fgb, out, boundaries, dropped, skip_sheets, skipped, shifted)
             total += n
             os.remove(zp)
             os.remove(fgb)
@@ -347,6 +374,12 @@ def main() -> None:
         for i, k in sorted(skipped.items()):
             code, r = by_i[i]
             log(f"  {code} {r['town']} 地図 {r['sheet']}: {k} 件")
+    if shifted:
+        by_i = {r["i"]: (code, r) for code, rs in skip_sheets.items() for r in rs}
+        log(f"測地系の取り違えで約460mずれていた地図の筆を、正しい位置に動かした: {sum(shifted.values())} 件（{len(shifted)} 件の決まり）")
+        for i, k in sorted(shifted.items()):
+            code, r = by_i[i]
+            log(f"  {code} {r['town']} 地図 {r['sheet']}: {k} 件（東へ {r['shift']['east']:.1f}m・北へ {r['shift']['north']:.1f}m）")
     if dropped:
         log(f"別の市区町村の中に置かれていた筆を外した: {sum(d['n'] for d in dropped.values())} 件")
         for city, d in sorted(dropped.items(), key=lambda kv: -kv[1]["n"]):
