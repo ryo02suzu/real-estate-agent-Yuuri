@@ -187,25 +187,45 @@ class Boundaries:
         return not self.loose_prepared[name].contains(c)
 
 
+def _crossings(x: float, y: float, ring: list) -> int:
+    """点 (x, y) から右へ伸ばした線が、輪の線を横切る回数"""
+    n = 0
+    for a, b in zip(ring, ring[1:]):
+        x1, y1, x2, y2 = a[0], a[1], b[0], b[1]
+        if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / (y2 - y1) + x1:
+            n += 1
+    return n
+
+
 def valid_geometry(geom: dict) -> dict:
-    """外周の線が自分と交わる正しくない形を、正しい形（穴のある形・いくつかの部分）に直す。
+    """外周の線が自分と交わる正しくない形を、アプリと同じ「偶奇」の決まり（その場所から外へ向かって線を
+    奇数回横切るなら中）で、正しい形（穴のある形・いくつかの部分）に直す。
     法務省の地図データには、区画のまわりを回る道路の筆を1本の線で外側と内側をつないで描いたものがあり
     （横浜市泉区ゆめが丘 101-35・印西市牧の原 3-137 など）、そのままタイルにすると内側の区画まで塗られて、
-    中の筆を押したのに道路の地番が出る。直せないとき・面の部分が残らないときは元のまま"""
-    from shapely.geometry import mapping, shape
-    from shapely.validation import make_valid
+    中の筆を押したのに道路の地番が出る。shapely の make_valid は線の回り方によって外側の部分まで塗ることがあり
+    （土浦市中村南１丁目 1401-63 が隣の 26筆の上まで広がった）使わない。線を交わる所で切って面に分け、
+    偶奇で中になる面だけをつなぐ。直せないとき・面が残らないときは元のまま"""
+    from shapely.geometry import LineString, mapping, shape
+    from shapely.ops import polygonize, unary_union
 
     try:
         g = shape(geom)
         if g.is_valid:
             return geom
-        fixed = make_valid(g)
-        parts = [x for x in getattr(fixed, "geoms", [fixed]) if x.geom_type in ("Polygon", "MultiPolygon") and not x.is_empty]
-        if not parts:
+        rings = []
+        for part in getattr(g, "geoms", [g]):
+            rings.append(list(part.exterior.coords))
+            rings += [list(r.coords) for r in part.interiors]
+        rings = [r for r in rings if len(r) >= 4]
+        keep = []
+        for face in polygonize(unary_union([LineString(r) for r in rings])):
+            p = face.representative_point()
+            if sum(_crossings(p.x, p.y, r) for r in rings) % 2:
+                keep.append(face)
+        fixed = unary_union(keep) if keep else None
+        if fixed is None or fixed.is_empty or fixed.geom_type not in ("Polygon", "MultiPolygon") or not fixed.is_valid:
             return geom
-        from shapely.ops import unary_union
-
-        return mapping(unary_union(parts))
+        return mapping(fixed)
     except Exception:
         return geom
 
