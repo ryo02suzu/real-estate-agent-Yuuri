@@ -94,6 +94,18 @@ describe("要注意点（問題になりそうな所）", () => {
     expect(town.issues.map((i) => i.id)).not.toContain("no-parcel");
   });
 
+  it("地図データで筆が重なる所は要確認にし、候補の地番と法務局で確かめる案内を添える", () => {
+    const t = triageOf(loaded({ parcels: { status: "ok", parcel: { ...parcel, overlaps: [{ kuiki: "渋谷区_神南_１丁目__", chiban: "60-2" }, { kuiki: "渋谷区_宇田川町___", chiban: "7" }] }, kind: "chiban", neighbors: [] } }));
+    const i = t.issues.find((x) => x.id === "overlap");
+    expect(i?.level).toBe("check");
+    expect(i?.title).toContain("候補 3筆");
+    expect(i?.detail).toContain("60-2");
+    expect(i?.detail).toContain("宇田川町 7");
+    expect(i?.confirm).toContain("法務局");
+    // 重なりが無ければ出ない
+    expect(triageOf(loaded()).issues.find((x) => x.id === "overlap")).toBeUndefined();
+  });
+
   it("市街化調整区域・農用地区域・盛土規制区域は要注意で、確かめる先を添える", () => {
     const t = triageOf(
       loaded({

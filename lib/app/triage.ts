@@ -11,7 +11,7 @@ import { HOUREI_LAWS, houreiGroups, houreiOffice, houreiOfficeAll, PREF_NAMES, t
 import { isekiFor } from "../roadmap/iseki";
 import type { Liquefaction } from "../roadmap/liquefaction";
 import { moridoAuthority, type Morido } from "../roadmap/morido";
-import { hasPieceMark, kuikiLabel, neighborList, registryChiban, type Parcel } from "../roadmap/parcel";
+import { hasPieceMark, kuikiLabel, kuikiLabelFrom, neighborList, registryChiban, type Parcel } from "../roadmap/parcel";
 import { PARCEL_DATA } from "../roadmap/parcel-data";
 import type { RirekiRecord } from "../roadmap/rireki";
 import { roadShort, type NearbyRoad } from "../roadmap/road-read";
@@ -327,6 +327,10 @@ function placeIssues(input: TriageInput): Issue[] {
     if (p.sanko) out.push({ id: "sanko", level: "check", topic: "place", title: "市町村の地番参考図の筆", detail: `${p.undetermined ? "登記所の地図では筆界未定地です。" : ""}参考図は登記の地番・筆の形と違うことがあります。`, confirm: "法務局の公図・登記で" });
     if (/^筆界未定/.test(p.chibanRaw)) out.push({ id: "undetermined", level: "warn", topic: "place", title: "筆界未定地", detail: "隣の筆との境界が決まっていない土地です。境界の確定（筆界特定・測量）が要ることがあり、融資や売買に効きます。", confirm: "法務局の公図・登記で" });
     if (hasPieceMark(p.chibanRaw) && p.chibanRaws && p.chibanRaws.length > 1) out.push({ id: "pieces", level: "check", topic: "place", title: `地図データでは${p.chibanRaws.length}つの区画に分かれた筆`, detail: `地番 ${registryChiban(p.chibanRaw)} は地図データで「${p.chibanRaws.join("」「")}」に分かれています（登記の地番は1つ）。面積は区画を合わせたものです。`, confirm: "公図・地積測量図で" });
+    if (p.overlaps?.length) {
+      const names = p.overlaps.map((o) => `${kuikiLabelFrom(o.kuiki, p.kuiki)} ${o.chiban}`);
+      out.push({ id: "overlap", level: "check", topic: "place", title: `地図データで筆が重なる所（候補 ${p.overlaps.length + 1}筆）`, detail: `この地点は、登記所の地図データで ${kuikiLabel(p.kuiki)} ${registryChiban(p.chibanRaw)} のほかに ${names.join("・")} も含みます。古い地図と新しい地図が両方入っている所などで、どちらが今の筆かはデータでは決められません。`, confirm: "法務局の公図・登記で地番を" });
+    }
   } else if (parcels.status === "none" && !parcels.approximate && !result.parcelMiss) {
     const chibanzu = chibanzuFor(m, result.lat, result.lng);
     out.push({ id: "no-parcel", level: "check", topic: "place", title: "この地点の筆が地図データに無い", detail: `登記所の地図データにこの地点の筆がありません（データの無い地域か、道路・河川など）。${chibanzu ? `${m.name}の${chibanzu.name}で地番を確かめられます。` : ""}`, confirm: "法務局の公図で" });

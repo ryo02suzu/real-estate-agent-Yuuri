@@ -2069,6 +2069,12 @@ function PropertyView({
           同じ地番がほかに{result.parcelOthers}件
         </HeroChip>
       )}
+      {/* 地図データで筆が重なる所（古い地図と新しい地図が両方ある所など）。押すと候補の地番と確かめ方 */}
+      {!!shownParcel?.overlaps?.length && (
+        <HeroChip tone="warn" onClick={() => setDetail({ kind: "parcel" })} icon={<CircleHelp size={13} strokeWidth={2} absoluteStrokeWidth />}>
+          要確認：筆が重なる所
+        </HeroChip>
+      )}
     </>
   );
   // 出典（模型に使っているもの。タブで変わる）。どのタブの出典も同じ枠に重ねて、いちばん長いタブの高さを取っておく

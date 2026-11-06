@@ -236,6 +236,30 @@ describe("地点の筆", () => {
     expect(await chibanAt(0.8, 0.45)).toBe("長狭物不明-20");
   });
 
+  it("同じデータの中で地番のある筆が重なっていれば、ほかの筆を候補（要確認）にする（二重地番の区画・地番の無い形は候補にしない）", async () => {
+    const [w, s, e, n] = tileBounds(SX, SY);
+    const at = (fx: number, fy: number) => ({ lat: s + (n - s) * fy, lng: w + (e - w) * fx });
+    const src = fakeSource({
+      [`${SX},${SY}`]: [
+        // 古い地図の大きな筆の上に、新しい地図の筆が乗っている（小美玉市高崎のような所）
+        { kuiki: "小美玉市_高崎___", chiban: "1234", polygon: box(SX, SY, 0.1, 0.1, 0.5, 0.5) },
+        { kuiki: "小美玉市_高崎___", chiban: "2001-1", polygon: box(SX, SY, 0.2, 0.2, 0.2, 0.2) },
+        { kuiki: "小美玉市_高崎___", chiban: "道-3", polygon: box(SX, SY, 0.1, 0.1, 0.5, 0.5) },
+        { kuiki: "小美玉市_高崎___", chiban: "51W1", polygon: box(SX, SY, 0.7, 0.1, 0.2, 0.2) },
+        { kuiki: "小美玉市_高崎___", chiban: "51W2", polygon: box(SX, SY, 0.7, 0.1, 0.2, 0.2) },
+      ],
+    });
+    const a = await parcelAt(at(0.3, 0.3).lat, at(0.3, 0.3).lng, src);
+    expect(a?.chibanRaw).toBe("1234");
+    expect(a?.overlaps).toEqual([{ kuiki: "小美玉市_高崎___", chiban: "2001-1" }]);
+    // 重なっていない所（1234 だけ）は候補なし
+    expect((await parcelAt(at(0.5, 0.5).lat, at(0.5, 0.5).lng, src))?.overlaps).toBeUndefined();
+    // 二重地番（同じ筆の区画）は候補にしない
+    const c = await parcelAt(at(0.75, 0.15).lat, at(0.75, 0.15).lng, src);
+    expect(c && registryChiban(c.chibanRaw)).toBe("51");
+    expect(c?.overlaps).toBeUndefined();
+  });
+
   it("公図から推定した位置の筆のタイルを合わせて読み、推定の印（確かさ）を付ける", async () => {
     const [w, s, e, n] = tileBounds(SX, SY);
     const at = (fx: number, fy: number) => ({ lat: s + (n - s) * fy, lng: w + (e - w) * fx });

@@ -56,6 +56,11 @@ export type Parcel = {
   sanko?: string;
   /** 登記所の地図では筆界未定地の所の、地番参考図の筆 */
   undetermined?: boolean;
+  /**
+   * 同じデータの中で、この地点を含む地番のある筆がほかにもあるとき、その筆（地番区域と登記の地番）。
+   * 正しい地図では筆は重ならないので、古い地図と新しい地図が両方入っている所などの、データでは決められない所（要確認）
+   */
+  overlaps?: { kuiki: string; chiban: string }[];
 };
 
 export type ParcelSearch =
@@ -354,6 +359,17 @@ export async function parcelAt(lat: number, lng: number, source: ParcelSource): 
   const ref = undetermined ? hits.find(({ f }) => f.sanko && /^\d/.test(f.chiban)) : undefined;
   if (ref) hit = ref;
   const { f, polygons } = hit;
+  // 同じデータの中で、この地点を含む地番のある筆がほかにもあれば候補にする（二重地番などの同じ筆の区画と、地番の無い形は除く）。
+  // 正しい地図では筆は重ならないので、古い地図と新しい地図が両方入っている所など、データでは決められない所の印（要確認）
+  const overlaps = /^\d/.test(f.chiban)
+    ? [
+        ...new Map(
+          hits
+            .filter(({ f: g }) => g !== f && sourceRank(g) === sourceRank(f) && /^\d/.test(g.chiban) && !(g.kuiki === f.kuiki && registryChiban(g.chiban) === registryChiban(f.chiban)))
+            .map(({ f: g }) => [`${g.kuiki}|${registryChiban(g.chiban)}`, { kuiki: g.kuiki, chiban: registryChiban(g.chiban) }] as const),
+        ).values(),
+      ]
+    : [];
   const pieces: ParcelPiece[] = [{ polygons, tile: [x, y] }];
   for (const [nx, ny] of neighborsToComplete(pieces))
     for (const g of (await source.tile(nx, ny)) ?? []) if (g.kuiki === f.kuiki && g.chiban === f.chiban) pieces.push({ polygons: g.polygons(), tile: [nx, ny] });
@@ -368,6 +384,7 @@ export async function parcelAt(lat: number, lng: number, source: ParcelSource): 
     ...(f.estimated ? { estimated: f.estimated } : {}),
     ...(f.sanko ? { sanko: f.sanko } : {}),
     ...(ref ? { undetermined: true } : {}),
+    ...(overlaps.length ? { overlaps } : {}),
   };
 }
 

@@ -22,6 +22,7 @@ import { HazardDetail } from "../hazard-card";
 import { LandPriceDetail } from "../land-price-card";
 import { LegendList } from "../legend";
 import { Notes } from "../notes";
+import { kuikiLabel, kuikiLabelFrom, registryChiban } from "@/lib/roadmap/parcel";
 import { ParcelDetail, type ParcelPick } from "../parcel-card";
 import { SchoolDetail, SchoolGapNote } from "../school-card";
 import { Sheet } from "../sheet";
@@ -90,7 +91,17 @@ export function DetailSheet({
       const chibanzu = chibanzuFor(m, result.lat, result.lng);
       body =
         data.parcels.status === "ok" ? (
-          <ParcelDetail info={data.parcels} chibanzu={chibanzu} pick={pick} />
+          <>
+            {/* 地図データで筆が重なる所：候補の地番と、法務局で確かめる案内（データではどちらが今の筆か決められない） */}
+            {!!data.parcels.parcel.overlaps?.length && (
+              <p className="mb-2 rounded-xl bg-[#fff1d6] px-3 py-2 text-[12px] leading-[1.6] text-[#8a4f3a]">
+                <b className="font-bold text-[#8a5a00]">要確認</b>：この地点は、登記所の地図データで {kuikiLabel(data.parcels.parcel.kuiki)} {registryChiban(data.parcels.parcel.chibanRaw)} のほかに{" "}
+                {data.parcels.parcel.overlaps.map((o) => `${kuikiLabelFrom(o.kuiki, data.parcels.status === "ok" ? data.parcels.parcel.kuiki : "")} ${o.chiban}`).join("・")} も含みます。
+                古い地図と新しい地図が両方入っている所などで、どちらが今の筆かはデータでは決められません。法務局の公図・登記（登記情報提供サービス）で地番を確かめてください。
+              </p>
+            )}
+            <ParcelDetail info={data.parcels} chibanzu={chibanzu} pick={pick} />
+          </>
         ) : (
           <>
             <Loading state={data.parcels} />
