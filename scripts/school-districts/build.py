@@ -23,8 +23,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import urllib.error
-import urllib.request
 import zipfile
 
 import openpyxl
@@ -32,6 +30,7 @@ import openpyxl
 import os as _os, sys as _sys
 
 _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), ".."))
+import ksj  # noqa: E402
 from regions import prefs  # noqa: E402
 
 # 対応している都道府県（lib/roadmap/data/regions.json。関東1都6県＋中部9県）
@@ -54,22 +53,13 @@ def log(*a):
 
 
 def get(url: str, rng: str | None = None) -> bytes:
-    h = dict(UA)
-    if rng:
-        h["Range"] = rng
-    with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=180) as r:
-        return r.read()
+    """読む（通信の失敗・429・5xx は読み直す。scripts/ksj.py）"""
+    return ksj.get(url, UA, rng)
 
 
 def exists(url: str) -> bool:
-    """ファイルがあるか。サーバーが無いファイルにエラーの HTML を 200 で返すことがあるので、先頭が ZIP の印（PK）のときだけ「ある」とする
-    （2026-11-07 の中部の土地利用で、無い 2026 年度の森林地域を「ある」として作り直しが止まった）"""
-    try:
-        return get(url, "bytes=0-15")[:2] == b"PK"
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return False
-        raise
+    """ファイルがあるか（404 なら無い・ZIP ならある。確認用のページなどは待って読み直す。scripts/ksj.py）"""
+    return ksj.exists(url, UA)
 
 
 def latest() -> int:
@@ -144,7 +134,7 @@ def build(year: int, out: str, work: str) -> dict:
     # 学校の位置（学校コード → 経度・緯度）
     where: dict[str, list[float]] = {}
     for pref in PREFS:
-        for f in read_zip(get(URL.format(k="P29", yy=yy, pref=pref)))["features"]:
+        for f in read_zip(ksj.get_zip(URL.format(k="P29", yy=yy, pref=pref), UA))["features"]:
             code = text(f["properties"].get("P29_002"))
             if code and f["geometry"] and f["geometry"]["type"] == "Point":
                 where[code] = [round(c, 6) for c in f["geometry"]["coordinates"]]
@@ -154,7 +144,7 @@ def build(year: int, out: str, work: str) -> dict:
     with open(seq, "w", encoding="utf-8") as fo:
         for kind, key in (("A27", "es"), ("A32", "jh")):
             for pref in PREFS:
-                for f in read_zip(get(URL.format(k=kind, yy=yy, pref=pref)))["features"]:
+                for f in read_zip(ksj.get_zip(URL.format(k=kind, yy=yy, pref=pref), UA))["features"]:
                     p = f["properties"]
                     city = str(p.get(f"{kind}_001") or "").zfill(5)
                     if not ok.get(city, {}).get(key):

@@ -24,8 +24,6 @@ import io
 import json
 import os
 import sys
-import urllib.error
-import urllib.request
 import zipfile
 
 URL = "https://nlftp.mlit.go.jp/ksj/gml/data/N02/N02-{yy}/N02-{yy}_GML.zip"
@@ -33,6 +31,7 @@ UA = {"User-Agent": "michilu-stations (+https://github.com/ryo02suzu/real-estate
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 SOURCE = os.path.join(ROOT, "lib", "roadmap", "data", "station-source.json")
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+import ksj  # noqa: E402
 from regions import REGIONS  # noqa: E402
 
 # 対応している地方（lib/roadmap/data/regions.json）と、そのまわり（県境の近くの物件から、となりの県の駅にも歩ける）
@@ -100,22 +99,13 @@ def log(*a):
 
 
 def get(url: str, rng: str | None = None) -> bytes:
-    h = dict(UA)
-    if rng:
-        h["Range"] = rng
-    with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=300) as r:
-        return r.read()
+    """読む（通信の失敗・429・5xx は読み直す。scripts/ksj.py）"""
+    return ksj.get(url, UA, rng, timeout=300)
 
 
 def exists(url: str) -> bool:
-    """ファイルがあるか。サーバーが無いファイルにエラーの HTML を 200 で返すことがあるので、先頭が ZIP の印（PK）のときだけ「ある」とする
-    （2026-11-07 の中部の土地利用で、無い 2026 年度の森林地域を「ある」として作り直しが止まった）"""
-    try:
-        return get(url, "bytes=0-15")[:2] == b"PK"
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return False
-        raise
+    """ファイルがあるか（404 なら無い・ZIP ならある。確認用のページなどは待って読み直す。scripts/ksj.py）"""
+    return ksj.exists(url, UA)
 
 
 def latest_year() -> int:
@@ -278,7 +268,7 @@ def attach_doors(stations: list[dict], doors: dict) -> dict:
 
 
 def build(yy: int, osm: list[str] | None = None) -> dict:
-    data = get(URL.format(yy=f"{yy:02d}"))
+    data = ksj.get_zip(URL.format(yy=f"{yy:02d}"), UA, timeout=300)
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         name = next(n for n in z.namelist() if n.endswith("_Station.geojson") and "UTF-8" in n)
         feats = json.loads(z.read(name))["features"]

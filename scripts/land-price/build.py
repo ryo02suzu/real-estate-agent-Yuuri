@@ -23,13 +23,12 @@ import subprocess
 import sys
 import tempfile
 import unicodedata
-import urllib.error
-import urllib.request
 import zipfile
 
 import os as _os, sys as _sys
 
 _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), ".."))
+import ksj  # noqa: E402
 from regions import prefs  # noqa: E402
 
 # 対応している都道府県（lib/roadmap/data/regions.json。関東1都6県＋中部9県）
@@ -50,22 +49,13 @@ def log(*a):
 
 
 def get(url: str, rng: str | None = None) -> bytes:
-    h = dict(UA)
-    if rng:
-        h["Range"] = rng
-    with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=180) as r:
-        return r.read()
+    """読む（通信の失敗・429・5xx は読み直す。scripts/ksj.py）"""
+    return ksj.get(url, UA, rng)
 
 
 def exists(url: str) -> bool:
-    """ファイルがあるか。サーバーが無いファイルにエラーの HTML を 200 で返すことがあるので、先頭が ZIP の印（PK）のときだけ「ある」とする
-    （2026-11-07 の中部の土地利用で、無い 2026 年度の森林地域を「ある」として作り直しが止まった）"""
-    try:
-        return get(url, "bytes=0-15")[:2] == b"PK"
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return False
-        raise
+    """ファイルがあるか（404 なら無い・ZIP ならある。確認用のページなどは待って読み直す。scripts/ksj.py）"""
+    return ksj.exists(url, UA)
 
 
 def latest(kind: str) -> int:
@@ -179,7 +169,7 @@ def build(l01: int, l02: int, out: str, work: str) -> dict:
             for pref in PREFS:
                 url = URL.format(k=kind, yy=f"{year % 100:02d}", pref=pref)
                 n = 0
-                for (lng, lat), props in points(kind, pref, read_zip(get(url))):
+                for (lng, lat), props in points(kind, pref, read_zip(ksj.get_zip(url, UA))):
                     geom = {"type": "Point", "coordinates": [round(lng, 6), round(lat, 6)]}
                     # 拡大した地図と物件のまわりを調べるのに使う（属性を全部）
                     f.write(json.dumps({"type": "Feature", "tippecanoe": {"layer": "lp", "minzoom": 13, "maxzoom": 13}, "geometry": geom, "properties": props}, ensure_ascii=False) + "\n")

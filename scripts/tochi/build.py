@@ -28,14 +28,12 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
-import urllib.error
-import urllib.request
 import zipfile
 
 import os as _os, sys as _sys
 
 _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), ".."))
+import ksj  # noqa: E402
 from regions import REGIONS, prefs  # noqa: E402
 
 # 作る都道府県（--region で地方を選ぶ。地方ごとに別のファイルにする）
@@ -57,49 +55,9 @@ def log(*a):
     print(*a, file=sys.stderr, flush=True)
 
 
-def get(url: str, rng: str | None = None) -> bytes:
-    """読む。サーバーの一時的な失敗（5xx・通信）は少し待って4回まで読み直す（404 はそのまま）"""
-    h = dict(UA)
-    if rng:
-        h["Range"] = rng
-    for i in range(4):
-        try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=180) as r:
-                return r.read()
-        except urllib.error.HTTPError as e:
-            if e.code < 500 or i == 3:
-                raise
-        except urllib.error.URLError:
-            if i == 3:
-                raise
-        time.sleep(2 * 2**i)
-    raise RuntimeError("unreachable")
-
-
-def exists(url: str) -> bool:
-    """ファイルがあるか。サーバーが無いファイルにエラーの HTML を 200 で返すことがあるので、先頭が ZIP の印（PK）のときだけ「ある」とする
-    （2026-11-07 の中部の土地利用で、無い 2026 年度の森林地域を「ある」として作り直しが止まった）"""
-    try:
-        return get(url, "bytes=0-15")[:2] == b"PK"
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return False
-        raise
-
-
 def latest(prefs_: tuple[str, ...] | None = None) -> dict[str, dict[str, int]]:
-    """データごと・都県ごとの一番新しい年度（無い都県は入れない）"""
-    this = datetime.date.today().year
-    out: dict[str, dict[str, int]] = {}
-    for code, ds in DATASETS.items():
-        years: dict[str, int] = {}
-        for pref in prefs_ or PREFS:
-            for year in range(this, ds["first"] - 1, -1):
-                if exists(BASE.format(code=code, yy=f"{year % 100:02d}", pref=pref)):
-                    years[pref] = year
-                    break
-        out[code] = years
-    return out
+    """データごと・都県ごとの一番新しい年度（無い都県は入れない。読み方は scripts/ksj.py）"""
+    return {code: ksj.newest(BASE, code, prefs_ or PREFS, ds["first"], UA) for code, ds in DATASETS.items()}
 
 
 def features(code: str, z: zipfile.ZipFile, work: str):
@@ -139,7 +97,7 @@ def build(years: dict[str, dict[str, int]], out: str, work: str) -> dict:
             n = 0
             for pref, year in sorted(by_pref.items()):
                 url = BASE.format(code=code, yy=f"{year % 100:02d}", pref=pref)
-                with zipfile.ZipFile(io.BytesIO(get(url))) as z:
+                with zipfile.ZipFile(io.BytesIO(ksj.get_zip(url, UA))) as z:
                     for g, props in features(code, z, work):
                         props["p"] = pref
                         fo.write(json.dumps({"type": "Feature", "geometry": g, "properties": props}, ensure_ascii=False) + "\n")

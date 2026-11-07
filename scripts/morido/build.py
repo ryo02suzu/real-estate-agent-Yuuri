@@ -30,6 +30,7 @@ import zipfile
 import os as _os, sys as _sys
 
 _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), ".."))
+import ksj  # noqa: E402
 from regions import prefs  # noqa: E402
 
 # 対応している都道府県（lib/roadmap/data/regions.json。関東1都6県＋中部9県）
@@ -51,22 +52,13 @@ def log(*a):
 
 
 def get(url: str, rng: str | None = None) -> bytes:
-    h = dict(UA)
-    if rng:
-        h["Range"] = rng
-    with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=180) as r:
-        return r.read()
+    """読む（通信の失敗・429・5xx は読み直す。scripts/ksj.py）"""
+    return ksj.get(url, UA, rng)
 
 
 def exists(url: str) -> bool:
-    """ファイルがあるか。サーバーが無いファイルにエラーの HTML を 200 で返すことがあるので、先頭が ZIP の印（PK）のときだけ「ある」とする
-    （2026-11-07 の中部の土地利用で、無い 2026 年度の森林地域を「ある」として作り直しが止まった）"""
-    try:
-        return get(url, "bytes=0-15")[:2] == b"PK"
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return False
-        raise
+    """ファイルがあるか（404 なら無い・ZIP ならある。確認用のページなどは待って読み直す。scripts/ksj.py）"""
+    return ksj.exists(url, UA)
 
 
 def latest() -> int:
@@ -102,7 +94,7 @@ def build(year: int, out: str, work: str) -> dict:
     authorities = dict(PENDING_CITIES)
     with open(seq, "w", encoding="utf-8") as fo:
         for pref in PREFS:
-            with zipfile.ZipFile(io.BytesIO(get(URL.format(yy=yy, pref=pref)))) as z:
+            with zipfile.ZipFile(io.BytesIO(ksj.get_zip(URL.format(yy=yy, pref=pref), UA))) as z:
                 name = next(n for n in z.namelist() if n.endswith(".geojson"))
                 feats = json.loads(z.read(name))["features"]
             for f in feats:
