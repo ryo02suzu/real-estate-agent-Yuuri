@@ -209,6 +209,14 @@
     - データの作り方：`.github/workflows/reinfolib.yml` が API（キーは GitHub の Secrets）と国土数値情報から作り、R2 の `reinfolib/<日付>/` に置く（JSON は gzip、地物は z14 の PMTiles）。データごとの置き場所・時点は `lib/roadmap/data/reinfolib-source.json`（作れなかったデータは前のまま）。3か月ごとに作り直す。API は間を空けて呼ぶ（約款：短い時間に多く呼ぶと止められることがある）。
     - 出典：API の約款の文（「このサービスは、国土交通省不動産情報ライブラリのAPI機能を使用していますが、提供情報の最新性、正確性、完全性等が保証されたものではありません」）と、データごとの出典（各モジュールの `*_CREDIT`）・注意書き（`*_CAUTIONS`）を、データを出す画面に添える。
 
+100. **対応エリアを地方ごとに広げる土台（中部9県）**（`lib/roadmap/regions.ts`、`lib/roadmap/data/regions.json`、`scripts/regions.py`、`lib/roadmap/data/chubu.ts`）
+    - 対応している地方と都道府県は `regions.json` の1か所で持つ（関東1都6県＋中部9県＝新潟・富山・石川・福井・山梨・長野・岐阜・静岡・愛知）。アプリ（`regions.ts`：都道府県名の表・住所の先頭が対応エリアかの判定・範囲）と、データを作るスクリプト（`scripts/regions.py`：`prefs("chubu")` など）が同じ JSON を読む。
+    - 中部9県の316市町村を登録した（市区町村コードと名前は国土地理院の市区町村表 `maps.gsi.go.jp/js/muni.js` から。政令市の新潟・静岡・浜松・名古屋は区のコードをまとめて1つ）。道路種別の公式図・問い合わせ先はまだ調べていないので、道路図の公開の有無は `coverage: "unknown"`（画面では「調査中」。地図のボタンは出さず、県か市の建築指導課で確かめるよう案内。要注意点にも「調査中」の項目）。調べた県から `data/niigata.ts` 〜 `data/aichi.ts` に移す。
+    - 逆ジオコーダの市区町村コード表（`gsi-muni-codes.json`）に中部9県を足した（住所の書き間違いの補正と、地図で選んだ地点の市区町村名に使う）。住所検索の候補は「関東だけを前に」から「対応エリア（関東・中部）を前に」に。「関東の外」の文言は「対応エリアの外」に。
+    - 国のデータの読み方：砂防等（`hourei.ts`）・盛土規制（`morido.ts`）・自然公園等（`tochi.ts`）は、データを取り込んである都道府県（source.json にある県）だけ答え、取り込み前の地方は「データなし」ではなく null（表示しない）にする。市区町村のハザードマップの一覧（`hazard-maps.json`）は中部込みで作り直した（627市区町村）。
+    - 地番の地図データ（`parcel-tiles.yml`）：`region` 入力（all・kanto・chubu）で作り直す地方を選び、都道府県ごとのタイルを R2 の `parcels/<年>/pref-*` に置き、最後に対応している全部の都道府県を1つ（`parcels/japan-<年>.pmtiles`）にまとめる。中部の G空間情報センターの組織名（moj-15niigata〜moj-23aichi）は API で実在を確かめた。
+    - まだ：用途地域・地価・学区・駅・施設・盛土・砂防等・自然公園等・建物・取引事例の中部分の取り込み、地番データの点検、道路図の調査、対応エリアの画面。
+
 ## 保守
 
 - **地図リンクの週次確認**: `.github/workflows/link-check.yml` が毎週月曜に `npm run check-links` を実行。役所の座標（`lib/roadmap/data/office-points.json`）でURLを作り、404・エラーページを検出すると失敗して通知される。
