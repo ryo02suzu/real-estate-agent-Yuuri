@@ -171,9 +171,9 @@ describe("市区町村のデータの有無", () => {
     expect(statusFor(["11201"], all)?.city).toBe("川越市");
     expect(statusFor(["99999"], all)).toBeUndefined();
   });
-  it("関東1都6県の市区町村の大半が載っている", () => {
+  it("対応エリア（関東1都6県・中部9県）の市区町村の大半が載っている", () => {
     expect(Object.keys(all).length).toBeGreaterThan(280);
-    expect(Object.keys(all).every((k) => /^(08|09|10|11|12|13|14)\d{3}$/.test(k))).toBe(true);
+    expect(Object.keys(all).every((k) => /^(0[89]|1[0-9]|2[0-3])\d{3}$/.test(k))).toBe(true);
   });
 });
 
