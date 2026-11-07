@@ -23,6 +23,7 @@ import datetime
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -32,7 +33,13 @@ import urllib.error
 import urllib.request
 import zipfile
 
-PREFS = ("08", "09", "10", "11", "12", "13", "14")
+import os as _os, sys as _sys
+
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), ".."))
+from regions import REGIONS, prefs  # noqa: E402
+
+# 作る都道府県（--region で地方を選ぶ。地方ごとに別のファイルにする）
+PREFS: tuple[str, ...] = prefs("kanto")
 BASE = "https://nlftp.mlit.go.jp/ksj/gml/data/{code}/{code}-{yy}/{code}-{yy}_{pref}_GML.zip"
 UA = {"User-Agent": "michilu-tochi (+https://github.com/ryo02suzu/real-estate-agent-Yuuri)"}
 ATTRIBUTION = '<a href="https://nlftp.mlit.go.jp/ksj/">「国土数値情報（自然公園地域データ・農業地域データ・森林地域データ）」（国土交通省）</a>を加工して作成'
@@ -79,13 +86,13 @@ def exists(url: str) -> bool:
         raise
 
 
-def latest() -> dict[str, dict[str, int]]:
+def latest(prefs_: tuple[str, ...] | None = None) -> dict[str, dict[str, int]]:
     """データごと・都県ごとの一番新しい年度（無い都県は入れない）"""
     this = datetime.date.today().year
     out: dict[str, dict[str, int]] = {}
     for code, ds in DATASETS.items():
         years: dict[str, int] = {}
-        for pref in PREFS:
+        for pref in prefs_ or PREFS:
             for year in range(this, ds["first"] - 1, -1):
                 if exists(BASE.format(code=code, yy=f"{year % 100:02d}", pref=pref)):
                     years[pref] = year
@@ -160,37 +167,56 @@ def main() -> None:
     ap.add_argument("--source", default="lib/roadmap/data/tochi-source.json")
     ap.add_argument("--public", default="public")
     ap.add_argument("--work", default=None)
+    ap.add_argument("--region", choices=sorted(REGIONS), help="地方（kanto・chubu）。地方ごとに別のファイルにする。省略時は全部の地方を順に")
     a = ap.parse_args()
 
-    years = latest()
+    regions = [a.region] if a.region else list(REGIONS)
     current = json.load(open(a.source, encoding="utf-8")) if os.path.exists(a.source) else {}
-    changed = years != current.get("years")
-    log(f"国土数値情報: {years} / アプリ: {current.get('years')} → {'更新あり' if changed else '更新なし'}")
+    # 関東は従来どおり source.json の一番上（url・years）、ほかの地方は regions.<地方> に書く
+    def stored(region: str) -> dict:
+        return current if region == "kanto" else (current.get("regions") or {}).get(region, {})
+
+    latest_by = {r: latest(prefs(r)) for r in regions}
+    changed_any = False
+    for r in regions:
+        changed = latest_by[r] != stored(r).get("years")
+        changed_any = changed_any or changed
+        log(f"{r}: 国土数値情報: {latest_by[r]} / アプリ: {stored(r).get('years')} → {'更新あり' if changed else '更新なし'}")
     if a.check:
         if os.environ.get("GITHUB_OUTPUT"):
             with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-                f.write(f"changed={'true' if changed else 'false'}\n")
+                f.write(f"changed={'true' if changed_any else 'false'}\n")
         return
     work = a.work or tempfile.mkdtemp(prefix="tochi-")
     os.makedirs(work, exist_ok=True)
     if not a.install:
         if not a.out:
             sys.exit("--out を指定してください")
-        build(years, a.out, work)
+        build(latest_by[regions[0]], a.out, work)
         return
-    stamp = max(y for by_pref in years.values() for y in by_pref.values())
-    rel = f"data/tochi-{stamp}-{datetime.date.today():%Y%m%d}.pmtiles"
-    out_path = os.path.join(a.public, rel)
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    counts = build(years, out_path, work)
-    for old in os.listdir(os.path.dirname(out_path)):
-        if old.startswith("tochi-") and old.endswith(".pmtiles") and old != os.path.basename(out_path):
-            os.remove(os.path.join(os.path.dirname(out_path), old))
-            log("removed", old)
-    with open(a.source, "w", encoding="utf-8") as f:
-        json.dump({"url": f"/{rel}", "years": years, "counts": counts}, f, ensure_ascii=False, indent=1)
-        f.write("\n")
-    log(f"source: {a.source} → /{rel}")
+    for r in regions:
+        years = latest_by[r]
+        stamp = max(y for by_pref in years.values() for y in by_pref.values())
+        prefix = "tochi-" if r == "kanto" else f"tochi-{r}-"
+        rel = f"data/{prefix}{stamp}-{datetime.date.today():%Y%m%d}.pmtiles"
+        out_path = os.path.join(a.public, rel)
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        counts = build(years, out_path, work)
+        # 同じ地方の前のファイルだけ消す（関東は tochi-<数字>…、ほかは tochi-<地方>-…）
+        mine = re.compile(r"^tochi-\d" if r == "kanto" else rf"^tochi-{re.escape(r)}-")
+        for old in os.listdir(os.path.dirname(out_path)):
+            if mine.match(old) and old.endswith(".pmtiles") and old != os.path.basename(out_path):
+                os.remove(os.path.join(os.path.dirname(out_path), old))
+                log("removed", old)
+        entry = {"url": f"/{rel}", "years": years, "counts": counts}
+        if r == "kanto":
+            current = {**entry, **({"regions": current["regions"]} if current.get("regions") else {})}
+        else:
+            current.setdefault("regions", {})[r] = entry
+        with open(a.source, "w", encoding="utf-8") as f:
+            json.dump(current, f, ensure_ascii=False, indent=1)
+            f.write("\n")
+        log(f"source: {a.source} → /{rel}")
 
 
 if __name__ == "__main__":

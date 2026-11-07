@@ -31,7 +31,13 @@ import urllib.error
 import urllib.request
 import zipfile
 
-PREFS = ("08", "09", "10", "11", "12", "13", "14")
+import os as _os, sys as _sys
+
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), ".."))
+from regions import prefs  # noqa: E402
+
+# 対応している都道府県（lib/roadmap/data/regions.json。関東1都6県＋中部9県）
+PREFS = prefs()
 BASE = "https://nlftp.mlit.go.jp/ksj/gml/data/{code}/{code}-{yy}/{code}-{yy}_{pref}_GML.zip"
 UA = {"User-Agent": "michilu-hourei (+https://github.com/ryo02suzu/real-estate-agent-Yuuri)"}
 ATTRIBUTION = (

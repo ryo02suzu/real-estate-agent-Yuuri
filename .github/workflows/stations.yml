@@ -29,21 +29,23 @@ jobs:
           python-version: "3.12"
       - name: 新しい年のデータが出たか（出ていなくても、出入口のために作り直す）
         run: python3 scripts/stations/build.py --check
-      - name: OpenStreetMap の関東の切り出しを読む（約0.6GB）
+      - name: OpenStreetMap の対応している地方の切り出しを読む（関東・中部。各0.5〜0.6GB）
         # 配布元が止まっていることがある（2026年10月に openstreetmap.fr が 502）ので、Geofabrik と openstreetmap.fr の順に試す
         run: |
-          for url in https://download.geofabrik.de/asia/japan/kanto-latest.osm.pbf https://download.openstreetmap.fr/extracts/asia/japan/kanto-latest.osm.pbf; do
-            if curl -sSfL --retry 2 --retry-delay 30 -o "$RUNNER_TEMP/kanto.osm.pbf" "$url"; then
-              echo "読んだ所：$url"
-              break
-            fi
-            rm -f "$RUNNER_TEMP/kanto.osm.pbf"
+          for region in $(jq -r 'keys[]' lib/roadmap/data/regions.json); do
+            for url in "https://download.geofabrik.de/asia/japan/$region-latest.osm.pbf" "https://download.openstreetmap.fr/extracts/asia/japan/$region-latest.osm.pbf"; do
+              if curl -sSfL --retry 2 --retry-delay 30 -o "$RUNNER_TEMP/$region.osm.pbf" "$url"; then
+                echo "読んだ所：$url"
+                break
+              fi
+              rm -f "$RUNNER_TEMP/$region.osm.pbf"
+            done
+            ls -la "$RUNNER_TEMP/$region.osm.pbf"
           done
-          ls -la "$RUNNER_TEMP/kanto.osm.pbf"
       - name: 駅のデータを作ってアプリに入れる
         run: |
           pip install -r scripts/poi/requirements.txt
-          python3 scripts/stations/build.py --install --osm "$RUNNER_TEMP/kanto.osm.pbf"
+          python3 scripts/stations/build.py --install --osm "$RUNNER_TEMP"/*.osm.pbf
           ls -la public/data
       - uses: actions/setup-node@v4
         with:

@@ -38,7 +38,15 @@ jobs:
     outputs:
       ready: ${{ steps.c.outputs.ready }}
       stamp: ${{ steps.c.outputs.stamp }}
+      prefs: ${{ steps.p.outputs.prefs }}
     steps:
+      - uses: actions/checkout@v4
+      - id: p
+        name: 作る都道府県（regions.json から）
+        run: |
+          prefs=$(jq -c '[.[] | .prefs | keys[]] | sort' lib/roadmap/data/regions.json)
+          echo "prefs=$prefs" >> "$GITHUB_OUTPUT"
+          echo "作る都道府県: $prefs"
       - id: c
         env:
           ACCOUNT: ${{ secrets.R2_ACCOUNT_ID }}
@@ -59,7 +67,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pref: ["08", "09", "10", "11", "12", "13", "14"]
+        pref: ${{ fromJSON(needs.check.outputs.prefs) }}
     env:
       STAMP: ${{ needs.check.outputs.stamp }}
       R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
@@ -106,18 +114,19 @@ jobs:
           make -C /tmp/tippecanoe -j"$(nproc)"
           mkdir -p ~/tippecanoe-bin && cp /tmp/tippecanoe/tippecanoe /tmp/tippecanoe/tile-join ~/tippecanoe-bin/
       - run: echo "$HOME/tippecanoe-bin" >> "$GITHUB_PATH"
-      - name: 関東1都6県を1つにまとめて R2 に置く
+      - name: 対応している全部の都道府県を1つにまとめて R2 に置く
         run: |
           mkdir -p work
           aws s3 cp "s3://$R2_BUCKET/buildings/$STAMP/" work/ --recursive --exclude "*" --include "pref-*.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors
           ls -la work
           ls work/pref-13.pmtiles >/dev/null || { echo "::error::東京都のタイルがありません"; exit 1; }
-          tile-join -q --force --no-tile-size-limit -o "work/kanto-$STAMP.pmtiles" \
+          ls work/pref-23.pmtiles >/dev/null || { echo "::error::愛知県のタイルがありません"; exit 1; }
+          tile-join -q --force --no-tile-size-limit -o "work/japan-$STAMP.pmtiles" \
             -n "MICHILU buildings (PLATEAU) $STAMP" \
             -A '<a href="https://www.mlit.go.jp/plateau/">「3D都市モデル（Project PLATEAU）」（国土交通省）</a>を加工して作成' \
             work/pref-*.pmtiles
-          ls -la "work/kanto-$STAMP.pmtiles"
-          aws s3 cp "work/kanto-$STAMP.pmtiles" "s3://$R2_BUCKET/buildings/kanto-$STAMP.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
+          ls -la "work/japan-$STAMP.pmtiles"
+          aws s3 cp "work/japan-$STAMP.pmtiles" "s3://$R2_BUCKET/buildings/japan-$STAMP.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
             --content-type application/octet-stream --cache-control "public, max-age=86400"
       - name: ブラウザから範囲指定で読めるようにする（CORS）
         run: |
@@ -127,7 +136,7 @@ jobs:
           aws s3api put-bucket-cors --bucket "$R2_BUCKET" --cors-configuration file://cors.json --endpoint-url "$R2_ENDPOINT"
       - name: 公開 URL で読めるか確かめる
         run: |
-          url="${R2_PUBLIC_URL%/}/buildings/kanto-$STAMP.pmtiles"
+          url="${R2_PUBLIC_URL%/}/buildings/japan-$STAMP.pmtiles"
           curl -sS -r 0-6 -H "Origin: https://michilu.vercel.app" -D headers.txt -o head.bin "$url"
           cat headers.txt
           grep -qi "^HTTP/.* 206" headers.txt || { echo "::error::範囲指定で読めません: $url"; exit 1; }
@@ -140,7 +149,7 @@ jobs:
           cache: npm
       - name: アプリの置き場所を書き換え、テストが通れば main に入れる
         run: |
-          codes=$(python3 scripts/building-tiles/build.py --list-codes 08,09,10,11,12,13,14)
+          codes=$(python3 scripts/building-tiles/build.py --list-codes "$(jq -r '[.[] | .prefs | keys[]] | sort | join(",")' lib/roadmap/data/regions.json)")
           edition="$(echo "$STAMP" | sed -E 's/^([0-9]{4})([0-9]{2}).*/\1年\2月時点/; s/年0/年/')"
           printf '{\n "url": "%s",\n "edition": "%s",\n "codes": %s\n}\n' "$URL" "$edition" "$codes" > lib/roadmap/data/building-source.json
           cat lib/roadmap/data/building-source.json | head -c 400

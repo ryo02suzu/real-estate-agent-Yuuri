@@ -33,7 +33,13 @@ CKAN = "https://www.geospatial.jp/ckan/api/3/action/package_show?id=ckan-dataset
 # 公表自治体及び掲載データ一覧（データの有無と時点）。G空間のデータセットの説明文にある Excel
 LIST_RE = re.compile(r"https://www\.mlit\.go\.jp/toshi/tosiko/content/\d+\.xlsx")
 UA = {"User-Agent": "michilu-zoning-tiles (+https://github.com/ryo02suzu/real-estate-agent-Yuuri)"}
-PREFS = ("08", "09", "10", "11", "12", "13", "14")
+import os as _os, sys as _sys
+
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), ".."))
+from regions import prefs  # noqa: E402
+
+# 対応している都道府県（lib/roadmap/data/regions.json。関東1都6県＋中部9県）
+PREFS = prefs()
 ATTRIBUTION = '<a href="https://www.mlit.go.jp/toshi/tosiko/toshi_tosiko_tk_000087.html">都市計画決定GISデータ（国土交通省）</a>を加工して作成'
 
 # タイルに入れるレイヤ（データのファイル名の末尾）と、名前に使う属性

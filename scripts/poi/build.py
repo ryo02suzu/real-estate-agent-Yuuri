@@ -130,12 +130,13 @@ def data_date(pbf: str) -> str:
     return datetime.date.fromtimestamp(os.path.getmtime(pbf)).isoformat()
 
 
-def build(pbf: str, out: str, work: str) -> dict[int, int]:
+def build(pbfs: list[str], out: str, work: str) -> dict[int, int]:
     seq = os.path.join(work, "poi.geojsonl")
     with open(seq, "w", encoding="utf-8") as f:
         h = Handler(f)
-        # 面の施設（way）は点の位置が要るので、位置を覚えながら読む
-        h.apply_file(pbf, locations=True)
+        # 面の施設（way）は点の位置が要るので、位置を覚えながら読む（関東・中部など、切り出しごとに）
+        for pbf in pbfs:
+            h.apply_file(pbf, locations=True)
     for k, (label, _) in KINDS.items():
         log(f"{k:>2} {label}: {h.counts.get(k, 0)}")
     tippecanoe = shutil.which("tippecanoe") or "tippecanoe"
@@ -154,7 +155,7 @@ def build(pbf: str, out: str, work: str) -> dict[int, int]:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--pbf", required=True, help="OpenStreetMap の地域の切り出し（.osm.pbf）")
+    ap.add_argument("--pbf", required=True, nargs="+", help="OpenStreetMap の地域の切り出し（.osm.pbf。関東・中部など複数可）")
     ap.add_argument("--out", help="出力する .pmtiles")
     ap.add_argument("--install", action="store_true", help="public/data/ に置いて lib/roadmap/data/poi-source.json を書き換える")
     ap.add_argument("--source", default="lib/roadmap/data/poi-source.json")
@@ -162,7 +163,7 @@ def main() -> None:
     ap.add_argument("--date", help="データの日付（省略時は .osm.pbf の見出しの時点）")
     a = ap.parse_args()
     work = tempfile.mkdtemp(prefix="poi-")
-    date = a.date or data_date(a.pbf)
+    date = a.date or max(data_date(p) for p in a.pbf)
     if not a.install:
         if not a.out:
             sys.exit("--out を指定してください")

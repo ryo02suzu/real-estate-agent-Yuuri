@@ -3,7 +3,7 @@ import { VectorTile } from "@mapbox/vector-tile";
 import { PbfReader } from "pbf";
 import { PMTiles, type Source } from "pmtiles";
 import type { Polygon } from "./parcel";
-import { TOCHI_DATA, TOCHI_KINDS, TOCHI_ZOOM, type TochiArea, type TochiSource } from "./tochi";
+import { TOCHI_DATA, TOCHI_KINDS, TOCHI_ZOOM, tochiUrlFor, type TochiArea, type TochiSource } from "./tochi";
 
 function decode(data: ArrayBuffer, x: number, y: number): TochiArea[] {
   const layer = new VectorTile(new PbfReader(new Uint8Array(data))).layers[TOCHI_DATA.layer];
@@ -41,14 +41,23 @@ export function tochiTileSource(src: string | Source): TochiSource {
 }
 
 /** 読みに行く URL（サイト内のパスは、開いているサイトの URL にする） */
-function tochiUrl(): string {
-  const { url } = TOCHI_DATA;
+function absolute(url: string): string {
   if (/^https?:/.test(url) || typeof window === "undefined") return url;
   return new URL(url, window.location.origin).href;
 }
 
-let site: TochiSource | undefined;
-/** アプリが使う区域のタイル（置き場所は data/tochi-source.json） */
+const sites = new Map<string, TochiSource>();
+/** 市区町村コードの地点が入る地方のタイル（置き場所は data/tochi-source.json）。取り込み前の地方は undefined */
+export function tochiSourceFor(city: string): TochiSource | undefined {
+  const url = tochiUrlFor(city);
+  if (!url) return undefined;
+  let s = sites.get(url);
+  if (!s) sites.set(url, (s = tochiTileSource(absolute(url))));
+  return s;
+}
+
+/** 関東のタイル（互換のため。地方を選ぶときは tochiSourceFor） */
 export const pmtilesTochiSource: TochiSource = {
-  tile: (x, y) => (site ??= tochiTileSource(tochiUrl())).tile(x, y),
+  tile: (x, y) => tochiSourceFor("13101")!.tile(x, y),
 };
+void TOCHI_DATA;

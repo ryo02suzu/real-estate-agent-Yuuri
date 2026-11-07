@@ -17,7 +17,7 @@ import { pmtilesMoridoSource } from "@/lib/roadmap/morido-tiles";
 import { suidoFor, type SuidoLink } from "@/lib/roadmap/suido";
 import { TOCHI_YEAR, tochiAt, tochiCheck, tochiLine, type Tochi } from "@/lib/roadmap/tochi";
 import { contactLinkText, contactName, noContactText, utilitiesFor, type UtilityContact, type UtilityKind, type Utilities } from "@/lib/roadmap/utilities";
-import { pmtilesTochiSource } from "@/lib/roadmap/tochi-tiles";
+import { tochiSourceFor } from "@/lib/roadmap/tochi-tiles";
 import { statusFor, zoningAt, zoningChips, zoningRows, type Zoning, type ZoningStatus } from "@/lib/roadmap/zoning";
 import { ZONING_DATA } from "@/lib/roadmap/zoning-data";
 import { pmtilesZoningSource } from "@/lib/roadmap/zoning-tiles";
@@ -48,7 +48,7 @@ export function useZoning(lat: number, lng: number, municipality: Municipality):
       // 盛土規制法・砂防指定地などの区域は読めなくても都市計画は出す
       withRetry(() => moridoAt(lat, lng, codes.split(",")[0], pmtilesMoridoSource)).catch(() => null),
       withRetry(() => houreiAt(lat, lng, codes.split(",")[0], pmtilesHoureiSource)).catch(() => null),
-      withRetry(() => tochiAt(lat, lng, codes.split(",")[0], pmtilesTochiSource)).catch(() => null),
+      withRetry(() => { const src = tochiSourceFor(codes.split(",")[0]); return src ? tochiAt(lat, lng, codes.split(",")[0], src) : Promise.resolve(null); }).catch(() => null),
     ])
       .then(([zoning, mod, morido, hourei, tochi]) => {
         if (!alive) return;

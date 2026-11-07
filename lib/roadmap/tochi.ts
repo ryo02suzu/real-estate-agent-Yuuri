@@ -2,6 +2,7 @@
 // 森林地域（森林法）。国土数値情報のデータ（scripts/tochi/build.py。z13 のタイル）から、物件の地点がどの区域に入るかを出す。都県の土地利用基本計画図
 // （縮尺約5万分の1）から作った概略の区域で、最新が2015年度版と古いので、参考として出し、都県・市町村の資料で確かめる旨を添える
 import SOURCE from "./data/tochi-source.json";
+import { regionOfMuni } from "./regions";
 import type { LngLat, Polygon } from "./parcel";
 import { tileOf } from "./parcel";
 import { inPolygon } from "./zoning";
@@ -10,6 +11,18 @@ import { inPolygon } from "./zoning";
 export const TOCHI_ZOOM = 13;
 
 export const TOCHI_DATA = { url: process.env.NEXT_PUBLIC_TOCHI_PMTILES_URL || SOURCE.url, layer: "tc" };
+
+type TochiRegionSource = { url: string; years: Record<string, Record<string, number>> };
+/** 地方ごとのタイル（関東は source.json の一番上、ほかの地方は regions.<地方>） */
+const REGION_SOURCES: Record<string, TochiRegionSource> = {
+  kanto: { url: TOCHI_DATA.url, years: SOURCE.years as Record<string, Record<string, number>> },
+  ...((SOURCE as { regions?: Record<string, TochiRegionSource> }).regions ?? {}),
+};
+/** 市区町村コードの地点のタイルの URL（取り込み前の地方・対応エリアの外は undefined） */
+export function tochiUrlFor(city: string): string | undefined {
+  const r = regionOfMuni(city);
+  return r ? REGION_SOURCES[r]?.url : undefined;
+}
 
 export type TochiKind = "自然公園地域" | "特別地域" | "特別保護地区" | "農業地域" | "農用地区域" | "国有林" | "地域森林計画対象民有林" | "保安林";
 
@@ -45,10 +58,10 @@ export type Tochi = {
 };
 
 /** データを取り込んである都道府県（取り込み前の地方は null） */
-const PREFS = new Set(Object.values(SOURCE.years as Record<string, Record<string, number>>).flatMap((by) => Object.keys(by)));
+const PREFS = new Set(Object.values(REGION_SOURCES).flatMap((r) => Object.values(r.years).flatMap((by) => Object.keys(by))));
 
 /** データの年度（都県で一番新しいもの） */
-export const TOCHI_YEAR = Math.max(...Object.values(SOURCE.years).flatMap((by) => Object.values(by)));
+export const TOCHI_YEAR = Math.max(...Object.values(REGION_SOURCES).flatMap((r) => Object.values(r.years).flatMap((by) => Object.values(by))));
 
 /** 出典（CC BY 4.0 のとおり、加工したことを書く） */
 export const TOCHI_CREDIT = `出典：「国土数値情報（自然公園地域データ・農業地域データ・森林地域データ）」（国土交通省、https://nlftp.mlit.go.jp/ksj/）を加工して作成（${TOCHI_YEAR}年度）`;

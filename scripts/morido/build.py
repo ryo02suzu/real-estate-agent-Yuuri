@@ -27,7 +27,13 @@ import urllib.error
 import urllib.request
 import zipfile
 
-PREFS = ("08", "09", "10", "11", "12", "13", "14")
+import os as _os, sys as _sys
+
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), ".."))
+from regions import prefs  # noqa: E402
+
+# 対応している都道府県（lib/roadmap/data/regions.json。関東1都6県＋中部9県）
+PREFS = prefs()
 URL = "https://nlftp.mlit.go.jp/ksj/gml/data/A56/A56-{yy}/A56-{yy}_{pref}_GML.zip"
 PAGE = "https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A56-{year}.html"
 UA = {"User-Agent": "michilu-morido (+https://github.com/ryo02suzu/real-estate-agent-Yuuri)"}
@@ -173,7 +179,7 @@ def main() -> None:
             log("removed", old)
     with open(a.source, "w", encoding="utf-8") as f:
         cities = counts.pop("authorities")
-        json.dump({"url": f"/{rel}", "year": year, "asOf": asof or f"{year}年度", "counts": counts, "cities": cities}, f, ensure_ascii=False, indent=1)
+        json.dump({"url": f"/{rel}", "year": year, "asOf": asof or f"{year}年度", "prefs": list(PREFS), "counts": counts, "cities": cities}, f, ensure_ascii=False, indent=1)
         f.write("\n")
     log(f"source: {a.source} → /{rel}")
 

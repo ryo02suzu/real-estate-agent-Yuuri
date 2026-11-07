@@ -32,8 +32,16 @@ URL = "https://nlftp.mlit.go.jp/ksj/gml/data/N02/N02-{yy}/N02-{yy}_GML.zip"
 UA = {"User-Agent": "michilu-stations (+https://github.com/ryo02suzu/real-estate-agent-Yuuri)"}
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 SOURCE = os.path.join(ROOT, "lib", "roadmap", "data", "station-source.json")
-# 関東1都6県と、そのまわり（県境の近くの物件から、となりの県の駅にも歩ける）
-BBOX = (138.3, 34.8, 141.0, 37.25)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from regions import REGIONS  # noqa: E402
+
+# 対応している地方（lib/roadmap/data/regions.json）と、そのまわり（県境の近くの物件から、となりの県の駅にも歩ける）
+BBOX = (
+    min(r["bounds"][0][0] for r in REGIONS.values()) - 0.1,
+    min(r["bounds"][0][1] for r in REGIONS.values()) - 0.1,
+    max(r["bounds"][1][0] for r in REGIONS.values()) + 0.1,
+    max(r["bounds"][1][1] for r in REGIONS.values()) + 0.1,
+)
 # 事業者の呼び方（広告や案内で使う短い名前）
 OPERATORS = {
     "東日本旅客鉄道": "JR東日本",
@@ -167,6 +175,16 @@ def osm_doors(pbf: str) -> dict:
     return out
 
 
+def osm_doors_all(pbfs: list[str]) -> dict:
+    """複数の切り出し（関東・中部など）の出入口などを合わせる"""
+    out: dict = {"entrance": [], "building": [], "node": []}
+    for p in pbfs:
+        d = osm_doors(p)
+        for k in out:
+            out[k].extend(d[k])
+    return out
+
+
 def osm_date(pbf: str) -> str:
     """切り出しの時点（.osm.pbf の見出しの osmosis_replication_timestamp。無ければファイルの更新日）"""
     import osmium
@@ -258,7 +276,7 @@ def attach_doors(stations: list[dict], doors: dict) -> dict:
     return counts
 
 
-def build(yy: int, osm: str | None = None) -> dict:
+def build(yy: int, osm: list[str] | None = None) -> dict:
     data = get(URL.format(yy=f"{yy:02d}"))
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         name = next(n for n in z.namelist() if n.endswith("_Station.geojson") and "UTF-8" in n)
@@ -289,10 +307,10 @@ def build(yy: int, osm: str | None = None) -> dict:
             g["p"] = [g["p"][int(i * step)] for i in range(12)]
     out = {"year": 2000 + yy, "stations": stations}
     if osm:
-        counts = attach_doors(stations, osm_doors(osm))
+        counts = attach_doors(stations, osm_doors_all(osm))
         log(f"入口の点：出入口 {counts['entrance']}・駅舎 {counts['building']}・駅の点 {counts['node']}・ホームだけ {counts['platform']}")
         out["doors"] = counts
-        out["doorsDate"] = osm_date(osm)
+        out["doorsDate"] = max(osm_date(p) for p in osm)
         # ODbL：OpenStreetMap から作った点を含むデータベースなので、同じ ODbL で公開し、そう書いておく
         out["license"] = (
             "e（駅の入口の点）は © OpenStreetMap contributors、Open Database License（ODbL 1.0。https://opendatacommons.org/licenses/odbl/）。"
@@ -306,7 +324,7 @@ def main() -> None:
     ap.add_argument("--check", action="store_true", help="新しい年のデータが出たか（GITHUB_OUTPUT に changed=）")
     ap.add_argument("--install", action="store_true", help="最新の年で作り、public/data/ に置く")
     ap.add_argument("--year", type=int, help="2桁の年（省略時は一番新しい年）")
-    ap.add_argument("--osm", help="OpenStreetMap の関東の切り出し（.osm.pbf）。駅の入口の点を足す")
+    ap.add_argument("--osm", nargs="+", help="OpenStreetMap の地域の切り出し（.osm.pbf。関東・中部など複数可）。駅の入口の点を足す")
     a = ap.parse_args()
     current = json.load(open(SOURCE)) if os.path.exists(SOURCE) else {}
     yy = a.year or latest_year()
