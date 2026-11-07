@@ -1887,11 +1887,26 @@ function PropertyView({
   const changeTab = (t: TabKey) => {
     if (t === tab) return;
     setTab(t);
-    // タブを変えたら、いちばん上へ（街の模型の見せ方が変わるのを見せる）
-    scroller.current?.scrollTo({
-      top: 0,
-      behavior: reducedMotion() ? "auto" : "smooth",
-    });
+    // 読んでいたパネル内で切り替える。先頭の模型へ戻すと、横向きではタブが画面外に隠れる。
+    // 本文を深く読んでいた場合だけ、パネルの先頭まで戻して次の項目を見せる。
+    const el = scroller.current;
+    const panel = sheetRef.current;
+    if (el && panel) {
+      const zoom =
+        parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue("--app-zoom"),
+        ) || 1;
+      const panelTop = Math.max(
+        0,
+        el.scrollTop + panel.getBoundingClientRect().top - el.getBoundingClientRect().top - 56 * zoom,
+      );
+      if (el.scrollTop > panelTop) {
+        el.scrollTo({
+          top: panelTop,
+          behavior: reducedMotion() ? "auto" : "smooth",
+        });
+      }
+    }
   };
   // 共有の画面（LINE・メールなど）が出せる端末か（この画面は調べたあとにだけ描くので、サーバーの描画とは食い違わない）
   const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";

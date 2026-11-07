@@ -4,7 +4,7 @@
 // components/app/zoom.ts）、スマホの画面だけで読む画像、ロゴ、検索窓の入力欄、いちばん下のメニュー。
 // 検索する前のホームは components/app/home.tsx、物件の画面は components/app/mobile-app.tsx
 import { FileText, Search, Star } from "lucide-react";
-import { useState, type CSSProperties, type ImgHTMLAttributes, type ReactNode, type RefObject } from "react";
+import { useState, useSyncExternalStore, type CSSProperties, type ImgHTMLAttributes, type ReactNode, type RefObject } from "react";
 import { ClockBack } from "./icons";
 
 /** 絵の幅（pt）。この幅で描いて、画面の幅に合わせて拡大・縮小する */
@@ -42,6 +42,9 @@ export function LogoLockup({ style, sky = false }: { style?: CSSProperties; sky?
   );
 }
 
+// 最初のHTMLでは入力を待つ。初期化前に打った文字を、制御された input の初期値で消さない。
+const subscribeReady = () => () => {};
+
 /**
  * 検索窓の入力欄。iPhone は 16px より小さい字の入力欄に触れると画面を拡大するので、字を 16px（拡大・縮小の後で）で描いてから
  * transform で絵の大きさ（size pt）に縮める
@@ -69,6 +72,7 @@ export function ScaledInput({
   /** 写真の上のすりガラスの欄（字を白く） */
   onPhoto?: boolean;
 }) {
+  const ready = useSyncExternalStore(subscribeReady, () => true, () => false);
   const k = `calc(${size} * var(--app-zoom, 1) / 16)`;
   return (
     <div className={`relative h-full min-w-0 flex-1 overflow-hidden ${className}`}>
@@ -78,6 +82,8 @@ export function ScaledInput({
         enterKeyHint="search"
         autoComplete={autoComplete}
         value={value}
+        disabled={!ready}
+        aria-busy={!ready || undefined}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={label}
