@@ -32,6 +32,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("長野県の全市町村を網羅している", () => covered("長野県"));
   it("愛知県の全市町村を網羅している", () => covered("愛知県"));
   it("岐阜県の全市町村を網羅している", () => covered("岐阜県"));
+  it("新潟県の全市町村を網羅している", () => covered("新潟県"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
@@ -49,6 +50,7 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
     長野県: ["026", "0260", "0261", "0263", "0264", "0265", "0266", "0267", "0268", "0269"],
     愛知県: ["052", "0531", "0532", "0533", "0536", "0561", "0562", "0563", "0564", "0565", "0566", "0567", "0568", "0569", "0586", "0587"],
     岐阜県: ["058", "0572", "0573", "0574", "0575", "0576", "0577", "05769", "0581", "0584", "0585"],
+    新潟県: ["025", "0250", "0254", "0255", "0256", "0257", "0258", "0259"],
   };
   const contacts = MUNICIPALITIES.flatMap((m) =>
     [m.contact, ...Object.values(m.contactByCode ?? {})].filter((c) => c?.phone).map((c) => ({ m, phone: c!.phone! })),
@@ -126,6 +128,7 @@ describe("都市計画区域外（国交省 令和6年都市計画現況調査�
     "20562": "木島平村", "20602": "栄村",
     "23561": "設楽町", "23562": "東栄町", "23563": "豊根村",
     "21504": "七宗町", "21506": "白川町", "21507": "東白川村", "21604": "白川村",
+    "15405": "出雲崎町", "15482": "津南町", "15504": "刈羽村", "15581": "関川村", "15586": "粟島浦村",
   };
 
   it("区域外の町村は「都市計画区域外」で、道路種別の地図を出さない", () => {
@@ -362,6 +365,44 @@ describe("岐阜県の道路図", () => {
   });
 });
 
+describe("新潟県の道路図", () => {
+  it("新潟市は にいがたeマップ（geogeo）の指定道路情報を lat/lon/z で開き、全区で同じ問い合わせ先（電話不可）", () => {
+    const m = findMunicipality("15103")!; // 中央区
+    expect(m.name).toBe("新潟市");
+    expect(m.codes).toHaveLength(8);
+    expect(m.coverage).toBe("partial");
+    const links = buildLinks(m, 37.916192, 139.036426);
+    expect(links[0].kind).toBe("designated_only");
+    expect(links[0].url).toBe("https://niigata.e-map.geogeo.jp/maps?mode=theme&lid=0&mid=15&lat=37.916192&lon=139.036426&z=17");
+    expect(links[1].url).toContain("mid=9&");
+    expect(resolveContact(m, "15108")).toMatchObject({ phone: "025-226-2845", noPhoneInquiry: true });
+  });
+
+  it("長岡は wagmap の道路情報、柏崎は ArcGIS の指定道路図、上越・新発田は位置指定道路の地図", () => {
+    expect(buildLinks(findMunicipality("15202")!, 37.4463, 138.8512)[0].url).toBe("https://www2.wagmap.jp/nagaoka/Map?mid=181&mpx=138.851200&mpy=37.446300&mps=2500&gprj=2");
+    const kz = buildLinks(findMunicipality("15205")!, 37.3718, 138.5589);
+    expect(kz[0].url).toBe("https://experience.arcgis.com/experience/0e686a1a7bae470c820d1327324c0b76/#widget_6=center:138.558900%2C37.371800%2C4326,scale:2500");
+    expect(kz[0].kind).toBe("road_type");
+    expect(kz[1].url).toContain("kashiwazaki.maps.arcgis.com/apps/webappviewer/index.html?id=4349877834834b94a74debf2267e4857&center=138.558900,37.371800,4326");
+    expect(buildLinks(findMunicipality("15222")!, 37.1479, 138.236)[0].kind).toBe("designated_only"); // 上越
+    expect(buildLinks(findMunicipality("15206")!, 37.9478, 139.3268)[0].url).toBe("https://gisshibatamap.geogeo.jp/maps?mode=theme&lid=1&mid=11&lat=37.947800&lon=139.326800&z=17");
+    expect(resolveContact(findMunicipality("15204")!, "15204")).toMatchObject({ phone: "0256-34-5727", noPhoneInquiry: true }); // 三条
+    expect(findMunicipality("15204")!.maps[0].verified).toBe(false);
+  });
+
+  it("県が扱う市町村は地域振興局の建築課が問い合わせ先。妙高は市の地図に位置指定・2項の図、見附は ArcGIS の路線網図、小千谷は PDF", () => {
+    expect(resolveContact(findMunicipality("15212")!, "15212")!.phone).toBe("0254-26-9199"); // 村上 → 新発田
+    const myoko = findMunicipality("15217")!;
+    expect(myoko.coverage).toBe("partial");
+    expect(buildLinks(myoko, 37.0256, 138.2536)[0].url).toBe("https://myokomap.geogeo.jp/maps?mode=theme&lid=1&mid=6&lat=37.025600&lon=138.253600&z=17");
+    expect(resolveContact(myoko, "15217")!.phone).toBe("025-526-9529");
+    expect(buildLinks(findMunicipality("15211")!, 37.5315, 138.9125)[0].url).toContain("mitsukecity.maps.arcgis.com/apps/webappviewer/index.html?id=51158390d69243bbacba49b89e9c3de1&center=138.912500,37.531500,4326");
+    expect(buildLinks(findMunicipality("15208")!, 37.3138, 138.7951)[0].pinpoint).toBe(false); // 小千谷
+    expect(buildLinks(findMunicipality("15210")!, 37.1276, 138.7595)[0].url).toBe("http://map.city.tokamachi.lg.jp/maps?mode=theme&lid=1&mid=24&lat=37.127600&lon=138.759500&z=17");
+    for (const code of ["15405", "15482", "15504", "15581", "15586"]) expect(findMunicipality(code)!.coverage).toBe("outside");
+  });
+});
+
 describe("buildLinks", () => {
   it("wagmap は世界測地系の座標に gprj=2 を付ける（自治体ごとの測地系の違いを吸収）", () => {
     const [link] = buildLinks(findMunicipality("11202")!, KUMAGAYA_CITY_HALL.lat, KUMAGAYA_CITY_HALL.lng);
@@ -561,13 +602,13 @@ describe("lookup", () => {
 
   it("中部の市町村は対応（道路図は調査中）", async () => {
     stubFetch(
-      [{ geometry: { coordinates: [138.8512, 37.4463] }, properties: { title: "新潟県長岡市大手通" } }],
-      { results: { muniCd: "15202", lv01Nm: "大手通" } },
+      [{ geometry: { coordinates: [137.2137, 36.6959] }, properties: { title: "富山県富山市新桜町" } }],
+      { results: { muniCd: "16201", lv01Nm: "新桜町" } },
     );
-    const r = await lookup("新潟県長岡市大手通1-4-10");
+    const r = await lookup("富山県富山市新桜町7-38");
     expect(r.status).toBe("ok");
     if (r.status === "ok") {
-      expect(r.municipality.name).toBe("長岡市");
+      expect(r.municipality.name).toBe("富山市");
       expect(r.municipality.coverage).toBe("unknown");
       expect(r.links).toEqual([]);
     }

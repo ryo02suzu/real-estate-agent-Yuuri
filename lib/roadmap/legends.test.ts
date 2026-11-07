@@ -8,6 +8,7 @@ describe("地図の凡例", () => {
     expect(legendKey("https://mapping-gunma.pref.gunma.jp/pref-gunma/Map?mid=155&mpx=1&mpy=2")).toBe("mapping-gunma.pref.gunma.jp/pref-gunma/155");
     expect(legendKey("https://ds.icba-info.jp/siteidouro/chiba/pref/")).toBe("ds.icba-info.jp/siteidouro/chiba/pref");
     expect(legendKey("https://www.sonicweb-asp.jp/setagaya/map?theme=shiteidouro&pos=139.6%2C35.6&scale=1000")).toBe("www.sonicweb-asp.jp/setagaya/map?theme=shiteidouro");
+    expect(legendKey("https://niigata.e-map.geogeo.jp/maps?mode=theme&lid=0&mid=15&lat=37.9&lon=139.0&z=17")).toBe("niigata.e-map.geogeo.jp/maps?mid=15");
     expect(legendKey("not a url")).toBeUndefined();
     // ALANDIS は同じパスで道路種別と市道の地図を u= で切り替えるので u= もキーに入れる
     expect(legendKey("https://webgis.alandis.jp/chiba12/webgis/index.php/autologin_jswebgis?ap=jsWebGIS&m=2&u=guest3&x=1&y=2&s=1000&rs=3857&li=3&si=0")).toBe(

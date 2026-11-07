@@ -154,3 +154,13 @@ export const gisGifu =
   (mid: number, scale = 2500): Build =>
   (lat, lng) =>
     `https://gis-gifu.jp/gifu/Map?mid=${mid}&mpx=${lng.toFixed(6)}&mpy=${lat.toFixed(6)}&mps=${scale}&gprj=3`;
+
+/**
+ * geogeo（ジオジオ）の公開型GIS（にいがたeマップ・eマップじょうえつ・新発田市市民公開地理情報システムなど）。
+ * /maps?mode=theme&lid=<大分類>&mid=<テーマ> に lat/lon/z を付けると、その地点を中心に開く（新潟市役所・糸魚川市役所などで確認）。
+ * 利用規約のあるテーマは最初に同意の画面が出る。base はスキーム付き（十日町市は https の証明書が合わないので http）
+ */
+export const geogeo =
+  (base: string, lid: number, mid: number, zoom = 17): Build =>
+  (lat, lng) =>
+    `${base}/maps?mode=theme&lid=${lid}&mid=${mid}&lat=${lat.toFixed(6)}&lon=${lng.toFixed(6)}&z=${zoom}`;

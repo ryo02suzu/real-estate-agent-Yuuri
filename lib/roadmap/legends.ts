@@ -21,6 +21,8 @@ export function legendKey(url: string): string | undefined {
   const mid = u.searchParams.get("mid");
   const m = u.pathname.match(/^\/([^/]+)\/Map$/);
   if (m && mid) return `${u.host}/${m[1]}/${mid}`;
+  // geogeo の公開型GIS（/maps?mode=theme&lid=…&mid=…）はテーマ番号で分ける
+  if (mid && u.pathname.endsWith("/maps")) return `${u.host}/maps?mid=${mid}`;
   const theme = u.searchParams.get("theme");
   if (theme) return `${u.host}${u.pathname}?theme=${theme}`;
   const user = u.searchParams.get("u");
