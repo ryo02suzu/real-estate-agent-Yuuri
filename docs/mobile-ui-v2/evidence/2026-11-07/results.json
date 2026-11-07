@@ -1,0 +1,194 @@
+{
+  "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+  "preview": "https://michilu-hreufqzgk-sourirettes-projects.vercel.app",
+  "checks": [
+    {
+      "browser": "chromium",
+      "width": 375,
+      "height": 667,
+      "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+      "overflow": false,
+      "target": {
+        "height": 45.90625,
+        "width": 78.90625,
+        "top": true,
+        "bottom": true
+      }
+    },
+    {
+      "browser": "chromium",
+      "width": 390,
+      "height": 844,
+      "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+      "overflow": false,
+      "target": {
+        "height": 45.984375,
+        "width": 83.640625,
+        "top": true,
+        "bottom": true
+      },
+      "storageDeniedOff": true,
+      "result": true,
+      "flight": false
+    },
+    {
+      "browser": "chromium",
+      "width": 402,
+      "height": 874,
+      "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+      "overflow": false,
+      "target": {
+        "height": 47.046875,
+        "width": 84.984375,
+        "top": true,
+        "bottom": true
+      }
+    },
+    {
+      "browser": "chromium",
+      "width": 430,
+      "height": 932,
+      "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+      "overflow": false,
+      "target": {
+        "height": 50.328125,
+        "width": 91.21875,
+        "top": true,
+        "bottom": true
+      }
+    },
+    {
+      "browser": "chromium",
+      "width": 844,
+      "height": 390,
+      "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+      "overflow": false,
+      "target": {
+        "height": 59.796875,
+        "width": 109.484375,
+        "top": true,
+        "bottom": true
+      }
+    },
+    {
+      "browser": "chromium",
+      "width": 1024,
+      "height": 768,
+      "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+      "overflow": false
+    },
+    {
+      "browser": "chromium",
+      "width": 1440,
+      "height": 900,
+      "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+      "overflow": false
+    },
+    {
+      "browser": "chromium",
+      "mode": "normal-search",
+      "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+      "canvases": [
+        {
+          "w": 390,
+          "h": 844
+        }
+      ],
+      "result": true
+    },
+    {
+      "browser": "webkit",
+      "width": 375,
+      "height": 667,
+      "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+      "overflow": false,
+      "target": {
+        "height": 45.90625,
+        "width": 80.078125,
+        "top": true,
+        "bottom": true
+      }
+    },
+    {
+      "browser": "webkit",
+      "width": 390,
+      "height": 844,
+      "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+      "overflow": false,
+      "target": {
+        "height": 45.984375,
+        "width": 83.3125,
+        "top": true,
+        "bottom": true
+      },
+      "storageDeniedOff": true,
+      "result": true,
+      "flight": false
+    },
+    {
+      "browser": "webkit",
+      "width": 402,
+      "height": 874,
+      "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+      "overflow": false,
+      "target": {
+        "height": 47.046875,
+        "width": 85.875,
+        "top": true,
+        "bottom": true
+      }
+    },
+    {
+      "browser": "webkit",
+      "width": 430,
+      "height": 932,
+      "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+      "overflow": false,
+      "target": {
+        "height": 50.328125,
+        "width": 91.890625,
+        "top": true,
+        "bottom": true
+      }
+    },
+    {
+      "browser": "webkit",
+      "width": 844,
+      "height": 390,
+      "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+      "overflow": false,
+      "target": {
+        "height": 59.796875,
+        "width": 109.15625,
+        "top": true,
+        "bottom": true
+      }
+    },
+    {
+      "browser": "webkit",
+      "width": 1024,
+      "height": 768,
+      "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+      "overflow": false
+    },
+    {
+      "browser": "webkit",
+      "width": 1440,
+      "height": 900,
+      "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+      "overflow": false
+    },
+    {
+      "browser": "webkit",
+      "mode": "normal-search",
+      "sha": "f71c3ff441b9db84f7f803d40d0dfd94c8bea736",
+      "canvases": [
+        {
+          "w": 390,
+          "h": 844
+        }
+      ],
+      "result": true
+    }
+  ]
+}
