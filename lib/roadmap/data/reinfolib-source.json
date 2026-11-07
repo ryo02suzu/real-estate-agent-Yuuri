@@ -1,27 +1,27 @@
 {
  "appraisal": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261022",
-  "asOf": "20261022",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261107",
+  "asOf": "20261107",
   "year": 2026,
-  "count": 8355,
+  "count": 12765,
   "zoom": 13
  },
  "fac": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261022",
-  "asOf": "20261022",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261107",
+  "asOf": "20261107",
   "counts": {
-   "1": 2017,
-   "2": 34194,
-   "3": 26081,
-   "4": 2890,
-   "5": 999
+   "1": 3182,
+   "2": 50390,
+   "3": 36413,
+   "4": 4092,
+   "5": 2412
   },
   "medicalYear": 2020,
   "kinderYear": 2023
  },
  "liq": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261022",
-  "asOf": "20261022",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261107",
+  "asOf": "20261107",
   "count": 848924,
   "levels": {
    "1": "非常に液状化しやすい",
@@ -63,8 +63,8 @@
   }
  },
  "pop": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261022",
-  "asOf": "20261022",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261107",
+  "asOf": "20261107",
   "years": [
    2020,
    2025,
@@ -75,7 +75,7 @@
    2050
   ],
   "reach": 2,
-  "count": 223893
+  "count": 438218
  },
  "ridership": {
   "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261022",
@@ -84,8 +84,8 @@
   "count": 2190
  },
  "rireki": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261022",
-  "asOf": "20261022",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261107",
+  "asOf": "20261107",
   "count": 11122,
   "kinds": {
    "11": 5140,
@@ -99,8 +99,8 @@
   }
  },
  "zousei": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261022",
-  "asOf": "20261022",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261107",
+  "asOf": "20261107",
   "count": 16981,
   "kinds": {
    "谷埋め型": 15475,
