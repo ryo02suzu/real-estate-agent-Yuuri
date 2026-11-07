@@ -144,3 +144,13 @@ export const nasushiobaraMap =
   (layers: string, zoom = 16): Build =>
   (lat, lng) =>
     `https://maps.city.nasushiobara.tochigi.jp/#/?center=${lng.toFixed(6)}%2F${lat.toFixed(6)}&zoom=${zoom}&baseMap=gsi&layers=${layers}`;
+
+/**
+ * 県域統合型GIS「ぎふ」（gis-gifu.jp。wagmap と同じ仕組みで岐阜県と県内市町村が共同運用）。
+ * 可児市・岐阜市の公式リンクと同じ gprj=3 で mpx/mpy を経度・緯度として渡す（同意ページを経て地図に戻り、
+ * 地図画像の要求 cp= が渡した座標になることと、可児市役所が中心に来ることを確認）。1/1000 のタイルが無い地図があるので既定は 1/2500
+ */
+export const gisGifu =
+  (mid: number, scale = 2500): Build =>
+  (lat, lng) =>
+    `https://gis-gifu.jp/gifu/Map?mid=${mid}&mpx=${lng.toFixed(6)}&mpy=${lat.toFixed(6)}&mps=${scale}&gprj=3`;

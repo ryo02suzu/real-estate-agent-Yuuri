@@ -31,6 +31,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("山梨県の全市町村を網羅している", () => covered("山梨県"));
   it("長野県の全市町村を網羅している", () => covered("長野県"));
   it("愛知県の全市町村を網羅している", () => covered("愛知県"));
+  it("岐阜県の全市町村を網羅している", () => covered("岐阜県"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
@@ -47,6 +48,7 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
     山梨県: ["055", "0551", "0553", "0554", "0555", "0556"],
     長野県: ["026", "0260", "0261", "0263", "0264", "0265", "0266", "0267", "0268", "0269"],
     愛知県: ["052", "0531", "0532", "0533", "0536", "0561", "0562", "0563", "0564", "0565", "0566", "0567", "0568", "0569", "0586", "0587"],
+    岐阜県: ["058", "0572", "0573", "0574", "0575", "0576", "0577", "05769", "0581", "0584", "0585"],
   };
   const contacts = MUNICIPALITIES.flatMap((m) =>
     [m.contact, ...Object.values(m.contactByCode ?? {})].filter((c) => c?.phone).map((c) => ({ m, phone: c!.phone! })),
@@ -123,6 +125,7 @@ describe("都市計画区域外（国交省 令和6年都市計画現況調査�
     "20446": "麻績村", "20448": "生坂村", "20450": "山形村", "20451": "朝日村", "20452": "筑北村", "20486": "小谷村", "20543": "高山村", "20588": "小川村",
     "20562": "木島平村", "20602": "栄村",
     "23561": "設楽町", "23562": "東栄町", "23563": "豊根村",
+    "21504": "七宗町", "21506": "白川町", "21507": "東白川村", "21604": "白川村",
   };
 
   it("区域外の町村は「都市計画区域外」で、道路種別の地図を出さない", () => {
@@ -313,6 +316,49 @@ describe("愛知県の道路図", () => {
     expect(buildLinks(findMunicipality("23225")!, 35.0015, 137.0505).map((l) => l.kind)).toEqual(["public_road", "public_road"]); // 知立市
     expect(findMunicipality("23209")!.maps).toEqual([]); // 碧南市
     expect(resolveContact(findMunicipality("23231")!, "23231")!.phone).toBe("0532-52-1315"); // 田原市 → 東三河
+  });
+});
+
+describe("岐阜県の道路図", () => {
+  it("可児市は県域統合型GISぎふの道路種別（2号・2項・位置指定）と道路台帳図を 1/2500 で開く", () => {
+    const m = findMunicipality("21214")!;
+    expect(m.coverage).toBe("partial");
+    const links = buildLinks(m, 35.425953, 137.061022);
+    expect(links[0].kind).toBe("road_type");
+    expect(links[0].url).toBe("https://gis-gifu.jp/gifu/Map?mid=11017&mpx=137.061022&mpy=35.425953&mps=2500&gprj=3");
+    expect(links[1].url).toBe("https://gis-gifu.jp/gifu/Map?mid=20010&mpx=137.061022&mpy=35.425953&mps=2500&gprj=3");
+    expect(resolveContact(m, "21214")!.phone).toBe("0574-62-1111");
+  });
+
+  it("特定行政庁の3市は道路種別が非公開で、県域統合型GISぎふの認定路線図・道路台帳を添える", () => {
+    const gifu = findMunicipality("21201")!;
+    expect(gifu.coverage).toBe("none");
+    expect(buildLinks(gifu, 35.4232, 136.7606)[0].url).toBe("https://gis-gifu.jp/gifu/Map?mid=20008&mpx=136.760600&mpy=35.423200&mps=2500&gprj=3");
+    expect(resolveContact(gifu, "21201")!.phone).toBe("058-214-2428");
+    expect(buildLinks(findMunicipality("21202")!, 35.3594, 136.6179)[0].url).toContain("gis-gifu.jp/gifu/Map?mid=429&");
+    expect(buildLinks(findMunicipality("21213")!, 35.3989, 136.8483)[0].url).toContain("mid=12105&");
+    expect(resolveContact(findMunicipality("21213")!, "21213")!.phone).toBe("058-383-1482");
+  });
+
+  it("県が扱う市町村は市町村の建築担当課が問い合わせ先で、注記に県の建築事務所を書く。PDF や cloud-gis の道路図は座標なしの入口", () => {
+    const seki = findMunicipality("21205")!;
+    expect(resolveContact(seki, "21205")!.dept).toBe("都市計画課 開発建築係");
+    expect(seki.note).toContain("中濃建築事務所");
+    expect(buildLinks(seki, 35.4957, 136.9181)[0].url).toContain("mid=3000&");
+    const mino = buildLinks(findMunicipality("21207")!, 35.5448, 136.9077);
+    expect(mino[0].url).toBe("https://www.city.mino.gifu.jp/docs/952459.html");
+    expect(mino[0].pinpoint).toBe(false);
+    const hashima = findMunicipality("21209")!.maps[0];
+    expect(hashima.verified).toBe(false);
+    expect(hashima.url).toBe("https://www.cloud-gis.jp/HashimaMap/terms.html");
+    expect(findMunicipality("21302")!.maps).toEqual([]); // 岐南町
+    expect(resolveContact(findMunicipality("21302")!, "21302")!.phone).toBe("058-247-1360");
+  });
+
+  it("限定特定行政庁の高山・多治見は非公開、七宗町・白川町・東白川村・白川村は都市計画区域外", () => {
+    expect(resolveContact(findMunicipality("21203")!, "21203")!.phone).toBe("0577-35-3159");
+    expect(findMunicipality("21204")!.note).toContain("限定特定行政庁");
+    for (const code of ["21504", "21506", "21507", "21604"]) expect(findMunicipality(code)!.coverage).toBe("outside");
   });
 });
 
@@ -515,13 +561,13 @@ describe("lookup", () => {
 
   it("中部の市町村は対応（道路図は調査中）", async () => {
     stubFetch(
-      [{ geometry: { coordinates: [136.7606, 35.4232] }, properties: { title: "岐阜県岐阜市司町" } }],
-      { results: { muniCd: "21201", lv01Nm: "司町" } },
+      [{ geometry: { coordinates: [138.8512, 37.4463] }, properties: { title: "新潟県長岡市大手通" } }],
+      { results: { muniCd: "15202", lv01Nm: "大手通" } },
     );
-    const r = await lookup("岐阜県岐阜市司町40-1");
+    const r = await lookup("新潟県長岡市大手通1-4-10");
     expect(r.status).toBe("ok");
     if (r.status === "ok") {
-      expect(r.municipality.name).toBe("岐阜市");
+      expect(r.municipality.name).toBe("長岡市");
       expect(r.municipality.coverage).toBe("unknown");
       expect(r.links).toEqual([]);
     }
