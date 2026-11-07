@@ -37,12 +37,12 @@ describe("対応している地方と都道府県", () => {
   });
 });
 
-describe("中部9県の市町村（静岡県以外は調査中）", () => {
-  it("調査中は281市町村。政令市は区のコードをまとめて1つ", () => {
-    expect(CHUBU_PENDING).toHaveLength(281);
+describe("中部9県の市町村（静岡県・山梨県以外は調査中）", () => {
+  it("調査中は254市町村。政令市は区のコードをまとめて1つ", () => {
+    expect(CHUBU_PENDING).toHaveLength(254);
     const byPref: Record<string, number> = {};
     for (const m of CHUBU_PENDING) byPref[m.pref] = (byPref[m.pref] ?? 0) + 1;
-    expect(byPref).toEqual({ 新潟県: 30, 富山県: 15, 石川県: 19, 福井県: 17, 山梨県: 27, 長野県: 77, 岐阜県: 42, 愛知県: 54 });
+    expect(byPref).toEqual({ 新潟県: 30, 富山県: 15, 石川県: 19, 福井県: 17, 長野県: 77, 岐阜県: 42, 愛知県: 54 });
     expect(findMunicipality("23101")?.name).toBe("名古屋市");
     expect(findMunicipality("22138")?.name).toBe("浜松市"); // 静岡県は調査済み（data/shizuoka.ts）
     expect(findMunicipality("15108")?.codes).toHaveLength(8);

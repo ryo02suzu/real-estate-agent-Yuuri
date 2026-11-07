@@ -48,12 +48,17 @@ PAUSE = 0.25
 import os as _os, sys as _sys
 
 _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), ".."))
-from regions import prefs  # noqa: E402
+from regions import REGIONS, prefs  # noqa: E402
 
 # 対応している都道府県（lib/roadmap/data/regions.json。関東1都6県＋中部9県）
 PREFS = prefs()
-# 関東1都6県と、そのまわり（scripts/stations と同じ。県境の近くの物件も、となりの県の分まで読める）
-BBOX = (138.3, 34.8, 141.0, 37.25)
+# 対応している地方の範囲をまとめたもの（regions.json の bounds）と、そのまわり 0.1度（県境の近くの物件も、となりの県の分まで読める）
+BBOX = (
+    min(r["bounds"][0][0] for r in REGIONS.values()) - 0.1,
+    min(r["bounds"][0][1] for r in REGIONS.values()) - 0.1,
+    max(r["bounds"][1][0] for r in REGIONS.values()) + 0.1,
+    max(r["bounds"][1][1] for r in REGIONS.values()) + 0.1,
+)
 DATASETS = ("liq", "zousei", "rireki", "ridership", "appraisal", "pop", "fac")
 NEEDS_KEY = {"liq", "zousei", "rireki", "ridership", "appraisal"}
 
@@ -351,19 +356,24 @@ from build import OPERATORS, line_name  # noqa: E402
 sys.path.pop(0)
 del sys.modules["build"]
 
-RIDERSHIP_YEARS = range(2011, 2024)
+RIDERSHIP_YEARS = range(2011, 2025)  # 国土数値情報 S12 の令和6年度版（2025年度整備）は 2024年まで
 
 
 def ridership_record(p: dict):
-    """1つの駅・路線の行 → 年ごとの乗降客数（その行に数が付いている年だけ。重複コード 2 は別の行に付いている）"""
+    """1つの駅・路線の行 → 年ごとの乗降客数（その行に数が付いている年だけ。重複コード 2 は別の行に付いている）。
+    API の年度ごとの項目名は「2024_passenger_count」のように年＋英語名（原典の S12_061 とは違う。2026-11 に確認）。
+    古い形（S12_006 …）のデータも読めるように両方を見る"""
     series = {}
     for i, year in enumerate(RIDERSHIP_YEARS):
         base = 6 + i * 4
-        dup, avail, count = text(p.get(f"S12_{base:03d}")), text(p.get(f"S12_{base + 1:03d}")), num(p.get(f"S12_{base + 3:03d}"))
+        dup = text(p.get(f"{year}_duplicate_code", p.get(f"S12_{base:03d}")))
+        avail = text(p.get(f"{year}_data_availability_code", p.get(f"S12_{base + 1:03d}")))
+        count = num(p.get(f"{year}_passenger_count", p.get(f"S12_{base + 3:03d}")))
         if dup == "1" and avail == "1" and count:
             series[year] = count
+    last_year = RIDERSHIP_YEARS[-1]
     last = 6 + (len(RIDERSHIP_YEARS) - 1) * 4
-    return series, text(p.get(f"S12_{last + 2:03d}"))
+    return series, text(p.get(f"{last_year}_remarks", p.get(f"S12_{last + 2:03d}")))
 
 
 def midpoint(g: dict):
@@ -830,6 +840,10 @@ def self_test():
     p = {"S12_054": "1", "S12_055": "1", "S12_057": 628118, "S12_056": "", "S12_050": "2", "S12_051": "1", "S12_053": 0}
     series, note = ridership_record(p)
     assert series == {2023: 628118}, series
+    # API の項目名（年＋英語名）でも同じ
+    p = {"2024_duplicate_code": "1", "2024_data_availability_code": "1", "2024_passenger_count": "1,234", "2024_remarks": "注", "2023_duplicate_code": "2", "2023_data_availability_code": "1", "2023_passenger_count": 0}
+    series, note = ridership_record(p)
+    assert series == {2024: 1234} and note == "注", (series, note)
     # 鑑定評価書
     row = {
         "価格時点": "2026", "標準地番号 市区町村コード 県コード": "13", "標準地番号 市区町村コード 市区町村コード": "101",

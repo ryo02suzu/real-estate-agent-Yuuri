@@ -28,6 +28,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("栃木県の全市町を網羅している", () => covered("栃木県"));
   it("茨城県の全市町村を網羅している", () => covered("茨城県"));
   it("静岡県の全市町を網羅している", () => covered("静岡県"));
+  it("山梨県の全市町村を網羅している", () => covered("山梨県"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
@@ -41,6 +42,7 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
     栃木県: ["028", "0282", "0283", "0284", "0285", "0287", "0288", "0289"],
     茨城県: ["029", "0280", "0291", "0293", "0294", "0296", "0297", "0299"],
     静岡県: ["053", "0537", "0538", "0539", "054", "0544", "0545", "0547", "0548", "055", "0550", "0557", "0558"],
+    山梨県: ["055", "0551", "0553", "0554", "0555", "0556"],
   };
   const contacts = MUNICIPALITIES.flatMap((m) =>
     [m.contact, ...Object.values(m.contactByCode ?? {})].filter((c) => c?.phone).map((c) => ({ m, phone: c!.phone! })),
@@ -100,13 +102,15 @@ describe("MUNICIPALITIES", () => {
 
 describe("都市計画区域外（国交省 令和6年都市計画現況調査の都市別一覧に無い市町村）", () => {
   // 千葉6・東京5・群馬7・埼玉1。いずれも区域外に接道を求める条例（建築基準法68条の9）の適用も無い。
-  // 静岡3は県「静岡県の土地利用」の市町別都市計画区域面積（令和4年3月31日現在）で区域が無い町
+  // 静岡3は県「静岡県の土地利用」の市町別都市計画区域面積（令和4年3月31日現在）で区域が無い町。
+  // 山梨7は県の都市計画区域マスタープラン（12区域）の市町村に無い市町村
   const OUTSIDE = {
     "12234": "南房総市", "12463": "鋸南町", "12342": "神崎町", "12422": "睦沢町", "12426": "長柄町", "12441": "大多喜町",
     "13307": "檜原村", "13308": "奥多摩町", "13362": "利島村", "13382": "御蔵島村", "13402": "青ヶ島村",
     "10366": "上野村", "10367": "神流町", "10383": "南牧村", "10428": "高山村", "10443": "片品村", "10444": "川場村", "10448": "昭和村",
     "11369": "東秩父村",
     "22305": "松崎町", "22306": "西伊豆町", "22429": "川根本町",
+    "19209": "北杜市", "19364": "早川町", "19366": "南部町", "19422": "道志村", "19429": "鳴沢村", "19442": "小菅村", "19443": "丹波山村",
   };
 
   it("区域外の町村は「都市計画区域外」で、道路種別の地図を出さない", () => {
@@ -171,6 +175,35 @@ describe("静岡県の道路図", () => {
     expect(links.map((l) => l.kind)).toEqual(["road_type", "road_type", "public_road"]);
     expect(links[0].url).toContain("wagmap.jp/kikugawa/Map?mid=5&");
     expect(links[1].url).toContain("gis.pref.shizuoka.jp");
+  });
+});
+
+describe("山梨県の道路図", () => {
+  it("甲府市以外は建設事務所ごとの県GIS（まっぷDE山梨）を開き、建設事務所が問い合わせ先", () => {
+    const kai = findMunicipality("19210")!; // 甲斐市
+    expect(kai.coverage).toBe("partial");
+    const [link] = buildLinks(kai, 35.6606, 138.5156);
+    expect(link.url).toBe("https://gis.pref.yamanashi.jp/webgis/?mp=502-125&bt=0&z=18&ll=35.660600%2C138.515600");
+    expect(link.kind).toBe("designated_only");
+    expect(resolveContact(kai, "19210")!.dept).toContain("中北建設事務所");
+    expect(buildLinks(findMunicipality("19202")!, 35.4876, 138.8078)[0].url).toContain("mp=503-67"); // 富士吉田市
+    expect(buildLinks(findMunicipality("19205")!, 35.6935, 138.6872)[0].url).toContain("mp=500-61"); // 山梨市
+    expect(buildLinks(findMunicipality("19365")!, 35.4661, 138.4421)[0].url).toContain("mp=501-31"); // 身延町
+  });
+
+  it("甲府市は道路種別が非公開で、こうふMAPの認定路線情報を開く", () => {
+    const m = findMunicipality("19201")!;
+    expect(m.coverage).toBe("none");
+    const links = buildLinks(m, 35.6642, 138.5683);
+    expect(links.map((l) => l.kind)).toEqual(["public_road", "public_road"]);
+    expect(links[0].url).toBe("https://kofu.geocloud.jp/mp/329?z=18&ll=35.664200,138.568300");
+    expect(resolveContact(m, "19201")).toMatchObject({ phone: "055-237-5824", noPhoneInquiry: true });
+  });
+
+  it("笛吹市は県の地図のあとに市道の路線網図を足す", () => {
+    const links = buildLinks(findMunicipality("19211")!, 35.6475, 138.6399);
+    expect(links.map((l) => l.kind)).toEqual(["designated_only", "public_road"]);
+    expect(links[1].url).toContain("wagmap.jp/fuefuki/Map?mid=4&");
   });
 });
 
@@ -373,13 +406,13 @@ describe("lookup", () => {
 
   it("中部の市町村は対応（道路図は調査中）", async () => {
     stubFetch(
-      [{ geometry: { coordinates: [138.568449, 35.662257] }, properties: { title: "山梨県甲府市丸の内一丁目" } }],
-      { results: { muniCd: "19201", lv01Nm: "丸の内一丁目" } },
+      [{ geometry: { coordinates: [138.181, 36.6513] }, properties: { title: "長野県長野市大字南長野" } }],
+      { results: { muniCd: "20201", lv01Nm: "大字南長野" } },
     );
-    const r = await lookup("山梨県甲府市丸の内1-18-1");
+    const r = await lookup("長野県長野市大字南長野幅下692-2");
     expect(r.status).toBe("ok");
     if (r.status === "ok") {
-      expect(r.municipality.name).toBe("甲府市");
+      expect(r.municipality.name).toBe("長野市");
       expect(r.municipality.coverage).toBe("unknown");
       expect(r.links).toEqual([]);
     }

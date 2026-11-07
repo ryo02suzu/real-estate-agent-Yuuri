@@ -31,7 +31,7 @@ describe("地図の凡例", () => {
   });
 
   it("地図ごと・市町村ごとの凡例を引く", () => {
-    expect(legendFor("https://www2.wagmap.jp/narita/Map?mid=4&mpx=1&mpy=2", "成田市")?.[0]).toEqual({ label: "国道・県道(幅員が4m以上の場合は1項1号)", color: "#267300" });
+    expect(legendFor("https://www2.wagmap.jp/narita/Map?mid=4&mpx=1&mpy=2", "成田市")?.[0]).toEqual({ label: "1:国道・県道(幅員が4m以上の場合は1項1号)", color: "#267300" });
     // 茨城県の共同の地図は市町村ごと
     expect(legendFor("https://www2.wagmap.jp/ibaraki/Map?mid=30&mpx=1&mpy=2", "古河市")?.map((e) => e.label)).toContain("3号道路");
     expect(legendFor("https://www2.wagmap.jp/ibaraki/Map?mid=30&mpx=1&mpy=2", "存在しない町")).toBeUndefined();
