@@ -62,9 +62,10 @@ def get(url: str, rng: str | None = None) -> bytes:
 
 
 def exists(url: str) -> bool:
+    """ファイルがあるか。サーバーが無いファイルにエラーの HTML を 200 で返すことがあるので、先頭が ZIP の印（PK）のときだけ「ある」とする
+    （2026-11-07 の中部の土地利用で、無い 2026 年度の森林地域を「ある」として作り直しが止まった）"""
     try:
-        get(url, "bytes=0-15")
-        return True
+        return get(url, "bytes=0-15")[:2] == b"PK"
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return False
