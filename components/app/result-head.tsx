@@ -136,7 +136,7 @@ export function PropertyHero({
         )}
         {note}
         {/* 地番の見出しのときは住所の行、住所が見出しのときは同じ住所を繰り返さず「住所をコピー」だけ */}
-        <button onClick={onCopy} aria-label="住所をコピー" className="pv-rise mt-[8px] flex max-w-full items-center gap-[6px] text-left leading-[1.3]" style={{ fontSize: 14, color: copied ? "#a6f0c6" : "rgba(255,255,255,0.92)", minHeight: 24 }}>
+        <button onClick={onCopy} aria-label="住所をコピー" className="pv-rise mt-[8px] flex max-w-full items-center gap-[6px] text-left leading-[1.3]" style={{ fontSize: 14, color: copied ? "#a6f0c6" : "rgba(255,255,255,0.92)", minHeight: `calc(${HIT} + 2px)` }}>
           <span className="truncate font-medium">{copied ? "住所をコピーしました" : lot ? address : "住所をコピー"}</span>
           {copied ? <Check size={14} strokeWidth={2.4} absoluteStrokeWidth className="shrink-0" /> : <Copy size={13} strokeWidth={1.9} absoluteStrokeWidth className="shrink-0 opacity-80" />}
         </button>
@@ -216,12 +216,12 @@ export function TabSegments({ tab, onTab }: { tab: TabKey; onTab: (t: TabKey) =>
     TABS.findIndex((t) => t.key === tab),
   );
   return (
-    <div role="tablist" aria-label="物件の情報" className="relative mx-[14px] flex rounded-full p-[3px]" style={{ height: 42, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}>
+    <div role="tablist" aria-label="物件の情報" className="relative mx-[14px] flex rounded-full p-[3px]" style={{ minHeight: 52, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}>
       <span aria-hidden className="pv-thumb absolute rounded-full" style={{ top: 3, bottom: 3, left: 3, width: `calc((100% - 6px) / ${TABS.length})`, transform: `translateX(${idx * 100}%)` }} />
       {TABS.map((t) => {
         const on = t.key === tab;
         return (
-          <button key={t.key} role="tab" aria-selected={on} aria-label={t.long} onClick={() => onTab(t.key)} className="relative z-[1] flex-1 whitespace-nowrap rounded-full font-semibold leading-none transition-colors duration-300" style={{ fontSize: 12.5, color: on ? "#1b3f73" : "rgba(255,255,255,0.86)" }}>
+          <button key={t.key} role="tab" aria-selected={on} aria-label={t.long} onClick={() => onTab(t.key)} className="relative z-[1] min-w-0 flex-1 break-words whitespace-normal rounded-full px-[3px] py-[8px] font-semibold leading-[1.3] transition-colors duration-300" style={{ minHeight: `calc(${HIT} + 2px)`, fontSize: 12.5, color: on ? "#1b3f73" : "rgba(255,255,255,0.86)" }}>
             {t.label}
           </button>
         );
