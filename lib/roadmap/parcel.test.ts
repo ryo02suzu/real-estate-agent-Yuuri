@@ -583,15 +583,18 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
   const data = JSON.parse(readFileSync(new URL("../../scripts/parcel-tiles/misplaced-sheets.json", import.meta.url), "utf8")) as {
     sheets: { code: string; sheet: string; town: string; parcels: number; reason: string; oaza?: string; chome?: string; chiban?: string[]; shift?: { kind: "T1" | "T2"; east: number; north: number } }[];
   };
-  it("測地系の取り違えで動かす地図（shift）は、地図ごと・向きと量が日本測地系と世界測地系の差（関東で西または東へ約290m・北または南へ約360m）", () => {
+  it("測地系の取り違えで動かす地図（shift）は、地図ごと・向きと量が日本測地系と世界測地系の差（関東・中部で西または東へ約255〜300m・北または南へ約325〜370m）", () => {
     for (const s of data.sheets.filter((x) => x.shift)) {
       const { kind, east, north } = s.shift!;
       expect(["T1", "T2"]).toContain(kind);
-      // T1：日本測地系の数字→世界測地系（北西へ）。T2：その逆（南東へ）
-      expect(east).toBeGreaterThanOrEqual(kind === "T1" ? -320 : 260);
-      expect(east).toBeLessThanOrEqual(kind === "T1" ? -260 : 320);
-      expect(north).toBeGreaterThanOrEqual(kind === "T1" ? 330 : -400);
-      expect(north).toBeLessThanOrEqual(kind === "T1" ? 400 : -330);
+      // T1：日本測地系の数字→世界測地系（北西へ動かす。今は南東へずれている）。T2：その逆（南東へ動かす）。
+      // 差は場所で変わる（国土地理院の TKY2JGD.par：福井県の西で東西 約256m、新潟県の北で南北 約326m、銚子で東西 約301m、館山で南北 約371m）
+      expect(east).toBeGreaterThanOrEqual(kind === "T1" ? -320 : 250);
+      expect(east).toBeLessThanOrEqual(kind === "T1" ? -250 : 320);
+      expect(north).toBeGreaterThanOrEqual(kind === "T1" ? 315 : -400);
+      expect(north).toBeLessThanOrEqual(kind === "T1" ? 400 : -315);
+      // 理由の向き（「地図全体が南東へ…ずれている」）が動かす向きの逆になっている
+      expect(s.reason).not.toMatch(kind === "T1" ? /地図全体が北西へ/ : /地図全体が南東へ/);
       expect(s.oaza).toBeUndefined();
       expect(s.chome).toBeUndefined();
       expect(s.chiban).toBeUndefined();
@@ -599,11 +602,11 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(s.reason).toMatch(/測地系/);
     }
   });
-  it("どれも 1都6県の5桁の市区町村コード・地図名・町・筆の数・理由がある。同じ決まりは1回だけ（町・地番で絞るときも）", () => {
+  it("どれも対応エリア（関東1都6県・中部9県）の5桁の市区町村コード・地図名・町・筆の数・理由がある。同じ決まりは1回だけ（町・地番で絞るときも）", () => {
     expect(data.sheets.length).toBeGreaterThan(0);
     const keys = new Set<string>();
     for (const s of data.sheets) {
-      expect(s.code).toMatch(/^(0[89]|1[0-4])\d{3}$/);
+      expect(s.code).toMatch(/^(0[89]|1\d|2[0-3])\d{3}$/);
       expect(s.sheet.trim()).not.toBe("");
       expect(s.town.trim()).not.toBe("");
       expect(s.parcels).toBeGreaterThan(0);
