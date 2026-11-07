@@ -51,7 +51,7 @@ export function topicStatuses(result: Ok, data: PropertyData, records: PropertyR
   {
     const { roads } = data;
     const link = result.links[0];
-    const offline = m.coverage === "none" || m.coverage === "outside";
+    const offline = m.coverage === "none" || m.coverage === "outside" || m.coverage === "unknown";
     const hint = offline ? "窓口で種別を確認（電話不可の市あり）→ 幅員・接道" : m.coverage === "partial" ? "一部は公式図、ほかは窓口で確認 → 幅員・接道" : "公式道路図で種別を確認 → 幅員・接道";
     if (roads.status === "loading") push("road", { status: "loading", chip: "確認中", value: "市の道路データを読んでいます", hint });
     else if (roads.status === "error") push("road", { status: "failed", chip: "読み込めず", value: "市の道路データを読めませんでした", hint: "再試行、または公式図で確認" });

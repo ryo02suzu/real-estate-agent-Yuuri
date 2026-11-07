@@ -44,7 +44,8 @@ export type Tochi = {
   year: number;
 };
 
-const PREFS = new Set(["08", "09", "10", "11", "12", "13", "14"]);
+/** データを取り込んである都道府県（取り込み前の地方は null） */
+const PREFS = new Set(Object.values(SOURCE.years as Record<string, Record<string, number>>).flatMap((by) => Object.keys(by)));
 
 /** データの年度（都県で一番新しいもの） */
 export const TOCHI_YEAR = Math.max(...Object.values(SOURCE.years).flatMap((by) => Object.values(by)));

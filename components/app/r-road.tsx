@@ -16,6 +16,7 @@ export const COVER: Record<string, string> = {
   partial: "ネットでは一部の種別だけ",
   none: "ネットには非公開（窓口で）",
   outside: "都市計画区域外（窓口で）",
+  unknown: "公開の有無は調査中（県か市の建築指導課で）",
 };
 const COVER_STEPS: { key: string; label: string }[] = [
   { key: "full", label: "全種別" },
@@ -31,7 +32,7 @@ export function RoadTab({ result, data, open, front, pick }: TabProps) {
   const m = result.municipality;
   const roads = data.roads;
   const list = roads.status === "ok" ? roads.roads.slice(0, 3) : [];
-  const offline = m.coverage === "none" || m.coverage === "outside";
+  const offline = m.coverage === "none" || m.coverage === "outside" || m.coverage === "unknown";
   const mapLink = result.links[0];
   const contact = result.contact;
   const phones = contact?.phone ? parsePhones(contact.phone) : [];

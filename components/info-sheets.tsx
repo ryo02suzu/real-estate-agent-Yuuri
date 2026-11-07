@@ -6,7 +6,7 @@ import { CoverageBadge } from "./coverage";
 import { AreaIcon, ChevronRightIcon, ClockIcon, InfoIcon, MapIcon, NoteIcon, PrintIcon } from "./icons";
 import { Sheet } from "./sheet";
 
-const ORDER: Municipality["coverage"][] = ["full", "partial", "none", "outside"];
+const ORDER: Municipality["coverage"][] = ["full", "partial", "none", "outside", "unknown"];
 
 export function CitiesSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const prefs = [...new Set(MUNICIPALITIES.map((m) => m.pref))];

@@ -6,6 +6,7 @@ import { KANAGAWA } from "./data/kanagawa";
 import { SAITAMA } from "./data/saitama";
 import { TOCHIGI } from "./data/tochigi";
 import { TOKYO } from "./data/tokyo";
+import { CHUBU_PENDING } from "./data/chubu";
 import { legendFor, type LegendEntry } from "./legends";
 import type { RoadRead } from "./road-read";
 import { findSheet, type SheetHit, type SheetIndex } from "./sheets";
@@ -44,7 +45,23 @@ export type Contact = {
   noPhoneInquiry?: boolean;
 };
 
-export type Prefecture = "埼玉県" | "千葉県" | "神奈川県" | "東京都" | "群馬県" | "栃木県" | "茨城県";
+export type Prefecture =
+  | "埼玉県"
+  | "千葉県"
+  | "神奈川県"
+  | "東京都"
+  | "群馬県"
+  | "栃木県"
+  | "茨城県"
+  | "新潟県"
+  | "富山県"
+  | "石川県"
+  | "福井県"
+  | "山梨県"
+  | "長野県"
+  | "岐阜県"
+  | "静岡県"
+  | "愛知県";
 
 export type Municipality = {
   pref: Prefecture;
@@ -54,8 +71,9 @@ export type Municipality = {
   /**
    * ネットで道路種別がどこまで分かるか。
    * outside = 市町村内に都市計画区域が無い（建築基準法の接道義務＝43条は原則かからない）
+   * unknown = 公開の有無をまだ調べていない（登録したばかりの地方。国のデータは出すが、道路図は県か市の建築指導課へ）
    */
-  coverage: "full" | "partial" | "none" | "outside";
+  coverage: "full" | "partial" | "none" | "outside" | "unknown";
   maps: MapLink[];
   contact?: Contact;
   /** 区によって窓口が違う政令市用。muniCd → 窓口 */
@@ -63,7 +81,7 @@ export type Municipality = {
   note?: string;
 };
 
-export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI];
+export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI, ...CHUBU_PENDING];
 
 /**
  * 市区町村に都市計画区域が無い（全域が都市計画区域外）と分かっているか。coverage が outside か、注記にそう書いてある町村

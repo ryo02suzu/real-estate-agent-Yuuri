@@ -1956,7 +1956,7 @@ function PropertyView({
         };
       case "road": {
         const link = result.links[0];
-        const offline = m.coverage === "none" || m.coverage === "outside";
+        const offline = m.coverage === "none" || m.coverage === "outside" || m.coverage === "unknown";
         return link && !offline
           ? {
               label: `${m.name}の道路種別の図`,

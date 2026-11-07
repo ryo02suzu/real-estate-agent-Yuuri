@@ -45,7 +45,7 @@ export function LocationPicker({
     const t = setTimeout(async () => {
       try {
         const rev = await reverseGeocode(lat, lng);
-        if (alive) setPlace(rev ? `${muniName(rev.muniCd) ?? ""}${rev.town}` || "（町名なし）" : "（関東の外か、海の上です）");
+        if (alive) setPlace(rev ? `${muniName(rev.muniCd) ?? ""}${rev.town}` || "（町名なし）" : "（対応エリアの外か、海の上です）");
       } catch {
         if (alive) setPlace("");
       }

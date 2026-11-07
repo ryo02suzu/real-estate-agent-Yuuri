@@ -375,6 +375,7 @@ const COVERAGE_ISSUE: Record<Ok["municipality"]["coverage"], Issue | undefined> 
   partial: { id: "coverage-partial", level: "check", topic: "road", title: "道路種別はネットで一部しか分からない市", detail: "位置指定道路など一部の種別だけが地図で分かります。載っていない道路は窓口で確かめます。", confirm: "建築指導の窓口で" },
   none: { id: "coverage-none", level: "check", topic: "road", title: "道路種別はネット非公開の市", detail: "前面道路の建築基準法上の種別は、窓口で確かめるしかありません（再建築の可否・セットバックに直結します）。", confirm: "建築指導の窓口で" },
   outside: { id: "coverage-outside", level: "check", topic: "road", title: "都市計画区域の無い市町村", detail: "接道義務（建築基準法43条）は原則かかりませんが、建築の扱いは市町村で確かめてください。", confirm: "市町村の建築の担当で" },
+  unknown: { id: "coverage-unknown", level: "check", topic: "road", title: "道路種別の公開の有無は調査中の市町村", detail: "この市町村の道路図がネットで見られるかは、まだ調べていません。前面道路の建築基準法上の種別は、県または市の建築指導課で確かめてください。", confirm: "県または市の建築指導課で" },
 };
 
 /** 次にやること */
@@ -398,8 +399,10 @@ function buildActions(input: TriageInput, issues: Issue[]): Action[] {
     const how =
       m.coverage === "none"
         ? `ネットでは非公開。${c?.noPhoneInquiry ? "電話では答えてもらえないので、窓口（FAX・メールの可否は要確認）で確かめます。" : "窓口か電話で確かめます。"}${c?.note && !c.noPhoneInquiry ? phoneNote : ""}`
-        : m.coverage === "outside"
-          ? "都市計画区域の外なので接道義務は原則ありませんが、建築の扱いを市町村で確かめます。"
+        : m.coverage === "unknown"
+          ? "道路図の公開の有無は調査中です。県または市の建築指導課で種別を確かめます。"
+          : m.coverage === "outside"
+            ? "都市計画区域の外なので接道義務は原則ありませんが、建築の扱いを市町村で確かめます。"
           : `まず${m.coverage === "full" ? "市の地図で種別を見てから" : "市の地図で分かる種別を見てから"}、重説には窓口で道路台帳・指定道路調書を確かめます。${phoneNote}`;
     out.push({
       id: "road",

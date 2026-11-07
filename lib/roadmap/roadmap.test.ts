@@ -73,8 +73,12 @@ describe("MUNICIPALITIES", () => {
     }
   });
 
-  it("すべての市町村（政令市は全区）に問い合わせ先がある", () => {
+  it("すべての市町村（政令市は全区）に問い合わせ先がある（道路図が調査中の市町村は地図も問い合わせ先もまだ無い）", () => {
     for (const m of MUNICIPALITIES) {
+      if (m.coverage === "unknown") {
+        expect(m.maps, m.name).toEqual([]);
+        continue;
+      }
       for (const c of m.codes) expect(resolveContact(m, c), `${m.name}(${c})`).toBeDefined();
     }
   });
@@ -309,11 +313,25 @@ describe("lookup", () => {
 
   it("未対応の市町村なら unsupported", async () => {
     stubFetch(
+      [{ geometry: { coordinates: [135.4959, 34.7024] }, properties: { title: "大阪府大阪市北区梅田一丁目" } }],
+      { results: { muniCd: "27127", lv01Nm: "梅田一丁目" } },
+    );
+    const r = await lookup("大阪府大阪市北区梅田1-1-1");
+    expect(r.status).toBe("unsupported");
+  });
+
+  it("中部の市町村は対応（道路図は調査中）", async () => {
+    stubFetch(
       [{ geometry: { coordinates: [138.568449, 35.662257] }, properties: { title: "山梨県甲府市丸の内一丁目" } }],
       { results: { muniCd: "19201", lv01Nm: "丸の内一丁目" } },
     );
     const r = await lookup("山梨県甲府市丸の内1-18-1");
-    expect(r.status).toBe("unsupported");
+    expect(r.status).toBe("ok");
+    if (r.status === "ok") {
+      expect(r.municipality.name).toBe("甲府市");
+      expect(r.municipality.coverage).toBe("unknown");
+      expect(r.links).toEqual([]);
+    }
   });
 
   it("対応済みの市なら地図リンクと問い合わせ先を返す", async () => {
@@ -375,9 +393,9 @@ describe("lookupPoint（地図で選んだ地点）", () => {
     expect(r.links[0].url).toContain("139.6239");
   });
 
-  it("関東の外や海の上は unsupported", async () => {
-    stubRev({ results: { muniCd: "19201", lv01Nm: "丸の内一丁目" } });
-    expect((await lookupPoint(35.662257, 138.568449)).status).toBe("unsupported");
+  it("対応エリアの外や海の上は unsupported", async () => {
+    stubRev({ results: { muniCd: "27127", lv01Nm: "梅田一丁目" } });
+    expect((await lookupPoint(34.7024, 135.4959)).status).toBe("unsupported");
     stubRev({});
     const sea = await lookupPoint(35.3, 139.9);
     expect(sea.status === "unsupported" && sea.matchedAddress).toBe("地図で選んだ地点");
@@ -386,7 +404,9 @@ describe("lookupPoint（地図で選んだ地点）", () => {
   it("市区町村コードの名前", () => {
     expect(muniName("13101")).toBe("東京都千代田区");
     expect(muniName("14131")).toBe("神奈川県川崎市川崎区");
-    expect(muniName("19201")).toBeUndefined();
+    expect(muniName("19201")).toBe("山梨県甲府市");
+    expect(muniName("22138")).toBe("静岡県浜松市中央区");
+    expect(muniName("27127")).toBeUndefined();
   });
 });
 

@@ -1,4 +1,4 @@
-"""市区町村のハザードマップのページの一覧（関東1都6県）を作る。
+"""市区町村のハザードマップのページの一覧（対応している都道府県。関東1都6県＋中部9県）を作る。
 
 ハザードマップポータルサイト（国土交通省・国土地理院）の「わがまちハザードマップ」のリンク先の一覧（CSV、オープンデータ）を
 種類ごと（洪水・内水・高潮・津波・土砂災害）に読み、市区町村コード → 種類 → ページの URL の JSON にする。
@@ -12,15 +12,19 @@
 import csv
 import io
 import json
+import os
 import sys
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from regions import prefs  # noqa: E402  対応している都道府県（lib/roadmap/data/regions.json）
+
 BASE = "https://disaportal.gsi.go.jp/hazardmapportal/hazardmap/uty/hminfo/{}.csv"
 # CSV の番号と種類（オープンデータのページの並び：1 洪水、2 内水、3 高潮、4 津波、5 土砂災害。6 火山・7 ため池は使わない）
 KINDS = {1: "flood", 2: "naisui", 3: "takashio", 4: "tsunami", 5: "dosha"}
-# 関東1都6県（茨城・栃木・群馬・埼玉・千葉・東京・神奈川）
-PREFS = ("08", "09", "10", "11", "12", "13", "14")
+# 対応している都道府県（関東1都6県＋中部9県。lib/roadmap/data/regions.json）
+PREFS = prefs()
 
 
 def fetch(url: str) -> str:

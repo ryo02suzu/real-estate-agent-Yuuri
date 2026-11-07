@@ -61,7 +61,8 @@ export type ReportOptions = {
   records?: PropertyRecords;
 };
 
-const COVERAGE_TEXT = { full: "道路種別はネットの地図で分かる", partial: "道路種別はネットで一部だけ分かる", none: "道路種別はネット非公開（窓口で確認）", outside: "都市計画区域外（窓口で確認）" } as const;
+const COVERAGE_TEXT = { full: "道路種別はネットの地図で分かる", partial: "道路種別はネットで一部だけ分かる", none: "道路種別はネット非公開（窓口で確認）", outside: "都市計画区域外（窓口で確認）",
+  unknown: "道路種別の公開の有無は調査中（県か市の建築指導課で確認）" } as const;
 
 const md = (t: number) => {
   const d = new Date(t);

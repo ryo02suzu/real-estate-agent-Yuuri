@@ -27,6 +27,7 @@ import zipfile
 
 import fiona
 
+# G空間情報センターの法務省の組織名（都道府県ごと）。API（organization_list / package_search）で実在を確かめたものだけ入れる
 ORGS = {
     "08": "moj-08ibaraki",
     "09": "moj-09tochigi",
@@ -35,6 +36,15 @@ ORGS = {
     "12": "moj-12chiba",
     "13": "moj-13tokyo",
     "14": "moj-14kanagawa",
+    "15": "moj-15niigata",
+    "16": "moj-16toyama",
+    "17": "moj-17ishikawa",
+    "18": "moj-18fukui",
+    "19": "moj-19yamanashi",
+    "20": "moj-20nagano",
+    "21": "moj-21gifu",
+    "22": "moj-22shizuoka",
+    "23": "moj-23aichi",
 }
 CKAN = "https://www.geospatial.jp/ckan/api/3/action/package_search"
 UA = {"User-Agent": "michilu-parcel-tiles (+https://github.com/ryo02suzu/real-estate-agent-Yuuri)"}

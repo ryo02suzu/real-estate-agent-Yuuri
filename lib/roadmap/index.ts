@@ -129,13 +129,13 @@ export async function lookup(
 /** 国土地理院の住所が住居表示の街区・号（「1番」「1番1号」）まで一致しているか（「354番地」は地番による住所） */
 const isJukyo = (matched: string) => /\d+番$|\d+号$/.test(matched.normalize("NFKC"));
 
-/** 逆ジオコーダの市区町村コード → 「さいたま市見沼区」「瑞穂町」（都県なし）。関東1都6県の外は undefined */
+/** 逆ジオコーダの市区町村コード → 「さいたま市見沼区」「瑞穂町」（都県なし）。対応エリアの外は undefined */
 export function muniCity(muniCd: string): string | undefined {
   for (const codes of Object.values(GSI_CODES as Record<string, Record<string, string>>)) if (codes[muniCd]) return codes[muniCd].replace(/\s/g, "");
   return undefined;
 }
 
-/** 逆ジオコーダの市区町村コード → 「埼玉県さいたま市西区」。関東1都6県の外は undefined */
+/** 逆ジオコーダの市区町村コード → 「埼玉県さいたま市西区」。対応エリアの外は undefined */
 export function muniName(muniCd: string): string | undefined {
   for (const [pref, codes] of Object.entries(GSI_CODES as Record<string, Record<string, string>>)) {
     if (codes[muniCd]) return `${pref}${codes[muniCd].replace(/\s/g, "")}`;

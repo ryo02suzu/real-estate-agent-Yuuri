@@ -186,7 +186,7 @@ function Found({
   const body = useRef<HTMLDivElement>(null);
   useFit(body);
   // ネットで分からない市は、地図ボタンを参考扱いにして問い合わせ先を先に見せる
-  const offline = m.coverage === "none" || m.coverage === "outside";
+  const offline = m.coverage === "none" || m.coverage === "outside" || m.coverage === "unknown";
   const primary = offline
     ? []
     : result.links.filter((l) => l.kind !== "public_road");
@@ -896,7 +896,7 @@ function DesktopFound({ query, result, onPick }: { query: string; result: Extrac
   const checklist = useChecklist(result);
   const [triageOpen, setTriageOpen] = useState(false);
   const [draft, setDraft] = useState(false);
-  const offline = m.coverage === "none" || m.coverage === "outside";
+  const offline = m.coverage === "none" || m.coverage === "outside" || m.coverage === "unknown";
   const primary = result.links.filter((l) => !offline && l.kind !== "public_road");
   const others = result.links.filter((l) => offline || l.kind === "public_road");
   // くわしい内容は、パネルの下のタブで1つずつ出す（全部を縦に並べると画面7枚分ほどになるので）。要点の行を押すと、そのタブを開いて動かす

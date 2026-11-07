@@ -100,7 +100,7 @@ function Report({ result }: { result: Ok }) {
       <Triage result={result} />
 
       <Section title="液状化の発生傾向" data="liq" state={liq} cautions={LIQ_CAUTIONS} credit={LIQ_CREDIT}>
-        {(l) => (l ? <p className="text-[16px] font-bold">{liquefactionText(l)}</p> : <p>この地点のデータはありません（海・河川・関東の外など）</p>)}
+        {(l) => (l ? <p className="text-[16px] font-bold">{liquefactionText(l)}</p> : <p>この地点のデータはありません（海・河川・対応エリアの外など）</p>)}
       </Section>
 
       <Section title="大規模盛土造成地" data="zousei" state={zousei} cautions={ZOUSEI_CAUTIONS} credit={ZOUSEI_CREDIT}>

@@ -76,9 +76,9 @@ export function AppHelpSheet({ open, onClose }: { open: boolean; onClose: () => 
   );
 }
 
-const ORDER: Municipality["coverage"][] = ["full", "partial", "none", "outside"];
+const ORDER: Municipality["coverage"][] = ["full", "partial", "none", "outside", "unknown"];
 /** 1都6県の並び（東京・神奈川・埼玉・千葉・茨城・栃木・群馬） */
-const PREF_ORDER: string[] = ["東京都", "神奈川県", "埼玉県", "千葉県", "茨城県", "栃木県", "群馬県"];
+const PREF_ORDER: string[] = ["東京都", "神奈川県", "埼玉県", "千葉県", "茨城県", "栃木県", "群馬県", "静岡県", "山梨県", "長野県", "愛知県", "岐阜県", "新潟県", "富山県", "石川県", "福井県"];
 const prefRank = (p: string) => (PREF_ORDER.includes(p) ? PREF_ORDER.indexOf(p) : 99);
 
 export function AppCitiesSheet({ open, onClose }: { open: boolean; onClose: () => void }) {

@@ -39,6 +39,15 @@ export const COVERAGE: Record<Coverage, { short: string; pill: string; long: str
     panel: "bg-[#f6f7f8] text-[#46505a] border-[#e0e4e7]",
     dot: "bg-[#9aa3ab]",
   },
+  unknown: {
+    short: "調査中",
+    pill: "道路図の公開の有無を調べています",
+    long: "この市町村の道路種別がネットで公開されているかは、まだ調べていません。県または市の建築指導課で確認してください。",
+    list: "調査中（道路図の公開の有無を確認中。問い合わせ先は県または市の建築指導課）",
+    badge: "bg-[#eef2f6] text-[#4e5d6e]",
+    panel: "bg-[#f5f8fb] text-[#43515f] border-[#dde5ee]",
+    dot: "bg-[#8aa0b8]",
+  },
 };
 
 export function CoverageBadge({ coverage }: { coverage: Coverage }) {
@@ -56,7 +65,7 @@ export function CoveragePill({ coverage }: { coverage: Coverage }) {
   const c = COVERAGE[coverage];
   return (
     <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${c.badge}`}>
-      <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] text-white ${c.dot}`}>{coverage === "full" ? "✓" : coverage === "partial" ? "−" : "!"}</span>
+      <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] text-white ${c.dot}`}>{coverage === "full" ? "✓" : coverage === "partial" ? "−" : coverage === "unknown" ? "?" : "!"}</span>
       {c.pill}
     </span>
   );

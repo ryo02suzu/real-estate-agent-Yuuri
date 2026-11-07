@@ -1,5 +1,6 @@
 // 国土地理院の無料API（APIキー不要・保存制限なし）で住所→座標→市区町村コードを引く。
 // 住所をサーバーに送らないよう、ブラウザから直接呼ぶ想定。
+import { PREF_NAME_RE } from "./regions";
 import { kanjiToInt } from "./parcel";
 
 export type GeocodeResult = {
@@ -25,9 +26,8 @@ export async function geocode(address: string): Promise<GeocodeResult | null> {
 }
 
 const PREF = /^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/;
-const KANTO = /^(東京都|神奈川県|埼玉県|千葉県|茨城県|栃木県|群馬県)/;
 
-/** 候補をすべて返す（同じ住所は1つにまとめ、関東を先に並べる） */
+/** 候補をすべて返す（同じ住所は1つにまとめ、対応エリア（関東・中部）を先に並べる） */
 export async function geocodeCandidates(address: string): Promise<GeocodeResult[]> {
   const url = `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(address)}`;
   const res = await fetch(url);
@@ -38,8 +38,8 @@ export async function geocodeCandidates(address: string): Promise<GeocodeResult[
   const list = items
     .map((it) => ({ lat: it.geometry.coordinates[1], lng: it.geometry.coordinates[0], matchedAddress: it.properties.title }))
     .filter((c) => !seen.has(c.matchedAddress) && seen.add(c.matchedAddress));
-  // 先頭の結果は国土地理院の一致度順なので崩さず、関東だけを前に寄せる（安定ソート）
-  return list.sort((a, b) => Number(KANTO.test(b.matchedAddress)) - Number(KANTO.test(a.matchedAddress)));
+  // 先頭の結果は国土地理院の一致度順なので崩さず、対応エリアだけを前に寄せる（安定ソート）
+  return list.sort((a, b) => Number(PREF_NAME_RE.test(b.matchedAddress)) - Number(PREF_NAME_RE.test(a.matchedAddress)));
 }
 
 /**

@@ -3,6 +3,7 @@
 // 国のデータは概略の位置で法的図書ではなく、重要事項説明の根拠には使えない（国土数値情報の注意事項）ので、参考として出し、
 // 区域を指定した都県・市（盛土規制法の担当課）の資料で確かめるよう添える
 import SOURCE from "./data/morido-source.json";
+import { PREF_NAMES } from "./regions";
 import type { LngLat, Polygon } from "./parcel";
 import { wagmap } from "./vendors";
 import { inPolygon } from "./zoning";
@@ -52,7 +53,9 @@ export function moridoCaution(authority: string): string {
   return `国のデータ（${SOURCE.asOf}時点）の概略の区域で、法的図書ではありません。重要事項説明には${authority}（盛土規制法の担当課）の資料で確かめてください`;
 }
 
-const PREFS: Record<string, string> = { "08": "茨城県", "09": "栃木県", "10": "群馬県", "11": "埼玉県", "12": "千葉県", "13": "東京都", "14": "神奈川県" };
+const PREFS: Record<string, string> = PREF_NAMES;
+/** データを取り込んである都道府県（build.py が書く。無ければ関東1都6県） */
+const DATA_PREFS = new Set<string>((SOURCE as { prefs?: string[] }).prefs ?? ["08", "09", "10", "11", "12", "13", "14"]);
 /** 区域を自ら指定する市（指定都市・中核市）の市区町村コード → 市の名前 */
 const CITIES = SOURCE.cities as Record<string, string>;
 
@@ -72,7 +75,7 @@ function tileOf(lat: number, lng: number, z: number): [number, number] {
  * 区域の無い所にはタイルが無い（水戸市のように、データの時点でまだ区域を指定していない市など）
  */
 export async function moridoAt(lat: number, lng: number, city: string, source: MoridoSource): Promise<Morido | null> {
-  if (!PREFS[city.slice(0, 2)]) return null;
+  if (!PREFS[city.slice(0, 2)] || !DATA_PREFS.has(city.slice(0, 2))) return null;
   const areas = (await source.tile(...tileOf(lat, lng, MORIDO_ZOOM))) ?? [];
   const p: LngLat = [lng, lat];
   // 重なっていれば、特定盛土等規制区域より宅地造成等工事規制区域（規制が細かい方）を先に

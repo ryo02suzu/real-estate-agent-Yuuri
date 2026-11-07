@@ -26,7 +26,8 @@ import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
 import { ZONING_CREDIT } from "./roadmap/zoning-data";
 import { triageLines, type Triage } from "./app/triage";
 
-const COVERAGE_SHORT = { full: "ネットで全種別が分かる", partial: "ネットで分かるのは一部", none: "ネット非公開（窓口で確認）", outside: "都市計画区域外（窓口で確認）" } as const;
+const COVERAGE_SHORT = { full: "ネットで全種別が分かる", partial: "ネットで分かるのは一部", none: "ネット非公開（窓口で確認）", outside: "都市計画区域外（窓口で確認）",
+  unknown: "公開の有無は調査中（県か市の建築指導課で確認）" } as const;
 
 /**
  * zoning：地点の都市計画、parcels：謄本・公図用の「所在 地番」の行（物件の筆と隣の筆。reference は住所の地点の筆で参考）、
