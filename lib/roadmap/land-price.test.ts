@@ -131,11 +131,17 @@ const fileSource = (path: string): Source => ({
 describe("アプリに入っている地価のタイル", () => {
   const src = landPriceTileSource(fileSource(PATH));
 
-  it("land-price-source.json のファイルがあり、関東1都6県の地点が入っている", async () => {
+  it("land-price-source.json のファイルがあり、関東1都6県の地点が入っている（中部9県は作り直したあとに増える）", async () => {
     expect(SRC.url).toMatch(/^\/data\/land-price-\d{4}-\d{4}\.pmtiles$/);
     expect(SRC.edition).toMatch(/^地価公示 令和\d+年（\d{4}年1月1日時点）・地価調査 令和\d+年（\d{4}年7月1日時点）$/);
     expect((await stat(PATH)).size).toBeGreaterThan(1_000_000);
-    for (const k of ["L01", "L02"]) for (const p of ["08", "09", "10", "11", "12", "13", "14"]) expect((SRC.points as Record<string, number>)[`${k}-${p}`]).toBeGreaterThan(200);
+    const points = SRC.points as Record<string, number>;
+    for (const k of ["L01", "L02"]) for (const p of ["08", "09", "10", "11", "12", "13", "14"]) expect(points[`${k}-${p}`]).toBeGreaterThan(200);
+    // 入っている都道府県は 関東1都6県＋中部9県（08〜23）だけで、どれも地点がある
+    for (const [key, n] of Object.entries(points)) {
+      expect(key, key).toMatch(/^L0[12]-(0[89]|1[0-9]|2[0-3])$/);
+      expect(n, key).toBeGreaterThan(0);
+    }
   });
 
   it("千代田区三番町：近くに地価公示の標準地があり、価格・前年比・駅・用途地域が読める", async () => {
@@ -152,7 +158,7 @@ describe("アプリに入っている地価のタイル", () => {
     expect(new Set(r.map((h) => `${h.kind}|${h.no}`)).size).toBe(r.length);
   });
 
-  it("横浜市・千葉市・さいたま市でも見つかり、関東の外（静岡県）は空", async () => {
+  it("横浜市・千葉市・さいたま市でも見つかり、対応エリアの外（大阪市）は空", async () => {
     // 地価調査の基準地番号は、県の中で重ならない地名（千葉市中央区は「中央(県)」）
     for (const [lat, lng, city] of [
       [35.4437, 139.638, "横浜市"],
@@ -163,6 +169,14 @@ describe("アプリに入っている地価のタイル", () => {
       expect(r.length).toBeGreaterThan(0);
       expect(r[0].address).toContain(city);
     }
-    expect(await nearestLandPrices(34.9756, 138.3828, src)).toEqual([]);
+    // 静岡市（中部）は、中部込みで作り直したデータなら見つかり、関東だけのデータなら空
+    const shizuoka = await nearestLandPrices(34.9756, 138.3828, src);
+    if ((SRC.points as Record<string, number>)["L01-22"]) {
+      expect(shizuoka.length).toBeGreaterThan(0);
+      expect(shizuoka[0].address).toContain("静岡市");
+    } else {
+      expect(shizuoka).toEqual([]);
+    }
+    expect(await nearestLandPrices(34.6937, 135.5023, src)).toEqual([]);
   });
 });

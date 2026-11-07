@@ -29,6 +29,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("茨城県の全市町村を網羅している", () => covered("茨城県"));
   it("静岡県の全市町を網羅している", () => covered("静岡県"));
   it("山梨県の全市町村を網羅している", () => covered("山梨県"));
+  it("長野県の全市町村を網羅している", () => covered("長野県"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
@@ -43,6 +44,7 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
     茨城県: ["029", "0280", "0291", "0293", "0294", "0296", "0297", "0299"],
     静岡県: ["053", "0537", "0538", "0539", "054", "0544", "0545", "0547", "0548", "055", "0550", "0557", "0558"],
     山梨県: ["055", "0551", "0553", "0554", "0555", "0556"],
+    長野県: ["026", "0260", "0261", "0263", "0264", "0265", "0266", "0267", "0268", "0269"],
   };
   const contacts = MUNICIPALITIES.flatMap((m) =>
     [m.contact, ...Object.values(m.contactByCode ?? {})].filter((c) => c?.phone).map((c) => ({ m, phone: c!.phone! })),
@@ -103,7 +105,8 @@ describe("MUNICIPALITIES", () => {
 describe("都市計画区域外（国交省 令和6年都市計画現況調査の都市別一覧に無い市町村）", () => {
   // 千葉6・東京5・群馬7・埼玉1。いずれも区域外に接道を求める条例（建築基準法68条の9）の適用も無い。
   // 静岡3は県「静岡県の土地利用」の市町別都市計画区域面積（令和4年3月31日現在）で区域が無い町。
-  // 山梨7は県の都市計画区域マスタープラン（12区域）の市町村に無い市町村
+  // 山梨7は県の都市計画区域マスタープラン（12区域）の市町村に無い市町村。
+  // 長野33は県「長野県の都市計画 資料編」（2025年3月31日現在）の都市計画決定事項一覧表（39区域・44市町村）に無い町村
   const OUTSIDE = {
     "12234": "南房総市", "12463": "鋸南町", "12342": "神崎町", "12422": "睦沢町", "12426": "長柄町", "12441": "大多喜町",
     "13307": "檜原村", "13308": "奥多摩町", "13362": "利島村", "13382": "御蔵島村", "13402": "青ヶ島村",
@@ -111,6 +114,11 @@ describe("都市計画区域外（国交省 令和6年都市計画現況調査�
     "11369": "東秩父村",
     "22305": "松崎町", "22306": "西伊豆町", "22429": "川根本町",
     "19209": "北杜市", "19364": "早川町", "19366": "南部町", "19422": "道志村", "19429": "鳴沢村", "19442": "小菅村", "19443": "丹波山村",
+    "20304": "川上村", "20305": "南牧村", "20306": "南相木村", "20307": "北相木村", "20324": "立科町", "20349": "青木村", "20350": "長和町", "20363": "原村",
+    "20404": "阿南町", "20407": "阿智村", "20409": "平谷村", "20410": "根羽村", "20411": "下條村", "20412": "売木村", "20413": "天龍村", "20414": "泰阜村",
+    "20415": "喬木村", "20416": "豊丘村", "20417": "大鹿村", "20423": "南木曽町", "20425": "木祖村", "20429": "王滝村", "20430": "大桑村",
+    "20446": "麻績村", "20448": "生坂村", "20450": "山形村", "20451": "朝日村", "20452": "筑北村", "20486": "小谷村", "20543": "高山村", "20588": "小川村",
+    "20562": "木島平村", "20602": "栄村",
   };
 
   it("区域外の町村は「都市計画区域外」で、道路種別の地図を出さない", () => {
@@ -204,6 +212,62 @@ describe("山梨県の道路図", () => {
     const links = buildLinks(findMunicipality("19211")!, 35.6475, 138.6399);
     expect(links.map((l) => l.kind)).toEqual(["designated_only", "public_road"]);
     expect(links[1].url).toContain("wagmap.jp/fuefuki/Map?mid=4&");
+  });
+});
+
+describe("長野県の道路図", () => {
+  it("長野市・松本市（特定行政庁）は市の wagmap の指定道路図を開く", () => {
+    const nagano = findMunicipality("20201")!;
+    expect(nagano.coverage).toBe("full");
+    const links = buildLinks(nagano, 36.6513, 138.181);
+    expect(links.map((l) => l.kind)).toEqual(["road_type", "public_road", "public_road"]);
+    expect(links[0].url).toBe("https://www2.wagmap.jp/nagano/Map?mid=40&mpx=138.181000&mpy=36.651300&mps=1000&gprj=2");
+    expect(resolveContact(nagano, "20201")).toMatchObject({ phone: "026-224-5048", noPhoneInquiry: true });
+    const matsumoto = findMunicipality("20202")!;
+    expect(matsumoto.coverage).toBe("full");
+    expect(buildLinks(matsumoto, 36.2381, 137.9718)[0].url).toContain("wagmap.jp/matsumoto/Map?mid=2&");
+  });
+
+  it("上田市（特定行政庁）は道路図が非公開で地図が無く、建築指導課が問い合わせ先", () => {
+    const m = findMunicipality("20203")!;
+    expect(m.coverage).toBe("none");
+    expect(m.maps).toEqual([]);
+    expect(resolveContact(m, "20203")!.phone).toBe("0268-23-5430");
+  });
+
+  it("飯田市（限定特定行政庁）はいいだWebまっぷの位置指定道路の図と道路網図を開く", () => {
+    const m = findMunicipality("20205")!;
+    expect(m.coverage).toBe("partial");
+    const links = buildLinks(m, 35.5148, 137.8216);
+    expect(links.map((l) => l.kind)).toEqual(["designated_only", "public_road"]);
+    expect(links[0].url).toBe("https://iida.geocloud.jp/mp/15?z=18&ll=35.514800,137.821600");
+    expect(links[1].url).toBe("https://iida.geocloud.jp/mp/3?z=18&ll=35.514800,137.821600");
+  });
+
+  it("県が扱う市町村は道路種別の地図が無く、建設事務所が問い合わせ先。市の道路台帳があれば添える", () => {
+    const suzaka = findMunicipality("20207")!;
+    expect(suzaka.coverage).toBe("none");
+    expect(resolveContact(suzaka, "20207")!.dept).toContain("長野建設事務所");
+    const links = buildLinks(suzaka, 36.6512, 138.3072);
+    expect(links.map((l) => l.kind)).toEqual(["public_road", "designated_only"]);
+    expect(links[0].url).toBe("https://experience.arcgis.com/experience/596c785b14594ba4bcf4f079acaab484/#widget_6=center:138.307200%2C36.651200%2C4326,scale:2500");
+    expect(links[1].url).toBe("https://www.pref.nagano.lg.jp/choken/kannai/renrakusaki/kenchikuka/index.html");
+    const azumino = findMunicipality("20220")!;
+    expect(buildLinks(azumino, 36.3039, 137.9057)[0].url).toBe(
+      "https://azuminocity.maps.arcgis.com/apps/webappviewer/index.html?id=ff06b231e28949d889bd1182cddc9eb1&center=137.905700,36.303900,4326&scale=2500",
+    );
+    expect(resolveContact(azumino, "20220")!.dept).toContain("松本建設事務所");
+    // 諏訪市は2026年9月末で限定特定行政庁を廃止し、県の諏訪建設事務所が扱う
+    expect(resolveContact(findMunicipality("20206")!, "20206")!.phone).toBe("0266-57-2923");
+    expect(findMunicipality("20214")!.maps).toEqual([]); // 茅野市
+  });
+
+  it("小諸市の路線網図（PDF）は URL だけで、位置から URL を作らない", () => {
+    const m = findMunicipality("20208")!;
+    const pdf = m.maps.find((l) => l.kind === "public_road")!;
+    expect(pdf.build).toBeNull();
+    expect(pdf.url).toContain("city.komoro.lg.jp");
+    expect(buildLinks(m, 36.3271, 138.4262).map((l) => l.kind)).toEqual(["public_road", "designated_only"]);
   });
 });
 
@@ -406,13 +470,13 @@ describe("lookup", () => {
 
   it("中部の市町村は対応（道路図は調査中）", async () => {
     stubFetch(
-      [{ geometry: { coordinates: [138.181, 36.6513] }, properties: { title: "長野県長野市大字南長野" } }],
-      { results: { muniCd: "20201", lv01Nm: "大字南長野" } },
+      [{ geometry: { coordinates: [136.7606, 35.4232] }, properties: { title: "岐阜県岐阜市司町" } }],
+      { results: { muniCd: "21201", lv01Nm: "司町" } },
     );
-    const r = await lookup("長野県長野市大字南長野幅下692-2");
+    const r = await lookup("岐阜県岐阜市司町40-1");
     expect(r.status).toBe("ok");
     if (r.status === "ok") {
-      expect(r.municipality.name).toBe("長野市");
+      expect(r.municipality.name).toBe("岐阜市");
       expect(r.municipality.coverage).toBe("unknown");
       expect(r.links).toEqual([]);
     }
