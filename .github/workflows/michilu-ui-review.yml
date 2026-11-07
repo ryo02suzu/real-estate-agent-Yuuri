@@ -2,7 +2,7 @@ name: MICHILU UI review evidence
 on:
   push:
     branches: [qa/michilu-ui-v2-review]
-    paths: [.github/workflows/michilu-ui-review.yml]
+    paths: [.github/workflows/michilu-ui-review.yml, scripts/qa/michilu-result-review.py]
 permissions:
   contents: read
 concurrency:
@@ -11,13 +11,18 @@ concurrency:
 jobs:
   browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       REVIEW_URL: http://127.0.0.1:3000
-      PREVIEW_URL: https://michilu-dbqcxx8b5-sourirettes-projects.vercel.app
-      REVIEW_SHA: d331a25e728b03e75b18664555a9fcfd1db609b1
-      REVIEW_PHASE: mobile-ui-v2-core-flow-d331a25
+      PREVIEW_URL: https://michilu-6qsh2ts80-sourirettes-projects.vercel.app
+      REVIEW_SHA: fbcc6a07579126fd4657a388e24331f952c2248c
+      REVIEW_PHASE: mobile-result-fbcc6a0
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+          path: qa-source
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -33,6 +38,9 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$REVIEW_SHA"
           npm ci
+          npm run lint
+          npm run typecheck
+          npm test
           npm run build
       - name: Serve the static build on the runner
         run: |
@@ -101,131 +109,12 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/michilu-browser"
           "$RUNNER_TEMP/michilu-browser/bin/pip" install playwright==1.62.0
           "$RUNNER_TEMP/michilu-browser/bin/playwright" install --with-deps chromium webkit
-      - name: Exercise the built app (not Vercel Preview)
-        shell: bash
+      - name: Verify input, result tabs and readable layout (not Vercel Preview)
         run: |
-          "$RUNNER_TEMP/michilu-browser/bin/python" - <<'PY'
-          import asyncio, json, os, re, platform
-          from urllib.parse import urlparse
-          from pathlib import Path
-          from playwright.async_api import async_playwright
-          out = Path("ui-review")
-          out.mkdir(exist_ok=True)
-          report = {"url": os.environ["REVIEW_URL"], "sha": os.environ["REVIEW_SHA"], "phase": os.environ["REVIEW_PHASE"], "deployment_tested": False, "preview_url": os.environ["PREVIEW_URL"], "os": platform.platform(), "real_iphone": False, "checks": []}
-          async def snapshot(page, name, record):
-              await page.screenshot(path=str(out / (name + ".png")), full_page=True)
-              (out / (name + ".txt")).write_text(await page.locator("body").inner_text(), encoding="utf-8")
-              record["layout"] = await page.evaluate("""() => ({
-                width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,
-                horizontalOverflow:document.documentElement.scrollWidth>innerWidth+1,
-                maps:[...document.querySelectorAll('.maplibregl-map')].map(e=>({class:e.className,box:e.getBoundingClientRect().toJSON(),position:getComputedStyle(e).position,height:getComputedStyle(e).height,canvases:[...e.querySelectorAll('canvas')].map(c=>({box:c.getBoundingClientRect().toJSON(),width:c.width,height:c.height}))})),
-                inputs:[...document.querySelectorAll('input')].filter(e=>e.getBoundingClientRect().width).map(e=>({name:e.getAttribute('aria-label')||e.id,fontSize:getComputedStyle(e).fontSize,box:e.getBoundingClientRect().toJSON()})),
-                controls:[...document.querySelectorAll('button,a')].filter(e=>e.getBoundingClientRect().width).map(e=>{
-                  const b=e.getBoundingClientRect(),p=getComputedStyle(e,'::after');
-                  const extended=e.matches('.mui-hit,.mui-hit-y,[role="tab"]') && p.content!=='none' && p.content!=='normal';
-                  const w=Math.max(b.width,extended?(parseFloat(p.width)||0):0),h=Math.max(b.height,extended?(parseFloat(p.height)||0):0);
-                  const cx=b.x+b.width/2,cy=b.y+b.height/2;
-                  return {text:e.getAttribute('aria-label')||e.innerText,box:b.toJSON(),hit_size:{width:w,height:h},
-                    hit_samples:[[-1,-1],[1,-1],[-1,1],[1,1],[0,0]].map(([dx,dy])=>{
-                      const x=cx+dx*(w/2-2),y=cy+dy*(h/2-2),inside=x>=0&&x<innerWidth&&y>=0&&y<innerHeight;
-                      const hit=inside?document.elementFromPoint(x,y):null;
-                      return {x,y,insideViewport:inside,receives:!!hit&&(hit===e||e.contains(hit))};
-                    })};
-                })
-              })""")
-          async def run():
-              async with async_playwright() as pw:
-                  for engine in ["chromium", "webkit"]:
-                      browser = await getattr(pw, engine).launch(args=["--enable-unsafe-swiftshader"] if engine == "chromium" else [])
-                      sizes = [(375,667),(390,844),(402,874),(430,932),(844,390),(1024,768),(1440,900)] if engine == "chromium" else [(390,844)]
-                      for width,height in sizes:
-                          name = f"{engine}-{width}x{height}"
-                          record = {"name":name,"browser_version":browser.version,"console_errors":[],"failed_requests":[]}
-                          report["checks"].append(record)
-                          record["console_messages"]=[]
-                          record["range_responses"]=[]
-                          ctx = await browser.new_context(viewport={"width":width,"height":height},device_scale_factor=1,locale="ja-JP",is_mobile=width<1024,has_touch=width<1024)
-                          page = await ctx.new_page()
-                          page.on("console",lambda msg,r=record:r["console_messages"].append({"type":msg.type,"text":msg.text[:600]}) if msg.type in ["warning","error"] else None)
-                          page.on("response",lambda res,r=record:r["range_responses"].append({"url":res.url,"status":res.status,"range":res.headers.get("content-range")}) if ".pmtiles" in res.url else None)
-                          page.on("pageerror", lambda error,r=record:r["console_errors"].append(str(error)))
-                          page.on("requestfailed", lambda req,r=record:r["failed_requests"].append({"url":req.url,"failure":req.failure}))
-                          try:
-                              response=await page.goto(report["url"],wait_until="domcontentloaded",timeout=40000)
-                              record["http_status"]=response.status if response else None
-                              if urlparse(page.url).netloc != urlparse(report["url"]).netloc:
-                                  raise AssertionError("App navigation left the review origin (authentication/redirect)")
-                              await page.locator("input#address").wait_for(state="visible",timeout=20000)
-                              assert "MICHILU" in await page.title(), "Expected the MICHILU app title"
-                              await page.evaluate("document.fonts.ready")
-                              await page.wait_for_timeout(1800)
-                              await snapshot(page,name+"-home",record)
-                              record["home_layout"]=record["layout"]
-                              # Failure gate: blank MapLibre canvases passed the old screenshot-only QA.
-                              # This checks the app's real layout; never apply an artificial CSS override.
-                              if width < 1024 and urlparse(page.url).netloc == urlparse(report["url"]).netloc:
-                                  await page.locator(".mui-japan-map").wait_for(state="visible", timeout=20000)
-                                  record["map_geometry"] = await page.locator(".mui-japan-map").first.evaluate(
-                                      "(e)=>({width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height,position:getComputedStyle(e).position})"
-                                  )
-                                  canvas = page.locator(".mui-japan-map canvas.maplibregl-canvas").first
-                                  await canvas.wait_for(state="visible", timeout=20000)
-                                  record["canvas_geometry"] = await canvas.evaluate(
-                                      "(e)=>({width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height})"
-                                  )
-                                  assert record["map_geometry"]["width"] > 200 and record["map_geometry"]["height"] > 150, "Mobile map layout is empty or collapsed"
-                                  assert record["canvas_geometry"]["width"] > 200 and record["canvas_geometry"]["height"] > 150, "Mobile MapLibre canvas is empty or collapsed"
-                              record["status"]="app_home_captured"
-                              if width==390:
-                                  await page.get_by_role("textbox",name=re.compile("住所")).first.fill("東京都新宿区西新宿2丁目8番1号")
-                                  await snapshot(page,name+"-input",{})
-                                  await page.get_by_role("button",name="検索",exact=True).first.click()
-                                  await page.wait_for_function("location.search.includes('q=')",timeout=35000)
-                                  await page.wait_for_timeout(6000)
-                                  await snapshot(page,name+"-result",record)
-                                  record["result_url"]=page.url
-                                  record["result_text"]=(await page.locator("body").inner_text())[:12000]
-                                  detail=page.get_by_role("button",name=re.compile("^都市計画")).first
-                                  # Core flow is mandatory, not a screenshot-only success.
-                                  await detail.wait_for(state="visible",timeout=30000)
-                                  await detail.click(timeout=30000)
-                                  await page.wait_for_timeout(600)
-                                  await snapshot(page,name+"-detail",{})
-                                  record["detail_clicked"]=True
-                                  back=page.get_by_role("button",name="一覧に戻る",exact=True).first
-                                  await back.click(timeout=15000)
-                                  await detail.wait_for(state="visible",timeout=15000)
-                                  await page.wait_for_timeout(400)
-                                  await snapshot(page,name+"-returned",{})
-                                  record["detail_returned"]=True
-                                  # Explicit browser simulations; not physical iPhone keyboard or OS text size.
-                                  if width==390:
-                                      await page.locator("#address").focus()
-                                      await page.set_viewport_size({"width":390,"height":430})
-                                      await page.wait_for_timeout(400)
-                                      await snapshot(page,name+"-keyboard-viewport-simulation",{})
-                                      await page.set_viewport_size({"width":390,"height":844})
-                                      await page.locator("#address").blur()
-                                      await page.evaluate("""() => [...document.querySelectorAll('body *')].map(e=>[e,parseFloat(getComputedStyle(e).fontSize)]).forEach(([e,size])=>{
-                                        if(size) e.style.fontSize=(size*2)+'px';
-                                      })""")
-                                      await snapshot(page,name+"-text-200pct-simulation",{})
-                          except Exception as e:
-                              record["status"]="blocked"
-                              record["error"]=str(e)[:1200]
-                              try: await snapshot(page,name+"-blocked",{})
-                              except Exception: pass
-                          await ctx.close()
-                          (out/"report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
-                      await browser.close()
-              print(json.dumps({"phase":report["phase"],"sha":report["sha"],"checks":[{k:v for k,v in r.items() if k not in ["layout","home_layout","failed_requests"]} for r in report["checks"]]},ensure_ascii=False))
-          asyncio.run(run())
-          if any(r.get('status') == 'blocked' for r in report['checks']):
-              raise SystemExit('Browser review contains blocked cases; see report.json')
-          PY
+          "$RUNNER_TEMP/michilu-browser/bin/python" qa-source/scripts/qa/michilu-result-review.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: michilu-ui-review-evidence
+          name: michilu-result-fbcc6a0-${{ github.run_id }}
           path: ui-review/
           retention-days: 14
