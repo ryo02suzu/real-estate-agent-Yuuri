@@ -297,7 +297,7 @@ export function HomeScreen({
             </span>
           ) : !input && onHere ? (
             // 現在地で調べる（現地に着いたとき。押すと現在地のまわりの地図が開き、物件を選んで調べる）
-            <button type="button" onClick={onHere} disabled={locating} aria-label={locating ? "現在地を確かめています" : "現在地で調べる"} className="press mr-[8px] flex shrink-0 items-center gap-[6px] rounded-full bg-white/[0.16] pl-[10px] pr-[12px] font-semibold" style={{ height: 38, fontSize: 13 }}>
+            <button type="button" onClick={onHere} disabled={locating} aria-label={locating ? "現在地を確かめています" : "現在地で調べる"} className="press mr-[8px] flex shrink-0 items-center gap-[6px] rounded-full bg-white/[0.16] pl-[10px] pr-[12px] font-semibold" style={{ height: HIT, fontSize: 13 }}>
               {locating ? <LoaderCircle size={17} strokeWidth={2.2} absoluteStrokeWidth className="animate-spin" /> : <LocateFixed size={17} strokeWidth={2.2} absoluteStrokeWidth color="#fff" />}
               現在地
             </button>
