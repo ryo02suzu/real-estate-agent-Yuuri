@@ -30,6 +30,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("静岡県の全市町を網羅している", () => covered("静岡県"));
   it("山梨県の全市町村を網羅している", () => covered("山梨県"));
   it("長野県の全市町村を網羅している", () => covered("長野県"));
+  it("愛知県の全市町村を網羅している", () => covered("愛知県"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
@@ -45,6 +46,7 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
     静岡県: ["053", "0537", "0538", "0539", "054", "0544", "0545", "0547", "0548", "055", "0550", "0557", "0558"],
     山梨県: ["055", "0551", "0553", "0554", "0555", "0556"],
     長野県: ["026", "0260", "0261", "0263", "0264", "0265", "0266", "0267", "0268", "0269"],
+    愛知県: ["052", "0531", "0532", "0533", "0536", "0561", "0562", "0563", "0564", "0565", "0566", "0567", "0568", "0569", "0586", "0587"],
   };
   const contacts = MUNICIPALITIES.flatMap((m) =>
     [m.contact, ...Object.values(m.contactByCode ?? {})].filter((c) => c?.phone).map((c) => ({ m, phone: c!.phone! })),
@@ -106,7 +108,8 @@ describe("都市計画区域外（国交省 令和6年都市計画現況調査�
   // 千葉6・東京5・群馬7・埼玉1。いずれも区域外に接道を求める条例（建築基準法68条の9）の適用も無い。
   // 静岡3は県「静岡県の土地利用」の市町別都市計画区域面積（令和4年3月31日現在）で区域が無い町。
   // 山梨7は県の都市計画区域マスタープラン（12区域）の市町村に無い市町村。
-  // 長野33は県「長野県の都市計画 資料編」（2025年3月31日現在）の都市計画決定事項一覧表（39区域・44市町村）に無い町村
+  // 長野33は県「長野県の都市計画 資料編」（2025年3月31日現在）の都市計画決定事項一覧表（39区域・44市町村）に無い町村。
+  // 愛知3は県の6都市計画区域（51市町村）に無い北設楽郡の町村
   const OUTSIDE = {
     "12234": "南房総市", "12463": "鋸南町", "12342": "神崎町", "12422": "睦沢町", "12426": "長柄町", "12441": "大多喜町",
     "13307": "檜原村", "13308": "奥多摩町", "13362": "利島村", "13382": "御蔵島村", "13402": "青ヶ島村",
@@ -119,6 +122,7 @@ describe("都市計画区域外（国交省 令和6年都市計画現況調査�
     "20415": "喬木村", "20416": "豊丘村", "20417": "大鹿村", "20423": "南木曽町", "20425": "木祖村", "20429": "王滝村", "20430": "大桑村",
     "20446": "麻績村", "20448": "生坂村", "20450": "山形村", "20451": "朝日村", "20452": "筑北村", "20486": "小谷村", "20543": "高山村", "20588": "小川村",
     "20562": "木島平村", "20602": "栄村",
+    "23561": "設楽町", "23562": "東栄町", "23563": "豊根村",
   };
 
   it("区域外の町村は「都市計画区域外」で、道路種別の地図を出さない", () => {
@@ -268,6 +272,47 @@ describe("長野県の道路図", () => {
     expect(pdf.build).toBeNull();
     expect(pdf.url).toContain("city.komoro.lg.jp");
     expect(buildLinks(m, 36.3271, 138.4262).map((l) => l.kind)).toEqual(["public_road", "designated_only"]);
+  });
+});
+
+describe("愛知県の道路図", () => {
+  it("名古屋市は市の指定道路図を #ズーム/緯度/経度 で開き、全区で同じ問い合わせ先", () => {
+    const m = findMunicipality("23106")!; // 中区
+    expect(m.name).toBe("名古屋市");
+    expect(m.codes).toHaveLength(16);
+    expect(m.coverage).toBe("full");
+    const links = buildLinks(m, 35.1815, 136.9066);
+    expect(links[0].url).toBe("https://www.shiteidourozu.city.nagoya.jp/nagoya/#17/35.181500/136.906600");
+    expect(links[0].kind).toBe("road_type");
+    expect(resolveContact(m, "23116")!.phone).toBe("052-972-2928");
+  });
+
+  it("豊橋・豊田・岡崎は wagmap の道路図、一宮・春日井は道路種別が非公開", () => {
+    expect(buildLinks(findMunicipality("23201")!, 34.7692, 137.3915)[0].url).toBe("https://www2.wagmap.jp/toyohashi/Map?mid=30&mpx=137.391500&mpy=34.769200&mps=1000&gprj=2");
+    expect(buildLinks(findMunicipality("23211")!, 35.0824, 137.1564)[0].url).toContain("wagmap.jp/toyotacity/Map?mid=13&");
+    expect(buildLinks(findMunicipality("23202")!, 34.9545, 137.1744).map((l) => l.kind)).toEqual(["road_type", "public_road"]);
+    expect(findMunicipality("23203")!.coverage).toBe("none"); // 一宮市
+    expect(resolveContact(findMunicipality("23203")!, "23203")).toMatchObject({ phone: "0586-28-8645", noPhoneInquiry: true });
+    expect(findMunicipality("23206")!.maps.map((l) => l.kind)).toEqual(["public_road"]); // 春日井市
+  });
+
+  it("限定特定行政庁の11市は市の建築課が問い合わせ先", () => {
+    for (const [code, phone] of [["23204", "0561-88-2686"], ["23205", "0569-84-0671"], ["23207", "0533-89-2117"], ["23210", "0566-62-1021"], ["23212", "0566-71-2241"], ["23213", "0563-65-2381"], ["23217", "0587-54-1111"], ["23219", "0568-76-1142"], ["23220", "0587-32-1409"], ["23222", "0562-38-6404"], ["23223", "0562-45-6314"]] as const) {
+      const m = findMunicipality(code)!;
+      expect(m.coverage, m.name).toBe("none");
+      expect(resolveContact(m, code)!.phone, m.name).toBe(phone);
+      expect(m.note, m.name).toContain("限定特定行政庁");
+    }
+  });
+
+  it("県が扱う市町村は建設事務所が問い合わせ先。cloudgis・wagmap の道路台帳があれば添える", () => {
+    const nagakute = findMunicipality("23238")!;
+    expect(resolveContact(nagakute, "23238")!.dept).toContain("尾張建設事務所");
+    expect(buildLinks(nagakute, 35.1841, 137.0486)[0].url).toBe("https://nagakute.cloudgis.jp/road/?lon=137.048600&lat=35.184100&z=18");
+    expect(buildLinks(findMunicipality("23214")!, 34.8264, 137.2197)[0].url).toBe("https://gamagori.cloudgis.jp/road/?lon=137.219700&lat=34.826400&z=18");
+    expect(buildLinks(findMunicipality("23225")!, 35.0015, 137.0505).map((l) => l.kind)).toEqual(["public_road", "public_road"]); // 知立市
+    expect(findMunicipality("23209")!.maps).toEqual([]); // 碧南市
+    expect(resolveContact(findMunicipality("23231")!, "23231")!.phone).toBe("0532-52-1315"); // 田原市 → 東三河
   });
 });
 
