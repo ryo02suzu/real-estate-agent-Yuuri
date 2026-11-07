@@ -106,7 +106,7 @@ function tileOf(lat: number, lng: number, z: number): [number, number] {
 
 const ORDER: HoureiKind[] = ["急傾斜地崩壊危険区域", "地すべり防止区域", "砂防指定地", "災害危険区域"];
 
-/** 地点の区域。city は物件の市区町村コード。関東1都6県の外は null。区域の無い所にはタイルが無い */
+/** 地点の区域。city は物件の市区町村コード。対応エリア（データのある都道府県）の外は null。区域の無い所にはタイルが無い */
 export async function houreiAt(lat: number, lng: number, city: string, source: HoureiSource): Promise<Hourei | null> {
   const pref = city.slice(0, 2);
   if (!PREF_NAMES[pref] || !DATA_PREFS.has(pref)) return null;
