@@ -3,22 +3,6 @@
 import type { Municipality } from "../municipalities";
 
 export const CHUBU_PENDING: Municipality[] = [
-  // 富山県（15）
-  { pref: "富山県", name: "富山市", codes: ["16201"], coverage: "unknown", maps: [] },
-  { pref: "富山県", name: "高岡市", codes: ["16202"], coverage: "unknown", maps: [] },
-  { pref: "富山県", name: "魚津市", codes: ["16204"], coverage: "unknown", maps: [] },
-  { pref: "富山県", name: "氷見市", codes: ["16205"], coverage: "unknown", maps: [] },
-  { pref: "富山県", name: "滑川市", codes: ["16206"], coverage: "unknown", maps: [] },
-  { pref: "富山県", name: "黒部市", codes: ["16207"], coverage: "unknown", maps: [] },
-  { pref: "富山県", name: "砺波市", codes: ["16208"], coverage: "unknown", maps: [] },
-  { pref: "富山県", name: "小矢部市", codes: ["16209"], coverage: "unknown", maps: [] },
-  { pref: "富山県", name: "南砺市", codes: ["16210"], coverage: "unknown", maps: [] },
-  { pref: "富山県", name: "射水市", codes: ["16211"], coverage: "unknown", maps: [] },
-  { pref: "富山県", name: "舟橋村", codes: ["16321"], coverage: "unknown", maps: [] },
-  { pref: "富山県", name: "上市町", codes: ["16322"], coverage: "unknown", maps: [] },
-  { pref: "富山県", name: "立山町", codes: ["16323"], coverage: "unknown", maps: [] },
-  { pref: "富山県", name: "入善町", codes: ["16342"], coverage: "unknown", maps: [] },
-  { pref: "富山県", name: "朝日町", codes: ["16343"], coverage: "unknown", maps: [] },
   // 石川県（19）
   { pref: "石川県", name: "金沢市", codes: ["17201"], coverage: "unknown", maps: [] },
   { pref: "石川県", name: "七尾市", codes: ["17202"], coverage: "unknown", maps: [] },

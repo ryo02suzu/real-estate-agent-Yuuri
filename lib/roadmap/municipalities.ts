@@ -13,6 +13,7 @@ import { NAGANO } from "./data/nagano";
 import { AICHI } from "./data/aichi";
 import { GIFU } from "./data/gifu";
 import { NIIGATA } from "./data/niigata";
+import { TOYAMA } from "./data/toyama";
 import { legendFor, type LegendEntry } from "./legends";
 import type { RoadRead } from "./road-read";
 import { findSheet, type SheetHit, type SheetIndex } from "./sheets";
@@ -87,7 +88,7 @@ export type Municipality = {
   note?: string;
 };
 
-export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI, ...SHIZUOKA, ...YAMANASHI, ...NAGANO, ...AICHI, ...GIFU, ...NIIGATA, ...CHUBU_PENDING];
+export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI, ...SHIZUOKA, ...YAMANASHI, ...NAGANO, ...AICHI, ...GIFU, ...NIIGATA, ...TOYAMA, ...CHUBU_PENDING];
 
 /**
  * 市区町村に都市計画区域が無い（全域が都市計画区域外）と分かっているか。coverage が outside か、注記にそう書いてある町村

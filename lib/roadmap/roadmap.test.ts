@@ -33,6 +33,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("愛知県の全市町村を網羅している", () => covered("愛知県"));
   it("岐阜県の全市町村を網羅している", () => covered("岐阜県"));
   it("新潟県の全市町村を網羅している", () => covered("新潟県"));
+  it("富山県の全市町村を網羅している", () => covered("富山県"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
@@ -51,6 +52,7 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
     愛知県: ["052", "0531", "0532", "0533", "0536", "0561", "0562", "0563", "0564", "0565", "0566", "0567", "0568", "0569", "0586", "0587"],
     岐阜県: ["058", "0572", "0573", "0574", "0575", "0576", "0577", "05769", "0581", "0584", "0585"],
     新潟県: ["025", "0250", "0254", "0255", "0256", "0257", "0258", "0259"],
+    富山県: ["076", "0763", "0765", "0766"],
   };
   const contacts = MUNICIPALITIES.flatMap((m) =>
     [m.contact, ...Object.values(m.contactByCode ?? {})].filter((c) => c?.phone).map((c) => ({ m, phone: c!.phone! })),
@@ -403,6 +405,34 @@ describe("新潟県の道路図", () => {
   });
 });
 
+describe("富山県の道路図", () => {
+  it("富山市はインフォマップとやま（wagmap）の路線網図、道路種別は窓口のみ（電話不可）。高岡市は PDF の道路網図", () => {
+    const m = findMunicipality("16201")!;
+    expect(m.coverage).toBe("none");
+    expect(buildLinks(m, 36.6959, 137.2137)[0].url).toBe("https://www2.wagmap.jp/toyama/Map?mid=21&mpx=137.213700&mpy=36.695900&mps=2500&gprj=2");
+    expect(resolveContact(m, "16201")).toMatchObject({ phone: "076-443-2107", noPhoneInquiry: true });
+    const tk = buildLinks(findMunicipality("16202")!, 36.7541, 137.0256);
+    expect(tk[0].pinpoint).toBe(false);
+    expect(resolveContact(findMunicipality("16202")!, "16202")!.phone).toBe("0766-20-1429");
+  });
+
+  it("県が扱う13市町村は県の指定道路図（座標なし）と土木センター建築課。滑川は wagmap、南砺は geogeo、砺波は Google マイマップ", () => {
+    const uozu = findMunicipality("16204")!;
+    expect(uozu.coverage).toBe("partial");
+    const links = buildLinks(uozu, 36.8273, 137.4093);
+    expect(links[0].kind).toBe("designated_only");
+    expect(links[0].url).toBe("https://publicsite.tdcp.pref.toyama.jp/panel/1741240937690");
+    expect(links[0].pinpoint).toBe(false);
+    expect(resolveContact(uozu, "16204")!.phone).toBe("0765-22-9117");
+    expect(buildLinks(findMunicipality("16206")!, 36.7642, 137.3413)[1].url).toBe("https://www2.wagmap.jp/namerikawacity/Map?mid=7&mpx=137.341300&mpy=36.764200&mps=2500&gprj=2");
+    expect(buildLinks(findMunicipality("16210")!, 36.5577, 136.8747)[1].url).toBe("https://nanto.geogeo.jp/maps?mode=theme&lid=0&mid=7&lat=36.557700&lon=136.874700&z=17");
+    expect(buildLinks(findMunicipality("16208")!, 36.6475, 136.9622)[1].url).toBe("https://www.google.com/maps/d/viewer?mid=1kE1n5Zls8Cn5RRjPi5c0IcsbckU&ll=36.647500,136.962200&z=17");
+    expect(resolveContact(findMunicipality("16321")!, "16321")!.phone).toBe("076-444-4449"); // 舟橋村 → 富山
+    expect(resolveContact(findMunicipality("16211")!, "16211")!.phone).toBe("0766-26-8426"); // 射水市 → 高岡
+    expect(MUNICIPALITIES.filter((x) => x.pref === "富山県" && x.coverage === "outside")).toHaveLength(0);
+  });
+});
+
 describe("buildLinks", () => {
   it("wagmap は世界測地系の座標に gprj=2 を付ける（自治体ごとの測地系の違いを吸収）", () => {
     const [link] = buildLinks(findMunicipality("11202")!, KUMAGAYA_CITY_HALL.lat, KUMAGAYA_CITY_HALL.lng);
@@ -602,13 +632,13 @@ describe("lookup", () => {
 
   it("中部の市町村は対応（道路図は調査中）", async () => {
     stubFetch(
-      [{ geometry: { coordinates: [137.2137, 36.6959] }, properties: { title: "富山県富山市新桜町" } }],
-      { results: { muniCd: "16201", lv01Nm: "新桜町" } },
+      [{ geometry: { coordinates: [136.6562, 36.5613] }, properties: { title: "石川県金沢市広坂" } }],
+      { results: { muniCd: "17201", lv01Nm: "広坂" } },
     );
-    const r = await lookup("富山県富山市新桜町7-38");
+    const r = await lookup("石川県金沢市広坂1-1-1");
     expect(r.status).toBe("ok");
     if (r.status === "ok") {
-      expect(r.municipality.name).toBe("富山市");
+      expect(r.municipality.name).toBe("金沢市");
       expect(r.municipality.coverage).toBe("unknown");
       expect(r.links).toEqual([]);
     }
