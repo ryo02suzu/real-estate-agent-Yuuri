@@ -27,6 +27,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("群馬県の全市町村を網羅している", () => covered("群馬県"));
   it("栃木県の全市町を網羅している", () => covered("栃木県"));
   it("茨城県の全市町村を網羅している", () => covered("茨城県"));
+  it("静岡県の全市町を網羅している", () => covered("静岡県"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
@@ -39,6 +40,7 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
     群馬県: ["027", "0270", "0274", "0276", "0277", "0278", "0279"],
     栃木県: ["028", "0282", "0283", "0284", "0285", "0287", "0288", "0289"],
     茨城県: ["029", "0280", "0291", "0293", "0294", "0296", "0297", "0299"],
+    静岡県: ["053", "0537", "0538", "0539", "054", "0544", "0545", "0547", "0548", "055", "0550", "0557", "0558"],
   };
   const contacts = MUNICIPALITIES.flatMap((m) =>
     [m.contact, ...Object.values(m.contactByCode ?? {})].filter((c) => c?.phone).map((c) => ({ m, phone: c!.phone! })),
@@ -97,12 +99,14 @@ describe("MUNICIPALITIES", () => {
 });
 
 describe("都市計画区域外（国交省 令和6年都市計画現況調査の都市別一覧に無い市町村）", () => {
-  // 千葉6・東京5・群馬7・埼玉1。いずれも区域外に接道を求める条例（建築基準法68条の9）の適用も無い
+  // 千葉6・東京5・群馬7・埼玉1。いずれも区域外に接道を求める条例（建築基準法68条の9）の適用も無い。
+  // 静岡3は県「静岡県の土地利用」の市町別都市計画区域面積（令和4年3月31日現在）で区域が無い町
   const OUTSIDE = {
     "12234": "南房総市", "12463": "鋸南町", "12342": "神崎町", "12422": "睦沢町", "12426": "長柄町", "12441": "大多喜町",
     "13307": "檜原村", "13308": "奥多摩町", "13362": "利島村", "13382": "御蔵島村", "13402": "青ヶ島村",
     "10366": "上野村", "10367": "神流町", "10383": "南牧村", "10428": "高山村", "10443": "片品村", "10444": "川場村", "10448": "昭和村",
     "11369": "東秩父村",
+    "22305": "松崎町", "22306": "西伊豆町", "22429": "川根本町",
   };
 
   it("区域外の町村は「都市計画区域外」で、道路種別の地図を出さない", () => {
@@ -120,6 +124,53 @@ describe("都市計画区域外（国交省 令和6年都市計画現況調査�
       expect(m.coverage, m.name).not.toBe("outside");
       expect(m.note, m.name).toContain("都市計画区域外");
     }
+  });
+});
+
+describe("静岡県の道路図", () => {
+  // 静岡県庁（葵区追手町9-6）
+  const KENCHO = { lat: 34.9768, lng: 138.3831 };
+
+  it("県が扱う市町は県GIS（geocloud 旧版の形）を開き、土木事務所が問い合わせ先", () => {
+    const m = findMunicipality("22325")!; // 函南町
+    expect(m.coverage).toBe("partial");
+    const [link] = buildLinks(m, KENCHO.lat, KENCHO.lng);
+    expect(link.url).toBe("https://www.gis.pref.shizuoka.jp/?mc=02&mp=101&z=18&ll=34.976800%2C138.383100");
+    expect(link.pinpoint && link.verified).toBe(true);
+    expect(resolveContact(m, "22325")!.dept).toContain("沼津土木事務所");
+  });
+
+  it("静岡市はしずマップ（geocloud 新版）、浜松市は wagmap を開き、浜名区・天竜区は北部都市整備事務所", () => {
+    const shizuoka = findMunicipality("22102")!; // 駿河区
+    expect(buildLinks(shizuoka, KENCHO.lat, KENCHO.lng)[0].url).toBe("https://city.shizuoka.geocloud.jp/mp/500?z=18&ll=34.976800,138.383100");
+    const hamamatsu = findMunicipality("22140")!; // 天竜区
+    expect(buildLinks(hamamatsu, 34.71, 137.726)[0].url).toBe("https://www2.wagmap.jp/hamamatsu/Map?mid=65&mpx=137.726000&mpy=34.710000&mps=1000&gprj=2");
+    expect(resolveContact(hamamatsu, "22140")!.dept).toContain("北部都市整備事務所");
+    expect(resolveContact(hamamatsu, "22138")!.dept).toBe("都市整備部 建築行政課");
+  });
+
+  it("湖西市は ArcGIS の地図から道路種別を文字で読める", () => {
+    const m = findMunicipality("22221")!;
+    expect(m.coverage).toBe("full");
+    const [link] = buildLinks(m, 34.718, 137.531);
+    expect(link.url).toBe("https://experience.arcgis.com/experience/dd07e699e2ce41ac8a265a386f59f6f3/page/page_40/#widget_950=center:137.531000%2C34.718000%2C4326,scale:2500");
+    expect(link.read?.field).toBe("a_type");
+  });
+
+  it("PDF で公開している市（沼津・三島・裾野・袋井）は一覧ページを開く", () => {
+    for (const [code, name] of [["22203", "沼津市"], ["22206", "三島市"], ["22220", "裾野市"], ["22216", "袋井市"]] as const) {
+      const m = findMunicipality(code)!;
+      expect(m.name).toBe(name);
+      const pdf = buildLinks(m, 35, 138.8).find((l) => !l.pinpoint)!;
+      expect(pdf.url, name).toMatch(/^https:\/\/www\.city\./);
+    }
+  });
+
+  it("菊川市は市の地図を先に、県GISも開く", () => {
+    const links = buildLinks(findMunicipality("22224")!, 34.758, 138.084);
+    expect(links.map((l) => l.kind)).toEqual(["road_type", "road_type", "public_road"]);
+    expect(links[0].url).toContain("wagmap.jp/kikugawa/Map?mid=5&");
+    expect(links[1].url).toContain("gis.pref.shizuoka.jp");
   });
 });
 

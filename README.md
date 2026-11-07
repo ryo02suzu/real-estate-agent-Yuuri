@@ -32,7 +32,7 @@ npm run build    # 静的サイトを out/ に書き出す（Vercel 等にその
 | `lib/roadmap/road-read.ts` | 市の道路種別の地図データ（公開の ArcGIS レイヤ）を読み、物件のまわりの道路の種別・方角・距離を出す（埼玉県の20町・行田市・つくば市） |
 | `lib/history.ts` | 直近5件の検索履歴（端末の localStorage のみ） |
 | `docs/features.md` | UIの機能要件 |
-| `docs/saitama-research.md`, `docs/chiba-research.md`, `docs/kanagawa-research.md`, `docs/tokyo-research.md`, `docs/kanto-north-research.md` | 市区町村ごとの調査結果と出典 |
+| `docs/saitama-research.md`, `docs/chiba-research.md`, `docs/kanagawa-research.md`, `docs/tokyo-research.md`, `docs/kanto-north-research.md`, `docs/shizuoka-research.md` | 市区町村ごとの調査結果と出典 |
 
 ## ロジックの使い方
 
