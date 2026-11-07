@@ -35,6 +35,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("新潟県の全市町村を網羅している", () => covered("新潟県"));
   it("富山県の全市町村を網羅している", () => covered("富山県"));
   it("石川県の全市町を網羅している", () => covered("石川県"));
+  it("福井県の全市町を網羅している", () => covered("福井県"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
@@ -55,6 +56,7 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
     新潟県: ["025", "0250", "0254", "0255", "0256", "0257", "0258", "0259"],
     富山県: ["076", "0763", "0765", "0766"],
     石川県: ["076", "0761", "0767", "0768"],
+    福井県: ["0770", "0776", "0778", "0779"],
   };
   const contacts = MUNICIPALITIES.flatMap((m) =>
     [m.contact, ...Object.values(m.contactByCode ?? {})].filter((c) => c?.phone).map((c) => ({ m, phone: c!.phone! })),
@@ -134,6 +136,7 @@ describe("都市計画区域外（国交省 令和6年都市計画現況調査�
     "21504": "七宗町", "21506": "白川町", "21507": "東白川村", "21604": "白川村",
     "15405": "出雲崎町", "15482": "津南町", "15504": "刈羽村", "15581": "関川村", "15586": "粟島浦村",
     "17386": "宝達志水町", "17407": "中能登町",
+    "18382": "池田町", "18404": "南越前町", "18483": "おおい町",
   };
 
   it("区域外の町村は「都市計画区域外」で、道路種別の地図を出さない", () => {
@@ -481,6 +484,41 @@ describe("石川県の道路図", () => {
   });
 });
 
+describe("福井県の道路図", () => {
+  it("県が扱う市町は県の指定道路マップ（wagmap・位置指定道路だけ）と土木事務所の建築課。凡例は42条1項5号の1つ", () => {
+    const sakai = findMunicipality("18210")!;
+    expect(sakai.coverage).toBe("partial");
+    const links = buildLinks(sakai, 36.1669, 136.2315);
+    expect(links[0]).toMatchObject({ kind: "designated_only", pinpoint: true, verified: true });
+    expect(links[0].url).toBe("https://www2.wagmap.jp/fukuidouro/Map?mid=1&mpx=136.231500&mpy=36.166900&mps=2500&gprj=2");
+    expect(links[0].legend).toEqual([{ label: "42条1項5号", color: expect.stringMatching(/^#[0-9a-f]{6}$/) }]);
+    // 坂井市WebMap（地理院地図と同じ作り）の認定路線網図
+    expect(links[1].url).toBe("https://www.city.fukui-sakai.lg.jp/webmap/index.html#17/36.166900/136.231500/&base=std&ls=std%7Cshidou&disp=11");
+    expect(resolveContact(sakai, "18210")!.phone).toBe("0776-82-1110"); // 三国土木事務所
+  });
+
+  it("敦賀市はつるがマップ（wagmap）の認定路線網図と道路台帳、越前市は Sonicweb（未確認）、大野・鯖江・あわらは PDF", () => {
+    const tsuruga = buildLinks(findMunicipality("18202")!, 35.6452, 136.0555);
+    expect(tsuruga.map((l) => l.url)).toEqual([
+      "https://www2.wagmap.jp/fukuidouro/Map?mid=1&mpx=136.055500&mpy=35.645200&mps=2500&gprj=2",
+      "https://www2.wagmap.jp/tsuruga/Map?mid=10&mpx=136.055500&mpy=35.645200&mps=2500&gprj=2",
+      "https://www2.wagmap.jp/tsuruga/Map?mid=12&mpx=136.055500&mpy=35.645200&mps=2500&gprj=2",
+    ]);
+    expect(buildLinks(findMunicipality("18209")!, 35.9036, 136.1689)[1]).toMatchObject({ verified: false, url: "https://www.sonicweb-asp.jp/echizen2/map?theme=th_7&pos=136.168900%2C35.903600&scale=1000" });
+    for (const code of ["18205", "18207", "18208"]) expect(buildLinks(findMunicipality(code)!, 36, 136.3)[1].pinpoint, code).toBe(false);
+  });
+
+  it("福井市は特定行政庁で県の地図に載らない。若狭町は旧三方町が敦賀、旧上中町が小浜の土木事務所", () => {
+    const fukui = findMunicipality("18201")!;
+    expect(fukui.coverage).toBe("none");
+    expect(fukui.maps.some((l) => l.build && l.build(36, 136).includes("fukuidouro"))).toBe(false);
+    expect(resolveContact(fukui, "18201")!.phone).toBe("0776-20-5574");
+    expect(resolveContact(findMunicipality("18501")!, "18501")).toMatchObject({ phone: "0770-22-5486", note: expect.stringContaining("0770-56-5914") });
+    expect(MUNICIPALITIES.filter((x) => x.pref === "福井県" && x.coverage === "outside").map((x) => x.name)).toEqual(["池田町", "南越前町", "おおい町"]);
+    expect(MUNICIPALITIES.filter((x) => x.pref === "福井県")).toHaveLength(17);
+  });
+});
+
 describe("buildLinks", () => {
   it("wagmap は世界測地系の座標に gprj=2 を付ける（自治体ごとの測地系の違いを吸収）", () => {
     const [link] = buildLinks(findMunicipality("11202")!, KUMAGAYA_CITY_HALL.lat, KUMAGAYA_CITY_HALL.lng);
@@ -678,7 +716,7 @@ describe("lookup", () => {
     expect(r.status).toBe("unsupported");
   });
 
-  it("中部の市町村は対応（道路図は調査中）", async () => {
+  it("中部の市町村も対応（福井市は道路種別が非公開で、位置指定道路の一覧表と市道の地図）", async () => {
     stubFetch(
       [{ geometry: { coordinates: [136.2196, 36.0641] }, properties: { title: "福井県福井市大手三丁目" } }],
       { results: { muniCd: "18201", lv01Nm: "大手三丁目" } },
@@ -687,8 +725,8 @@ describe("lookup", () => {
     expect(r.status).toBe("ok");
     if (r.status === "ok") {
       expect(r.municipality.name).toBe("福井市");
-      expect(r.municipality.coverage).toBe("unknown");
-      expect(r.links).toEqual([]);
+      expect(r.municipality.coverage).toBe("none");
+      expect(r.links[0]).toMatchObject({ kind: "designated_only", pinpoint: false });
     }
   });
 

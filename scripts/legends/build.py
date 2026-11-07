@@ -131,6 +131,11 @@ def legend_of(host: str, slug: str, mid: str, extra: str) -> dict | None:
         return None
     if list(per_city) == [None]:
         legend = per_city[None]
+        # 土木事務所ごとのレイヤに同じ種別・同じ色が並ぶ地図（福井県の指定道路マップ「42条1項5号_福井」「42条1項5号_三国」…）は1つにまとめる。
+        # 全部の項目が「同じ種別_○○」で同じ色のときだけ（朝霞市の「1項5号_指定」「1項5号_廃止」のように種別の違う項目が混ざる凡例はそのまま）
+        bases = {re.sub(r"_[^_]+$", "", x["label"]) for x in legend}
+        if len(legend) > 1 and len(bases) == 1 and all("_" in x["label"] for x in legend) and len({x["color"] for x in legend}) == 1:
+            legend = [{"label": bases.pop(), "color": legend[0]["color"]}]
         # 「指定道路」1つだけのような、種別の分からない凡例は出さない（画像で配る地図）
         if len(legend) == 1 and legend[0]["label"] in ("建築基準法道路", "指定道路", "指定道路図"):
             return None

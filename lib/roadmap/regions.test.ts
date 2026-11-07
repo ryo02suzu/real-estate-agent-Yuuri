@@ -37,16 +37,18 @@ describe("対応している地方と都道府県", () => {
   });
 });
 
-describe("中部9県の市町村（福井県が調査中）", () => {
-  it("調査中は17市町。政令市は区のコードをまとめて1つ", () => {
-    expect(CHUBU_PENDING).toHaveLength(17);
+describe("中部9県の市町村（9県すべて調べ終えた）", () => {
+  const CHUBU = Object.values(REGIONS.chubu.prefs);
+
+  it("中部は316市町村（政令市は区のコードをまとめて1つ）で、調査中は残っていない", () => {
+    expect(CHUBU_PENDING).toHaveLength(0);
     const byPref: Record<string, number> = {};
-    for (const m of CHUBU_PENDING) byPref[m.pref] = (byPref[m.pref] ?? 0) + 1;
-    expect(byPref).toEqual({ 福井県: 17 });
+    for (const m of MUNICIPALITIES) if (CHUBU.includes(m.pref)) byPref[m.pref] = (byPref[m.pref] ?? 0) + 1;
+    expect(byPref).toEqual({ 静岡県: 35, 山梨県: 27, 長野県: 77, 愛知県: 54, 岐阜県: 42, 新潟県: 30, 富山県: 15, 石川県: 19, 福井県: 17 });
+    expect(MUNICIPALITIES.filter((m) => m.coverage === "unknown")).toEqual([]);
     expect(findMunicipality("23101")?.name).toBe("名古屋市");
-    expect(findMunicipality("22138")?.name).toBe("浜松市"); // 静岡県は調査済み（data/shizuoka.ts）
+    expect(findMunicipality("22138")?.name).toBe("浜松市");
     expect(findMunicipality("15108")?.codes).toHaveLength(8);
-    expect(CHUBU_PENDING.every((m) => m.coverage === "unknown" && m.maps.length === 0)).toBe(true);
   });
 
   it("コードは全体で重複せず、国土地理院の市区町村表にある", () => {
@@ -56,7 +58,7 @@ describe("中部9県の市町村（福井県が調査中）", () => {
       seen.add(c);
     }
     const table = Object.assign({}, ...Object.values(GSI_CODES as Record<string, Record<string, string>>)) as Record<string, string>;
-    for (const m of CHUBU_PENDING) for (const c of m.codes) expect(table[c], `${m.name} ${c}`).toBeDefined();
+    for (const m of MUNICIPALITIES) if (CHUBU.includes(m.pref)) for (const c of m.codes) expect(table[c], `${m.name} ${c}`).toBeDefined();
     // 区のある市は、市そのもののコード（22130 浜松市）を持たない（逆ジオコーダは区のコードを返す）
     expect(table["22130"]).toBeUndefined();
     expect(table["22138"]).toBe("浜松市 中央区");
