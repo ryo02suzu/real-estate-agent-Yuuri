@@ -3,26 +3,6 @@
 import type { Municipality } from "../municipalities";
 
 export const CHUBU_PENDING: Municipality[] = [
-  // 石川県（19）
-  { pref: "石川県", name: "金沢市", codes: ["17201"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "七尾市", codes: ["17202"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "小松市", codes: ["17203"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "輪島市", codes: ["17204"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "珠洲市", codes: ["17205"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "加賀市", codes: ["17206"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "羽咋市", codes: ["17207"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "かほく市", codes: ["17209"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "白山市", codes: ["17210"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "能美市", codes: ["17211"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "野々市市", codes: ["17212"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "川北町", codes: ["17324"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "津幡町", codes: ["17361"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "内灘町", codes: ["17365"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "志賀町", codes: ["17384"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "宝達志水町", codes: ["17386"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "中能登町", codes: ["17407"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "穴水町", codes: ["17461"], coverage: "unknown", maps: [] },
-  { pref: "石川県", name: "能登町", codes: ["17463"], coverage: "unknown", maps: [] },
   // 福井県（17）
   { pref: "福井県", name: "福井市", codes: ["18201"], coverage: "unknown", maps: [] },
   { pref: "福井県", name: "敦賀市", codes: ["18202"], coverage: "unknown", maps: [] },

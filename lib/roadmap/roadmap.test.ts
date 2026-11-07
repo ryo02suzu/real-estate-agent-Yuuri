@@ -34,6 +34,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("岐阜県の全市町村を網羅している", () => covered("岐阜県"));
   it("新潟県の全市町村を網羅している", () => covered("新潟県"));
   it("富山県の全市町村を網羅している", () => covered("富山県"));
+  it("石川県の全市町を網羅している", () => covered("石川県"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
@@ -53,6 +54,7 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
     岐阜県: ["058", "0572", "0573", "0574", "0575", "0576", "0577", "05769", "0581", "0584", "0585"],
     新潟県: ["025", "0250", "0254", "0255", "0256", "0257", "0258", "0259"],
     富山県: ["076", "0763", "0765", "0766"],
+    石川県: ["076", "0761", "0767", "0768"],
   };
   const contacts = MUNICIPALITIES.flatMap((m) =>
     [m.contact, ...Object.values(m.contactByCode ?? {})].filter((c) => c?.phone).map((c) => ({ m, phone: c!.phone! })),
@@ -131,6 +133,7 @@ describe("都市計画区域外（国交省 令和6年都市計画現況調査�
     "23561": "設楽町", "23562": "東栄町", "23563": "豊根村",
     "21504": "七宗町", "21506": "白川町", "21507": "東白川村", "21604": "白川村",
     "15405": "出雲崎町", "15482": "津南町", "15504": "刈羽村", "15581": "関川村", "15586": "粟島浦村",
+    "17386": "宝達志水町", "17407": "中能登町",
   };
 
   it("区域外の町村は「都市計画区域外」で、道路種別の地図を出さない", () => {
@@ -433,6 +436,51 @@ describe("富山県の道路図", () => {
   });
 });
 
+describe("石川県の道路図", () => {
+  it("金沢市はまちづくり支援情報システム（wagmap）の建築基準関係道路等情報。道路の相談は建築指導課 宅地係", () => {
+    const m = findMunicipality("17201")!;
+    expect(m.coverage).toBe("partial");
+    const links = buildLinks(m, 36.5613, 136.6562);
+    expect(links[0]).toMatchObject({ kind: "road_type", pinpoint: true, verified: true });
+    expect(links[0].url).toBe("https://www2.wagmap.jp/kanazawa-mss/Map?mid=10&mpx=136.656200&mpy=36.561300&mps=2500&gprj=2");
+    expect(links[0].legend?.map((x) => x.label)).toEqual(expect.arrayContaining(["市道", "位置指定道路", "42条1項4号道路"]));
+    expect(links[1]).toMatchObject({ kind: "public_road", url: "https://www2.wagmap.jp/kanazawa-mss/Map?mid=5&mpx=136.656200&mpy=36.561300&mps=2500&gprj=2" });
+    expect(resolveContact(m, "17201")!.phone).toBe("076-220-2329");
+  });
+
+  it("小松市・能美市は表示するレイヤ（mtl）を付けて、建築基準法の道路を最初から出す", () => {
+    const komatsu = findMunicipality("17203")!;
+    expect(komatsu.coverage).toBe("full");
+    const [k] = buildLinks(komatsu, 36.4027, 136.4524);
+    expect(k.url).toBe("https://www2.wagmap.jp/komatsu/Map?mid=2&mpx=136.452400&mpy=36.402700&mps=2500&gprj=2&mtl=204");
+    expect(k.legend?.map((x) => x.label)).toEqual(expect.arrayContaining(["第一号", "第五号", "法第86条第2項"]));
+    const nomi = findMunicipality("17211")!;
+    expect(nomi.coverage).toBe("partial");
+    const [n] = buildLinks(nomi, 36.4468, 136.5547);
+    expect(n.url).toBe("https://www2.wagmap.jp/nomi/Map?mid=5&mpx=136.554700&mpy=36.446800&mps=2500&gprj=2&mtl=49");
+    expect(n.legend?.map((x) => x.label)).toEqual(expect.arrayContaining(["1号市道", "2項道路"]));
+    expect(resolveContact(nomi, "17211")!.phone).toBe("0761-58-2251");
+  });
+
+  it("七尾・加賀・白山・野々市は道路種別が非公開。白山は wagmap、野々市は PDF、加賀は Sonicweb（未確認）の市道の地図", () => {
+    for (const code of ["17202", "17206", "17210", "17212"]) expect(findMunicipality(code)!.coverage).toBe("none");
+    expect(buildLinks(findMunicipality("17210")!, 36.5145, 136.5656)[0].url).toBe("https://www2.wagmap.jp/hakusan/Map?mid=3&mpx=136.565600&mpy=36.514500&mps=2500&gprj=2");
+    expect(buildLinks(findMunicipality("17212")!, 36.5195, 136.6097)[0].pinpoint).toBe(false);
+    expect(buildLinks(findMunicipality("17206")!, 36.3028, 136.3148)[0]).toMatchObject({ verified: false, url: "https://www.sonicweb-asp.jp/kaga/map?theme=th_29&pos=136.314800%2C36.302800&scale=1000" });
+    expect(resolveContact(findMunicipality("17202")!, "17202")!.phone).toBe("0767-53-8429");
+  });
+
+  it("県が扱う12市町は4土木事務所の建築課。宝達志水町・中能登町は都市計画区域外", () => {
+    expect(resolveContact(findMunicipality("17324")!, "17324")!.phone).toBe("0761-21-3333"); // 川北町 → 南加賀
+    expect(resolveContact(findMunicipality("17209")!, "17209")!.phone).toBe("076-289-4162"); // かほく市 → 津幡
+    expect(resolveContact(findMunicipality("17207")!, "17207")!.phone).toBe("0767-52-7604"); // 羽咋市 → 中能登
+    expect(resolveContact(findMunicipality("17205")!, "17205")!.phone).toBe("0768-26-2353"); // 珠洲市 → 奥能登
+    expect(buildLinks(findMunicipality("17204")!, 37.3906, 136.8992)[0].url).toBe("https://www.city.wajima.ishikawa.jp/docs/2024080100014/");
+    expect(MUNICIPALITIES.filter((x) => x.pref === "石川県" && x.coverage === "outside").map((x) => x.name)).toEqual(["宝達志水町", "中能登町"]);
+    expect(MUNICIPALITIES.filter((x) => x.pref === "石川県")).toHaveLength(19);
+  });
+});
+
 describe("buildLinks", () => {
   it("wagmap は世界測地系の座標に gprj=2 を付ける（自治体ごとの測地系の違いを吸収）", () => {
     const [link] = buildLinks(findMunicipality("11202")!, KUMAGAYA_CITY_HALL.lat, KUMAGAYA_CITY_HALL.lng);
@@ -632,13 +680,13 @@ describe("lookup", () => {
 
   it("中部の市町村は対応（道路図は調査中）", async () => {
     stubFetch(
-      [{ geometry: { coordinates: [136.6562, 36.5613] }, properties: { title: "石川県金沢市広坂" } }],
-      { results: { muniCd: "17201", lv01Nm: "広坂" } },
+      [{ geometry: { coordinates: [136.2196, 36.0641] }, properties: { title: "福井県福井市大手三丁目" } }],
+      { results: { muniCd: "18201", lv01Nm: "大手三丁目" } },
     );
-    const r = await lookup("石川県金沢市広坂1-1-1");
+    const r = await lookup("福井県福井市大手3-10-1");
     expect(r.status).toBe("ok");
     if (r.status === "ok") {
-      expect(r.municipality.name).toBe("金沢市");
+      expect(r.municipality.name).toBe("福井市");
       expect(r.municipality.coverage).toBe("unknown");
       expect(r.links).toEqual([]);
     }

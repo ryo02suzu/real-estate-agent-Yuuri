@@ -92,9 +92,15 @@ def hcodes(items):
 
 def legend_of(host: str, slug: str, mid: str, extra: str) -> dict | None:
     tree = layer_tree(host, slug, mid)
-    # 表示するレイヤ：URL の mcl で切り替えている地図はそのレイヤ、それ以外は最初から表示されているレイヤ
-    mcl = urllib.parse.unquote(urllib.parse.parse_qs(extra.lstrip("&")).get("mcl", [""])[0])
-    want = {int(x) for x in re.findall(r"(\d+),\d+,\d+,\d+", mcl)} if mcl else None
+    # 表示するレイヤ：URL の mcl・mtl で切り替えている地図はそのレイヤ、それ以外は最初から表示されているレイヤ
+    # （mcl は「レイヤ番号,…」の組を「;」で並べたもの、mtl はレイヤ番号を「,」で並べたもの。小松市・能美市は mtl で建築基準法の道路を出す）
+    qs = urllib.parse.parse_qs(extra.lstrip("&"))
+    mcl = urllib.parse.unquote(qs.get("mcl", [""])[0])
+    mtl = urllib.parse.unquote(qs.get("mtl", [""])[0])
+    want = {int(x) for x in re.findall(r"(\d+),\d+,\d+,\d+", mcl)} | {int(x) for x in re.findall(r"\d+", mtl)}
+    want = want or None
+    # 地図そのものが建築基準法の道路の地図（金沢市「建築基準関係道路等情報」など）なら、「国道」「県道」「市道」の線も凡例に入れる
+    road_map = bool(re.search(r"(建築基準|道路種別|指定道路)", norm(tree.get("lname"))))
     per_city: dict[str | None, list[dict]] = {}
 
     def walk(items):
@@ -102,6 +108,7 @@ def legend_of(host: str, slug: str, mid: str, extra: str) -> dict | None:
             if it.get("classname") == "lyr":
                 take = (it.get("id") in want) if want is not None else bool(it.get("inputtypechecked"))
                 lname = norm(it.get("lname"))
+                public = road_map and re.fullmatch(r"(国道|県道|都道|市道|町道|村道|区道)", lname) is not None
                 if take and not (NOT_ROAD.search(lname) and not ROADISH.search(lname)):
                     m = re.match(r"(.+?)_(.+[市町村区])$", lname)
                     city = m.group(2) if m else None
@@ -110,7 +117,7 @@ def legend_of(host: str, slug: str, mid: str, extra: str) -> dict | None:
                         label = norm(h.get("lname"))
                         if city:
                             label = re.sub(rf"_{re.escape(city)}$", "", label)
-                        if not label or "図郭" in label or not (ROADISH.search(label) or ROADISH.search(lname)):
+                        if not label or "図郭" in label or not (public or ROADISH.search(label) or ROADISH.search(lname)):
                             continue
                         color = icon_color(host, slug, h.get("icon") or "")
                         lst = per_city.setdefault(city, [])
