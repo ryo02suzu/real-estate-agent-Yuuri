@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SRC from "./data/station-source.json";
+import { REGIONS } from "./regions";
 import type { LngLat } from "./parcel";
 import { isCableOnly, lineLabel, nearbyStations, nearestStations, stationLine, walkDistances, walkMinutes, type Station } from "./walk";
 
@@ -98,8 +99,11 @@ describe("アプリに入っている駅のデータ", () => {
     for (const n of ["新宿", "横浜", "大宮", "千葉", "桐生", "西桐生"]) expect(by.get(n)?.e?.length, n).toBeGreaterThan(0);
     expect(by.get("新宿")!.k).toBe(1);
     expect(Math.max(...STATIONS.map((s) => s.e?.length ?? 0))).toBeLessThanOrEqual(16);
-    // ほとんどの駅に入口の点がある（無いのは関東の外の駅や、路面電車の停留場など）
-    expect(STATIONS.filter((s) => s.e?.length).length / STATIONS.length).toBeGreaterThan(0.8);
+    // 関東の範囲の駅は、ほとんどに入口の点がある（無いのは路面電車の停留場など）。中部の駅の入口の点の多さは確かめていないので、割合は関東の範囲で見る
+    const [[w, s0], [e, n0]] = REGIONS.kanto.bounds;
+    const kanto = STATIONS.filter((s) => s.p.some(([x, y]) => x >= w && x <= e && y >= s0 && y <= n0));
+    expect(kanto.length).toBeGreaterThan(2000);
+    expect(kanto.filter((s) => s.e?.length).length / kanto.length).toBeGreaterThan(0.8);
     expect(SRC.doorsDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 

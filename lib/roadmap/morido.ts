@@ -71,7 +71,7 @@ function tileOf(lat: number, lng: number, z: number): [number, number] {
 }
 
 /**
- * 地点の盛土規制法の区域。city は物件の市区町村コード（区域外のときの確かめ先）。関東1都6県の外は null。
+ * 地点の盛土規制法の区域。city は物件の市区町村コード（区域外のときの確かめ先）。データを取り込んである都道府県の外は null。
  * 区域の無い所にはタイルが無い（水戸市のように、データの時点でまだ区域を指定していない市など）
  */
 export async function moridoAt(lat: number, lng: number, city: string, source: MoridoSource): Promise<Morido | null> {

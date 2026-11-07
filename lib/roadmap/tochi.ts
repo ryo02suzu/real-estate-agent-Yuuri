@@ -66,7 +66,7 @@ export const TOCHI_YEAR = Math.max(...Object.values(REGION_SOURCES).flatMap((r) 
 /** 出典（CC BY 4.0 のとおり、加工したことを書く） */
 export const TOCHI_CREDIT = `出典：「国土数値情報（自然公園地域データ・農業地域データ・森林地域データ）」（国土交通省、https://nlftp.mlit.go.jp/ksj/）を加工して作成（${TOCHI_YEAR}年度）`;
 
-/** 地点の自然公園・農業振興地域・森林地域の区域（関東の外は null） */
+/** 地点の自然公園・農業振興地域・森林地域の区域（データを取り込んである地方の外は null） */
 export async function tochiAt(lat: number, lng: number, city: string, source: TochiSource): Promise<Tochi | null> {
   if (!PREFS.has(city.slice(0, 2))) return null;
   const areas = (await source.tile(...tileOf(lat, lng, TOCHI_ZOOM))) ?? [];
