@@ -11,6 +11,7 @@ import { DEALS_DATA, DEALS_NOTE } from "@/lib/roadmap/deals";
 import { HOSPITAL_SOURCE } from "@/lib/roadmap/facilities";
 import { LAND_PRICE_DATA } from "@/lib/roadmap/land-price-data";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
+import { AREA_LABEL } from "@/lib/roadmap/regions";
 import { POI_DATA } from "@/lib/roadmap/poi";
 import { SCHOOL_DATA } from "@/lib/roadmap/school-data";
 import { STATION_DATA } from "@/lib/roadmap/walk";
@@ -130,7 +131,7 @@ export function AppCitiesSheet({ open, onClose }: { open: boolean; onClose: () =
 export function AppSourcesSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const rows: [string, string][] = [
     ["住所検索・市区町村の判定", "国土地理院の住所検索 API（入れた住所と座標は、この API にだけ送られます。MICHILU のサーバーには送りません）"],
-    ["道路種別の地図・問い合わせ先", "関東1都6県の市区町村の公開ページ（毎週リンクを自動で確認）"],
+    ["道路種別の地図・問い合わせ先", `${AREA_LABEL}の市区町村の公開ページ（毎週リンクを自動で確認）`],
     ["用途地域など（都市計画）", `都市計画決定GISデータ（国土交通省）${ZONING_DATA.edition}`],
     ["地番・筆の形", `登記所備付地図データ（法務省）${PARCEL_DATA.edition}・市町村の地番参考図`],
     ["建物", `3D都市モデル PLATEAU（国土交通省）${BUILDING_DATA.edition ?? ""}`],

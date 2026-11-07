@@ -5,6 +5,7 @@
 import { ArrowLeft, ChevronRight, Map as MapIcon, MapPin, Search, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import type { LookupResult } from "@/lib/roadmap";
+import { AREA_LABEL } from "@/lib/roadmap/regions";
 import { CARD, HEAD, LIGHT, Note, Primary, shortAddress, TEXT } from "./r-ui";
 import { TileMap } from "./tile-map";
 import { NAVY } from "./ui";
@@ -109,7 +110,7 @@ export function NotOkPage({ query, result, onPick, onMap, onBack, backLabel, ban
           </TileMap>
         </div>
         <div className="mt-[10px]">
-          <Empty icon={<Search size={28} strokeWidth={1.6} absoluteStrokeWidth color="#9fb0c8" />} title={`${city || "この市町村"}はまだ未対応です`} body="MICHILUは関東1都6県の市区町村に対応しています。市町村の公式サイトで「指定道路図」や「道路種別」を探してください。">
+          <Empty icon={<Search size={28} strokeWidth={1.6} absoluteStrokeWidth color="#9fb0c8" />} title={`${city || "この市町村"}はまだ未対応です`} body={`MICHILUは${AREA_LABEL}の市区町村に対応しています。市町村の公式サイトで「指定道路図」や「道路種別」を探してください。`}>
             <Primary href={`https://www.google.com/search?q=${encodeURIComponent(`${city} 建築基準法 道路種別`)}`} icon={<Search size={17} strokeWidth={2} absoluteStrokeWidth />}>
               Googleで探す
             </Primary>

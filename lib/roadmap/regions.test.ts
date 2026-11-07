@@ -11,7 +11,7 @@ describe("対応している地方と都道府県", () => {
     expect(Object.keys(REGIONS.chubu.prefs)).toHaveLength(9);
     expect(Object.keys(PREF_NAMES)).toHaveLength(16);
     expect(PREF_NAMES["22"]).toBe("静岡県");
-    expect(AREA_LABEL).toBe("関東7都県・中部9県");
+    expect(AREA_LABEL).toBe("関東1都6県・中部9県");
   });
 
   it("コードから地方を引く", () => {

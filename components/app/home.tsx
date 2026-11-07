@@ -14,6 +14,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type R
 import { monthDay, placeParts } from "@/lib/app/scene";
 import { homePart, type HomePart } from "@/lib/app/sun";
 import { MUNICIPALITIES } from "@/lib/roadmap";
+import { AREA_LABEL } from "@/lib/roadmap/regions";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import type { Resume } from "@/lib/resume";
 import { Sheet } from "../sheet";
@@ -469,7 +470,7 @@ export function HomeMenu({
     {
       title: "データ",
       items: [
-        { Icon: MapPin, title: "対応している市区町村", sub: "関東1都6県", right: String(MUNICIPALITIES.length), run: onCities },
+        { Icon: MapPin, title: "対応している市区町村", sub: AREA_LABEL, right: String(MUNICIPALITIES.length), run: onCities },
         { Icon: Database, title: "データの出典と時点", sub: "国・自治体の公開データ", run: onSources },
         { Icon: Download, title: "調査記録の書き出し・読み込み", sub: "機種変更・データ消失への備え", run: onStorage },
         ...(onSender ? [{ Icon: Building2, title: "書類の差出人", sub: "照会文・調査メモ・案内図に入れる会社名・担当者", run: onSender }] : []),

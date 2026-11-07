@@ -8,6 +8,7 @@
 import { Bell, Building2, ChevronRight, CircleHelp, Database, Download, Info, LoaderCircle, LogIn, MapPin, Smartphone, Star, TriangleAlert, type LucideIcon } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { MUNICIPALITIES } from "@/lib/roadmap";
+import { AREA_LABEL } from "@/lib/roadmap/regions";
 import { hasSender, senderShort, useSender } from "@/lib/sender";
 import { AURORA, DARK_GLASS, GLOW, PAGE } from "./home";
 import { ClockBack } from "./icons";
@@ -195,7 +196,7 @@ export function AccountPage({
         <Head title="使い方・データ・アプリ" className="mt-[10px]" />
         <div className={`overflow-hidden ${CARD}`}>
           <Row icon={icon(CircleHelp)} title="使い方" sub="住所・地番・地図で調べて、市の地図を開くまで" minH={52} onClick={onHelp} />
-          <Row icon={icon(MapPin)} title="対応している市区町村" right={`${MUNICIPALITIES.length}`} rightColor={LIGHT} sub="関東1都6県" minH={52} onClick={onCities} />
+          <Row icon={icon(MapPin)} title="対応している市区町村" right={`${MUNICIPALITIES.length}`} rightColor={LIGHT} sub={AREA_LABEL} minH={52} onClick={onCities} />
           <Row icon={icon(Database)} title="データの出典と時点" sub="国・自治体の公開データ" minH={52} onClick={onSources} />
           <Row
             icon={

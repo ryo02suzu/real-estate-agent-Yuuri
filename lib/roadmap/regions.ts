@@ -45,4 +45,5 @@ export const SUPPORTED_BOUNDS: [[number, number], [number, number]] = REGION_ORD
 );
 
 /** 「関東1都6県・中部9県」のような対応エリアの言い方 */
-export const AREA_LABEL = REGION_ORDER.map((k) => `${REGIONS[k].name}${Object.keys(REGIONS[k].prefs).length}${k === "kanto" ? "都県" : "県"}`).join("・");
+// 例「関東1都6県・中部9県」（関東は東京都を含むので「1都6県」と書く）
+export const AREA_LABEL = REGION_ORDER.map((k) => `${REGIONS[k].name}${k === "kanto" ? "1都6県" : `${Object.keys(REGIONS[k].prefs).length}県`}`).join("・");
