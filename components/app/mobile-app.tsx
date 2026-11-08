@@ -1601,7 +1601,7 @@ function PropertyView({
   const root = useRef<HTMLDivElement>(null);
   useShrink(root, 140);
   const screenH = useScreenHeight(root);
-  // 見出し（街の模型が見える所）の高さ：画面の 60%（背の低い画面でも 330pt）
+  // 見出しの最小の高さ。文字が大きい・住所が長いときは内容に合わせて伸ばし、地図の操作や出典と重ねない。
   const heroH = Math.round(Math.max(330, (screenH ?? 760) * 0.6));
   const heroBox = useRef<HTMLDivElement>(null);
   /** 右下の「大きく見る」と出典（模型の札をここに重ねない） */
@@ -2218,8 +2218,8 @@ function PropertyView({
       {/* 見出し（街の模型が見える所）。指で横になぞると模型が回る */}
       <div
         ref={heroBox}
-        className="pv-hero relative select-none"
-        style={{ height: heroH, touchAction: "pan-y" }}
+        className="pv-hero relative flex select-none flex-col"
+        style={{ minHeight: heroH, touchAction: "pan-y" }}
         onPointerDown={onHeroPointer}
         onPointerMove={onHeroPointer}
         onPointerUp={onHeroPointer}
@@ -2286,7 +2286,7 @@ function PropertyView({
           textRef={textRef}
         />
         {/* 右下：街の模型を大きく見る（模型が出せない端末は、平らな地図を大きく）と、その下に出典。ボタンは出典の枠の上に積むので重ならない */}
-        <div className="pointer-events-none absolute bottom-[10px] right-[12px] z-[3] flex flex-col items-end gap-[7px]">
+        <div className="pv-map-tools pointer-events-none relative z-[3] mt-auto flex flex-col items-end gap-[7px] px-[12px] pb-[10px] pt-[24px]">
           <button
             ref={bigBtn}
             onClick={has3d ? enterBig : () => setFull({})}
@@ -2321,14 +2321,13 @@ function PropertyView({
             ))}
           </p>
         </div>
-        {rotHint && (
-          <div className="pv-rothint pointer-events-none absolute bottom-[44px] left-[14px] z-[3] flex">
-            <span className="flex items-center gap-[7px] rounded-full px-[14px] py-[8px] font-semibold text-white" style={{ background: "rgba(10,16,30,0.62)", border: "1px solid rgba(255,255,255,0.2)", fontSize: 12.5 }}>
-              <Hand size={16} strokeWidth={2} absoluteStrokeWidth className="pv-rothand" />
-              横になぞると回せます
-            </span>
-          </div>
-        )}
+        {/* ヒントの出入りで、読んでいるタブの位置を動かさない。非表示の間も場所を保つ */}
+        <div aria-hidden={!rotHint} className={`pv-rothint pointer-events-none relative z-[3] mx-[14px] mb-[10px] flex ${rotHint ? "" : "invisible"}`}>
+          <span className="flex items-center gap-[7px] rounded-full px-[14px] py-[8px] font-semibold text-white" style={{ background: "rgba(10,16,30,0.62)", border: "1px solid rgba(255,255,255,0.2)", fontSize: 12.5 }}>
+            <Hand size={16} strokeWidth={2} absoluteStrokeWidth className="pv-rothand" />
+            横になぞると回せます
+          </span>
+        </div>
       </div>
 
       {/* すりガラスのシート（タブの切り替えと中身） */}
