@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Jost, Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
+// PC の「調査デスク」の見た目（.desk の中だけに効く。components/desktop-shell.tsx）
+import "./desk.css";
 import { LAUNCH_CITY_SCRIPT } from "@/components/app/launch-city-script";
 import { LAUNCH_SCRIPT } from "@/components/app/launch-script";
 import { APP_ZOOM_SCRIPT } from "@/components/app/zoom";

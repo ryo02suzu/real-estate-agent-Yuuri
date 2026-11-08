@@ -105,7 +105,8 @@ function TidyDraftBody({ sections }: { sections: DraftSection[] }) {
   );
 }
 
-function DraftBody({ sections }: { sections: DraftSection[] }) {
+/** 下書きの中身（欄のタブ・欄ごと・全部のコピー）。PC の調査デスクの書類の画面からも使う */
+export function DraftBody({ sections }: { sections: DraftSection[] }) {
   const [tab, setTab] = useState(0);
   const all = useCopy();
   const part = useCopy();

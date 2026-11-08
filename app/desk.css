@@ -1,0 +1,1838 @@
+/*
+ * PC の「調査デスク」（components/desktop-shell.tsx・components/desk/*）。横幅 1024px 以上だけで出す画面で、どれも .desk の中だけに効く
+ * （スマホの画面 components/app には効かない）。
+ * 並び：全面に地図か 3D（.desk-stage）、その上に上の帯・左の細い列・真ん中（重ねて開く画面）・右のカルテ（.desk-ui の格子）。
+ * 色はクリームの板に金色。見た目の設定（明るい・暗い・端末に合わせる）は .desk の data-theme。動きを減らす設定では動かさない
+ */
+.desk {
+  --bg: #ece6dc;
+  --panel: rgba(255, 251, 245, 0.86);
+  --panel-strong: rgba(255, 251, 245, 0.97);
+  --panel-solid: #fffbf5;
+  --ink: #1f1a14;
+  --muted: #625849;
+  --line: rgba(31, 26, 20, 0.12);
+  --line-strong: rgba(31, 26, 20, 0.24);
+  --gold: #b88a4d;
+  --gold-2: #e3c79a;
+  --gold-3: #7d5a28;
+  --gold-soft: rgba(184, 138, 77, 0.15);
+  --gold-grad: linear-gradient(145deg, #a8834a 0%, #8a6632 55%, #6f5126 100%);
+  --warn: #a3351f;
+  --warn-soft: rgba(184, 67, 47, 0.1);
+  --ok: #24704a;
+  --ok-soft: rgba(46, 125, 79, 0.1);
+  --info: #24569c;
+  --info-soft: rgba(43, 95, 168, 0.1);
+  --shadow: 0 18px 50px rgba(40, 30, 10, 0.18);
+  --shadow-sm: 0 4px 14px rgba(40, 30, 10, 0.1);
+  --r-lg: 18px;
+  --r-md: 12px;
+  --r-sm: 9px;
+  --rail-w: 76px;
+  --karte-w: 456px;
+  --gap: 12px;
+  --pad-x: 16px;
+  --top-h: 56px;
+  --font-ui: var(--font-noto-sans-jp), "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  --font-num: var(--font-jost), var(--font-noto-sans-jp), sans-serif;
+  color-scheme: light;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.6;
+}
+@media (max-width: 1199px) {
+  .desk {
+    --karte-w: 420px;
+  }
+}
+.desk[data-theme="dark"] {
+  --bg: #15171f;
+  --panel: rgba(24, 26, 35, 0.84);
+  --panel-strong: rgba(24, 26, 35, 0.96);
+  --panel-solid: #1b1e28;
+  --ink: #f3ede4;
+  --muted: #b3aa9d;
+  --line: rgba(243, 237, 228, 0.14);
+  --line-strong: rgba(243, 237, 228, 0.28);
+  --gold: #d2a86a;
+  --gold-2: #e9d2a8;
+  --gold-3: #e3c08a;
+  --gold-soft: rgba(210, 168, 106, 0.18);
+  --warn: #f08a75;
+  --warn-soft: rgba(240, 138, 117, 0.14);
+  --ok: #72cf98;
+  --ok-soft: rgba(114, 207, 152, 0.13);
+  --info: #94b6ee;
+  --info-soft: rgba(148, 182, 238, 0.14);
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  .desk[data-theme="auto"] {
+    --bg: #15171f;
+    --panel: rgba(24, 26, 35, 0.84);
+    --panel-strong: rgba(24, 26, 35, 0.96);
+    --panel-solid: #1b1e28;
+    --ink: #f3ede4;
+    --muted: #b3aa9d;
+    --line: rgba(243, 237, 228, 0.14);
+    --line-strong: rgba(243, 237, 228, 0.28);
+    --gold: #d2a86a;
+    --gold-2: #e9d2a8;
+    --gold-3: #e3c08a;
+    --gold-soft: rgba(210, 168, 106, 0.18);
+    --warn: #f08a75;
+    --warn-soft: rgba(240, 138, 117, 0.14);
+    --ok: #72cf98;
+    --ok-soft: rgba(114, 207, 152, 0.13);
+    --info: #94b6ee;
+    --info-soft: rgba(148, 182, 238, 0.14);
+    --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+    --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.35);
+    color-scheme: dark;
+  }
+}
+.desk *,
+.desk *::before,
+.desk *::after {
+  box-sizing: border-box;
+}
+.desk button,
+.desk input,
+.desk select,
+.desk textarea {
+  font: inherit;
+  color: inherit;
+}
+.desk a {
+  color: var(--gold-3);
+}
+.desk :focus-visible {
+  outline: 2px solid var(--gold-3);
+  outline-offset: 2px;
+}
+.desk .num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+.desk .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+/* ---- 板（すりガラス） */
+.desk .glass {
+  background: var(--panel);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+}
+
+/* ---- ボタン */
+.desk .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-strong);
+  border-radius: var(--r-sm);
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-decoration: none;
+  color: var(--ink);
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    transform 0.08s;
+}
+.desk .btn:hover {
+  border-color: var(--gold);
+  background: linear-gradient(var(--gold-soft), var(--gold-soft)), var(--panel-strong);
+}
+.desk .btn:active {
+  transform: translateY(1px);
+}
+.desk .btn.primary {
+  background: var(--gold-grad);
+  color: #fff;
+  border-color: transparent;
+  font-weight: 600;
+}
+.desk .btn.primary:hover {
+  filter: brightness(1.07);
+  background: var(--gold-grad);
+}
+.desk .btn.ghost {
+  background: transparent;
+  border-color: transparent;
+}
+.desk .btn.ghost:hover {
+  background: var(--gold-soft);
+}
+.desk .btn.icon {
+  padding: 0;
+  width: 34px;
+  height: 34px;
+}
+.desk .btn[aria-pressed="true"] {
+  border-color: var(--gold);
+  background: linear-gradient(var(--gold-soft), var(--gold-soft)), var(--panel-strong);
+  color: var(--gold-3);
+  font-weight: 600;
+}
+.desk .btn:disabled,
+.desk .btn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.desk .btn.small {
+  min-height: 28px;
+  padding: 3px 10px;
+  font-size: 12.5px;
+}
+.desk .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 1px 9px;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.desk .chip.warn {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+  background: var(--warn-soft);
+}
+.desk .chip.ok {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+  background: var(--ok-soft);
+}
+.desk .chip.info {
+  color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 45%, transparent);
+  background: var(--info-soft);
+}
+.desk .chip.gold {
+  color: var(--gold-3);
+  border-color: color-mix(in srgb, var(--gold) 55%, transparent);
+  background: var(--gold-soft);
+}
+.desk .kbd {
+  font-family: var(--font-num);
+  font-size: 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  padding: 0 5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.desk .hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+.desk .seg {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 3px;
+  background: var(--panel-strong);
+}
+.desk .seg button {
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 3px 11px;
+  min-height: 26px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.desk .seg button:hover {
+  color: var(--ink);
+}
+.desk .seg button[aria-pressed="true"],
+.desk .seg button[aria-checked="true"],
+.desk .seg button[aria-selected="true"] {
+  background: var(--ink);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+/* ---- 並び */
+.desk-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.desk-stage .desk-layer {
+  position: absolute;
+  inset: 0;
+}
+.desk-stage .desk-layer[hidden] {
+  display: block !important;
+  visibility: hidden;
+  pointer-events: none;
+}
+.desk-ui {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  display: grid;
+  grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--karte-w);
+  grid-template-rows: var(--top-h) minmax(0, 1fr);
+  gap: var(--gap);
+  padding: 12px var(--pad-x);
+}
+.desk-ui > * {
+  pointer-events: auto;
+}
+.desk-topbar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+.desk-rail {
+  grid-column: 1;
+  grid-row: 2;
+}
+.desk-center {
+  grid-column: 2;
+  grid-row: 2;
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  pointer-events: none !important;
+}
+.desk-center > * {
+  pointer-events: auto;
+}
+.desk-karte {
+  grid-column: 3;
+  grid-row: 2;
+}
+.desk:not([data-karte="1"]) .desk-center,
+.desk[data-ovwide="1"] .desk-center {
+  grid-column: 2 / -1;
+}
+.desk[data-ovwide="1"] .desk-karte {
+  visibility: hidden;
+  opacity: 0;
+}
+.desk[data-wide="1"] .desk-rail,
+.desk[data-wide="1"] .desk-karte {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+.desk[data-wide="1"] .desk-center {
+  grid-column: 1 / -1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .desk:not([data-motion="off"]) .desk-karte,
+  .desk:not([data-motion="off"]) .desk-rail {
+    transition:
+      opacity 0.3s,
+      visibility 0.3s;
+  }
+}
+
+/* ---- 上の帯 */
+.desk-topbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 10px 0 14px;
+  min-width: 0;
+}
+.desk-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px 6px 4px 2px;
+  border-radius: 10px;
+  flex: none;
+}
+.desk-brand:hover {
+  background: var(--gold-soft);
+}
+/* ロゴの字は板の字の色に（暗い見た目でも読めるように） */
+.desk .desk-brand > span {
+  color: var(--ink);
+}
+.desk-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 360px;
+  max-width: 680px;
+  min-width: 260px;
+  height: 40px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-strong);
+  background: var(--panel-strong);
+  padding: 0 4px 0 12px;
+  margin-inline: auto;
+}
+.desk-search:focus-within {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(184, 138, 77, 0.24);
+}
+.desk-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 15px;
+  color: var(--ink);
+}
+.desk-search input::placeholder {
+  color: var(--muted);
+  opacity: 0.85;
+}
+.desk-search .go {
+  height: 32px;
+  min-height: 32px;
+}
+.desk-topright {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+@media (max-width: 1279px) {
+  .desk-topright .wide-only {
+    display: none;
+  }
+}
+
+/* ---- 左の細い列 */
+.desk-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0;
+  min-height: 0;
+  position: relative;
+  /* 札（押せる所の名前）を、重ねて開く画面より上に出す */
+  z-index: 6;
+}
+.desk-rail .tab {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--muted);
+  position: relative;
+  flex: none;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.desk-rail .tab:hover,
+.desk-rail .tab:focus-visible {
+  background: var(--gold-soft);
+  color: var(--ink);
+}
+.desk-rail .tab[aria-current="true"],
+.desk-rail .tab[aria-pressed="true"] {
+  background: var(--gold-soft);
+  color: var(--gold-3);
+  border-color: color-mix(in srgb, var(--gold) 55%, transparent);
+}
+.desk-rail .tab:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.desk-rail .badge {
+  position: absolute;
+  right: 1px;
+  top: 1px;
+  min-width: 17px;
+  height: 17px;
+  border-radius: 9px;
+  background: var(--gold-3);
+  color: #fff;
+  font-size: 10.5px;
+  font-family: var(--font-num);
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+  line-height: 1;
+}
+.desk-rail .tip {
+  position: absolute;
+  left: 58px;
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  white-space: nowrap;
+  font-size: 12px;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 4px 9px;
+  border-radius: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
+  z-index: 5;
+}
+.desk-rail .tab:hover .tip,
+.desk-rail .tab:focus-visible .tip {
+  opacity: 1;
+  transform: translateY(-50%);
+}
+.desk-rail .sep {
+  width: 28px;
+  height: 1px;
+  background: var(--line);
+  margin: 2px 0;
+  flex: none;
+}
+.desk-rail .spacer {
+  flex: 1;
+}
+.desk-rail .prop {
+  width: 62px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  padding: 5px 2px 4px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--muted);
+  overflow: hidden;
+  flex: none;
+}
+.desk-rail .prop b {
+  display: block;
+  font-family: var(--font-num);
+  font-size: 11.5px;
+  color: var(--ink);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.desk-rail .prop span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.desk-rail .prop:hover {
+  border-color: var(--gold);
+}
+.desk-rail .prop[aria-current="true"] {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(184, 138, 77, 0.28);
+}
+
+/* ---- 真ん中：地図／3D の切り替え・層・操作 */
+.desk-modebar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  z-index: 2;
+}
+.desk-modebar .seg {
+  box-shadow: var(--shadow-sm);
+}
+.desk-layers {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  z-index: 2;
+}
+.desk-layers .btn {
+  justify-content: flex-start;
+  box-shadow: var(--shadow-sm);
+}
+.desk-layers .btn i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--muted);
+  opacity: 0.45;
+  flex: none;
+}
+.desk-layers .btn[aria-pressed="true"] i {
+  background: var(--gold);
+  opacity: 1;
+}
+.desk-ctl {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 2;
+}
+.desk-ctl .btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  box-shadow: var(--shadow-sm);
+}
+.desk-hints {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.desk-hints span {
+  font-size: 11.5px;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 9px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.desk-foot {
+  position: absolute;
+  left: 0;
+  right: 52px;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  z-index: 2;
+  pointer-events: none;
+}
+.desk-foot > * {
+  pointer-events: auto;
+}
+.desk-credits {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 100%;
+}
+/* 重ねる画面を開いている間：3D の操作は隠し、画面は出典の上で止める（Google のロゴと出典・模型の出典は、いつも見える所に） */
+.desk[data-ov="1"] .desk-hints,
+.desk[data-ov="1"] .desk-ctl,
+.desk[data-ov="1"] .desk-layers {
+  visibility: hidden;
+}
+.desk[data-view="3d"] .desk-ov {
+  bottom: calc(var(--desk-credit-h, 0px) + 8px);
+}
+/* Google の 3D の出典（ロゴと、いま見えているタイルの出典）。いつも出し、ほかの物に重ねない */
+.desk-gcredit {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: 100%;
+  padding: 0 0 2px;
+}
+.desk-gcredit img {
+  display: block;
+  flex: none;
+}
+.desk-gcredit span {
+  font-size: 11px;
+  line-height: 1.35;
+  color: #fff;
+  text-shadow:
+    0 0 2px rgba(0, 0, 0, 0.85),
+    0 0 6px rgba(0, 0, 0, 0.5);
+  min-width: 0;
+}
+.desk-credit {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 3px 9px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  max-width: 560px;
+}
+.desk-note {
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 6px 12px;
+  box-shadow: var(--shadow-sm);
+  max-width: 460px;
+}
+.desk-3d {
+  background: linear-gradient(180deg, var(--sky-top, #6ea1e8) 0%, var(--sky-horizon, #e3edf6) 62%, var(--sky-horizon, #e3edf6) 100%);
+  transition: background 1s ease;
+}
+.desk-3d-host,
+.desk-3d-labels {
+  position: absolute;
+  inset: 0;
+}
+.desk-3d-labels {
+  pointer-events: none;
+  overflow: hidden;
+}
+.desk-3d-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.3;
+  color: #1f1a14;
+  background: rgba(255, 251, 245, 0.95);
+  border: 1px solid rgba(31, 26, 20, 0.14);
+  border-left: 3px solid var(--dot, #b88a4d);
+  border-radius: 9px;
+  padding: 3px 9px;
+  box-shadow: 0 4px 12px rgba(40, 30, 10, 0.18);
+  transition: opacity 0.2s;
+  will-change: transform;
+}
+.desk-3d-label b {
+  font-family: var(--font-num);
+  font-weight: 600;
+  font-size: 13px;
+}
+.desk-3d-label span {
+  font-size: 11px;
+  color: #625849;
+}
+.desk-3d-label.is-lot {
+  border: 1px solid #b88a4d;
+  border-left-width: 1px;
+  background: rgba(255, 251, 245, 0.98);
+}
+
+/* LiveMap の道具（地図のとき）をデスクの部品に。地図はカルテ・左の列の下まで広がるので、MapLibre の道具を見える所へ寄せる */
+.desk .desk-map-tools {
+  top: var(--desk-top, 80px) !important;
+  right: var(--desk-right, 16px) !important;
+  max-height: calc(100% - var(--desk-top, 80px) - 120px);
+}
+.desk .desk-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 5px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--panel-strong);
+  color: var(--ink);
+  font-size: 12.5px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+}
+.desk .desk-tool:hover {
+  border-color: var(--gold);
+}
+.desk .desk-tool svg {
+  color: var(--gold-3);
+}
+.desk .desk-tool.is-on {
+  border-color: var(--gold);
+  background: linear-gradient(var(--gold-soft), var(--gold-soft)), var(--panel-strong);
+  color: var(--gold-3);
+  font-weight: 600;
+}
+.desk .desk-seg {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 3px;
+  background: var(--panel-strong);
+  box-shadow: var(--shadow-sm);
+}
+.desk .desk-seg button {
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 3px 11px;
+  min-height: 26px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.desk .desk-seg button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--bg);
+  font-weight: 600;
+}
+.desk .desk-menu {
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  padding: 4px;
+  background: var(--panel-strong);
+  box-shadow: var(--shadow-sm);
+}
+.desk .desk-menu button {
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 3px 10px;
+  min-height: 26px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ink);
+}
+.desk .desk-menu button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--bg);
+}
+.desk .desk-menu button.is-off {
+  color: var(--muted);
+}
+.desk .desk-stage .maplibregl-ctrl-bottom-right {
+  right: var(--desk-right, 16px);
+  bottom: 12px;
+}
+/* 地図の出典は、左の列やカルテの下にもぐらないよう、見えている所の幅に収める（消したり隠したりはしない） */
+.desk .desk-stage .maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib {
+  /* 余白（左 8px・右 28px）と外の空き 10px の分も引く */
+  max-width: calc(100vw - var(--desk-left, 16px) - var(--desk-right, 16px) - 52px);
+}
+.desk .desk-stage .maplibregl-ctrl-bottom-left {
+  left: var(--desk-left, 16px);
+}
+.desk .desk-stage .maplibregl-ctrl-top-left {
+  left: var(--desk-left, 16px);
+  top: var(--desk-top, 80px);
+}
+.desk .desk-place {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: #1f1a14;
+  background: rgba(255, 251, 245, 0.96);
+  border: 1px solid rgba(31, 26, 20, 0.16);
+  border-left: 3px solid #2b5fa8;
+  border-radius: 8px;
+  padding: 2px 8px;
+  box-shadow: 0 3px 10px rgba(40, 30, 10, 0.18);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.desk .desk-place.is-school {
+  border-left-color: #2e7d4f;
+}
+.desk .desk-place.is-poi {
+  border-left-color: #b88a4d;
+}
+.desk .desk-place b {
+  font-weight: 600;
+}
+.desk .desk-place span {
+  font-size: 10.5px;
+  color: #625849;
+}
+
+/* ---- ホーム（物件を調べる前の真ん中のカード） */
+.desk-welcome {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  width: min(640px, 100% - 24px);
+  max-height: calc(100% - 24px);
+  overflow: auto;
+  padding: 30px 34px 24px;
+  text-align: center;
+}
+.desk-welcome h1 {
+  font-size: 26px;
+  line-height: 1.45;
+  margin: 0 0 8px;
+  font-weight: 700;
+  text-wrap: balance;
+  letter-spacing: 0.01em;
+}
+.desk-welcome p {
+  margin: 0;
+  color: var(--muted);
+}
+.desk-welcome .ex {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+.desk-welcome .stats {
+  display: flex;
+  justify-content: center;
+  gap: 22px;
+  margin: 18px 0 0;
+}
+.desk-welcome .stats div {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.desk-welcome .stats dd {
+  margin: 0;
+  font-family: var(--font-num);
+  font-weight: 500;
+  font-size: 20px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.desk-welcome .stats dd.small {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 600;
+}
+.desk-welcome .recent {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.desk-card {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  width: min(560px, 100% - 24px);
+  max-height: calc(100% - 24px);
+  overflow: auto;
+  padding: 16px;
+}
+.desk-banner {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: min(560px, 100% - 24px);
+  padding: 9px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  box-shadow: var(--shadow-sm);
+}
+.desk-banner.is-error {
+  background: #fdf1ec;
+  color: #8a3a26;
+  border: 1px solid rgba(184, 67, 47, 0.3);
+}
+.desk-banner.is-busy {
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+}
+
+/* ---- 重ねて開く画面（下の地図・3D が字に透けないよう、板は濃いめ） */
+.desk .desk-ov.glass {
+  background: var(--panel-strong);
+}
+.desk-ov {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 5;
+}
+.desk-ov.narrow {
+  left: 50%;
+  right: auto;
+  width: min(760px, 100%);
+  transform: translateX(-50%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .desk:not([data-motion="off"]) .desk-ov {
+    animation: desk-ov-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .desk:not([data-motion="off"]) .desk-ov.narrow {
+    animation-name: desk-ov-in-narrow;
+  }
+}
+@keyframes desk-ov-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.995);
+  }
+}
+@keyframes desk-ov-in-narrow {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px) scale(0.995);
+  }
+}
+.desk-ov-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px 12px 18px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.desk-ov-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.desk-ov-head .hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.desk-ov-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 18px 18px;
+}
+.desk-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel-strong);
+  transition: border-color 0.15s;
+}
+.desk-row:hover {
+  border-color: var(--gold);
+}
+.desk-row .big {
+  font-family: var(--font-num);
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  min-width: 100px;
+  font-variant-numeric: tabular-nums;
+}
+.desk-row .meta {
+  font-size: 12.5px;
+  color: var(--muted);
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.desk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.desk-datehead {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  margin: 12px 0 4px;
+}
+.desk-datehead:first-child {
+  margin-top: 0;
+}
+.desk-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.desk-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 220px;
+  height: 36px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-strong);
+  background: var(--panel-strong);
+  padding: 0 10px;
+}
+.desk-filter:focus-within {
+  border-color: var(--gold);
+}
+.desk-filter input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+.desk-empty {
+  text-align: center;
+  padding: 44px 20px;
+  color: var(--muted);
+}
+.desk-empty b {
+  display: block;
+  color: var(--ink);
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+.desk-two {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
+}
+.desk-two .side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+  min-height: 0;
+}
+.desk-two .side .btn {
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+  min-height: 38px;
+}
+.desk-two .side .btn small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.desk-two .side .btn[aria-pressed="true"] small {
+  color: var(--gold-3);
+}
+.desk-two .main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel-strong);
+  overflow: hidden;
+}
+.desk-two .main .mh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+  flex: none;
+}
+.desk-two .main .mb {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 18px;
+}
+/* 今までの部品（白い札・紺の書類の見せ方）は、白い紙の上に置く（暗い見た目のときも読めるように） */
+.desk .paper {
+  background: #fffdf9;
+  color: #242e37;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(31, 26, 20, 0.1);
+  padding: 14px 16px;
+  color-scheme: light;
+}
+.desk .paper a {
+  color: #8a6632;
+}
+.desk-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.desk-step {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel-strong);
+  padding: 14px;
+}
+.desk-step .no {
+  font-family: var(--font-num);
+  color: var(--gold-3);
+  font-size: 22px;
+  font-weight: 500;
+}
+.desk-step b {
+  display: block;
+  margin: 4px 0 6px;
+}
+.desk-areas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.desk-areas button {
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 9px 12px;
+  background: var(--panel-strong);
+  cursor: pointer;
+}
+.desk-areas button:hover {
+  border-color: var(--gold);
+}
+.desk-areas button[aria-pressed="true"] {
+  border-color: var(--gold);
+  background: linear-gradient(var(--gold-soft), var(--gold-soft)), var(--panel-strong);
+}
+.desk-areas b {
+  display: block;
+}
+.desk-areas span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.desk-setrow {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 10px 16px;
+  align-items: start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.desk-setrow .k {
+  font-weight: 600;
+}
+.desk-setrow .d {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.desk-opt {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.desk-opt label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  background: var(--panel-strong);
+}
+.desk-opt label:has(input:checked) {
+  border-color: var(--gold);
+  background: linear-gradient(var(--gold-soft), var(--gold-soft)), var(--panel-strong);
+  color: var(--gold-3);
+  font-weight: 600;
+}
+.desk-opt label:has(input:focus-visible) {
+  outline: 2px solid var(--gold-3);
+  outline-offset: 2px;
+}
+.desk-opt input {
+  accent-color: var(--gold-3);
+}
+.desk-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel-strong);
+}
+.desk-check input {
+  margin-top: 4px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gold-3);
+  flex: none;
+}
+.desk-check.done .t {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.desk-issue {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel-strong);
+}
+.desk-board {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13.5px;
+}
+.desk-board th,
+.desk-board td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.desk-board thead th {
+  position: sticky;
+  top: 0;
+  background: var(--panel-solid);
+  z-index: 1;
+  vertical-align: bottom;
+}
+.desk-board tbody th {
+  color: var(--muted);
+  font-weight: 500;
+  background: var(--gold-soft);
+  width: 170px;
+}
+.desk-board td + td,
+.desk-board th + td {
+  border-left: 1px solid var(--line);
+}
+/* カルテの中の表は狭いので詰める */
+.desk-sec .desk-board {
+  font-size: 12.5px;
+}
+.desk-sec .desk-board th,
+.desk-sec .desk-board td {
+  padding: 7px 7px;
+}
+
+/* ---- 右のカルテ */
+.desk-karte {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .desk:not([data-motion="off"]) .desk-karte.is-new {
+    animation: desk-karte-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+}
+@keyframes desk-karte-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+.desk-karte .head {
+  padding: 14px 16px 10px 18px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.desk-karte .town {
+  font-size: 12.5px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.desk-karte .town > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.desk-karte .big-num {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  min-width: 0;
+}
+.desk-karte .big-num .label {
+  font-size: 12px;
+  color: var(--muted);
+  align-self: flex-end;
+  padding-bottom: 6px;
+}
+.desk-karte .big-num h2 {
+  margin: 0;
+  font-family: var(--font-num);
+  font-weight: 500;
+  font-size: 36px;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.desk-karte .big-num h2.addr {
+  font-family: var(--font-ui);
+  font-size: 21px;
+  font-weight: 700;
+  white-space: normal;
+  line-height: 1.35;
+}
+.desk-karte .acts {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+.desk-karte .facts {
+  display: flex;
+  gap: 4px 14px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.desk-karte .facts b {
+  color: var(--ink);
+  font-family: var(--font-num);
+  font-weight: 500;
+  font-size: 15px;
+}
+.desk-karte .placenote {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.55;
+  border-radius: 10px;
+  padding: 6px 10px;
+  background: var(--info-soft);
+  color: var(--ink);
+}
+.desk-karte .placenote.warn {
+  background: var(--warn-soft);
+}
+.desk-karte .placenote button.mini {
+  border: 1px solid var(--line-strong);
+  background: var(--panel-strong);
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-size: 12px;
+  cursor: pointer;
+  margin: 3px 4px 0 0;
+}
+.desk-status {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 9px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  flex: none;
+  transition: background 0.15s;
+}
+.desk-status:hover {
+  background: var(--gold-soft);
+}
+.desk-ring {
+  width: 54px;
+  height: 54px;
+}
+.desk-ring circle {
+  fill: none;
+  stroke-width: 6;
+}
+.desk-ring .bg {
+  stroke: var(--line);
+}
+.desk-ring .fg {
+  stroke: var(--gold);
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  transition: stroke-dashoffset 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.desk-ring text {
+  font-family: var(--font-num);
+  font-size: 13px;
+  fill: var(--ink);
+}
+.desk-status .chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.desk-sections {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scroll-padding-top: 10px;
+}
+.desk-sec {
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel-strong);
+  transition: border-color 0.2s;
+}
+.desk-sec:hover,
+.desk-sec:focus-within,
+.desk-sec[data-open="true"] {
+  border-color: color-mix(in srgb, var(--gold) 60%, transparent);
+}
+.desk-sec > h3 {
+  margin: 0;
+}
+.desk-sec > h3 > button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 26px auto minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 14px;
+}
+.desk-sec .ico {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--gold-soft);
+  color: var(--gold-3);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.desk-sec .name {
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.desk-sec .sum {
+  font-size: 12.5px;
+  color: var(--muted);
+  justify-self: end;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  font-weight: 400;
+}
+.desk-sec .arrow {
+  color: var(--muted);
+  transition: transform 0.25s;
+}
+.desk-sec[data-open="true"] .arrow {
+  transform: rotate(90deg);
+}
+.desk-sec .inner {
+  padding: 0 12px 12px;
+  font-size: 13px;
+}
+/*
+ * カルテの項目の中身と、真ん中のカードには、今までの部品（地図データのカード。明るい色で作ってある）が入るので、いつも明るい紙の色にする。
+ * 明るい見た目では外と同じ色なので変わらず、暗い見た目では暗い板の上に明るい紙が乗る
+ */
+.desk .desk-sec .inner,
+.desk .desk-card {
+  --panel: rgba(255, 251, 245, 0.86);
+  --panel-strong: rgba(255, 251, 245, 0.97);
+  --panel-solid: #fffbf5;
+  --ink: #1f1a14;
+  --muted: #625849;
+  --line: rgba(31, 26, 20, 0.12);
+  --line-strong: rgba(31, 26, 20, 0.24);
+  --gold: #b88a4d;
+  --gold-2: #e3c79a;
+  --gold-3: #7d5a28;
+  --gold-soft: rgba(184, 138, 77, 0.15);
+  --warn: #a3351f;
+  --warn-soft: rgba(184, 67, 47, 0.1);
+  --ok: #24704a;
+  --ok-soft: rgba(46, 125, 79, 0.1);
+  --info: #24569c;
+  --info-soft: rgba(43, 95, 168, 0.1);
+  color-scheme: light;
+  color: var(--ink);
+}
+.desk .desk-sec .inner {
+  background: var(--panel-solid);
+  border-radius: 0 0 13px 13px;
+}
+.desk[data-theme="dark"] .desk-sec .inner {
+  padding-top: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  .desk[data-theme="auto"] .desk-sec .inner {
+    padding-top: 10px;
+  }
+}
+.desk-kv {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+}
+.desk-kv dt {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.desk-kv dd {
+  margin: 0;
+  text-align: right;
+  min-width: 0;
+}
+.desk-btnrow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.desk-small {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.desk-subhead {
+  margin: 14px 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.desk-subhead:first-child {
+  margin-top: 0;
+}
+.desk-grid2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+}
+.desk-stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel-solid);
+}
+.desk-stat .st {
+  flex: none;
+}
+.desk-stat .v {
+  min-width: 0;
+  font-size: 12.5px;
+}
+.desk-stat .v small {
+  display: block;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.desk-karte .foot {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  flex: none;
+}
+.desk-karte .foot .btn {
+  flex: 1;
+  min-height: 38px;
+}
+
+/* ---- 小物 */
+.desk-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translate(-50%, 0);
+  z-index: 60;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 9px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  box-shadow: var(--shadow);
+  max-width: min(640px, 100% - 32px);
+}
+.desk-toast button {
+  border: 0;
+  background: transparent;
+  color: var(--gold-2);
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .desk:not([data-motion="off"]) .desk-toast {
+    animation: desk-toast-in 0.22s ease both;
+  }
+}
+@keyframes desk-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 14px);
+  }
+}
+.desk-tray {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 14px;
+  border-radius: 999px;
+  max-width: calc(100% - 120px);
+}
+.desk-tray .lab {
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.desk-tray .items {
+  display: flex;
+  gap: 6px;
+  overflow: hidden;
+  min-width: 0;
+}
+.desk-tray .item {
+  font-family: var(--font-num);
+  font-size: 12.5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 1px 4px 1px 10px;
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  white-space: nowrap;
+  background: var(--panel-strong);
+}
+.desk-tray .item button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0 4px;
+  border-radius: 999px;
+}
+.desk-loading {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--gold-3);
+  animation: desk-spin 0.8s linear infinite;
+  flex: none;
+}
+@keyframes desk-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .desk .desk-loading {
+    animation-duration: 2.4s;
+  }
+  .desk *,
+  .desk *::before,
+  .desk *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+.desk[data-motion="off"] *,
+.desk[data-motion="off"] *::before,
+.desk[data-motion="off"] *::after {
+  transition-duration: 0.01ms !important;
+}
+
+/* 印刷では画面（地図・3D・カルテ）を出さない（Google の 3D の絵を印刷に入れない。印刷するのは調査メモ・案内図・照会文だけ） */
+@media print {
+  .desk-stage,
+  .desk-ui,
+  .desk-toast {
+    display: none !important;
+  }
+}
+/* 模型の札（スマホの大きさの拡大を PC では使わない） */
+.desk .pv-chip {
+  zoom: 1;
+}
+/* 今までの PC の白いカードを、カルテの中では枠だけにする */
+.desk .paper > section.shadow-soft {
+  box-shadow: none;
+  border: 0;
+  border-radius: var(--r-md);
+}

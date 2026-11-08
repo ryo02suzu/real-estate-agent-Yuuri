@@ -23,6 +23,8 @@ import {
   SANKO_COLOR,
   LAND_PRICE_EVENT,
   LAND_PRICE_LAYERS,
+  OVERLAY_EVENT,
+  type OverlayKey,
   LAND_PRICE_MIN_ZOOM,
   PARCEL_HIT_LAYERS,
   PARCEL_LAYERS,
@@ -49,7 +51,7 @@ import { chibanLabel, isLotChiban, kuikiLabel, registryChiban } from "@/lib/road
 import { readRoadShapes, type RoadRead } from "@/lib/roadmap/road-read";
 import { sheetName, type SheetHit } from "@/lib/roadmap/sheets";
 import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
-import { BuildingIcon, ChevronRightIcon, FrameIcon, HazardIcon, InfoIcon, LandPriceIcon, LocateIcon, ParcelIcon, PinIcon, RoadIcon, ZoningIcon } from "./icons";
+import { BuildingIcon, ChevronRightIcon, FrameIcon, HazardIcon, InfoIcon, LandPriceIcon, LocateIcon, ParcelIcon, PinIcon, RoadIcon, TrainIcon, ZoningIcon } from "./icons";
 import { MapLegend, type LegendItem } from "./map-legend";
 
 // 描画のワーカーは public/maplibre/<版>/ に置いてある（scripts/copy-maplibre-worker.mjs）
@@ -191,6 +193,9 @@ const HAZARD_FOOT: Partial<Record<HazardKind, string>> = {
   keizoku: "「2週間以上」の色でも4週間以上のことがあります。",
 };
 
+/** PC（調査デスク）：「駅・学校」で地図に出す札（物件の画面がもう読んだ駅・学校・施設） */
+export type MapPlace = { key: string; name: string; sub?: string; kind: "station" | "school" | "poi"; lng: number; lat: number };
+
 export type LiveMapProps = {
   /** 物件の位置。無ければ関東全体を表示する */
   point?: Point;
@@ -232,6 +237,10 @@ export type LiveMapProps = {
   parcelPick?: { has: (kuiki: string, chiban: string) => boolean; toggle: (kuiki: string, chiban: string) => void };
   /** 現在地（スマホの「現在地で調べる」。青い点と誤差の円を出す。位置は端末の中だけで使い、送らない） */
   me?: { lat: number; lng: number; accuracy?: number };
+  /** PC（調査デスク）：道具の見た目をデスクの部品にそろえる（スマホは渡さない） */
+  skin?: "desk";
+  /** PC：「駅・学校」で出す札（渡したときだけ道具に出る） */
+  places?: MapPlace[];
 };
 
 /** 濃さを変えるレイヤとその不透明度の属性（ハザードのタイルはこれに加えて raster-opacity） */
@@ -281,6 +290,8 @@ export default function LiveMap({
   overlayOpacity,
   parcelPick,
   me,
+  skin,
+  places,
 }: LiveMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -314,6 +325,8 @@ export default function LiveMap({
   // 道路種別を読んでいる最中か（読み終えるまで「読み込んでいます」のまま）。件数の上限で読み切れなかったか
   const roadsLoading = useRef(false);
   const roadsTruncated = useRef(false);
+  // PC：駅・学校の札を出しているか
+  const [placesOn, setPlacesOn] = useState(false);
   // 重ねているハザードの種類（null は重ねていない）。「ハザード」を押し直したときは前の種類に戻す
   const [hazard, setHazard] = useState<HazardKind | null>(initialHazard ?? null);
   const lastHazard = useRef<HazardKind>(initialHazard ?? "flood");
@@ -822,8 +835,8 @@ export default function LiveMap({
   }, [on.roads, roadsKey, loaded]);
 
   /** 「筆・地番」などを押したとき。町を見ているくらいなら、描ける大きさまで寄る。すぐに「読み込んでいます」などを出し、地図が落ち着いたら中身を見て出し直す */
-  const toggleOverlay = (k: Overlay) => {
-    const next = !on[k];
+  const toggleOverlay = (k: Overlay, want?: boolean) => {
+    const next = want ?? !on[k];
     setShown((s) => ({ ...s, [k]: next }));
     const map = mapRef.current;
     const z = map?.getZoom() ?? 0;
@@ -832,6 +845,48 @@ export default function LiveMap({
     setNote(k, !next ? undefined : z < AUTO_ZOOM_FROM ? "zoom" : "loading");
     if (!next && (k === "zoning" || k === "roads")) setLegendOf(k, undefined);
   };
+
+  // PC：地図の外（3D の画面の層のボタン）から重ねを入れる・外す。最新の関数を呼ぶ
+  const outside = useRef({ toggleOverlay });
+  useEffect(() => {
+    outside.current = { toggleOverlay };
+  });
+  useEffect(() => {
+    const onSet = (e: Event) => {
+      const { key, on: want } = (e as CustomEvent<{ key: OverlayKey; on: boolean }>).detail;
+      if (key === "places") setPlacesOn(want);
+      else outside.current.toggleOverlay(key, want);
+    };
+    window.addEventListener(OVERLAY_EVENT, onSet);
+    return () => window.removeEventListener(OVERLAY_EVENT, onSet);
+  }, []);
+
+  // PC：駅・学校の札（地図の上の小さな札。押しても何もしない。物件の画面が読んだ地点だけ）
+  const placesKey = placesOn && places ? places.map((p) => `${p.key}@${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join("|") : "";
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !placesKey || !places) return;
+    const marks = places.map((p) => {
+      const el = document.createElement("div");
+      el.className = `desk-place is-${p.kind}`;
+      el.setAttribute("role", "img");
+      el.setAttribute("aria-label", `${p.name}${p.sub ? `（${p.sub}）` : ""}`);
+      const b = document.createElement("b");
+      b.textContent = p.name;
+      el.append(b);
+      if (p.sub) {
+        const sub = document.createElement("span");
+        sub.textContent = p.sub;
+        el.append(sub);
+      }
+      return new Marker({ element: el, anchor: "bottom" }).setLngLat([p.lng, p.lat]).addTo(map);
+    });
+    return () => {
+      for (const m of marks) m.remove();
+    };
+    // 地点の並びは placesKey で見る
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placesKey, loaded]);
 
   // 背景（淡色・標準・写真）
   useEffect(() => {
@@ -952,8 +1007,9 @@ export default function LiveMap({
     ),
   ];
 
-  const toolBase = "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] shadow-soft";
-  const tool = `${toolBase} bg-white/95 text-ink hover:bg-mint`;
+  const desk = skin === "desk";
+  const toolBase = desk ? "desk-tool is-on" : "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] shadow-soft";
+  const tool = desk ? "desk-tool" : `${toolBase} bg-white/95 text-ink hover:bg-mint`;
   return (
     <div className="absolute inset-0">
       {/* MapLibre の CSS が地図の箱を position: relative にするので、絶対配置ではなく大きさで広げる */}
@@ -963,13 +1019,13 @@ export default function LiveMap({
         <PinIcon className="pointer-events-none absolute left-1/2 top-1/2 h-11 w-11 -translate-x-1/2 -translate-y-full text-brand drop-shadow-md" />
       )}
       <div className={`absolute flex flex-col items-end gap-2 ${toolsClassName}`}>
-        <div className="flex rounded-full bg-white/95 p-0.5 shadow-soft" role="group" aria-label="背景の地図">
+        <div className={desk ? "desk-seg" : "flex rounded-full bg-white/95 p-0.5 shadow-soft"} role="group" aria-label="背景の地図">
           {(Object.keys(BASEMAPS) as Basemap[]).map((k) => (
             <button
               key={k}
               onClick={() => setBasemap(k)}
               aria-pressed={basemap === k}
-              className={`rounded-full px-3 py-1 text-[12px] ${basemap === k ? "bg-gold text-white" : "text-ink hover:bg-mint"}`}
+              className={desk ? "" : `rounded-full px-3 py-1 text-[12px] ${basemap === k ? "bg-gold text-white" : "text-ink hover:bg-mint"}`}
             >
               {BASEMAPS[k].label}
             </button>
@@ -1019,6 +1075,12 @@ export default function LiveMap({
           <LandPriceIcon className={`h-4 w-4 ${on.landPrice ? "" : "text-brand"}`} />
           地価
         </button>
+        {places && places.length > 0 && (
+          <button onClick={() => setPlacesOn((v) => !v)} aria-pressed={placesOn} className={placesOn ? toolBase : tool} title="最寄り駅・小中学校・近くの施設を地図に出す（物件の画面で読んだ地点）">
+            <TrainIcon className={`h-4 w-4 ${placesOn ? "" : "text-brand"}`} />
+            駅・学校
+          </button>
+        )}
         <button
           onClick={toggleHazard}
           aria-pressed={!!hazard}
@@ -1032,19 +1094,19 @@ export default function LiveMap({
         </button>
         {hazardMenu && (
           // 種類を選ぶ（iPhone で拡大されないよう、選択欄ではなくボタンを並べる）
-          <div role="group" aria-label="ハザードの種類" className="grid grid-cols-2 gap-0.5 rounded-2xl bg-white/95 p-1 shadow-soft">
+          <div role="group" aria-label="ハザードの種類" className={desk ? "desk-menu grid grid-cols-2 gap-0.5" : "grid grid-cols-2 gap-0.5 rounded-2xl bg-white/95 p-1 shadow-soft"}>
             {HAZARD_KINDS.map((k) => (
               <button
                 key={k}
                 onClick={() => pickHazard(k)}
                 aria-pressed={hazard === k}
                 title={HAZARDS[k].label}
-                className={`rounded-full px-2.5 py-1 text-[11.5px] leading-tight ${hazard === k ? "bg-gold text-white" : "text-ink hover:bg-mint"}`}
+                className={desk ? "" : `rounded-full px-2.5 py-1 text-[11.5px] leading-tight ${hazard === k ? "bg-gold text-white" : "text-ink hover:bg-mint"}`}
               >
                 {HAZARDS[k].short}
               </button>
             ))}
-            <button onClick={() => pickHazard(null)} className="rounded-full px-2.5 py-1 text-[11.5px] leading-tight text-muted hover:bg-mint">
+            <button onClick={() => pickHazard(null)} className={desk ? "is-off" : "rounded-full px-2.5 py-1 text-[11.5px] leading-tight text-muted hover:bg-mint"}>
               重ねない
             </button>
           </div>

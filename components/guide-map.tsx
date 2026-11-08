@@ -51,7 +51,8 @@ export function GuideMapSheet({ result, open, onClose, sender }: { result: Ok; o
   );
 }
 
-function GuideMapBody({ result, sender }: { result: Ok; sender?: Sender }) {
+/** 案内図の中身（縮めた1枚・印刷のボタン・印刷用の1枚）。PC の調査デスクの書類の画面からも使う */
+export function GuideMapBody({ result, sender }: { result: Ok; sender?: Sender }) {
   const frame = useRef<HTMLDivElement>(null);
   const page = useRef<HTMLDivElement>(null);
   const scale = usePreviewScale(frame);
