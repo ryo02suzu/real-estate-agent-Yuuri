@@ -1,28 +1,28 @@
 {
  "appraisal": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261107",
-  "asOf": "20261107",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261108",
+  "asOf": "20261108",
   "year": 2026,
-  "count": 12765,
+  "count": 14595,
   "zoom": 13
  },
  "fac": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261107",
-  "asOf": "20261107",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261108",
+  "asOf": "20261108",
   "counts": {
-   "1": 3182,
-   "2": 50390,
-   "3": 36413,
-   "4": 4092,
-   "5": 2412
+   "1": 3770,
+   "2": 56998,
+   "3": 40348,
+   "4": 4743,
+   "5": 3179
   },
   "medicalYear": 2020,
   "kinderYear": 2023
  },
  "liq": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261107",
-  "asOf": "20261107",
-  "count": 2212561,
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261108",
+  "asOf": "20261108",
+  "count": 2894327,
   "levels": {
    "1": "非常に液状化しやすい",
    "2": "液状化しやすい",
@@ -63,8 +63,8 @@
   }
  },
  "pop": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261107",
-  "asOf": "20261107",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261108",
+  "asOf": "20261108",
   "years": [
    2020,
    2025,
@@ -75,17 +75,17 @@
    2050
   ],
   "reach": 2,
-  "count": 438218
+  "count": 608555
  },
  "ridership": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261107",
-  "asOf": "20261107",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261108",
+  "asOf": "20261108",
   "year": 2024,
-  "count": 5088
+  "count": 5434
  },
  "rireki": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261107",
-  "asOf": "20261107",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261108",
+  "asOf": "20261108",
   "count": 22388,
   "kinds": {
    "11": 13626,
@@ -102,12 +102,12 @@
   }
  },
  "zousei": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261107",
-  "asOf": "20261107",
-  "count": 33490,
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261108",
+  "asOf": "20261108",
+  "count": 34328,
   "kinds": {
-   "谷埋め型": 30582,
-   "腹付け型": 2237,
+   "谷埋め型": 31378,
+   "腹付け型": 2279,
    "区分していない": 671
   }
  }
