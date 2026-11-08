@@ -90,11 +90,19 @@ def build(year: int, out: str, work: str) -> dict:
     seq = os.path.join(work, "morido.geojsonl")
     counts = {"areas": 0, "cities": 0}
     cities = set()
+    # データのある都道府県。国土数値情報にその年度のファイルが無い県（2025年度の青森県など。404）は飛ばし、
+    # アプリはその県で区域の有無を出さない（「区域外」と言わない。lib/roadmap/morido.ts の DATA_PREFS）
+    found: list[str] = []
     # 指定都市・中核市の市区町村コード → 市の名前（区域外の地点で、どこの資料で確かめるか）
     authorities = dict(PENDING_CITIES)
     with open(seq, "w", encoding="utf-8") as fo:
         for pref in PREFS:
-            with zipfile.ZipFile(io.BytesIO(ksj.get_zip(URL.format(yy=yy, pref=pref), UA))) as z:
+            url = URL.format(yy=yy, pref=pref)
+            if not exists(url):
+                log(f"{pref}: {year}年度のデータが国土数値情報に無い（404）ので飛ばす")
+                continue
+            found.append(pref)
+            with zipfile.ZipFile(io.BytesIO(ksj.get_zip(url, UA))) as z:
                 name = next(n for n in z.namelist() if n.endswith(".geojson"))
                 feats = json.loads(z.read(name))["features"]
             for f in feats:
@@ -118,7 +126,9 @@ def build(year: int, out: str, work: str) -> dict:
                 fo.write(json.dumps({"type": "Feature", "geometry": f["geometry"], "properties": {k: v for k, v in props.items() if v}}, ensure_ascii=False) + "\n")
                 counts["areas"] += 1
     counts["cities"] = len(cities)
-    log(f"区域 {counts['areas']}・市区町村 {counts['cities']}")
+    if not found:
+        raise SystemExit(f"{year}年度のデータがどの都道府県にもありません")
+    log(f"区域 {counts['areas']}・市区町村 {counts['cities']}・都道府県 {len(found)}（無い {sorted(set(PREFS) - set(found))}）")
     tippecanoe = shutil.which("tippecanoe") or "tippecanoe"
     subprocess.run(
         [
@@ -131,6 +141,7 @@ def build(year: int, out: str, work: str) -> dict:
     os.remove(seq)
     log(f"{out}: {os.path.getsize(out) / 1e6:.1f}MB")
     counts["authorities"] = dict(sorted(authorities.items()))
+    counts["prefs"] = found
     return counts
 
 
@@ -172,7 +183,8 @@ def main() -> None:
             log("removed", old)
     with open(a.source, "w", encoding="utf-8") as f:
         cities = counts.pop("authorities")
-        json.dump({"url": f"/{rel}", "year": year, "asOf": asof or f"{year}年度", "prefs": list(PREFS), "counts": counts, "cities": cities}, f, ensure_ascii=False, indent=1)
+        found = counts.pop("prefs")
+        json.dump({"url": f"/{rel}", "year": year, "asOf": asof or f"{year}年度", "prefs": found, "counts": counts, "cities": cities}, f, ensure_ascii=False, indent=1)
         f.write("\n")
     log(f"source: {a.source} → /{rel}")
 
