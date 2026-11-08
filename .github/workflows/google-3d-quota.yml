@@ -1,0 +1,43 @@
+# Google の実写 3D（Photorealistic 3D Tiles）を「月 999 回まで・1 日の上限なし」で使うための見張り役。
+# その日の「ルートの要求」の 1 日の割り当てを、今月の残り（月の上限 − 今月使った数）に入れ直す（scripts/google-3d/quota.mjs）。
+# Google Cloud には月の割り当てが無く、確実に止められるのは 1 日の割り当てだけなので、毎日それを今月の残りに合わせる。
+#
+# 必要な設定（リポジトリの Settings → Secrets and variables → Actions）。無ければ何もしないで終わる：
+#   Secrets:   GOOGLE_3D_SA_KEY（サービスアカウントの鍵の JSON。役割は「Cloud Quotas 管理者」と「Monitoring 閲覧者」）
+#   Variables: GOOGLE_3D_PROJECT（省略時は鍵の project_id）、GOOGLE_3D_MONTHLY_CAP（省略時 999）、GOOGLE_3D_QUOTA_ID（省略時は一覧から探す）
+# 鍵は会話やコードに書かず、ここに登録する。
+name: Google の 3D の回数（月の上限）
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 1 時間ごと（今月の残りを今日の割り当てに）
+    - cron: "7 * * * *"
+    # 太平洋時間の 23:40 ごろ（冬 07:40 UTC・夏 06:40 UTC）。明日の分を先に入れる（定期実行は遅れることがある）
+    - cron: "40 6,7 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: google-3d-quota
+  cancel-in-progress: false
+
+jobs:
+  quota:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/google-3d
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 今月の残りを、その日の割り当てに入れる
+        env:
+          GOOGLE_3D_SA_KEY: ${{ secrets.GOOGLE_3D_SA_KEY }}
+          GOOGLE_3D_PROJECT: ${{ vars.GOOGLE_3D_PROJECT }}
+          GOOGLE_3D_MONTHLY_CAP: ${{ vars.GOOGLE_3D_MONTHLY_CAP }}
+          GOOGLE_3D_QUOTA_ID: ${{ vars.GOOGLE_3D_QUOTA_ID }}
+        run: node scripts/google-3d/quota.mjs

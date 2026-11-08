@@ -35,8 +35,13 @@ export const CITY3D_EVENT = "michilu:city3d";
 
 /** Google の鍵（ビルドのときに埋め込まれる。ブラウザ用の鍵なので、Google Cloud でサイトと API を制限しておく） */
 const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAP_TILES_KEY ?? "";
-/** Google の 3D の街を使う設定があるか（データの出典の画面で、Google の規約のリンクを出す） */
-export const GOOGLE_CITY_CONFIGURED = GOOGLE_KEY !== "";
+/**
+ * ホームの帯でも Google の 3D を使うか（環境変数 NEXT_PUBLIC_GOOGLE_3D_BAND=on のときだけ）。帯はアプリを開くたびにルートを 1 回要求するので、
+ * 既定では使わず、月の無料の回数（全体で 999 回まで。.github/workflows/google-3d-quota.yml）を PC の 3D に残す
+ */
+const BAND_GOOGLE = process.env.NEXT_PUBLIC_GOOGLE_3D_BAND === "on";
+/** 帯で Google の 3D の街を使う設定があるか（データの出典の画面で、Google の規約のリンクを出す） */
+export const GOOGLE_CITY_CONFIGURED = GOOGLE_KEY !== "" && BAND_GOOGLE;
 /**
  * 検証用：港区の PLATEAU（2025 年度・LOD2・質感なし）の 3D タイル。国土交通省 Project PLATEAU（CC BY 4.0）。
  * 鍵が無くても、位置・距離・面の向き・合成を確かめられる（質感つきは粗い段階が無く、帯の広さだと 2GB 近くになるので使わない）
@@ -58,7 +63,8 @@ export function city3dSource(): City3DSource | null {
   const m = location.hash.match(/(?:^#|&)city3d=(off|plateau|google)(?:&|$)/);
   if (m?.[1] === "off") return null;
   if (m?.[1] === "plateau") return "plateau";
-  if (!GOOGLE_KEY) return null;
+  // 帯の Google は設定（NEXT_PUBLIC_GOOGLE_3D_BAND=on）か、確かめるときの #city3d=google のときだけ
+  if (!GOOGLE_KEY || (!BAND_GOOGLE && m?.[1] !== "google")) return null;
   // データ節約の設定（iPhone の「省データモード」など）では読まない（数十 MB になることがある）
   const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
   if (conn?.saveData) return null;
