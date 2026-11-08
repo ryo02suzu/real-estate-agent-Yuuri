@@ -22,7 +22,7 @@ const PREF = /^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/;
 /** 番地の始まり（数字か「一丁目」） */
 const NUM = /[0-9]|[一二三四五六七八九十]+丁目/;
 
-/** 関東の市区町村（政令市は「横浜市西区」と「横浜市」の両方）。長い名前から順に */
+/** 対応している市区町村（政令市は「横浜市西区」と「横浜市」の両方）。長い名前から順に */
 const MUNIS: Muni[] = (() => {
   const out: Muni[] = [];
   const cities = new Set<string>();
@@ -155,7 +155,7 @@ function typedMunis(query: string): Muni[] {
 /**
  * 市区町村の名前の書き間違いを直した住所（直す所が無ければ null）：
  * 「市・区」が抜けた（宇都宮南大通り → 宇都宮市南大通り、横浜西区 → 横浜市西区）、合併前の市の名前（大宮市 → さいたま市大宮区）、
- * 1字違い（宇津宮市 → 宇都宮市）。どれも関東の市区町村の名前で1つに決まるときだけ
+ * 1字違い（宇津宮市 → 宇都宮市）。どれも対応している市区町村の名前で1つに決まるときだけ
  */
 export function fixMunicipality(query: string): string | null {
   const t = typedParts(query);
@@ -176,7 +176,10 @@ export function fixMunicipality(query: string): string | null {
   if (!out.size && tok && [...tok[1]].length >= 3) {
     for (const m of pool) if (!m.ward && m.city.length === tok[1].length && editDistance(newForm(tok[1]), m.city) === 1) out.add(m.city + tok[2]);
   }
-  return out.size === 1 ? `${t.pref}${[...out][0]}${t.num}` : null;
+  // 同じ頭の市町村が2つ以上（横浜市と青森県の横浜町）なら、続きが区の名前まで合うもの（横浜市西区）を選ぶ
+  const ward = [...out].filter((c) => MUNIS.some((m) => m.ward && c.startsWith(m.name)));
+  const pick = out.size === 1 ? [...out] : ward.length === 1 ? ward : [];
+  return pick.length === 1 ? `${t.pref}${pick[0]}${t.num}` : null;
 }
 
 /**

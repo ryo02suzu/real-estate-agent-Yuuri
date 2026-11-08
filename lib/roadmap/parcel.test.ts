@@ -781,11 +781,11 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(n7).toBeLessThan(352);
     }
   });
-  it("どれも対応エリア（関東1都6県・中部9県）の5桁の市区町村コード・地図名・町・筆の数・理由がある。同じ決まりは1回だけ（町・地番で絞るときも）", () => {
+  it("どれも対応エリア（関東1都6県・中部9県・東北6県）の5桁の市区町村コード・地図名・町・筆の数・理由がある。同じ決まりは1回だけ（町・地番で絞るときも）", () => {
     expect(data.sheets.length).toBeGreaterThan(0);
     const keys = new Set<string>();
     for (const s of data.sheets) {
-      expect(s.code).toMatch(/^(0[89]|1\d|2[0-3])\d{3}$/);
+      expect(s.code).toMatch(/^(0[2-9]|1\d|2[0-3])\d{3}$/);
       expect(s.sheet.trim()).not.toBe("");
       expect(s.town.trim()).not.toBe("");
       expect(s.parcels).toBeGreaterThan(0);

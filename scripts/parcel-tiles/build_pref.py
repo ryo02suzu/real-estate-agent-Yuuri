@@ -29,6 +29,12 @@ import fiona
 
 # G空間情報センターの法務省の組織名（都道府県ごと）。API（organization_list / package_search）で実在を確かめたものだけ入れる
 ORGS = {
+    "02": "moj-02aomori",
+    "03": "moj-03iwate",
+    "04": "moj-04miyagi",
+    "05": "moj-05akita",
+    "06": "moj-06yamagata",
+    "07": "moj-07fukushima",
     "08": "moj-08ibaraki",
     "09": "moj-09tochigi",
     "10": "moj-10gunma",

@@ -223,7 +223,8 @@ function Welcome({
         ].map(([v, k]) => (
           <div key={k} className="rounded-2xl bg-white px-3 py-2.5 shadow-soft">
             <dt className="text-[10.5px] text-muted">{k}</dt>
-            <dd className="mt-0.5 text-[16px] font-semibold tracking-[0.02em] text-ink">{v}</dd>
+            {/* 対応エリアは地方が増えると長くなる（「関東・中部・東北」）。1行に収まるよう字を小さくする */}
+            <dd className={`mt-0.5 ${v.length > 6 ? "text-[13.5px]" : "text-[16px]"} font-semibold tracking-[0.02em] text-ink`}>{v}</dd>
           </div>
         ))}
       </dl>
