@@ -2,26 +2,32 @@
 
 // 書類のシート（スマホ）。どれも同じ高さ（DOC_BODY）で開き、中身は真ん中の枠の中で動かす（押す・選ぶ・差出人を開くで、シートの大きさが
 // 変わらない）。地番の一覧など「書類の中身」を読みやすく見せてコピー・共有するシート（DocSheet。中身は lib/app/doc.ts）、
-// 照会文を手紙の形で見せてコピー・印刷（A4）・共有するシート（InquirySheet）、調査メモを印刷する前に中身と読み込みの状態を
+// 照会文のシート（InquirySheet。「照会文」で使うひな形を選んで手紙の形で見せ、コピー・印刷（A4）・共有。「送る」で宛先を入れて、
+// メール・FAX・電話のアプリを開く。components/app/inquiry-send.tsx）、調査メモを印刷する前に中身と読み込みの状態を
 // 確かめるシート（MemoSheet）。コピー・共有・印刷は押した操作の中で呼ぶ（iPhone の Safari はそうでないと動かない）。
 // どれも document.body に出す（物件の画面の枠の外。見た目は body の .theme-navy に従う）
 import { Check, ClipboardCopy, Printer, Share2 } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { docText, type Doc } from "@/lib/app/doc";
-import { letterText, type Letter } from "@/lib/app/inquiry-letter";
+import { inquiryLetter, letterText } from "@/lib/app/inquiry-letter";
+import { STANDARD_ID, inquiryValues, mergeSubject, mergeTemplate, unknownTokens, type InquiryInput } from "@/lib/app/inquiry-template";
+import { EMPTY_TO, forgetInquiryTo, loadInquiryTo, officeKey, saveInquirySettings, saveInquiryTo, templateOf, useInquirySettings, type InquiryTo } from "@/lib/inquiry-store";
+import { parsePhones } from "@/lib/phone";
+import type { Contact } from "@/lib/roadmap";
 import { PrintIcon } from "../icons";
 import { Sheet } from "../sheet";
 import { useCopy } from "../use-copy";
-import { DocView, LetterView, PrintLetter } from "./doc-view";
+import { DOC_BODY, DOC_PANE } from "./doc-size";
+import { DocView, LetterView, PrintLetter, TextLetter } from "./doc-view";
+import { FaxCover, SendPanel, TemplateChips } from "./inquiry-send";
+import { TemplatesSheet } from "./template-editor";
 
 const NAVY = "#133664";
 const PRIMARY = "flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-light to-brand py-2.5 text-[14px] font-bold text-white shadow-soft dense:py-2";
 
-/** 書類のシートの中身の高さ（どの書類も同じ。画面の高さに合わせ、上限 640px） */
-export const DOC_BODY = "flex h-[min(74dvh,640px)] flex-col";
-/** 書類の中身を見せる枠（残りの高さをぜんぶ使い、中で縦に動かす） */
-export const DOC_PANE = "min-h-0 flex-1 overflow-y-auto overscroll-y-contain rounded-[16px] bg-[#f4f7fb] p-2.5";
+// シートの大きさ（components/app/doc-size.ts。ほかの書類のシートもここから読む）
+export { DOC_BODY, DOC_PANE };
 
 /** コピー・共有・印刷のボタンの列 */
 export function DocActions({ text, onPrint, printLabel = "印刷・PDF" }: { text: string; onPrint?: () => void; printLabel?: string }) {
@@ -76,8 +82,25 @@ export function DocSheet({ open, onClose, title, lead, doc, note, extra }: { ope
   );
 }
 
-/** 照会文のシート：手紙の形で見せ、コピー（メールの本文）・印刷（FAX 用の A4）・共有。開いている間は、印刷の対象を照会文にする */
-export function InquirySheet({ open, onClose, lead, letter, note, extra }: { open: boolean; onClose: () => void; lead: string; letter: Letter; note?: string; extra?: ReactNode }) {
+type InquiryProps = {
+  onClose: () => void;
+  lead: string;
+  /** 照会文の材料（物件の住所・地番・宛先の課・市区町村・差出人・日付。lib/app/inquiry-template.ts の inquiryInputOf） */
+  input: InquiryInput;
+  /** 都道府県（宛先帳の鍵。同じ名前の町村を分ける） */
+  pref: string;
+  /** 窓口のデータ（電話・メール・受付時間・注意。無い市区町村もある） */
+  contact?: Contact;
+  note?: string;
+  extra?: ReactNode;
+};
+
+/**
+ * 照会文のシート：「照会文」（使うひな形を選び、手紙の形で見せ、コピー（メールの本文）・印刷（FAX 用の A4）・共有）と
+ * 「送る」（宛先を入れて、メール・FAX・電話のアプリを開く）。開いている間は、印刷の対象を照会文にする
+ * （「印刷して FAX」のときだけ、1枚目に FAX 送付状を付ける。body の data-print="fax"）
+ */
+export function InquirySheet({ open, ...props }: { open: boolean } & InquiryProps) {
   useEffect(() => {
     if (!open) return;
     document.body.dataset.print = "letter";
@@ -86,22 +109,154 @@ export function InquirySheet({ open, onClose, lead, letter, note, extra }: { ope
     };
   }, [open]);
   if (!open) return null;
-  return createPortal(
-    <Sheet title="道路種別の照会文" open onClose={onClose}>
-      <div className={`${DOC_BODY} text-ink`}>
-        <p className="shrink-0 text-[12px] leading-[1.6] text-muted dense:leading-[1.5]">{lead}</p>
-        {extra && <div className="shrink-0">{extra}</div>}
-        <div className={`${DOC_PANE} mt-2`} aria-label="照会文">
-          <div className="rounded-[10px] bg-white px-3.5 py-3 shadow-[0_1px_4px_rgba(20,45,85,0.10)]">
-            <LetterView letter={letter} />
+  return createPortal(<InquiryBody {...props} />, document.body);
+}
+
+/** 窓口のデータから入れる宛先（電話は最初の番号。FAX 番号は窓口のデータに無いので空） */
+const toOf = (c?: Contact): InquiryTo => ({ ...EMPTY_TO, email: c?.email ?? "", phone: c?.phone ? (parsePhones(c.phone)[0]?.number ?? "") : "" });
+
+type Tab = "letter" | "send";
+const TABS: { key: Tab; label: string }[] = [
+  { key: "letter", label: "照会文" },
+  { key: "send", label: "送る" },
+];
+
+function InquiryBody({ onClose, lead, input, pref, contact, note, extra }: InquiryProps) {
+  const settings = useInquirySettings();
+  const [pick, setPick] = useState(settings.pick);
+  const [tab, setTab] = useState<Tab>("letter");
+  const [dir, setDir] = useState<"r" | "l" | null>(null);
+  // ひな形を作る・直す（このシートの上に重ねて開く）
+  const [edit, setEdit] = useState(false);
+  // 宛先（この窓口に覚えた値か、窓口のデータ）。直すたびに端末に覚える
+  const office = officeKey(pref, input.city, input.dept);
+  const [to, setTo] = useState<InquiryTo>(() => loadInquiryTo(office) ?? toOf(contact));
+  const [saved, setSaved] = useState<boolean | null>(null);
+  const [remembered, setRemembered] = useState(() => loadInquiryTo(office) !== null);
+  // FAX 送付状の送付枚数（送付状＋照会文。添付を足すのは利用者）
+  const [pages, setPages] = useState(2);
+
+  const tpl = templateOf(settings, pick);
+  const standard = tpl.id === STANDARD_ID;
+  const letter = inquiryLetter(input);
+  const { values } = inquiryValues(input);
+  // 標準は今の照会文そのもの（letterText と同じ文になることはテストで確かめている）
+  const text = standard ? letterText(letter) : mergeTemplate(tpl.body, values).text;
+  const subject = mergeSubject(tpl.subject, values).text;
+  const unknown = standard ? [] : unknownTokens(tpl.subject, tpl.body);
+  const ready = standard || tpl.body.trim() !== "";
+
+  const choose = (id: string) => {
+    setPick(id);
+    // 次に開いたときも同じひな形（保存できなくても、この画面では選んだまま）
+    saveInquirySettings({ ...settings, pick: id });
+  };
+  const changeTo = (next: InquiryTo) => {
+    setTo(next);
+    const ok = saveInquiryTo(office, next);
+    setSaved(ok);
+    if (ok) setRemembered(true);
+  };
+  const resetTo = () => {
+    forgetInquiryTo(office);
+    setTo(toOf(contact));
+    setSaved(null);
+    setRemembered(false);
+  };
+  const go = (t: Tab) => {
+    if (t === tab) return;
+    setDir(t === "send" ? "r" : "l");
+    setTab(t);
+  };
+  const onTabKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const next: Tab = tab === "letter" ? "send" : "letter";
+    go(next);
+    document.getElementById(`iq-tab-${next}`)?.focus();
+  };
+  // 押した操作の中で印刷を呼ぶ（iPhone はプリントの画面から PDF にもできる）。印刷の対象は body の data-print（app/globals.css）
+  const print = (mode: "letter" | "fax") => {
+    document.body.dataset.print = mode;
+    window.print();
+  };
+
+  return (
+    <>
+      <Sheet title="道路種別の照会文" open onClose={() => !edit && onClose()}>
+        <div className={`${DOC_BODY} text-ink`}>
+          {/* 照会文 ⇄ 送る（切り替えてもシートの大きさは変わらない） */}
+          <div role="tablist" aria-label="照会文と送り方" className="relative grid h-[44px] shrink-0 grid-cols-2 rounded-full bg-[#eef2f7]">
+            <span aria-hidden className="td-seg-pill absolute inset-y-[3px] left-[3px] w-[calc(50%-3px)] rounded-full bg-white shadow-[0_1px_4px_rgba(20,45,85,0.16)]" style={{ transform: tab === "send" ? "translateX(100%)" : "none" }} />
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                id={`iq-tab-${t.key}`}
+                role="tab"
+                aria-selected={tab === t.key}
+                aria-controls="iq-panel"
+                tabIndex={tab === t.key ? 0 : -1}
+                onClick={() => go(t.key)}
+                onKeyDown={onTabKey}
+                className="relative z-[1] h-[44px] rounded-full text-[14px] font-bold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2f7cf6]"
+                style={{ color: tab === t.key ? NAVY : "#5f6f86" }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div key={tab} id="iq-panel" role="tabpanel" aria-labelledby={`iq-tab-${tab}`} className="td-pane mt-2 flex min-h-0 flex-1 flex-col" data-dir={dir ?? undefined}>
+            {tab === "letter" ? (
+              <>
+                <p className="shrink-0 text-[12px] leading-[1.6] text-muted dense:leading-[1.5]">{lead}</p>
+                <TemplateChips list={settings.list} pick={tpl.id} onPick={choose} onEdit={() => setEdit(true)} />
+                {extra && <div className="-mt-1 shrink-0">{extra}</div>}
+                {unknown.length > 0 && <p className="mt-1.5 shrink-0 rounded-xl bg-[#fff4e5] px-3 py-1.5 text-[11.5px] leading-[1.5] text-[#7a5a2a] [overflow-wrap:anywhere]">入らない項目：{unknown.join("・")}（書いたまま残ります。「ひな形を作る・直す」で直せます）</p>}
+                <div className={`${DOC_PANE} mt-2`} aria-label="照会文">
+                  <div className="rounded-[10px] bg-white px-3.5 py-3 shadow-[0_1px_4px_rgba(20,45,85,0.10)]">
+                    {standard ? <LetterView letter={letter} /> : ready ? <TextLetter text={text} /> : <p className="text-[12.5px] leading-[1.7] text-muted">このひな形は本文が空です。「ひな形を作る・直す」で本文を入れてください。</p>}
+                  </div>
+                </div>
+                <DocActions text={text} onPrint={() => print("letter")} printLabel="印刷・PDF" />
+                {note && <p className="mt-2 shrink-0 text-[10.5px] leading-[1.5] text-muted [@media(max-height:720px)]:hidden">{note}</p>}
+              </>
+            ) : (
+              <SendPanel
+                dept={input.dept}
+                templateName={tpl.name.trim() || "名前なし"}
+                subject={subject}
+                body={text}
+                ready={ready}
+                unknown={unknown}
+                to={to}
+                onTo={changeTo}
+                saved={saved}
+                canReset={remembered}
+                onReset={resetTo}
+                contact={contact}
+                faxFormat={settings.fax}
+                pages={pages}
+                onPages={setPages}
+                onPrintFax={() => print("fax")}
+              />
+            )}
           </div>
         </div>
-        <DocActions text={letterText(letter)} onPrint={() => window.print()} printLabel="印刷・PDF" />
-        {note && <p className="mt-2 shrink-0 text-[10.5px] leading-[1.5] text-muted [@media(max-height:720px)]:hidden">{note}</p>}
-      </div>
-      <PrintLetter letter={letter} />
-    </Sheet>,
-    document.body,
+        <PrintLetter
+          letter={letter}
+          text={standard ? undefined : text}
+          cover={<FaxCover to={input.dept} fax={to.fax} date={letter.date} pages={pages} from={letter.from} blankFrom={letter.blankFrom} subject={subject} />}
+        />
+      </Sheet>
+      {/* ひな形を作る・直す（照会文のシートの上に重ねる。閉じると、選べるひな形が新しくなっている） */}
+      {edit &&
+        createPortal(
+          <div className="theme-navy relative z-[60]">
+            <TemplatesSheet open onClose={() => setEdit(false)} input={input} />
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 

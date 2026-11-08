@@ -69,7 +69,7 @@ import {
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { buildReport, type ReportDetail } from "@/lib/app/report";
 import { docText } from "@/lib/app/doc";
-import { inquiryLetter } from "@/lib/app/inquiry-letter";
+import { inquiryDeptOf, inquiryInputOf } from "@/lib/app/inquiry-template";
 import { parcelDoc } from "@/lib/app/parcel-doc";
 import { publishDocStatus } from "@/lib/app/doc-status";
 import { dataHints } from "@/lib/app/todo";
@@ -139,6 +139,7 @@ import { RecordSheet } from "./record-sheet";
 import { TodoSheet } from "./todo-sheet";
 import { setLandingSource } from "./flight-handoff";
 import { SenderInline, SenderSheet } from "./sender-editor";
+import { TemplatesSheet } from "./template-editor";
 import { useSitePhotos } from "./site-photos";
 import { Expand } from "./research";
 import { SKY_EVENT, skyTop, useShrink, useSkyClock } from "./sky";
@@ -225,7 +226,7 @@ export type MobileAppProps = {
   onHome: () => void;
 };
 
-type AppSheet = "help" | "cities" | "sources" | "install" | "storage" | "sender" | null;
+type AppSheet = "help" | "cities" | "sources" | "install" | "storage" | "sender" | "templates" | null;
 
 /** ホームの最近の検索 ⇄ 履歴のつながる動き（morphTo）で、行・板・検索欄のほかに名前を付ける所（ロゴの帯・ページの名前） */
 const MORPH_SHELL: ReadonlySet<string> = new Set(["app-brand", "page-title"]);
@@ -1098,6 +1099,8 @@ export function MobileApp(props: MobileAppProps) {
           onClose={() => setSheet(null)}
         />
         <SenderSheet open={sheet === "sender"} onClose={() => setSheet(null)} />
+        {/* 照会の文面（ひな形）。物件を開いていれば、その物件の値で下見する（無ければ見本） */}
+        <TemplatesSheet open={sheet === "templates"} onClose={() => setSheet(null)} result={ok} />
         <StorageSheet
           open={sheet === "storage"}
           onClose={() => setSheet(null)}
@@ -1147,6 +1150,7 @@ export function MobileApp(props: MobileAppProps) {
           onSources={() => setSheet("sources")}
           onStorage={() => setSheet("storage")}
           onSender={() => setSheet("sender")}
+          onTemplates={() => setSheet("templates")}
           onInstall={() => setSheet("install")}
           standalone={standalone}
           onMore={() => go("account")}
@@ -1588,12 +1592,8 @@ function PropertyView({
   const m = result.municipality;
   const p = result.parcel;
   const found = p && !result.picked ? p : undefined;
-  // 道路種別の照会文の宛先：分かっていれば道路種別の窓口（市区町村名を頭に）、無ければ建築の担当課
-  const inquiryDept = result.contact
-    ? /^(東京都|\S{2,3}県)\s/.test(result.contact.dept)
-      ? result.contact.dept
-      : `${m.name} ${result.contact.dept}`
-    : `${m.name} 建築指導の担当課`;
+  // 道路種別の照会文の宛先：分かっていれば道路種別の窓口（市区町村名を頭に）、無ければ建築の担当課（lib/app/inquiry-template.ts）
+  const inquiryDept = inquiryDeptOf(result);
   const title = `${displayAddress(result.matchedAddress)}${found ? ` ${chibanLabel(found.chibanRaw)}` : ""}`;
   const longTab = TABS.find((t) => t.key === tab)?.long ?? "";
 
@@ -2510,12 +2510,14 @@ function PropertyView({
         photos={photos}
       />
       {/* 役所の照会文：建築の担当課（分かっていれば窓口の名前）宛ての、日付・差出人・記・回答欄つきの依頼文（FAX は A4 で印刷）。
-          物件の筆の地番が分かっていれば入れる */}
+          物件の筆の地番が分かっていれば入れる。「送る」で、利用者のメール・FAX・電話のアプリを開く（自動では送らない） */}
       <InquirySheet
         open={inquiry}
         onClose={() => setInquiry(false)}
-        lead={`${inquiryDept} あての照会文です。メールは「コピー」して本文に、FAX は「印刷・PDF」で A4 にして送れます。${result.contact?.noPhoneInquiry ? "この市区町村は電話では答えてもらえません。" : ""}`}
-        letter={inquiryLetter({ address: result.matchedAddress, chiban: found ? registryChiban(found.chibanRaw) : undefined, dept: inquiryDept, sender, date: new Date() })}
+        lead={`${inquiryDept} あての照会文です。中身を確かめて、「送る」からメール・FAX で送れます（コピー・印刷もできます）。${result.contact?.noPhoneInquiry ? "この市区町村は電話では答えてもらえません。" : ""}`}
+        input={inquiryInputOf(result, sender, new Date())}
+        pref={m.pref}
+        contact={result.contact}
         extra={<SenderInline />}
         note="役所によって照会の受け方（窓口のみ・FAX・メール・決まった様式）が違います。先に電話か公式サイトで確かめてください。住宅地図・公図の写し（物件に印）を添えると早く答えてもらえます。"
       />

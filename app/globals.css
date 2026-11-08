@@ -1684,6 +1684,7 @@ html[data-home="night"] .sf-ghost {
  * 印刷・PDF 保存：結果が出ていれば、画面（地図・パネル・シート）は出さず、調査メモ（components/print-sheet.tsx）だけを A4 に出す。
  * 案内図のシートを開いているあいだ（body の data-print="guide"）は、調査メモの代わりに案内図（components/guide-map.tsx）を出す。
  * 照会文のシートを開いているあいだ（data-print="letter"。スマホ）は、照会文の A4 の1枚（components/app/doc-view.tsx の PrintLetter）を出す。
+ * 照会文のシートの「印刷して FAX」（data-print="fax"）は、1枚目に FAX 送付状（components/app/inquiry-send.tsx の FaxCover）、2枚目から照会文。
  * 結果が出ていない画面（ホーム・候補選び）は、これまでどおり画面をそのまま印刷する
  */
 .print-sheet,
@@ -1732,6 +1733,22 @@ html[data-home="night"] .sf-ghost {
   body[data-print="letter"] > .print-letter {
     display: block;
     padding: 0 3mm;
+  }
+  body[data-print="fax"] > .print-sheet {
+    display: none !important;
+  }
+  body[data-print="fax"] > .print-letter {
+    display: block;
+    padding: 0 3mm;
+  }
+  .print-fax-cover {
+    display: none;
+  }
+  body[data-print="fax"] .print-fax-cover {
+    display: block;
+    break-after: page;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }
 
@@ -2943,6 +2960,12 @@ html[data-home="night"] .sf-ghost {
   .rp-in,
   .rp-pane[data-dir] {
     animation: none;
+  }
+}
+/* 照会の文面（ひな形）のシートの「元に戻す」（components/app/template-editor.tsx）：下から少し浮き上がって出る。動きを減らす設定では出るだけ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .iq-toast {
+    animation: fav-toast-in 0.42s cubic-bezier(0.2, 0.9, 0.25, 1.12) backwards;
   }
 }
 

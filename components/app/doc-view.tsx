@@ -2,7 +2,7 @@
 
 // スマホの書類の見せ方。lib/app/doc.ts の中身（題・章・行）を、見出し・表・印で読みやすく見せる（コピーする文は docText）。
 // 注意は赤い▲、確かめる所は「要確認」の札、やることは□（済みは緑の☑）、確かめる先の地図・ページは「開く」の札（押すと開く）。
-// 照会文は手紙の形（LetterView）で見せ、A4 の1枚（PrintLetter）にも印刷できる
+// 照会文は手紙の形（LetterView。自分のひな形は書いたとおりの行で TextLetter）で見せ、A4 の1枚（PrintLetter）にも印刷できる
 import { ExternalLink, Square, SquareCheck, TriangleAlert } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -206,11 +206,21 @@ export function LetterView({ letter, print }: { letter: Letter; print?: boolean 
   );
 }
 
-/** 照会文の A4 の1枚（画面には出ない。照会文のシートを開いている間だけ、印刷の対象になる。app/globals.css の .print-letter） */
-export function PrintLetter({ letter }: { letter: Letter }) {
+/** 自分のひな形の照会文（書いたとおりの行で。print：A4 に印刷する大きさ） */
+export function TextLetter({ text, print }: { text: string; print?: boolean }) {
+  return <div className={`${print ? "text-[10.5pt] leading-[1.6]" : "text-[12.5px] leading-[1.7]"} whitespace-pre-wrap text-[#1d1b18] [overflow-wrap:anywhere]`}>{text}</div>;
+}
+
+/**
+ * 照会文の A4 の1枚（画面には出ない。照会文のシートを開いている間だけ、印刷の対象になる。app/globals.css の .print-letter）。
+ * text は自分のひな形の文（書いたとおりの行で印刷する。無ければ標準の手紙の形）。cover は印刷して FAX するときの送付状
+ * （body の data-print="fax" のときだけ1枚目に出る）
+ */
+export function PrintLetter({ letter, text, cover }: { letter: Letter; text?: string; cover?: ReactNode }) {
   return createPortal(
     <div className="print-letter bg-white">
-      <LetterView letter={letter} print />
+      {cover}
+      {text === undefined ? <LetterView letter={letter} print /> : <TextLetter text={text} print />}
     </div>,
     document.body,
   );

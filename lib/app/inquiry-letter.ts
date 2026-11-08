@@ -29,6 +29,15 @@ export const LETTER_ASK = [
   "公道（市道など）か私道か",
 ];
 
+/** 地番が分からないときの記入欄（照会文の「地番：」の後ろ） */
+export const CHIBAN_BLANK = "（　　　　　　　）";
+
+/** 記の「ご教示いただきたい事項」の行（(1) 〜 (5)） */
+export const askLines = (): string[] => LETTER_ASK.map((a, i) => `(${i + 1}) ${a}`);
+
+/** ご回答欄の1行（コピー・共有する文の形） */
+export const answerLine = (a: { label: string; value: string }): string => `${a.label}：${a.value}`;
+
 /** 地番の書き方を、書類の形（3556番1）にする。枝番の無い地番は「3556番」 */
 export function formalChiban(chiban: string): string {
   const s = half(chiban).trim();
@@ -53,8 +62,8 @@ export function inquiryLetter({ address, chiban, dept, sender, date }: { address
       "お忙しいところ恐れ入りますが、よろしくお願いいたします。",
     ],
     items: [
-      { title: "所在地", lines: [half(address), `地番：${chiban ? formalChiban(chiban) : "（　　　　　　　）"}`] },
-      { title: "ご教示いただきたい事項", lines: LETTER_ASK.map((a, i) => `(${i + 1}) ${a}`) },
+      { title: "所在地", lines: [half(address), `地番：${chiban ? formalChiban(chiban) : CHIBAN_BLANK}`] },
+      { title: "ご教示いただきたい事項", lines: askLines() },
       { title: "添付資料", lines: ["住宅地図の写し（物件の位置に印）", "公図の写し"] },
     ],
     answer: [
@@ -89,6 +98,6 @@ export function letterText(l: Letter): string {
     "",
     "――――――――――――――――――――",
     "ご回答欄（ご記入のうえ、FAX・メールでご返信いただけますと幸いです）",
-    ...l.answer.map((a) => `${a.label}：${a.value}`),
+    ...l.answer.map(answerLine),
   ].join("\n");
 }

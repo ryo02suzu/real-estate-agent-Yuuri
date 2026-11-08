@@ -9,7 +9,7 @@
 // まだ何も調べていないときは、最近の検索の代わりに「はじめての方へ」（住所と地番の例。押すとそのまま調べる）を出す。
 // 写真の上の字は白（読みやすいよう薄い影）。寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。
 // 縦は画面の高さに合わせ、検索欄と最近の検索のあいだの空きで伸び縮みする（背の低い画面でもスクロールせずに収まる）
-import { ArrowRight, Bell, Building2, ChevronRight, CircleHelp, Database, Download, LoaderCircle, LocateFixed, Map as MapIcon, MapPin, MapPinned, Search, Smartphone, Sparkles, TriangleAlert, UserRound, X } from "lucide-react";
+import { ArrowRight, Bell, Building2, ChevronRight, CircleHelp, Database, Download, FilePenLine, LoaderCircle, LocateFixed, Map as MapIcon, MapPin, MapPinned, Search, Smartphone, Sparkles, TriangleAlert, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { monthDay, placeParts } from "@/lib/app/scene";
 import { homePart, type HomePart } from "@/lib/app/sun";
@@ -412,7 +412,7 @@ function SectionHead({ title, onMore, className = "", style }: { title: string; 
   );
 }
 
-/** ホームの右上のメニュー（≡）。下のメニューに入れていない、ときどき使うもの（地図で選ぶ・お知らせ・使い方・データ・アプリ・アカウント） */
+/** ホームの右上のメニュー（≡）。下のメニューに入れていない、ときどき使うもの（地図で選ぶ・お知らせ・使い方・データ（書類の差出人・照会の文面も）・アプリ・アカウント） */
 export function HomeMenu({
   open,
   onClose,
@@ -424,6 +424,7 @@ export function HomeMenu({
   onSources,
   onStorage,
   onSender,
+  onTemplates,
   onInstall,
   standalone,
   onMore,
@@ -445,6 +446,8 @@ export function HomeMenu({
   onStorage: () => void;
   /** 書類の差出人（会社名・担当者。照会文・調査メモ・案内図に入れる） */
   onSender?: () => void;
+  /** 照会の文面（ひな形）：照会文の件名・本文のひな形と、FAX をメールで送るサービスの宛先の形（components/app/template-editor.tsx） */
+  onTemplates?: () => void;
   /** ホーム画面に追加 */
   onInstall: () => void;
   standalone: boolean;
@@ -474,6 +477,7 @@ export function HomeMenu({
         { Icon: Database, title: "データの出典と時点", sub: "国・自治体の公開データ", run: onSources },
         { Icon: Download, title: "調査記録の書き出し・読み込み", sub: "機種変更・データ消失への備え", run: onStorage },
         ...(onSender ? [{ Icon: Building2, title: "書類の差出人", sub: "照会文・調査メモ・案内図に入れる会社名・担当者", run: onSender }] : []),
+        ...(onTemplates ? [{ Icon: FilePenLine, title: "照会の文面（ひな形）", sub: "照会文の件名・本文のひな形と、FAX をメールで送る宛先の形", run: onTemplates }] : []),
       ],
     },
     {
