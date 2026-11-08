@@ -14,6 +14,11 @@ export type SheetIndex = {
    * このときの URL は、その図の中心で開く地図システムの URL
    */
   howto?: string;
+  /**
+   * 図が ZIP にまとめて配られている県（青森県の道路種別図）。cells の URL は ZIP を落とす入口のページで、
+   * 画面では「図面 ○○（ZIP の中）」と呼び、ボタンは入口のページを開く
+   */
+  zip?: boolean;
   /** [図の名前, PDFのURL, 中心x, 中心y, 幅, 高さ]。幅・高さが無ければ w, h を使う */
   cells: ([string, string, number, number] | [string, string, number, number, number, number])[];
   /**
@@ -32,6 +37,8 @@ export type SheetHit = {
   bounds: [number, number, number, number];
   /** 地図システムで図を開いてもらう市の手順（SheetIndex.howto） */
   howto?: string;
+  /** 図が ZIP にまとめて配られている（url は ZIP を落とす入口のページ） */
+  zip?: true;
   /** 物件が図の端に近いとき、隣の図 */
   neighbor?: { label: string; url: string };
   /** 市全体で1枚の図（西東京市など）。画面では「図 ○○」ではなく「市全体の図」と呼ぶ */
@@ -95,6 +102,7 @@ export function findSheet(ix: SheetIndex, lat: number, lng: number, town?: strin
   if (!inside) return undefined;
   const hit: SheetHit = { label: inside.label, url: inside.url, where: where(inside.u + 0.5, inside.v + 0.5), bounds: boundsOf(ix, inside.cell) };
   if (ix.howto) hit.howto = ix.howto.replaceAll("{label}", inside.label);
+  if (ix.zip) hit.zip = true;
   if (ix.cells.length === 1) hit.whole = true;
   // 端から図の1割以内なら、そちら側の隣の図も出す（索引図の位置合わせの誤差を見込む）
   const edge = 0.4;

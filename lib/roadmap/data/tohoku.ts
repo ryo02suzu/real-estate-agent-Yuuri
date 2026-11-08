@@ -1,50 +1,9 @@
 // 東北6県の市町村のうち、道路種別の公式図・問い合わせ先をまだ登録していない市町村。市区町村コードと名前は国土地理院の市区町村表（maps.gsi.go.jp/js/muni.js）から。
 // 道路種別の公式図・問い合わせ先を調べる前の市町村を coverage: "unknown"（調査中）でここに置き、調べた県から data/<県>.ts に移す。
-// 登録済み：宮城県（data/miyagi.ts）
+// 登録済み：宮城県（data/miyagi.ts）・青森県（data/aomori.ts）
 import type { Municipality } from "../municipalities";
 
 export const TOHOKU_PENDING: Municipality[] = [
-  // 青森県（40）
-  { pref: "青森県", name: "青森市", codes: ["02201"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "弘前市", codes: ["02202"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "八戸市", codes: ["02203"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "黒石市", codes: ["02204"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "五所川原市", codes: ["02205"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "十和田市", codes: ["02206"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "三沢市", codes: ["02207"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "むつ市", codes: ["02208"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "つがる市", codes: ["02209"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "平川市", codes: ["02210"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "平内町", codes: ["02301"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "今別町", codes: ["02303"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "蓬田村", codes: ["02304"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "外ヶ浜町", codes: ["02307"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "鰺ヶ沢町", codes: ["02321"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "深浦町", codes: ["02323"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "西目屋村", codes: ["02343"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "藤崎町", codes: ["02361"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "大鰐町", codes: ["02362"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "田舎館村", codes: ["02367"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "板柳町", codes: ["02381"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "鶴田町", codes: ["02384"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "中泊町", codes: ["02387"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "野辺地町", codes: ["02401"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "七戸町", codes: ["02402"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "六戸町", codes: ["02405"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "横浜町", codes: ["02406"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "東北町", codes: ["02408"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "六ヶ所村", codes: ["02411"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "おいらせ町", codes: ["02412"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "大間町", codes: ["02423"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "東通村", codes: ["02424"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "風間浦村", codes: ["02425"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "佐井村", codes: ["02426"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "三戸町", codes: ["02441"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "五戸町", codes: ["02442"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "田子町", codes: ["02443"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "南部町", codes: ["02445"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "階上町", codes: ["02446"], coverage: "unknown", maps: [] },
-  { pref: "青森県", name: "新郷村", codes: ["02450"], coverage: "unknown", maps: [] },
   // 岩手県（33）
   { pref: "岩手県", name: "盛岡市", codes: ["03201"], coverage: "unknown", maps: [] },
   { pref: "岩手県", name: "宮古市", codes: ["03202"], coverage: "unknown", maps: [] },

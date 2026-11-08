@@ -110,7 +110,7 @@ export function SheetPreview({
           className="bg-gold mt-3 flex items-center justify-center gap-2 rounded-xl py-3 text-[14px] font-semibold text-white"
         >
           <MapIcon className="h-5 w-5" />
-          {sheet.howto ? `地図で図 ${sheet.label} を開く` : `${sheetName(sheet)}の PDF を開く`}
+          {sheet.zip ? `県のページを開く（図面 ${sheet.label}）` : sheet.howto ? `地図で図 ${sheet.label} を開く` : `${sheetName(sheet)}の PDF を開く`}
         </a>
       </Sheet>
       <a
