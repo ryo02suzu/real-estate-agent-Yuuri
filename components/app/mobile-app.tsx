@@ -2628,7 +2628,19 @@ function PlaceNote({
   const asChiban = chibanArea
     ? chibanQueryOf(query, /丁目/.test(result.town))
     : undefined;
-  if (parcelMiss) {
+  if (parcel && result.jukyoAlt) {
+    // 入力が登記の地番の書き方（「14番1」）なので地番の筆を出した。国土地理院は住居表示（「14番1号」）として当てていた
+    const alt = displayAddress(result.jukyoAlt);
+    short = `地番 ${registryChiban(parcel.chibanRaw)} として表示しています`;
+    text = (
+      <>
+        {`入力の「${registryChiban(parcel.chibanRaw).replace(/-/g, "番")}」を登記の地番として探しました。住居表示の「${alt}」とは別の場所のことがあります。`}
+        <span className="mt-[5px] flex">
+          <MiniButton onClick={() => onPick(result.jukyoAlt!)}>住居表示「{alt}」で探す</MiniButton>
+        </span>
+      </>
+    );
+  } else if (parcelMiss) {
     warn = true;
     short =
       parcelMiss.reason === "not_found"

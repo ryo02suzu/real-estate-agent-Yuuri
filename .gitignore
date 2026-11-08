@@ -57,3 +57,6 @@ __pycache__/
 
 # ホームの街の焼き込みの作業場所（約 2GB）
 scripts/city-bake/work/
+
+# Claude Code の作業用の git worktree
+.claude/worktrees/

@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import KOZU_SOURCE from "./data/kozu-source.json";
-import { lookup } from "./index";
+import { lookup, registryStyle } from "./index";
+import { loadParcelIndex } from "./parcel-index";
 import { mergeParcelSources, withoutCities } from "./parcel-tiles";
 import { sankoCovers } from "./sanko-data";
 import {
@@ -27,6 +28,7 @@ import {
   tileOf,
   townFromAddress,
   townKey,
+  townMatches,
   type ParcelFeature,
   type ParcelSource,
   type Polygon,
@@ -495,6 +497,117 @@ describe("lookup で地番を探す", () => {
     const r = await lookup("埼玉県熊谷市下奈良391番地", { parcels: fakeSource({ [`${SX},${SY}`]: [{ kuiki: "熊谷市_下奈良___", chiban: "391-1" }] }) });
     expect(r.status === "ok" && r.approximate).toBe(true);
     expect(r.status === "ok" && r.parcelMiss).toEqual({ chiban: "391", reason: "not_found", similar: ["391-1"] });
+  });
+
+  /** 国土地理院の住所検索が title の住所を返す fetch（逆ジオコーダは世田谷区弦巻） */
+  const stubGsi = (title: string, muniCd = "13112", town = "弦巻三丁目") =>
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          url.includes("AddressSearch") ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title } }] : { results: { muniCd, lv01Nm: town } },
+      })),
+    );
+  const YUMI = (c: string) => fakeSource({ [`${SX},${SY}`]: [{ kuiki: "世田谷区_弦巻_３丁目__", chiban: c }] });
+
+  // 2026-11-08 の総当たり（地価公示・地価調査の所在 400地点）：所在の「弦巻3丁目14番1」を国土地理院が住居表示の「14番1号」として当て、
+  // 地番の筆を探さずに住居表示の地点を出していた（筆のデータがある 164地点のうち 32地点。うち 30地点は入力と同じ地番の筆がその場所にあった）
+  it("登記の書き方（「14番1」号なし）は、国土地理院が住居表示（14番1号）に当てても地番の筆を出し、住居表示の住所を添える", async () => {
+    stubGsi("東京都世田谷区弦巻三丁目１４番１号");
+    const r = await lookup("東京都世田谷区弦巻3丁目14番1", { parcels: YUMI("14-1") });
+    expect(r.status === "ok" && [r.parcel?.chiban, r.jukyoAlt]).toEqual(["14-1", "東京都世田谷区弦巻三丁目１４番１号"]);
+  });
+
+  it("住居表示が街区（「22番」）までしか合わず枝番が残る「22-39」も、地番の筆を先に探す", async () => {
+    stubGsi("東京都世田谷区弦巻三丁目２２番");
+    const r = await lookup("東京都世田谷区弦巻3丁目22-39", { parcels: YUMI("22-39") });
+    expect(r.status === "ok" && r.parcel?.chiban).toBe("22-39");
+  });
+
+  it("住居表示の書き方（「14-1」で号まで合う・「14番1号」）は、今までどおり住居表示の地点（地番を探さない）", async () => {
+    stubGsi("東京都世田谷区弦巻三丁目１４番１号");
+    const a = await lookup("東京都世田谷区弦巻3丁目14-1", { parcels: YUMI("14-1") });
+    expect(a.status === "ok" && [a.parcel, a.jukyoAlt]).toEqual([undefined, undefined]);
+    const b = await lookup("東京都世田谷区弦巻3丁目14番1号", { parcels: YUMI("14-1") });
+    expect(b.status === "ok" && b.parcel).toBe(undefined);
+  });
+
+  it("地番として探して筆が無ければ、住居表示の地点のまま（何も言わない）", async () => {
+    stubGsi("東京都世田谷区弦巻三丁目１４番１号");
+    const r = await lookup("東京都世田谷区弦巻3丁目14番1", { parcels: YUMI("99-9") });
+    expect(r.status === "ok" && [r.parcel, r.parcelMiss, r.jukyoAlt, r.matchedAddress]).toEqual([undefined, undefined, undefined, "東京都世田谷区弦巻三丁目１４番１号"]);
+  });
+
+  it("登記の書き方かどうか（registryStyle）", () => {
+    for (const s of ["弦巻3丁目14番1", "中希望が丘22番39", "高勢町2丁目150番地", "下奈良391番地3", "下奈良1234番地の5", "地番 青木2丁目217番8"]) expect(registryStyle(s)).toBe(true);
+    for (const s of ["弦巻3丁目14番1号", "弦巻3丁目14-1", "弦巻3丁目14番", "神南1-19-11"]) expect(registryStyle(s)).toBe(false);
+  });
+});
+
+describe("地番の索引（町の代表点から遠い筆）", () => {
+  // 2026-11-08 の総当たり：大桑村大字長野2922番2・東吾妻町大字岩井1015番3 など、広い大字で国土地理院の町の代表点から遠い所の筆は、
+  // 代表点のまわり 3 タイルに同じ町の筆が無く「地図データがない地域」、または探し切れず「見つかりません」になっていた
+  const FAR = { [`${SX + 9},${SY + 6}`]: [{ kuiki: "木曽郡大桑村_大字長野___", chiban: "2922-2" }, { kuiki: "木曽郡大桑村_大字長野___", chiban: "2921" }] };
+  it("索引が無ければ今までどおり（代表点のまわりに町の筆が無いので地図データのない地域）", async () => {
+    const r = await searchParcel({ city: "大桑村", town: "長野", chiban: "2922-2" }, START, fakeSource(FAR));
+    expect(r.status).toBe("no_map");
+  });
+  it("索引に番号の入ったタイルがあれば、そのタイルを先に開いて見つける（遠くても）", async () => {
+    const src = fakeSource(FAR);
+    const index = { k: { "木曽郡大桑村_大字長野___": [[SX + 9, SY + 6, 2900, 2930] as [number, number, number, number], [SX + 1, SY, 10, 50] as [number, number, number, number]] } };
+    const r = await searchParcel({ city: "大桑村", town: "長野", chiban: "2922番2" }, START, src, { index });
+    expect(r.status === "found" && r.parcel.chiban).toBe("2922-2");
+    // 番号の入っていないタイル（10〜50 番）は開かない
+    expect(src.reads[0]).toBe(`${SX + 9},${SY + 6}`);
+    expect(src.reads).not.toContain(`${SX + 1},${SY}`);
+  });
+  it("索引の町が合わない・番号が入っていなければ、今までの探し方に続ける", async () => {
+    const near = fakeSource({ [`${SX},${SY}`]: [{ kuiki: "熊谷市_下奈良___", chiban: "391-3" }] });
+    const index = { k: { "熊谷市_上奈良___": [[SX + 9, SY + 6, 1, 999] as [number, number, number, number]] } };
+    const r = await searchParcel({ city: "熊谷市", town: "下奈良", chiban: "391-3" }, START, near, { index });
+    expect(r.status === "found" && r.parcel.chiban).toBe("391-3");
+  });
+});
+
+describe("地番の索引の読み込み（loadParcelIndex）", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("置き場所が無い・市区町村コードの形でない・404・形が違うときは null。正しい形は返し、同じ URL は1回だけ読む", async () => {
+    expect(await loadParcelIndex("20406", "")).toBeNull();
+    expect(await loadParcelIndex("abc", "https://x.test/i/{code}.json")).toBeNull();
+    const fetchMock = vi.fn(async (url: string) =>
+      url.includes("404") ? { ok: false, json: async () => null } : url.includes("bad") ? { ok: true, json: async () => ({ v: 2 }) } : { ok: true, json: async () => ({ v: 1, z: 16, k: { "木曽郡大桑村_大字長野___": [[1, 2, 3, 4]] } }) },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await loadParcelIndex("20406", "https://x.test/404/{code}.json")).toBeNull();
+    expect(await loadParcelIndex("20406", "https://x.test/bad/{code}.json")).toBeNull();
+    const ok = await loadParcelIndex("20406", "https://x.test/ok/{code}.json");
+    expect(ok?.k["木曽郡大桑村_大字長野___"]).toEqual([[1, 2, 3, 4]]);
+    await loadParcelIndex("20406", "https://x.test/ok/{code}.json");
+    expect(fetchMock.mock.calls.filter(([u]) => String(u).includes("/ok/20406.json"))).toHaveLength(1);
+  });
+});
+
+describe("地番区域の町の名前の合わせ方（townMatches）", () => {
+  // 2026-11-08 の総当たりで見つけた書き方：小字の欄に町の続き（豊明市・かほく市・西尾市・白山市）、大字の欄が空（阿南町）
+  it("大字＋丁目のほか、小字の欄に町の続き・丁目を入れる地番区域、大字の欄が空の地番区域にも当たる", () => {
+    expect(townMatches("豊明市_栄町__上姥子_", townKey("栄町上姥子"))).toBe(true);
+    expect(townMatches("かほく市_白尾__ハ_", townKey("白尾ハ"))).toBe(true);
+    expect(townMatches("下伊那郡阿南町___字新野_", townKey("新野"))).toBe(true);
+    expect(townMatches("名古屋市中区_栄__三丁目_", townKey("栄三丁目"))).toBe(true);
+    expect(townMatches("川口市_青木_２丁目__", townKey("青木二丁目"))).toBe(true);
+    expect(townMatches("さいたま市見沼区_大字南中丸___", townKey("大字南中丸"))).toBe(true);
+  });
+  it("丁目の書き方だけ違うもの：地番区域が大字だけ（住所の丁目は地番の区域でない）、入力に丁目が無い", () => {
+    expect(townMatches("松戸市_古ケ崎___", townKey("古ヶ崎四丁目"))).toBe(true);
+    expect(townMatches("松戸市_古ケ崎_４丁目__", townKey("古ヶ崎"))).toBe(true);
+  });
+  it("別の町には当たらない（名前の一部・別の丁目・別の大字）", () => {
+    expect(townMatches("川口市_青木_２丁目__", townKey("青木三丁目"))).toBe(false);
+    expect(townMatches("豊明市_栄町__上姥子_", townKey("栄町下姥子"))).toBe(false);
+    expect(townMatches("刈谷市_小山町___", townKey("小山"))).toBe(false);
+    expect(townMatches("刈谷市_一ツ木町_６丁目__", townKey("一ツ木町五丁目"))).toBe(false);
+    expect(townMatches("熊谷市_下奈良___", "")).toBe(false);
   });
 });
 

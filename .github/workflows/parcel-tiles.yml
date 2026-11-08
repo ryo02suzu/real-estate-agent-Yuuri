@@ -134,6 +134,15 @@ jobs:
             [ "$i" -lt 3 ] || exit 1
             echo "書き込みに失敗。$((i * 30)) 秒後にやり直す"; sleep $((i * 30))
           done
+      # 地番の索引（市区町村コードごとの JSON。アプリの地番検索が、町の代表点から遠い筆も最初に開くタイルで見つける。build_pref.py の write_index）
+      - name: 地番の索引を R2 に置く
+        run: |
+          ls work/index | head -3; echo "$(ls work/index | wc -l) 市区町村"
+          for i in 1 2 3; do
+            aws s3 cp work/index/ "s3://$R2_BUCKET/parcels/$YEAR/index/" --recursive --content-type application/json --endpoint-url "$R2_ENDPOINT" --only-show-errors && break
+            [ "$i" -lt 3 ] || exit 1
+            echo "書き込みに失敗。$((i * 30)) 秒後にやり直す"; sleep $((i * 30))
+          done
 
   merge:
     needs: [check, build]
@@ -201,6 +210,16 @@ jobs:
           grep -qi "^access-control-allow-origin:" headers.txt || { echo "::error::CORS のヘッダがありません"; exit 1; }
           [ "$(head -c 7 head.bin)" = "PMTiles" ] || { echo "::error::PMTiles ではありません"; exit 1; }
           echo "URL=$url" >> "$GITHUB_ENV"
+          # 地番の索引も公開 URL で読めるか（今回作った都県のうち最初の都県の、最初の市区町村で確かめる）
+          idx="${R2_PUBLIC_URL%/}/parcels/$YEAR/index/{code}.json"
+          first=$(aws s3 ls "s3://$R2_BUCKET/parcels/$YEAR/index/" --endpoint-url "$R2_ENDPOINT" | awk '{print $4}' | grep '\.json$' | head -1)
+          if [ -n "$first" ]; then
+            curl -fsS -H "Origin: https://michilu.vercel.app" -o idx.json "${R2_PUBLIC_URL%/}/parcels/$YEAR/index/$first"
+            jq -e '.v == 1 and (.k | type == "object")' idx.json > /dev/null || { echo "::error::地番の索引の形が違います: $first"; exit 1; }
+            echo "INDEX=$idx" >> "$GITHUB_ENV"
+          else
+            echo "::warning::地番の索引がありません（アプリは今までどおりの探し方を使う）"
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -209,7 +228,11 @@ jobs:
         run: |
           # 版の表示は法務省の年度版（毎年4月公開）。公図から推定した筆（kozu-source.json）と同じ書き方にそろえる
           # （同じ版なら下書きで版を1回だけ書くため）
-          printf '{\n "url": "%s",\n "edition": "%s年4月公開版"\n}\n' "$URL" "$YEAR" > lib/roadmap/data/parcel-source.json
+          if [ -n "$INDEX" ]; then
+            printf '{\n "url": "%s",\n "edition": "%s年4月公開版",\n "index": "%s"\n}\n' "$URL" "$YEAR" "$INDEX" > lib/roadmap/data/parcel-source.json
+          else
+            printf '{\n "url": "%s",\n "edition": "%s年4月公開版"\n}\n' "$URL" "$YEAR" > lib/roadmap/data/parcel-source.json
+          fi
           if git diff --quiet; then echo "変更なし"; exit 0; fi
           npm ci
           npm test

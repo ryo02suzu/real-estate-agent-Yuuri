@@ -293,6 +293,66 @@ class _Neighbors:
         return [self.geoms[j] for j in self.tree.query(area) if j != index]
 
 
+# 地番の索引（アプリの地番検索が、町の代表点から遠い筆も最初に開くタイルで見つけられるように）。
+# 市区町村コードごとに、地番区域 → [[z16 のタイル x, y, そのタイルの地番の番号（枝番の前）の最小, 最大], …]。
+# 地番の頭の甲乙丙・イロハ・番外は外して番号だけで数える（lib/roadmap/parcel.ts の isLotChiban と同じ形）。道・水などの地番の無い筆は入れない
+INDEX_ZOOM = 16
+LOT_BASE = re.compile(r"^(?:番外|[甲乙丙丁戊己庚辛壬癸]{1,2}|[ｲﾛﾊﾆﾎﾍﾄﾁﾘﾇﾙｦイロハニホヘトチリヌルヲ]|仮)?-?(\d+)")
+
+
+def _tile_xy(lng: float, lat: float, z: int = INDEX_ZOOM) -> tuple[int, int]:
+    n = 2**z
+    lat = max(-85.0, min(85.0, lat))
+    r = math.radians(lat)
+    return int((lng + 180) / 360 * n), int((1 - math.log(math.tan(r) + 1 / math.cos(r)) / math.pi) / 2 * n)
+
+
+def _bbox(coords, b=None):
+    """GeoJSON の座標（入れ子）の範囲 [西, 南, 東, 北]"""
+    if coords and isinstance(coords[0], (int, float)):
+        x, y = coords[0], coords[1]
+        if b is None:
+            return [x, y, x, y]
+        b[0], b[1], b[2], b[3] = min(b[0], x), min(b[1], y), max(b[2], x), max(b[3], y)
+        return b
+    for c in coords:
+        b = _bbox(c, b)
+    return b
+
+
+def add_to_index(index: dict, code: str, kuiki: str, chiban: str, geom: dict) -> None:
+    """1つの筆を索引に足す（筆の範囲がかかる z16 のタイルすべて。大きな筆で 64 枚を超えるときは四隅のタイルだけ）"""
+    m = LOT_BASE.match(unicodedata.normalize("NFKC", chiban or ""))
+    if not m or not geom or not geom.get("coordinates"):
+        return
+    base = int(m.group(1))
+    b = _bbox(geom["coordinates"])
+    if b is None:
+        return
+    x0, y1 = _tile_xy(b[0], b[1])
+    x1, y0 = _tile_xy(b[2], b[3])
+    tiles = [(x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)]
+    if len(tiles) > 64:
+        tiles = [(x0, y0), (x0, y1), (x1, y0), (x1, y1)]
+    k = index.setdefault(code, {}).setdefault(kuiki, {})
+    for t in tiles:
+        r = k.get(t)
+        if r is None:
+            k[t] = [base, base]
+        else:
+            r[0], r[1] = min(r[0], base), max(r[1], base)
+
+
+def write_index(index: dict, directory: str) -> int:
+    """市区町村コードごとに <directory>/<code>.json を書く。形：{"v":1,"z":16,"k":{地番区域:[[x,y,最小,最大],…]}}"""
+    os.makedirs(directory, exist_ok=True)
+    for code, by_kuiki in index.items():
+        k = {kuiki: sorted([x, y, lo, hi] for (x, y), (lo, hi) in tiles.items()) for kuiki, tiles in sorted(by_kuiki.items())}
+        with open(os.path.join(directory, f"{code}.json"), "w", encoding="utf-8") as f:
+            json.dump({"v": 1, "z": INDEX_ZOOM, "code": code, "k": k}, f, ensure_ascii=False, separators=(",", ":"))
+    return len(index)
+
+
 def append_features(
     fgb: str,
     out,
@@ -301,6 +361,8 @@ def append_features(
     skip_sheets: dict[str, list[dict]] | None = None,
     skipped: dict | None = None,
     shifted: dict | None = None,
+    index: dict | None = None,
+    code: str = "",
 ) -> int:
     """mojxml2ogr の出力から、地番区域と地番だけの GeoJSON の行を書き足す
     （位置がずれた地図の筆と、別の市区町村の中に置かれた筆は外す。測地系の取り違えの地図は正しい位置に動かす）"""
@@ -336,6 +398,8 @@ def append_features(
                     pass
             feat = {"type": "Feature", "properties": {"地番区域": kuiki, "地番": p.get("地番") or ""}, "geometry": valid_geometry(geom, lambda face, i=i: nb.near(i, face))}
             out.write(json.dumps(feat, ensure_ascii=False, separators=(",", ":")) + "\n")
+            if index is not None:
+                add_to_index(index, code, kuiki, p.get("地番") or "", feat["geometry"])
             n += 1
     return n
 
@@ -348,7 +412,9 @@ def main() -> None:
     ap.add_argument("--work", default="work", help="作業用のディレクトリ（zip などを一時的に置く）")
     ap.add_argument("--only", nargs="*", help="この市区町村コードで始まる zip だけ（試すとき用）")
     ap.add_argument("--boundary", help="市区町村の境界（国土数値情報 N03 の zip）。あれば、別の市区町村の中に置かれた筆を外す")
+    ap.add_argument("--index", help="地番の索引を書くディレクトリ（市区町村コードごとの JSON。省略時は <work>/index）")
     a = ap.parse_args()
+    index: dict = {}
     boundaries = Boundaries(a.boundary) if a.boundary else None
     dropped: dict = {}
     skip_sheets = load_skip_sheets()
@@ -373,7 +439,7 @@ def main() -> None:
             download(url, zp)
             # 任意座標系・地区外は入れない（位置が合わない／筆ではない）
             subprocess.run(["mojxml2ogr", fgb, zp], check=True, stdout=subprocess.DEVNULL)
-            n = append_features(fgb, out, boundaries, dropped, skip_sheets, skipped, shifted)
+            n = append_features(fgb, out, boundaries, dropped, skip_sheets, skipped, shifted, index, name[:5])
             total += n
             os.remove(zp)
             os.remove(fgb)
@@ -395,6 +461,8 @@ def main() -> None:
         for city, d in sorted(dropped.items(), key=lambda kv: -kv[1]["n"]):
             log(f"  {city}: {d['n']} 件（例 {' / '.join(d['ex'])}）")
     log(f"筆 {total} 件 → tippecanoe")
+    idx_dir = a.index or os.path.join(a.work, "index")
+    log(f"地番の索引: {write_index(index, idx_dir)} 市区町村 → {idx_dir}")
 
     # z16 は全ての筆を入れる（地番検索に使う）。z14・15 は表示用で、混んだタイルは間引いてよい
     subprocess.run(

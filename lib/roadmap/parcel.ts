@@ -157,6 +157,43 @@ export function kuikiParts(kuiki: string): { city: string; town: string; koaza: 
   return { city: cityKey(city), town: townKey(oaza + chome), koaza };
 }
 
+/**
+ * 地番区域の町の名前として合うもの（townKey でそろえた形）。法務省の地図データは市町村ごとに書き方が違う：
+ * 大字＋丁目（川口市青木２丁目）のほか、小字の欄に町の続き（豊明市「栄町」＋「上姥子」、かほく市「白尾」＋「ハ」）や
+ * 丁目（名古屋市の一部の区・安城市など「大字」＋「三丁目」）を入れる所、大字の欄が空で小字の欄だけの所（阿南町「字新野」）がある
+ */
+export function kuikiTowns(kuiki: string): string[] {
+  const [, oaza = "", chome = "", koaza = ""] = kuiki.split("_");
+  const out = new Set([townKey(oaza + chome)]);
+  if (koaza) {
+    out.add(townKey(oaza + chome + koaza));
+    if (/丁目/.test(koaza)) out.add(townKey(oaza + koaza));
+    if (!oaza && !chome) out.add(townKey(koaza));
+  }
+  out.delete("");
+  return [...out];
+}
+
+/**
+ * 国土地理院の住所の町（townKey でそろえた形）が、地番区域の町に当たるか。名前の候補（kuikiTowns）のどれかと同じか、
+ * 丁目の書き方だけが違うもの：地番区域が大字だけで丁目に分かれていない所（住所の「二丁目」は地番の区域ではない）と、
+ * 住所に丁目が無い入力（「青木217-8」）で地番区域が丁目に分かれている所
+ */
+export function townMatches(kuiki: string, town: string): boolean {
+  if (!town) return false;
+  const names = kuikiTowns(kuiki);
+  if (names.includes(town)) return true;
+  const [, oaza = "", chome = "", koaza = ""] = kuiki.split("_");
+  const base = townKey(oaza);
+  if (!base) return false;
+  const chomeless = town.replace(/\d+丁目$/, "");
+  // 地番区域に丁目が無い（丁目も小字の欄にも無い）：住所の丁目を外して大字と比べる
+  if (!chome && !/丁目/.test(koaza) && chomeless !== town && chomeless === base) return true;
+  // 入力の住所に丁目が無い：地番区域の大字だけと比べる（同じ地番がほかの丁目にもあれば候補が増える）
+  if (chomeless === town && (chome || /丁目/.test(koaza)) && town === base) return true;
+  return false;
+}
+
 /** 法務省の地図データに残っている合併前の市町村の名前 → 今の市（地番区域の市区町村名を比べるときに読み替える） */
 const OLD_CITY: Record<string, string> = {
   勢多郡富士見村: "前橋市",
@@ -211,7 +248,18 @@ export async function searchParcel(
   q: { city: string; town: string; chiban: string },
   start: { lat: number; lng: number },
   source: ParcelSource,
-  { maxTiles = 40, radius = 4, batch = 4 }: { maxTiles?: number; radius?: number; batch?: number } = {},
+  {
+    maxTiles = 40,
+    radius = 4,
+    batch = 4,
+    index,
+  }: {
+    maxTiles?: number;
+    radius?: number;
+    batch?: number;
+    /** 地番の索引（lib/roadmap/parcel-index.ts）。あれば、その町で番号が入っているタイルを先に開く */
+    index?: { k: Record<string, [number, number, number, number][]> } | null;
+  } = {},
 ): Promise<ParcelSearch> {
   const [sx, sy] = tileOf(start.lat, start.lng);
   const town = townKey(q.town);
@@ -264,7 +312,7 @@ export async function searchParcel(
     tiles.forEach(([x, y], i) => {
       seen.add(`${x},${y}`);
       for (const f of got[i] ?? []) {
-        if (kuikiParts(f.kuiki).town !== town) continue;
+        if (!townMatches(f.kuiki, town)) continue;
         townSeen = true;
         // 地図データの「51-3W2」（同じ地番の土地の分かれた区画）も「51-3」として探す
         const c = registryChiban(normalizeChiban(f.chiban));
@@ -299,6 +347,28 @@ export async function searchParcel(
       }
     });
   };
+
+  // 索引があれば、同じ町（townMatches）の地番区域で、探す番号が入っているタイルを近い順に先に開く（最大 24 枚）。
+  // 見つからなければ（索引に無い地番の書き方など）、下の今までの探し方に続ける（開いたタイルは読み直さない）
+  if (index) {
+    const num = Number.parseInt(want.replace(new RegExp(`^${LOT_PREFIX}-?`), ""), 10);
+    if (!Number.isNaN(num)) {
+      const tiles: [number, number][] = [];
+      const key = new Set<string>();
+      for (const [kuiki, entries] of Object.entries(index.k)) {
+        if (!townMatches(kuiki, town)) continue;
+        for (const [x, y, lo, hi] of entries) {
+          const k = `${x},${y}`;
+          if (lo <= num && num <= hi && !key.has(k)) {
+            key.add(k);
+            tiles.push([x, y]);
+          }
+        }
+      }
+      tiles.sort((a, b) => (a[0] - sx) ** 2 + (a[1] - sy) ** 2 - ((b[0] - sx) ** 2 + (b[1] - sy) ** 2));
+      for (let i = 0; i < Math.min(tiles.length, 24) && !hits.size; i += 8) await visit(tiles.slice(i, Math.min(i + 8, 24)));
+    }
+  }
 
   while (seen.size < maxTiles && !hits.size) {
     const next: [number, number][] = [];

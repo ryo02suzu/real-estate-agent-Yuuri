@@ -10,6 +10,11 @@ export const PARCEL_DATA = {
   edition: process.env.NEXT_PUBLIC_PARCEL_EDITION || SOURCE.edition,
   /** タイルのレイヤ名 */
   layer: "fude",
+  /**
+   * 地番の索引（市区町村コードごとの JSON。{code} を市区町村コードに置き換える）。タイルと同じワークフローが作る
+   * （scripts/parcel-tiles/build_pref.py の write_index）。無ければ、町の代表点のまわりから探す今までの探し方だけを使う
+   */
+  index: process.env.NEXT_PUBLIC_PARCEL_INDEX_URL || (SOURCE as { index?: string }).index || "",
 };
 
 /** 利用規約どおりの出典と、加工したことの記載 */

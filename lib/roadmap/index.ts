@@ -3,6 +3,7 @@ import { correctAddress, describeMatch, type AddressFix, type AddressMiss } from
 import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, needsChoice, reverseGeocode, type GeocodeResult } from "./geocode";
 import { buildLinks, findMunicipality, resolveContact, type Contact, type Municipality, type ResolvedLink } from "./municipalities";
 import { parcelAt, searchParcel, splitChiban, townFromAddress, type Parcel, type ParcelSource } from "./parcel";
+import { loadParcelIndex, type ParcelIndex } from "./parcel-index";
 import { pmtilesParcelSource } from "./parcel-tiles";
 
 export * from "./municipalities";
@@ -34,6 +35,11 @@ export type LookupResult =
       parcelOthers?: number;
       /** 地番で探したが見つからなかったときの案内と、枝番違いなどの近い地番 */
       parcelMiss?: { chiban: string; reason: "not_found" | "no_map" | "error"; similar: string[] };
+      /**
+       * 国土地理院は住居表示（「14番1号」「22番」）として当てたが、入力が登記の書き方（「14番1」）なので地番の筆を出した。
+       * その住居表示の住所（別の場所のことがあるので、画面で住居表示として探し直せるようにする）
+       */
+      jukyoAlt?: string;
       municipality: Municipality;
       links: ResolvedLink[];
       /** その地点の問い合わせ先（政令市は区ごとの窓口） */
@@ -47,7 +53,17 @@ export type LookupResult =
  */
 export async function lookup(
   address: string,
-  { parcels = pmtilesParcelSource, exact = false }: { parcels?: ParcelSource; /** 書き間違いを直さず、入れたとおりに探す */ exact?: boolean } = {},
+  {
+    parcels = pmtilesParcelSource,
+    exact = false,
+    loadIndex = loadParcelIndex,
+  }: {
+    parcels?: ParcelSource;
+    /** 書き間違いを直さず、入れたとおりに探す */
+    exact?: boolean;
+    /** 地番の索引の読み方（試験で差し替える） */
+    loadIndex?: (code: string) => Promise<ParcelIndex | null>;
+  } = {},
 ): Promise<LookupResult> {
   const chiban = splitChiban(address);
   // 「地番」の語は外して調べる（国土地理院が番地まで持っていれば、その位置から筆を探せる）
@@ -79,13 +95,18 @@ export async function lookup(
     ...(said?.miss ? { miss: said.miss } : {}),
   };
   let parcelMiss: Extract<LookupResult, { status: "ok" }>["parcelMiss"];
-  // 住居表示（「1番」「1番1号」）まで一致した住所は地番ではないので探さない。町・大字まで、または「354番地」までの一致なら、
-  // 地番の筆を探して位置（枝番まで）と筆の形を出す
-  if (chiban && (chiban.explicit || !isJukyo(geo.matchedAddress))) {
+  // 住居表示（「1番」「1番1号」）まで一致した住所は、ふつうは地番ではないので探さない。町・大字まで、または「354番地」までの一致なら、
+  // 地番の筆を探して位置（枝番まで）と筆の形を出す。ただし入力が登記の書き方（「14番1」「150番地」。号が無い）か、
+  // 住居表示が街区（「22番」）までしか合わず枝番が残るときは、地番の筆を先に探す（見つからなければ住居表示の地点のまま）
+  const jukyo = isJukyo(geo.matchedAddress);
+  const asRegistry = !!chiban && jukyo && (registryStyle(address) || (!/号$/.test(geo.matchedAddress.normalize("NFKC")) && chiban.chiban.includes("-")));
+  if (chiban && (chiban.explicit || !jukyo || asRegistry)) {
     const city = muniCity(rev.muniCd) ?? municipality.name;
     const town = townFromAddress(geo.matchedAddress, city);
     try {
-      const r = town ? await searchParcel({ city, town, chiban: chiban.chiban }, geo, parcels) : ({ status: "no_map" } as const);
+      // 地番の索引（市区町村コードごと。あれば番号の入ったタイルを先に開く。無ければ null で今までの探し方）
+      const index = town ? await loadIndex(rev.muniCd) : null;
+      const r = town ? await searchParcel({ city, town, chiban: chiban.chiban }, geo, parcels, { index }) : ({ status: "no_map" } as const);
       if (r.status === "found") {
         const { lat, lng } = r.parcel.point;
         const prev = (await reverseGeocode(lat, lng)) ?? rev;
@@ -100,6 +121,7 @@ export async function lookup(
           ...notes,
           parcel: r.parcel,
           parcelOthers: r.others,
+          ...(jukyo && !chiban.explicit ? { jukyoAlt: geo.matchedAddress } : {}),
           municipality: m,
           links: buildLinks(m, lat, lng, prev.town),
           contact: resolveContact(m, prev.muniCd),
@@ -128,6 +150,16 @@ export async function lookup(
 
 /** 国土地理院の住所が住居表示の街区・号（「1番」「1番1号」）まで一致しているか（「354番地」は地番による住所） */
 const isJukyo = (matched: string) => /\d+番$|\d+号$/.test(matched.normalize("NFKC"));
+
+/**
+ * 入力の末尾が登記の地番の書き方か（「14番1」「22番39」「150番地」「391番地3」「1234番地の5」。住居表示は「14番1号」「14-1」と書く）。
+ * 「地番」の語・甲乙・番外は splitChiban で外してから見る
+ */
+export function registryStyle(input: string): boolean {
+  const s = input.normalize("NFKC").replace(/\s+/g, "").replace(/[(（]?地番[)）]?[:：]?/g, "");
+  if (/号$/.test(s)) return false;
+  return /\d+番地(?:の?\d+)?$/.test(s) || /\d+番の?\d+$/.test(s);
+}
 
 /** 逆ジオコーダの市区町村コード → 「さいたま市見沼区」「瑞穂町」（都県なし）。対応エリアの外は undefined */
 export function muniCity(muniCd: string): string | undefined {
