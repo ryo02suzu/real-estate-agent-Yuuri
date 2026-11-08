@@ -36,6 +36,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("富山県の全市町村を網羅している", () => covered("富山県"));
   it("石川県の全市町を網羅している", () => covered("石川県"));
   it("福井県の全市町を網羅している", () => covered("福井県"));
+  it("宮城県の全市町村を網羅している", () => covered("宮城県"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
@@ -57,6 +58,7 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
     富山県: ["076", "0763", "0765", "0766"],
     石川県: ["076", "0761", "0767", "0768"],
     福井県: ["0770", "0776", "0778", "0779"],
+    宮城県: ["022", "0220", "0223", "0224", "0225", "0226", "0228", "0229"],
   };
   const contacts = MUNICIPALITIES.flatMap((m) =>
     [m.contact, ...Object.values(m.contactByCode ?? {})].filter((c) => c?.phone).map((c) => ({ m, phone: c!.phone! })),
@@ -516,6 +518,52 @@ describe("福井県の道路図", () => {
     expect(resolveContact(findMunicipality("18501")!, "18501")).toMatchObject({ phone: "0770-22-5486", note: expect.stringContaining("0770-56-5914") });
     expect(MUNICIPALITIES.filter((x) => x.pref === "福井県" && x.coverage === "outside").map((x) => x.name)).toEqual(["池田町", "南越前町", "おおい町"]);
     expect(MUNICIPALITIES.filter((x) => x.pref === "福井県")).toHaveLength(17);
+  });
+});
+
+describe("宮城県の道路図", () => {
+  const miyagi = MUNICIPALITIES.filter((m) => m.pref === "宮城県");
+
+  it("仙台市は指定道路図（wagmap・全種別）を指定道路図の表示で開き、窓口は道路のある区の街並み形成課（詳細は電話で答えない）", () => {
+    const sendai = findMunicipality("04101")!;
+    expect(sendai.coverage).toBe("full");
+    const links = buildLinks(sendai, 38.268215, 140.869356);
+    expect(links[0]).toMatchObject({ kind: "road_type", pinpoint: true, verified: true });
+    expect(links[0].url).toBe("https://www2.wagmap.jp/sendai_tokei/Map?mid=601&mpx=140.869356&mpy=38.268215&mps=2500&gprj=2&mtl=628");
+    expect(links[1].url).toBe("https://www2.wagmap.jp/sendaicity/Map?mid=161&mpx=140.869356&mpy=38.268215&mps=2500&gprj=2");
+    expect(resolveContact(sendai, "04101")).toMatchObject({ dept: "青葉区役所 建設部 街並み形成課", phone: "022-225-7211", noPhoneInquiry: true });
+    expect(resolveContact(sendai, "04105")).toMatchObject({ dept: "泉区役所 建設部 街並み形成課", phone: "022-372-3111", note: expect.stringContaining("オンライン") });
+  });
+
+  it("特定行政庁は仙台・石巻・塩竈・大崎の4市。残り31市町村は県の5つの土木事務所の建築班（県の相談窓口一覧どおり）", () => {
+    expect(miyagi).toHaveLength(35);
+    expect(miyagi.filter((m) => !m.contact?.dept.startsWith("宮城県")).map((m) => m.name)).toEqual(["仙台市", "石巻市", "塩竈市", "大崎市"]);
+    const count: Record<string, number> = {};
+    for (const m of miyagi) if (m.contact?.dept.startsWith("宮城県")) count[m.contact.dept] = (count[m.contact.dept] ?? 0) + 1;
+    expect(count).toEqual({
+      "宮城県 仙台土木事務所 建築部 建築第一班": 12,
+      "宮城県 大河原土木事務所 建築班": 9,
+      "宮城県 北部土木事務所 建築班": 5,
+      "宮城県 東部土木事務所 建築班": 3,
+      "宮城県 気仙沼土木事務所 建築班": 2,
+    });
+    const office = (code: string) => resolveContact(findMunicipality(code)!, code)!;
+    expect(office("04207")).toMatchObject({ phone: "022-297-4347", fax: "022-297-4119", noPhoneInquiry: true }); // 名取市（仙台土木）
+    expect(office("04206")).toMatchObject({ phone: "0224-53-3918", noPhoneInquiry: true }); // 白石市（大河原土木）
+    expect(office("04213").noPhoneInquiry).toBeUndefined(); // 栗原市（北部土木は電話の扱いを書いていない）
+    expect(office("04581")).toMatchObject({ phone: "0225-94-8691", noPhoneInquiry: true }); // 女川町（東部土木）
+    expect(office("04606").phone).toBe("0226-24-2538"); // 南三陸町（気仙沼土木）
+  });
+
+  it("七ヶ宿町・色麻町は全域が都市計画区域外。市町の道路網図は「市町村道か」の目安なので、仙台市のほかは道路種別の地図なし（none）", () => {
+    expect(miyagi.filter((m) => m.coverage === "outside").map((m) => m.name)).toEqual(["七ケ宿町", "色麻町"]);
+    expect(miyagi.filter((m) => m.coverage === "full").map((m) => m.name)).toEqual(["仙台市"]);
+    for (const m of miyagi) {
+      expect(m.coverage, m.name).not.toBe("unknown");
+      if (m.coverage !== "full") expect(m.maps.every((x) => x.kind === "public_road"), m.name).toBe(true);
+    }
+    // 富谷市は今のコードだけ（町だったころの 04423 は使わない）
+    expect(findMunicipality("04216")?.codes).toEqual(["04216"]);
   });
 });
 

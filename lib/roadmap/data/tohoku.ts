@@ -1,6 +1,6 @@
-// 東北6県の市町村（227）。市区町村コードと名前は国土地理院の市区町村表（maps.gsi.go.jp/js/muni.js）から。
+// 東北6県の市町村のうち、道路種別の公式図・問い合わせ先をまだ登録していない市町村。市区町村コードと名前は国土地理院の市区町村表（maps.gsi.go.jp/js/muni.js）から。
 // 道路種別の公式図・問い合わせ先を調べる前の市町村を coverage: "unknown"（調査中）でここに置き、調べた県から data/<県>.ts に移す。
-// 仙台市は区のコード（04101〜04105）をまとめて1つ（逆ジオコーダは区のコードを返す）。富谷市は今のコード 04216（市になる前の 04423 は使わない）
+// 登録済み：宮城県（data/miyagi.ts）
 import type { Municipality } from "../municipalities";
 
 export const TOHOKU_PENDING: Municipality[] = [
@@ -79,42 +79,6 @@ export const TOHOKU_PENDING: Municipality[] = [
   { pref: "岩手県", name: "九戸村", codes: ["03506"], coverage: "unknown", maps: [] },
   { pref: "岩手県", name: "洋野町", codes: ["03507"], coverage: "unknown", maps: [] },
   { pref: "岩手県", name: "一戸町", codes: ["03524"], coverage: "unknown", maps: [] },
-  // 宮城県（35）
-  { pref: "宮城県", name: "仙台市", codes: ["04101", "04102", "04103", "04104", "04105"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "石巻市", codes: ["04202"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "塩竈市", codes: ["04203"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "気仙沼市", codes: ["04205"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "白石市", codes: ["04206"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "名取市", codes: ["04207"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "角田市", codes: ["04208"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "多賀城市", codes: ["04209"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "岩沼市", codes: ["04211"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "登米市", codes: ["04212"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "栗原市", codes: ["04213"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "東松島市", codes: ["04214"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "大崎市", codes: ["04215"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "富谷市", codes: ["04216"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "蔵王町", codes: ["04301"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "七ケ宿町", codes: ["04302"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "大河原町", codes: ["04321"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "村田町", codes: ["04322"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "柴田町", codes: ["04323"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "川崎町", codes: ["04324"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "丸森町", codes: ["04341"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "亘理町", codes: ["04361"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "山元町", codes: ["04362"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "松島町", codes: ["04401"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "七ヶ浜町", codes: ["04404"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "利府町", codes: ["04406"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "大和町", codes: ["04421"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "大郷町", codes: ["04422"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "大衡村", codes: ["04424"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "色麻町", codes: ["04444"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "加美町", codes: ["04445"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "涌谷町", codes: ["04501"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "美里町", codes: ["04505"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "女川町", codes: ["04581"], coverage: "unknown", maps: [] },
-  { pref: "宮城県", name: "南三陸町", codes: ["04606"], coverage: "unknown", maps: [] },
   // 秋田県（25）
   { pref: "秋田県", name: "秋田市", codes: ["05201"], coverage: "unknown", maps: [] },
   { pref: "秋田県", name: "能代市", codes: ["05202"], coverage: "unknown", maps: [] },
