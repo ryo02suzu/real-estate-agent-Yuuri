@@ -715,6 +715,42 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(s.reason).toMatch(/測地系/);
     }
   });
+  it("動かす量は、平面直角座標の数字の取り違えとして計算した値（同じ座標系の中ではほぼ同じ量で、T1 と T2 は向きが逆）", () => {
+    // 平面直角座標の系：関東（茨城〜神奈川）IX、新潟・山梨・長野・静岡 VIII、富山・石川・岐阜・愛知 VII、福井 VI。
+    // 緯度経度の変換量（TKY2JGD.par）をそのまま使うと場所ごとに 3〜12m 違い、最初の関東の決まりは同じ系の中で最大 11.9m ばらついていた。
+    // 数字の取り違えとして計算すると、同じ系の中では原点からの距離の分しか変わらない（2026-11-08 の作り直しで最大 2.7m）
+    const zone = (code: string) => {
+      const p = Number(code.slice(0, 2));
+      return p <= 14 ? "IX" : [15, 19, 20, 22].includes(p) ? "VIII" : p === 18 ? "VI" : "VII";
+    };
+    const groups = new Map<string, [number, number][]>();
+    for (const s of data.sheets.filter((x) => x.shift)) {
+      // T2 は向きを逆にして T1 とまとめる
+      const sign = s.shift!.kind === "T1" ? 1 : -1;
+      const g = groups.get(zone(s.code)) ?? [];
+      g.push([sign * s.shift!.east, sign * s.shift!.north]);
+      groups.set(zone(s.code), g);
+    }
+    expect(groups.get("IX")?.length).toBeGreaterThan(10);
+    const mean = (vs: [number, number][]) => [vs.reduce((a, v) => a + v[0], 0) / vs.length, vs.reduce((a, v) => a + v[1], 0) / vs.length];
+    for (const [z, vs] of groups) {
+      const [me, mn] = mean(vs);
+      for (const [e, n] of vs) expect(Math.hypot(e - me, n - mn), `系 ${z}`).toBeLessThan(4);
+    }
+    // 関東（IX）は T1 で西へ約 293m・北へ約 356m。富山・岐阜・愛知（VII）は西へ約 271m・北へ約 349m
+    const [ixE, ixN] = mean(groups.get("IX")!);
+    expect(ixE).toBeGreaterThan(-296);
+    expect(ixE).toBeLessThan(-290);
+    expect(ixN).toBeGreaterThan(353);
+    expect(ixN).toBeLessThan(359);
+    if (groups.has("VII")) {
+      const [e7, n7] = mean(groups.get("VII")!);
+      expect(e7).toBeGreaterThan(-275);
+      expect(e7).toBeLessThan(-267);
+      expect(n7).toBeGreaterThan(346);
+      expect(n7).toBeLessThan(352);
+    }
+  });
   it("どれも対応エリア（関東1都6県・中部9県）の5桁の市区町村コード・地図名・町・筆の数・理由がある。同じ決まりは1回だけ（町・地番で絞るときも）", () => {
     expect(data.sheets.length).toBeGreaterThan(0);
     const keys = new Set<string>();

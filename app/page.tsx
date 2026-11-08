@@ -13,8 +13,9 @@ import { Sheet } from "@/components/sheet";
 import { favoriteKey, loadFavorites, removeFavorite, type FavoriteItem } from "@/lib/favorites";
 import { addHistory, clearHistory, loadHistory, removeHistory, restoreHistory, type HistoryItem } from "@/lib/history";
 import { propertyIdOf } from "@/lib/property-id";
-import { GeocoderUnavailable, lookup, lookupPoint, MUNICIPALITIES, type AddressFix, type LookupResult } from "@/lib/roadmap";
+import { GeocoderUnavailable, lookup, lookupPoint, type AddressFix, type LookupResult } from "@/lib/roadmap";
 import { buildHash, pageUrl, readUrlState } from "@/lib/app/url";
+import { AREA_SHORT } from "@/lib/roadmap/regions";
 
 /** literal：書き間違いを直した住所を、入れたとおりに探し直した（そのときの直し。スマホで「直した住所で探す」に使う） */
 type Shown = { query: string; result: LookupResult; literal?: AddressFix };
@@ -27,10 +28,8 @@ function historyDepth(): number {
   return typeof d === "number" ? d : 0;
 }
 
-const PREFS = [...new Set(MUNICIPALITIES.map((m) => m.pref))];
-// 関東の1都6県がそろったら地方名でまとめて表示する
-const KANTO = ["東京都", "神奈川県", "埼玉県", "千葉県", "茨城県", "栃木県", "群馬県"];
-const AREA_TEXT = KANTO.every((p) => PREFS.includes(p as (typeof PREFS)[number])) ? "関東1都6県" : PREFS.join("・");
+// PC のホームの「対応エリア」。対応している地方の名前（例「関東・中部」。都県の数までは小さな枠に入らない）
+const AREA_TEXT = AREA_SHORT;
 
 /** 下から出る画面。メニュー・お気に入り・マイページは、このファイルの中で出す */
 type AnySheet = SheetName | "menu" | "favorites" | "account";
