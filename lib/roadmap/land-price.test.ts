@@ -131,15 +131,15 @@ const fileSource = (path: string): Source => ({
 describe("アプリに入っている地価のタイル", () => {
   const src = landPriceTileSource(fileSource(PATH));
 
-  it("land-price-source.json のファイルがあり、関東1都6県の地点が入っている（中部9県は作り直したあとに増える）", async () => {
+  it("land-price-source.json のファイルがあり、関東1都6県の地点が入っている（中部9県・東北6県も入る）", async () => {
     expect(SRC.url).toMatch(/^\/data\/land-price-\d{4}-\d{4}\.pmtiles$/);
     expect(SRC.edition).toMatch(/^地価公示 令和\d+年（\d{4}年1月1日時点）・地価調査 令和\d+年（\d{4}年7月1日時点）$/);
     expect((await stat(PATH)).size).toBeGreaterThan(1_000_000);
     const points = SRC.points as Record<string, number>;
     for (const k of ["L01", "L02"]) for (const p of ["08", "09", "10", "11", "12", "13", "14"]) expect(points[`${k}-${p}`]).toBeGreaterThan(200);
-    // 入っている都道府県は 関東1都6県＋中部9県（08〜23）だけで、どれも地点がある
+    // 入っている都道府県は 関東1都6県・中部9県・東北6県（02〜23）だけで、どれも地点がある
     for (const [key, n] of Object.entries(points)) {
-      expect(key, key).toMatch(/^L0[12]-(0[89]|1[0-9]|2[0-3])$/);
+      expect(key, key).toMatch(/^L0[12]-(0[2-9]|1[0-9]|2[0-3])$/);
       expect(n, key).toBeGreaterThan(0);
     }
   });
