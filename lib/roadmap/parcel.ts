@@ -187,8 +187,9 @@ export function townMatches(kuiki: string, town: string): boolean {
   const base = townKey(oaza);
   if (!base) return false;
   const chomeless = town.replace(/\d+丁目$/, "");
-  // 地番区域に丁目が無い（丁目も小字の欄にも無い）：住所の丁目を外して大字と比べる
-  if (!chome && !/丁目/.test(koaza) && chomeless !== town && chomeless === base) return true;
+  // 地番区域が大字だけ（丁目も小字も無い）：住所の丁目を外して大字と比べる。小字のある地番区域（尾張旭市「桜ケ丘町」＋「西」）は
+  // 住所の「桜ケ丘町一丁目」とは別の区域なので当てない（同じ地番の別の土地を出してしまう）
+  if (!chome && !koaza && chomeless !== town && chomeless === base) return true;
   // 入力の住所に丁目が無い：地番区域の大字だけと比べる（同じ地番がほかの丁目にもあれば候補が増える）
   if (chomeless === town && (chome || /丁目/.test(koaza)) && town === base) return true;
   return false;
@@ -223,7 +224,16 @@ export function townFromAddress(address: string, city: string): string {
   return rest.replace(/[0-9][0-9番地号の‐‑–—―−－-]*$/, "");
 }
 
-const baseNumber = (chiban: string) => Number.parseInt(chiban, 10);
+const LOT_HEAD = new RegExp(`^(${LOT_PREFIX})-?`);
+
+/** 地番の頭の文字（甲乙丙・イロハ・番外）と、その後ろ（「乙987-1」→ ["乙", "987-1"]） */
+export function splitLotHead(chiban: string): [string, string] {
+  const m = chiban.match(LOT_HEAD);
+  return m ? [m[1], chiban.slice(m[0].length)] : ["", chiban];
+}
+
+/** 地番の番号（枝番の前。頭の文字は外す） */
+const baseNumber = (chiban: string) => Number.parseInt(splitLotHead(chiban)[1], 10);
 
 /** 緯度経度 → z のタイル番号 */
 export function tileOf(lat: number, lng: number, z = PARCEL_ZOOM): [number, number] {
@@ -265,6 +275,7 @@ export async function searchParcel(
   const town = townKey(q.town);
   const want = normalizeChiban(q.chiban);
   const wantBase = baseNumber(want);
+  const [wantHead, wantRest] = splitLotHead(want);
   const seen = new Set<string>();
   const hits = new Map<string, ParcelPiece[]>();
   const raw = new Map<string, string>();
@@ -274,6 +285,8 @@ export async function searchParcel(
   const sanko = new Map<string, string>();
   const rank = new Map<string, number>();
   const similar = new Set<string>();
+  // 見つけた筆の地番（小字の欄にイロハがある所では、頭のイロハを外した地番。筆の地番区域にイロハが入っている）
+  const found = new Map<string, string>();
   let focus: [number, number] = [sx, sy];
   let closest = Number.POSITIVE_INFINITY;
   let townSeen = false;
@@ -301,6 +314,7 @@ export async function searchParcel(
       raws.delete(k);
       raw.delete(k);
       rank.delete(k);
+      found.delete(k);
       estimated.delete(k);
       sanko.delete(k);
     }
@@ -316,7 +330,10 @@ export async function searchParcel(
         townSeen = true;
         // 地図データの「51-3W2」（同じ地番の土地の分かれた区画）も「51-3」として探す
         const c = registryChiban(normalizeChiban(f.chiban));
-        if (c === want) {
+        const [head] = splitLotHead(c);
+        // 「白尾ハ6番1」「美川中町ル18番4」：イロハが地番の頭ではなく、地番区域の小字の欄にある所（かほく市・白山市など）
+        const kanaKoaza = !!wantHead && !head && kuikiParts(f.kuiki).koaza.normalize("NFKC") === wantHead;
+        if (c === want || (kanaKoaza && c === wantRest)) {
           const g = groupOf(f.kuiki, x, y);
           // 同じ筆が別のデータにもあれば（法務省の地図データ → 地番参考図 → 推定の位置の順に使う）、形を混ぜない
           const r = sourceRank(f);
@@ -329,6 +346,7 @@ export async function searchParcel(
             sanko.delete(g);
           }
           rank.set(g, r);
+          found.set(g, c);
           hits.set(g, [...(hits.get(g) ?? []), { polygons: f.polygons(), tile: [x, y] }]);
           raw.set(g, f.chiban);
           raws.set(g, (raws.get(g) ?? new Set<string>()).add(f.chiban));
@@ -338,7 +356,8 @@ export async function searchParcel(
         }
         const b = baseNumber(c);
         if (Number.isNaN(b)) continue;
-        if (b === wantBase && similar.size < 8) similar.add(c);
+        // 似た地番の候補は、頭の文字が同じもの（「乙987-2」を探して「甲987-1」は出さない）
+        if (b === wantBase && (head === wantHead || kanaKoaza) && similar.size < 8) similar.add(kanaKoaza ? `${wantHead}${c}` : c);
         // 地番の数字が近い筆のあたりを次に探す（地番は近い番号が近くに並ぶことが多い）
         if (Math.abs(b - wantBase) < closest) {
           closest = Math.abs(b - wantBase);
@@ -351,7 +370,7 @@ export async function searchParcel(
   // 索引があれば、同じ町（townMatches）の地番区域で、探す番号が入っているタイルを近い順に先に開く（最大 24 枚）。
   // 見つからなければ（索引に無い地番の書き方など）、下の今までの探し方に続ける（開いたタイルは読み直さない）
   if (index) {
-    const num = Number.parseInt(want.replace(new RegExp(`^${LOT_PREFIX}-?`), ""), 10);
+    const num = Number.parseInt(wantRest, 10);
     if (!Number.isNaN(num)) {
       const tiles: [number, number][] = [];
       const key = new Set<string>();
@@ -409,7 +428,7 @@ export async function searchParcel(
     status: "found",
     parcel: {
       kuiki,
-      chiban: want,
+      chiban: found.get(group) ?? want,
       chibanRaw: raw.get(group)!,
       ...(raws.get(group)!.size > 1 ? { chibanRaws: [...raws.get(group)!].sort(byPieceMark) } : {}),
       pieces,

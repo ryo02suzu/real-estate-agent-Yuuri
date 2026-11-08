@@ -209,6 +209,31 @@ describe("筆の探索", () => {
     expect(src.reads.length).toBeLessThanOrEqual(32);
   });
 
+  it("イロハが地番区域の小字の欄にある所（「白尾ハ6番1」→ 地番区域「白尾」＋「ハ」の 6-1）も見つける。同じ番号のほかの小字の筆は出さない", async () => {
+    const src = fakeSource({
+      [`${SX},${SY}`]: [
+        { kuiki: "かほく市_白尾__イ_", chiban: "6-1" },
+        { kuiki: "かほく市_白尾__ハ_", chiban: "6-2" },
+      ],
+      [`${SX + 1},${SY}`]: [{ kuiki: "かほく市_白尾__ハ_", chiban: "6-1", polygon: box(SX + 1, SY, 0.2, 0.3, 0.3, 0.2) }],
+    });
+    for (const town of ["白尾", "白尾ハ"]) {
+      const r = await searchParcel({ city: "かほく市", town, chiban: "ハ6-1" }, START, src);
+      expect(r.status).toBe("found");
+      if (r.status !== "found") continue;
+      expect(r.parcel.kuiki).toBe("かほく市_白尾__ハ_");
+      expect(r.parcel.chiban).toBe("6-1");
+    }
+    // 無ければ、同じ小字の近い地番だけを候補に（入力と同じ「ハ」付きの書き方で）
+    const none = await searchParcel({ city: "かほく市", town: "白尾", chiban: "ハ6-9" }, START, src, { maxTiles: 12 });
+    expect(none).toEqual({ status: "not_found", similar: ["ハ6-1", "ハ6-2"] });
+  });
+
+  it("甲乙の付いた地番は、頭の文字まで同じ筆だけ（「乙987-1」を探して「甲987-1」は出さない）", async () => {
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: "取手市_白山_３丁目__", chiban: "甲987-1" }, { kuiki: "取手市_白山_３丁目__", chiban: "乙987-2" }] });
+    expect(await searchParcel({ city: "取手市", town: "白山３丁目", chiban: "乙987-1" }, START, src, { maxTiles: 12 })).toEqual({ status: "not_found", similar: ["乙987-2"] });
+  });
+
   it("代表点のまわりに地図が無くても、3枚離れた所の町の筆まで探しに行く", async () => {
     const src = fakeSource({ [`${SX + 3},${SY}`]: [{ kuiki: "熊谷市_三ケ尻___", chiban: "1877-1" }] });
     const r = await searchParcel({ city: "熊谷市", town: "三ヶ尻", chiban: "1877-1" }, START, src);
@@ -608,6 +633,11 @@ describe("地番区域の町の名前の合わせ方（townMatches）", () => {
     expect(townMatches("刈谷市_小山町___", townKey("小山"))).toBe(false);
     expect(townMatches("刈谷市_一ツ木町_６丁目__", townKey("一ツ木町五丁目"))).toBe(false);
     expect(townMatches("熊谷市_下奈良___", "")).toBe(false);
+  });
+  it("小字のある地番区域は、住所の丁目を外して当てない（尾張旭市「桜ケ丘町」＋「西」と「桜ケ丘町一丁目」は別の区域。2026-11-08 の総当たりで、同じ地番の 608m 離れた別の土地を出していた）", () => {
+    expect(townMatches("尾張旭市_桜ケ丘町__西_", townKey("桜ケ丘町一丁目"))).toBe(false);
+    expect(townMatches("尾張旭市_桜ケ丘町__西_", townKey("桜ケ丘町西"))).toBe(true);
+    expect(townMatches("尾張旭市_桜ケ丘町___", townKey("桜ケ丘町一丁目"))).toBe(true);
   });
 });
 
