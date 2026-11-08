@@ -78,8 +78,8 @@ function townBuffer(x: number, y: number): Promise<ArrayBuffer | null> {
   return p;
 }
 
-/** 建物・道路・水（4枚のタイル。1枚も読めなければ null） */
-async function loadTown(origin: Origin): Promise<TownModel | null> {
+/** 建物・道路・水（4枚のタイル。1枚も読めなければ null）。PC のカルテの「土地に接する道」も同じものを読む（読んだタイルは覚えておく） */
+export async function loadTown(origin: Origin): Promise<TownModel | null> {
   const tiles = townTiles(origin);
   const bufs = await Promise.all(tiles.map(([x, y]) => townBuffer(x, y)));
   if (bufs.every((b) => !b)) return null;
@@ -249,16 +249,21 @@ export type BackdropProps = {
   flatCenter: number;
   /** 割り付けを測るための、模型の箱 */
   boxRef?: RefObject<HTMLDivElement | null>;
+  /** PC（調査デスク）：上の字を読みやすくする影を付けない・光は上の帯で選んだ時間帯・マウスで地面ごと動かせる（スマホは渡さない） */
+  desk?: { light: { part: ScenePart; az: number; alt: number } };
 };
 
 /** 物件の画面のいちばん奥（空・街の模型・札・影） */
-export function PropertyBackdrop({ result, data, tab, motion, hold, neighbors, picked, hazard, visible, hazLayer, onReady, onFlat, onFront, flatCenter, boxRef }: BackdropProps) {
+export function PropertyBackdrop({ result, data, tab, motion, hold, neighbors, picked, hazard, visible, hazLayer, onReady, onFlat, onFront, flatCenter, boxRef, desk }: BackdropProps) {
   const host = useRef<HTMLDivElement>(null);
   const labelBox = useRef<HTMLDivElement>(null);
   const [api, setApi] = useState<PropertyScene | null>(null);
   const [flat, setFlat] = useState(false);
   const [size, setSize] = useState({ w: 393, h: 800 });
-  const sun = usePropertySun(result.lat, result.lng);
+  const now = usePropertySun(result.lat, result.lng);
+  // PC は上の帯で選んだ時間帯の光（時計に合わせるときは、今の太陽から決めた値が来る）
+  const sun = desk?.light ?? now;
+  const isDesk = !!desk;
   const origin = { lat: result.lat, lng: result.lng };
   const key = `${origin.lat},${origin.lng}`;
   // 呼び返しは最新のものを使う（模型を作り直さない）
@@ -279,7 +284,7 @@ export function PropertyBackdrop({ result, data, tab, motion, hold, neighbors, p
     }
     let alive = true;
     let made: PropertyScene | null = null;
-    createPropertyScene(host.current, labelBox.current, { reduced: reducedMotion() })
+    createPropertyScene(host.current, labelBox.current, { reduced: reducedMotion(), desk: isDesk })
       .then((s) => {
         if (!alive) {
           s?.dispose();
@@ -304,7 +309,8 @@ export function PropertyBackdrop({ result, data, tab, motion, hold, neighbors, p
       made?.dispose();
       cb.current.onReady(null);
     };
-  }, []);
+    // isDesk はその画面の間は変わらない（スマホでは false のまま）
+  }, [isDesk]);
 
   // 大きさ
   useEffect(() => {
@@ -561,8 +567,8 @@ export function PropertyBackdrop({ result, data, tab, motion, hold, neighbors, p
           </div>
         </div>
       )}
-      {/* 上の字を読みやすくする影 */}
-      <div className="pointer-events-none absolute inset-x-0 top-0" style={{ height: "56%", background: `linear-gradient(180deg, rgba(${SHADE.rgb.join(",")},${SHADE.alpha}) 0%, rgba(${SHADE.rgb.join(",")},0.34) 52%, rgba(${SHADE.rgb.join(",")},0.12) 78%, rgba(${SHADE.rgb.join(",")},0) 100%)` }} />
+      {/* 上の字を読みやすくする影（PC は字を模型に重ねないので付けない） */}
+      {!desk && <div className="pointer-events-none absolute inset-x-0 top-0" style={{ height: "56%", background: `linear-gradient(180deg, rgba(${SHADE.rgb.join(",")},${SHADE.alpha}) 0%, rgba(${SHADE.rgb.join(",")},0.34) 52%, rgba(${SHADE.rgb.join(",")},0.12) 78%, rgba(${SHADE.rgb.join(",")},0) 100%)` }} />}
       {/* 模型の札 */}
       <div ref={labelBox} className="pointer-events-none absolute inset-0 overflow-hidden" />
     </div>

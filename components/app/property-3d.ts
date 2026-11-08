@@ -40,7 +40,7 @@ export type ScreenRect = { l: number; t: number; r: number; b: number };
  * 画面の割り付け（px。模型の箱の左上から）。centerY は土地を置く高さ、sheetTop はシートの上の端（札はこれより下に出さない）、
  * topLimit は上のボタンの下、avoid は見出しの字の行ごとの四角（札を重ねない）、cover はシートが模型を覆った割合（0〜1）
  */
-export type SceneLayout = { centerY: number; sheetTop: number; topLimit: number; avoid: ScreenRect[]; cover: number };
+export type SceneLayout = { centerY: number; sheetTop: number; topLimit: number; avoid: ScreenRect[]; cover: number; /** PC：土地を置く横の位置（px。無ければ真ん中） */ centerX?: number };
 
 export type PropertyScene = {
   setBase(base: SceneBase): void;
@@ -87,6 +87,11 @@ export type PropertyScene = {
   northUp(): void;
   setPlanView(on: boolean): void;
   zoomBy(f: number): void;
+  /** PC：横に回す（ラジアン。キーボードと回すボタン）・見ているタブの元の向きに戻す */
+  rotateBy(rad: number): void;
+  resetView(): void;
+  /** PC：タブごとの元の距離に掛ける倍率（設定の「3D の初めの寄り」。スマホは使わず 1 のまま） */
+  setDistScale(f: number): void;
   /** カメラが動いたら知らせる（方位の針・平面の切り替えに使う）。null で止める */
   onCamera(cb: ((v: CameraView) => void) | null): void;
   /** 全画面で直前に押した所（1回で消える） */
@@ -181,7 +186,10 @@ class Bag {
 }
 
 /** 模型を作る（WebGL が使えなければ null） */
-export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElement, opts: { reduced: boolean }): Promise<PropertyScene | null> {
+/**
+ * opts.desk：PC（調査デスク）の模型。マウスで Shift を押しながら（または右ボタンで）ドラッグすると地面ごと動かせる（スマホは渡さない）
+ */
+export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElement, opts: { reduced: boolean; desk?: boolean }): Promise<PropertyScene | null> {
   const THREE: Three = await import("three");
   let renderer: T.WebGLRenderer;
   try {
@@ -454,6 +462,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
   let H = 1;
   let sunDir = { az: 160, alt: 40 };
   let touched = false;
+  let distScale = 1;
   let ambientUntil = 0;
   const fade: Record<Fade, number> = { front: 0, zone: 0, flood: 0, gauge: 0, nb: 0, route: 0, pins: 0, bars: 0, haz: 0, lots: 0, grid: 1 };
   const cur: Record<string, number | T.Color> = {};
@@ -1152,7 +1161,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
   }
 
   // ---- カメラ
-  let drag: { x: number; y: number; az: number; po: number; t: number; vx: number; id: number } | null = null;
+  let drag: { x: number; y: number; az: number; po: number; t: number; vx: number; id: number; pan?: { tx: number; tz: number } } | null = null;
   let tap: { x: number; y: number; t: number } | null = null;
   let lastTap = 0;
   let lotTapAt = 0;
@@ -1496,7 +1505,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
   function applyPreset(name: SceneTab | "intro" | "nb", animate = true, dur = 1400) {
     const p = presets[name];
     if (!p) return;
-    moveCam({ tx: p.t[0], ty: p.t[1], tz: p.t[2], dist: p.dist, polar: p.polar, azim: p.azim }, animate, dur);
+    moveCam({ tx: p.t[0], ty: p.t[1], tz: p.t[2], dist: name === "intro" ? p.dist : p.dist * distScale, polar: p.polar, azim: p.azim }, animate, dur);
   }
   /** カメラを to へ（向きは近い回り方で）。animate しないときや動きを減らす設定では、すぐ */
   function moveCam(target: Cam, animate = true, dur = 1400) {
@@ -1536,7 +1545,8 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
   /** 土地を画面の centerY の高さに置く（カメラの向きはそのまま、写す範囲だけずらす。全画面では画面の真ん中へ動かす） */
   function setView() {
     const y = viewY || layout.centerY || H * 0.42;
-    camera.setViewOffset(W, H, 0, H / 2 - y, W, H);
+    const x = layout.centerX ?? W / 2;
+    camera.setViewOffset(W, H, W / 2 - x, H / 2 - y, W, H);
     camera.updateProjectionMatrix();
   }
 
@@ -1823,7 +1833,7 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
     ptrs.delete(e.pointerId);
     if (ptrs.size < 2) gest = null;
     if (drag && ptrs.size === 0) {
-      inertia = still() || cancelled ? 0 : clamp(drag.vx, -0.004, 0.004) * 16;
+      inertia = still() || cancelled || drag.pan ? 0 : clamp(drag.vx, -0.004, 0.004) * 16;
       drag = null;
     }
     if (!cancelled && tap && performance.now() - tap.t < 350) {
@@ -1923,6 +1933,8 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
       ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (ptrs.size === 1) {
         drag = { x: e.clientX, y: e.clientY, az: cam.azim, po: cam.polar, t: performance.now(), vx: 0, id: e.pointerId };
+        // PC：Shift か右ボタンのドラッグは、地面ごと動かす
+        if (opts.desk && e.pointerType === "mouse" && (e.shiftKey || e.button === 2)) drag.pan = { tx: cam.tx, tz: cam.tz };
         tap = { x: e.clientX, y: e.clientY, t: performance.now() };
       }
       if (ptrs.size === 2) {
@@ -1944,6 +1956,23 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
       ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (gest && ptrs.size === 2) {
         gestMove(false, MIN_DIST, MAX_DIST);
+        touched = true;
+      } else if (drag?.pan && e.pointerId === drag.id) {
+        // PC：地面をつかんで動かす（画面の右は地面の (cos, -sin)、画面の上（奥）は (-sin, -cos)。物件から離れすぎない）
+        const dx = e.clientX - drag.x;
+        const dy = e.clientY - drag.y;
+        const k = metersPerPx();
+        const kf = k / Math.max(0.3, Math.cos(cam.polar));
+        const ca = Math.cos(cam.azim);
+        const sa = Math.sin(cam.azim);
+        cam.tx = drag.pan.tx - ca * dx * k - sa * dy * kf;
+        cam.tz = drag.pan.tz + sa * dx * k - ca * dy * kf;
+        const r = Math.hypot(cam.tx - parts.center.x, cam.tz - parts.center.z);
+        if (r > 600) {
+          cam.tx = parts.center.x + ((cam.tx - parts.center.x) * 600) / r;
+          cam.tz = parts.center.z + ((cam.tz - parts.center.z) * 600) / r;
+        }
+        if (tap && Math.hypot(dx, dy) > 8) tap = null;
         touched = true;
       } else if (drag && e.pointerId === drag.id) {
         const dx = e.clientX - drag.x;
@@ -1988,6 +2017,23 @@ export async function createPropertyScene(host: HTMLElement, labelHost: HTMLElem
       moveCam({ ...cam, polar: on ? 0.03 : 0.86 }, true, 800);
     },
     zoomBy: (f) => moveCam({ ...cam, dist: clamp(cam.dist * f, FREE_MIN, FREE_MAX) }, true, 380),
+    rotateBy: (rad) => {
+      touched = true;
+      moveCam({ ...cam, azim: cam.azim + rad }, true, 420);
+      wake();
+    },
+    resetView: () => {
+      touched = false;
+      applyPreset(nbOn && tab === "basic" ? "nb" : tab, true, 900);
+      wake();
+    },
+    setDistScale: (f) => {
+      if (f === distScale) return;
+      distScale = f;
+      // 降りてくる途中は、降りた先の距離にだけ効かせる
+      if (arrived && !touched) applyPreset(nbOn && tab === "basic" ? "nb" : tab, true, 900);
+      wake();
+    },
     onCamera: (cb) => {
       camCb = cb;
       lastCam = "";

@@ -795,7 +795,8 @@ export function linkTexts(link: ResolvedLink, agree?: boolean, copyHint = "上�
   return { sub, tip };
 }
 
-function MapButton({
+/** 地図を開くボタン（説明と開いたあとの操作。PC は凡例をその下に）。PC の調査デスクのカルテからも使う */
+export function MapButton({
   link,
   primary,
   row,

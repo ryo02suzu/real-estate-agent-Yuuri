@@ -1,7 +1,7 @@
 "use client";
 
 // スマホの「その他」から開く案内のシート：使い方・対応している市区町村・データの出典と時点・データの保存について。
-// PC は components/info-sheets.tsx の金色のまま（ここはスマホの紺の見た目）。シートの動きは components/sheet.tsx
+// PC は調査デスクの重ねて開く画面（components/desk/overlays.tsx。ここはスマホの紺の見た目）。シートの動きは components/sheet.tsx
 import { Download, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { bundleFileName, bundleSummary, importBundle, makeBundle, type BundleSummary } from "@/lib/backup";

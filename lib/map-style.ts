@@ -229,6 +229,13 @@ export function showHazardOnMap(kind: HazardKind) {
   window.dispatchEvent(new CustomEvent<HazardKind>(HAZARD_EVENT, { detail: kind }));
 }
 
+/** PC（調査デスク）：地図の外から「筆・地番」「用途地域」などの重ねを入れる・外す（3D の画面の層のボタンから地図に切り替えたとき） */
+export const OVERLAY_EVENT = "michilu:map-overlay";
+export type OverlayKey = "parcels" | "zoning" | "roads" | "buildings" | "landPrice" | "places";
+export function setMapOverlay(key: OverlayKey, on: boolean) {
+  window.dispatchEvent(new CustomEvent<{ key: OverlayKey; on: boolean }>(OVERLAY_EVENT, { detail: { key, on } }));
+}
+
 /** 見つけた筆（地番区域と、データのままの地番。二重地番などで区画が分かれていれば、その全部） */
 type HitParcel = { kuiki: string; chibanRaw: string; chibanRaws?: string[] };
 
