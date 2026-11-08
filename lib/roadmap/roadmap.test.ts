@@ -37,6 +37,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("石川県の全市町を網羅している", () => covered("石川県"));
   it("福井県の全市町を網羅している", () => covered("福井県"));
   it("宮城県の全市町村を網羅している", () => covered("宮城県"));
+  it("青森県の全市町村を網羅している", () => covered("青森県"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
@@ -59,6 +60,7 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
     石川県: ["076", "0761", "0767", "0768"],
     福井県: ["0770", "0776", "0778", "0779"],
     宮城県: ["022", "0220", "0223", "0224", "0225", "0226", "0228", "0229"],
+    青森県: ["017", "0172", "0173", "0174", "0175", "0176", "0178"],
   };
   const contacts = MUNICIPALITIES.flatMap((m) =>
     [m.contact, ...Object.values(m.contactByCode ?? {})].filter((c) => c?.phone).map((c) => ({ m, phone: c!.phone! })),
@@ -518,6 +520,39 @@ describe("福井県の道路図", () => {
     expect(resolveContact(findMunicipality("18501")!, "18501")).toMatchObject({ phone: "0770-22-5486", note: expect.stringContaining("0770-56-5914") });
     expect(MUNICIPALITIES.filter((x) => x.pref === "福井県" && x.coverage === "outside").map((x) => x.name)).toEqual(["池田町", "南越前町", "おおい町"]);
     expect(MUNICIPALITIES.filter((x) => x.pref === "福井県")).toHaveLength(17);
+  });
+});
+
+describe("青森県の道路図", () => {
+  const aomori = MUNICIPALITIES.filter((m) => m.pref === "青森県");
+
+  it("県が扱う市町村は県の道路種別図（ZIP の中の PDF）で、物件の位置から図面番号（国土基本図の図郭・第X系）を出す", () => {
+    // 役場の位置（国土地理院の住所検索）→ 図面番号（平面直角座標の換算は国土地理院の計算と一致、10GE52 は地理院地図と画像で照合）
+    const at = (code: string, lat: number, lng: number) => buildLinks(findMunicipality(code)!, lat, lng)[0];
+    expect(at("02301", 40.926051, 140.955937)).toMatchObject({ kind: "road_type", verified: true, sheet: { label: "10GE52", zip: true } }); // 平内町（東青）
+    expect(at("02208", 41.293052, 141.183058).sheet?.label).toBe("10FE27"); // むつ市（下北）
+    expect(at("02207", 40.683072, 141.369086).sheet?.label).toBe("10HF41"); // 三沢市（上北）
+    expect(at("02210", 40.583742, 140.567123).sheet?.label).toBe("10HD84"); // 平川市（中南）
+    expect(at("02442", 40.531105, 141.307783).sheet?.label).toBe("10IF00"); // 五戸町（三八）
+    expect(at("02209", 40.808738, 140.380191).sheet?.label).toBe("10HD00"); // つがる市（西北）
+    const l = at("02301", 40.926051, 140.955937);
+    expect(l.url).toContain("kijyunho.html");
+    expect(l.sheet?.howto).toContain("東青県土整備事務所管内分");
+    expect(l.sheet?.howto).toContain("印刷用_10GE52.pdf");
+  });
+
+  it("特定行政庁は青森市・弘前市・八戸市。県の図は都市計画区域のある25市町村、区域の無い12町村は区域外", () => {
+    expect(aomori).toHaveLength(40);
+    expect(aomori.filter((m) => !m.contact?.dept.startsWith("青森県")).map((m) => m.name)).toEqual(["青森市", "弘前市", "八戸市"]);
+    expect(aomori.filter((m) => m.maps.some((x) => x.sheets)).length).toBe(25);
+    expect(aomori.filter((m) => m.coverage === "outside").map((m) => m.name).sort()).toEqual(
+      ["今別町", "佐井村", "中泊町", "新郷村", "深浦町", "西目屋村", "田子町", "大間町", "東通村", "風間浦村", "蓬田村", "横浜町"].sort(),
+    );
+    expect(aomori.some((m) => m.coverage === "unknown")).toBe(false);
+    // 弘前市・八戸市の geogeo は lng（lon ではない）で位置を渡す。八戸市は https の証明書が合わないので http
+    expect(buildLinks(findMunicipality("02202")!, 40.603149, 140.46315)[0].url).toBe("https://hirosakimap.geogeo.jp/maps?mode=theme&lid=2&mid=9&lat=40.603149&lng=140.463150&z=17");
+    expect(buildLinks(findMunicipality("02203")!, 40.511864, 141.490005)[0].url).toBe("http://map.city.hachinohe.aomori.jp/maps?mode=theme&lid=1&mid=5&lat=40.511864&lng=141.490005&z=17");
+    expect(resolveContact(findMunicipality("02201")!, "02201")).toMatchObject({ phone: "017-752-8274", noPhoneInquiry: true });
   });
 });
 

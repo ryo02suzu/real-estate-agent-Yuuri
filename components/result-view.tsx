@@ -772,7 +772,9 @@ function SlimPreview({ result, onFix, onExpand }: { result: Extract<LookupResult
 export function linkTexts(link: ResolvedLink, agree?: boolean, copyHint = "上の「住所コピー」を押し、地図の住所検索に貼り付けてください。"): { sub: string; tip?: string } {
   const sheet = link.sheet;
   const sub = sheet
-    ? sheet.howto
+    ? sheet.zip
+      ? `物件の図面は ${sheet.label}（県のページの ZIP の中）`
+      : sheet.howto
       ? `物件が載っている図（${sheet.label}）の場所で地図が開きます`
       : sheet.whole
         ? "市全体の図が開きます"
