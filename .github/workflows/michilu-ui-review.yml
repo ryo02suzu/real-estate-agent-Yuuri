@@ -14,9 +14,9 @@ jobs:
     timeout-minutes: 25
     env:
       REVIEW_URL: http://127.0.0.1:3000
-      PREVIEW_URL: https://michilu-6qsh2ts80-sourirettes-projects.vercel.app
-      REVIEW_SHA: fbcc6a07579126fd4657a388e24331f952c2248c
-      REVIEW_PHASE: mobile-result-fbcc6a0
+      PREVIEW_URL: https://michilu-6lm54nw85-sourirettes-projects.vercel.app
+      REVIEW_SHA: 44ba2d7934ce8a12ddedeaafa1bde3171d24513b
+      REVIEW_PHASE: mobile-result-44ba2d7
     steps:
       - uses: actions/checkout@v4
         with:
@@ -115,6 +115,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: michilu-result-fbcc6a0-${{ github.run_id }}
+          name: michilu-result-44ba2d7-${{ github.run_id }}
           path: ui-review/
           retention-days: 14

@@ -78,10 +78,11 @@ async def layout(page):
 
 
 async def selected_tab_geometry(tab):
+    # Rounded targets: verify the 44px horizontal/vertical span, not corners outside the pill.
     return await tab.evaluate("""e=>{
       const r=e.getBoundingClientRect(),cx=r.x+r.width/2,cy=r.y+r.height/2;
       return {box:r.toJSON(),selected:e.getAttribute('aria-selected'),
-        hit44:[[-21,-21],[21,-21],[-21,21],[21,21],[0,0]].map(([dx,dy])=>{
+        hit44:[[0,-21],[0,21],[-21,0],[21,0],[0,0]].map(([dx,dy])=>{
           const x=cx+dx,y=cy+dy,hit=document.elementFromPoint(x,y);
           return {x,y,receives:x>=0&&x<innerWidth&&y>=0&&y<innerHeight&&!!hit&&e.contains(hit)};
         })};
