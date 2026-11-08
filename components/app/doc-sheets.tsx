@@ -113,7 +113,7 @@ export function InquirySheet({ open, ...props }: { open: boolean } & InquiryProp
 }
 
 /** 窓口のデータから入れる宛先（電話は最初の番号。FAX 番号は窓口のデータに無いので空） */
-const toOf = (c?: Contact): InquiryTo => ({ ...EMPTY_TO, email: c?.email ?? "", phone: c?.phone ? (parsePhones(c.phone)[0]?.number ?? "") : "" });
+const toOf = (c?: Contact): InquiryTo => ({ ...EMPTY_TO, email: c?.email ?? "", fax: c?.fax ?? "", phone: c?.phone ? (parsePhones(c.phone)[0]?.number ?? "") : "" });
 
 type Tab = "letter" | "send";
 const TABS: { key: Tab; label: string }[] = [

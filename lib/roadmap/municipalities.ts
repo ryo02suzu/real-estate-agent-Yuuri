@@ -47,6 +47,8 @@ export type MapLink = {
 export type Contact = {
   dept: string;
   phone?: string;
+  /** FAX 番号（公式のページに載っているものだけ。照会を送る画面の FAX の宛先に入る） */
+  fax?: string;
   email?: string;
   hours?: string;
   /** 電話で答えてくれるか等、問い合わせ時の注意 */

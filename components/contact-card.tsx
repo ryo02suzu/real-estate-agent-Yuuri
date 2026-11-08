@@ -33,6 +33,12 @@ export function ContactCard({ contact, city, address }: { contact: Contact; city
             <dd className="text-ink">{contact.hours}</dd>
           </>
         )}
+        {contact.fax && (
+          <>
+            <dt className="text-muted">FAX</dt>
+            <dd className="tabular text-ink">{contact.fax}</dd>
+          </>
+        )}
         {contact.note && (
           <>
             <dt className="text-muted">備考</dt>
