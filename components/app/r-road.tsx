@@ -87,7 +87,7 @@ export function RoadTab({ result, data, open, front, pick }: TabProps) {
           )}
           {roads.status === "none" && (
             <li className="py-[8px] leading-[1.5]" style={{ fontSize: 13, color: G.sub }}>
-              {m.name}の道路の種別は、MICHILU では読めません。下のボタンから市の図を開いて確かめてください。
+              {m.name}の道路の種別は、MICHILU では読めません。下のボタンから{mapLink && /県/.test(mapLink.label) ? "県" : m.name}の図を開いて確かめてください。
             </li>
           )}
           {roads.status === "error" && (
@@ -136,7 +136,18 @@ export function RoadTab({ result, data, open, front, pick }: TabProps) {
 
       {/* 市町村の道路種別の図（いちばん使う操作） */}
       {mapLink ? (
-        <GMain href={mapLink.url} icon={<Route size={19} strokeWidth={1.9} absoluteStrokeWidth />} title={offline ? "参考の地図を開く" : `${m.name}の道路種別の図を開く`} sub={mapLink.label} />
+        <>
+          <GMain href={mapLink.url} icon={<Route size={19} strokeWidth={1.9} absoluteStrokeWidth />} title={offline ? "参考の地図を開く" : `${m.name}の道路種別の図を開く`} sub={mapLink.label} />
+          {/* 図が ZIP にまとめて配られている県（青森県）：物件の位置の図面番号と開き方 */}
+          {mapLink.sheet?.zip && (
+            <p className="-mt-[2px] rounded-[14px] px-[12px] py-[9px] leading-[1.5]" style={{ fontSize: 12.5, color: G.sub, background: "rgba(0,0,0,0.18)" }}>
+              <b className="font-semibold" style={{ color: "#ffe2a3" }}>
+                物件の図面は {mapLink.sheet.label}
+              </b>
+              （図の{mapLink.sheet.where}あたり{mapLink.sheet.neighbor ? `。境に近いので隣の ${mapLink.sheet.neighbor.label} も` : ""}）。{mapLink.sheet.howto}
+            </p>
+          )}
+        </>
       ) : (
         <GMain onClick={() => open("contact")} icon={<Phone size={18} strokeWidth={1.9} absoluteStrokeWidth />} title="道路の種別は窓口で" sub={`${m.name}の担当の問い合わせ先`} />
       )}
