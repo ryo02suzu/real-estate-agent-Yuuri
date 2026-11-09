@@ -2,7 +2,8 @@
 import REGIONS_JSON from "./data/regions.json";
 
 export type RegionKey = keyof typeof REGIONS_JSON;
-export type Region = { name: string; prefs: Record<string, string>; bounds: [[number, number], [number, number]] };
+/** osm：OpenStreetMap の切り出しの配布元での地方の名前（近畿は Geofabrik では kansai）。無ければ地方の鍵と同じ */
+export type Region = { name: string; prefs: Record<string, string>; bounds: [[number, number], [number, number]]; osm?: string };
 
 export const REGIONS = REGIONS_JSON as unknown as Record<RegionKey, Region>;
 /** 対応している地方の順（候補の並びや一覧の順に使う） */

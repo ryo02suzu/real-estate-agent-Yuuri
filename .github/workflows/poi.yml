@@ -42,11 +42,13 @@ jobs:
           git clone --depth 1 --branch "$TIPPECANOE_VERSION" https://github.com/felt/tippecanoe.git /tmp/tippecanoe
           make -C /tmp/tippecanoe -j"$(nproc)"
           mkdir -p ~/tippecanoe-bin && cp /tmp/tippecanoe/tippecanoe /tmp/tippecanoe/tile-join ~/tippecanoe-bin/
-      - name: OpenStreetMap の対応している地方の切り出しを読む（関東・中部。各0.5〜0.6GB）
+      - name: OpenStreetMap の対応している地方の切り出しを読む（regions.json の地方。各0.5〜0.6GB 前後）
         # 配布元が止まっていることがある（2026年10月に openstreetmap.fr が 502）ので、Geofabrik と openstreetmap.fr の順に試す
         run: |
           for region in $(jq -r 'keys[]' lib/roadmap/data/regions.json); do
-            for url in "https://download.geofabrik.de/asia/japan/$region-latest.osm.pbf" "https://download.openstreetmap.fr/extracts/asia/japan/$region-latest.osm.pbf"; do
+            # 配布元での地方の名前（近畿は Geofabrik では kansai。regions.json の osm。無ければ地方の鍵のまま）
+            osm=$(jq -r --arg r "$region" '.[$r].osm // $r' lib/roadmap/data/regions.json)
+            for url in "https://download.geofabrik.de/asia/japan/$osm-latest.osm.pbf" "https://download.openstreetmap.fr/extracts/asia/japan/$osm-latest.osm.pbf"; do
               if curl -sSfL --retry 2 --retry-delay 30 -o "$RUNNER_TEMP/$region.osm.pbf" "$url"; then
                 echo "読んだ所：$url"
                 break
