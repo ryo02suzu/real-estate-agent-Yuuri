@@ -120,7 +120,7 @@ describe("建物のデータの置き場所（data/building-source.json）", () 
   it("置き場所は空（まだ作っていない）か R2 の PMTiles。データのある市区町村は5桁のコード", () => {
     expect(SOURCE.url === "" || /^https:\/\/.+\.pmtiles$/.test(SOURCE.url)).toBe(true);
     // 関東1都6県・中部9県・東北6県の市区町村コード
-    for (const c of SOURCE.codes) expect(c).toMatch(/^(0[2-9]|1[0-9]|2[0-3])\d{3}$/);
+    for (const c of SOURCE.codes) expect(c).toMatch(/^(0[2-9]|1[0-9]|2[0-9]|30)\d{3}$/);
     if (SOURCE.url) {
       expect(SOURCE.edition).toMatch(/^\d{4}年\d{1,2}月時点$/);
       // 東京23区は全部ある

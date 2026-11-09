@@ -55,7 +55,7 @@ describe("自然公園地域・農業地域・森林地域", () => {
     expect(tochiLine(none!)).toBe("自然公園・農業振興地域・森林地域の外");
     expect(tochiForestText(none!)).toBe("森林地域の外");
     expect(tochiCheck(none!, "千代田区")).toBeUndefined();
-    expect(await tochiAt(LAT, LNG, "27127", fake([]))).toBeNull(); // 大阪市（関東・中部の外）
+    expect(await tochiAt(LAT, LNG, "34101", fake([]))).toBeNull(); // 広島市（対応エリアの外）
   });
 });
 

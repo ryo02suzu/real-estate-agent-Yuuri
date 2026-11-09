@@ -45,7 +45,7 @@ describe("土砂災害などの法令の区域", () => {
     const out = await houreiAt(LAT, LNG, "14201", fake([]));
     expect(out?.hits).toEqual([]);
     expect(houreiLine(out!)).toBe("砂防指定地・地すべり防止区域・急傾斜地崩壊危険区域・災害危険区域の外（国のデータ・参考）");
-    expect(await houreiAt(34.69, 135.5, "27127", fake([]))).toBeNull(); // 大阪市（関東・中部の外）
+    expect(await houreiAt(34.3853, 132.4553, "34101", fake([]))).toBeNull(); // 広島市（対応エリアの外）
     // 群馬県の砂防指定地、埼玉県の災害危険区域は国のデータに無い
     expect((await houreiAt(LAT, LNG, "10202", fake([])))?.missing).toEqual(["砂防指定地"]);
     expect((await houreiAt(LAT, LNG, "11201", fake([])))?.missing).toEqual(["災害危険区域"]);

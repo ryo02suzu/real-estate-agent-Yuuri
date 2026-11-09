@@ -137,9 +137,9 @@ describe("アプリに入っている地価のタイル", () => {
     expect((await stat(PATH)).size).toBeGreaterThan(1_000_000);
     const points = SRC.points as Record<string, number>;
     for (const k of ["L01", "L02"]) for (const p of ["08", "09", "10", "11", "12", "13", "14"]) expect(points[`${k}-${p}`]).toBeGreaterThan(200);
-    // 入っている都道府県は 関東1都6県・中部9県・東北6県（02〜23）だけで、どれも地点がある
+    // 入っている都道府県は 関東1都6県・中部9県・東北6県・近畿2府5県（02〜30）だけで、どれも地点がある
     for (const [key, n] of Object.entries(points)) {
-      expect(key, key).toMatch(/^L0[12]-(0[2-9]|1[0-9]|2[0-3])$/);
+      expect(key, key).toMatch(/^L0[12]-(0[2-9]|1[0-9]|2[0-9]|30)$/);
       expect(n, key).toBeGreaterThan(0);
     }
   });
@@ -158,7 +158,7 @@ describe("アプリに入っている地価のタイル", () => {
     expect(new Set(r.map((h) => `${h.kind}|${h.no}`)).size).toBe(r.length);
   });
 
-  it("横浜市・千葉市・さいたま市でも見つかり、対応エリアの外（大阪市）は空", async () => {
+  it("横浜市・千葉市・さいたま市でも見つかり、対応エリアの外（広島市）は空", async () => {
     // 地価調査の基準地番号は、県の中で重ならない地名（千葉市中央区は「中央(県)」）
     for (const [lat, lng, city] of [
       [35.4437, 139.638, "横浜市"],
@@ -177,6 +177,6 @@ describe("アプリに入っている地価のタイル", () => {
     } else {
       expect(shizuoka).toEqual([]);
     }
-    expect(await nearestLandPrices(34.6937, 135.5023, src)).toEqual([]);
+    expect(await nearestLandPrices(34.3853, 132.4553, src)).toEqual([]); // 広島市（中国地方はまだ）
   });
 });
