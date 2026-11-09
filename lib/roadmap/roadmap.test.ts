@@ -38,6 +38,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("福井県の全市町を網羅している", () => covered("福井県"));
   it("宮城県の全市町村を網羅している", () => covered("宮城県"));
   it("青森県の全市町村を網羅している", () => covered("青森県"));
+  it("山形県の全市町村を網羅している", () => covered("山形県"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
@@ -61,6 +62,7 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
     福井県: ["0770", "0776", "0778", "0779"],
     宮城県: ["022", "0220", "0223", "0224", "0225", "0226", "0228", "0229"],
     青森県: ["017", "0172", "0173", "0174", "0175", "0176", "0178"],
+    山形県: ["023", "0233", "0234", "0235", "0237", "0238"],
   };
   const contacts = MUNICIPALITIES.flatMap((m) =>
     [m.contact, ...Object.values(m.contactByCode ?? {})].filter((c) => c?.phone).map((c) => ({ m, phone: c!.phone! })),
@@ -553,6 +555,50 @@ describe("青森県の道路図", () => {
     expect(buildLinks(findMunicipality("02202")!, 40.603149, 140.46315)[0].url).toBe("https://hirosakimap.geogeo.jp/maps?mode=theme&lid=2&mid=9&lat=40.603149&lng=140.463150&z=17");
     expect(buildLinks(findMunicipality("02203")!, 40.511864, 141.490005)[0].url).toBe("http://map.city.hachinohe.aomori.jp/maps?mode=theme&lid=1&mid=5&lat=40.511864&lng=141.490005&z=17");
     expect(resolveContact(findMunicipality("02201")!, "02201")).toMatchObject({ phone: "017-752-8274", noPhoneInquiry: true });
+  });
+});
+
+describe("山形県の道路図", () => {
+  const yamagata = MUNICIPALITIES.filter((m) => m.pref === "山形県" && m.coverage !== "unknown");
+  const contactOf = (code: string) => resolveContact(findMunicipality(code)!, code);
+
+  it("道路種別の地図は県・市町村とも公開されておらず、市町の道路網図・道路台帳は目安として添える（coverage は none か区域外）", () => {
+    expect(yamagata.every((m) => m.coverage === "none" || m.coverage === "outside")).toBe(true);
+    expect(yamagata.some((m) => m.maps.some((x) => x.kind !== "public_road"))).toBe(false);
+    // 山形市の地図情報（wagmap）・酒田市のさかたまっぷ（geogeo は lon で位置を渡す）
+    expect(buildLinks(findMunicipality("06201")!, 38.255245, 140.340225)[0].url).toBe(
+      "https://www2.wagmap.jp/yamagata/Map?mid=5&mpx=140.340225&mpy=38.255245&mps=1000&gprj=2",
+    );
+    expect(buildLinks(findMunicipality("06204")!, 38.915062, 139.836578)[0].url).toBe(
+      "https://sakata.geogeo.jp/maps?mode=theme&lid=3&mid=17&lat=38.915062&lon=139.836578&z=17",
+    );
+  });
+
+  it("特定行政庁の山形市と小規模な建築物を扱う4市は市の課が窓口。天童市と河北町は道路種別を電話では答えない", () => {
+    expect(contactOf("06201")).toMatchObject({ dept: "まちづくり政策部 建築指導課 審査係", phone: "023-641-1212" });
+    for (const code of ["06202", "06203", "06204", "06210"]) expect(contactOf(code)?.dept.startsWith("山形県")).toBe(false);
+    expect(contactOf("06210")).toMatchObject({ noPhoneInquiry: true });
+    expect(contactOf("06321")).toMatchObject({ phone: "0237-73-2114", fax: "0237-72-7333", noPhoneInquiry: true });
+  });
+
+  it("村山・置賜は市町の受付担当課が窓口（審査する総合支庁を注記）。最上・庄内と西川町は総合支庁の建築課が窓口", () => {
+    expect(contactOf("06206")).toMatchObject({ dept: "建設管理課 建築住宅係", phone: "0237-85-1627" });
+    expect(contactOf("06206")?.note).toContain("村山総合支庁の案内");
+    expect(contactOf("06213")?.note).toContain("置賜総合支庁が案内");
+    expect(contactOf("06322")?.dept).toBe("山形県 村山総合支庁 建設部 建築課（審査指導担当）");
+    for (const code of ["06205", "06361", "06362", "06364"]) expect(contactOf(code)?.phone).toBe("0233-29-1418");
+    expect(findMunicipality("06361")!.note).toContain("0233-29-5628");
+    // 庄内：庄内町は町のページの案内どおり町の建設課、三川町・遊佐町は庄内総合支庁
+    expect(contactOf("06428")).toMatchObject({ dept: "建設課 都市計画係", phone: "0234-42-0860" });
+    for (const code of ["06426", "06461"]) expect(contactOf(code)?.phone).toBe("0235-66-5642");
+    // 置賜の5町は町の担当課
+    expect(contactOf("06381")?.dept).toBe("建設課 都市住宅係");
+    expect(contactOf("06402")?.email).toBe("kensetu@so.town.shirataka.yamagata.jp");
+  });
+
+  it("都市計画区域の無い町村は区域外", () => {
+    expect(yamagata).toHaveLength(35);
+    expect(yamagata.filter((m) => m.coverage === "outside").map((m) => m.name).sort()).toEqual(["舟形町", "大蔵村", "鮭川村", "戸沢村", "飯豊町"].sort());
   });
 });
 

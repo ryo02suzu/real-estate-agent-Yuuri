@@ -1,6 +1,6 @@
 // 東北6県の市町村のうち、道路種別の公式図・問い合わせ先をまだ登録していない市町村。市区町村コードと名前は国土地理院の市区町村表（maps.gsi.go.jp/js/muni.js）から。
 // 道路種別の公式図・問い合わせ先を調べる前の市町村を coverage: "unknown"（調査中）でここに置き、調べた県から data/<県>.ts に移す。
-// 登録済み：宮城県（data/miyagi.ts）・青森県（data/aomori.ts）
+// 登録済み：宮城県（data/miyagi.ts）・青森県（data/aomori.ts）・山形県（data/yamagata.ts）
 import type { Municipality } from "../municipalities";
 
 export const TOHOKU_PENDING: Municipality[] = [
@@ -64,42 +64,6 @@ export const TOHOKU_PENDING: Municipality[] = [
   { pref: "秋田県", name: "美郷町", codes: ["05434"], coverage: "unknown", maps: [] },
   { pref: "秋田県", name: "羽後町", codes: ["05463"], coverage: "unknown", maps: [] },
   { pref: "秋田県", name: "東成瀬村", codes: ["05464"], coverage: "unknown", maps: [] },
-  // 山形県（35）
-  { pref: "山形県", name: "山形市", codes: ["06201"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "米沢市", codes: ["06202"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "鶴岡市", codes: ["06203"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "酒田市", codes: ["06204"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "新庄市", codes: ["06205"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "寒河江市", codes: ["06206"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "上山市", codes: ["06207"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "村山市", codes: ["06208"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "長井市", codes: ["06209"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "天童市", codes: ["06210"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "東根市", codes: ["06211"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "尾花沢市", codes: ["06212"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "南陽市", codes: ["06213"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "山辺町", codes: ["06301"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "中山町", codes: ["06302"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "河北町", codes: ["06321"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "西川町", codes: ["06322"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "朝日町", codes: ["06323"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "大江町", codes: ["06324"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "大石田町", codes: ["06341"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "金山町", codes: ["06361"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "最上町", codes: ["06362"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "舟形町", codes: ["06363"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "真室川町", codes: ["06364"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "大蔵村", codes: ["06365"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "鮭川村", codes: ["06366"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "戸沢村", codes: ["06367"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "高畠町", codes: ["06381"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "川西町", codes: ["06382"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "小国町", codes: ["06401"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "白鷹町", codes: ["06402"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "飯豊町", codes: ["06403"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "三川町", codes: ["06426"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "庄内町", codes: ["06428"], coverage: "unknown", maps: [] },
-  { pref: "山形県", name: "遊佐町", codes: ["06461"], coverage: "unknown", maps: [] },
   // 福島県（59）
   { pref: "福島県", name: "福島市", codes: ["07201"], coverage: "unknown", maps: [] },
   { pref: "福島県", name: "会津若松市", codes: ["07202"], coverage: "unknown", maps: [] },
