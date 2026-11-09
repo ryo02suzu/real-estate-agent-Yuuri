@@ -39,6 +39,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("宮城県の全市町村を網羅している", () => covered("宮城県"));
   it("青森県の全市町村を網羅している", () => covered("青森県"));
   it("山形県の全市町村を網羅している", () => covered("山形県"));
+  it("福島県の全市町村を網羅している", () => covered("福島県"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
@@ -63,6 +64,7 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
     宮城県: ["022", "0220", "0223", "0224", "0225", "0226", "0228", "0229"],
     青森県: ["017", "0172", "0173", "0174", "0175", "0176", "0178"],
     山形県: ["023", "0233", "0234", "0235", "0237", "0238"],
+    福島県: ["024", "0240", "0241", "0242", "0243", "0244", "0246", "0247", "0248"],
   };
   const contacts = MUNICIPALITIES.flatMap((m) =>
     [m.contact, ...Object.values(m.contactByCode ?? {})].filter((c) => c?.phone).map((c) => ({ m, phone: c!.phone! })),
@@ -599,6 +601,73 @@ describe("山形県の道路図", () => {
   it("都市計画区域の無い町村は区域外", () => {
     expect(yamagata).toHaveLength(35);
     expect(yamagata.filter((m) => m.coverage === "outside").map((m) => m.name).sort()).toEqual(["舟形町", "大蔵村", "鮭川村", "戸沢村", "飯豊町"].sort());
+  });
+});
+
+describe("福島県の道路図", () => {
+  const fukushima = MUNICIPALITIES.filter((m) => m.pref === "福島県");
+  const contactOf = (code: string) => resolveContact(findMunicipality(code)!, code);
+
+  it("県の指定道路図（5号と2項・図郭の PDF）を、物件の位置の図（国土基本図 1/2500・第IX系）で開く", () => {
+    // 県の合同庁舎（国土地理院の住所検索の点）→ 図の名前（白河の FE881 と南相馬の DG951 は地理院地図と画像で照合）
+    const shirakawa = buildLinks(findMunicipality("07205")!, 37.131145, 140.199081)[0];
+    expect(shirakawa).toMatchObject({ kind: "designated_only", verified: true, sheet: { label: "FE881", url: "https://www.pref.fukushima.lg.jp/uploaded/attachment/730267.pdf" } });
+    expect(shirakawa.legend).toEqual([
+      { label: "5号道路（位置指定道路）", color: "#fdb000" },
+      { label: "2項道路", color: "#61dcff" },
+    ]);
+    expect(buildLinks(findMunicipality("07212")!, 37.639957, 140.973007)[0].sheet?.label).toBe("DG951");
+    // 図の無い場所（大熊町のいまの役場のあたり）は市町村のページと「見つからない」の案内
+    const okuma = buildLinks(findMunicipality("07545")!, 37.382942, 140.952087)[0];
+    expect(okuma.sheet).toBeUndefined();
+    expect(okuma.url).toBe("https://www.pref.fukushima.lg.jp/sec/41065b/shiteidourozu-ookuma.html");
+    expect(fukushima.filter((m) => m.maps.some((x) => x.sheets)).length).toBe(38);
+    // 名前には市町村のページの更新日
+    expect(findMunicipality("07205")!.maps[0].label).toMatch(/^指定道路図（福島県・位置指定道路と2項道路、20\d\d年\d+月\d+日更新）$/);
+  });
+
+  it("特定行政庁の3市と限定特定行政庁の2市は市の課。福島市・いわき市は道路種別を電話では答えない", () => {
+    expect(contactOf("07201")).toMatchObject({ dept: "都市政策部 開発建築指導課 指導係（本庁舎6階）", phone: "024-525-3764", noPhoneInquiry: true });
+    expect(contactOf("07204")).toMatchObject({ phone: "0246-22-7516", noPhoneInquiry: true });
+    expect(contactOf("07203")).toMatchObject({ phone: "024-924-2371", email: "kentikuhoumu@city.koriyama.lg.jp" });
+    expect(contactOf("07207")).toMatchObject({ dept: "建設部 まち共創課 都市政策係", phone: "0248-88-9154" });
+    // 会津若松市の位置指定道路（ArcGIS Experience）は物件の位置で開く
+    expect(buildLinks(findMunicipality("07202")!, 37.495094, 139.929825)[0].url).toBe(
+      "https://experience.arcgis.com/experience/57a82df733f947b3bc28226a7c69de3d/#widget_6=center:139.929825%2C37.495094%2C4326,scale:2500",
+    );
+  });
+
+  it("県北建設事務所の管内は建設事務所が窓口。ほかの6事務所の管内は、道路の相談を案内されている市町村の窓口", () => {
+    for (const code of ["07210", "07213", "07214", "07301", "07303", "07308", "07322"])
+      expect(contactOf(code)).toMatchObject({ dept: "福島県 県北建設事務所 建築住宅課（指導審査担当）", phone: "024-521-2575", noPhoneInquiry: true });
+    expect(fukushima.filter((m) => m.contact?.dept.startsWith("福島県")).length).toBe(7);
+    expect(contactOf("07211")).toMatchObject({ dept: "建設部 都市計画課 建築住宅係", phone: "0247-82-1114" });
+    expect(contactOf("07211")?.note).toContain("県中建設事務所が案内");
+    expect(contactOf("07211")?.note).toContain("024-935-1462");
+    expect(contactOf("07205")?.note).toContain("県南建設事務所が案内");
+    expect(contactOf("07421")?.note).toContain("会津若松建設事務所が案内");
+    expect(contactOf("07208")?.note).toContain("喜多方建設事務所が案内");
+    expect(contactOf("07368")?.note).toContain("南会津建設事務所が案内");
+    expect(contactOf("07209")?.note).toContain("相双建設事務所が案内");
+    // 大熊町：事務所の表の番号はいまは下水道係なので、町のページの都市計画係
+    expect(contactOf("07545")).toMatchObject({ dept: "復興事業課 都市計画係", phone: "0240-23-7068" });
+    // 町村の地図：矢吹タウンマップ（道路網図）と猪苗代・双葉の町道（ArcGIS）は物件の位置で開く
+    expect(buildLinks(findMunicipality("07466")!, 37.201241, 140.338623)[1].url).toBe(
+      "https://www.mtc-service.jp/MapPocketBookPublicYabuki/maps.html?latitude=37.201241&longitude=140.338623&zoom=2500&groupid=4",
+    );
+    expect(buildLinks(findMunicipality("07408")!, 37.557865, 140.105148)[1]).toMatchObject({ kind: "public_road", pinpoint: true, verified: true });
+    expect(buildLinks(findMunicipality("07546")!, 37.45293, 141.003799)[1]).toMatchObject({ kind: "public_road", pinpoint: true, verified: true });
+  });
+
+  it("都市計画区域の無い15町村は区域外。西会津町は県の図が公開準備中", () => {
+    expect(fukushima).toHaveLength(59);
+    expect(fukushima.some((m) => m.coverage === "unknown")).toBe(false);
+    expect(fukushima.filter((m) => m.coverage === "outside").map((m) => m.name).sort()).toEqual(
+      ["天栄村", "下郷町", "檜枝岐村", "只見町", "北塩原村", "柳津町", "三島町", "金山町", "昭和村", "矢祭町", "鮫川村", "古殿町", "川内村", "葛尾村", "飯舘村"].sort(),
+    );
+    const nishiaizu = findMunicipality("07405")!;
+    expect(nishiaizu).toMatchObject({ coverage: "none", maps: [] });
+    expect(nishiaizu.note).toContain("公開準備中");
   });
 });
 

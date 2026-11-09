@@ -40,6 +40,14 @@ describe("地図の凡例", () => {
     expect(legendFor("https://example.com/map", "成田市")).toBeUndefined();
   });
 
+  it("「*」で終わるキーは、その前の部分で始まる地図に当てる（福島県の指定道路図は市町村ごとのページ）", () => {
+    expect(legendFor("https://www.pref.fukushima.lg.jp/sec/41065b/shiteidourozu-date.html", "伊達市")?.map((e) => e.label)).toEqual(["5号道路（位置指定道路）", "2項道路"]);
+    expect(legendFor("https://www.pref.fukushima.lg.jp/sec/41065b/shiteidourozu-shirakawa.html", "白河市")?.[0].color).toBe("#fdb000");
+    // 同じ県のほかのページ（指定道路図の入口・位置指定の公告）には当てない
+    expect(legendFor("https://www.pref.fukushima.lg.jp/sec/41065b/shiteidourozu.html", "福島市")).toBeUndefined();
+    expect(legendFor("https://www.pref.fukushima.lg.jp/sec/41065b/shiteidouro.html", "福島市")).toBeUndefined();
+  });
+
   it("凡例の色は #rrggbb", () => {
     for (const m of MUNICIPALITIES)
       for (const l of buildLinks(m, 36, 139.5)) for (const e of legendFor(l.url, m.name) ?? []) expect(e.color, `${m.name} ${e.label}`).toMatch(/^#[0-9a-f]{6}$/);

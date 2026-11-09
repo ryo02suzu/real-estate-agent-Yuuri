@@ -1686,5 +1686,19 @@
     "color": "#00c5ff"
    }
   ]
+ },
+ "www.pref.fukushima.lg.jp/sec/41065b/shiteidourozu-*": {
+  "map": "福島県 指定道路図（市町村ごとのページの図郭の PDF。どの図も同じ凡例）",
+  "source": "https://www.pref.fukushima.lg.jp/uploaded/attachment/730267.pdf（白河市[FE881] の凡例欄と線の色。2026-11-09 に PDF の線の色の値を読んだ）",
+  "legend": [
+   {
+    "label": "5号道路（位置指定道路）",
+    "color": "#fdb000"
+   },
+   {
+    "label": "2項道路",
+    "color": "#61dcff"
+   }
+  ]
  }
 }
