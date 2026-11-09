@@ -55,6 +55,14 @@ describe("住所の書き間違いを直して探し直す（correctAddress）",
     }
   });
 
+  it("地割の住所（岩手県など）：番地まで合っていれば探し直さない。別の地割には直さない", async () => {
+    expect(await correctAddress("岩手県紫波郡矢巾町大字南矢幅第13地割123番地", at("岩手県矢巾町大字南矢幅第十三地割１２３番地"), never)).toBeNull();
+    // 町までの一致で候補に別の地割（第十二）と入れた地割（第十三）があれば、入れた地割を選ぶ（1字違いの第十二には直さない）
+    const g = fakeGsi({ "岩手県矢巾町大字南矢幅第十三地割123番地": ["岩手県矢巾町大字南矢幅第十三地割１２３番地"] });
+    const r = await correctAddress("矢巾町南矢幅第13地割123番地", at("岩手県矢巾町大字南矢幅第十二地割", "岩手県矢巾町大字南矢幅第十三地割"), g.search);
+    expect(r && "query" in r && r.query).toBe("岩手県矢巾町大字南矢幅第十三地割123番地");
+  });
+
   it("旧字（髙田馬場）を今の字にする", async () => {
     const g = fakeGsi({ "新宿区高田馬場1-1": ["東京都新宿区高田馬場一丁目１番"] });
     const r = await correctAddress("新宿区髙田馬場1-1", at("東京都新宿区"), g.search);
@@ -135,6 +143,24 @@ describe("入れた住所と出す住所の違いの説明（describeMatch）", 
     expect(describeMatch("宇都宮市南大通り○○マンション", "栃木県宇都宮市南大通り")).toBeNull();
     expect(describeMatch("〒320-0811 宇都宮市南大通り1-2-3", "栃木県宇都宮市南大通り一丁目２番３号")).toBeNull();
   });
+
+  it("岩手県などの地割（「第13地割」）は町名の一部。国土地理院の「大字…第十三地割」（大字つき・漢数字）と同じと見る", () => {
+    // 国土地理院の住所検索の答え（2026-11-09）
+    expect(describeMatch("岩手県紫波郡矢巾町大字南矢幅第13地割123番地", "岩手県矢巾町大字南矢幅第十三地割１２３番地")).toBeNull();
+    expect(describeMatch("矢巾町南矢幅第13地割123", "岩手県矢巾町大字南矢幅第十三地割１２３番地")).toBeNull();
+    expect(describeMatch("岩手県九戸郡野田村大字野田第20地割14番地", "岩手県野田村大字野田第二十地割１４番地")).toBeNull();
+    expect(describeMatch("岩手県岩手郡岩手町大字五日市第10地割44番地", "岩手県岩手町大字五日市第十地割４４番地")).toBeNull();
+    // 違う地割に当たったら言う
+    expect(describeMatch("岩手県紫波郡矢巾町大字南矢幅第13地割123番地", "岩手県矢巾町大字南矢幅第十二地割")?.miss).toEqual({
+      typed: "南矢幅第13地割",
+      found: "大字南矢幅第十二地割",
+      kind: "town",
+    });
+  });
+
+  it("小字の「字」を国土地理院が書かずに名前を残したとき（「高善寺字大川鉢」→「高善寺大川鉢」）は何も言わない", () => {
+    expect(describeMatch("岩手県二戸郡一戸町高善寺字大川鉢24番地9", "岩手県一戸町高善寺大川鉢２４番地")).toBeNull();
+  });
 });
 
 describe("部品", () => {
@@ -143,6 +169,10 @@ describe("部品", () => {
     expect(similarTown("南大道り", "南大通り")).toBe(true);
     expect(similarTown("本町", "元町")).toBe(false);
     expect(similarTown("千住朝日町", "千住旭町")).toBe(false);
+  });
+  it("地割の番号は番地ではなく町名に入れる", () => {
+    expect(typedParts("岩手県紫波郡矢巾町大字南矢幅第13地割123番地")).toEqual({ pref: "岩手県", place: "矢巾町南矢幅第13地割", num: "123番地" });
+    expect(typedParts("矢巾町南矢幅第１３地割１２３")).toEqual({ pref: "", place: "矢巾町南矢幅第13地割", num: "123" });
   });
   it("郵便番号と郡を外して分ける", () => {
     expect(typedParts("〒190-1201 西多摩郡瑞穂町箱根ケ崎2335")).toEqual({ pref: "", place: "瑞穂町箱根ケ崎", num: "2335" });

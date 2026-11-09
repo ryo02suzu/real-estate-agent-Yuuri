@@ -5,7 +5,7 @@
 // （最大4回）、入れた住所をより細かく説明できたときだけ使う。何をどう直したか（「南大道り」→「南大通り」）を返して画面に小さく出す。
 // 直しきれずに別の町に当たったときも、そのことを返す（黙って別の町を出さない）。住所は国土地理院の API にだけ送る
 import GSI_CODES from "./data/gsi-muni-codes.json";
-import { addressNumbers, geocodeCandidates, type GeocodeResult } from "./geocode";
+import { CHIWARI, addressNumbers, chiwariDigits, geocodeCandidates, type GeocodeResult } from "./geocode";
 
 type Muni = { pref: string; name: string; city: string; ward?: string };
 
@@ -21,6 +21,11 @@ export type AddressMiss = { typed: string; found: string; kind: "town" | "city" 
 const PREF = /^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/;
 /** 番地の始まり（数字か「一丁目」） */
 const NUM = /[0-9]|[一二三四五六七八九十]+丁目/;
+/**
+ * 番地の始まりの位置。「第13地割」の番号は町名の一部（岩手県などの大字の区分け）なので飛ばす。
+ * 地割の部分を同じ長さの字に置き換えてから探すので、位置はもとの文字列のまま
+ */
+const numAt = (s: string) => s.replace(CHIWARI, (m) => "地".repeat(m.length)).search(NUM);
 
 /** 対応している市区町村（政令市は「横浜市西区」と「横浜市」の両方）。長い名前から順に */
 const MUNIS: Muni[] = (() => {
@@ -51,8 +56,13 @@ const OLD_RE = new RegExp(`[${Object.keys(OLD).join("")}]`, "g");
 export const newForm = (s: string) => s.replace(OLD_RE, (c) => OLD[c] ?? c);
 /** 名前を比べるときの形：ヶ・ケ・ヵ・が、竜・龍を同じに（1字ずつの置き換えなので、長さは変わらない） */
 const vary = (s: string) => newForm(s).replace(/[ヶヵケが]/g, "ケ").replace(/竜/g, "龍");
+/**
+ * 町名を比べるときの形：vary に加えて「大字」を外し、地割の番号を数字にそろえる（岩手県などの「大字南矢幅第13地割」は、
+ * 国土地理院が「大字南矢幅第十三地割」と大字つき・漢数字で返す）。長さが変わるので、比べるときだけに使う
+ */
+const townForm = (s: string) => chiwariDigits(vary(s.normalize("NFKC"))).replace(/大字/g, "");
 /** 町名の書き方の揺れ（送り仮名の「り」、「ノ」「ヶ」「ッ」など）を除いた形。「南大通」と「南大通り」を同じと見る */
-const loose = (s: string) => vary(s.normalize("NFKC")).replace(/[りリのノケ之ッツ]/g, "");
+const loose = (s: string) => townForm(s).replace(/[りリのノケ之ッツ]/g, "");
 
 /** 2つの文字列の違いの数（1字の足す・消す・置き換えを1と数える） */
 export function editDistance(a: string, b: string): number {
@@ -73,11 +83,18 @@ function allowance(a: string, b: string): number {
   return n >= 6 ? 2 : n >= 3 ? 1 : 0;
 }
 
+/** 地割の番号が違う（「第13地割」と「第12地割」は1字違いでも別の場所なので、書き間違いと見ない）。loose の形どうしで比べる */
+const otherChiwari = (a: string, b: string) => {
+  const no = (s: string) => s.match(/(\d+)地割/)?.[1];
+  return !!no(a) && !!no(b) && no(a) !== no(b);
+};
+
 /** 入れた町名と正式な町名が、書き間違い・書き方違いの範囲で同じか（途中まで入れた「南大」→「南大通り」も同じと見る） */
 export function similarTown(typed: string, official: string): boolean {
   const a = loose(typed);
   const b = loose(official);
   if (a === b) return true;
+  if (otherChiwari(a, b)) return false;
   if ([...a].length >= 2 && b.startsWith(a)) return true;
   return editDistance(a, b) <= allowance(typed, official);
 }
@@ -87,7 +104,7 @@ export function typedParts(input: string): { pref: string; place: string; num: s
   let s = input.normalize("NFKC").replace(/^〒?\s*\d{3}-?\d{4}\s*/, "").trim();
   const pref = s.match(PREF)?.[1] ?? "";
   s = s.slice(pref.length);
-  const at = s.search(NUM);
+  const at = numAt(s);
   let place = (at < 0 ? s : s.slice(0, at)).replace(/\s+/g, "").replace(/大字/g, "");
   // 「西多摩郡瑞穂町」の郡（国土地理院の住所に郡は無い）
   const county = place.match(/^(.{1,4}?郡)(.+)$/);
@@ -105,7 +122,7 @@ export function splitOfficial(address: string): Official | null {
   // 関東の外は名前の表が無いので、最初の「市・区・町・村」まで
   const muni = m?.name ?? rest.match(/^.+?[市区町村]/)?.[0] ?? "";
   const after = rest.slice(muni.length);
-  const at = after.search(NUM);
+  const at = numAt(after);
   return { pref, muni, city: m?.city ?? muni, ward: m?.ward, town: at < 0 ? after : after.slice(0, at), num: at < 0 ? "" : after.slice(at) };
 }
 
@@ -199,7 +216,7 @@ export function fixTown(query: string, cands: GeocodeResult[]): { query: string 
   }
   const near = [...towns.keys()]
     .map((town) => ({ town, d: editDistance(loose(typed), loose(town)) }))
-    .filter((x) => x.d <= allowance(typed, x.town));
+    .filter((x) => x.d <= allowance(typed, x.town) && !otherChiwari(loose(typed), loose(x.town)));
   if (!near.length) return null;
   const best = Math.min(...near.map((x) => x.d));
   const top = near.filter((x) => x.d === best);
@@ -319,14 +336,16 @@ export function describeMatch(input: string, matched: string, used?: string): { 
   const place = off.town.includes("字") ? t.place : t.place.replace(/(.)字[^字]+$/, "$1");
   if (!place) return null;
   const official = off.muni + off.town;
-  if (!used && vary(official).endsWith(vary(place))) return null;
+  // 国土地理院は小字の「字」を書かずに名前だけ残すことがある（「高善寺字大川鉢」→「高善寺大川鉢」）
+  const plain = t.place.replace(/(.)字/g, "$1");
+  if (!used && (townForm(official).endsWith(townForm(place)) || townForm(official).endsWith(townForm(plain)))) return null;
   if (used) return { fix: fixLabel(place, off) };
   const town = townOf(place, off);
   if (!off.town) return town ? { miss: { typed: town, found: off.muni, kind: "city" } } : null;
   if (town === null) return null;
   if (!similarTown(town, off.town)) {
     // 「南大通り○○マンション」のように、正式な町名のあとに建物名などが続くだけなら言わない
-    if (vary(town).startsWith(vary(off.town)) && !t.num) return null;
+    if (townForm(town).startsWith(townForm(off.town)) && !t.num) return null;
     return { miss: { typed: town, found: off.town, kind: "town" } };
   }
   return { fix: fixLabel(place, off) };

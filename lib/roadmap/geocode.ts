@@ -54,16 +54,24 @@ export function needsChoice(input: string, candidates: GeocodeResult[]): boolean
   return places.size > 1;
 }
 
-/** 入力に番地（数字）があるのに、結果が町・大字までしか一致していない（代表点になっている） */
+/**
+ * 地割（岩手県などで大字を区分けした「第13地割」）。番号は町名の一部で、番地ではない。
+ * 国土地理院は「第十三地割」と漢数字で返すので、比べるときは数字にそろえる（chiwariDigits）
+ */
+export const CHIWARI = /第?(?:[0-9０-９]+|[一二三四五六七八九十]+)地割/g;
+/** 地割の番号を数字に（「第十三地割」→「第13地割」、「第１３地割」→「第13地割」） */
+export const chiwariDigits = (s: string) =>
+  s.replace(CHIWARI, (m) => m.normalize("NFKC").replace(/[一二三四五六七八九十]+/, (k) => String(kanjiToInt(k))));
+
+/** 入力に番地（数字）があるのに、結果が町・大字までしか一致していない（代表点になっている）。地割の番号は番地に数えない */
 export function isApproximate(input: string, matchedAddress: string): boolean {
   const digit = /[0-9０-９]/;
-  return digit.test(input) && !digit.test(matchedAddress);
+  return digit.test(input.replace(CHIWARI, "")) && !digit.test(matchedAddress.replace(CHIWARI, ""));
 }
 
-/** 住所の番号（丁目・番地・号）を数の並びにする（「丸の内一丁目9番」→ [1, 9]）。郵便番号は外し、漢数字の丁目も数える */
+/** 住所の番号（丁目・番地・号）を数の並びにする（「丸の内一丁目9番」→ [1, 9]）。郵便番号は外し、漢数字の丁目・地割も数える */
 export function addressNumbers(a: string): number[] {
-  const s = a
-    .normalize("NFKC")
+  const s = chiwariDigits(a.normalize("NFKC"))
     .replace(/〒?\s*\d{3}-\d{4}/g, "")
     .replace(/([一二三四五六七八九十]+)丁目/g, (_, k: string) => `${kanjiToInt(k)}丁目`);
   return (s.match(/\d+/g) ?? []).map(Number);
