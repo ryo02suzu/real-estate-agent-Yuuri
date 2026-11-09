@@ -24,7 +24,7 @@ export function Header({ onMenu, onHome, compact }: { onMenu: () => void; onHome
     <button
       onClick={onMenu}
       aria-label="メニュー"
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-ink shadow-soft hover:bg-mint"
+      className="mui-hit flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-ink shadow-soft hover:bg-mint"
     >
       <MenuIcon className="h-5 w-5" />
     </button>
@@ -34,7 +34,7 @@ export function Header({ onMenu, onHome, compact }: { onMenu: () => void; onHome
     return (
       <header className="flex items-center">
         {/* ロゴを押すとホームへ戻る */}
-        <button onClick={onHome} aria-label="ホームへ戻る" className="flex items-center gap-2">
+        <button onClick={onHome} aria-label="ホームへ戻る" className="mui-hit flex items-center gap-2">
           <Image src={MARK.src} alt="" width={Math.round((42 * MARK.w) / MARK.h)} height={42} priority />
           <Wordmark className="text-[22px] leading-none" />
         </button>
@@ -46,7 +46,7 @@ export function Header({ onMenu, onHome, compact }: { onMenu: () => void; onHome
   return (
     <header className="relative pt-2">
       <div className="absolute right-0 top-0">{menu}</div>
-      <div className="flex items-center justify-center gap-2.5 pt-7 [@media(max-height:720px)]:pt-3">
+      <div className="flex items-center justify-center gap-2.5 pt-7 short:pt-3">
         <Image src={MARK.src} alt="" width={Math.round((64 * MARK.w) / MARK.h)} height={64} priority />
         <Wordmark className="text-[32px] leading-none" />
       </div>

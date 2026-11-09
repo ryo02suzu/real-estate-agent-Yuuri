@@ -609,11 +609,16 @@ export function sheetFeatures(sheet?: SheetHit): FeatureCollection {
   };
 }
 
-/** WebGL が使えるか（使えなければ動く地図の代わりに静的なプレビューを出す） */
+/**
+ * WebGL が使えるか（使えなければ動く地図の代わりに静的なプレビューを出す）。確かめるために作った WebGL の文脈はすぐ返す
+ * （全画面の地図を何度も開いても、端末が同時に持てる文脈の数の上限に近づかず、ほかの地図の文脈が失われないように）
+ */
 export function webglAvailable(): boolean {
   try {
     const c = document.createElement("canvas");
-    return !!(c.getContext("webgl2") || c.getContext("webgl"));
+    const gl = c.getContext("webgl2") || c.getContext("webgl");
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();
+    return !!gl;
   } catch {
     return false;
   }

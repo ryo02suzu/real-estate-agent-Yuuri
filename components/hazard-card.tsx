@@ -26,13 +26,16 @@ import {
   type HazardReport,
 } from "@/lib/roadmap/hazard";
 import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
+import { panelHazardChips, type PanelChip } from "@/lib/panel-status";
 import { AlertIcon, ChevronRightIcon, ExternalIcon, HazardIcon, MapIcon } from "./icons";
 import { Notes } from "./notes";
+import { usePanelDetail } from "./panel-detail";
+import { RetryRow, RowLink } from "./panel-row";
 import { Sheet } from "./sheet";
 
 export type HazardState =
   | { status: "loading" }
-  | { status: "error" }
+  | { status: "error"; /** 読み込み直す */ retry?: () => void; /** 読めなくても開ける、市区町村のハザードマップ（わがまちハザードマップ）の市区町村コード */ muniCd?: string }
   | {
       status: "ok";
       report: HazardReport;
@@ -60,11 +63,14 @@ async function readHazard(lat: number, lng: number): Promise<HazardReport> {
 /** 地点の災害リスクと地面の高さ、市区町村のハザードマップのページを読む */
 export function useHazard(lat: number, lng: number, municipality: Municipality): HazardState {
   const codes = municipality.codes.join(",");
-  const key = `${lat},${lng},${codes}`;
+  // 読み込み直すたびに増やす（同じ地点でも読み直す）
+  const [attempt, setAttempt] = useState(0);
+  const key = `${lat},${lng},${codes}#${attempt}`;
   const [state, setState] = useState<{ key: string; value: HazardState }>();
   useEffect(() => {
     let alive = true;
     const list = codes.split(",");
+    const failed: HazardState = { status: "error", retry: () => setAttempt((n) => n + 1), muniCd: list[0] };
     Promise.all([
       readHazard(lat, lng),
       elevationAt(lat, lng, browserTileFetcher).catch(() => null),
@@ -74,10 +80,10 @@ export function useHazard(lat: number, lng: number, municipality: Municipality):
         if (!alive) return;
         const read = HAZARD_KINDS.filter((k) => report[k]);
         // どの種類も読めなかったときは「読み込めませんでした」
-        if (read.length > 0 && read.every((k) => report[k]?.status === "error")) return setState({ key, value: { status: "error" } });
+        if (read.length > 0 && read.every((k) => report[k]?.status === "error")) return setState({ key, value: failed });
         setState({ key, value: { status: "ok", report, elevation, maps: index ? hazardMapsFor(list, index) : {}, muniCd: list[0], ground: groundMaps(lat, lng) } });
       })
-      .catch(() => alive && setState({ key, value: { status: "error" } }));
+      .catch(() => alive && setState({ key, value: failed }));
     return () => {
       alive = false;
     };
@@ -106,7 +112,17 @@ export function HazardLine({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const chips = state.status === "ok" ? hazardChips(state.report) : [];
+  // 結果パネルの中の詳細なら、地図の重ね表示へ移っても詳細は開いたまま（地図を閉じると同じ詳細に戻る）
+  const inPanel = !!usePanelDetail();
+  // スマホの結果パネル（onOpen が無い）は、読めなかった種類・データの無い内水を「区域外」と言い切らない（lib/panel-status.ts）。PC は従来どおり
+  const chips: PanelChip[] = state.status === "ok" ? (onOpen ? hazardChips(state.report) : panelHazardChips(state.report)) : [];
+  // スマホの結果パネル（onOpen が無い）：読めなければ行を「再読み込み」にする（PC は従来どおり）
+  if (!onOpen && state.status === "error" && state.retry)
+    return (
+      <RetryRow label="災害リスク" icon={<HazardIcon className="h-3.5 w-3.5 shrink-0 text-brand-light" />} onRetry={state.retry}>
+        {state.muniCd && <RowLink href={wagamachiUrl(state.muniCd)}>{city}のハザードマップ</RowLink>}
+      </RetryRow>
+    );
   return (
     <>
       <button
@@ -124,7 +140,15 @@ export function HazardLine({
             {chips.map((c) => (
               <span
                 key={c.text}
-                className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-1 ${c.warn ? "bg-[#f8ece6] text-[#8a4f3a]" : "bg-[#f3f1ed] text-ink"}`}
+                className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-1 ${
+                  c.state === "fail"
+                    ? "bg-[var(--mui-warn-bg)] font-semibold text-[var(--mui-warn-ink)]"
+                    : c.state === "none"
+                      ? "text-muted"
+                      : c.warn
+                        ? "bg-[#f8ece6] text-[#8a4f3a]"
+                        : "bg-[#f3f1ed] text-ink"
+                }`}
               >
                 {c.color && <span className="h-2 w-2 shrink-0 rounded-[2px] border border-black/10" style={{ background: c.color }} />}
                 {compact ? (c.short ?? c.text) : c.text}
@@ -135,14 +159,14 @@ export function HazardLine({
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
       {state.status === "ok" && !onOpen && (
-        <Sheet title="災害リスク（参考）" open={open} onClose={() => setOpen(false)}>
+        <Sheet detail title="災害リスク（参考）" open={open} onClose={() => setOpen(false)}>
           <HazardDetail
             state={state}
             city={city}
             onShowMap={
               onShowMap &&
               ((k) => {
-                setOpen(false);
+                if (!inPanel) setOpen(false);
                 onShowMap(k);
               })
             }
@@ -196,7 +220,7 @@ function HazardDetail({ state, city, onShowMap }: { state: Extract<HazardState, 
                 onClick={() => onShowMap(r.kind as HazardKind)}
                 aria-label={`${r.name}を地図に重ねる`}
                 title="地図に重ねる"
-                className="flex shrink-0 items-center gap-1 rounded-full border border-line px-2 py-1 text-[11.5px] text-brand lg:hover:bg-mint densest:py-0.5"
+                className="mui-hit flex shrink-0 items-center gap-1 rounded-full border border-line px-2 py-1 text-[11.5px] text-brand lg:hover:bg-mint densest:py-0.5"
               >
                 <MapIcon className="h-3 w-3" />
                 地図

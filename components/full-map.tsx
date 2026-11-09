@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import type { LookupResult } from "@/lib/roadmap";
 import type { HazardKind } from "@/lib/roadmap/hazard";
 import { CloseIcon, MapIcon } from "./icons";
 import { MapPanel } from "./map-panel";
 import { MapPreview } from "./map-preview";
+import { useModal } from "./use-modal";
 
 type Ok = Extract<LookupResult, { status: "ok" }>;
 
@@ -34,21 +35,19 @@ export function FullMap({
 }) {
   // 凡例は地図の下に出す（地図とピンを隠さない）
   const [legendSlot, setLegendSlot] = useState<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  // 一時的に重なる画面：開いたらこの画面にフォーカス、Tab は中だけ、背景は触れない、Esc・端末の「戻る」で閉じ、閉じたら開いた元へフォーカスを戻す
+  const root = useRef<HTMLDivElement>(null);
+  useModal(root, true, onClose);
 
   const sheet = result.links.find((l) => l.sheet)?.sheet;
   const roadLink = result.links.find((l) => l.read);
   const roads = roadLink?.read ? { read: roadLink.read, city: result.municipality.name } : undefined;
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white" role="dialog" aria-modal="true" aria-label="物件のまわりの地図">
+    <div ref={root} tabIndex={-1} className="fixed inset-0 z-50 flex flex-col bg-white outline-none" role="dialog" aria-modal="true" aria-label="物件のまわりの地図">
       <header className="flex items-center gap-2 px-4 pb-2 pt-[max(10px,env(safe-area-inset-top))]">
         <MapIcon className="h-5 w-5 text-brand" />
         <h2 className="min-w-0 flex-1 truncate text-[15px] font-semibold text-ink">物件のまわりの地図</h2>
-        <button onClick={onClose} aria-label="閉じる" className="rounded-full p-2 text-muted hover:bg-mint">
+        <button onClick={onClose} aria-label="閉じる" className="mui-hit rounded-full p-2 text-muted hover:bg-mint">
           <CloseIcon className="h-5 w-5" />
         </button>
       </header>
