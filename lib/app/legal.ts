@@ -5,7 +5,7 @@ import { houreiGroups, type Hourei } from "../roadmap/hourei";
 import type { Morido } from "../roadmap/morido";
 import type { NearbyRoad } from "../roadmap/road-read";
 import type { Tochi } from "../roadmap/tochi";
-import type { Zoning } from "../roadmap/zoning";
+import type { Zoning, ZoningStatus } from "../roadmap/zoning";
 
 export type ZoneGroup = "low" | "midHigh" | "res" | "nearCom" | "com" | "semiInd" | "ind" | "indOnly" | "none";
 
@@ -58,6 +58,12 @@ export type Note = { icon: NoteIcon; title: string; body: string; /** 注意が�
 
 export type NoteInput = {
   zoning: Zoning;
+  /**
+   * その市の都市計画のデータの有無（statusFor）。「都市計画区域の外」と言えるのは、その市の都市計画区域のデータがあるとき
+   * （st.layers.tokei が 1）か、市区町村に都市計画区域が無いと分かっているとき（outside）だけ。どちらでもなければ言わない
+   */
+  st?: ZoningStatus;
+  outside?: boolean;
   morido?: Morido;
   hourei?: Hourei;
   tochi?: Tochi;
@@ -69,7 +75,7 @@ export type NoteInput = {
 const meters = (d: number) => `約${Math.max(1, Math.round(d))}m`;
 
 /** 建築時の注意点。区域の指定・計画道路などの注意を先に、防火・容積率・高さのルールをあとに並べる */
-export function buildingNotes({ zoning: z, morido, hourei, tochi, roads, buildingYear }: NoteInput): Note[] {
+export function buildingNotes({ zoning: z, st, outside, morido, hourei, tochi, roads, buildingYear }: NoteInput): Note[] {
   const y = z.youto[0];
   const g = zoneGroup(y?.name);
   const warn: Note[] = [];
@@ -77,7 +83,7 @@ export function buildingNotes({ zoning: z, morido, hourei, tochi, roads, buildin
 
   if (z.senbiki === "市街化調整区域")
     warn.push({ icon: "warn", title: "市街化調整区域", body: "市街化を抑える区域です。原則として、開発や建築に都道府県・市の許可が必要です（都市計画法）。", warn: true });
-  if (!z.tokei && !z.jyuntoshi && y === undefined)
+  if (!z.tokei && !z.jyuntoshi && y === undefined && (outside || st?.layers.tokei === 1))
     warn.push({ icon: "plan", title: "都市計画区域の外", body: "都市計画区域の外では、接道義務（建築基準法43条）や用途地域の制限は原則かかりません。区域は市で確認してください。" });
   if (z.road !== undefined)
     warn.push({ icon: "road", title: "都市計画道路が近い", body: `都市計画道路の中心線まで${meters(z.road)}。計画線にかかる部分には建築の制限があります（都市計画法53条）。`, warn: true });

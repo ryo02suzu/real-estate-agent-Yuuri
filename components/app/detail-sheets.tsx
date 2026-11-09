@@ -3,6 +3,7 @@
 // 「もっと見る」などで下から出す詳しい画面。今までの詳しい部品（地番・用途地域・ハザード・地価・駅・学区・建物・問い合わせ先）を
 // 紺の色で出し、新しい画面（施設の一覧・評価の根拠・建築時の注意点・道路の色の見方・避難場所・価格の事例）を足す。
 // シートは拡大・縮小しない（ふつうの文字の大きさで読める）
+import { noCityPlanning } from "@/lib/roadmap/municipalities";
 import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 import { buildingNotes } from "@/lib/app/legal";
@@ -187,7 +188,7 @@ export function DetailSheet({
       body = <ScoreSheet data={data} />;
       break;
     case "notes":
-      body = <NotesSheet data={data} />;
+      body = <NotesSheet data={data} outside={noCityPlanning(m)} />;
       break;
     case "roads":
       body = <RoadsSheet result={result} data={data} />;
@@ -287,11 +288,14 @@ function ScoreSheet({ data }: { data: PropertyData }) {
 }
 
 /** 建築時の注意点（全部） */
-function NotesSheet({ data }: { data: PropertyData }) {
+/** outside：市区町村に都市計画区域が無いと分かっている（データが無くても「都市計画区域の外」と言える） */
+function NotesSheet({ data, outside }: { data: PropertyData; outside: boolean }) {
   const z = data.zoning;
   if (z.status !== "ok") return <Loading state={z} />;
   const notes = buildingNotes({
     zoning: z.zoning,
+    st: z.st,
+    outside,
     morido: z.morido,
     hourei: z.hourei,
     tochi: z.tochi,

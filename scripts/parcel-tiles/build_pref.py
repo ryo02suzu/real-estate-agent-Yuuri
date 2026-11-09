@@ -51,6 +51,13 @@ ORGS = {
     "21": "moj-21gifu",
     "22": "moj-22shizuoka",
     "23": "moj-23aichi",
+    "24": "moj-24mie",
+    "25": "moj-25shiga",
+    "26": "moj-26kyoto",
+    "27": "moj-27osaka",
+    "28": "moj-28hyogo",
+    "29": "moj-29nara",
+    "30": "moj-30wakayama",
 }
 CKAN = "https://www.geospatial.jp/ckan/api/3/action/package_search"
 UA = {"User-Agent": "michilu-parcel-tiles (+https://github.com/ryo02suzu/real-estate-agent-Yuuri)"}

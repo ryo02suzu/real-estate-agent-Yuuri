@@ -1055,10 +1055,10 @@ describe("lookup", () => {
 
   it("未対応の市町村なら unsupported", async () => {
     stubFetch(
-      [{ geometry: { coordinates: [135.4959, 34.7024] }, properties: { title: "大阪府大阪市北区梅田一丁目" } }],
-      { results: { muniCd: "27127", lv01Nm: "梅田一丁目" } },
+      [{ geometry: { coordinates: [132.4553, 34.3853] }, properties: { title: "広島県広島市中区国泰寺町一丁目" } }],
+      { results: { muniCd: "34101", lv01Nm: "国泰寺町一丁目" } },
     );
-    const r = await lookup("大阪府大阪市北区梅田1-1-1");
+    const r = await lookup("広島県広島市中区国泰寺町1-6-34");
     expect(r.status).toBe("unsupported");
   });
 
@@ -1136,8 +1136,8 @@ describe("lookupPoint（地図で選んだ地点）", () => {
   });
 
   it("対応エリアの外や海の上は unsupported", async () => {
-    stubRev({ results: { muniCd: "27127", lv01Nm: "梅田一丁目" } });
-    expect((await lookupPoint(34.7024, 135.4959)).status).toBe("unsupported");
+    stubRev({ results: { muniCd: "34101", lv01Nm: "国泰寺町一丁目" } });
+    expect((await lookupPoint(34.3853, 132.4553)).status).toBe("unsupported");
     stubRev({});
     const sea = await lookupPoint(35.3, 139.9);
     expect(sea.status === "unsupported" && sea.matchedAddress).toBe("地図で選んだ地点");
@@ -1148,7 +1148,8 @@ describe("lookupPoint（地図で選んだ地点）", () => {
     expect(muniName("14131")).toBe("神奈川県川崎市川崎区");
     expect(muniName("19201")).toBe("山梨県甲府市");
     expect(muniName("22138")).toBe("静岡県浜松市中央区");
-    expect(muniName("27127")).toBeUndefined();
+    expect(muniName("27127")).toBe("大阪府大阪市北区");
+    expect(muniName("34101")).toBeUndefined();
   });
 });
 

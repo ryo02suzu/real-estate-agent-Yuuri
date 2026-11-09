@@ -29,6 +29,8 @@ export function LawTab({ result, data, open }: TabProps) {
   const notes = z
     ? buildingNotes({
         zoning: z,
+        st: zoning.status === "ok" ? zoning.st : undefined,
+        outside: noCityPlanning(m),
         morido: zoning.status === "ok" ? zoning.morido : undefined,
         hourei: zoning.status === "ok" ? zoning.hourei : undefined,
         tochi: zoning.status === "ok" ? zoning.tochi : undefined,

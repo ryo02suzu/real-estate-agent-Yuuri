@@ -44,9 +44,18 @@ export const SUPPORTED_BOUNDS: [[number, number], [number, number]] = REGION_ORD
   ] as [[number, number], [number, number]],
 );
 
-/** 「関東1都6県・中部9県」のような対応エリアの言い方 */
-// 例「関東1都6県・中部9県」（関東は東京都を含むので「1都6県」と書く）
-export const AREA_LABEL = REGION_ORDER.map((k) => `${REGIONS[k].name}${k === "kanto" ? "1都6県" : `${Object.keys(REGIONS[k].prefs).length}県`}`).join("・");
+/** 地方の都道府県の数え方（「1都6県」「2府5県」「9県」）。名前の最後の字（都・道・府・県）で数える */
+function prefCount(prefs: Record<string, string>): string {
+  const names = Object.values(prefs);
+  return ["都", "道", "府", "県"]
+    .map((u) => [u, names.filter((n) => n.endsWith(u)).length] as const)
+    .filter(([, n]) => n > 0)
+    .map(([u, n]) => `${n}${u}`)
+    .join("");
+}
+
+/** 「関東1都6県・中部9県・東北6県・近畿2府5県」のような対応エリアの言い方 */
+export const AREA_LABEL = REGION_ORDER.map((k) => `${REGIONS[k].name}${prefCount(REGIONS[k].prefs)}`).join("・");
 
 /** 地方の名前だけの短い言い方（例「関東・中部」。PC のホームの小さな枠に入れる） */
 export const AREA_SHORT = REGION_ORDER.map((k) => REGIONS[k].name).join("・");

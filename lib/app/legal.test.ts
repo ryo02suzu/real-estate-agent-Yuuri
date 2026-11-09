@@ -66,4 +66,16 @@ describe("法令・規制の一般的なルールの目安", () => {
     expect(notes.find((n) => n.title === "容積率の上限")!.body).toContain("幅×0.4（住居系）");
     expect(notes.find((n) => n.title === "法22条区域かの確認")!.body).toContain("指定はありません");
   });
+
+  it("「都市計画区域の外」は、その市の都市計画区域のデータがあるか、区域が無いと分かっている町村のときだけ言う", () => {
+    const empty = zoning({ tokei: false });
+    const title = (n: ReturnType<typeof buildingNotes>) => n.map((x) => x.title);
+    // データを取り込む前の市（近畿など）：区域のデータが無いので言わない
+    expect(title(buildingNotes({ zoning: empty }))).not.toContain("都市計画区域の外");
+    expect(title(buildingNotes({ zoning: empty, st: { city: "大阪市", asOf: null, layers: {} } }))).not.toContain("都市計画区域の外");
+    // その市のデータに都市計画区域がある（地点が区域の外）
+    expect(title(buildingNotes({ zoning: empty, st: { city: "○○市", asOf: "2025-03-31", layers: { tokei: 1 } } }))).toContain("都市計画区域の外");
+    // 区域の無い町村と分かっている
+    expect(title(buildingNotes({ zoning: empty, outside: true }))).toContain("都市計画区域の外");
+  });
 });
