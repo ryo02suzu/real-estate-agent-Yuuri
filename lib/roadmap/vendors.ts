@@ -157,10 +157,12 @@ export const gisGifu =
 
 /**
  * geogeo（ジオジオ）の公開型GIS（にいがたeマップ・eマップじょうえつ・新発田市市民公開地理情報システムなど）。
- * /maps?mode=theme&lid=<大分類>&mid=<テーマ> に lat/lon/z を付けると、その地点を中心に開く（新潟市役所・糸魚川市役所などで確認）。
+ * /maps?mode=theme&lid=<大分類>&mid=<テーマ> に lat/lng/z を付けると、その地点を中心にピンを立てて開く。経度の名前は lng
+ * （lon は読まれず、テーマの最初の位置＝多くは市役所のあたりのまま開く。2026-11-09 に一関市の地図で市役所から離れた地点を開いて
+ * 比べ、geogeo の11の地図で lng のときだけページの init_mode が "latlng" になることを確かめた）。
  * 利用規約のあるテーマは最初に同意の画面が出る。base はスキーム付き（十日町市は https の証明書が合わないので http）
  */
 export const geogeo =
   (base: string, lid: number, mid: number, zoom = 17): Build =>
   (lat, lng) =>
-    `${base}/maps?mode=theme&lid=${lid}&mid=${mid}&lat=${lat.toFixed(6)}&lon=${lng.toFixed(6)}&z=${zoom}`;
+    `${base}/maps?mode=theme&lid=${lid}&mid=${mid}&lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&z=${zoom}`;

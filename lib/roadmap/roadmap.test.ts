@@ -40,6 +40,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("青森県の全市町村を網羅している", () => covered("青森県"));
   it("山形県の全市町村を網羅している", () => covered("山形県"));
   it("福島県の全市町村を網羅している", () => covered("福島県"));
+  it("岩手県の全市町村を網羅している", () => covered("岩手県"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
@@ -63,6 +64,7 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
     福井県: ["0770", "0776", "0778", "0779"],
     宮城県: ["022", "0220", "0223", "0224", "0225", "0226", "0228", "0229"],
     青森県: ["017", "0172", "0173", "0174", "0175", "0176", "0178"],
+    岩手県: ["019", "0191", "0192", "0193", "0194", "0195", "0197", "0198"],
     山形県: ["023", "0233", "0234", "0235", "0237", "0238"],
     福島県: ["024", "0240", "0241", "0242", "0243", "0244", "0246", "0247", "0248"],
   };
@@ -382,14 +384,14 @@ describe("岐阜県の道路図", () => {
 });
 
 describe("新潟県の道路図", () => {
-  it("新潟市は にいがたeマップ（geogeo）の指定道路情報を lat/lon/z で開き、全区で同じ問い合わせ先（電話不可）", () => {
+  it("新潟市は にいがたeマップ（geogeo）の指定道路情報を lat/lng/z で開き、全区で同じ問い合わせ先（電話不可）", () => {
     const m = findMunicipality("15103")!; // 中央区
     expect(m.name).toBe("新潟市");
     expect(m.codes).toHaveLength(8);
     expect(m.coverage).toBe("partial");
     const links = buildLinks(m, 37.916192, 139.036426);
     expect(links[0].kind).toBe("designated_only");
-    expect(links[0].url).toBe("https://niigata.e-map.geogeo.jp/maps?mode=theme&lid=0&mid=15&lat=37.916192&lon=139.036426&z=17");
+    expect(links[0].url).toBe("https://niigata.e-map.geogeo.jp/maps?mode=theme&lid=0&mid=15&lat=37.916192&lng=139.036426&z=17");
     expect(links[1].url).toContain("mid=9&");
     expect(resolveContact(m, "15108")).toMatchObject({ phone: "025-226-2845", noPhoneInquiry: true });
   });
@@ -401,7 +403,7 @@ describe("新潟県の道路図", () => {
     expect(kz[0].kind).toBe("road_type");
     expect(kz[1].url).toContain("kashiwazaki.maps.arcgis.com/apps/webappviewer/index.html?id=4349877834834b94a74debf2267e4857&center=138.558900,37.371800,4326");
     expect(buildLinks(findMunicipality("15222")!, 37.1479, 138.236)[0].kind).toBe("designated_only"); // 上越
-    expect(buildLinks(findMunicipality("15206")!, 37.9478, 139.3268)[0].url).toBe("https://gisshibatamap.geogeo.jp/maps?mode=theme&lid=1&mid=11&lat=37.947800&lon=139.326800&z=17");
+    expect(buildLinks(findMunicipality("15206")!, 37.9478, 139.3268)[0].url).toBe("https://gisshibatamap.geogeo.jp/maps?mode=theme&lid=1&mid=11&lat=37.947800&lng=139.326800&z=17");
     expect(resolveContact(findMunicipality("15204")!, "15204")).toMatchObject({ phone: "0256-34-5727", noPhoneInquiry: true }); // 三条
     expect(findMunicipality("15204")!.maps[0].verified).toBe(false);
   });
@@ -410,11 +412,11 @@ describe("新潟県の道路図", () => {
     expect(resolveContact(findMunicipality("15212")!, "15212")!.phone).toBe("0254-26-9199"); // 村上 → 新発田
     const myoko = findMunicipality("15217")!;
     expect(myoko.coverage).toBe("partial");
-    expect(buildLinks(myoko, 37.0256, 138.2536)[0].url).toBe("https://myokomap.geogeo.jp/maps?mode=theme&lid=1&mid=6&lat=37.025600&lon=138.253600&z=17");
+    expect(buildLinks(myoko, 37.0256, 138.2536)[0].url).toBe("https://myokomap.geogeo.jp/maps?mode=theme&lid=1&mid=6&lat=37.025600&lng=138.253600&z=17");
     expect(resolveContact(myoko, "15217")!.phone).toBe("025-526-9529");
     expect(buildLinks(findMunicipality("15211")!, 37.5315, 138.9125)[0].url).toContain("mitsukecity.maps.arcgis.com/apps/webappviewer/index.html?id=51158390d69243bbacba49b89e9c3de1&center=138.912500,37.531500,4326");
     expect(buildLinks(findMunicipality("15208")!, 37.3138, 138.7951)[0].pinpoint).toBe(false); // 小千谷
-    expect(buildLinks(findMunicipality("15210")!, 37.1276, 138.7595)[0].url).toBe("http://map.city.tokamachi.lg.jp/maps?mode=theme&lid=1&mid=24&lat=37.127600&lon=138.759500&z=17");
+    expect(buildLinks(findMunicipality("15210")!, 37.1276, 138.7595)[0].url).toBe("http://map.city.tokamachi.lg.jp/maps?mode=theme&lid=1&mid=24&lat=37.127600&lng=138.759500&z=17");
     for (const code of ["15405", "15482", "15504", "15581", "15586"]) expect(findMunicipality(code)!.coverage).toBe("outside");
   });
 });
@@ -439,7 +441,7 @@ describe("富山県の道路図", () => {
     expect(links[0].pinpoint).toBe(false);
     expect(resolveContact(uozu, "16204")!.phone).toBe("0765-22-9117");
     expect(buildLinks(findMunicipality("16206")!, 36.7642, 137.3413)[1].url).toBe("https://www2.wagmap.jp/namerikawacity/Map?mid=7&mpx=137.341300&mpy=36.764200&mps=2500&gprj=2");
-    expect(buildLinks(findMunicipality("16210")!, 36.5577, 136.8747)[1].url).toBe("https://nanto.geogeo.jp/maps?mode=theme&lid=0&mid=7&lat=36.557700&lon=136.874700&z=17");
+    expect(buildLinks(findMunicipality("16210")!, 36.5577, 136.8747)[1].url).toBe("https://nanto.geogeo.jp/maps?mode=theme&lid=0&mid=7&lat=36.557700&lng=136.874700&z=17");
     expect(buildLinks(findMunicipality("16208")!, 36.6475, 136.9622)[1].url).toBe("https://www.google.com/maps/d/viewer?mid=1kE1n5Zls8Cn5RRjPi5c0IcsbckU&ll=36.647500,136.962200&z=17");
     expect(resolveContact(findMunicipality("16321")!, "16321")!.phone).toBe("076-444-4449"); // 舟橋村 → 富山
     expect(resolveContact(findMunicipality("16211")!, "16211")!.phone).toBe("0766-26-8426"); // 射水市 → 高岡
@@ -572,7 +574,7 @@ describe("山形県の道路図", () => {
       "https://www2.wagmap.jp/yamagata/Map?mid=5&mpx=140.340225&mpy=38.255245&mps=1000&gprj=2",
     );
     expect(buildLinks(findMunicipality("06204")!, 38.915062, 139.836578)[0].url).toBe(
-      "https://sakata.geogeo.jp/maps?mode=theme&lid=3&mid=17&lat=38.915062&lon=139.836578&z=17",
+      "https://sakata.geogeo.jp/maps?mode=theme&lid=3&mid=17&lat=38.915062&lng=139.836578&z=17",
     );
   });
 
@@ -668,6 +670,82 @@ describe("福島県の道路図", () => {
     const nishiaizu = findMunicipality("07405")!;
     expect(nishiaizu).toMatchObject({ coverage: "none", maps: [] });
     expect(nishiaizu.note).toContain("公開準備中");
+  });
+});
+
+describe("岩手県の道路図", () => {
+  const iwate = MUNICIPALITIES.filter((m) => m.pref === "岩手県");
+  const contactOf = (code: string) => resolveContact(findMunicipality(code)!, code);
+
+  it("道路種別を市が判定する7市（盛岡市と限定特定行政庁の6市）は市の課。一関市・宮古市は電話では答えない", () => {
+    expect(iwate).toHaveLength(33);
+    expect(iwate.some((m) => m.coverage === "unknown")).toBe(false);
+    expect(iwate.filter((m) => !m.contact?.dept.startsWith("岩手県")).map((m) => m.name)).toEqual(["盛岡市", "宮古市", "花巻市", "北上市", "一関市", "釜石市", "奥州市"]);
+    expect(contactOf("03201")).toMatchObject({ dept: "都市整備部 建築指導課 指導係（都南分庁舎2階）", phone: "019-639-9054", email: "kentikusido@city.morioka.iwate.jp" });
+    expect(contactOf("03209")).toMatchObject({ phone: "0191-21-8543", fax: "0191-21-8800", noPhoneInquiry: true });
+    expect(contactOf("03202")).toMatchObject({ phone: "0193-62-2111（代表）", noPhoneInquiry: true });
+    expect(contactOf("03202")?.note).toContain("5号道路（位置指定道路）と2項道路");
+    // 釜石市は2026年9月24日に新庁舎へ移り、番号が 52-01xx に変わった（県の窓口一覧の 22-2111 は使えない）
+    expect(contactOf("03211")).toMatchObject({ dept: "建設部 都市計画課 建築住宅係", phone: "0193-52-0105" });
+    expect(contactOf("03211")?.note).toContain("0193-22-2111 は使えない");
+  });
+
+  it("一関市は いちのせきeマップ（geogeo）の指定道路情報を lat/lng/z で開き、全種別の凡例を出す", () => {
+    const links = buildLinks(findMunicipality("03209")!, 38.9172, 141.24);
+    expect(links[0]).toMatchObject({ kind: "road_type", pinpoint: true, verified: true });
+    expect(links[0].url).toBe("https://ichinoseki.geogeo.jp/maps?mode=theme&lid=9&mid=16&lat=38.917200&lng=141.240000&z=17");
+    expect(links[0].legend?.map((e) => e.label)).toEqual(["1号道路", "2号道路", "2号道路（エリア）", "2項道路", "3号道路", "4号道路", "5号道路", "特定通路", "非道路"]);
+    expect(links[1]).toMatchObject({ kind: "public_road", url: expect.stringContaining("&mid=15&") });
+    expect(links[1].legend).toBeUndefined();
+  });
+
+  it("県が判定する26市町村は県の7つの建築指導課（県の窓口一覧どおり）。電話では原則答えない", () => {
+    const count: Record<string, number> = {};
+    for (const m of iwate) if (m.contact?.dept.startsWith("岩手県")) count[m.contact.dept] = (count[m.contact.dept] ?? 0) + 1;
+    expect(count).toEqual({
+      "岩手県 盛岡広域振興局 土木部 建築指導課": 7,
+      "岩手県 県南広域振興局 土木部 建築指導課": 2,
+      "岩手県 県南広域振興局 花巻土木センター 建築指導課": 2,
+      "岩手県 沿岸広域振興局 土木部 建築指導課": 4,
+      "岩手県 沿岸広域振興局 大船渡土木センター 建築指導課": 3,
+      "岩手県 県北広域振興局 土木部 建築指導課": 4,
+      "岩手県 県北広域振興局 二戸土木センター 建築指導課": 4,
+    });
+    // 再編（2026年4月1日）後の窓口：平泉町は一関土木センターではなく県南広域振興局 土木部、西和賀町は花巻土木センター
+    expect(contactOf("03402")).toMatchObject({ phone: "0197-22-2882", fax: "0197-22-2863", email: "BD0006@pref.iwate.jp", noPhoneInquiry: true });
+    expect(contactOf("03366")?.dept).toBe("岩手県 県南広域振興局 花巻土木センター 建築指導課");
+    expect(contactOf("03482")?.phone).toBe("0193-25-2708（代表）/ 0193-27-5573（建築指導課）");
+    expect(contactOf("03322")?.note).toContain("回答まで2〜3週間");
+    expect(contactOf("03322")?.note).toContain("019-611-2632");
+  });
+
+  it("県の指定道路図（いわてデジタルマップ）は都市計画区域のある18市町村。区域の無い8町村は区域外", () => {
+    const withMap = iwate.filter((m) => m.maps.some((x) => x.label.startsWith("指定道路図（いわてデジタルマップ")));
+    expect(withMap.map((m) => m.name).sort()).toEqual(
+      ["八幡平市", "滝沢市", "岩手町", "雫石町", "矢巾町", "紫波町", "金ケ崎町", "平泉町", "遠野市", "大船渡市", "陸前高田市", "大槌町", "山田町", "岩泉町", "久慈市", "野田村", "二戸市", "一戸町"].sort(),
+    );
+    for (const m of withMap) expect(m.coverage).toBe("full");
+    expect(buildLinks(findMunicipality("03322")!, 39.606106, 141.143341)[0]).toMatchObject({
+      kind: "road_type",
+      pinpoint: true,
+      verified: false,
+      url: "https://www.sonicweb-asp.jp/iwate/map?theme=th_158&pos=141.143341%2C39.606106&scale=1000",
+    });
+    expect(iwate.filter((m) => m.coverage === "outside").map((m) => m.name).sort()).toEqual(["葛巻町", "西和賀町", "住田町", "田野畑村", "普代村", "軽米町", "九戸村", "洋野町"].sort());
+    for (const m of iwate.filter((x) => x.coverage === "outside")) expect(m.maps).toEqual([]);
+  });
+
+  it("市の地図：盛岡・北上・釜石の市道の地図（wagmap）は物件の位置で開く。奥州・紫波・一戸・陸前高田は入口のページ", () => {
+    const morioka = buildLinks(findMunicipality("03201")!, 39.701853, 141.136486);
+    expect(morioka[0]).toMatchObject({ kind: "designated_only", pinpoint: false, url: "https://www.city.morioka.iwate.jp/service/1037208/1009284.html" });
+    expect(morioka[1].url).toBe("https://www2.wagmap.jp/morioka/Map?mid=4&mpx=141.136486&mpy=39.701853&mps=2500&gprj=2");
+    expect(morioka[2].url).toBe("https://www2.wagmap.jp/morioka/Map?mid=7&mpx=141.136486&mpy=39.701853&mps=1000&gprj=2");
+    expect(buildLinks(findMunicipality("03206")!, 39.2867, 141.1131)[0].url).toContain("/kitakami/Map?mid=4&");
+    expect(buildLinks(findMunicipality("03211")!, 39.277245, 141.885345)[0].url).toBe("https://www2.wagmap.jp/kamaishi/Map?mid=3&mpx=141.885345&mpy=39.277245&mps=2500&gprj=2");
+    expect(findMunicipality("03215")!.maps[0]).toMatchObject({ kind: "public_road", build: null, url: "https://www.city.oshu.iwate.jp/soshiki/10/1069/3/1/18386.html" });
+    expect(findMunicipality("03321")!.maps[1].url).toBe("https://www.town.shiwa.iwate.jp/soshiki/3/1_3/1783909032298531/");
+    expect(findMunicipality("03524")!.maps[1].url).toBe("https://www.town.ichinohe.iwate.jp/soshikikarasagasu/chiikiseibika/kanrigakari/5265.html");
+    expect(findMunicipality("03210")!.maps[1].kind).toBe("public_road");
   });
 });
 

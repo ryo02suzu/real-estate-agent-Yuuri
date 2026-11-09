@@ -1,43 +1,9 @@
 // 東北6県の市町村のうち、道路種別の公式図・問い合わせ先をまだ登録していない市町村。市区町村コードと名前は国土地理院の市区町村表（maps.gsi.go.jp/js/muni.js）から。
 // 道路種別の公式図・問い合わせ先を調べる前の市町村を coverage: "unknown"（調査中）でここに置き、調べた県から data/<県>.ts に移す。
-// 登録済み：宮城県（data/miyagi.ts）・青森県（data/aomori.ts）・山形県（data/yamagata.ts）・福島県（data/fukushima.ts）
+// 登録済み：宮城県（data/miyagi.ts）・青森県（data/aomori.ts）・山形県（data/yamagata.ts）・福島県（data/fukushima.ts）・岩手県（data/iwate.ts）
 import type { Municipality } from "../municipalities";
 
 export const TOHOKU_PENDING: Municipality[] = [
-  // 岩手県（33）
-  { pref: "岩手県", name: "盛岡市", codes: ["03201"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "宮古市", codes: ["03202"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "大船渡市", codes: ["03203"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "花巻市", codes: ["03205"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "北上市", codes: ["03206"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "久慈市", codes: ["03207"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "遠野市", codes: ["03208"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "一関市", codes: ["03209"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "陸前高田市", codes: ["03210"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "釜石市", codes: ["03211"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "二戸市", codes: ["03213"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "八幡平市", codes: ["03214"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "奥州市", codes: ["03215"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "滝沢市", codes: ["03216"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "雫石町", codes: ["03301"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "葛巻町", codes: ["03302"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "岩手町", codes: ["03303"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "紫波町", codes: ["03321"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "矢巾町", codes: ["03322"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "西和賀町", codes: ["03366"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "金ケ崎町", codes: ["03381"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "平泉町", codes: ["03402"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "住田町", codes: ["03441"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "大槌町", codes: ["03461"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "山田町", codes: ["03482"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "岩泉町", codes: ["03483"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "田野畑村", codes: ["03484"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "普代村", codes: ["03485"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "軽米町", codes: ["03501"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "野田村", codes: ["03503"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "九戸村", codes: ["03506"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "洋野町", codes: ["03507"], coverage: "unknown", maps: [] },
-  { pref: "岩手県", name: "一戸町", codes: ["03524"], coverage: "unknown", maps: [] },
   // 秋田県（25）
   { pref: "秋田県", name: "秋田市", codes: ["05201"], coverage: "unknown", maps: [] },
   { pref: "秋田県", name: "能代市", codes: ["05202"], coverage: "unknown", maps: [] },

@@ -12,6 +12,7 @@ import { MIYAGI } from "./data/miyagi";
 import { AOMORI } from "./data/aomori";
 import { YAMAGATA } from "./data/yamagata";
 import { FUKUSHIMA } from "./data/fukushima";
+import { IWATE } from "./data/iwate";
 import { SHIZUOKA } from "./data/shizuoka";
 import { YAMANASHI } from "./data/yamanashi";
 import { NAGANO } from "./data/nagano";
@@ -103,7 +104,7 @@ export type Municipality = {
   note?: string;
 };
 
-export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI, ...SHIZUOKA, ...YAMANASHI, ...NAGANO, ...AICHI, ...GIFU, ...NIIGATA, ...TOYAMA, ...ISHIKAWA, ...FUKUI, ...CHUBU_PENDING, ...AOMORI, ...MIYAGI, ...YAMAGATA, ...FUKUSHIMA, ...TOHOKU_PENDING];
+export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI, ...SHIZUOKA, ...YAMANASHI, ...NAGANO, ...AICHI, ...GIFU, ...NIIGATA, ...TOYAMA, ...ISHIKAWA, ...FUKUI, ...CHUBU_PENDING, ...AOMORI, ...IWATE, ...MIYAGI, ...YAMAGATA, ...FUKUSHIMA, ...TOHOKU_PENDING];
 
 /**
  * 市区町村に都市計画区域が無い（全域が都市計画区域外）と分かっているか。coverage が outside か、注記にそう書いてある町村
