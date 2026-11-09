@@ -70,17 +70,17 @@ describe("中部9県の市町村（9県すべて調べ終えた）", () => {
   });
 });
 
-describe("東北6県の市町村（調査中から始める）", () => {
+describe("東北6県の市町村（6県すべて調べ終えた）", () => {
   const TOHOKU = Object.values(REGIONS.tohoku.prefs);
 
-  it("東北は227市町村（仙台市は区のコードをまとめて1つ）", () => {
+  it("東北は227市町村（仙台市は区のコードをまとめて1つ）で、調査中は残っていない", () => {
+    expect(TOHOKU_PENDING).toHaveLength(0);
     const byPref: Record<string, number> = {};
     for (const m of MUNICIPALITIES) if (TOHOKU.includes(m.pref)) byPref[m.pref] = (byPref[m.pref] ?? 0) + 1;
     expect(byPref).toEqual({ 青森県: 40, 岩手県: 33, 宮城県: 35, 秋田県: 25, 山形県: 35, 福島県: 59 });
     expect(findMunicipality("04101")?.name).toBe("仙台市");
     expect(findMunicipality("04105")?.codes).toHaveLength(5);
-    // 調べ終えていない市町村は、調査中（道路図は県か市の建築指導課へ）
-    for (const m of TOHOKU_PENDING) expect(m.coverage).toBe("unknown");
+    expect(MUNICIPALITIES.filter((m) => TOHOKU.includes(m.pref) && m.coverage === "unknown")).toEqual([]);
   });
 
   it("コードは国土地理院の市区町村表にあり、仙台市そのもの（04100）・富谷町の古いコード（04423）は使わない", () => {

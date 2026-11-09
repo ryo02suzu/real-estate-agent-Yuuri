@@ -41,6 +41,7 @@ describe("カバー率（国土地理院の市区町村コード表と照合）"
   it("山形県の全市町村を網羅している", () => covered("山形県"));
   it("福島県の全市町村を網羅している", () => covered("福島県"));
   it("岩手県の全市町村を網羅している", () => covered("岩手県"));
+  it("秋田県の全市町村を網羅している", () => covered("秋田県"));
 });
 
 describe("電話番号の区切り（市外局番の桁数）", () => {
@@ -65,6 +66,7 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
     宮城県: ["022", "0220", "0223", "0224", "0225", "0226", "0228", "0229"],
     青森県: ["017", "0172", "0173", "0174", "0175", "0176", "0178"],
     岩手県: ["019", "0191", "0192", "0193", "0194", "0195", "0197", "0198"],
+    秋田県: ["018", "0182", "0183", "0184", "0185", "0186", "0187"],
     山形県: ["023", "0233", "0234", "0235", "0237", "0238"],
     福島県: ["024", "0240", "0241", "0242", "0243", "0244", "0246", "0247", "0248"],
   };
@@ -746,6 +748,74 @@ describe("岩手県の道路図", () => {
     expect(findMunicipality("03321")!.maps[1].url).toBe("https://www.town.shiwa.iwate.jp/soshiki/3/1_3/1783909032298531/");
     expect(findMunicipality("03524")!.maps[1].url).toBe("https://www.town.ichinohe.iwate.jp/soshikikarasagasu/chiikiseibika/kanrigakari/5265.html");
     expect(findMunicipality("03210")!.maps[1].kind).toBe("public_road");
+  });
+});
+
+describe("秋田県の道路図", () => {
+  const akita = MUNICIPALITIES.filter((m) => m.pref === "秋田県");
+  const contactOf = (code: string) => resolveContact(findMunicipality(code)!, code);
+
+  it("市が扱うのは特定行政庁の秋田市・横手市と、小規模な建築物だけの大館市・大仙市。大館市は電話では答えない", () => {
+    expect(akita).toHaveLength(25);
+    expect(akita.some((m) => m.coverage === "unknown")).toBe(false);
+    expect(akita.filter((m) => !m.contact?.dept.startsWith("秋田県")).map((m) => m.name)).toEqual(["秋田市", "横手市", "大館市", "大仙市"]);
+    expect(contactOf("05201")).toMatchObject({ dept: "都市整備部 建築指導課（本庁舎4階）", phone: "018-888-5769" });
+    expect(contactOf("05201")?.note).toContain("事前協議書");
+    expect(contactOf("05203")).toMatchObject({ phone: "0182-35-2224", fax: "0182-32-4029", email: "kenchiku@city.yokote.lg.jp" });
+    expect(contactOf("05204")).toMatchObject({ phone: "0186-43-7083", fax: "0186-55-1018", email: "kentiku@city.odate.lg.jp", noPhoneInquiry: true });
+    expect(contactOf("05212")).toMatchObject({ phone: "0187-88-8822", fax: "0187-62-4600", email: "kenju@city.daisen.lg.jp" });
+  });
+
+  it("県が扱う21市町村は7つの地域振興局 建設部 建築課（県の窓口一覧どおり）。兼務局は水・金が遠隔の日で、本務局を添える", () => {
+    const count: Record<string, number> = {};
+    for (const m of akita) if (m.contact?.dept.startsWith("秋田県")) count[m.contact.dept] = (count[m.contact.dept] ?? 0) + 1;
+    expect(count).toEqual({
+      "秋田県 北秋田地域振興局 建設部 建築課 建築指導チーム": 2,
+      "秋田県 鹿角地域振興局 建設部 建築課": 2,
+      "秋田県 山本地域振興局 建設部 建築課": 4,
+      "秋田県 秋田地域振興局 建設部 建築課 建築指導チーム": 6,
+      "秋田県 由利地域振興局 建設部 建築課 建築指導チーム": 2,
+      "秋田県 仙北地域振興局 建設部 建築課 建築指導チーム": 2,
+      "秋田県 雄勝地域振興局 建設部 建築課": 3,
+    });
+    // 兼務局（鹿角・山本・由利・雄勝）は水・金が遠隔の日。本務局（北秋田・秋田・仙北）は電話等の相談の時間
+    expect(contactOf("05209")).toMatchObject({ phone: "0186-23-2311", hours: expect.stringContaining("水・金は遠隔") });
+    expect(contactOf("05209")?.note).toContain("本務は北秋田地域振興局 建設部 建築課（0186-63-2531）");
+    expect(contactOf("05210")?.note).toContain("本務は秋田地域振興局 建設部 建築課（018-860-3491）");
+    expect(contactOf("05207")?.note).toContain("本務は仙北地域振興局 建設部 建築課（0187-63-3124）");
+    expect(contactOf("05213")).toMatchObject({ phone: "0186-63-2531", fax: "0186-62-9540", email: "ktkenchiku@mail2.pref.akita.lg.jp", hours: "8:30〜17:15（電話等の相談）" });
+    expect(contactOf("05211")?.note).toContain("建築基準法を所管していない");
+    expect(contactOf("05202")?.note).toContain("0185-89-2940");
+  });
+
+  it("秋田市の道路情報閲覧システムは入口だけ（1号・2号・5号・2項。3号・4号はシステムの情報に無いので partial）、横手市は位置指定道路などの図", () => {
+    const akitaCity = findMunicipality("05201")!;
+    expect(akitaCity.coverage).toBe("partial");
+    expect(buildLinks(akitaCity, 39.718627, 140.102384)[0]).toMatchObject({ kind: "road_type", pinpoint: false, verified: true, url: "https://ds.icba-info.jp/siteidouro/akita/city/" });
+    expect(akitaCity.maps[0].tip).toContain("営利目的では使えない");
+    const yokote = findMunicipality("05203")!;
+    expect(yokote.coverage).toBe("partial");
+    expect(yokote.maps[0]).toMatchObject({ kind: "designated_only", build: null, url: "https://app.city.yokote.lg.jp/shiteidouro/" });
+  });
+
+  it("大仙市は指定道路図（図郭ごとの PDF・96枚）から物件の位置の図を出し、全種別の凡例を出す", () => {
+    const daisen = findMunicipality("05212")!;
+    expect(daisen.coverage).toBe("full");
+    // 大仙市役所（国土地理院の住所検索の座標）→ 10MD021（図を地理院地図と重ねて確かめた）
+    const [link] = buildLinks(daisen, 39.452633, 140.476227);
+    expect(link).toMatchObject({ kind: "road_type", verified: true, sheet: { label: "10MD021", url: "https://www.city.daisen.lg.jp/uploads/public/archive_0000000485_01/62_10MD021.pdf" } });
+    expect(link.legend?.map((e) => e.label)).toEqual(["1号道路", "2号道路", "3号道路", "5号道路（市道に認定済みは緑の点線つき）", "2項道路"]);
+    expect(daisen.maps[0].sheets?.cells).toHaveLength(96);
+    expect(buildLinks(daisen, 39.492616, 140.426423)[0].sheet?.label).toBe("10LD813"); // 神宮寺のあたり（図の中心）
+  });
+
+  it("都市計画区域は13市4町。区域の無い8町村は区域外で地図なし、残りの県の市町村は道路種別の地図なし（市道の図だけ）", () => {
+    expect(akita.filter((m) => m.coverage === "outside").map((m) => m.name).sort()).toEqual(["上小阿仁村", "藤里町", "三種町", "八峰町", "井川町", "大潟村", "羽後町", "東成瀬村"].sort());
+    for (const m of akita.filter((x) => x.coverage === "outside")) expect(m.maps).toEqual([]);
+    expect(akita.filter((m) => m.coverage === "full").map((m) => m.name)).toEqual(["大仙市"]);
+    const roadOnly = akita.filter((m) => m.coverage === "none" && m.maps.length > 0);
+    expect(roadOnly.map((m) => m.name).sort()).toEqual(["北秋田市", "にかほ市", "湯沢市"].sort());
+    for (const m of roadOnly) expect(m.maps.every((x) => x.kind === "public_road" && x.build === null)).toBe(true);
   });
 });
 

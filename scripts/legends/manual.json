@@ -1742,5 +1742,31 @@
     "color": "#ff0080"
    }
   ]
+ },
+ "www.city.daisen.lg.jp/genre/machizukuri/road": {
+  "map": "大仙市 指定道路図（地域ごとのページの図郭の PDF。どの図も同じ凡例）",
+  "source": "https://www.city.daisen.lg.jp/uploads/public/archive_0000000485_01/62_10MD021.pdf（大仙市役所の図の右上の凡例欄。2026-11-09 に図を画像にして線の色を読んだ）",
+  "legend": [
+   {
+    "label": "1号道路",
+    "color": "#37a93e"
+   },
+   {
+    "label": "2号道路",
+    "color": "#88c626"
+   },
+   {
+    "label": "3号道路",
+    "color": "#76cb53"
+   },
+   {
+    "label": "5号道路（市道に認定済みは緑の点線つき）",
+    "color": "#f9a80c"
+   },
+   {
+    "label": "2項道路",
+    "color": "#81d6f4"
+   }
+  ]
  }
 }

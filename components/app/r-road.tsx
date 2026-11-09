@@ -87,7 +87,14 @@ export function RoadTab({ result, data, open, front, pick }: TabProps) {
           )}
           {roads.status === "none" && (
             <li className="py-[8px] leading-[1.5]" style={{ fontSize: 13, color: G.sub }}>
-              {m.name}の道路の種別は、MICHILU では読めません。下のボタンから{mapLink && /県/.test(mapLink.label) ? "県" : m.name}の図を開いて確かめてください。
+              {m.name}の道路の種別は、MICHILU では読めません。
+              {!offline && mapLink
+                ? `下のボタンから${/県/.test(mapLink.label) ? "県" : m.name}の図を開いて確かめてください。`
+                : m.coverage === "unknown"
+                  ? "道路種別の図の公開の有無を調べている途中なので、窓口で確かめてください。"
+                  : m.coverage === "outside"
+                    ? "全域が都市計画区域の外で、道路種別の図はありません。建築確認などは窓口で確かめてください。"
+                    : `道路種別の図はネットに無いので、窓口で確かめてください${mapLink ? "（下の参考の地図は、市町村道かどうかの目安）" : ""}。`}
             </li>
           )}
           {roads.status === "error" && (
