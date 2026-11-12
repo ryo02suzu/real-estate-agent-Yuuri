@@ -115,6 +115,69 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     for (const m of KINKI_PENDING) expect(m.coverage).toBe("unknown");
   });
 
+  it("府県が扱う市町村と政令市は登録済み（145）。残りの82（特定行政庁の市と奈良県）は調査中", () => {
+    const done: Record<string, number> = {};
+    for (const m of MUNICIPALITIES) if (KINKI.includes(m.pref) && m.coverage !== "unknown") done[m.pref] = (done[m.pref] ?? 0) + 1;
+    expect(done).toEqual({ 三重県: 21, 滋賀県: 12, 京都府: 25, 大阪府: 28, 兵庫県: 30, 和歌山県: 29 });
+    expect(KINKI_PENDING).toHaveLength(82);
+    // 調査中に残るのは、市が道路を扱う市（特定行政庁など）と、県の仕組みを調べている奈良県だけ
+    expect(KINKI_PENDING.filter((m) => m.pref !== "奈良県").every((m) => m.name.endsWith("市"))).toBe(true);
+    // 政令市：京都市・大阪市・神戸市は全種別の図、堺市は載る種別を確かめられていないので一部
+    expect(findMunicipality("26104")?.coverage).toBe("full");
+    expect(findMunicipality("27127")?.coverage).toBe("full");
+    expect(findMunicipality("27141")?.coverage).toBe("partial");
+    expect(findMunicipality("28110")?.coverage).toBe("full");
+  });
+
+  it("登録済みの市町村は、窓口の電話があり、都市計画区域の無い17町村には地図を出さない", () => {
+    const done = MUNICIPALITIES.filter((m) => KINKI.includes(m.pref) && m.coverage !== "unknown");
+    for (const m of done) expect(m.contact?.phone, `${m.pref}${m.name}`).toMatch(/^0\d+-\d+-\d{4}$/);
+    const outside = done.filter((m) => m.coverage === "outside");
+    expect(outside.map((m) => m.name).sort()).toEqual(
+      ["大台町", "度会町", "大紀町", "紀宝町", "笠置町", "和束町", "南山城村", "伊根町", "市川町", "神河町", "紀美野町", "広川町", "日高町", "印南町", "日高川町", "古座川町", "北山村"].sort(),
+    );
+    for (const m of outside) expect(m.maps, m.name).toEqual([]);
+    // 府県の地図が無い（ネットに出ていない）市町村は none で、地図を出さない
+    for (const m of done.filter((x) => x.coverage === "none")) expect(m.maps, m.name).toEqual([]);
+    // 一部・全部の市町村には、開ける地図が1つ以上ある
+    for (const m of done.filter((x) => x.coverage === "full" || x.coverage === "partial")) expect(m.maps.length, m.name).toBeGreaterThan(0);
+  });
+
+  it("同意の画面がある地図は「確認済み」にせず、同意は自分でする案内を付ける。入口だけの地図は入口の URL を持つ", () => {
+    const done = MUNICIPALITIES.filter((m) => KINKI.includes(m.pref) && m.coverage !== "unknown");
+    for (const m of done) {
+      for (const link of m.maps) {
+        if (link.build) {
+          // 近畿で物件の位置で開く地図は、どれも利用規約・利用条件への同意の先（MICHILU は同意の先を開いていない）
+          expect(link.verified, `${m.name} ${link.label}`).toBe(false);
+          expect(link.tip, `${m.name} ${link.label}`).toMatch(/自分で(「同意する」を押す|同意する)/);
+          expect(link.build(34.7, 135.5)).toMatch(/^https:\/\//);
+        } else {
+          expect(link.url, `${m.name} ${link.label}`).toMatch(/^https:\/\//);
+        }
+      }
+    }
+    // 県のページのリンクと同じ形（和歌山県地理情報システム）
+    expect(findMunicipality("30202")?.maps[0].build?.(34.15, 135.2)).toBe("https://wakayamaken.geocloud.jp/webgis/?t=gsi&mp=31&op=100&vlf=-1&z=18&ll=34.150000%2C135.200000");
+    // 三重県・滋賀県・京都府の府県の地図と大阪市は、注意事項・利用条件のあるページ（入口）を開く
+    expect(findMunicipality("24203")?.maps[0]).toMatchObject({ build: null, url: "https://www.pref.mie.lg.jp/JUTAKU/HP/84478031368.htm" });
+    expect(findMunicipality("25209")?.maps[0]).toMatchObject({ build: null, url: "https://www.pref.shiga.lg.jp/re00/888.html" });
+    expect(findMunicipality("26208")?.maps[0]).toMatchObject({ build: null, url: "https://www.pref.kyoto.jp/kenchiku/1291697604560.html" });
+    expect(findMunicipality("27127")?.maps[0]).toMatchObject({ build: null, url: "https://www.city.osaka.lg.jp/toshikeikaku/page/0000012045.html" });
+  });
+
+  it("道路種別を電話で答えない窓口は、電話のボタンを控えめにする印が付く", () => {
+    // 府県・市のページに、電話などでは答えないと書かれているところ
+    for (const code of ["27127", "27141", "27322", "26104", "26208", "25209", "24203", "30208"]) {
+      expect(findMunicipality(code)?.contact?.noPhoneInquiry, code).toBe(true);
+    }
+    // 書かれていないところ（兵庫県の土木事務所・和歌山県の那賀のほかの窓口）には付けない
+    for (const code of ["28201", "28221", "30202", "30206"]) {
+      const m = findMunicipality(code);
+      if (m && m.coverage !== "unknown") expect(m.contact?.noPhoneInquiry, code).toBeUndefined();
+    }
+  });
+
   it("コードは国土地理院の市区町村表にあり、政令市そのもののコード（26100・27100・27140・28100）は使わない", () => {
     const table = Object.assign({}, ...Object.values(GSI_CODES as Record<string, Record<string, string>>)) as Record<string, string>;
     for (const m of MUNICIPALITIES) if (KINKI.includes(m.pref)) for (const c of m.codes) expect(table[c], `${m.name} ${c}`).toBeDefined();
