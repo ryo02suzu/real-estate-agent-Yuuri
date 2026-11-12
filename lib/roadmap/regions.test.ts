@@ -115,13 +115,14 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     for (const m of KINKI_PENDING) expect(m.coverage).toBe("unknown");
   });
 
-  it("府県が扱う市町村と政令市は登録済み（145）。残りの82（特定行政庁の市と奈良県）は調査中", () => {
+  it("府県が扱う市町村と政令市は登録済み（181）。残りの46（特定行政庁の市）は調査中", () => {
     const done: Record<string, number> = {};
     for (const m of MUNICIPALITIES) if (KINKI.includes(m.pref) && m.coverage !== "unknown") done[m.pref] = (done[m.pref] ?? 0) + 1;
-    expect(done).toEqual({ 三重県: 21, 滋賀県: 12, 京都府: 25, 大阪府: 28, 兵庫県: 30, 和歌山県: 29 });
-    expect(KINKI_PENDING).toHaveLength(82);
-    // 調査中に残るのは、市が道路を扱う市（特定行政庁など）と、県の仕組みを調べている奈良県だけ
-    expect(KINKI_PENDING.filter((m) => m.pref !== "奈良県").every((m) => m.name.endsWith("市"))).toBe(true);
+    expect(done).toEqual({ 三重県: 21, 滋賀県: 12, 京都府: 25, 大阪府: 28, 兵庫県: 30, 奈良県: 36, 和歌山県: 29 });
+    expect(KINKI_PENDING).toHaveLength(46);
+    // 調査中に残るのは、市が道路を扱う市（特定行政庁など）だけ
+    expect(KINKI_PENDING.every((m) => m.name.endsWith("市"))).toBe(true);
+    expect(KINKI_PENDING.filter((m) => m.pref === "奈良県").map((m) => m.name)).toEqual(["奈良市", "橿原市", "生駒市"]);
     // 政令市：京都市・大阪市・神戸市は全種別の図、堺市は載る種別を確かめられていないので一部
     expect(findMunicipality("26104")?.coverage).toBe("full");
     expect(findMunicipality("27127")?.coverage).toBe("full");
@@ -129,12 +130,14 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     expect(findMunicipality("28110")?.coverage).toBe("full");
   });
 
-  it("登録済みの市町村は、窓口の電話があり、都市計画区域の無い17町村には地図を出さない", () => {
+  it("登録済みの市町村は、窓口の電話があり、都市計画区域の無い28町村には地図を出さない", () => {
     const done = MUNICIPALITIES.filter((m) => KINKI.includes(m.pref) && m.coverage !== "unknown");
     for (const m of done) expect(m.contact?.phone, `${m.pref}${m.name}`).toMatch(/^0\d+-\d+-\d{4}$/);
     const outside = done.filter((m) => m.coverage === "outside");
     expect(outside.map((m) => m.name).sort()).toEqual(
-      ["大台町", "度会町", "大紀町", "紀宝町", "笠置町", "和束町", "南山城村", "伊根町", "市川町", "神河町", "紀美野町", "広川町", "日高町", "印南町", "日高川町", "古座川町", "北山村"].sort(),
+      ["大台町", "度会町", "大紀町", "紀宝町", "笠置町", "和束町", "南山城村", "伊根町", "市川町", "神河町", "紀美野町", "広川町", "日高町", "印南町", "日高川町", "古座川町", "北山村"]
+        .concat(["山添村", "曽爾村", "御杖村", "黒滝村", "天川村", "野迫川村", "十津川村", "下北山村", "上北山村", "川上村", "東吉野村"])
+        .sort(),
     );
     for (const m of outside) expect(m.maps, m.name).toEqual([]);
     // 府県の地図が無い（ネットに出ていない）市町村は none で、地図を出さない
@@ -159,20 +162,37 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     }
     // 県のページのリンクと同じ形（和歌山県地理情報システム）
     expect(findMunicipality("30202")?.maps[0].build?.(34.15, 135.2)).toBe("https://wakayamaken.geocloud.jp/webgis/?t=gsi&mp=31&op=100&vlf=-1&z=18&ll=34.150000%2C135.200000");
-    // 三重県・滋賀県・京都府の府県の地図と大阪市は、注意事項・利用条件のあるページ（入口）を開く
+    // 三重県・滋賀県・京都府・奈良県の府県の地図と大阪市は、注意事項・利用条件のあるページ（入口）を開く
     expect(findMunicipality("24203")?.maps[0]).toMatchObject({ build: null, url: "https://www.pref.mie.lg.jp/JUTAKU/HP/84478031368.htm" });
     expect(findMunicipality("25209")?.maps[0]).toMatchObject({ build: null, url: "https://www.pref.shiga.lg.jp/re00/888.html" });
     expect(findMunicipality("26208")?.maps[0]).toMatchObject({ build: null, url: "https://www.pref.kyoto.jp/kenchiku/1291697604560.html" });
     expect(findMunicipality("27127")?.maps[0]).toMatchObject({ build: null, url: "https://www.city.osaka.lg.jp/toshikeikaku/page/0000012045.html" });
+    expect(findMunicipality("29203")?.maps[0]).toMatchObject({ build: null, url: "https://www.pref.nara.lg.jp/n155/33833.html" });
+  });
+
+  it("奈良県：県の道路システムに載る18市町村は一部（1項1号は載らない）、準備中の7市町は非公開、窓口は3つの土木事務所", () => {
+    const nara = MUNICIPALITIES.filter((m) => m.pref === "奈良県" && m.coverage !== "unknown");
+    expect(nara.filter((m) => m.coverage === "partial").map((m) => m.name).sort()).toEqual(
+      ["大和高田市", "大和郡山市", "桜井市", "五條市", "御所市", "香芝市", "葛城市", "宇陀市", "平群町", "三郷町", "斑鳩町", "安堵町", "川西町", "三宅町", "田原本町", "高取町", "明日香村", "大淀町"].sort(),
+    );
+    expect(nara.filter((m) => m.coverage === "none").map((m) => m.name).sort()).toEqual(["天理市", "上牧町", "王寺町", "広陵町", "河合町", "吉野町", "下市町"].sort());
+    for (const m of nara.filter((x) => x.coverage === "partial")) expect(m.maps[0].tip, m.name).toMatch(/1項1号.*載らず/);
+    // 窓口：郡山 7・高田 11・中和 18（県のチラシの所管地域）
+    const byPhone: Record<string, number> = {};
+    for (const m of nara) byPhone[m.contact!.phone!] = (byPhone[m.contact!.phone!] ?? 0) + 1;
+    expect(byPhone).toEqual({ "0743-51-0209": 7, "0745-44-3877": 11, "0744-48-3079": 18 });
+    // 県が管理する道路の事務所は、建築の窓口と分け方が違う（天理市は建築が郡山、道路が奈良）
+    expect(findMunicipality("29204")?.contact?.note).toContain("奈良土木事務所");
+    expect(findMunicipality("29207")?.contact?.note).toContain("五條土木事務所");
   });
 
   it("道路種別を電話で答えない窓口は、電話のボタンを控えめにする印が付く", () => {
     // 府県・市のページに、電話などでは答えないと書かれているところ
-    for (const code of ["27127", "27141", "27322", "26104", "26208", "25209", "24203", "30208"]) {
+    for (const code of ["27127", "27141", "27322", "26104", "26208", "25209", "24203", "30208", "29202", "29207", "29449"]) {
       expect(findMunicipality(code)?.contact?.noPhoneInquiry, code).toBe(true);
     }
-    // 書かれていないところ（兵庫県の土木事務所・和歌山県の那賀のほかの窓口）には付けない
-    for (const code of ["28201", "28221", "30202", "30206"]) {
+    // 書かれていないところ（兵庫県の土木事務所・和歌山県の那賀のほかの窓口・奈良県の郡山と中和）には付けない
+    for (const code of ["28201", "28221", "30202", "30206", "29203", "29206"]) {
       const m = findMunicipality(code);
       if (m && m.coverage !== "unknown") expect(m.contact?.noPhoneInquiry, code).toBeUndefined();
     }

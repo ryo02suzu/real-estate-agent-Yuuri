@@ -12,6 +12,7 @@ import { KINKI_PENDING } from "./data/kinki";
 import { HYOGO } from "./data/hyogo";
 import { KYOTO } from "./data/kyoto";
 import { MIE } from "./data/mie";
+import { NARA } from "./data/nara";
 import { OSAKA } from "./data/osaka";
 import { SHIGA } from "./data/shiga";
 import { WAKAYAMA } from "./data/wakayama";
@@ -119,7 +120,7 @@ export type Municipality = {
   note?: string;
 };
 
-export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI, ...SHIZUOKA, ...YAMANASHI, ...NAGANO, ...AICHI, ...GIFU, ...NIIGATA, ...TOYAMA, ...ISHIKAWA, ...FUKUI, ...CHUBU_PENDING, ...AOMORI, ...IWATE, ...MIYAGI, ...AKITA, ...YAMAGATA, ...FUKUSHIMA, ...TOHOKU_PENDING, ...MIE, ...SHIGA, ...KYOTO, ...OSAKA, ...HYOGO, ...WAKAYAMA, ...KINKI_PENDING];
+export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI, ...SHIZUOKA, ...YAMANASHI, ...NAGANO, ...AICHI, ...GIFU, ...NIIGATA, ...TOYAMA, ...ISHIKAWA, ...FUKUI, ...CHUBU_PENDING, ...AOMORI, ...IWATE, ...MIYAGI, ...AKITA, ...YAMAGATA, ...FUKUSHIMA, ...TOHOKU_PENDING, ...MIE, ...SHIGA, ...KYOTO, ...OSAKA, ...HYOGO, ...NARA, ...WAKAYAMA, ...KINKI_PENDING];
 
 /**
  * 市区町村に都市計画区域が無い（全域が都市計画区域外）と分かっているか。coverage が outside か、注記にそう書いてある町村

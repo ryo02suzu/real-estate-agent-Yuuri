@@ -1,5 +1,5 @@
-// 近畿2府5県の市町村（227）のうち、道路種別の公式図・問い合わせ先をまだ調べ終えていない市町村（82）。coverage: "unknown"（調査中）でここに置き、
-// 調べた府県・市から data/<府県>.ts に移す（三重・滋賀・京都・大阪・兵庫・和歌山の、府県が扱う市町村と政令市は移した。2026-11）。
+// 近畿2府5県の市町村（227）のうち、道路種別の公式図・問い合わせ先をまだ調べ終えていない市町村（46）。coverage: "unknown"（調査中）でここに置き、
+// 調べた府県・市から data/<府県>.ts に移す（三重・滋賀・京都・大阪・兵庫・奈良・和歌山の、府県が扱う市町村と政令市は移した。2026-11）。
 // 市区町村コードと名前は国土地理院の市区町村表（maps.gsi.go.jp/js/muni.js）から。
 // 政令市（京都市・大阪市・堺市・神戸市）は区のコードをまとめて1つ（逆ジオコーダは区のコードを返すので、市そのもののコード 26100・27100・27140・28100 は使わない）
 import type { Municipality } from "../municipalities";
@@ -52,46 +52,10 @@ export const KINKI_PENDING: Municipality[] = [
   { pref: "兵庫県", name: "高砂市", codes: ["28216"], coverage: "unknown", maps: [] },
   { pref: "兵庫県", name: "川西市", codes: ["28217"], coverage: "unknown", maps: [] },
   { pref: "兵庫県", name: "三田市", codes: ["28219"], coverage: "unknown", maps: [] },
-  // 奈良県（39。県の仕組みから調べている途中）
+  // 奈良県（39のうち、特定行政庁の3市）
   { pref: "奈良県", name: "奈良市", codes: ["29201"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "大和高田市", codes: ["29202"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "大和郡山市", codes: ["29203"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "天理市", codes: ["29204"], coverage: "unknown", maps: [] },
   { pref: "奈良県", name: "橿原市", codes: ["29205"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "桜井市", codes: ["29206"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "五條市", codes: ["29207"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "御所市", codes: ["29208"], coverage: "unknown", maps: [] },
   { pref: "奈良県", name: "生駒市", codes: ["29209"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "香芝市", codes: ["29210"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "葛城市", codes: ["29211"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "宇陀市", codes: ["29212"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "山添村", codes: ["29322"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "平群町", codes: ["29342"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "三郷町", codes: ["29343"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "斑鳩町", codes: ["29344"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "安堵町", codes: ["29345"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "川西町", codes: ["29361"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "三宅町", codes: ["29362"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "田原本町", codes: ["29363"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "曽爾村", codes: ["29385"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "御杖村", codes: ["29386"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "高取町", codes: ["29401"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "明日香村", codes: ["29402"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "上牧町", codes: ["29424"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "王寺町", codes: ["29425"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "広陵町", codes: ["29426"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "河合町", codes: ["29427"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "吉野町", codes: ["29441"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "大淀町", codes: ["29442"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "下市町", codes: ["29443"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "黒滝村", codes: ["29444"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "天川村", codes: ["29446"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "野迫川村", codes: ["29447"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "十津川村", codes: ["29449"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "下北山村", codes: ["29450"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "上北山村", codes: ["29451"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "川上村", codes: ["29452"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "東吉野村", codes: ["29453"], coverage: "unknown", maps: [] },
   // 和歌山県（30のうち、特定行政庁の和歌山市）
   { pref: "和歌山県", name: "和歌山市", codes: ["30201"], coverage: "unknown", maps: [] },
 ];

@@ -726,14 +726,15 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
   const data = JSON.parse(readFileSync(new URL("../../scripts/parcel-tiles/misplaced-sheets.json", import.meta.url), "utf8")) as {
     sheets: { code: string; sheet: string; town: string; parcels: number; reason: string; oaza?: string; chome?: string; chiban?: string[]; shift?: { kind: "T1" | "T2"; east: number; north: number } }[];
   };
-  it("測地系の取り違えで動かす地図（shift）は、地図ごと・向きと量が日本測地系と世界測地系の差（関東・中部で西または東へ約255〜300m・北または南へ約325〜370m）", () => {
+  it("測地系の取り違えで動かす地図（shift）は、地図ごと・向きと量が日本測地系と世界測地系の差（関東・中部・近畿で西または東へ約245〜300m・北または南へ約325〜370m）", () => {
     for (const s of data.sheets.filter((x) => x.shift)) {
       const { kind, east, north } = s.shift!;
       expect(["T1", "T2"]).toContain(kind);
       // T1：日本測地系の数字→世界測地系（北西へ動かす。今は南東へずれている）。T2：その逆（南東へ動かす）。
-      // 差は場所で変わる（国土地理院の TKY2JGD.par：福井県の西で東西 約256m、新潟県の北で南北 約326m、銚子で東西 約301m、館山で南北 約371m）
-      expect(east).toBeGreaterThanOrEqual(kind === "T1" ? -320 : 250);
-      expect(east).toBeLessThanOrEqual(kind === "T1" ? -250 : 320);
+      // 差は場所で変わる（国土地理院の TKY2JGD.par：福井県の西で東西 約256m、新潟県の北で南北 約326m、銚子で東西 約301m、館山で南北 約371m。
+      // 兵庫県（平面直角座標の V 系）は東西 約245〜248m）
+      expect(east).toBeGreaterThanOrEqual(kind === "T1" ? -320 : 240);
+      expect(east).toBeLessThanOrEqual(kind === "T1" ? -240 : 320);
       expect(north).toBeGreaterThanOrEqual(kind === "T1" ? 315 : -400);
       expect(north).toBeLessThanOrEqual(kind === "T1" ? 400 : -315);
       // 理由の向き（「地図全体が南東へ…ずれている」）が動かす向きの逆になっている
@@ -746,12 +747,12 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     }
   });
   it("動かす量は、平面直角座標の数字の取り違えとして計算した値（同じ座標系の中ではほぼ同じ量で、T1 と T2 は向きが逆）", () => {
-    // 平面直角座標の系：関東（茨城〜神奈川）IX、新潟・山梨・長野・静岡 VIII、富山・石川・岐阜・愛知 VII、福井 VI。
+    // 平面直角座標の系：関東（茨城〜神奈川）IX、新潟・山梨・長野・静岡 VIII、富山・石川・岐阜・愛知 VII、福井と近畿（兵庫を除く）VI、兵庫 V。
     // 緯度経度の変換量（TKY2JGD.par）をそのまま使うと場所ごとに 3〜12m 違い、最初の関東の決まりは同じ系の中で最大 11.9m ばらついていた。
     // 数字の取り違えとして計算すると、同じ系の中では原点からの距離の分しか変わらない（2026-11-08 の作り直しで最大 2.7m）
     const zone = (code: string) => {
       const p = Number(code.slice(0, 2));
-      return p <= 14 ? "IX" : [15, 19, 20, 22].includes(p) ? "VIII" : p === 18 ? "VI" : "VII";
+      return p <= 14 ? "IX" : [15, 19, 20, 22].includes(p) ? "VIII" : [18, 24, 25, 26, 27, 29, 30].includes(p) ? "VI" : p === 28 ? "V" : "VII";
     };
     const groups = new Map<string, [number, number][]>();
     for (const s of data.sheets.filter((x) => x.shift)) {
@@ -779,6 +780,31 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(e7).toBeLessThan(-267);
       expect(n7).toBeGreaterThan(346);
       expect(n7).toBeLessThan(352);
+    }
+    // 近畿（VI 系：滋賀・京都・大阪・奈良）は西へ約 262m・北へ約 347m。兵庫（V 系）は西へ約 247m・北へ約 344m
+    const [e6, n6] = mean(groups.get("VI")!);
+    expect(e6).toBeGreaterThan(-266);
+    expect(e6).toBeLessThan(-258);
+    expect(n6).toBeGreaterThan(344);
+    expect(n6).toBeLessThan(350);
+    const [e5, n5] = mean(groups.get("V")!);
+    expect(e5).toBeGreaterThan(-250);
+    expect(e5).toBeLessThan(-244);
+    expect(n5).toBeGreaterThan(341);
+    expect(n5).toBeLessThan(348);
+  });
+  it("近畿（2026-11-12）：三田市のニュータウンの4枚は、道路縁と隣の地図で確かめた同じ量（西へ3.0m・南へ3.3m）を計算した量に足している", () => {
+    const kinki = data.sheets.filter((s) => /^(2[4-9]|30)/.test(s.code) && s.shift);
+    expect(kinki).toHaveLength(14);
+    const sanda = kinki.filter((s) => s.code === "28219");
+    expect(sanda.map((s) => s.sheet).sort()).toEqual(["あかしあ台１～５丁目", "すずかけ台１～４丁目", "ゆりのき台１～６丁目（修正後）", "北摂三田ニュータウン南地区"].sort());
+    for (const s of sanda) {
+      // 計算した量（東へ約 -245.0m・北へ約 346.4m）に、4枚とも同じ量を足した
+      expect(s.shift!.east).toBeGreaterThanOrEqual(-248.2);
+      expect(s.shift!.east).toBeLessThanOrEqual(-247.9);
+      expect(s.shift!.north).toBeGreaterThanOrEqual(342.9);
+      expect(s.shift!.north).toBeLessThanOrEqual(343.2);
+      expect(s.reason).toMatch(/4枚に同じ量（西へ 3\.0m・南へ 3\.3m）を足して/);
     }
   });
   it("どれも対応エリア（関東1都6県・中部9県・東北6県・近畿2府5県）の5桁の市区町村コード・地図名・町・筆の数・理由がある。同じ決まりは1回だけ（町・地番で絞るときも）", () => {
