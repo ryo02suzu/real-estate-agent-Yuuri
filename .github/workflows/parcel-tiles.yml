@@ -54,8 +54,12 @@ jobs:
       - uses: actions/checkout@v4
       - id: p
         name: 作る都道府県（regions.json から）
+        env:
+          # 入力はコマンドに直接埋め込まず、環境変数で受けて形を確かめる（地方の名前は英小文字。カンマ区切りで複数可）
+          REGION: ${{ inputs.region || 'all' }}
         run: |
-          region="${{ inputs.region || 'all' }}"
+          region="$REGION"
+          if ! printf '%s' "$region" | grep -Eq '^[a-z]+(,[a-z]+)*$'; then echo "::error::地方の指定が分かりません"; exit 1; fi
           all=$(jq -c '[.[] | .prefs | keys[]] | sort' lib/roadmap/data/regions.json)
           if [ "$region" = "all" ]; then prefs="$all"; else
             prefs=$(jq -c --arg r "$region" '[($r | split(",")[]) as $k | .[$k].prefs | keys[]] | sort' lib/roadmap/data/regions.json)
@@ -67,9 +71,11 @@ jobs:
       - id: c
         env:
           ACCOUNT: ${{ secrets.R2_ACCOUNT_ID }}
+          YEAR_INPUT: ${{ inputs.year || '' }}
         run: |
           # 年度版：入力が無ければ G空間情報センターの zip 名（「11105-0300-2025.zip」）の一番新しい年
-          year="${{ inputs.year || '' }}"
+          year="$YEAR_INPUT"
+          if [ -n "$year" ] && ! printf '%s' "$year" | grep -Eq '^[0-9]{4}$'; then echo "::error::年度版は4桁の数字で入れてください"; exit 1; fi
           if [ -z "$year" ]; then
             year=$(curl -sS "https://www.geospatial.jp/ckan/api/3/action/package_search?fq=organization:moj-13tokyo&rows=1000" \
               | jq -r '[.result.results[].resources[].name | select(test("^[0-9]{5}-[0-9]{4}-[0-9]{4}\\.zip$")) | .[-8:-4]] | max // empty')

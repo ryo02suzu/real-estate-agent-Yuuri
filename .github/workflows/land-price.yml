@@ -36,9 +36,12 @@ jobs:
           python-version: "3.12"
       - name: 新しい年のデータが出たか
         id: c
+        env:
+          # 入力はコマンドに直接埋め込まず、環境変数で受ける
+          FORCE: ${{ inputs.force }}
         run: |
           python3 scripts/land-price/build.py --check
-          if [ "${{ inputs.force }}" = "true" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+          if [ "$FORCE" = "true" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; fi
       - uses: actions/cache@v4
         if: steps.c.outputs.changed == 'true'
         id: tippecanoe

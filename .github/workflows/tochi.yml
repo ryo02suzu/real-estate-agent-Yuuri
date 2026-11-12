@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       region:
-        description: 作り直す地方（空なら全部。kanto・chubu）
+        description: 作り直す地方（空なら全部。kanto・chubu・tohoku・kinki のどれか1つ）
         required: false
       force:
         description: 新しいデータが無くても作り直す
@@ -38,10 +38,15 @@ jobs:
           python-version: "3.12"
       - name: 新しいデータが出たか
         id: c
+        env:
+          # 入力はコマンドに直接埋め込まず、環境変数で受けて形を確かめる（地方の名前は英小文字だけ）
+          REGION: ${{ inputs.region }}
+          FORCE: ${{ inputs.force }}
         run: |
           pip install pyshp==2.3.1
-          python3 scripts/tochi/build.py --check ${{ inputs.region && format('--region {0}', inputs.region) || '' }}
-          if [ "${{ inputs.force }}" = "true" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+          if [ -n "$REGION" ] && ! printf '%s' "$REGION" | grep -Eq '^[a-z]+$'; then echo "::error::地方の指定が分かりません"; exit 1; fi
+          python3 scripts/tochi/build.py --check ${REGION:+--region "$REGION"}
+          if [ "$FORCE" = "true" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; fi
       - uses: actions/cache@v4
         if: steps.c.outputs.changed == 'true'
         id: tippecanoe
@@ -56,9 +61,12 @@ jobs:
           mkdir -p ~/tippecanoe-bin && cp /tmp/tippecanoe/tippecanoe /tmp/tippecanoe/tile-join ~/tippecanoe-bin/
       - name: タイルを作ってアプリに入れる
         if: steps.c.outputs.changed == 'true'
+        env:
+          REGION: ${{ inputs.region }}
         run: |
           export PATH="$HOME/tippecanoe-bin:$PATH"
-          python3 scripts/tochi/build.py --install --work "$RUNNER_TEMP/tochi" ${{ inputs.region && format('--region {0}', inputs.region) || '' }}
+          if [ -n "$REGION" ] && ! printf '%s' "$REGION" | grep -Eq '^[a-z]+$'; then echo "::error::地方の指定が分かりません"; exit 1; fi
+          python3 scripts/tochi/build.py --install --work "$RUNNER_TEMP/tochi" ${REGION:+--region "$REGION"}
           ls -la public/data
       - uses: actions/setup-node@v4
         if: steps.c.outputs.changed == 'true'
@@ -74,6 +82,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A public/data lib/roadmap/data/tochi-source.json
-          git commit -m "Update the natural park, agricultural and forest area data: $(jq -c .years lib/roadmap/data/tochi-source.json) (automatic)"
+          git commit -m "Update the natural park, agricultural and forest area data: $(jq -c '{kanto: ([.years[][]] | max)} + ((.regions // {}) | map_values([.years[][]] | max))' lib/roadmap/data/tochi-source.json) (automatic)"
           git pull --rebase
           git push
