@@ -45,7 +45,7 @@ describe("謄本・公図を取るときの地番の一覧", () => {
   it("推定の位置・地番参考図の筆は、その印と注意を添える。筆が無ければ確かめる先を書く", () => {
     const est = parcelListText(result, { target: "千代田区三番町 2-1", neighbors: [], reference: false, estimated: "low" });
     expect(est).toContain("千代田区三番町 2-1（推定の位置）");
-    expect(est).toContain("※筆の位置は公図から推定したもの（確度が低く、5m前後ずれることあり）。");
+    expect(est).toContain("※筆の位置は公図から推定したもの（確度が低く、5m前後（1割弱は30m以上）ずれることあり）。");
     const sanko = parcelListText(result, { target: "市川市国府台１丁目 2-1", neighbors: [], reference: false, sanko: "12203" });
     expect(sanko).toContain("市川市国府台１丁目 2-1（地番参考図）");
     expect(sanko).toContain("※市町村の課税用の参考図で、登記の地番・筆の形と違うことがあります。");

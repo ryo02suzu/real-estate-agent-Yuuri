@@ -746,9 +746,13 @@ export function parcelMark(p: { estimated?: Estimated; sanko?: string }): string
   return p.sanko ? SANKO_MARK : estimatedMark(p);
 }
 
-/** 公図から推定した位置の筆の、ずれの目安（見出しや注記に添える） */
+/**
+ * 公図から推定した位置の筆の、ずれの目安（見出しや注記に添える）。
+ * 関東の地価公示・地価調査の地点（2026-11-13）で確かめると、確度の高い推定（q=1・1,868地点）は 99.3% が 30m 以内に同じ地番の筆があり、
+ * 確度の低い推定（q=2・715地点）は 91.2%。残りの 7.6% は 30m より離れた所・別の町に置かれていた
+ */
 export function estimatedNote(e: Estimated): string {
-  return e === "low" ? "確度が低く、5m前後ずれることあり" : "数mずれることあり";
+  return e === "low" ? "確度が低く、5m前後（1割弱は30m以上）ずれることあり" : "数mずれることあり";
 }
 
 /** 地番区域を「熊谷市下奈良」「川口市青木２丁目」のように読める形に */

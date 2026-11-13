@@ -350,7 +350,7 @@ describe("buildSummary の地番", () => {
     };
     const parcels = (estimated?: "high" | "low") => ({ parcels: { target: "横浜市港北区日吉５丁目 1234", neighbors: ["1233"], reference: false, estimated } });
     const low = buildSummary(result, parcels("low"));
-    expect(low).toContain("【謄本・公図用の地番（公図から推定した位置・確度が低く、5m前後ずれることあり）】\n・物件：横浜市港北区日吉５丁目 1234");
+    expect(low).toContain("【謄本・公図用の地番（公図から推定した位置・確度が低く、5m前後（1割弱は30m以上）ずれることあり）】\n・物件：横浜市港北区日吉５丁目 1234");
     expect(low).toContain("国土地理院の基盤地図情報（道路縁）に合わせて MICHILU が推定の位置に置いたもの");
     expect(buildSummary(result, parcels("high"))).toContain("【謄本・公図用の地番（公図から推定した位置・数mずれることあり）】");
     const plain = buildSummary(result, parcels());
