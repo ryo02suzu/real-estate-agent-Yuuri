@@ -2,9 +2,10 @@
 
 // 「道路」タブ（すりガラスのシートの中。街の模型では前の道路に光が流れる）：前の道路（市町村の道路の地図データの種別・幅員と、
 // 国土地理院の地図の道路の幅の区分）、市町村の道路種別の図がネットでどこまで見られるか、その図を開く大きなボタン（MICHILU の中心の機能）、
-// 地図の色と幅員のくわしい話、問い合わせ先、窓口で確かめること。
+// その地図の開き方（市のページのどこを押すか）と市の注意書き、地図の色と幅員のくわしい話、問い合わせ先、窓口で確かめること。
 // どれも地図のデータの参考で、建築基準法の道路か・接道の条件を満たすかは判断しない（市の図と窓口で確かめる）
 import { ListChecks, Phone, Route } from "lucide-react";
+import { roadGuide } from "@/lib/app/road-guide";
 import { parsePhones } from "@/lib/phone";
 import { G, GBadge, GCard, GFaint, GHead, GMain, GNote, GPill, GRow, TILE, TILE_GOLD } from "./g-ui";
 import { RoadIcon } from "./icons";
@@ -34,6 +35,9 @@ export function RoadTab({ result, data, open, front, pick }: TabProps) {
   const list = roads.status === "ok" ? roads.roads.slice(0, 3) : [];
   const offline = m.coverage === "none" || m.coverage === "outside" || m.coverage === "unknown";
   const mapLink = result.links[0];
+  // 地図の開き方（開いたあとの道順）。大きなボタンの地図の分はボタンのすぐ下に短く、全部は「くわしい話」のシートに出す
+  const guide = roadGuide(result.links);
+  const mainTip = mapLink && !mapLink.sheet?.zip ? guide.find((g) => g.url === mapLink.url && g.label === mapLink.label)?.tip : undefined;
   const contact = result.contact;
   const phones = contact?.phone ? parsePhones(contact.phone) : [];
   const dept = contact ? (/^(東京都|\S{2,3}県)\s/.test(contact.dept) ? contact.dept : `${m.name} ${contact.dept}`) : "";
@@ -139,6 +143,12 @@ export function RoadTab({ result, data, open, front, pick }: TabProps) {
         <p className="mt-[8px] leading-[1.5]" style={{ fontSize: 12, color: G.sub }}>
           {m.name}の道路種別の図：{COVER[m.coverage] ?? COVER.none}
         </p>
+        {/* 市の注意書き（図に載る範囲・区域の外の地区・データの時点など）。長いので2行まで出し、押すと全部読める */}
+        {m.note && (
+          <button type="button" data-road-note onClick={() => open("roads")} aria-haspopup="dialog" className="press mt-[5px] block w-full text-left leading-[1.5]" style={{ fontSize: 11.5, color: G.sub }}>
+            <span className="line-clamp-2">{m.note}</span>
+          </button>
+        )}
       </div>
 
       {/* 市町村の道路種別の図（いちばん使う操作） */}
@@ -153,6 +163,21 @@ export function RoadTab({ result, data, open, front, pick }: TabProps) {
               </b>
               （図の{mapLink.sheet.where}あたり{mapLink.sheet.neighbor ? `。境に近いので隣の ${mapLink.sheet.neighbor.label} も` : ""}）。{mapLink.sheet.howto}
             </p>
+          )}
+          {/* 開いたあとの道順（市のページのどこを押すか・同意は自分で、など）。3行まで出し、押すと全部の地図の分が読める */}
+          {mainTip && (
+            <button type="button" data-road-tip onClick={() => open("roads")} aria-haspopup="dialog" className="press -mt-[2px] block w-full rounded-[14px] px-[12px] py-[9px] text-left leading-[1.5]" style={{ fontSize: 12.5, color: G.sub, background: "rgba(0,0,0,0.18)" }}>
+              <span className="line-clamp-3">
+                <b className="font-semibold" style={{ color: "#ffe2a3" }}>
+                  開き方
+                </b>
+                {"　"}
+                {mainTip}
+              </span>
+              <span className="mt-[4px] block font-semibold leading-none" style={{ fontSize: 12, color: G.blue }}>
+                開き方と注意を全部読む
+              </span>
+            </button>
           )}
         </>
       ) : (
@@ -169,7 +194,7 @@ export function RoadTab({ result, data, open, front, pick }: TabProps) {
       )}
 
       <GCard className="overflow-hidden">
-        <GRow icon={<RoadIcon size={18} stroke={1.7} color="#fff" />} title="地図の色と幅員のくわしい話" sub="近くの道路の種別・市町村の地図の色の見方" onClick={() => open("roads")} minH={56} />
+        <GRow icon={<RoadIcon size={18} stroke={1.7} color="#fff" />} title="地図の色と幅員のくわしい話" sub={guide.length || m.note ? "地図の開き方と注意・近くの道路・色の見方" : "近くの道路の種別・市町村の地図の色の見方"} onClick={() => open("roads")} minH={56} />
         {contact && (
           <GRow
             icon={<Phone size={17} strokeWidth={1.8} absoluteStrokeWidth color="#fff" />}

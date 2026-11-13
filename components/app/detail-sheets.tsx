@@ -7,6 +7,7 @@ import { noCityPlanning } from "@/lib/roadmap/municipalities";
 import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 import { buildingNotes } from "@/lib/app/legal";
+import { roadGuide } from "@/lib/app/road-guide";
 import type { RecordTopic } from "@/lib/records";
 import { livingScores, SCORE_METHOD } from "@/lib/app/scores";
 import { chibanzuFor } from "@/lib/roadmap/chibanzu";
@@ -323,8 +324,31 @@ function NotesSheet({ data, outside }: { data: PropertyData; outside: boolean })
 function RoadsSheet({ result, data }: { result: Ok; data: PropertyData }) {
   const roads = data.roads;
   const legends = result.links.filter((l) => l.legend?.length);
+  const m = result.municipality;
+  // 地図ごとの開き方（開いたあとの道順）と、市の注意書き。PC は地図のボタンと市の名前の下に出している
+  const guide = roadGuide(result.links);
   return (
     <div>
+      {(m.note || guide.length > 0) && (
+        <section className="mb-3">
+          <h3 className="text-[14px] font-bold text-ink">{m.name}の地図の開き方と注意</h3>
+          {m.note && <p className="mt-1 text-[13px] leading-[1.6] text-ink">{m.note}</p>}
+          {guide.length > 0 && (
+            <ul className="mt-1 divide-y divide-line/70">
+              {guide.map((g) => (
+                <li key={`${g.label}|${g.url}`} className="py-2">
+                  <p className="text-[14px] font-semibold leading-[1.45] text-ink">{g.label}</p>
+                  <p className="mt-0.5 text-[12.5px] leading-[1.65] text-muted">{g.tip}</p>
+                  <a href={g.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[12.5px] text-brand underline">
+                    <ExternalLink className="h-3 w-3" />
+                    この地図を開く（{g.what}）
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
       {roads.status !== "none" && (
         <section>
           <h3 className="text-[14px] font-bold text-ink">物件のまわりの道路（地図データ）</h3>
