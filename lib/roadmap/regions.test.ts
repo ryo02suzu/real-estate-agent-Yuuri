@@ -115,11 +115,11 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     for (const m of KINKI_PENDING) expect(m.coverage).toBe("unknown");
   });
 
-  it("府県が扱う市町村と政令市は登録済み（181）。残りの46（特定行政庁の市）は調査中", () => {
+  it("府県が扱う市町村・政令市・三重県の8市は登録済み（189）。残りの38（特定行政庁の市）は調査中", () => {
     const done: Record<string, number> = {};
     for (const m of MUNICIPALITIES) if (KINKI.includes(m.pref) && m.coverage !== "unknown") done[m.pref] = (done[m.pref] ?? 0) + 1;
-    expect(done).toEqual({ 三重県: 21, 滋賀県: 12, 京都府: 25, 大阪府: 28, 兵庫県: 30, 奈良県: 36, 和歌山県: 29 });
-    expect(KINKI_PENDING).toHaveLength(46);
+    expect(done).toEqual({ 三重県: 29, 滋賀県: 12, 京都府: 25, 大阪府: 28, 兵庫県: 30, 奈良県: 36, 和歌山県: 29 });
+    expect(KINKI_PENDING).toHaveLength(38);
     // 調査中に残るのは、市が道路を扱う市（特定行政庁など）だけ
     expect(KINKI_PENDING.every((m) => m.name.endsWith("市"))).toBe(true);
     expect(KINKI_PENDING.filter((m) => m.pref === "奈良県").map((m) => m.name)).toEqual(["奈良市", "橿原市", "生駒市"]);
@@ -140,8 +140,8 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
         .sort(),
     );
     for (const m of outside) expect(m.maps, m.name).toEqual([]);
-    // 府県の地図が無い（ネットに出ていない）市町村は none で、地図を出さない
-    for (const m of done.filter((x) => x.coverage === "none")) expect(m.maps, m.name).toEqual([]);
+    // 道路種別の地図が無い（ネットに出ていない）市町村は none で、道路種別の地図は出さない（市町村道の参考の地図だけは出すことがある）
+    for (const m of done.filter((x) => x.coverage === "none")) expect(m.maps.filter((l) => l.kind !== "public_road"), m.name).toEqual([]);
     // 一部・全部の市町村には、開ける地図が1つ以上ある
     for (const m of done.filter((x) => x.coverage === "full" || x.coverage === "partial")) expect(m.maps.length, m.name).toBeGreaterThan(0);
   });
@@ -151,9 +151,10 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     for (const m of done) {
       for (const link of m.maps) {
         if (link.build) {
-          // 近畿で物件の位置で開く地図は、どれも利用規約・利用条件への同意の先（MICHILU は同意の先を開いていない）
+          // 近畿で物件の位置で開く地図は、利用規約・利用条件への同意の先（MICHILU は同意の先を開いていない）か、
+          // 海外の回線から開けない地図（Sonicweb）。どれも位置で開くことを確かめていないので「確認済み」にしない
           expect(link.verified, `${m.name} ${link.label}`).toBe(false);
-          expect(link.tip, `${m.name} ${link.label}`).toMatch(/自分で(「同意する」を押す|同意する)/);
+          expect(link.tip, `${m.name} ${link.label}`).toMatch(/自分で(「同意する」を押す|同意する)|海外の回線から開けない/);
           expect(link.build(34.7, 135.5)).toMatch(/^https:\/\//);
         } else {
           expect(link.url, `${m.name} ${link.label}`).toMatch(/^https:\/\//);
@@ -168,6 +169,30 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     expect(findMunicipality("26208")?.maps[0]).toMatchObject({ build: null, url: "https://www.pref.kyoto.jp/kenchiku/1291697604560.html" });
     expect(findMunicipality("27127")?.maps[0]).toMatchObject({ build: null, url: "https://www.city.osaka.lg.jp/toshikeikaku/page/0000012045.html" });
     expect(findMunicipality("29203")?.maps[0]).toMatchObject({ build: null, url: "https://www.pref.nara.lg.jp/n155/33833.html" });
+  });
+
+  it("三重県の8市：ネットの図は一部の種別だけ（松阪市は窓口だけ）。リンクを制限している市のページへは直接つながない", () => {
+    const cities = ["24201", "24202", "24204", "24205", "24207", "24208", "24210", "24216"].map((c) => findMunicipality(c)!);
+    expect(cities.map((m) => m.name)).toEqual(["津市", "四日市市", "松阪市", "桑名市", "鈴鹿市", "名張市", "亀山市", "伊賀市"]);
+    expect(cities.map((m) => m.coverage)).toEqual(["partial", "partial", "none", "partial", "partial", "partial", "partial", "partial"]);
+    // 亀山市（トップページ以外へのリンクは原則禁止）・伊賀市（リンクの前に知らせる）のページへは直接つながず、三重県のページを開く
+    for (const code of ["24210", "24216"]) {
+      for (const link of findMunicipality(code)!.maps) {
+        const url = link.build ? link.build(34.85, 136.45) : link.url!;
+        expect(url, link.label).not.toMatch(/city\.kameyama\.mie\.jp|city\.iga\.lg\.jp/);
+      }
+      expect(findMunicipality(code)!.maps[0]).toMatchObject({ build: null, url: "https://www.pref.mie.lg.jp/KENCHIKU/HP/m0168200177.htm" });
+    }
+    // 四日市市は GIS の各地点への直接のリンクを認めていないので、市のページ（入口）だけ
+    for (const link of findMunicipality("24202")!.maps) expect(link.build).toBeNull();
+    // 鈴鹿市の地図は、市「地理情報」のページのリンクと同じ形
+    expect(findMunicipality("24207")!.maps[0].build?.(34.881943, 136.584429)).toBe(
+      "https://www.sonicweb-asp.jp/city_suzuka/map?theme=th_34&layers=th_24,dm#layers=dm%2Cth_24&scale=3750&pos=136.584429%2C34.881943",
+    );
+    expect(findMunicipality("24207")!.maps[2].build?.(34.881688, 136.585062)).toBe("https://www.sonicweb-asp.jp/city_suzuka/map?theme=th_12#scale=3750&pos=136.585062%2C34.881688");
+    // 亀山市は電話での問い合わせを原則受け付けない
+    expect(findMunicipality("24210")?.contact?.noPhoneInquiry).toBe(true);
+    for (const code of ["24201", "24202", "24204", "24205", "24207", "24208", "24216"]) expect(findMunicipality(code)?.contact?.noPhoneInquiry, code).toBeUndefined();
   });
 
   it("奈良県：県の道路システムに載る18市町村は一部（1項1号は載らない）、準備中の7市町は非公開、窓口は3つの土木事務所", () => {

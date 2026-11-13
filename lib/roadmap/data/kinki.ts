@@ -1,19 +1,10 @@
-// 近畿2府5県の市町村（227）のうち、道路種別の公式図・問い合わせ先をまだ調べ終えていない市町村（46）。coverage: "unknown"（調査中）でここに置き、
-// 調べた府県・市から data/<府県>.ts に移す（三重・滋賀・京都・大阪・兵庫・奈良・和歌山の、府県が扱う市町村と政令市は移した。2026-11）。
+// 近畿2府5県の市町村（227）のうち、道路種別の公式図・問い合わせ先をまだ調べ終えていない市町村（38）。coverage: "unknown"（調査中）でここに置き、
+// 調べた府県・市から data/<府県>.ts に移す（7府県の、府県が扱う市町村と政令市、三重県の8市は移した。2026-11）。
 // 市区町村コードと名前は国土地理院の市区町村表（maps.gsi.go.jp/js/muni.js）から。
 // 政令市（京都市・大阪市・堺市・神戸市）は区のコードをまとめて1つ（逆ジオコーダは区のコードを返すので、市そのもののコード 26100・27100・27140・28100 は使わない）
 import type { Municipality } from "../municipalities";
 
 export const KINKI_PENDING: Municipality[] = [
-  // 三重県（29のうち、市が道路を扱う8市）
-  { pref: "三重県", name: "津市", codes: ["24201"], coverage: "unknown", maps: [] },
-  { pref: "三重県", name: "四日市市", codes: ["24202"], coverage: "unknown", maps: [] },
-  { pref: "三重県", name: "松阪市", codes: ["24204"], coverage: "unknown", maps: [] },
-  { pref: "三重県", name: "桑名市", codes: ["24205"], coverage: "unknown", maps: [] },
-  { pref: "三重県", name: "鈴鹿市", codes: ["24207"], coverage: "unknown", maps: [] },
-  { pref: "三重県", name: "名張市", codes: ["24208"], coverage: "unknown", maps: [] },
-  { pref: "三重県", name: "亀山市", codes: ["24210"], coverage: "unknown", maps: [] },
-  { pref: "三重県", name: "伊賀市", codes: ["24216"], coverage: "unknown", maps: [] },
   // 滋賀県（19のうち、特定行政庁の7市）
   { pref: "滋賀県", name: "大津市", codes: ["25201"], coverage: "unknown", maps: [] },
   { pref: "滋賀県", name: "彦根市", codes: ["25202"], coverage: "unknown", maps: [] },
