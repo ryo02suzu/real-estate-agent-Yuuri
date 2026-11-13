@@ -970,17 +970,17 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
   const data = JSON.parse(readFileSync(new URL("../../scripts/parcel-tiles/misplaced-sheets.json", import.meta.url), "utf8")) as {
     sheets: { code: string; sheet: string; town: string; parcels: number; reason: string; oaza?: string; chome?: string; chiban?: string[]; shift?: { kind: "T1" | "T2" | "数字の誤り" | "照合"; east: number; north: number } }[];
   };
-  it("測地系の取り違えで動かす地図（shift）は、地図ごと・向きと量が日本測地系と世界測地系の差（関東・中部・近畿で西または東へ約245〜300m・北または南へ約325〜370m）", () => {
+  it("測地系の取り違えで動かす地図（shift）は、地図ごと・向きと量が日本測地系と世界測地系の差（西または東へ約245〜300m・北または南へ、関東・中部・近畿で約325〜370m、東北の X 系で約300〜315m）", () => {
     for (const s of data.sheets.filter((x) => x.shift && (x.shift.kind === "T1" || x.shift.kind === "T2"))) {
       const { kind, east, north } = s.shift!;
       expect(["T1", "T2"]).toContain(kind);
       // T1：日本測地系の数字→世界測地系（北西へ動かす。今は南東へずれている）。T2：その逆（南東へ動かす）。
       // 差は場所で変わる（国土地理院の TKY2JGD.par：福井県の西で東西 約256m、新潟県の北で南北 約326m、銚子で東西 約301m、館山で南北 約371m。
-      // 兵庫県（平面直角座標の V 系）は東西 約245〜248m）
+      // 兵庫県（平面直角座標の V 系）は東西 約245〜248m。東北（青森〜山形の X 系）は北へ短く、花巻市で南北 約310m）
       expect(east).toBeGreaterThanOrEqual(kind === "T1" ? -320 : 240);
       expect(east).toBeLessThanOrEqual(kind === "T1" ? -240 : 320);
-      expect(north).toBeGreaterThanOrEqual(kind === "T1" ? 315 : -400);
-      expect(north).toBeLessThanOrEqual(kind === "T1" ? 400 : -315);
+      expect(north).toBeGreaterThanOrEqual(kind === "T1" ? 290 : -400);
+      expect(north).toBeLessThanOrEqual(kind === "T1" ? 400 : -290);
       // 理由の向き（「地図全体が南東へ…ずれている」）が動かす向きの逆になっている
       expect(s.reason).not.toMatch(kind === "T1" ? /地図全体が北西へ/ : /地図全体が南東へ/);
       expect(s.reason).not.toMatch(kind === "T1" ? /北西へ約\d+mずれている/ : /南東へ約\d+mずれている/);
@@ -1002,7 +1002,7 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     // 数字の取り違えとして計算すると、同じ系の中では原点からの距離の分しか変わらない（2026-11-08 の作り直しで最大 2.7m）
     const zone = (code: string) => {
       const p = Number(code.slice(0, 2));
-      return p <= 14 ? "IX" : [15, 19, 20, 22].includes(p) ? "VIII" : [18, 24, 25, 26, 27, 29, 30].includes(p) ? "VI" : p === 28 ? "V" : "VII";
+      return p <= 6 ? "X" : p <= 14 ? "IX" : [15, 19, 20, 22].includes(p) ? "VIII" : [18, 24, 25, 26, 27, 29, 30].includes(p) ? "VI" : p === 28 ? "V" : "VII";
     };
     const groups = new Map<string, [number, number][]>();
     for (const s of data.sheets.filter((x) => x.shift && (x.shift.kind === "T1" || x.shift.kind === "T2"))) {
