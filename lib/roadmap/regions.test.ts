@@ -116,14 +116,14 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     for (const m of KINKI_PENDING) expect(m.coverage).toBe("unknown");
   });
 
-  it("府県が扱う市町村・政令市・三重県の8市・奈良県の3市・滋賀県の7市は登録済み（199）。残りの28（特定行政庁の市）は調査中", () => {
+  it("府県が扱う市町村・政令市・三重県の8市・奈良県の3市・滋賀県の7市・宇治市・和歌山市は登録済み（201）。残りの26（大阪府と兵庫県の、市が道路を扱う市）は調査中", () => {
     const done: Record<string, number> = {};
     for (const m of MUNICIPALITIES) if (KINKI.includes(m.pref) && m.coverage !== "unknown") done[m.pref] = (done[m.pref] ?? 0) + 1;
-    expect(done).toEqual({ 三重県: 29, 滋賀県: 19, 京都府: 25, 大阪府: 28, 兵庫県: 30, 奈良県: 39, 和歌山県: 29 });
-    expect(KINKI_PENDING).toHaveLength(28);
+    expect(done).toEqual({ 三重県: 29, 滋賀県: 19, 京都府: 26, 大阪府: 28, 兵庫県: 30, 奈良県: 39, 和歌山県: 30 });
+    expect(KINKI_PENDING).toHaveLength(26);
     // 調査中に残るのは、市が道路を扱う市（特定行政庁など）だけ
     expect(KINKI_PENDING.every((m) => m.name.endsWith("市"))).toBe(true);
-    expect(KINKI_PENDING.filter((m) => m.pref === "奈良県" || m.pref === "滋賀県")).toEqual([]);
+    expect([...new Set(KINKI_PENDING.map((m) => m.pref))]).toEqual(["大阪府", "兵庫県"]);
     // 政令市：京都市・大阪市・神戸市は全種別の図、堺市は載る種別を確かめられていないので一部
     expect(findMunicipality("26104")?.coverage).toBe("full");
     expect(findMunicipality("27127")?.coverage).toBe("full");
@@ -247,6 +247,28 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     expect(higashiomi.note).toContain("旧永源寺町");
   });
 
+  it("宇治市・和歌山市：市が道路を扱う。宇治市は市のお願いに合わせてトップページから、和歌山市は市のページから地図へ進む", () => {
+    const uji = findMunicipality("26204")!;
+    const wakayama = findMunicipality("30201")!;
+    expect([uji.name, wakayama.name]).toEqual(["宇治市", "和歌山市"]);
+    // 宇治市：参考の道路種別（凡例を確かめられていないので一部）。リンクはトップページ（市「リンク・著作権・免責事項」）。電話では答えない
+    expect(uji.coverage).toBe("partial");
+    expect(uji.maps).toHaveLength(1);
+    expect(uji.maps[0]).toMatchObject({ kind: "road_type", build: null, url: "https://www.city.uji.kyoto.jp/" });
+    expect(uji.maps[0].tip).toMatch(/確認申請の手続きについて.*京都府統合型GIS.*自分で同意する/);
+    expect(uji.contact).toMatchObject({ phone: "0774-20-8794", fax: "0774-21-0409", noPhoneInquiry: true });
+    // 和歌山市：指定道路図（道路参考図）は全種別（市のチラシの凡例）。市のページ（入口）から開く
+    expect(wakayama.coverage).toBe("full");
+    expect(wakayama.maps.map((l) => l.kind)).toEqual(["road_type", "public_road"]);
+    for (const link of wakayama.maps) expect(link.build, link.label).toBeNull();
+    expect(wakayama.maps[0].url).toBe("https://www.city.wakayama.wakayama.jp/kurashi/sumai_jyougesuidou/1001110/1010370/1036252.html");
+    expect(wakayama.maps[0].tip).toMatch(/1項1号・1項2号・1項3号・1項4号・1項5号・2項/);
+    // 和歌山市のリンクの決まり：和歌山市のページへのリンクだと分かるように書く
+    for (const link of wakayama.maps) expect(link.label).toContain("和歌山市のページから開く");
+    expect(wakayama.contact).toMatchObject({ phone: "073-435-1100", fax: "073-435-1175", email: "kenchikushido@city.wakayama.lg.jp" });
+    expect(wakayama.contact?.noPhoneInquiry).toBeUndefined();
+  });
+
   it("奈良県の3市（奈良・橿原・生駒）：市が道路を扱い、地図は市のページ（入口）から開く。道路種別の案内があるのは橿原市だけ", () => {
     const [nara, kashihara, ikoma] = ["29201", "29205", "29209"].map((c) => findMunicipality(c)!);
     expect([nara, kashihara, ikoma].map((m) => m.name)).toEqual(["奈良市", "橿原市", "生駒市"]);
@@ -271,11 +293,11 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
 
   it("道路種別を電話で答えない窓口は、電話のボタンを控えめにする印が付く", () => {
     // 府県・市のページに、電話などでは答えないと書かれているところ
-    for (const code of ["27127", "27141", "27322", "26104", "26208", "25209", "24203", "30208", "29202", "29207", "29449", "25206", "25213"]) {
+    for (const code of ["27127", "27141", "27322", "26104", "26208", "25209", "24203", "30208", "29202", "29207", "29449", "25206", "25213", "26204"]) {
       expect(findMunicipality(code)?.contact?.noPhoneInquiry, code).toBe(true);
     }
     // 書かれていないところ（兵庫県の土木事務所・和歌山県の那賀のほかの窓口・奈良県の郡山と中和）には付けない
-    for (const code of ["28201", "28221", "30202", "30206", "29203", "29206", "25201", "25202", "25203", "25204", "25207", "29201", "29205", "29209"]) {
+    for (const code of ["28201", "28221", "30202", "30206", "29203", "29206", "25201", "25202", "25203", "25204", "25207", "29201", "29205", "29209", "30201"]) {
       const m = findMunicipality(code);
       if (m && m.coverage !== "unknown") expect(m.contact?.noPhoneInquiry, code).toBeUndefined();
     }
