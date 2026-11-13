@@ -272,6 +272,56 @@ describe("筆の探索", () => {
     expect(r.status === "found" && r.parcel.kuiki).toBe(K);
   });
 
+  // 平川市碇ヶ関：小字ごとに同じ地番があるが、法務省のデータの地番区域は大字だけ（小字が書かれていない）
+  it("地番区域に小字が無く同じ地番が2か所あれば、入力に小字があっても決められない：その印と、もう一方の場所を返す", async () => {
+    const H = "平川市_碇ヶ関___";
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: H, chiban: "69-2" }], [`${SX + 2},${SY}`]: [{ kuiki: H, chiban: "69-2" }] });
+    const sub = addressSub("青森県平川市碇ヶ関鯨森", "碇ヶ関", "平川市");
+    const r = await searchParcel({ city: "平川市", town: "碇ヶ関", chiban: "69-2", sub }, START, src, { batch: 20 });
+    expect(r.status === "found" && [r.others, r.unverified, r.alts?.length]).toEqual([1, true, 1]);
+    // もう一方の場所は、間に1枚おいた先のタイルの中
+    const [w, , e] = tileBounds(SX + 2, SY);
+    expect(r.status === "found" && r.alts![0].point.lng > w && r.alts![0].point.lng < e).toBe(true);
+    // 小字を書かなければ「ほかに1件」だけ（決められない印は付けない）
+    const plain = await searchParcel({ city: "平川市", town: "碇ヶ関", chiban: "69-2" }, START, src, { batch: 20 });
+    expect(plain.status === "found" && [plain.others, plain.unverified, plain.alts?.length]).toEqual([1, undefined, 1]);
+  });
+
+  it("入力の小字を確かめられないときは、索引で番号の入っているタイルを最後まで開いて、同じ地番の筆をすべて数える", async () => {
+    const H = "平川市_碇ヶ関___";
+    // 索引では 10枚のタイルに 60〜80 番台がある。近い1枚目と、9枚目（最初の8枚の外）に同じ 69-2
+    const tiles: [number, number, number, number][] = Array.from({ length: 10 }, (_, i) => [SX + i * 2, SY, 60, 80]);
+    const data: Record<string, { kuiki: string; chiban: string }[]> = {};
+    tiles.forEach(([x, y], i) => (data[`${x},${y}`] = [{ kuiki: H, chiban: i === 0 || i === 8 ? "69-2" : "70" }]));
+    const index = { k: { [H]: tiles } };
+    const sub = addressSub("青森県平川市碇ヶ関鯨森", "碇ヶ関", "平川市");
+    const r = await searchParcel({ city: "平川市", town: "碇ヶ関", chiban: "69-2", sub }, START, fakeSource(data), { index });
+    expect(r.status === "found" && [r.others, r.unverified]).toEqual([1, true]);
+    // 小字を書かなければ、最初に見つかった所で止める（今までどおり）
+    const plain = await searchParcel({ city: "平川市", town: "碇ヶ関", chiban: "69-2" }, START, fakeSource(data), { index });
+    expect(plain.status === "found" && plain.others).toBe(0);
+  });
+
+  it("小字の合う地番区域の筆は、確かめられた筆（ほかに同じ地番があっても決められない印は付けない）", async () => {
+    const src = fakeSource({
+      [`${SX},${SY}`]: [{ kuiki: "鶴岡市_羽黒町手向__字手向_", chiban: "147-1" }],
+      [`${SX + 2},${SY}`]: [{ kuiki: "鶴岡市_羽黒町手向___", chiban: "147-1" }],
+    });
+    const sub = addressSub("山形県鶴岡市羽黒町手向字手向", "羽黒町手向", "鶴岡市");
+    const r = await searchParcel({ city: "鶴岡市", town: "羽黒町手向", chiban: "147-1", sub }, START, src, { batch: 20 });
+    expect(r.status === "found" && [r.parcel.kuiki, r.others, r.unverified]).toEqual(["鶴岡市_羽黒町手向__字手向_", 1, undefined]);
+  });
+
+  it("小字の合うと確かめられた筆を、小字の書かれていない地番区域の近い筆より先に選ぶ", async () => {
+    const src = fakeSource({
+      [`${SX},${SY}`]: [{ kuiki: "鶴岡市_羽黒町手向___", chiban: "147-1" }],
+      [`${SX + 2},${SY}`]: [{ kuiki: "鶴岡市_羽黒町手向__字手向_", chiban: "147-1" }],
+    });
+    const sub = addressSub("山形県鶴岡市羽黒町手向字手向", "羽黒町手向", "鶴岡市");
+    const r = await searchParcel({ city: "鶴岡市", town: "羽黒町手向", chiban: "147-1", sub }, START, src, { batch: 20 });
+    expect(r.status === "found" && [r.parcel.kuiki, r.others, r.unverified]).toEqual(["鶴岡市_羽黒町手向__字手向_", 1, undefined]);
+  });
+
   it("代表点のまわりに地図が無くても、3枚離れた所の町の筆まで探しに行く", async () => {
     const src = fakeSource({ [`${SX + 3},${SY}`]: [{ kuiki: "熊谷市_三ケ尻___", chiban: "1877-1" }] });
     const r = await searchParcel({ city: "熊谷市", town: "三ヶ尻", chiban: "1877-1" }, START, src);

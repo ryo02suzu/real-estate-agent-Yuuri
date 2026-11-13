@@ -65,7 +65,19 @@ export type Parcel = {
 };
 
 export type ParcelSearch =
-  | { status: "found"; parcel: Parcel; /** 同じ町に同じ地番の別の筆（小字違いなど）がいくつあったか */ others: number }
+  | {
+      status: "found";
+      parcel: Parcel;
+      /** 同じ町に同じ地番の別の筆（小字違いなど）がいくつあったか */
+      others: number;
+      /** ほかの候補（同じ地番の別の筆）の地番区域と場所。近い順に最大 6 */
+      alts?: { kuiki: string; point: { lat: number; lng: number } }[];
+      /**
+       * 入力に小字・地割などが書いてあるのに、地番区域にその区分が書かれておらず、同じ地番の筆がほかにもある。
+       * どれが入力の土地かはデータから決められない（平川市碇ヶ関：小字ごとに同じ地番があるが、地番区域は大字だけ）
+       */
+      unverified?: true;
+    }
   | {
       status: "not_found";
       /** 枝番違いなど、近い地番 */
@@ -175,6 +187,19 @@ export function kuikiAllows(kuiki: string, sub: AddressSub | null | undefined, t
   const k: AddressSub = { nums: { ...(a?.nums ?? {}) }, name: `${a?.name ?? ""}${b?.name ?? ""}` };
   for (const [counter, ns] of Object.entries(b?.nums ?? {})) k.nums[counter] = [...(k.nums[counter] ?? []), ...ns];
   return subCompatible(sub, k);
+}
+
+/**
+ * 地番区域に、入力の区分（addressSub）と比べられる情報があるか（小字の名前どうし、または同じ数え方の番号）。
+ * 無ければ、その筆が入力の小字・地割の土地かどうかは確かめられていない
+ */
+export function kuikiHasSub(kuiki: string, sub: AddressSub): boolean {
+  const [, , chome = "", koaza = ""] = kuiki.split("_");
+  const a = subParse(chome);
+  const b = subParse(koaza);
+  const name = `${a?.name ?? ""}${b?.name ?? ""}`;
+  if (sub.name && name) return true;
+  return Object.keys(sub.nums).some((c) => a?.nums[c] || b?.nums[c]);
 }
 
 /** 地番区域の区分の名前（「字追回」「第9地割」「10号」「3丁目字東」。案内に出す） */
@@ -416,10 +441,12 @@ export async function searchParcel(
 
   // 索引があれば、同じ町（townMatches）の地番区域で、探す番号が入っているタイルを近い順に先に開く（最大 24 枚）。
   // 見つからなければ（索引に無い地番の書き方など）、下の今までの探し方に続ける（開いたタイルは読み直さない）
+  // 索引で、同じ町の地番区域のうち探す番号が入っているタイル（近い順）
+  const indexTiles: [number, number][] = [];
   if (index) {
     const num = Number.parseInt(wantRest, 10);
     if (!Number.isNaN(num)) {
-      const tiles: [number, number][] = [];
+      const tiles = indexTiles;
       const key = new Set<string>();
       for (const [kuiki, entries] of Object.entries(index.k)) {
         if (!townMatches(kuiki, town)) continue;
@@ -455,10 +482,20 @@ export async function searchParcel(
   if (!hits.size)
     return townSeen ? { status: "not_found", similar: [...similar].sort(compareChiban), ...(elsewhere.size ? { elsewhere: [...elsewhere] } : {}) } : { status: "no_map" };
 
-  // 同じ地番が複数の地番区域にあれば（小字違いなど）や、同じ地番区域でも離れた区画なら、市区町村が合うもの、次に代表点に近いものを選ぶ
+  // 入力に小字・地割などがあるのに、見つけた筆の地番区域にその区分が書かれていなければ、別の小字の同じ地番かもしれない。
+  // 索引で番号の入っているタイルを最後まで（最大 24 枚）開いて、同じ地番の筆をすべて数える
+  const checked = (k: string) => !q.sub || kuikiHasSub(groupKuiki(k), q.sub);
+  if (q.sub && [...hits.keys()].some((k) => !checked(k))) {
+    const rest = indexTiles.slice(0, 24).filter(([x, y]) => !seen.has(`${x},${y}`));
+    for (let i = 0; i < rest.length; i += 8) await visit(rest.slice(i, i + 8));
+  }
+
+  // 同じ地番が複数の地番区域にあれば（小字違いなど）や、同じ地番区域でも離れた区画なら、市区町村が合うもの、
+  // 次に入力の小字・地割などが地番区域と合うと確かめられたもの、次に代表点に近いものを選ぶ
   const ranked = [...hits.entries()].sort(
     ([ka, pa], [kb, pb]) =>
       Number(cityMatches(kuikiParts(groupKuiki(kb)).city, q.city)) - Number(cityMatches(kuikiParts(groupKuiki(ka)).city, q.city)) ||
+      (q.sub ? Number(checked(kb)) - Number(checked(ka)) : 0) ||
       tileDist(pa, sx, sy) - tileDist(pb, sx, sy),
   );
   const [group, pieces] = ranked[0];
@@ -485,6 +522,8 @@ export async function searchParcel(
       ...(sanko.has(group) ? { sanko: sanko.get(group) } : {}),
     },
     others: ranked.length - 1,
+    ...(ranked.length > 1 ? { alts: ranked.slice(1, 7).map(([k, ps]) => ({ kuiki: groupKuiki(k), point: interiorPoint(ps) })) } : {}),
+    ...(ranked.length > 1 && !checked(group) ? { unverified: true as const } : {}),
   };
 }
 

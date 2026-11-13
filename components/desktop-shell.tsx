@@ -561,6 +561,7 @@ export function DesktopShell({
             onFavorite={toggleFav}
             onCompare={addToCompare}
             onPick={onPickAddress}
+            onPickPoint={onPickPoint}
             onLiteral={onLiteral}
             onMap={toMap}
             onFix={onFix}

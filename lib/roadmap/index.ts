@@ -2,7 +2,7 @@ import GSI_CODES from "./data/gsi-muni-codes.json";
 import { correctAddress, describeMatch, type AddressFix, type AddressMiss } from "./address-fix";
 import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, matchedNumbers, needsChoice, numbersAgree, reverseGeocode, withoutNumbers, type GeocodeResult } from "./geocode";
 import { buildLinks, findMunicipality, resolveContact, type Contact, type Municipality, type ResolvedLink } from "./municipalities";
-import { normalizeChiban, parcelAt, searchParcel, splitChiban, splitLotHead, townFromAddress, type Parcel, type ParcelSource } from "./parcel";
+import { kuikiSubLabel, normalizeChiban, parcelAt, searchParcel, splitChiban, splitLotHead, townFromAddress, type Parcel, type ParcelSource } from "./parcel";
 import { addressSub } from "./parcel-sub";
 import { loadParcelIndex, type ParcelIndex } from "./parcel-index";
 import { pmtilesParcelSource } from "./parcel-tiles";
@@ -34,6 +34,10 @@ export type LookupResult =
       parcel?: Parcel;
       /** 同じ町に同じ地番の筆がほかにもあった数（小字違いなど） */
       parcelOthers?: number;
+      /** ほかの候補（同じ地番の別の筆）。区分の名前（「字羽黒山」。地番区域に書かれていなければ空）と場所 */
+      parcelAlts?: { label: string; lat: number; lng: number }[];
+      /** 入力の小字・地割などを地図データで確かめられず、同じ地番の筆がほかにもある（どれが入力の土地かは決められない） */
+      parcelUnsure?: true;
       /** 地番で探したが見つからなかったときの案内と、枝番違いなどの近い地番 */
       parcelMiss?: {
         chiban: string;
@@ -133,6 +137,8 @@ export async function lookup(
           ...notes,
           parcel: r.parcel,
           parcelOthers: r.others,
+          ...(r.alts?.length ? { parcelAlts: r.alts.map((a) => ({ label: kuikiSubLabel(a.kuiki), lat: a.point.lat, lng: a.point.lng })) } : {}),
+          ...(r.unverified ? { parcelUnsure: true as const } : {}),
           ...(jukyo && !chiban.explicit ? { jukyoAlt: geo.matchedAddress } : {}),
           municipality: m,
           links: buildLinks(m, lat, lng, prev.town),

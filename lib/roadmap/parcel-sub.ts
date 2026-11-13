@@ -120,3 +120,22 @@ export function elsewhereNote(labels: string[] | undefined): string {
   if (!labels?.length) return "";
   return `同じ地番は${labels.slice(0, 3).map((l) => `「${l}」`).join("")}${labels.length > 3 ? "など" : ""}にあります（入れた小字・地割などとは別の土地なので、出していません）。`;
 }
+
+/** ある地点から見た、別の地点の向きと距離（「北へ 700m」「南東へ 1.2km」）。同じ地番の別の筆の案内に使う */
+export function awayLabel(from: { lat: number; lng: number }, to: { lat: number; lng: number }): string {
+  const east = (to.lng - from.lng) * 111320 * Math.cos((from.lat * Math.PI) / 180);
+  const north = (to.lat - from.lat) * 111320;
+  const d = Math.hypot(east, north);
+  const dir = ["東", "北東", "北", "北西", "西", "南西", "南", "南東"][((Math.round(Math.atan2(north, east) / (Math.PI / 4)) % 8) + 8) % 8];
+  return `${dir}へ ${d >= 1000 ? `${(d / 1000).toFixed(1)}km` : `${Math.max(10, Math.round(d / 10) * 10)}m`}`;
+}
+
+/**
+ * 同じ地番の筆がほかにもあるときの案内の文（lookup の parcelAlts・parcelUnsure）。
+ * unsure：入れた小字・地割などが地図データに書かれておらず、どれが入れた土地かを決められない
+ */
+export function altsNote(chiban: string, count: number, unsure: boolean): string {
+  return unsure
+    ? `同じ地番 ${chiban} の土地が、この町に${count + 1}か所あります。入れた小字・地割などは地図データに書かれていないため、どれが入れた土地かは決められません（町の中心に近い方を出しています）。`
+    : `同じ地番 ${chiban} の土地が、この町にほかに${count}か所あります（小字ちがいなど）。`;
+}

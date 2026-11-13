@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { kuikiAllows, kuikiSubLabel } from "./parcel";
-import { addressSub, kanjiNumber, subCompatible, subNorm, subParse } from "./parcel-sub";
+import { addressSub, altsNote, awayLabel, elsewhereNote, kanjiNumber, subCompatible, subNorm, subParse } from "./parcel-sub";
 
 describe("町より細かい区分（丁目・地割・号・字・区・部・小字）の読み取り", () => {
   it("漢数字を数にする（位の字が無ければ並べて読む）", () => {
@@ -161,3 +161,26 @@ describe("地番区域が入力の区分と食い違わないか", () => {
     expect(kuikiSubLabel("熊谷市_下奈良___")).toBe("");
   });
 });
+
+describe("案内の文", () => {
+  it("同じ地番が別の区分にあったとき", () => {
+    expect(elsewhereNote(["字羽黒山"])).toBe("同じ地番は「字羽黒山」にあります（入れた小字・地割などとは別の土地なので、出していません）。");
+    expect(elsewhereNote(["第9地割", "第18地割", "第20地割", "第21地割"])).toContain("「第9地割」「第18地割」「第20地割」など");
+    expect(elsewhereNote(undefined)).toBe("");
+    expect(elsewhereNote([])).toBe("");
+  });
+
+  it("同じ地番の筆がほかにもあるとき（どれか決められないときは、そう言う）", () => {
+    expect(altsNote("69-2", 1, true)).toContain("この町に2か所あります");
+    expect(altsNote("69-2", 1, true)).toContain("どれが入れた土地かは決められません");
+    expect(altsNote("147-1", 2, false)).toBe("同じ地番 147-1 の土地が、この町にほかに2か所あります（小字ちがいなど）。");
+  });
+
+  it("もう一方の筆の向きと距離", () => {
+    const from = { lat: 40.4788554, lng: 140.6287122 };
+    expect(awayLabel(from, { lat: 40.4725725, lng: 140.6292972 })).toBe("南へ 700m");
+    expect(awayLabel(from, { lat: from.lat + 0.02, lng: from.lng + 0.026 })).toBe("北東へ 3.1km");
+    expect(awayLabel(from, { lat: from.lat, lng: from.lng - 0.001 })).toBe("西へ 80m");
+  });
+});
+

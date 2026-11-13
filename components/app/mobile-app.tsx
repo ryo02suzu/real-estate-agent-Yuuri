@@ -67,7 +67,7 @@ import {
   type Neighbor,
 } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
-import { elsewhereNote } from "@/lib/roadmap/parcel-sub";
+import { altsNote, awayLabel, elsewhereNote } from "@/lib/roadmap/parcel-sub";
 import { buildReport, type ReportDetail } from "@/lib/app/report";
 import { docText } from "@/lib/app/doc";
 import { inquiryDeptOf, inquiryInputOf } from "@/lib/app/inquiry-template";
@@ -2361,6 +2361,7 @@ function PropertyView({
           result={result}
           data={data}
           onPick={onPick}
+          onPickPoint={onPickPoint}
           onFix={onFix}
         />
         <div
@@ -2608,12 +2609,14 @@ function PlaceNote({
   result,
   data,
   onPick,
+  onPickPoint,
   onFix,
 }: {
   query: string;
   result: Ok;
   data: PropertyData;
   onPick: (address: string) => void;
+  onPickPoint: (lat: number, lng: number) => void;
   onFix: () => void;
 }) {
   const { approximate, picked, parcel, parcelMiss } = result;
@@ -2631,7 +2634,26 @@ function PlaceNote({
   const asChiban = chibanArea
     ? chibanQueryOf(query, /丁目/.test(result.town))
     : undefined;
-  if (parcel && result.jukyoAlt) {
+  if (parcel && result.parcelAlts?.length) {
+    // 同じ地番の筆がほかにもある（小字ちがいなど）。入れた小字を地図データで確かめられないときは、はっきり知らせる
+    const alts = result.parcelAlts;
+    warn = !!result.parcelUnsure;
+    short = result.parcelUnsure
+      ? `同じ地番の土地が${alts.length + 1}か所あります（どれかは決められません）`
+      : `同じ地番の土地がほかに${alts.length}か所あります`;
+    text = (
+      <>
+        {altsNote(registryChiban(parcel.chibanRaw), result.parcelOthers ?? alts.length, !!result.parcelUnsure)}
+        <span className="mt-[5px] flex flex-wrap items-center gap-[5px]">
+          {alts.slice(0, 4).map((a) => (
+            <MiniButton key={`${a.lat},${a.lng}`} onClick={() => onPickPoint(a.lat, a.lng)}>
+              {a.label ? `${a.label}の筆を見る` : "もう一方を見る"}（{awayLabel(result, a)}）
+            </MiniButton>
+          ))}
+        </span>
+      </>
+    );
+  } else if (parcel && result.jukyoAlt) {
     // 入力が登記の地番の書き方（「14番1」）なので地番の筆を出した。国土地理院は住居表示（「14番1号」）として当てていた
     const alt = displayAddress(result.jukyoAlt);
     short = `地番 ${registryChiban(parcel.chibanRaw)} として表示しています`;
@@ -2733,7 +2755,7 @@ function PlaceNote({
   }
   if (!text) return null;
   return (
-    <PlaceBanner warn={warn} short={short} onFix={onFix} open={!!parcelMiss}>
+    <PlaceBanner warn={warn} short={short} onFix={onFix} open={!!parcelMiss || !!result.parcelUnsure}>
       {text}
     </PlaceBanner>
   );

@@ -26,7 +26,7 @@ import type { AddressFix } from "@/lib/roadmap";
 import { distanceText } from "@/lib/roadmap/land-price";
 import { chibanLabel, chibanQueryOf, isLotChiban, kuikiLabel, registryChiban, type Neighbor } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
-import { elsewhereNote } from "@/lib/roadmap/parcel-sub";
+import { altsNote, awayLabel, elsewhereNote } from "@/lib/roadmap/parcel-sub";
 import { roadShort } from "@/lib/roadmap/road-read";
 import { youtoShort } from "@/lib/roadmap/zoning";
 import { addressOffLot, pickKey, registryNeighbors, type ParcelPick } from "../parcel-card";
@@ -85,6 +85,8 @@ type Props = {
   onFavorite: (item: HistoryItem) => void;
   onCompare: (c: CompareItem) => void;
   onPick: (address: string) => void;
+  /** 地図の地点（同じ地番の別の筆など）へ移る */
+  onPickPoint?: (lat: number, lng: number) => void;
   onLiteral?: (fix: AddressFix) => void;
   onMap: (layer?: MapLayer, arg?: HazardKind | [number, number]) => void;
   onFix: () => void;
@@ -383,7 +385,7 @@ export function DeskProperty(props: Props) {
           {refLot && <span className="chip gold">住所の地点の筆 {refLot}（参考）</span>}
           {data.parcels.status === "loading" && <span>筆を確認しています…</span>}
         </div>
-        <PlaceNotes query={query} result={result} data={data} onPick={props.onPick} onFix={props.onFix} onLiteral={props.onLiteral} />
+        <PlaceNotes query={query} result={result} data={data} onPick={props.onPick} onPickPoint={props.onPickPoint} onFix={props.onFix} onLiteral={props.onLiteral} />
       </div>
       <button type="button" className="desk-status" onClick={() => setOverlay("triage")} aria-label={`調査の進み具合 ${doneN}/${data.triage.actions.length}。要注意${warns}件・要確認${checks}件・次にやること${left}件。押すと要注意点と次にやることを開く`}>
         <Ring done={doneN} total={data.triage.actions.length} />
@@ -540,7 +542,7 @@ export function DeskProperty(props: Props) {
 }
 
 /** 物件の場所の確かさで注意がいるとき（スマホの物件の画面の PlaceNote と同じ場合分け） */
-function PlaceNotes({ query, result, data, onPick, onFix, onLiteral }: { query: string; result: Ok; data: ReturnType<typeof useProperty>; onPick: (a: string) => void; onFix: () => void; onLiteral?: (fix: AddressFix) => void }) {
+function PlaceNotes({ query, result, data, onPick, onPickPoint, onFix, onLiteral }: { query: string; result: Ok; data: ReturnType<typeof useProperty>; onPick: (a: string) => void; onPickPoint?: (lat: number, lng: number) => void; onFix: () => void; onLiteral?: (fix: AddressFix) => void }) {
   const { approximate, picked, parcel, parcelMiss } = result;
   const notes: { warn?: boolean; body: ReactNode }[] = [];
   const mini = (label: string, run: () => void) => (
@@ -604,7 +606,16 @@ function PlaceNotes({ query, result, data, onPick, onFix, onLiteral }: { query: 
   const sp = data.parcels.status === "ok" ? data.parcels.parcel : undefined;
   if (sp?.estimated) notes.push({ warn: true, body: `この筆の位置は、公図（任意座標）を道路の縁に合わせて推定したものです（確かさ：${sp.estimated === "high" ? "高め" : "低め"}）。数mずれることがあります。` });
   if (sp?.sanko) notes.push({ warn: true, body: "この筆の形は、市町村の地番参考図から作ったものです。登記所の地図とは違うことがあります。" });
-  if (result.parcelOthers) notes.push({ warn: true, body: `同じ地番の筆がほかに${result.parcelOthers}件あります（小字違いなど）。` });
+  if (result.parcelOthers)
+    notes.push({
+      warn: true,
+      body: (
+        <>
+          {sp ? altsNote(registryChiban(sp.chibanRaw), result.parcelOthers, !!result.parcelUnsure) : `同じ地番の筆がほかに${result.parcelOthers}件あります（小字違いなど）。`}
+          {onPickPoint && result.parcelAlts?.slice(0, 4).map((a) => mini(`${a.label ? `${a.label}の筆を見る` : "もう一方を見る"}（${awayLabel(result, a)}）`, () => onPickPoint(a.lat, a.lng)))}
+        </>
+      ),
+    });
   if (sp?.overlaps?.length) notes.push({ warn: true, body: "要確認：地図データで筆が重なる所です。「筆・隣地」で候補の地番と確かめ方を見てください。" });
   if (!notes.length) return null;
   return (
