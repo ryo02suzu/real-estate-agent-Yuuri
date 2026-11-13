@@ -13,7 +13,7 @@ import type { Liquefaction } from "../roadmap/liquefaction";
 import { moridoAuthority, type Morido } from "../roadmap/morido";
 import { hasPieceMark, isLotChiban, kuikiLabel, kuikiLabelFrom, neighborList, registryChiban, type Parcel } from "../roadmap/parcel";
 import { PARCEL_DATA } from "../roadmap/parcel-data";
-import { elsewhereNote } from "../roadmap/parcel-sub";
+import { awayNote, elsewhereNote } from "../roadmap/parcel-sub";
 import type { RirekiRecord } from "../roadmap/rireki";
 import { roadShort, type NearbyRoad } from "../roadmap/road-read";
 import { suidoFor } from "../roadmap/suido";
@@ -301,8 +301,8 @@ function placeIssues(input: TriageInput): Issue[] {
       id: "parcel-miss",
       level: "check",
       topic: "place",
-      title: `地番 ${r.chiban} が見つからない`,
-      detail: r.reason === "not_found" ? `${PARCEL_DATA.edition}の地図に見つかりません。${elsewhereNote(r.elsewhere) || "分筆・合筆で地番が変わったか、小字が違う可能性があります。"}${r.similar.length ? `近い地番：${r.similar.slice(0, 4).join("・")}。` : ""}` : r.reason === "no_map" ? "この地域は登記所の地図データがありません。" : "地図データを読み込めませんでした。",
+      title: r.away ? `地番 ${r.chiban} が離れた町で見つかった（場所は出していない）` : `地番 ${r.chiban} が見つからない`,
+      detail: r.away ? awayNote(r.chiban, r.away) : r.reason === "not_found" ? `${PARCEL_DATA.edition}の地図に見つかりません。${elsewhereNote(r.elsewhere) || "分筆・合筆で地番が変わったか、小字が違う可能性があります。"}${r.similar.length ? `近い地番：${r.similar.slice(0, 4).join("・")}。` : ""}` : r.reason === "no_map" ? "この地域は登記所の地図データがありません。" : "地図データを読み込めませんでした。",
       confirm: "法務局の公図・登記で地番と位置を",
     });
   } else if (input.townMiss) {

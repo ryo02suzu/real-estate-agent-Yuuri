@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addressNumbers, isApproximate, matchedNumbers, numbersAgree, partialMatch, withoutNumbers } from "./geocode";
+import { addressNumbers, isApproximate, matchedNumbers, numbersAgree, partialMatch, subAreaDropped, withoutNumbers } from "./geocode";
 
 describe("住所の一致の深さ", () => {
   it("番地がまったく無い一致は、町の中心（isApproximate）", () => {
@@ -82,3 +82,14 @@ describe("見つかった番地が、入れた番地と食い違わないか", (
   });
 });
 
+describe("入力の番号の区分が、見つかった住所に無いか（subAreaDropped）", () => {
+  it("「10字」「第16地割」を飛ばして番地だけで当てたもの", () => {
+    expect(subAreaDropped("福井県越前市横市町10字四ノ縄1番4", "福井県越前市横市町１番地")).toBe(true);
+    expect(subAreaDropped("岩手県花巻市石鳥谷町好地第16地割24番2", "岩手県花巻市石鳥谷町好地２４番地")).toBe(true);
+  });
+  it("区分まで合っている・区分を書いていない・小字の名前だけ（番号が無い）は当てはまらない", () => {
+    expect(subAreaDropped("岩手県花巻市石鳥谷町好地第16地割24番2", "岩手県花巻市石鳥谷町好地第十六地割２４番地")).toBe(false);
+    expect(subAreaDropped("埼玉県熊谷市下奈良391番地3", "埼玉県熊谷市下奈良３９１番地")).toBe(false);
+    expect(subAreaDropped("山形県鶴岡市羽黒町手向字手向147番1", "山形県鶴岡市羽黒町手向１４７番地")).toBe(false);
+  });
+});

@@ -7,7 +7,7 @@ import { chibanzuFor } from "@/lib/roadmap/chibanzu";
 import type { HazardKind } from "@/lib/roadmap/hazard";
 import { chibanLabel, chibanQueryOf, isLotChiban, kuikiLabel, parcelMark, registryChiban } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
-import { elsewhereNote } from "@/lib/roadmap/parcel-sub";
+import { awayNote, elsewhereNote } from "@/lib/roadmap/parcel-sub";
 import { sheetName } from "@/lib/roadmap/sheets";
 import type { DraftInput } from "@/lib/draft";
 import { buildSummary } from "@/lib/summary";
@@ -465,17 +465,20 @@ function Place({
         <div className={warn}>
           <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
           <span>
-            {parcelMiss.reason === "not_found"
+            {parcelMiss.away
+              ? town
+              : parcelMiss.reason === "not_found"
               ? `地番 ${parcelMiss.chiban} は見つかりません（${PARCEL_DATA.edition}の地図）。${town}`
               : parcelMiss.reason === "no_map"
                 ? `この地域は地番の地図データがありません。${town}`
                 : `地番の地図データを読み込めませんでした。${town}`}
+            {parcelMiss.away && <span className="mt-0.5 block">{awayNote(parcelMiss.chiban, parcelMiss.away)}</span>}
             {!!parcelMiss.elsewhere?.length && (
               <span className="mt-0.5 flex flex-wrap items-center gap-1">
                 {elsewhereNote(parcelMiss.elsewhere)}
-                {parcelMiss.elsewhere.slice(0, 3).map((l) => (
-                  <button key={l} onClick={() => onPick(`地番 ${address}${l}${parcelMiss.chiban}`)} className="rounded-full bg-mint px-2 py-px font-semibold text-brand">
-                    {l}の {parcelMiss.chiban} を見る
+                {parcelMiss.elsewhere.slice(0, 3).map((e) => (
+                  <button key={e.query} onClick={() => onPick(`地番 ${e.query}`)} className="rounded-full bg-mint px-2 py-px font-semibold text-brand">
+                    {e.label}の {parcelMiss.chiban} を見る
                   </button>
                 ))}
               </span>

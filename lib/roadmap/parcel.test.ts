@@ -265,6 +265,46 @@ describe("筆の探索", () => {
     expect(r).toEqual({ status: "not_found", similar: ["24-7"], elsewhere: ["第9地割"] });
   });
 
+  // 2026-11-13 の地価公示・地価調査の所在での確かめ：丁目を書いた所在を、丁目の無い地番区域の同じ地番に当てた 29件はすべて別の土地だった
+  it("入力に丁目があれば、丁目の無い地番区域・別の丁目の同じ地番は当てず、別の土地として知らせる（川崎市麻生区上麻生1丁目5番3：丁目の無い「上麻生」の 5-3 は 2.6km 先）", async () => {
+    const src = fakeSource({
+      [`${SX},${SY}`]: [
+        { kuiki: "川崎市麻生区_上麻生___", chiban: "5-3" },
+        { kuiki: "川崎市麻生区_上麻生_５丁目__", chiban: "5-3" },
+        { kuiki: "川崎市麻生区_上麻生_５丁目__", chiban: "5-4" },
+      ],
+    });
+    // 国土地理院の町が丁目まで合わなかったとき（町は「上麻生」）も、入力の丁目で絞る
+    const r = await searchParcel({ city: "川崎市麻生区", town: "上麻生", chiban: "5-3", chome: 1 }, START, src, { maxTiles: 12 });
+    expect(r).toEqual({ status: "not_found", similar: [], elsewhere: ["", "5丁目"] });
+    // 丁目が合う地番区域なら当てる
+    const five = await searchParcel({ city: "川崎市麻生区", town: "上麻生五丁目", chiban: "5-3", chome: 5 }, START, src, { maxTiles: 12 });
+    expect(five.status === "found" && five.parcel.kuiki).toBe("川崎市麻生区_上麻生_５丁目__");
+  });
+
+  it("丁目を書かない入力で、同じ地番が丁目の無い地番区域と丁目のある地番区域にあれば、丁目の無い方を先にする（東金市田間字新町12番1）", async () => {
+    const src = fakeSource({
+      [`${SX},${SY}`]: [{ kuiki: "東金市_田間_３丁目__", chiban: "12-1" }],
+      [`${SX + 2},${SY}`]: [{ kuiki: "東金市_田間___", chiban: "12-1" }],
+    });
+    const sub = addressSub("千葉県東金市田間字新町", "田間", "東金市");
+    const r = await searchParcel({ city: "東金市", town: "田間", chiban: "12-1", sub, chome: null }, START, src, { batch: 20 });
+    expect(r.status === "found" && [r.parcel.kuiki, r.others]).toEqual(["東金市_田間___", 1]);
+  });
+
+  it("町の地番区域が番号の区分（字・地割・号）で分かれていれば、入力の番号が書かれていない地番区域の同じ地番は当てない（越前市横市町10字四ノ縄1番4）", async () => {
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: "越前市_横市町___", chiban: "1-4" }, { kuiki: "越前市_横市町_１字__", chiban: "1-4" }] });
+    const index: { k: Record<string, [number, number, number, number][]> } = {
+      k: { "越前市_横市町___": [[SX, SY, 1, 9]], "越前市_横市町_１字__": [[SX, SY, 1, 9]], "越前市_横市町_７字__": [[SX + 5, SY, 1, 9]] },
+    };
+    const sub = addressSub("福井県越前市横市町10字四ノ縄", "横市町", "越前市");
+    const r = await searchParcel({ city: "越前市", town: "横市町", chiban: "1-4", sub }, START, src, { maxTiles: 12, index });
+    expect(r).toEqual({ status: "not_found", similar: [], elsewhere: ["", "1字"] });
+    // 町の地番区域が番号の区分で分かれていなければ、今までどおり（比べられないので当てる）
+    const plain = await searchParcel({ city: "越前市", town: "横市町", chiban: "1-4", sub }, START, fakeSource({ [`${SX},${SY}`]: [{ kuiki: "越前市_横市町___", chiban: "1-4" }] }), { maxTiles: 12 });
+    expect(plain.status === "found" && plain.parcel.kuiki).toBe("越前市_横市町___");
+  });
+
   it("地番区域に小字が書かれていなければ、入力に小字があっても当てる（比べられない）", async () => {
     const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: K, chiban: "391-3" }] });
     const sub = addressSub("埼玉県熊谷市下奈良字東原", "下奈良", "熊谷市");
@@ -579,6 +619,61 @@ describe("lookup で地番を探す", () => {
     expect(r.lng).toBeGreaterThan(w);
     expect(r.lng).toBeLessThan(e);
     expect(r.links[0].url).toContain(r.lng.toFixed(6));
+  });
+
+  it("丁目を書いた住所で、同じ地番が丁目の無い地番区域にしか無ければ、当てずに知らせ、丁目を外して探し直せるようにする", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          url.includes("AddressSearch")
+            ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "神奈川県川崎市麻生区上麻生一丁目" } }]
+            : { results: { muniCd: "14137", lv01Nm: "上麻生一丁目" } },
+      })),
+    );
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: "川崎市麻生区_上麻生___", chiban: "5-3" }, { kuiki: "川崎市麻生区_上麻生_５丁目__", chiban: "5-4" }] });
+    const r = await lookup("神奈川県川崎市麻生区上麻生1丁目5番3", { parcels: src, loadIndex: async () => null });
+    expect(r.status === "ok" && r.parcel).toBe(undefined);
+    expect(r.status === "ok" && r.parcelMiss?.elsewhere).toEqual([{ label: "丁目の付かない区域", query: "神奈川県川崎市麻生区上麻生5-3" }]);
+  });
+
+  it("見つけた筆が入れた町から遠い別の町にあれば（図面ごとの置き間違いのおそれ）、物件の場所としては出さず、そのことと場所を返す", async () => {
+    const far = tileBounds(SX + 30, SY);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const lat = Number(new URL(url, "https://x").searchParams.get("lat"));
+        const lon = Number(new URL(url, "https://x").searchParams.get("lon"));
+        return {
+          ok: true,
+          json: async () =>
+            url.includes("AddressSearch")
+              ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "福島県いわき市中央台高久一丁目" } }]
+              : { results: { muniCd: "07204", lv01Nm: lon > far[0] && lat > 0 ? "平絹谷" : "中央台高久一丁目" } },
+        };
+      }),
+    );
+    const K = "いわき市_中央台高久_１丁目__";
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: K, chiban: "17-11" }], [`${SX + 30},${SY}`]: [{ kuiki: K, chiban: "17-12" }] });
+    const index = { v: 1, k: { [K]: [[SX, SY, 17, 17], [SX + 30, SY, 17, 17]] } } as unknown as Awaited<ReturnType<typeof loadParcelIndex>>;
+    const r = await lookup("福島県いわき市中央台高久1丁目17番12", { parcels: src, loadIndex: async () => index });
+    expect(r.status === "ok" && r.parcel).toBe(undefined);
+    expect(r.status === "ok" && r.parcelMiss?.away?.town).toBe("平絹谷");
+    expect(r.status === "ok" && r.parcelMiss!.away!.km).toBeGreaterThan(3);
+    // 同じ町なら（広い大字で代表点から遠いだけ）今までどおり出す
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          url.includes("AddressSearch")
+            ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "福島県いわき市中央台高久一丁目" } }]
+            : { results: { muniCd: "07204", lv01Nm: "中央台高久一丁目" } },
+      })),
+    );
+    const same = await lookup("福島県いわき市中央台高久1丁目17番12", { parcels: src, loadIndex: async () => index });
+    expect(same.status === "ok" && same.parcel?.chiban).toBe("17-12");
   });
 
   it("国土地理院が番地まで見つけた住所は、筆が見つからなくても何も言わない", async () => {

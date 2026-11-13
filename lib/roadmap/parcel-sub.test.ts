@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { kuikiAllows, kuikiSubLabel } from "./parcel";
-import { addressSub, altsNote, awayLabel, elsewhereNote, kanjiNumber, subCompatible, subNorm, subParse } from "./parcel-sub";
+import { kuikiAllows, kuikiChome, kuikiSubLabel, townCounters } from "./parcel";
+import { addressSub, altsNote, awayLabel, awayNote, elsewhereLabel, elsewhereNote, kanjiNumber, sameTownName, subCompatible, subNorm, subParse, typedChome } from "./parcel-sub";
 
 describe("町より細かい区分（丁目・地割・号・字・区・部・小字）の読み取り", () => {
   it("漢数字を数にする（位の字が無ければ並べて読む）", () => {
@@ -155,6 +155,21 @@ describe("地番区域が入力の区分と食い違わないか", () => {
     expect(kuikiAllows("南秋田郡井川町_浜井川__字追回_", undefined)).toBe(true);
   });
 
+  it("地番区域の丁目（丁目の欄・小字の欄・大字の欄。「字五丁目」は小字の名前）", () => {
+    expect(kuikiChome("川口市_青木_２丁目__")).toBe(2);
+    expect(kuikiChome("名古屋市中区_栄__三丁目_")).toBe(3);
+    expect(kuikiChome("飯田市_白山町三丁目東___")).toBe(3);
+    expect(kuikiChome("下野市_薬師寺__字五丁目_")).toBeNull();
+    expect(kuikiChome("熊谷市_下奈良___")).toBeNull();
+  });
+
+  it("町の地番区域が分かれている番号の区分（索引から。丁目は除く）", () => {
+    const index = { k: { "越前市_横市町___": [], "越前市_横市町_１字__": [], "越前市_横市町_７字__": [], "越前市_別の町_３丁目__": [] } };
+    expect([...townCounters(index, "横市町")]).toEqual(["字"]);
+    expect([...townCounters(index, "別の町三丁目")]).toEqual([]);
+    expect([...townCounters(null, "横市町")]).toEqual([]);
+  });
+
   it("案内に出す区分の名前", () => {
     expect(kuikiSubLabel("花巻市_石鳥谷町好地_第９地割__")).toBe("第9地割");
     expect(kuikiSubLabel("鶴岡市_羽黒町手向__字羽黒山_")).toBe("字羽黒山");
@@ -164,10 +179,16 @@ describe("地番区域が入力の区分と食い違わないか", () => {
 
 describe("案内の文", () => {
   it("同じ地番が別の区分にあったとき", () => {
-    expect(elsewhereNote(["字羽黒山"])).toBe("同じ地番は「字羽黒山」にあります（入れた小字・地割などとは別の土地なので、出していません）。");
-    expect(elsewhereNote(["第9地割", "第18地割", "第20地割", "第21地割"])).toContain("「第9地割」「第18地割」「第20地割」など");
+    expect(elsewhereNote([{ label: "字羽黒山" }])).toBe("同じ地番は「字羽黒山」にあります（入れた丁目・小字・地割などとは別の土地なので、出していません）。");
+    expect(elsewhereNote(["第9地割", "第18地割", "第20地割", "第21地割"].map((label) => ({ label })))).toContain("「第9地割」「第18地割」「第20地割」など");
     expect(elsewhereNote(undefined)).toBe("");
     expect(elsewhereNote([])).toBe("");
+  });
+
+  it("区分の付かない地番区域の言い方（入れた住所に丁目があったかで言い分ける）", () => {
+    expect(elsewhereLabel("字羽黒山")).toBe("字羽黒山");
+    expect(elsewhereLabel("", true)).toBe("丁目の付かない区域");
+    expect(elsewhereLabel("")).toBe("字・地割などの付かない区域");
   });
 
   it("同じ地番の筆がほかにもあるとき（どれか決められないときは、そう言う）", () => {
@@ -184,3 +205,38 @@ describe("案内の文", () => {
   });
 });
 
+describe("入力の住所の丁目（typedChome）", () => {
+  it("町の名前のすぐ後ろの丁目", () => {
+    expect(typedChome("神奈川県川崎市麻生区上麻生1丁目", "上麻生一丁目", "川崎市麻生区")).toBe(1);
+    expect(typedChome("神奈川県川崎市麻生区上麻生一丁目", "上麻生", "川崎市麻生区")).toBe(1);
+    expect(typedChome("石川県加賀市小菅波町2丁目", "小菅波町", "加賀市")).toBe(2);
+    expect(typedChome("群馬県伊勢崎市赤堀今井町一丁目", "赤堀今井町一丁目", "伊勢崎市")).toBe(1);
+  });
+
+  it("「字五丁目」は小字の名前なので丁目にしない。丁目が無ければ null", () => {
+    expect(typedChome("栃木県下野市薬師寺字五丁目", "薬師寺", "下野市")).toBeNull();
+    expect(typedChome("兵庫県南あわじ市福良字弐丁目", "福良", "南あわじ市")).toBeNull();
+    expect(typedChome("埼玉県熊谷市下奈良", "下奈良", "熊谷市")).toBeNull();
+    expect(typedChome("千葉県東金市田間字新町", "田間", "東金市")).toBeNull();
+  });
+
+  it("市区町村の名前の中の町の名前には当てない（「中央区中央」）", () => {
+    expect(typedChome("千葉県千葉市中央区中央3丁目", "中央三丁目", "千葉市中央区")).toBe(3);
+  });
+});
+
+describe("離れた町で見つかった筆", () => {
+  it("同じ町の名前か（丁目・大字・字の書き方の違いは同じ）", () => {
+    expect(sameTownName("中央台高久一丁目", "中央台高久１丁目")).toBe(true);
+    expect(sameTownName("大字下奈良", "下奈良")).toBe(true);
+    expect(sameTownName("平絹谷", "中央台高久一丁目")).toBe(false);
+    expect(sameTownName("", "下奈良")).toBe(false);
+  });
+
+  it("案内の文", () => {
+    expect(awayNote("17-12", { km: 10.1, town: "平絹谷" })).toBe(
+      "地番 17-12 の筆は、入れた町から約10km 離れた「平絹谷」で見つかりました。地図データの置き間違いのおそれがあるため、物件の場所としては出していません。",
+    );
+    expect(awayNote("5-3", { km: 3.4, town: "西長岡町" })).toContain("約3.4km");
+  });
+});

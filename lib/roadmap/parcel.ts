@@ -3,7 +3,7 @@
 // 国土地理院で調べた町・大字の代表点のまわりから近い順に読み、地番区域と地番が一致する筆を探す。
 // タイルの読み込みは ParcelSource に任せる（実物は parcel-tiles.ts、テストでは作り物を渡す）。
 import { SANKO_MARK } from "./sanko-data";
-import { subCompatible, subParse, type AddressSub } from "./parcel-sub";
+import { subCompatible, subNorm, subParse, type AddressSub } from "./parcel-sub";
 
 /** 筆を探すタイルのズーム（このズームのタイルに全ての筆が入っている） */
 export const PARCEL_ZOOM = 16;
@@ -208,6 +208,40 @@ export function kuikiSubLabel(kuiki: string): string {
   return `${chome}${koaza}`;
 }
 
+/**
+ * 地番区域の丁目の番号（丁目の欄、小字の欄の「三丁目」、大字の欄の「白山町三丁目東」のどれか）。丁目の無い地番区域は null。
+ * 小字の名前としての丁目（「字五丁目」）は丁目に数えない
+ */
+export function kuikiChome(kuiki: string): number | null {
+  const [, oaza = "", chome = "", koaza = ""] = kuiki.split("_");
+  for (const part of [chome, koaza, oaza]) {
+    const s = subNorm(part);
+    if (/^字/.test(s)) continue;
+    const m = s.match(/(\d+)丁目/);
+    if (m) return Number(m[1]);
+  }
+  return null;
+}
+
+/**
+ * 町（大字）の地番区域が、番号の区分（地割・号・字・区など。丁目は除く）で分かれているか：索引にある、同じ大字の地番区域の区分の数え方。
+ * 入力にその数え方の番号があるのに、筆の地番区域に書かれていなければ、その筆は入力の土地ではない
+ * （越前市横市町には「１字」「７字」の地番区域があり、「横市町10字四ノ縄1番4」を区分の無い地番区域の 1-4 に当てると 709m 先の別の土地だった）。
+ * 小字の名前は、同じ大字の中で小字の書かれた地番区域と書かれていない地番区域に同じ土地が分かれて入っていることがある（磐梯町大字磐梯）ので、ここでは数えない
+ */
+export function townCounters(index: { k: Record<string, unknown> } | null | undefined, town: string): Set<string> {
+  const out = new Set<string>();
+  if (!index) return out;
+  const base = townKey(town).replace(/\d+丁目$/, "");
+  if (!base) return out;
+  for (const kuiki of Object.keys(index.k)) {
+    const [, oaza = "", chome = "", koaza = ""] = kuiki.split("_");
+    if (townKey(oaza) !== base) continue;
+    for (const part of [chome, koaza]) for (const c of Object.keys(subParse(part)?.nums ?? {})) if (c !== "丁目") out.add(c);
+  }
+  return out;
+}
+
 /** 地番区域を市区町村・町（大字＋丁目）・小字に分ける */
 export function kuikiParts(kuiki: string): { city: string; town: string; koaza: string } {
   const [city = "", oaza = "", chome = "", koaza = ""] = kuiki.split("_");
@@ -318,6 +352,11 @@ export async function searchParcel(
     chiban: string;
     /** 入力の住所に書いてあった、町より細かい区分（丁目・地割・号・小字など。lib/roadmap/parcel-sub.ts の addressSub）。食い違う地番区域の筆は当てない */
     sub?: AddressSub | null;
+    /**
+     * 入力の住所で町の名前のすぐ後ろに書かれた丁目（lib/roadmap/parcel-sub.ts の typedChome）。あれば、その丁目の地番区域の筆だけを当てる
+     * （丁目の無い地番区域・別の丁目の同じ地番は別の土地）。無ければ、同じ地番が丁目の無い地番区域にもあるとき、そちらを先にする
+     */
+    chome?: number | null;
   },
   start: { lat: number; lng: number },
   source: ParcelSource,
@@ -348,8 +387,20 @@ export async function searchParcel(
   const sanko = new Map<string, string>();
   const rank = new Map<string, number>();
   const similar = new Set<string>();
-  // 同じ地番が、入力の丁目・地割・小字とは別の地番区域にあった（別の土地。区分の名前）
+  // 同じ地番が、入力の丁目・地割・小字とは別の地番区域にあった（別の土地。区分の名前。区分の付かない地番区域は空）
   const elsewhere = new Set<string>();
+  // 町（大字）の地番区域が分かれている番号の区分（地割・号・字など）。入力にその番号があれば、書かれていない地番区域の筆は当てない
+  const counters = townCounters(index, q.town);
+  /** 入力の丁目・番号の区分が、その地番区域で確かめられるか（丁目が違う・丁目が無い、町が使う区分が書かれていなければ別の土地） */
+  const strictOk = (kuiki: string): boolean => {
+    if (q.chome != null && kuikiChome(kuiki) !== q.chome) return false;
+    if (q.sub && counters.size) {
+      const [, , chome = "", koaza = ""] = kuiki.split("_");
+      const have = new Set([...Object.keys(subParse(chome)?.nums ?? {}), ...Object.keys(subParse(koaza)?.nums ?? {})]);
+      for (const c of Object.keys(q.sub.nums)) if (c !== "丁目" && counters.has(c) && !have.has(c)) return false;
+    }
+    return true;
+  };
   // 見つけた筆の地番（小字の欄にイロハがある所では、頭のイロハを外した地番。筆の地番区域にイロハが入っている）
   const found = new Map<string, string>();
   let focus: [number, number] = [sx, sy];
@@ -400,9 +451,8 @@ export async function searchParcel(
         const kanaKoaza = !!wantHead && !head && kuikiParts(f.kuiki).koaza.normalize("NFKC") === wantHead;
         if (c === want || (kanaKoaza && c === wantRest)) {
           // 入力に丁目・地割・小字が書いてあって、筆の地番区域と食い違えば、同じ地番の別の土地（当てない）
-          if (!kanaKoaza && !kuikiAllows(f.kuiki, q.sub, q.town)) {
-            const label = kuikiSubLabel(f.kuiki);
-            if (label && elsewhere.size < 8) elsewhere.add(label);
+          if (!kanaKoaza && (!kuikiAllows(f.kuiki, q.sub, q.town) || !strictOk(f.kuiki))) {
+            if (elsewhere.size < 8) elsewhere.add(kuikiSubLabel(f.kuiki));
             continue;
           }
           const g = groupOf(f.kuiki, x, y);
@@ -429,7 +479,8 @@ export async function searchParcel(
         if (Number.isNaN(b)) continue;
         // 似た地番の候補は、頭の文字が同じもの（「乙987-2」を探して「甲987-1」は出さない）
         // 入力の区分（丁目・地割・小字など）と食い違う地番区域の枝番は、別の土地なので候補にしない
-        if (b === wantBase && (head === wantHead || kanaKoaza) && similar.size < 8 && (kanaKoaza || kuikiAllows(f.kuiki, q.sub, q.town))) similar.add(kanaKoaza ? `${wantHead}${c}` : c);
+        if (b === wantBase && (head === wantHead || kanaKoaza) && similar.size < 8 && (kanaKoaza || (kuikiAllows(f.kuiki, q.sub, q.town) && strictOk(f.kuiki))))
+          similar.add(kanaKoaza ? `${wantHead}${c}` : c);
         // 地番の数字が近い筆のあたりを次に探す（地番は近い番号が近くに並ぶことが多い）
         if (Math.abs(b - wantBase) < closest) {
           closest = Math.abs(b - wantBase);
@@ -491,11 +542,14 @@ export async function searchParcel(
   }
 
   // 同じ地番が複数の地番区域にあれば（小字違いなど）や、同じ地番区域でも離れた区画なら、市区町村が合うもの、
-  // 次に入力の小字・地割などが地番区域と合うと確かめられたもの、次に代表点に近いものを選ぶ
+  // 次に入力の小字・地割などが地番区域と合うと確かめられたもの、次に（入力に丁目が無ければ）丁目の無い地番区域のもの、次に代表点に近いものを選ぶ。
+  // 丁目の書かれていない住所は、丁目の無い地番区域の地番のことが多い（地価公示の所在「東金市田間字新町12番1」は丁目の無い「田間」の 12-1）
+  const chomeless = (k: string) => Number(q.chome == null && kuikiChome(groupKuiki(k)) === null);
   const ranked = [...hits.entries()].sort(
     ([ka, pa], [kb, pb]) =>
       Number(cityMatches(kuikiParts(groupKuiki(kb)).city, q.city)) - Number(cityMatches(kuikiParts(groupKuiki(ka)).city, q.city)) ||
       (q.sub ? Number(checked(kb)) - Number(checked(ka)) : 0) ||
+      chomeless(kb) - chomeless(ka) ||
       tileDist(pa, sx, sy) - tileDist(pb, sx, sy),
   );
   const [group, pieces] = ranked[0];

@@ -69,6 +69,19 @@ export function isApproximate(input: string, matchedAddress: string): boolean {
   return digit.test(input.replace(CHIWARI, "")) && !digit.test(matchedAddress.replace(CHIWARI, ""));
 }
 
+/**
+ * 入力に書いた番号の区分（「10字」「第16地割」）が、見つかった住所に無いか。国土地理院がその区分を飛ばして番地だけで当てると、
+ * 同じ番地の別の区分の場所になることがある（「越前市横市町10字四ノ縄1番4」が、区分の無い「横市町１番地」の 599m 先に当たった）
+ */
+export function subAreaDropped(input: string, matchedAddress: string): boolean {
+  const areas = (a: string) =>
+    new Set(
+      [...a.normalize("NFKC").matchAll(/第?(\d+|[一二三四五六七八九十]+)(字|地割)/g)].map((m) => `${/^\d+$/.test(m[1]) ? Number(m[1]) : kanjiToInt(m[1])}${m[2]}`),
+    );
+  const got = areas(matchedAddress);
+  return [...areas(input)].some((a) => !got.has(a));
+}
+
 /** 住所の番号（丁目・番地・号）を数の並びにする（「丸の内一丁目9番」→ [1, 9]）。郵便番号は外し、漢数字の丁目・地割も数える */
 export function addressNumbers(a: string): number[] {
   const s = chiwariDigits(a.normalize("NFKC"))

@@ -67,7 +67,7 @@ import {
   type Neighbor,
 } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
-import { altsNote, awayLabel, elsewhereNote } from "@/lib/roadmap/parcel-sub";
+import { altsNote, awayLabel, awayNote, elsewhereNote } from "@/lib/roadmap/parcel-sub";
 import { buildReport, type ReportDetail } from "@/lib/app/report";
 import { docText } from "@/lib/app/doc";
 import { inquiryDeptOf, inquiryInputOf } from "@/lib/app/inquiry-template";
@@ -2667,29 +2667,38 @@ function PlaceNote({
     );
   } else if (parcelMiss) {
     warn = true;
-    short =
-      parcelMiss.reason === "not_found"
+    short = parcelMiss.away
+      ? `地番 ${parcelMiss.chiban} は離れた町にあります（要確認）`
+      : parcelMiss.reason === "not_found"
         ? `地番 ${parcelMiss.chiban} は見つかりません`
         : parcelMiss.reason === "no_map"
           ? "地番の地図データがない地域です"
           : "地番の地図を読み込めませんでした";
     text = (
       <>
-        {parcelMiss.reason === "not_found"
-          ? `地番 ${parcelMiss.chiban} は見つかりません（${PARCEL_DATA.edition}の地図）。`
-          : parcelMiss.reason === "no_map"
-            ? "この地域は地番の地図データがありません。"
-            : "地番の地図データを読み込めませんでした。"}
+        {parcelMiss.away
+          ? ""
+          : parcelMiss.reason === "not_found"
+            ? `地番 ${parcelMiss.chiban} は見つかりません（${PARCEL_DATA.edition}の地図）。`
+            : parcelMiss.reason === "no_map"
+              ? "この地域は地番の地図データがありません。"
+              : "地番の地図データを読み込めませんでした。"}
         {approximate && "町の中心を表示しています。"}
+        {parcelMiss.away && (
+          <span className="mt-[5px] flex flex-wrap items-center gap-[5px]">
+            {awayNote(parcelMiss.chiban, parcelMiss.away)}
+            <MiniButton onClick={() => onPickPoint(parcelMiss.away!.lat, parcelMiss.away!.lng)}>その筆を見る（{parcelMiss.away.town}）</MiniButton>
+          </span>
+        )}
         {!!parcelMiss.elsewhere?.length && (
           <span className="mt-[5px] flex flex-wrap items-center gap-[5px]">
             {elsewhereNote(parcelMiss.elsewhere)}
-            {parcelMiss.elsewhere.slice(0, 3).map((l) => (
+            {parcelMiss.elsewhere.slice(0, 3).map((e) => (
               <MiniButton
-                key={l}
-                onClick={() => onPick(`地番 ${result.matchedAddress}${l}${parcelMiss.chiban}`)}
+                key={e.query}
+                onClick={() => onPick(`地番 ${e.query}`)}
               >
-                {l}の {parcelMiss.chiban} を見る
+                {e.label}の {parcelMiss.chiban} を見る
               </MiniButton>
             ))}
           </span>

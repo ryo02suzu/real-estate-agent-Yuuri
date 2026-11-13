@@ -113,12 +113,70 @@ export function addressSub(body: string, town: string, city = ""): AddressSub | 
 }
 
 /**
- * 地番が見つからなかったとき、同じ地番が別の区分（小字・地割・号・丁目）にあったことの案内（lookup の parcelMiss.elsewhere）。
+ * 入力の住所で、町（大字）の名前のすぐ後ろに書かれた丁目の番号（「上麻生1丁目5番3」＋町「上麻生一丁目」→ 1）。無ければ null。
+ * 「薬師寺字五丁目」「福良字弐丁目」のように「字」の付いたものは小字の名前なので、丁目としては数えない。
+ * 地価公示・地価調査の所在（2026年・約3.3万地点）では、丁目を書いた所在を丁目の無い地番区域の同じ地番に当てると、29件すべてが
+ * 別の土地（100m〜2.6km先）だった（丁目は地番区域の一部）
+ */
+export function typedChome(body: string, town: string, city = ""): number | null {
+  const b = subNorm(body);
+  const t = subNorm(town)
+    .replace(/^(?:大字|字)/, "")
+    .replace(/\d+丁目$/, "");
+  if (!t) return null;
+  const c = subNorm(city);
+  const ci = c ? b.indexOf(c) : -1;
+  let from = ci >= 0 ? ci + c.length : 0;
+  for (;;) {
+    const i = b.indexOf(t, from);
+    if (i < 0) return null;
+    const rest = b.slice(i + t.length);
+    if (/^[市区郡]/.test(rest)) {
+      from = i + 1;
+      continue;
+    }
+    const m = rest.match(/^[町村]?(\d+)丁目/);
+    return m ? Number(m[1]) : null;
+  }
+}
+
+/** 同じ地番が、入れた区分とは別の所にあったことの案内の1つ（label：区分の名前。区分の付かない区域は空。query：その地番を探し直す住所） */
+export type Elsewhere = { label: string; query: string };
+
+/** 区分の名前の画面での言い方（区分の付かない区域は、入れた住所に丁目があったかで言い分ける） */
+export function elsewhereLabel(label: string, chome = false): string {
+  return label || (chome ? "丁目の付かない区域" : "字・地割などの付かない区域");
+}
+
+/**
+ * 地番が見つからなかったとき、同じ地番が別の区分（小字・地割・号・丁目）にあったことの案内（lookup の parcelMiss.elsewhere。label は画面での言い方）。
  * 別の土地なので当てていないことを言う。無ければ空
  */
-export function elsewhereNote(labels: string[] | undefined): string {
-  if (!labels?.length) return "";
-  return `同じ地番は${labels.slice(0, 3).map((l) => `「${l}」`).join("")}${labels.length > 3 ? "など" : ""}にあります（入れた小字・地割などとは別の土地なので、出していません）。`;
+export function elsewhereNote(list: { label: string }[] | undefined): string {
+  if (!list?.length) return "";
+  const labels = list.map((e) => e.label);
+  return `同じ地番は${labels.slice(0, 3).map((l) => `「${l}」`).join("")}${labels.length > 3 ? "など" : ""}にあります（入れた丁目・小字・地割などとは別の土地なので、出していません）。`;
+}
+
+/**
+ * 見つけた筆が、入れた町から遠く離れた別の町にあったときの案内（lookup の parcelMiss.away）。
+ * 法務省の地図データには、図面ごと別の町の上に置かれたもの（いわき市中央台高久1丁目の図面が約10km 北の平絹谷に置かれている等）があるので、
+ * その筆を「入れた土地」としては出さない
+ */
+export function awayNote(chiban: string, away: { km: number; town: string }): string {
+  return `地番 ${chiban} の筆は、入れた町から約${away.km >= 10 ? Math.round(away.km) : away.km.toFixed(1)}km 離れた「${away.town}」で見つかりました。地図データの置き間違いのおそれがあるため、物件の場所としては出していません。`;
+}
+
+/** 2つの町の名前が同じ町を指すか（丁目・大字・字の書き方の違いを除いて、どちらかがもう一方を含む） */
+export function sameTownName(a: string, b: string): boolean {
+  const k = (s: string) =>
+    subNorm(s)
+      .replace(/^(?:大字|字)/, "")
+      .replace(/\d+丁目$/, "");
+  const x = k(a);
+  const y = k(b);
+  if (!x || !y) return false;
+  return x === y || (Math.min(x.length, y.length) >= 2 && (x.includes(y) || y.includes(x)));
 }
 
 /** ある地点から見た、別の地点の向きと距離（「北へ 700m」「南東へ 1.2km」）。同じ地番の別の筆の案内に使う */

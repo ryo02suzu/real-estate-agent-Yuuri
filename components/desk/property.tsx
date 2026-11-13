@@ -26,7 +26,7 @@ import type { AddressFix } from "@/lib/roadmap";
 import { distanceText } from "@/lib/roadmap/land-price";
 import { chibanLabel, chibanQueryOf, isLotChiban, kuikiLabel, registryChiban, type Neighbor } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
-import { altsNote, awayLabel, elsewhereNote } from "@/lib/roadmap/parcel-sub";
+import { altsNote, awayLabel, awayNote, elsewhereNote } from "@/lib/roadmap/parcel-sub";
 import { roadShort } from "@/lib/roadmap/road-read";
 import { youtoShort } from "@/lib/roadmap/zoning";
 import { addressOffLot, pickKey, registryNeighbors, type ParcelPick } from "../parcel-card";
@@ -570,12 +570,18 @@ function PlaceNotes({ query, result, data, onPick, onPickPoint, onFix, onLiteral
       warn: true,
       body: (
         <>
-          {parcelMiss.reason === "not_found" ? `地番 ${parcelMiss.chiban} は見つかりません（${PARCEL_DATA.edition}の地図）。` : parcelMiss.reason === "no_map" ? "この地域は地番の地図データがありません。" : "地番の地図データを読み込めませんでした。"}
+          {parcelMiss.away ? "" : parcelMiss.reason === "not_found" ? `地番 ${parcelMiss.chiban} は見つかりません（${PARCEL_DATA.edition}の地図）。` : parcelMiss.reason === "no_map" ? "この地域は地番の地図データがありません。" : "地番の地図データを読み込めませんでした。"}
           {approximate && "町の中心を表示しています。"}
+          {parcelMiss.away && (
+            <span className="block">
+              {awayNote(parcelMiss.chiban, parcelMiss.away)}
+              {onPickPoint && mini(`その筆を見る（${parcelMiss.away.town}）`, () => onPickPoint(parcelMiss.away!.lat, parcelMiss.away!.lng))}
+            </span>
+          )}
           {!!parcelMiss.elsewhere?.length && (
             <span className="block">
               {elsewhereNote(parcelMiss.elsewhere)}
-              {parcelMiss.elsewhere.slice(0, 3).map((l) => mini(`${l}の ${parcelMiss.chiban} を見る`, () => onPick(`地番 ${result.matchedAddress}${l}${parcelMiss.chiban}`)))}
+              {parcelMiss.elsewhere.slice(0, 3).map((e) => mini(`${e.label}の ${parcelMiss.chiban} を見る`, () => onPick(`地番 ${e.query}`)))}
             </span>
           )}
           {parcelMiss.similar.length > 0 && <span className="block">近い地番：{parcelMiss.similar.slice(0, 4).map((c) => mini(c, () => onPick(`地番 ${result.matchedAddress}${c}`)))}</span>}
