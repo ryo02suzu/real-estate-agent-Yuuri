@@ -116,9 +116,9 @@ import {
 import { prefetchFlight, SPACE_BACKGROUND } from "./flight-space";
 import type { FlightTarget } from "./globe-flight";
 import { HOME_PHOTO_EVENT, homeTop } from "./home-photo";
+import { AppMenu, MENU_TOP, type MenuPage } from "./app-menu";
 import {
   HomeBackdrop,
-  HomeMenu,
   HomeScreen,
   LIGHT_GLASS,
   PAGE,
@@ -513,6 +513,51 @@ export function MobileApp(props: MobileAppProps) {
       { enableHighAccuracy: true, timeout: 15_000, maximumAge: 30_000 },
     );
   };
+  /**
+   * 右上のメニュー（≡）から：住所・地番で調べる。検索する前のホームに戻って、検索欄に入れられるようにする（押した指のうちに
+   * 欄を選ぶので、iPhone でもキーボードが出る。物件の画面を開いていたときは、ホームへ戻るだけ。戻り終わるのを待てないため）
+   */
+  const searchFromMenu = () => {
+    forgetBack();
+    setOpening(null);
+    setHistRestore(null);
+    setReport(false);
+    if (shown) {
+      setMenu(false);
+      backHome();
+      return;
+    }
+    flushSync(() => {
+      setMenu(false);
+      setPage("home");
+    });
+    inputRef.current?.focus();
+  };
+  /** メニューの「現在地」：位置が取れるまでメニューの上で待ち、取れたら（地図が開く）・取れなかったら（下に一言）メニューを閉じる */
+  const hereFromMenu = useRef(false);
+  useEffect(() => {
+    if (locating || !hereFromMenu.current) return;
+    hereFromMenu.current = false;
+    queueMicrotask(() => setMenu(false));
+  }, [locating]);
+  const findHereFromMenu = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setMenu(false);
+      findHere();
+      return;
+    }
+    hereFromMenu.current = true;
+    findHere();
+  };
+  /** メニューからページへ（下のメニューで移るときと同じく、履歴へ戻る先・開いていたレポートは消す） */
+  const pageFromMenu = (k: MenuPage) => {
+    forgetBack();
+    setOpening(null);
+    setHistRestore(null);
+    setReport(false);
+    setMenu(false);
+    go(k);
+  };
   const pickRecent = (h: HistoryItem) => {
     forgetBack();
     if (page === "home" && !shown) takeOff(h.address.replace(/^地番\s*/, ""));
@@ -584,7 +629,9 @@ export function MobileApp(props: MobileAppProps) {
     const set = () => {
       const color = flying
         ? FLIGHT_TOP
-        : showHome
+        : menu
+          ? MENU_TOP
+          : showHome
           ? homeTop()
           : page === "favorites"
             ? favoritesTop()
@@ -610,7 +657,7 @@ export function MobileApp(props: MobileAppProps) {
       removeEventListener(SKY_EVENT, set);
       removeEventListener(HOME_PHOTO_EVENT, set);
     };
-  }, [showHome, tabPage, flying, page, okLat, okLng, standalone]);
+  }, [showHome, tabPage, flying, page, okLat, okLng, standalone, menu]);
   // PC の画面に切り替わったら、body の背景は元の色に戻す
   useEffect(
     () => () => {
@@ -1137,10 +1184,18 @@ export function MobileApp(props: MobileAppProps) {
             }}
           />
         )}
-        <HomeMenu
+        {/* 右上のメニュー（≡）。設定・案内のシートは、この上に重ねて開く（閉じるとメニューに戻る） */}
+        <AppMenu
           open={menu}
           onClose={() => setMenu(false)}
-          onMap={openMap}
+          covered={sheet !== null || news}
+          onSearch={searchFromMenu}
+          onMap={() => {
+            setMenu(false);
+            openMap();
+          }}
+          onHere={findHereFromMenu}
+          locating={locating}
           onNews={() => {
             setNews(true);
             markNewsSeen();
@@ -1154,7 +1209,9 @@ export function MobileApp(props: MobileAppProps) {
           onTemplates={() => setSheet("templates")}
           onInstall={() => setSheet("install")}
           standalone={standalone}
-          onMore={() => go("account")}
+          onPage={pageFromMenu}
+          historyCount={propertyCount(history)}
+          favoriteCount={favorites.length}
           motion={motionOn}
           onMotion={setMotionSetting}
         />

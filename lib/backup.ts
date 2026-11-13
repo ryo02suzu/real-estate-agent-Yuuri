@@ -46,6 +46,31 @@ export function bundleSummary(text: string): BundleSummary {
   return { ok: true, exportedAt: typeof b.exportedAt === "string" ? b.exportedAt : "", history: history.length, favorites: favorites.length, records: records.length, first };
 }
 
+/** 最後に書き出した日時を覚える鍵（右上のメニュー（≡）の「最後の書き出し」に出す。端末の中だけ。書き出すファイルには入れない） */
+const EXPORTED_KEY = "michilu:exported-at";
+/** 書き出したとき window に出す合図（開いているメニューが「最後の書き出し」を読み直す） */
+export const EXPORTED_EVENT = "michilu:exported";
+
+/** 書き出した（共有シートで渡した・ダウンロードした）ことを覚える */
+export function noteExported(now = Date.now()): void {
+  try {
+    localStorage.setItem(EXPORTED_KEY, String(now));
+  } catch {
+    // 覚えられなくても、書き出しはできている
+  }
+  if (typeof dispatchEvent === "function") dispatchEvent(new Event(EXPORTED_EVENT));
+}
+
+/** 最後に書き出した日時（ミリ秒）。まだ書き出していない・読めないときは null */
+export function lastExported(): number | null {
+  try {
+    const v = Number(localStorage.getItem(EXPORTED_KEY));
+    return Number.isFinite(v) && v > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 /** 足す（上書きしない）。足した数を返す */
 export function importBundle(text: string): { ok: boolean; added: { history: number; favorites: number; records: number; checklist: number } } {
   const s = bundleSummary(text);

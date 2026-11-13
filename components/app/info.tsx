@@ -4,7 +4,7 @@
 // PC は調査デスクの重ねて開く画面（components/desk/overlays.tsx。ここはスマホの紺の見た目）。シートの動きは components/sheet.tsx
 import { Download, Upload } from "lucide-react";
 import { useRef, useState } from "react";
-import { bundleFileName, bundleSummary, importBundle, makeBundle, type BundleSummary } from "@/lib/backup";
+import { bundleFileName, bundleSummary, importBundle, makeBundle, noteExported, type BundleSummary } from "@/lib/backup";
 import { MUNICIPALITIES, type Municipality } from "@/lib/roadmap";
 import { BUILDING_DATA } from "@/lib/roadmap/building-data";
 import { DEALS_DATA, DEALS_NOTE } from "@/lib/roadmap/deals";
@@ -63,7 +63,7 @@ function Callout({ title, children }: { title: string; children: React.ReactNode
 
 export function AppHelpSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const steps: [string, string][] = [
-    ["住所・地番・地図で調べる", "ホームの欄に住所か地番を入れて、キーボードの「検索」か → を押します。住所の無い土地は、右上の ≡ の「地図で場所を選ぶ」。現地にいるときは、欄の右の「現在地」で今いる場所のまわりの地図を開き、物件に印を合わせて調べます。"],
+    ["住所・地番・地図で調べる", "ホームの欄に住所か地番を入れて、キーボードの「検索」か → を押します。住所の無い土地は、右上の ≡ の「地図で選ぶ」。現地にいるときは、欄の右の「現在地」で今いる場所のまわりの地図を開き、物件に印を合わせて調べます。"],
     ["場所を確かめる", "上の見出しの住所と、街の模型（出せない端末では地図）の印が物件と合っているか見ます。ずれていたら、概要の地図の「場所を直す」。"],
     ["6つのタブを見る", "概要・道路・法令・ハザード・周辺・相場。上の街の模型は、タブに合わせて見せ方が変わります（指で横になぞると回ります。「大きく見る」で画面いっぱいにして、ずらす・回す・寄る・筆を押して地番を見る）。隣の土地は概要の配置図で、方角と接する長さの目安が分かります。"],
     ["公式の資料で確かめて記録する", "「要注意点と次にやること」の行を開き、窓口・現地で聞いた答えの札を押して「記録して済みにする」。概要の「調査の状況」の札の「確認を記録」からも書けます。記録はこの端末の中だけに残り、重説の下書き・調査メモに入ります。お気に入りは、物件の画面の右上と下の操作バーの ★。"],
@@ -199,6 +199,7 @@ export function StorageSheet({ open, onClose, standalone, onImported }: { open: 
     try {
       if (typeof navigator.share === "function" && typeof navigator.canShare === "function" && navigator.canShare({ files: [f] })) {
         await navigator.share({ files: [f], title: "MICHILU の調査記録" });
+        noteExported();
         setMsg({ text: `書き出しました（${name}）。共有先に保存されています。` });
         return;
       }
@@ -214,6 +215,7 @@ export function StorageSheet({ open, onClose, standalone, onImported }: { open: 
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    noteExported();
     setMsg({ text: `${name} をダウンロードしました。` });
   };
   const onFile = async (f: File | undefined) => {
@@ -299,7 +301,7 @@ export function StorageSheet({ open, onClose, standalone, onImported }: { open: 
         ))}
       </dl>
       <Callout title={standalone ? "ホーム画面のアプリで開いています" : "ホーム画面に追加すると消えにくくなります"}>
-        {standalone ? "この開き方なら、Safari の7日の条件は当てはまりません。念のため、ときどき書き出しておくと安心です。" : "「その他」の「ホーム画面に追加」から追加できます。追加したアプリは Safari とは別の保存場所になるので、履歴は引き継がれません（書き出して読み込めば移せます）。"}
+        {standalone ? "この開き方なら、Safari の7日の条件は当てはまりません。念のため、ときどき書き出しておくと安心です。" : "右上の ≡ の「ホーム画面に追加」から追加できます。追加したアプリは Safari とは別の保存場所になるので、履歴は引き継がれません（書き出して読み込めば移せます）。"}
       </Callout>
     </Sheet>
   );

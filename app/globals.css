@@ -1773,6 +1773,62 @@ html[data-home="night"] .sf-ghost {
 }
 
 /*
+ * 右上のメニュー（≡。components/app/app-menu.tsx）：画面いっぱいの暗いすりガラス。後ろのページ（写真）を強くぼかして紺に沈め、
+ * 左上と右下に淡い青の光。ぼかしが使えない端末と「透明度を下げる」設定では、透けない紺の地にする。
+ * 開くときは 0.26 秒でふわっと現れ、中身は上から順に浮き上がる（.menu-rise。遅れは style の --d）。閉じるときは 0.18 秒で消える。
+ * 動きを減らす設定では動かさない。浮き上がりは終わったら外す（backwards）。スマホだけで使う（PC はこの画面を使わない）
+ */
+.menu-veil {
+  background:
+    radial-gradient(70% 40% at 0% 0%, rgba(76, 130, 255, 0.2) 0%, rgba(76, 130, 255, 0) 100%),
+    radial-gradient(65% 38% at 100% 100%, rgba(40, 190, 255, 0.13) 0%, rgba(40, 190, 255, 0) 100%),
+    linear-gradient(180deg, rgba(8, 16, 34, 0.76) 0%, rgba(6, 12, 26, 0.86) 100%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  backdrop-filter: blur(28px) saturate(150%);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .menu-veil {
+    background:
+      radial-gradient(70% 40% at 0% 0%, rgba(76, 130, 255, 0.2) 0%, rgba(76, 130, 255, 0) 100%),
+      radial-gradient(65% 38% at 100% 100%, rgba(40, 190, 255, 0.13) 0%, rgba(40, 190, 255, 0) 100%),
+      linear-gradient(180deg, #0d1a35 0%, #070f21 100%);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .menu-veil {
+    background:
+      radial-gradient(70% 40% at 0% 0%, rgba(76, 130, 255, 0.2) 0%, rgba(76, 130, 255, 0) 100%),
+      linear-gradient(180deg, #0d1a35 0%, #070f21 100%);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+/*
+ * メニューを開いている間（html の data-menu。app-menu.tsx）は、後ろのページの動きを止め、光の重ね（screen・soft-light で重ねる層）を隠す。
+ * すりガラスは後ろを画面いっぱいにぼかすので、後ろが動くと毎回ぼかし直しになって電池を使う。光の重ねの層は、ぼかしの中で層の境目が
+ * 筋に見えることがある。閉じ始めたら元に戻す（止めた所から続きを動かす）
+ */
+html[data-menu="open"] .theme-navy.app-touch * {
+  animation-play-state: paused !important;
+}
+html[data-menu="open"] :is(.home-sunflare, .fav-halo, .fav-glint, .fav-star, .fav-alpen, .docs-glow, .docs-beacon, .hist-glow) {
+  visibility: hidden;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .menu-veil[data-menu="open"] {
+    animation: page-fade 260ms ease both;
+  }
+  .menu-veil[data-menu="closing"] {
+    animation: page-fade 180ms ease reverse both;
+    pointer-events: none;
+  }
+  .menu-veil[data-menu="open"] .menu-rise {
+    animation: home-rise var(--m-base) var(--m-out) backwards;
+    animation-delay: calc(60ms + var(--d, 0ms));
+  }
+}
+
+/*
  * 下から出るシート（components/sheet.tsx）。スマホだけ：開く 320ms、閉じる 240ms。背景は黒 40% にフェード。
  * 指で下にすべらせている間（data-drag）は動きを止め、離して戻るとき（data-settle）は 200ms で戻る。PC は今までどおり動かさない
  */

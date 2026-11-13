@@ -3,21 +3,18 @@
 // スマホのホーム（検索する前の画面）。届いたデザインのとおり、画面いっぱいの街の写真（時間帯で 朝・昼・夕方・夕方と夜のあいだ・夜 の
 // 5 枚を切り替える。components/app/home-photo.ts。下のメニューの後ろまで敷くので、写真は components/app/mobile-app.tsx が
 // HomeBackdrop で画面の一番奥に置く）の上に、上から：
-// ロゴ（今までのマークと MICHILU の白い版）と右上のメニュー（≡。地図で選ぶ・お知らせ・使い方・データ・アプリ・アカウント。HomeMenu）、
+// ロゴ（今までのマークと MICHILU の白い版）と右上のメニュー（≡。中身は components/app/app-menu.tsx）、
 // 「不動産の現場に、／すぐ使える情報を。」、住所・地番の検索欄（すりガラス。キーボードの「検索」か、字を入れると出る → で調べる）、
 // 写真の街並みを見せる空き、最近の検索（暗いすりガラスの一覧に3件。続きは履歴のページ）。
 // まだ何も調べていないときは、最近の検索の代わりに「はじめての方へ」（住所と地番の例。押すとそのまま調べる）を出す。
 // 写真の上の字は白（読みやすいよう薄い影）。寸法は幅393ptの値で、画面の幅に合わせて拡大・縮小する（components/app/zoom.ts）。
 // 縦は画面の高さに合わせ、検索欄と最近の検索のあいだの空きで伸び縮みする（背の低い画面でもスクロールせずに収まる）
-import { ArrowRight, Bell, Building2, ChevronRight, CircleHelp, Database, Download, FilePenLine, LoaderCircle, LocateFixed, Map as MapIcon, MapPin, MapPinned, Search, Smartphone, Sparkles, TriangleAlert, UserRound, X } from "lucide-react";
+import { ArrowRight, ChevronRight, LoaderCircle, LocateFixed, MapPinned, Search, TriangleAlert, X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { monthDay, placeParts } from "@/lib/app/scene";
 import { homePart, type HomePart } from "@/lib/app/sun";
-import { MUNICIPALITIES } from "@/lib/roadmap";
-import { AREA_LABEL } from "@/lib/roadmap/regions";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import type { Resume } from "@/lib/resume";
-import { Sheet } from "../sheet";
 import { SWAP_MS, useDayPart } from "./day-photo";
 import { ScaledInput } from "./frame";
 import { HOME_PHOTO_EVENT, homePhoto } from "./home-photo";
@@ -408,137 +405,6 @@ function SectionHead({ title, onMore, className = "", style }: { title: string; 
           <ChevronRight size={15} strokeWidth={2} absoluteStrokeWidth className="transition-transform duration-200 group-active:translate-x-[3px]" />
         </button>
       )}
-    </div>
-  );
-}
-
-/** ホームの右上のメニュー（≡）。下のメニューに入れていない、ときどき使うもの（地図で選ぶ・お知らせ・使い方・データ（書類の差出人・照会の文面も）・アプリ・アカウント） */
-export function HomeMenu({
-  open,
-  onClose,
-  onMap,
-  onNews,
-  unread,
-  onHelp,
-  onCities,
-  onSources,
-  onStorage,
-  onSender,
-  onTemplates,
-  onInstall,
-  standalone,
-  onMore,
-  motion,
-  onMotion,
-}: {
-  open: boolean;
-  onClose: () => void;
-  /** 地図で場所を選ぶ（住所の無い土地も選べる） */
-  onMap: () => void;
-  onNews: () => void;
-  unread: boolean;
-  onHelp: () => void;
-  /** 対応している市区町村 */
-  onCities: () => void;
-  /** データの出典と時点 */
-  onSources: () => void;
-  /** 調査記録の書き出し・読み込み */
-  onStorage: () => void;
-  /** 書類の差出人（会社名・担当者。照会文・調査メモ・案内図に入れる） */
-  onSender?: () => void;
-  /** 照会の文面（ひな形）：照会文の件名・本文のひな形と、FAX をメールで送るサービスの宛先の形（components/app/template-editor.tsx） */
-  onTemplates?: () => void;
-  /** ホーム画面に追加 */
-  onInstall: () => void;
-  standalone: boolean;
-  /** アカウント・その他のページ */
-  onMore: () => void;
-  /** 動きの演出（検索したときの地球からのズーム・ホームとお気に入りの写真の動き）がオンか */
-  motion: boolean;
-  onMotion: (on: boolean) => void;
-}) {
-  if (!open) return null;
-  const groups: { title: string; items: { Icon: typeof Search; title: string; sub: string; dot?: boolean; right?: string; run: () => void }[] }[] = [
-    {
-      title: "調べる",
-      items: [{ Icon: MapIcon, title: "地図で場所を選ぶ", sub: "住所の無い土地も、地図の上で選んで調べられます", run: onMap }],
-    },
-    {
-      title: "お知らせ・使い方",
-      items: [
-        { Icon: Bell, title: "お知らせ", sub: "新しい機能・データの更新", dot: unread, right: unread ? "新着" : undefined, run: onNews },
-        { Icon: CircleHelp, title: "使い方", sub: "住所・地番・地図で調べて、市の地図を開くまで", run: onHelp },
-      ],
-    },
-    {
-      title: "データ",
-      items: [
-        { Icon: MapPin, title: "対応している市区町村", sub: AREA_LABEL, right: String(MUNICIPALITIES.length), run: onCities },
-        { Icon: Database, title: "データの出典と時点", sub: "国・自治体の公開データ", run: onSources },
-        { Icon: Download, title: "調査記録の書き出し・読み込み", sub: "機種変更・データ消失への備え", run: onStorage },
-        ...(onSender ? [{ Icon: Building2, title: "書類の差出人", sub: "照会文・調査メモ・案内図に入れる会社名・担当者", run: onSender }] : []),
-        ...(onTemplates ? [{ Icon: FilePenLine, title: "照会の文面（ひな形）", sub: "照会文の件名・本文のひな形と、FAX をメールで送る宛先の形", run: onTemplates }] : []),
-      ],
-    },
-    {
-      title: "アプリ",
-      items: [
-        { Icon: Smartphone, title: "ホーム画面に追加", sub: standalone ? "追加したアプリで開いています" : "ブラウザの枠なしで、アプリのように使う", right: standalone ? "追加済み" : undefined, run: onInstall },
-        { Icon: UserRound, title: "アカウント・その他", sub: "ログイン・会社での共有（準備中）、件数", run: onMore },
-      ],
-    },
-  ];
-  const switchId = "motion-switch";
-  return (
-    <div className="theme-navy">
-      <Sheet title="メニュー" open onClose={onClose}>
-        {groups.map((g, gi) => (
-          <section key={g.title} className={gi ? "mt-3" : ""}>
-            <h3 className="text-[12px] font-semibold text-muted">{g.title}</h3>
-            <ul className="divide-y divide-line">
-              {g.items.map((it) => (
-                <li key={it.title}>
-                  <button
-                    onClick={() => {
-                      onClose();
-                      it.run();
-                    }}
-                    className="flex w-full items-center gap-3 py-3 text-left active:bg-mint/50"
-                  >
-                    <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mint text-brand">
-                      <it.Icon className="h-[18px] w-[18px]" />
-                      {it.dot && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#f0263a]" />}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[14.5px] font-semibold text-ink">{it.title}</span>
-                      <span className="mt-0.5 block text-[12px] leading-[1.5] text-muted">{it.sub}</span>
-                    </span>
-                    {it.right && <span className={`shrink-0 text-[12px] font-semibold ${it.dot ? "text-[#c0391b]" : "text-muted"}`}>{it.right}</span>}
-                    <ChevronRight className="h-4 w-4 shrink-0 text-muted" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
-        {/* 動きの演出（押してもメニューは閉じない） */}
-        <section className="mt-3">
-          <h3 className="text-[12px] font-semibold text-muted">表示</h3>
-          <label htmlFor={switchId} className="flex w-full cursor-pointer items-center gap-3 py-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mint text-brand">
-              <Sparkles className="h-[18px] w-[18px]" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[14.5px] font-semibold text-ink">動きの演出</span>
-              <span className="mt-0.5 block text-[12px] leading-[1.5] text-muted">検索したときの地球からのズーム・写真のゆっくりした動き</span>
-            </span>
-            <input id={switchId} type="checkbox" role="switch" checked={motion} onChange={(e) => onMotion(e.target.checked)} className="peer sr-only" />
-            <span aria-hidden className="relative h-[30px] w-[50px] shrink-0 rounded-full bg-[#d5dbe5] transition-colors peer-checked:bg-[#2f7cf6] peer-focus-visible:ring-2 peer-focus-visible:ring-[#9db8e6]">
-              <span className={`absolute top-[2px] h-[26px] w-[26px] rounded-full bg-white shadow transition-[left] ${motion ? "left-[22px]" : "left-[2px]"}`} />
-            </span>
-          </label>
-        </section>
-      </Sheet>
     </div>
   );
 }
