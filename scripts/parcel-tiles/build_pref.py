@@ -123,7 +123,7 @@ SHEETS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "misplace
 def load_skip_sheets(path: str = SHEETS_FILE) -> dict[str, list[dict]]:
     """外す筆の決まり（市区町村コードごと）。sheet（地図名）が「*」ならその市区町村コードのデータ全部。
     oaza（大字名）・chome（丁目名）があればその町の筆だけ、chiban（地番の一覧）があればその地番の筆だけ外す。
-    shift（east・north：m）があれば外さず、その量だけ動かす（日本測地系と世界測地系の取り違えで約460mずれた地図）。
+    shift（east・north：m）があれば外さず、その量だけ動かす（日本測地系と世界測地系の取り違えで約460mずれた地図や、座標の数字の誤りで約10kmずれた地図）。
     法務省が直して地図名が変われば、何も外さなくなる"""
     if not os.path.exists(path):
         return {}
@@ -465,7 +465,7 @@ def main() -> None:
             log(f"  {code} {r['town']} 地図 {r['sheet']}: {k} 件")
     if shifted:
         by_i = {r["i"]: (code, r) for code, rs in skip_sheets.items() for r in rs}
-        log(f"測地系の取り違えで約460mずれていた地図の筆を、正しい位置に動かした: {sum(shifted.values())} 件（{len(shifted)} 件の決まり）")
+        log(f"位置がずれていた地図の筆（測地系の取り違え・座標の数字の誤り）を、正しい位置に動かした: {sum(shifted.values())} 件（{len(shifted)} 件の決まり）")
         for i, k in sorted(shifted.items()):
             code, r = by_i[i]
             log(f"  {code} {r['town']} 地図 {r['sheet']}: {k} 件（東へ {r['shift']['east']:.1f}m・北へ {r['shift']['north']:.1f}m）")

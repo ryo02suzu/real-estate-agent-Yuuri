@@ -968,10 +968,10 @@ describe("地番参考図のある市町村", () => {
 describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-sheets.json）", () => {
   // タイルを作るとき（build_pref.py）に外す地図。書き方を間違えると何も外れないか、正しい地図まで外れる
   const data = JSON.parse(readFileSync(new URL("../../scripts/parcel-tiles/misplaced-sheets.json", import.meta.url), "utf8")) as {
-    sheets: { code: string; sheet: string; town: string; parcels: number; reason: string; oaza?: string; chome?: string; chiban?: string[]; shift?: { kind: "T1" | "T2"; east: number; north: number } }[];
+    sheets: { code: string; sheet: string; town: string; parcels: number; reason: string; oaza?: string; chome?: string; chiban?: string[]; shift?: { kind: "T1" | "T2" | "数字の誤り"; east: number; north: number } }[];
   };
   it("測地系の取り違えで動かす地図（shift）は、地図ごと・向きと量が日本測地系と世界測地系の差（関東・中部・近畿で西または東へ約245〜300m・北または南へ約325〜370m）", () => {
-    for (const s of data.sheets.filter((x) => x.shift)) {
+    for (const s of data.sheets.filter((x) => x.shift && x.shift.kind !== "数字の誤り")) {
       const { kind, east, north } = s.shift!;
       expect(["T1", "T2"]).toContain(kind);
       // T1：日本測地系の数字→世界測地系（北西へ動かす。今は南東へずれている）。T2：その逆（南東へ動かす）。
@@ -1005,7 +1005,7 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       return p <= 14 ? "IX" : [15, 19, 20, 22].includes(p) ? "VIII" : [18, 24, 25, 26, 27, 29, 30].includes(p) ? "VI" : p === 28 ? "V" : "VII";
     };
     const groups = new Map<string, [number, number][]>();
-    for (const s of data.sheets.filter((x) => x.shift)) {
+    for (const s of data.sheets.filter((x) => x.shift && x.shift.kind !== "数字の誤り")) {
       // T2 は向きを逆にして T1 とまとめる
       const sign = s.shift!.kind === "T1" ? 1 : -1;
       const g = groups.get(zone(s.code)) ?? [];
@@ -1042,6 +1042,22 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     expect(e5).toBeLessThan(-244);
     expect(n5).toBeGreaterThan(341);
     expect(n5).toBeLessThan(348);
+  });
+  it("座標の数字の誤り（kind「数字の誤り」）で動かす地図は、平面直角座標の 1,000m の倍数だけずれていて、理由に確かめた根拠がある", () => {
+    // いわき市中央台高久１丁目の図面（62筆）は、平面直角座標の北向きの数字が 1万m 大きく、約10km 北の平絹谷の上にあった。
+    // 緯度経度で動かす量は、座標の北と真北の向きの差・縮尺のため、1万m ちょうどにはならない（東へ -114.8m・北へ -10,029.9m）
+    const xs = data.sheets.filter((s) => s.shift?.kind === "数字の誤り");
+    expect(xs.map((s) => [s.code, s.sheet])).toContainEqual(["07204", "10548_hosei_20121015090204"]);
+    for (const s of xs) {
+      const d = Math.hypot(s.shift!.east, s.shift!.north);
+      const k = Math.round(d / 1000);
+      expect(k).toBeGreaterThan(0);
+      expect(Math.abs(d - k * 1000)).toBeLessThan(k * 10 + 5);
+      expect(s.reason).toMatch(/平面直角座標/);
+      expect(s.reason).toMatch(/地価公示|地価調査/);
+      expect(s.chiban).toBeUndefined();
+      expect(s.sheet).not.toBe("*");
+    }
   });
   it("近畿（2026-11-12）：三田市のニュータウンの4枚は、道路縁と隣の地図で確かめた同じ量（西へ3.0m・南へ3.3m）を計算した量に足している", () => {
     const kinki = data.sheets.filter((s) => /^(2[4-9]|30)/.test(s.code) && s.shift);
