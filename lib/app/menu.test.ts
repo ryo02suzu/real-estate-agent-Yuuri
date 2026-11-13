@@ -3,7 +3,7 @@ import { lastExported, noteExported } from "../backup";
 import { EMPTY_SETTINGS } from "../inquiry-store";
 import type { PropertyRecords } from "../records";
 import { EMPTY_SENDER, senderShort } from "../sender";
-import { backupNote, recordedCount, senderNote, templateNote } from "./menu";
+import { backupNote, recordedCount, resumeTarget, senderNote, templateNote } from "./menu";
 
 // 端末の localStorage の代わり（テストの間だけ）
 const store = new Map<string, string>();
@@ -53,6 +53,17 @@ describe("右上のメニューの一言", () => {
     expect(lastExported()).toBe(1_700_000_000_000);
     store.set("michilu:exported-at", "壊れた値");
     expect(lastExported()).toBeNull();
+  });
+
+  it("続きから：直近に開いていた物件が履歴に残っていれば、その行と開いていたタブ。消した物件・記録なしは出さない", () => {
+    const shibuya = { address: "東京都渋谷区神南一丁目19番11号", city: "渋谷区", at: 1 };
+    const picked = { address: "宮城県仙台市泉区館四丁目", city: "仙台市泉区", at: 2, ll: [38.32, 140.84] as [number, number] };
+    const r = (historyKey: string) => ({ pid: "p", label: "x", historyKey, tab: "road", scroll: 0, at: 9 });
+    expect(resumeTarget(undefined, [shibuya])).toBeNull();
+    expect(resumeTarget(r("東京都渋谷区神南一丁目19番11号"), [picked, shibuya])).toEqual({ item: shibuya, tab: "road", at: 9 });
+    // 地図で選んだ地点は座標で結びつく（lib/history.ts の historyKey）
+    expect(resumeTarget(r("38.32,140.84"), [shibuya, picked])?.item).toBe(picked);
+    expect(resumeTarget(r("消した物件"), [shibuya, picked])).toBeNull();
   });
 
   it("確認の記録がある物件の数（記録を消して空になった物件は数えない）", () => {

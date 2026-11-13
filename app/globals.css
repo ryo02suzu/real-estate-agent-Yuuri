@@ -1773,58 +1773,266 @@ html[data-home="night"] .sf-ghost {
 }
 
 /*
- * 右上のメニュー（≡。components/app/app-menu.tsx）：画面いっぱいの暗いすりガラス。後ろのページ（写真）を強くぼかして紺に沈め、
- * 左上と右下に淡い青の光。ぼかしが使えない端末と「透明度を下げる」設定では、透けない紺の地にする。
- * 開くときは 0.26 秒でふわっと現れ、中身は上から順に浮き上がる（.menu-rise。遅れは style の --d）。閉じるときは 0.18 秒で消える。
- * 動きを減らす設定では動かさない。浮き上がりは終わったら外す（backwards）。スマホだけで使う（PC はこの画面を使わない）
+ * 右上のメニュー（≡。components/app/app-menu.tsx）。後ろのページの写真はそのまま残し、ページの字と板・下のメニューは薄れて消える
+ * （html[data-menu]）。写真は画面いっぱいのぼかし（.menu-blur）でぼかし、その上に ≡ の所から円く広がる紺の幕（.menu-tint。上と下を
+ * 濃く、真ん中は写真の色が透ける。≡ の側に淡い青の光）。ぼかしが使えない端末と「透明度を下げる」設定では、透けない紺の地にする。
+ * --pull は下へ引いた量（0〜1。引くほど幕が薄れる）。スマホだけで使う（PC はこの画面を使わない）
  */
-.menu-veil {
+.menu-blur {
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+  opacity: calc(1 - var(--pull, 0) * 0.25);
+}
+.menu-tint {
   background:
-    radial-gradient(70% 40% at 0% 0%, rgba(76, 130, 255, 0.2) 0%, rgba(76, 130, 255, 0) 100%),
-    radial-gradient(65% 38% at 100% 100%, rgba(40, 190, 255, 0.13) 0%, rgba(40, 190, 255, 0) 100%),
-    linear-gradient(180deg, rgba(8, 16, 34, 0.76) 0%, rgba(6, 12, 26, 0.86) 100%);
-  -webkit-backdrop-filter: blur(28px) saturate(150%);
-  backdrop-filter: blur(28px) saturate(150%);
+    radial-gradient(85% 40% at 100% 0%, rgba(90, 150, 255, 0.16) 0%, rgba(90, 150, 255, 0) 100%),
+    linear-gradient(180deg, rgba(8, 15, 31, 0.74) 0%, rgba(8, 15, 31, 0.44) 12%, rgba(7, 13, 28, 0.26) 34%, rgba(6, 11, 24, 0.3) 64%, rgba(5, 9, 20, 0.56) 100%);
+  opacity: calc(1 - var(--pull, 0) * 0.4);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .menu-veil {
+  .menu-tint {
     background:
-      radial-gradient(70% 40% at 0% 0%, rgba(76, 130, 255, 0.2) 0%, rgba(76, 130, 255, 0) 100%),
-      radial-gradient(65% 38% at 100% 100%, rgba(40, 190, 255, 0.13) 0%, rgba(40, 190, 255, 0) 100%),
-      linear-gradient(180deg, #0d1a35 0%, #070f21 100%);
+      radial-gradient(85% 40% at 100% 0%, rgba(90, 150, 255, 0.17) 0%, rgba(90, 150, 255, 0) 100%),
+      linear-gradient(180deg, #0d1a35 0%, #0a1530 45%, #070f21 100%);
   }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .menu-veil {
+  .menu-blur {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .menu-tint {
     background:
-      radial-gradient(70% 40% at 0% 0%, rgba(76, 130, 255, 0.2) 0%, rgba(76, 130, 255, 0) 100%),
-      linear-gradient(180deg, #0d1a35 0%, #070f21 100%);
+      radial-gradient(85% 40% at 100% 0%, rgba(90, 150, 255, 0.17) 0%, rgba(90, 150, 255, 0) 100%),
+      linear-gradient(180deg, #0d1a35 0%, #0a1530 45%, #070f21 100%);
+  }
+}
+/* 閉じている間は押せない（後ろのページがもう現れ始めている） */
+.menu-root:is([data-menu="closing"], [data-menu="swiped"]) {
+  pointer-events: none;
+}
+/* 上の帯：スクロールしたらすりガラスを敷き、真ん中に小さく「メニュー」（大きな見出しが帯の下へ入ったら） */
+.menu-headbar {
+  opacity: 0;
+  background: rgba(9, 15, 30, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  transition: opacity 0.2s ease;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .menu-headbar {
+    background: rgba(9, 15, 30, 0.96);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
 }
+.menu-head[data-scrolled] .menu-headbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+.menu-mini {
+  opacity: 0;
+  transform: translate(-50%, 6px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.28s var(--m-out);
+}
+.menu-head[data-titled] .menu-mini {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.menu-logo {
+  transition:
+    opacity 0.2s ease,
+    transform 0.28s var(--m-out);
+}
+.menu-head[data-titled] .menu-logo {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+/* 閉じ始めたら帯の地は消す（ページの帯に戻る） */
+.menu-root:is([data-menu="closing"], [data-menu="swiped"]) :is(.menu-headbar, .menu-mini) {
+  opacity: 0;
+}
+/* ≡ → ×：3本の線（≡ の線と同じ長さ・間・太さ。lucide の Menu を 22pt・線 1.8 で描いたもの）。止まっている形は × */
+.menu-bars {
+  position: relative;
+  display: block;
+  width: 16.5px;
+  height: 13px;
+}
+.mb {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 16.5px;
+  height: 1.8px;
+  margin-top: -0.9px;
+  border-radius: 1px;
+  background: #fff;
+}
+.mb1 {
+  transform: rotate(45deg) scaleX(1.06);
+}
+.mb2 {
+  opacity: 0;
+  transform: scaleX(0.2);
+}
+.mb3 {
+  transform: rotate(-45deg) scaleX(1.06);
+}
+/* 下へ引いて、閉じる所まで来たら × が光る */
+.menu-x {
+  transition:
+    transform 0.22s cubic-bezier(0.34, 1.5, 0.64, 1),
+    background-color 0.2s ease;
+}
+.menu-root[data-armed] .menu-x {
+  background: rgba(255, 255, 255, 0.34) !important;
+  transform: scale(1.1);
+}
+/* 一覧の行の間の細い線（アイコンの右から） */
+.menu-row + .menu-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 53px;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.menu-row:active {
+  background: rgba(255, 255, 255, 0.07);
+}
 /*
- * メニューを開いている間（html の data-menu。app-menu.tsx）は、後ろのページの動きを止め、光の重ね（screen・soft-light で重ねる層）を隠す。
- * すりガラスは後ろを画面いっぱいにぼかすので、後ろが動くと毎回ぼかし直しになって電池を使う。光の重ねの層は、ぼかしの中で層の境目が
- * 筋に見えることがある。閉じ始めたら元に戻す（止めた所から続きを動かす）
+ * メニューを開いている間（html の data-menu="open"。app-menu.tsx）は、後ろのページの字と板・下のメニューを薄れさせて消し
+ * （写真だけが残る）、動きを止め、光の重ね（screen・soft-light で重ねる層）を隠す。後ろが動くと毎回ぼかし直しになって電池を使う。
+ * 光の重ねの層は、ぼかしの中で層の境目が筋に見えることがある。閉じ始めたら（"closing"）元に戻しながら現れる
  */
+@media (max-width: 1023px) {
+  html[data-menu="open"] :is([data-scroller], [data-app-nav]) {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  html[data-menu] :is([data-scroller], [data-app-nav]) {
+    transition: opacity 0.24s ease;
+  }
+}
 html[data-menu="open"] .theme-navy.app-touch * {
   animation-play-state: paused !important;
 }
 html[data-menu="open"] :is(.home-sunflare, .fav-halo, .fav-glint, .fav-star, .fav-alpen, .docs-glow, .docs-beacon, .hist-glow) {
   visibility: hidden;
 }
+/*
+ * 動き（動きを減らす設定では付けない）：
+ * 開く…ぼかしがふわっと現れ、幕は ≡ から円く広がる（app-menu.tsx）。≡ の線が × に回り（少し行き過ぎて戻る）、見出しは
+ * ページと同じ動き（.pt-in）、板は上から順に浮き上がる（.menu-rise。遅れは style の --d）。新しいお知らせの赤い印は波紋を出す。
+ * 閉じる…中身は少し上へ抜けて消え、幕は × へ縮み（app-menu.tsx）、× は ≡ に戻る。
+ * 下へ引いて閉じる（data-menu="swiped"）…中身は引いた所からそのまま下へ、幕とぼかしは薄れて消える。
+ * 引いている間（data-drag）は追いかけるだけ、足りずに離したとき（data-settle）は元の位置へ戻る
+ */
 @media (prefers-reduced-motion: no-preference) {
-  .menu-veil[data-menu="open"] {
-    animation: page-fade 260ms ease both;
+  .menu-root[data-menu="open"] .menu-blur {
+    animation: page-fade 0.32s ease backwards;
   }
-  .menu-veil[data-menu="closing"] {
-    animation: page-fade 180ms ease reverse both;
-    pointer-events: none;
+  .menu-root:is([data-menu="closing"], [data-menu="swiped"]) .menu-blur,
+  .menu-root[data-menu="swiped"] .menu-tint {
+    animation: menu-out 0.3s ease forwards;
   }
-  .menu-veil[data-menu="open"] .menu-rise {
-    animation: home-rise var(--m-base) var(--m-out) backwards;
-    animation-delay: calc(60ms + var(--d, 0ms));
+  .menu-root[data-menu="open"] .menu-rise {
+    animation: menu-rise 0.56s var(--m-out) backwards;
+    animation-delay: calc(110ms + var(--d, 0ms));
+  }
+  .menu-content {
+    transition: transform 0.34s var(--m-out);
+  }
+  .menu-root[data-settle] :is(.menu-blur, .menu-tint) {
+    transition: opacity 0.34s ease;
+  }
+  .menu-root[data-drag] :is(.menu-content, .menu-blur, .menu-tint) {
+    transition: none;
+  }
+  .menu-root[data-menu="closing"] .menu-content {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.985);
+    transition:
+      opacity 0.16s ease,
+      transform 0.26s cubic-bezier(0.4, 0, 1, 1);
+  }
+  .menu-root[data-menu="swiped"] .menu-content {
+    opacity: 0;
+    transform: translateY(42vh);
+    transition:
+      transform 0.3s cubic-bezier(0.3, 0.6, 0.5, 1),
+      opacity 0.26s ease;
+  }
+  .menu-root[data-menu="open"] .mb1 {
+    animation: mb1-in 0.46s cubic-bezier(0.34, 1.45, 0.64, 1) backwards;
+  }
+  .menu-root[data-menu="open"] .mb2 {
+    animation: mb2-in 0.26s ease backwards;
+  }
+  .menu-root[data-menu="open"] .mb3 {
+    animation: mb3-in 0.46s cubic-bezier(0.34, 1.45, 0.64, 1) backwards;
+  }
+  .menu-root:is([data-menu="closing"], [data-menu="swiped"]) .mb1 {
+    animation: mb1-in 0.26s cubic-bezier(0.4, 0, 0.2, 1) reverse forwards;
+  }
+  .menu-root:is([data-menu="closing"], [data-menu="swiped"]) .mb2 {
+    animation: mb2-in 0.26s ease reverse forwards;
+  }
+  .menu-root:is([data-menu="closing"], [data-menu="swiped"]) .mb3 {
+    animation: mb3-in 0.26s cubic-bezier(0.4, 0, 0.2, 1) reverse forwards;
+  }
+  .menu-ping::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: #f0263a;
+    animation: menu-ping 1.8s cubic-bezier(0, 0, 0.2, 1) 0.6s infinite;
+  }
+}
+@keyframes menu-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes menu-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+}
+@keyframes mb1-in {
+  from {
+    transform: translateY(-5.5px);
+  }
+}
+@keyframes mb2-in {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mb3-in {
+  from {
+    transform: translateY(5.5px);
+  }
+}
+@keyframes menu-ping {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  70%,
+  to {
+    transform: scale(2.6);
+    opacity: 0;
   }
 }
 

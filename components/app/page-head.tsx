@@ -16,10 +16,13 @@ import { reducedMotion } from "./tokens";
 /** 英字（ロゴの MICHILU と同じ書体） */
 const LATIN = "var(--font-jost), sans-serif";
 
-/** 右上のメニュー（≡）。まだ見ていないお知らせがあれば赤い印 */
+/**
+ * 右上のメニュー（≡）。まだ見ていないお知らせがあれば赤い印。data-menu-button は、開いたメニューがこのボタンの所から広がるための目印
+ * （components/app/app-menu.tsx）
+ */
 export function MenuButton({ onMenu, unread }: { onMenu: () => void; unread: boolean }) {
   return (
-    <button onClick={onMenu} aria-label={unread ? "メニュー（新しいお知らせがあります）" : "メニュー"} className="press relative flex shrink-0 items-center justify-center rounded-full" style={{ ...LIGHT_GLASS, width: 46, height: 46, minWidth: HIT, minHeight: HIT }}>
+    <button onClick={onMenu} data-menu-button aria-label={unread ? "メニュー（新しいお知らせがあります）" : "メニュー"} className="press relative flex shrink-0 items-center justify-center rounded-full" style={{ ...LIGHT_GLASS, width: 46, height: 46, minWidth: HIT, minHeight: HIT }}>
       <Menu size={22} strokeWidth={1.8} absoluteStrokeWidth color="#fff" />
       {unread && <span className="absolute rounded-full border-2 border-white bg-[#f0263a]" style={{ right: 2, top: 2, width: 11, height: 11 }} />}
     </button>
@@ -43,7 +46,7 @@ export function BrandBar({ onMenu, unread, logoClass = "" }: { onMenu: () => voi
  * 数え上がる件数（開いたときは 0 から、件数が変わったときは前の数から、0.6 秒ほどで）。動きを減らす設定では、そのまま出す。
  * 数は requestAnimationFrame の中で入れる（描くたびに数を変えない）
  */
-function useCountUp(target: number, from0: boolean): number {
+export function useCountUp(target: number, from0: boolean): number {
   const [n, setN] = useState(() => (from0 && !reducedMotion() ? 0 : target));
   const shown = useRef(n);
   useEffect(() => {

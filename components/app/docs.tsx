@@ -17,7 +17,7 @@ import { ChevronRight, Clock3, MapPin, Search } from "lucide-react";
 import { useRef, type CSSProperties, type ReactNode } from "react";
 import { docMainSub, docStatusLine, useDocStatus } from "@/lib/app/doc-status";
 import { propertyCount } from "@/lib/app/history-view";
-import { placeParts } from "@/lib/app/scene";
+import { placeLine, placeParts } from "@/lib/app/scene";
 import { dayPart } from "@/lib/app/sun";
 import { favoriteKey } from "@/lib/favorites";
 import { historyKey, type HistoryItem } from "@/lib/history";
@@ -167,14 +167,6 @@ function placeName(h: HistoryItem): string {
   return city && town ? `${city}${town}` : full;
 }
 
-/** カードの物件の名前：市区町村と町名に、番地か地番を添える（同じ町の物件と見分けられるように） */
-function placeTitle(h: HistoryItem): string {
-  const { city, town, full } = placeParts(h);
-  if (!city || !town) return full;
-  const tail = full.startsWith(city) ? full.slice(city.length).trim() : full;
-  const num = h.ll ? "" : tail.startsWith(town) ? tail.slice(town.length).trim() : "";
-  return num ? `${city}${town} ${num}` : `${city}${town}`;
-}
 
 /** 書類・出力：書類を作る物件（開いている物件、無ければ最近調べた物件）のカードと、ほかの物件から作る一覧 */
 export function DocsPage({
@@ -244,7 +236,7 @@ export function DocsPage({
               {current ? "いま開いている物件" : target ? `最近調べた物件・${when(target.at, now)}` : "書類を作る物件"}
             </p>
             <p className="mt-[7px] truncate font-medium leading-[1.3]" style={{ fontSize: 17, color: "rgba(255,255,255,0.96)" }}>
-              {target ? placeTitle(target) : "まだありません"}
+              {target ? placeLine(target) : "まだありません"}
             </p>
           </div>
           <button
