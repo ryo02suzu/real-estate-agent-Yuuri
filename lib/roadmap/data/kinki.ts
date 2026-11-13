@@ -1,20 +1,10 @@
-// 近畿2府5県の市町村（227）のうち、道路種別の公式図・問い合わせ先をまだ調べ終えていない市町村（38）。coverage: "unknown"（調査中）でここに置き、
-// 調べた府県・市から data/<府県>.ts に移す（7府県の、府県が扱う市町村と政令市、三重県の8市は移した。2026-11）。
+// 近畿2府5県の市町村（227）のうち、道路種別の公式図・問い合わせ先をまだ調べ終えていない市町村（26。大阪府の15市と兵庫県の11市）。coverage: "unknown"（調査中）でここに置き、
+// 調べた府県・市から data/<府県>.ts に移す（7府県の、府県が扱う市町村と政令市、三重県の8市、奈良県の3市、滋賀県の7市、宇治市、和歌山市は移した。2026-11）。
 // 市区町村コードと名前は国土地理院の市区町村表（maps.gsi.go.jp/js/muni.js）から。
 // 政令市（京都市・大阪市・堺市・神戸市）は区のコードをまとめて1つ（逆ジオコーダは区のコードを返すので、市そのもののコード 26100・27100・27140・28100 は使わない）
 import type { Municipality } from "../municipalities";
 
 export const KINKI_PENDING: Municipality[] = [
-  // 滋賀県（19のうち、特定行政庁の7市）
-  { pref: "滋賀県", name: "大津市", codes: ["25201"], coverage: "unknown", maps: [] },
-  { pref: "滋賀県", name: "彦根市", codes: ["25202"], coverage: "unknown", maps: [] },
-  { pref: "滋賀県", name: "長浜市", codes: ["25203"], coverage: "unknown", maps: [] },
-  { pref: "滋賀県", name: "近江八幡市", codes: ["25204"], coverage: "unknown", maps: [] },
-  { pref: "滋賀県", name: "草津市", codes: ["25206"], coverage: "unknown", maps: [] },
-  { pref: "滋賀県", name: "守山市", codes: ["25207"], coverage: "unknown", maps: [] },
-  { pref: "滋賀県", name: "東近江市", codes: ["25213"], coverage: "unknown", maps: [] },
-  // 京都府（26のうち、特定行政庁の宇治市）
-  { pref: "京都府", name: "宇治市", codes: ["26204"], coverage: "unknown", maps: [] },
   // 大阪府（43のうち、大阪市・堺市のほかの特定行政庁の15市）
   { pref: "大阪府", name: "岸和田市", codes: ["27202"], coverage: "unknown", maps: [] },
   { pref: "大阪府", name: "豊中市", codes: ["27203"], coverage: "unknown", maps: [] },
@@ -43,10 +33,4 @@ export const KINKI_PENDING: Municipality[] = [
   { pref: "兵庫県", name: "高砂市", codes: ["28216"], coverage: "unknown", maps: [] },
   { pref: "兵庫県", name: "川西市", codes: ["28217"], coverage: "unknown", maps: [] },
   { pref: "兵庫県", name: "三田市", codes: ["28219"], coverage: "unknown", maps: [] },
-  // 奈良県（39のうち、特定行政庁の3市）
-  { pref: "奈良県", name: "奈良市", codes: ["29201"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "橿原市", codes: ["29205"], coverage: "unknown", maps: [] },
-  { pref: "奈良県", name: "生駒市", codes: ["29209"], coverage: "unknown", maps: [] },
-  // 和歌山県（30のうち、特定行政庁の和歌山市）
-  { pref: "和歌山県", name: "和歌山市", codes: ["30201"], coverage: "unknown", maps: [] },
 ];

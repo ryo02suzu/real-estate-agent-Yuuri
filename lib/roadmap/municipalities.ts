@@ -10,12 +10,12 @@ import { CHUBU_PENDING } from "./data/chubu";
 import { TOHOKU_PENDING } from "./data/tohoku";
 import { KINKI_PENDING } from "./data/kinki";
 import { HYOGO } from "./data/hyogo";
-import { KYOTO } from "./data/kyoto";
+import { KYOTO, KYOTO_CITIES } from "./data/kyoto";
 import { MIE, MIE_CITIES } from "./data/mie";
-import { NARA } from "./data/nara";
+import { NARA, NARA_CITIES } from "./data/nara";
 import { OSAKA } from "./data/osaka";
-import { SHIGA } from "./data/shiga";
-import { WAKAYAMA } from "./data/wakayama";
+import { SHIGA, SHIGA_CITIES } from "./data/shiga";
+import { WAKAYAMA, WAKAYAMA_CITIES } from "./data/wakayama";
 import { MIYAGI } from "./data/miyagi";
 import { AOMORI } from "./data/aomori";
 import { YAMAGATA } from "./data/yamagata";
@@ -121,7 +121,7 @@ export type Municipality = {
   note?: string;
 };
 
-export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI, ...SHIZUOKA, ...YAMANASHI, ...NAGANO, ...AICHI, ...GIFU, ...NIIGATA, ...TOYAMA, ...ISHIKAWA, ...FUKUI, ...CHUBU_PENDING, ...AOMORI, ...IWATE, ...MIYAGI, ...AKITA, ...YAMAGATA, ...FUKUSHIMA, ...TOHOKU_PENDING, ...MIE, ...MIE_CITIES, ...SHIGA, ...KYOTO, ...OSAKA, ...HYOGO, ...NARA, ...WAKAYAMA, ...KINKI_PENDING];
+export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI, ...SHIZUOKA, ...YAMANASHI, ...NAGANO, ...AICHI, ...GIFU, ...NIIGATA, ...TOYAMA, ...ISHIKAWA, ...FUKUI, ...CHUBU_PENDING, ...AOMORI, ...IWATE, ...MIYAGI, ...AKITA, ...YAMAGATA, ...FUKUSHIMA, ...TOHOKU_PENDING, ...MIE, ...MIE_CITIES, ...SHIGA, ...SHIGA_CITIES, ...KYOTO, ...KYOTO_CITIES, ...OSAKA, ...HYOGO, ...NARA, ...NARA_CITIES, ...WAKAYAMA, ...WAKAYAMA_CITIES, ...KINKI_PENDING];
 
 /**
  * 市区町村に都市計画区域が無い（全域が都市計画区域外）と分かっているか。coverage が outside か、注記にそう書いてある町村
