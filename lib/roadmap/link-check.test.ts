@@ -6,8 +6,9 @@ import { describe, expect, it } from "vitest";
 import POINTS from "./data/office-points.json";
 import { MUNICIPALITIES, buildLinks } from "./index";
 
-// 一部の地図は自動ブラウザ風のアクセスを拒むので、iPhone の Safari として取りに行く
-const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+// 役所のサイトには、MICHILU の自動の確認であることを名乗って取りに行く（ブラウザのふりはしない）。
+// 自動の確認を断るサイト（403・429）は、壊れているとは言えないので「要確認」にとどめ、手で開いて確かめる
+const UA = "Mozilla/5.0 (compatible; michilu-link-check; +https://github.com/ryo02suzu/real-estate-agent-Yuuri)";
 const ERROR_TEXT = /ページが見つかりません|お探しのページ|Page Not Found|404 Not Found|ファイルが見つかりません|公開を終了/i;
 
 type Row = { city: string; label: string; url: string; result: "ok" | "broken" | "unreachable"; detail: string };
@@ -17,6 +18,7 @@ async function check(url: string): Promise<Pick<Row, "result" | "detail">> {
     const res = await fetch(url, { headers: { "User-Agent": UA, "Accept-Language": "ja" }, redirect: "follow", signal: AbortSignal.timeout(30_000) });
     // 5xx は役所のサーバーの一時的な不調や途中の中継の問題が多いので「要確認」にとどめる
     if (res.status >= 500) return { result: "unreachable", detail: `HTTP ${res.status}` };
+    if (res.status === 403 || res.status === 429) return { result: "unreachable", detail: `HTTP ${res.status}（自動の確認を受け付けないサイト。手で開いて確かめる）` };
     if (res.status >= 400) return { result: "broken", detail: `HTTP ${res.status}` };
     const type = res.headers.get("content-type") ?? "";
     if (type.includes("text/html")) {

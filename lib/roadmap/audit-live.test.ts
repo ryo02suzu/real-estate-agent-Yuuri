@@ -5,6 +5,7 @@
 // 一覧にして AUDIT_OUT（既定は audit-report/）に Markdown と JSON で書く。ふつうのテスト（npm test）では動かない。
 //   AUDIT_LIVE=1 npx vitest run lib/roadmap/audit-live.test.ts
 //   AUDIT_ONLY=桐生市,船橋市 で市区町村を絞れる
+//   AUDIT_PREF=青森県,岩手県 で都道府県を絞れる（地方ごとに分けて動かすとき）
 import { mkdir, open, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import type { Source } from "pmtiles";
@@ -43,6 +44,7 @@ const QUERY: Record<string, string> = { 三宅村: "東京都三宅島三宅村"
 const live = describe.runIf(process.env.AUDIT_LIVE === "1");
 const OUT = process.env.AUDIT_OUT || "audit-report";
 const ONLY = (process.env.AUDIT_ONLY || "").split(",").filter(Boolean);
+const PREFS = (process.env.AUDIT_PREF || "").split(",").filter(Boolean);
 const CONCURRENCY = Number(process.env.AUDIT_CONCURRENCY || 4);
 
 /** アプリと同じサイトに置いたファイル（public/）を、範囲を指定して読む */
@@ -275,7 +277,7 @@ live("全市区町村の点検", () => {
       const u = String(url);
       return u.startsWith("/data/") ? Promise.resolve(new Response(readFileSync(`public${u}`))) : real(url, init);
     });
-    const list = MUNICIPALITIES.filter((m) => !ONLY.length || ONLY.includes(m.name));
+    const list = MUNICIPALITIES.filter((m) => (!ONLY.length || ONLY.includes(m.name)) && (!PREFS.length || PREFS.includes(m.pref)));
     const started = Date.now();
     const rows = await pool(list, CONCURRENCY, auditOne, (i, r) => {
       if (r.flags.length || i % 25 === 0) console.log(`[${i + 1}/${list.length}] ${r.pref}${r.name}${r.flags.length ? `：${r.flags.join(" / ")}` : ""}`);
