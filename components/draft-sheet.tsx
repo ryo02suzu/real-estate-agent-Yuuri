@@ -3,10 +3,15 @@
 // 重説・物件概要の下書きのシート（中身は lib/draft.ts）。欄ごとにタブで見せ（スマホでも1画面に収める。欄が長ければ
 // シートが dense → denser → densest の順に詰める。components/sheet.tsx）、欄ごと・全部をコピーできる。
 // スマホはメニュー（app/page.tsx）から DRAFT_EVENT で開き、PC は結果の印刷・書類の欄から開く
+import { Check, ClipboardCopy } from "lucide-react";
 import { Fragment, useState } from "react";
 import { createPortal } from "react-dom";
+import { docText } from "@/lib/app/doc";
+import { draftDoc, draftSectionDoc, uniqueSentences } from "@/lib/app/draft-doc";
 import { buildDraft, draftText, sectionLines, DRAFT_NOTE, type DraftInput, type DraftSection } from "@/lib/draft";
 import type { LookupResult } from "@/lib/roadmap";
+import { DOC_BODY, DOC_PANE } from "./app/doc-sheets";
+import { DocSectionView } from "./app/doc-view";
 import { CopyIcon } from "./icons";
 import { Sheet } from "./sheet";
 import { useCopy } from "./use-copy";
@@ -32,23 +37,83 @@ const TAB_NAMES: [RegExp, string][] = [
 ];
 const tabName = (s: DraftSection) => TAB_NAMES.find(([re]) => re.test(s.title))?.[1] ?? s.title;
 
-export function DraftSheet({ result, input, open, onClose }: { result: Ok; input: DraftInput; open: boolean; onClose: () => void }) {
+/**
+ * tidy：スマホの見せ方（components/app の書類と同じ形。シートの高さを固定して、タブを変えても大きさが変わらない。欄の URL は「開く」、
+ * 隣地は所在をまとめて短く、コピーする文は見出しと行の形。lib/app/draft-doc.ts）。PC は渡さない（今までどおり）
+ */
+export function DraftSheet({ result, input, open, onClose, tidy }: { result: Ok; input: DraftInput; open: boolean; onClose: () => void; tidy?: boolean }) {
   if (!open) return null;
   // document.body に出す（PC のパネルは backdrop-blur で fixed の基準になり、その中では画面いっぱいに出せない）
   return createPortal(
     <Sheet title="重説・物件概要の下書き" open onClose={onClose}>
-      <DraftBody sections={buildDraft(result, input)} />
+      {tidy ? <TidyDraftBody sections={buildDraft(result, input)} /> : <DraftBody sections={buildDraft(result, input)} />}
     </Sheet>,
     document.body,
   );
 }
 
-function DraftBody({ sections }: { sections: DraftSection[] }) {
+/** スマホの下書き：欄のタブ（1行。横にすべらせる）・欄の中身（同じ高さの枠の中）・全部コピー／この欄をコピー */
+function TidyDraftBody({ sections }: { sections: DraftSection[] }) {
   const [tab, setTab] = useState(0);
   const all = useCopy();
   const part = useCopy();
   const s = sections[Math.min(tab, sections.length - 1)];
   const checks = sections.reduce((n, x) => n + x.rows.filter((r) => r.check).length, 0);
+  const confirmed = sections.reduce((n, x) => n + x.rows.filter((r) => r.confirmed).length, 0);
+  const section = draftSectionDoc(s);
+  const source = /^出典/.test(s.title);
+  return (
+    <div className={`${DOC_BODY} text-ink`}>
+      <p className="shrink-0 text-[12px] leading-[1.6] text-muted">
+        重説・販売図面の欄の順に並べた参考の下書きです（法令上の判断はしません）。<b className="font-semibold text-[#8a5a00]">要確認 {checks}か所</b>は役所・法務局・現地で確かめてから書いてください。
+        {confirmed > 0 && <b className="ml-1 font-semibold text-[#1f8f5a]">確認済み {confirmed}か所は、あなたが確かめた結果です。</b>}
+      </p>
+      <div role="tablist" aria-label="欄" className="-mx-5 mt-2 flex shrink-0 gap-1.5 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {sections.map((x, i) => {
+          const n = x.rows.filter((r) => r.check).length;
+          return (
+            <button key={x.title} role="tab" aria-selected={i === tab} onClick={() => setTab(i)} className="press inline-flex h-[32px] shrink-0 items-center gap-1 rounded-full px-3 text-[13px] font-semibold transition-colors duration-150" style={{ background: i === tab ? "#133664" : "#eef2f7", color: i === tab ? "#fff" : "#41506a" }}>
+              {tabName(x)}
+              {n > 0 && <span className="rounded-full px-1.5 text-[10.5px] font-bold tabular-nums" style={{ background: i === tab ? "rgba(255,255,255,0.2)" : "#fff1d6", color: i === tab ? "#fff" : "#8a5a00" }}>{n}</span>}
+            </button>
+          );
+        })}
+      </div>
+      <div className={`${DOC_PANE} mt-2`} role="tabpanel" aria-label={s.title}>
+        {source ? (
+          // 出典は長いので、小さな字で並べる（同じ注が2回出ないように）
+          <div className="space-y-1 rounded-[14px] bg-white px-3 py-2.5 text-[11px] leading-[1.55] text-muted shadow-[0_1px_3px_rgba(20,45,85,0.08)]">
+            {uniqueSentences(s.rows.map((r) => r.value)).map((v) => (
+              <p key={v}>{v}</p>
+            ))}
+          </div>
+        ) : (
+          <DocSectionView section={section} />
+        )}
+      </div>
+      <div className="mt-2.5 flex shrink-0 gap-2">
+        <button onClick={() => all.copy(docText(draftDoc(sections, new Date())))} className="press flex h-[48px] flex-1 items-center justify-center gap-2 rounded-[16px] text-[15px] font-bold text-white transition-colors duration-200" style={{ background: all.done ? "#1f8f5a" : "#133664" }}>
+          {all.done ? <Check key="done" className="td-bump h-5 w-5" strokeWidth={3} /> : <ClipboardCopy className="h-[18px] w-[18px]" />}
+          {all.done ? "コピーしました" : "全部コピー"}
+        </button>
+        <button onClick={() => part.copy(docText({ title: `重説の下書き：${s.title}`, head: [], sections: [section] }))} className="press flex h-[48px] shrink-0 items-center justify-center gap-1.5 rounded-[16px] px-4 text-[14px] font-bold" style={{ background: "#e3ebf6", color: "#133664" }}>
+          {part.done ? <Check className="h-4 w-4" strokeWidth={3} /> : <CopyIcon className="h-4 w-4" />}
+          {part.done ? "コピー済" : "この欄だけ"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** 下書きの中身（欄のタブ・欄ごと・全部のコピー）。PC の調査デスクの書類の画面からも使う */
+export function DraftBody({ sections }: { sections: DraftSection[] }) {
+  const [tab, setTab] = useState(0);
+  const all = useCopy();
+  const part = useCopy();
+  const s = sections[Math.min(tab, sections.length - 1)];
+  const checks = sections.reduce((n, x) => n + x.rows.filter((r) => r.check).length, 0);
+  // あなたが確かめた結果を入れた欄の数（スマホの「次にやること」で書いたとき。PC は入れないので出ない）
+  const confirmed = sections.reduce((n, x) => n + x.rows.filter((r) => r.confirmed).length, 0);
   return (
     <div className="text-ink">
       <p className="text-[11px] leading-[1.6] text-muted dense:leading-[1.5] denser:text-[10.5px] densest:leading-[1.4]">
@@ -56,6 +121,7 @@ function DraftBody({ sections }: { sections: DraftSection[] }) {
         <span className="densest:hidden">重説・販売図面の欄の順に並べた参考の下書きです（法令上の判断はしません）。</span>
         <b className="font-semibold text-[#8a4f3a]">要確認（{checks}）</b>は役所・法務局・現地で<span className="densest:hidden">確かめてください。</span>
         <span className="hidden densest:inline">確認。法令の判断はしません</span>
+        {confirmed > 0 && <b className="ml-1 font-semibold text-[#1f8f5a]">確認済み（{confirmed}）は、あなたが確かめた結果です。</b>}
       </p>
       <button
         onClick={() => all.copy(draftText(sections))}
@@ -101,6 +167,7 @@ function DraftBody({ sections }: { sections: DraftSection[] }) {
                 <dd className="min-w-0">
                   <span className={r.value === "要確認" ? "font-semibold text-[#8a4f3a]" : ""}>{r.value}</span>
                   {r.check && r.value !== "要確認" && <span className="ml-1 whitespace-nowrap rounded bg-[#f6e4dc] px-1 text-[10px] text-[#8a4f3a]">要確認</span>}
+                  {r.confirmed && <span className="ml-1 whitespace-nowrap rounded bg-[#e3f5ec] px-1 text-[10px] font-semibold text-[#1f8f5a]">確認済み</span>}
                   {r.note &&
                     (/^https?:/.test(r.note) ? (
                       // URL は画面では「開く」だけ（コピーした文には URL が入る）
@@ -108,7 +175,8 @@ function DraftBody({ sections }: { sections: DraftSection[] }) {
                         開く
                       </a>
                     ) : (
-                      <Note text={r.note} />
+                      // 確かめた結果の欄は「確認済み」の印を付けたので、注の頭の「確認済み」は省く（コピーした文には入る）
+                      <Note text={r.confirmed ? r.note.replace(/^確認済み /, "") : r.note} />
                     ))}
                 </dd>
               </Fragment>

@@ -8,6 +8,7 @@ describe("地図の凡例", () => {
     expect(legendKey("https://mapping-gunma.pref.gunma.jp/pref-gunma/Map?mid=155&mpx=1&mpy=2")).toBe("mapping-gunma.pref.gunma.jp/pref-gunma/155");
     expect(legendKey("https://ds.icba-info.jp/siteidouro/chiba/pref/")).toBe("ds.icba-info.jp/siteidouro/chiba/pref");
     expect(legendKey("https://www.sonicweb-asp.jp/setagaya/map?theme=shiteidouro&pos=139.6%2C35.6&scale=1000")).toBe("www.sonicweb-asp.jp/setagaya/map?theme=shiteidouro");
+    expect(legendKey("https://niigata.e-map.geogeo.jp/maps?mode=theme&lid=0&mid=15&lat=37.9&lng=139.0&z=17")).toBe("niigata.e-map.geogeo.jp/maps?mid=15");
     expect(legendKey("not a url")).toBeUndefined();
     // ALANDIS は同じパスで道路種別と市道の地図を u= で切り替えるので u= もキーに入れる
     expect(legendKey("https://webgis.alandis.jp/chiba12/webgis/index.php/autologin_jswebgis?ap=jsWebGIS&m=2&u=guest3&x=1&y=2&s=1000&rs=3857&li=3&si=0")).toBe(
@@ -31,12 +32,20 @@ describe("地図の凡例", () => {
   });
 
   it("地図ごと・市町村ごとの凡例を引く", () => {
-    expect(legendFor("https://www2.wagmap.jp/narita/Map?mid=4&mpx=1&mpy=2", "成田市")?.[0]).toEqual({ label: "国道・県道(幅員が4m以上の場合は1項1号)", color: "#267300" });
+    expect(legendFor("https://www2.wagmap.jp/narita/Map?mid=4&mpx=1&mpy=2", "成田市")?.[0]).toEqual({ label: "1:国道・県道(幅員が4m以上の場合は1項1号)", color: "#267300" });
     // 茨城県の共同の地図は市町村ごと
     expect(legendFor("https://www2.wagmap.jp/ibaraki/Map?mid=30&mpx=1&mpy=2", "古河市")?.map((e) => e.label)).toContain("3号道路");
     expect(legendFor("https://www2.wagmap.jp/ibaraki/Map?mid=30&mpx=1&mpy=2", "存在しない町")).toBeUndefined();
     expect(legendFor("https://www.sonicweb-asp.jp/setagaya/map?theme=shiteidouro&pos=1%2C2&scale=1000", "世田谷区")?.map((e) => e.label)).toContain("非常用通路");
     expect(legendFor("https://example.com/map", "成田市")).toBeUndefined();
+  });
+
+  it("「*」で終わるキーは、その前の部分で始まる地図に当てる（福島県の指定道路図は市町村ごとのページ）", () => {
+    expect(legendFor("https://www.pref.fukushima.lg.jp/sec/41065b/shiteidourozu-date.html", "伊達市")?.map((e) => e.label)).toEqual(["5号道路（位置指定道路）", "2項道路"]);
+    expect(legendFor("https://www.pref.fukushima.lg.jp/sec/41065b/shiteidourozu-shirakawa.html", "白河市")?.[0].color).toBe("#fdb000");
+    // 同じ県のほかのページ（指定道路図の入口・位置指定の公告）には当てない
+    expect(legendFor("https://www.pref.fukushima.lg.jp/sec/41065b/shiteidourozu.html", "福島市")).toBeUndefined();
+    expect(legendFor("https://www.pref.fukushima.lg.jp/sec/41065b/shiteidouro.html", "福島市")).toBeUndefined();
   });
 
   it("凡例の色は #rrggbb", () => {

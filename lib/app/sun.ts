@@ -1,0 +1,337 @@
+// 太陽の計算（天体の部分）。時間連動ヘッダー（components/app/sky.tsx）の土台。
+// 東京駅を基準地点にして、今の日時から太陽の高度・方位・日の出入りを出す（SunCalc 2。角度は度、方位は北0°の時計回り、
+// 高度は大気差込み。日の出入りは utcOffset=540 で「日本の暦の日」で切る）。
+// 天体の位置は演出の都合で変えない。空の色・街の写真の混ぜ方（blend・light）は見た目の調整で、ここで一元管理する。
+// 太陽本体を画面のどこに描くか（projectSun）は、写真のカメラの向き・画角が設定されるまで null（描かない）
+import * as SunCalc from "suncalc";
+
+/** 基準地点（東京駅）。全ページで同じ地点を使う。将来は設定で変えられるようにする */
+export const BASE = { lat: 35.6812, lng: 139.7671, utcOffset: 540 } as const;
+export type Base = { lat: number; lng: number; utcOffset: number };
+
+export type SunTimes = {
+  sunrise: Date | null;
+  sunset: Date | null;
+  solarNoon: Date;
+  /** 市民薄明の始まり・終わり（−6°） */
+  dawn: Date | null;
+  dusk: Date | null;
+  /** 天文薄明の終わり・始まり（−18°） */
+  nightEnd: Date | null;
+  night: Date | null;
+  /** ゴールデンアワー（6°） */
+  goldenHourEnd: Date | null;
+  goldenHour: Date | null;
+};
+
+export type Solar = {
+  at: Date;
+  /** 高度（度。地平線 0、天頂 90。大気差込み） */
+  altitude: number;
+  /** 方位（度。北 0、東 90、南 180、西 270） */
+  azimuth: number;
+  /** 高度が上がっている（朝）か */
+  rising: boolean;
+  times: SunTimes;
+};
+
+/** 今の日時の太陽 */
+export function solar(at: Date, base: Base = BASE): Solar {
+  const p = SunCalc.getPosition(at, base.lat, base.lng);
+  const next = SunCalc.getPosition(new Date(at.getTime() + 60_000), base.lat, base.lng);
+  const t = SunCalc.getTimes(at, base.lat, base.lng, 0, base.utcOffset);
+  const d = (v: Date | boolean | null | undefined) => (v instanceof Date ? v : null);
+  return {
+    at,
+    altitude: p.altitude,
+    azimuth: p.azimuth,
+    rising: next.altitude > p.altitude,
+    times: {
+      sunrise: d(t.sunrise),
+      sunset: d(t.sunset),
+      solarNoon: t.solarNoon,
+      dawn: d(t.dawn),
+      dusk: d(t.dusk),
+      nightEnd: d(t.nightEnd),
+      night: d(t.night),
+      goldenHourEnd: d(t.goldenHourEnd),
+      goldenHour: d(t.goldenHour),
+    },
+  };
+}
+
+/** 0→1 に滑らかに（境界で急に変わらないように） */
+export function smoothstep(a: number, b: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+
+/** 街の写真4枚の混ぜ方（合計 1）。昼・夕方・薄暮・夜 */
+export type Blend = { day: number; golden: number; twilight: number; dawn: number; night: number };
+
+/**
+ * 太陽の高度と「昇っているか」から、写真の混ぜ方を決める（時刻では決めない）。
+ * 夕方（沈む）：+10°以上 昼 → 0° 夕方 → −6° 薄暮 → −12° 夜。
+ * 朝（昇る）：−6°以下 夜 → 0° 夜明け（dawn：薄暮の空に、光の消えた街） → +10° 昼。
+ * 夕方の絵（街に明かりが点いている薄暮・夕焼け）は夜明けには使わない（朝と夕方で同じ高度でも色が違う）
+ */
+export function blend(altitude: number, rising: boolean): Blend {
+  const b: Blend = { day: 0, golden: 0, twilight: 0, dawn: 0, night: 0 };
+  if (!rising) {
+    if (altitude >= 0) {
+      b.day = smoothstep(0, 10, altitude);
+      b.golden = 1 - b.day;
+    } else if (altitude >= -6) {
+      b.golden = smoothstep(-6, 0, altitude);
+      b.twilight = 1 - b.golden;
+    } else {
+      b.twilight = smoothstep(-12, -6, altitude);
+      b.night = 1 - b.twilight;
+    }
+  } else if (altitude >= 0) {
+    b.day = smoothstep(0, 10, altitude);
+    b.dawn = 1 - b.day;
+  } else if (altitude >= -6) {
+    b.dawn = smoothstep(-6, 0, altitude);
+    b.night = 1 - b.dawn;
+  } else {
+    b.night = 1;
+  }
+  return b;
+}
+
+/** 書類・出力のページの写真の時間帯（届いた机の写真 3 枚：昼・夕方・夜） */
+export type DayPart = "day" | "evening" | "night";
+
+/**
+ * 太陽の高さで、書類・出力のページの写真を選ぶ（季節で時刻が変わる。東京駅で 11 月 1 日なら 昼 5:49〜・夕方 16:12〜・夜 17:15〜、
+ * 6 月 21 日なら 昼 4:11〜・夕方 18:23〜・夜 19:34〜、12 月 22 日なら 昼 6:33〜・夕方 15:53〜・夜 17:03〜）。
+ * 夕方（沈む）：+6°（ゴールデンアワーの始まり。日の入りの約 35 分前）から −6°（市民薄明の終わり。日の入りの約 30 分後）まで。それより低ければ夜。
+ * 朝（昇る）：−3°（日の出の約 15 分前）からは昼（夕方の写真は夕焼けと点いた街の明かりなので、朝には使わない）。
+ * 3 枚は構図が違う写真なので、混ぜずにどれか 1 枚を選ぶ
+ */
+export function dayPart(altitude: number, rising: boolean): DayPart {
+  if (rising) return altitude >= -3 ? "day" : "night";
+  if (altitude >= 6) return "day";
+  if (altitude >= -6) return "evening";
+  return "night";
+}
+
+/** お気に入りのページの写真の時間帯（届いた富士山の写真 4 枚：昼・昼と夕方のあいだ・夕方・夜） */
+export type FavPart = DayPart | "afternoon";
+
+/** 昼と夕方のあいだが始まる太陽の高さ（度。沈んでいくとき。日の入りの約 1 時間 30 分前） */
+export const AFTERNOON_FROM = 16;
+
+/**
+ * 太陽の高さで、お気に入りのページの富士山の写真を選ぶ。書類・出力（dayPart）の昼のうち、太陽が沈んでいく途中で
+ * +16° より低くなってから、夕方の始まり（+6°）までを「昼と夕方のあいだ」にする（約 1 時間。東京駅で 11 月 1 日なら 15:16〜16:12、
+ * 6 月 21 日なら 17:30〜18:23、12 月 22 日なら 14:49〜15:53）。夕方・夜の境目は dayPart と同じ。
+ * 朝（昇る）は低い太陽でも昼のまま（あいだの写真は西日なので）
+ */
+export function favPart(altitude: number, rising: boolean): FavPart {
+  const p = dayPart(altitude, rising);
+  return p === "day" && !rising && altitude < AFTERNOON_FROM ? "afternoon" : p;
+}
+
+/** 履歴のページの写真の時間帯（届いた住宅街の写真 4 枚：朝・昼・夕方・夜。同じ通りを同じ場所から写したもの） */
+export type HistPart = DayPart | "morning";
+
+/** 朝が終わる太陽の高さ（度。昇っていくとき。日の出の約 1 時間 30 分後） */
+export const MORNING_UNTIL = 16;
+
+/**
+ * 太陽の高さで、履歴のページの写真を選ぶ。書類・出力（dayPart）の昼のうち、太陽が昇っていく途中で +16° より低いあいだ
+ * （日の出の約 15 分前の −3° から、日の出の約 1 時間 30 分後まで）を朝にする。夕方・夜の境目は dayPart と同じ。
+ * 時刻は sun.test.ts（東京駅で 11 月 1 日・6 月 21 日・12 月 22 日）
+ */
+export function histPart(altitude: number, rising: boolean): HistPart {
+  const p = dayPart(altitude, rising);
+  return p === "day" && rising && altitude < MORNING_UNTIL ? "morning" : p;
+}
+
+/** ホームの写真の時間帯（届いた街の写真 5 枚：朝・昼・夕方・夕方と夜のあいだ・夜。同じ街を同じ場所から写したもの） */
+export type HomePart = HistPart | "dusk";
+
+/** 夕方が終わる太陽の高さ（度。沈んでいくとき。太陽が地平線の下に沈みきったころ） */
+export const SUNSET_AT = -1;
+
+/**
+ * 太陽の高さで、ホームの写真を選ぶ。朝・昼・夜の境目は履歴（histPart）と同じで、夕方（沈む太陽が +6° より低い）を、
+ * 太陽が沈みきる −1° までの「夕方」（夕日が見える写真）と、そこから −6°（市民薄明の終わり。日の入りの約 30 分後）までの
+ * 「夕方と夜のあいだ」（日が沈んで明かりが点いた写真）に分ける（東京駅で 11 月 1 日なら 夕方 16:12〜・あいだ 16:50〜・夜 17:15〜）。
+ * 最初に描く前の <head> の計算（lib/app/sky-vars.ts の SKY_HEAD_SCRIPT）も同じ境目
+ */
+export function homePart(altitude: number, rising: boolean): HomePart {
+  const p = histPart(altitude, rising);
+  return p === "evening" && altitude < SUNSET_AT ? "dusk" : p;
+}
+
+/** 写真の重ね順（下から上）。components/app/sky.tsx はこの順に重ねる */
+export const PHOTO_ORDER = ["night", "twilight", "dawn", "golden", "day"] as const;
+
+/**
+ * 重ねた写真それぞれの不透明度。混ぜ方（合計 1）をそのまま不透明度にすると、重なった所で下の地が透けて薄くなるので、
+ * 下から k 枚目は「k 枚目までの重みの合計に対する自分の重み」にする（下の1枚は 1）。こうすると合成の色が重みどおりの混色になる
+ */
+export function layerOpacity(b: Blend): Record<keyof Blend, number> {
+  const out = { day: 0, golden: 0, twilight: 0, dawn: 0, night: 0 };
+  let sum = 0;
+  for (const k of PHOTO_ORDER) {
+    sum += b[k];
+    out[k] = sum > 0 ? b[k] / sum : 0;
+  }
+  return out;
+}
+
+export type RGB = [number, number, number];
+/** 写真の上端（時刻・電池の帯につなぐ）の色。届いた4枚の帯の切り抜き（public/home/sky）の上端を測った値 */
+export const SKY_TOP: Record<keyof Blend, RGB> = {
+  day: [123, 185, 232],
+  golden: [150, 154, 183],
+  twilight: [116, 116, 153],
+  dawn: [116, 116, 153],
+  night: [24, 38, 79],
+};
+/** 空の中ほど（見出しの後ろ）と地平線の近くの色。各ページの帯のグラデーションに使う */
+export const SKY_MID: Record<keyof Blend, RGB> = {
+  day: [176, 215, 239],
+  golden: [212, 170, 162],
+  twilight: [173, 135, 151],
+  dawn: [173, 135, 151],
+  night: [41, 50, 91],
+};
+export const SKY_HORIZON: Record<keyof Blend, RGB> = {
+  day: [191, 204, 218],
+  golden: [202, 160, 137],
+  twilight: [174, 128, 132],
+  dawn: [175, 130, 137],
+  night: [67, 65, 90],
+};
+
+const mix = (cols: Record<keyof Blend, RGB>, b: Blend): RGB => {
+  const out: RGB = [0, 0, 0];
+  for (const k of Object.keys(b) as (keyof Blend)[]) for (let i = 0; i < 3; i++) out[i] += cols[k][i] * b[k];
+  return out;
+};
+const hex = (c: RGB) => `#${c.map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, "0")).join("")}`;
+/** 相対輝度（0〜1） */
+const luminance = (c: RGB) => (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255;
+
+/** コードで描く光の指示（空のグロー・ガラスのハイライト・文字の色） */
+export type Light = {
+  /** 写真の上端の色（時刻・電池の帯をこの色に） */
+  top: string;
+  /** 空の中ほどと地平線の近くの色（各ページの帯のグラデーション） */
+  mid: string;
+  horizon: string;
+  /** 地平線の光（色と強さ 0〜1）。空のマスクの中にだけ乗せる */
+  glow: { color: string; strength: number };
+  /** ガラスのカードの縁のハイライトの色 */
+  highlight: string;
+  /** 空が暗く、ロゴ・見出しを白にするか */
+  dark: boolean;
+  /** 夜らしさ 0〜1（下のぼかしの色などに使う） */
+  nightness: number;
+};
+
+/**
+ * 光の差す向き（画面の左 0 〜 右 100）。東（方位 60°）から昇って西（300°）に沈む太陽を、画面の左から右へ当てはめる
+ * （書類・出力の帯の差し込む光などに使う。写真の中の位置ではない）
+ */
+export function lightX(azimuth: number): number {
+  return Math.round(Math.min(100, Math.max(0, ((azimuth - 60) / 240) * 100)));
+}
+
+export function light(altitude: number, rising: boolean, b: Blend = blend(altitude, rising), colors?: { top: RGB; mid: RGB; horizon: RGB }): Light {
+  // 空の色は、大気の式（lib/app/atmosphere.ts）から渡されればそれ。無ければ写真の帯を測った値を混ぜる
+  const top = colors?.top ?? mix(SKY_TOP, b);
+  const mid = colors?.mid ?? mix(SKY_MID, b);
+  const horizon = colors?.horizon ?? mix(SKY_HORIZON, b);
+  // 地平線の光：太陽が地平線の近く（−8°〜+6°）で強い。朝は桃色、夕方は橙
+  const near = Math.exp(-((altitude + 1) * (altitude + 1)) / (2 * 4.5 * 4.5));
+  const glowColor: RGB = rising ? [255, 214, 170] : [255, 178, 120];
+  // ガラスの縁：昼は白、夕方・朝は金、夜は青み
+  const warm = altitude < 8 && altitude > -8 ? smoothstep(8, 0, altitude) * (1 - smoothstep(-2, -8, altitude)) : 0;
+  const nightness = b.night + 0.5 * (b.twilight + b.dawn);
+  const white: RGB = [255, 255, 255];
+  const gold: RGB = [255, 222, 160];
+  const blue: RGB = [190, 208, 245];
+  const hl: RGB = [0, 1, 2].map((i) => white[i] * (1 - warm) * (1 - nightness) + gold[i] * warm * (1 - nightness) + blue[i] * nightness) as RGB;
+  return {
+    top: hex(top),
+    mid: hex(mid),
+    horizon: hex(horizon),
+    glow: { color: hex(glowColor), strength: Math.round(near * 100) / 100 },
+    highlight: hex(hl),
+    dark: luminance(top) < 0.42,
+    nightness: Math.round(nightness * 100) / 100,
+  };
+}
+
+/** 写真のカメラ（撮影の向き・画角・地平線の位置）。設定するまで太陽本体は描かない（README の指示のとおり） */
+export type Camera = {
+  /** 方位・画角を実際に測って入れたら true。生成画像は撮影方位が不明なので最初は false */
+  calibrated: boolean;
+  /** カメラが向いている方位（度。北 0） */
+  bearing: number;
+  /** 水平画角（度） */
+  hfov: number;
+  /** 画像の中の地平線の位置（上から 0〜1） */
+  horizon: number;
+  /** 幅 ÷ 高さ */
+  aspect: number;
+};
+
+/**
+ * ホームの帯のカメラ。汐留の上空 約 260m（PLATEAU の実在の街を焼き込んだ視点）から西南西（方位 246°）を、ほぼ水平に見る（+0.25°。
+ * 地平線は上から 50.5%。富士山が見出しの下の文字に隠れない高さ）。画角は 62°。東京タワーが中央のやや右、その右奥に富士山。夕日は 8 月下旬〜4 月は画面の中に沈み、
+ * 5〜7 月は右の端の外
+ */
+export const HOME_CAMERA: Camera = { calibrated: true, bearing: 246, hfov: 62, horizon: 0.505189, aspect: 393 / 275 };
+
+const R = Math.PI / 180;
+
+/**
+ * 太陽を画面のどこに描くか（直線投影。0〜1 の割合）。カメラが未設定なら null。
+ * カメラの後ろにあるときも null。画角の外は inside=false（本体は描かず、光だけ）
+ */
+export function projectSun(sun: { altitude: number; azimuth: number }, cam: Camera): { x: number; y: number; inside: boolean } | null {
+  if (!cam.calibrated) return null;
+  const tanH = Math.tan((cam.hfov / 2) * R);
+  const tanV = tanH / cam.aspect;
+  // 地平線を上から horizon の位置に置くための上向きの傾き
+  const pitch = Math.atan((2 * cam.horizon - 1) * tanV);
+  const y0 = cam.bearing * R;
+  const alt = sun.altitude * R;
+  const az = sun.azimuth * R;
+  const d = [Math.cos(alt) * Math.sin(az), Math.cos(alt) * Math.cos(az), Math.sin(alt)];
+  const f = [Math.sin(y0) * Math.cos(pitch), Math.cos(y0) * Math.cos(pitch), Math.sin(pitch)];
+  const r = [Math.cos(y0), -Math.sin(y0), 0];
+  const u = [-Math.sin(y0) * Math.sin(pitch), -Math.cos(y0) * Math.sin(pitch), Math.cos(pitch)];
+  const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const z = dot(d, f);
+  if (z <= 0) return null;
+  const sx = dot(d, r) / z / tanH;
+  const sy = dot(d, u) / z / tanV;
+  return { x: (sx + 1) / 2, y: (1 - sy) / 2, inside: Math.abs(sx) <= 1 && Math.abs(sy) <= 1 };
+}
+
+/**
+ * プレビュー用の日時の固定（URL の #t=2026-06-21T18:30。時差が無ければ日本時間）。無ければ null。
+ * 本番でも使えるが、表示が変わるだけで保存や通信には使わない
+ */
+export function overrideTime(hash: string): Date | null {
+  const m = hash.replace(/^#/, "").match(/(?:^|&)t=([^&]+)/);
+  if (!m) return null;
+  const v = decodeURIComponent(m[1]);
+  const iso = /[zZ]|[+-]\d\d:?\d\d$/.test(v) ? v : `${v}${v.length <= 10 ? "T12:00" : ""}+09:00`;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** 日本時間の「時:分」 */
+export function jstTime(d: Date | null): string {
+  if (!d) return "—";
+  return d.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" });
+}

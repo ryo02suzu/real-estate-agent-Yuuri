@@ -21,6 +21,8 @@ export function legendKey(url: string): string | undefined {
   const mid = u.searchParams.get("mid");
   const m = u.pathname.match(/^\/([^/]+)\/Map$/);
   if (m && mid) return `${u.host}/${m[1]}/${mid}`;
+  // geogeo の公開型GIS（/maps?mode=theme&lid=…&mid=…）はテーマ番号で分ける
+  if (mid && u.pathname.endsWith("/maps")) return `${u.host}/maps?mid=${mid}`;
   const theme = u.searchParams.get("theme");
   if (theme) return `${u.host}${u.pathname}?theme=${theme}`;
   const user = u.searchParams.get("u");
@@ -31,9 +33,21 @@ export function legendKey(url: string): string | undefined {
 }
 
 /** 地図の凡例。県の共同の地図（茨城県）は市町村ごとの凡例を引く。無ければ undefined */
+const STORED = LEGENDS as Record<string, Stored>;
+
+/**
+ * 「*」で終わるキー：その前の部分で始まる地図はどれも同じ凡例（福島県の指定道路図は、県が市町村ごとのページで同じ作りの図を出す）。
+ * ふつうのキーと同じ地図に当たるときは、ふつうのキーを使う
+ */
+const PREFIXES = Object.keys(STORED)
+  .filter((k) => k.endsWith("*"))
+  .map((k) => [k.slice(0, -1), k] as const);
+
 export function legendFor(url: string, city: string): LegendEntry[] | undefined {
   const key = legendKey(url);
-  const s = key ? (LEGENDS as Record<string, Stored>)[key] : undefined;
+  if (!key) return undefined;
+  const prefix = STORED[key] ? undefined : PREFIXES.find(([p]) => key.startsWith(p));
+  const s = STORED[key] ?? (prefix ? STORED[prefix[1]] : undefined);
   if (!s) return undefined;
   const list = s.byCity ? s.byCity[city] : s.legend;
   return list && list.length ? list : undefined;

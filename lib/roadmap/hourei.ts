@@ -3,6 +3,7 @@
 // どれも縮尺 1/25,000 程度の概略の位置で、重要事項説明の根拠には使えない（国土数値情報の注意事項）ので参考として出し、
 // 指定した都県・市の資料で確かめる旨と、都県が利用条件で求める特記事項を添える
 import SOURCE from "./data/hourei-source.json";
+import { PREF_NAMES as REGION_PREF_NAMES } from "./regions";
 import type { LngLat, Polygon } from "./parcel";
 import { inPolygon } from "./zoning";
 
@@ -57,9 +58,11 @@ export const HOUREI_DATA = { url: process.env.NEXT_PUBLIC_HOUREI_PMTILES_URL || 
 export const HOUREI_CREDIT =
   "出典：「国土数値情報（砂防指定地データ・地すべり防止区域データ・急傾斜地崩壊危険区域データ・災害危険区域データ）」（国土交通省、https://nlftp.mlit.go.jp/ksj/）を加工して作成";
 
-export const PREF_NAMES: Record<string, string> = { "08": "茨城県", "09": "栃木県", "10": "群馬県", "11": "埼玉県", "12": "千葉県", "13": "東京都", "14": "神奈川県" };
+export const PREF_NAMES: Record<string, string> = REGION_PREF_NAMES;
 
 const YEARS = SOURCE.years as Record<string, Record<string, number>>;
+/** データを取り込んである都道府県（取り込み前の地方は null を返す） */
+const DATA_PREFS = new Set(Object.values(YEARS).flatMap((by) => Object.keys(by)));
 
 /** 都県が利用条件で、成果物に明記するよう求めている特記事項（国土数値情報の都県別の利用条件） */
 const NOTES: Partial<Record<HoureiKind, Record<string, string>>> = {
@@ -103,10 +106,10 @@ function tileOf(lat: number, lng: number, z: number): [number, number] {
 
 const ORDER: HoureiKind[] = ["急傾斜地崩壊危険区域", "地すべり防止区域", "砂防指定地", "災害危険区域"];
 
-/** 地点の区域。city は物件の市区町村コード。関東1都6県の外は null。区域の無い所にはタイルが無い */
+/** 地点の区域。city は物件の市区町村コード。対応エリア（データのある都道府県）の外は null。区域の無い所にはタイルが無い */
 export async function houreiAt(lat: number, lng: number, city: string, source: HoureiSource): Promise<Hourei | null> {
   const pref = city.slice(0, 2);
-  if (!PREF_NAMES[pref]) return null;
+  if (!PREF_NAMES[pref] || !DATA_PREFS.has(pref)) return null;
   const areas = (await source.tile(...tileOf(lat, lng, HOUREI_ZOOM))) ?? [];
   const p: LngLat = [lng, lat];
   const seen = new Set<string>();

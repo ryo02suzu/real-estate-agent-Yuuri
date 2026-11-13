@@ -19,11 +19,14 @@ on:
 
 jobs:
   claude:
+    # 書いた人が、このリポジトリの持ち主・メンバー・共同作業者のときだけ動かす（author_association）。
+    # claude-code-action も書き込める人かを確かめるが、その前の段（部品の取り込みなど）から、ほかの人の Issue・コメントでは動かさない。
+    # Issue は「書いた人」で見るので、ほかの人が書いた Issue を持ち主が担当に付けても動かない（本文が指示として読まれるのを防ぐ）
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.review.author_association)) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')) && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
     runs-on: ubuntu-latest
     # 長く動き続けないように（1 回の依頼で 60 分まで）
     timeout-minutes: 60

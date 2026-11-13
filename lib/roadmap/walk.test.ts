@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SRC from "./data/station-source.json";
+import { REGIONS } from "./regions";
 import type { LngLat } from "./parcel";
-import { lineLabel, nearbyStations, nearestStations, stationLine, walkDistances, walkMinutes, type Station } from "./walk";
+import { isCableOnly, lineLabel, nearbyStations, nearestStations, stationLine, walkDistances, walkMinutes, type Station } from "./walk";
 
 // 緯度 35.5・経度 139.6 のあたり。1m ≒ 経度 0.0000110・緯度 0.0000090
 const X = 139.6;
@@ -56,6 +57,22 @@ describe("徒歩の道のり", () => {
       stationLine({ name: "菊名", lines: [["東横線", "東急"], ["横浜線", "JR東日本"]], meters: 612, minutes: 8, straight: 480, routed: true }),
     ).toBe("菊名駅（東急東横線・JR横浜線）徒歩約8分（約610m）");
     expect(stationLine({ name: "菊名", lines: [["東横線", "東急"]], meters: 1480, minutes: 19, straight: 1480, routed: false })).toBe("菊名駅（東急東横線）直線約1.5km");
+    // 出入口が分からずホームまでで測った駅は、そう書く（出入口・駅舎・駅の位置までは書き足さない）
+    const base = { name: "菊名", lines: [["東横線", "東急"]] as [string, string][], meters: 612, minutes: 8, straight: 480, routed: true };
+    expect(stationLine({ ...base, to: "platform" })).toBe("菊名駅（東急東横線）徒歩約8分（ホームまで約610m）");
+    expect(stationLine({ ...base, to: "entrance" })).toBe("菊名駅（東急東横線）徒歩約8分（約610m）");
+    expect(stationLine({ ...base, meters: 2400, routed: false, to: "platform" })).toBe("菊名駅（東急東横線）直線（ホームまで）約2.4km");
+  });
+
+  it("出入口の点がある駅は出入口まで、無い駅はホームの線まで（直線）", () => {
+    // ホームの東の端（東 100m）は近いが、出入口は西の端（東 400m）。ホームだけの駅は東 300m
+    const ends: Station = { n: "端", l: [["本線", "私鉄"]], p: [at(100, 0), at(400, 0)], e: [at(420, 0)], k: 1 };
+    const plain: Station = { n: "中", l: [["本線", "私鉄"]], p: [at(300, 0)] };
+    const r = nearbyStations(Y, X, [ends, plain]);
+    expect(r.map((n) => [n.station.n, Math.round(n.straight)])).toEqual([
+      ["中", 300],
+      ["端", 420],
+    ]);
   });
 });
 
@@ -75,6 +92,37 @@ describe("アプリに入っている駅のデータ", () => {
   it("横浜市港北区大豆戸町の近くの駅（直線）に菊名・大倉山・新横浜", () => {
     const near = nearbyStations(35.5146, 139.6218, STATIONS).map((n) => n.station.n);
     for (const n of ["菊名", "大倉山", "新横浜"]) expect(near).toContain(n);
+  });
+
+  it("駅の入口の点（OpenStreetMap）が入っている。出入口の多い駅は16点まで", () => {
+    const by = new Map(STATIONS.map((s) => [s.n, s]));
+    for (const n of ["新宿", "横浜", "大宮", "千葉", "桐生", "西桐生"]) expect(by.get(n)?.e?.length, n).toBeGreaterThan(0);
+    expect(by.get("新宿")!.k).toBe(1);
+    expect(Math.max(...STATIONS.map((s) => s.e?.length ?? 0))).toBeLessThanOrEqual(16);
+    // 関東の範囲の駅は、ほとんどに入口の点がある（無いのは路面電車の停留場など）。中部の駅の入口の点の多さは確かめていないので、割合は関東の範囲で見る
+    const [[w, s0], [e, n0]] = REGIONS.kanto.bounds;
+    const kanto = STATIONS.filter((s) => s.p.some(([x, y]) => x >= w && x <= e && y >= s0 && y <= n0));
+    expect(kanto.length).toBeGreaterThan(2000);
+    expect(kanto.filter((s) => s.e?.length).length / kanto.length).toBeGreaterThan(0.8);
+    expect(SRC.doorsDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("檜原村の役場のあたり（2km 以内に駅が無い）は、山の上のケーブルカーの駅（御岳山）ではなく、ふつうの駅を直線の目安にする", () => {
+    const near = nearbyStations(35.7277, 139.1488, STATIONS);
+    expect(near).toHaveLength(1);
+    expect(near[0].straight).toBeGreaterThan(2000);
+    expect(near[0].station.n).not.toBe("御岳山");
+    expect(isCableOnly(near[0].station)).toBe(false);
+    // 箱根の強羅はケーブルカーと登山電車の駅なので、ケーブルカーだけの駅ではない
+    const goura = STATIONS.find((s) => s.n === "強羅")!;
+    expect(isCableOnly(goura)).toBe(false);
+    expect(isCableOnly(STATIONS.find((s) => s.n === "御岳山")!)).toBe(true);
+  });
+
+  it("桐生市元宿町のあたりは、西桐生より桐生が近い（ホームの端ではなく、駅舎・駅の位置まで測る）", () => {
+    const near = nearbyStations(36.413, 139.327, STATIONS);
+    expect(near[0].station.n).toBe("桐生");
+    expect(near.findIndex((n) => n.station.n === "西桐生")).toBeGreaterThan(0);
   });
 });
 

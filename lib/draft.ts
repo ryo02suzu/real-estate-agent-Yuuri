@@ -9,11 +9,11 @@ import { rosenkaLinks } from "./roadmap/rosenka";
 import { SANKO_NOTE } from "./roadmap/sanko-data";
 import { distanceText, kindText, priceText, type LandPriceHit } from "./roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
-import { chibanLabel, estimatedNote, kuikiLabel, parcelMark, type Estimated } from "./roadmap/parcel";
+import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark, type Estimated } from "./roadmap/parcel";
 import type { NearbyRoad } from "./roadmap/road-read";
-import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
+import { schoolCredit, schoolGaps, schoolGapShort, schoolLine, type Schools } from "./roadmap/school";
 import { POI_NOTE, poiCredit, poiWalkText, type PoiWalk } from "./roadmap/poi";
-import { lineLabel, STATION_CREDIT, type StationWalk } from "./roadmap/walk";
+import { lineLabel, STATION_CREDIT, TO_LABEL, type StationWalk } from "./roadmap/walk";
 import { CHIBANZU_NOTE, chibanzuFor } from "./roadmap/chibanzu";
 import { HOUREI_CREDIT, HOUREI_LAWS, houreiAsOf, houreiCaution, houreiGroups, houreiNotesLine, houreiOffice, houreiOfficeAll, PREF_NAMES, type Hourei, type HoureiKind } from "./roadmap/hourei";
 import { isekiFor } from "./roadmap/iseki";
@@ -23,14 +23,16 @@ import { TOCHI_CREDIT, tochiAgriText, tochiCheck, tochiForestText, tochiParkText
 import { MORIDO_CREDIT, moridoCaution, moridoDetail, moridoValue, type Morido } from "./roadmap/morido";
 import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
 import { ZONING_CREDIT } from "./roadmap/zoning-data";
+import type { ConfirmedItem } from "./app/confirmed";
 
-/** 下書きの1行。check：役所・法務局・現地で確かめる必要がある（データが無い・参考にとどまる） */
-export type DraftRow = { label: string; value: string; note?: string; check?: boolean };
+/** 下書きの1行。check：役所・法務局・現地で確かめる必要がある（データが無い・参考にとどまる）。confirmed：あなたが確かめた結果（確認の記録から） */
+export type DraftRow = { label: string; value: string; note?: string; check?: boolean; confirmed?: boolean };
 export type DraftSection = { title: string; rows: DraftRow[] };
 
 export type DraftInput = {
   zoning?: { zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi };
-  parcels?: { target?: string; neighbors: string[]; reference: boolean; estimated?: Estimated; sanko?: string };
+  /** offLot：住所の地点の筆が、隣地のとても多い筆（地番の付いた公道など。物件の外の土地の可能性） */
+  parcels?: { target?: string; neighbors: string[]; reference: boolean; offLot?: boolean; estimated?: Estimated; sanko?: string };
   roads?: NearbyRoad[];
   hazard?: { report: HazardReport; elevation: Elevation | null; maps: HazardMaps; muniCd: string };
   building?: BuildingResult;
@@ -38,12 +40,14 @@ export type DraftInput = {
   schools?: Schools;
   stations?: StationWalk[];
   pois?: PoiWalk[];
+  /** あなたが確かめた結果（スマホの「次にやること」・確認の記録で書いたもの。lib/app/confirmed.ts）。対応する欄を確認済みにする */
+  confirmed?: ConfirmedItem[];
 };
 
 const CHECK = "要確認";
 
 /** 重要事項説明書（法令上の制限・道路・災害）と販売図面（物件概要）の欄の並びの下書き */
-export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zoning, parcels, roads, hazard, building, landPrice, schools, stations, pois }: DraftInput = {}): DraftSection[] {
+export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zoning, parcels, roads, hazard, building, landPrice, schools, stations, pois, confirmed }: DraftInput = {}): DraftSection[] {
   const m = result.municipality;
   const p = result.parcel;
   const found = p && !result.picked ? p : undefined;
@@ -53,7 +57,8 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   const place: DraftRow[] = [
     {
       label: "所在（住所）",
-      value: `${result.matchedAddress}${found ? "" : " 付近"}`,
+      // 住所の数字は半角にそろえる（国土地理院の住所は「１９番１１号」のように全角。地番は半角）
+      value: `${result.matchedAddress.normalize("NFKC")}${found ? "" : " 付近"}`,
       note: result.picked ? "地図で選んだ地点" : result.approximate ? "番地まで見つからず、町の中心の位置" : undefined,
       check: result.approximate,
     },
@@ -73,11 +78,18 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     place.push({
       label: "所在（地番）",
       value: `${parcels.target}${parcels.estimated ? "（推定）" : parcels.sanko ? "（地番参考図）" : ""}`,
-      note: parcels.reference ? "住所の地点にある筆（参考）。住居表示と地番は別のもの" : undefined,
+      note: parcels.offLot
+        ? "住所の地点にある筆（参考）。隣地がとても多く、道路など物件の外の土地の可能性があるので、公図で確認"
+        : parcels.reference
+          ? "住所の地点にある筆（参考）。住居表示と地番は別のもの"
+          : undefined,
       check: true,
     });
   else place.push({ label: "所在（地番）", value: CHECK, note: "登記・公図で確認", check: true });
-  if (parcels?.neighbors.length) place.push({ label: "隣地の地番", value: parcels.neighbors.join("、"), note: "境界が接している筆（地図データから）" });
+  // 住所の地点の筆が道路などの可能性があるときは、その筆の隣地（道沿いの筆）を物件の隣地として書かない
+  if (parcels?.neighbors.length && parcels.offLot)
+    place.push({ label: "隣地の地番", value: `省略（この筆に接する筆は${parcels.neighbors.length}筆）`, note: "住所の地点の筆が道路など物件の外の土地の可能性があるので、公図で物件の筆を確かめてから隣地を調べる", check: true });
+  else if (parcels?.neighbors.length) place.push({ label: "隣地の地番", value: neighborList(parcels.neighbors), note: "境界が接している筆（地図データから）" });
   const chibanzu = chibanzuFor(m, result.lat, result.lng);
   if (chibanzu) place.push({ label: "地番の参考図", value: `${chibanzu.name}（${chibanzu.url}）`, note: CHIBANZU_NOTE });
   place.push({ label: "緯度・経度", value: `${result.lat.toFixed(6)}, ${result.lng.toFixed(6)}` });
@@ -248,7 +260,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     outline.push({
       label: "交通",
       value: `${s.lines.map(lineLabel).join("・")}「${s.name}」駅 ${s.routed ? `徒歩約${s.minutes}分` : `直線約${(s.meters / 1000).toFixed(1)}km`}`,
-      note: s.routed ? `道路距離 約${Math.round(s.meters / 10) * 10}m・駅の出入口までではない目安` : "歩いて行ける範囲に駅なし・直線距離",
+      note: s.routed ? `道路距離 約${Math.round(s.meters / 10) * 10}m（${TO_LABEL[s.to ?? "platform"]}）・地図から出した目安` : "歩いて行ける範囲に駅なし・直線距離",
       check: true,
     });
   const y = zoning?.zoning.youto[0];
@@ -256,6 +268,9 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   if (zoning?.zoning.bouka) outline.push({ label: "防火指定", value: zoning.zoning.bouka });
   if (schools?.elementary) outline.push({ label: "小学校区", value: schoolLine(schools.elementary) });
   if (schools?.junior) outline.push({ label: "中学校区", value: schoolLine(schools.junior) });
+  // 出せなかった学校区は、確かめる先を【要確認】で
+  for (const g of schools ? schoolGaps(result.municipality.codes[0], schools) : [])
+    outline.push({ label: g.label, value: `${result.municipality.name}の教育委員会で確認`, note: `データなし（${schoolGapShort(g.why, result.municipality.name)}）`, check: true });
   const hit = building?.hit;
   if (hit) outline.push({ label: "建物（PLATEAU）", value: `${buildingSummary(hit.building)}${hit.building.height ? `・高さ約${hit.building.height.toFixed(1)}m` : ""}`, note: "登記・建築確認の内容とは異なることがある", check: true });
   const near = (landPrice ?? [])[0];
@@ -294,8 +309,81 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   // 都県が利用条件で求める特記事項（砂防指定地などの区域のデータ）
   const notes = hr && houreiNotesLine(hr.pref);
   if (notes) credit(notes);
+  if (confirmed?.length) applyConfirmed(sections, confirmed);
   if (credits.length) sections.push({ title: "出典", rows: credits });
   return sections;
+}
+
+/**
+ * 確かめた結果を入れる欄：節（見出しの頭。title は無ければ作る節）・置き換える欄（同じことを書く欄。onlyCheck は要確認のときだけ）・
+ * 外す欄（データが無いときの「要確認」の欄で、確かめた結果の欄がその代わりになるもの）
+ */
+type Spot = { section: RegExp; title?: string; replace?: RegExp; onlyCheck?: boolean; drop?: RegExp };
+const SPOTS: Record<string, Spot> = {
+  "road.kind": { section: /^敷地と道路/, drop: /^道路の種別・幅員$/ },
+  "road.width": { section: /^敷地と道路/ },
+  "road.frontage": { section: /^敷地と道路/ },
+  "road.setback": { section: /^敷地と道路/ },
+  "zoning.youto": { section: /^都市計画法/, replace: /^用途地域$/ },
+  "zoning.ratio": { section: /^都市計画法/ },
+  "zoning.koudo": { section: /^都市計画法/ },
+  "zoning.chiku": { section: /^都市計画法/ },
+  "law.kuiki": { section: /^その他の法令/ },
+  "law.iseki": { section: /^その他の法令/, replace: /^文化財保護法/ },
+  "law.lifeline": { section: /^飲用水/ },
+  "hazard.flood": { section: /^ハザードマップ/ },
+  "hazard.dosha": { section: /^ハザードマップ/ },
+  "hazard.tsunami": { section: /^ハザードマップ/ },
+  "hazard.ekijo": { section: /^ハザードマップ/ },
+  "parcel.touki": { section: /^物件の表示/, replace: /^所在（地番）$/, onlyCheck: true },
+  "parcel.boundary": { section: /^物件の表示/ },
+  "around.site": { section: /^現地で確かめたこと/, title: "現地で確かめたこと" },
+};
+
+/**
+ * 確かめた結果を下書きに入れる。同じことを書く欄があればその欄を確認済みに書き換えて「要確認」を外し（データの値は注に残す）、
+ * 無ければ節の先頭（物件の表示は所在の欄の下）に足す。建ぺい率・容積率は「60%・200%」のように2つ書いてあれば2つの欄に分ける
+ */
+function applyConfirmed(sections: DraftSection[], items: ConfirmedItem[]): void {
+  const added = new Map<DraftSection, DraftRow[]>();
+  const sectionOf = (spot: Spot): DraftSection | undefined => {
+    const found = sections.find((x) => spot.section.test(x.title));
+    if (found || !spot.title) return found;
+    const made: DraftSection = { title: spot.title, rows: [] };
+    sections.push(made);
+    return made;
+  };
+  const swap = (sec: DraftSection, re: RegExp, row: DraftRow, onlyCheck?: boolean): boolean => {
+    const i = sec.rows.findIndex((r) => re.test(r.label) && (!onlyCheck || r.value === CHECK));
+    if (i < 0) return false;
+    const old = sec.rows[i];
+    sec.rows[i] = { ...row, label: old.label, note: old.value === CHECK ? row.note : `${row.note}。データ：${old.value}` };
+    return true;
+  };
+  for (const c of items) {
+    const key = `${c.topic}.${c.sub}`;
+    const spot = SPOTS[key];
+    const sec = spot && sectionOf(spot);
+    if (!spot || !sec) continue;
+    const row: DraftRow = { label: c.label, value: c.value, note: c.detail, confirmed: true };
+    if (key === "zoning.ratio") {
+      const m = c.value.normalize("NFKC").match(/^\s*(\d+(?:\.\d+)?)\s*%?\s*[・／/,、\s]\s*(\d+(?:\.\d+)?)\s*%?\s*$/);
+      if (m && sec.rows.some((r) => r.label === "建ぺい率") && sec.rows.some((r) => r.label === "容積率")) {
+        swap(sec, /^建ぺい率$/, { ...row, value: `${m[1]}%` });
+        swap(sec, /^容積率$/, { ...row, value: `${m[2]}%` });
+        continue;
+      }
+    }
+    if (key === "law.kuiki" && c.label === "盛土規制法の区域" && swap(sec, /^宅地造成及び特定盛土等規制法$/, row)) continue;
+    if (spot.replace && swap(sec, spot.replace, row, spot.onlyCheck)) continue;
+    if (spot.drop) sec.rows = sec.rows.filter((r) => !(spot.drop!.test(r.label) && r.value === CHECK));
+    added.set(sec, [...(added.get(sec) ?? []), row]);
+  }
+  for (const [sec, rows] of added) {
+    // 物件の表示は所在の欄の下、ほかは節の先頭（現地で確かめたことの節は新しく作る。出典はこのあとに足すので、出典の前になる）
+    const at = /^物件の表示/.test(sec.title) ? sec.rows.reduce((n, r, i) => (/^所在（/.test(r.label) ? i + 1 : n), 0) : 0;
+    sec.rows.splice(at, 0, ...rows);
+  }
 }
 
 const KSJ = /^出典：「国土数値情報（(.+?)）」（国土交通省、https:\/\/nlftp\.mlit\.go\.jp\/ksj\/）を加工して作成(.*)$/;

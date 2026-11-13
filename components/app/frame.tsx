@@ -1,0 +1,172 @@
+"use client";
+
+// スマホの新しい見た目（紺）の枠：絵の幅（393pt。画面の幅に合わせて拡大・縮小する。CSS の zoom。値は app/layout.tsx の <head> で決める。
+// components/app/zoom.ts）、スマホの画面だけで読む画像、ロゴ、検索窓の入力欄、いちばん下のメニュー。
+// 検索する前のホームは components/app/home.tsx、物件の画面は components/app/mobile-app.tsx
+import { FileText, Search, Star } from "lucide-react";
+import { useState, useSyncExternalStore, type CSSProperties, type ImgHTMLAttributes, type ReactNode, type RefObject } from "react";
+import { ClockBack } from "./icons";
+
+/** 絵の幅（pt）。この幅で描いて、画面の幅に合わせて拡大・縮小する */
+export const ART_W = 393;
+export const ZOOM = "var(--app-zoom, 1)";
+
+/** 1×1 の透明な画像（PC の幅でスマホの画像の代わりに入れる） */
+const BLANK = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+/**
+ * スマホの画面だけで読む画像。最初の表示（書き出した HTML）はスマホの画面で、PC は表示のあとで PC の画面に切り替わるので、
+ * PC の幅では空の画像にして読み込ませない（<picture> の中の画像には React が先読みも付けない）
+ */
+export function PhoneImg(props: ImgHTMLAttributes<HTMLImageElement>) {
+  return (
+    <picture>
+      <source media="(min-width: 1024px)" srcSet={BLANK} />
+      <img {...props} alt={props.alt ?? ""} />
+    </picture>
+  );
+}
+
+/**
+ * ロゴ（新しいマーク・MICHILU・「不動産の現場に、すぐ使える情報を。」。届いた素材から切り出した透過の画像）。
+ * sky のときは白い版（形はそのまま、色だけ白。public/home/logo-white.webp）を重ね、空が暗いときに白へ切り替える（--sky-dark）
+ */
+export function LogoLockup({ style, sky = false }: { style?: CSSProperties; sky?: boolean }) {
+  const alt = "MICHILU 不動産の現場に、すぐ使える情報を。";
+  if (!sky) return <PhoneImg src="/home/logo.webp" alt={alt} width={900} height={160} draggable={false} style={{ width: "auto", ...style }} />;
+  return (
+    <span className="relative inline-block" style={{ height: style?.height }}>
+      <PhoneImg src="/home/logo.webp" alt={alt} width={900} height={160} draggable={false} className="sky-logo-navy block" style={{ width: "auto", ...style }} />
+      <PhoneImg src="/home/logo-white.webp" alt="" aria-hidden width={900} height={160} draggable={false} className="sky-logo-white absolute left-0 top-0 block" style={{ width: "auto", ...style }} />
+    </span>
+  );
+}
+
+// 最初のHTMLでは入力を待つ。初期化前に打った文字を、制御された input の初期値で消さない。
+const subscribeReady = () => () => {};
+
+/**
+ * 検索窓の入力欄。iPhone は 16px より小さい字の入力欄に触れると画面を拡大するので、字を 16px（拡大・縮小の後で）で描いてから
+ * transform で絵の大きさ（size pt）に縮める
+ */
+export function ScaledInput({
+  value,
+  onChange,
+  inputRef,
+  placeholder = "住所・地番を入力（例：渋谷区神南1-19-11）",
+  label = "住所・地番",
+  size = 10.06,
+  autoComplete = "street-address",
+  className = "ml-[10.3px] mr-[4px]",
+  onPhoto = false,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  inputRef?: RefObject<HTMLInputElement | null>;
+  placeholder?: string;
+  label?: string;
+  /** 絵の上の字の大きさ（pt） */
+  size?: number;
+  autoComplete?: string;
+  className?: string;
+  /** 写真の上のすりガラスの欄（字を白く） */
+  onPhoto?: boolean;
+}) {
+  const ready = useSyncExternalStore(subscribeReady, () => true, () => false);
+  const k = `calc(${size} * var(--app-zoom, 1) / 16)`;
+  return (
+    <div className={`relative h-full min-w-0 flex-1 overflow-hidden ${className}`}>
+      <input
+        ref={inputRef}
+        type="search"
+        enterKeyHint="search"
+        autoComplete={autoComplete}
+        value={value}
+        disabled={!ready}
+        aria-busy={!ready || undefined}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={label}
+        className={`absolute left-0 top-1/2 bg-transparent outline-none placeholder:font-normal [&::-webkit-search-cancel-button]:hidden ${onPhoto ? "font-normal text-white placeholder:text-white/70" : "font-medium text-[#121a2b] placeholder:text-[#8d97a8]"}`}
+        style={{ width: `calc(100% / ${k})`, fontSize: "calc(16px / var(--app-zoom, 1))", transform: `translateY(-50%) scale(${k})`, transformOrigin: "left center" }}
+      />
+    </div>
+  );
+}
+
+/** ページ（検索＝ホーム・お気に入り・履歴・書類・出力と、ホームの右上のメニュー（≡）から開くその他） */
+export type NavKey = "home" | "history" | "favorites" | "docs" | "account";
+
+/** 白いメニュー（物件・下のメニューのページ）の色 */
+const ON = "#133664";
+const OFF = "#68738a";
+/** ホームの写真の上のメニュー（暗いすりガラス）の色 */
+const ON_DARK = "#5aaeff";
+const OFF_DARK = "rgba(255,255,255,0.78)";
+/** iPhone のアプリの下のメニューと同じくらいの大きさ（アイコン約24pt・名前11pt） */
+// アイコンと名前は、ボタンの字の色（currentColor）で描く（選んだ所が変わると、色がゆっくり移る。app/globals.css の .nav-item）
+const NAV: { key: NavKey; label: string; icon: (on: boolean) => ReactNode }[] = [
+  { key: "home", label: "検索", icon: (on) => <Search size={24} strokeWidth={on ? 2.1 : 1.7} absoluteStrokeWidth color="currentColor" /> },
+  { key: "favorites", label: "お気に入り", icon: (on) => <Star size={24} strokeWidth={on ? 2 : 1.6} absoluteStrokeWidth color="currentColor" fill={on ? "currentColor" : "none"} /> },
+  { key: "history", label: "履歴", icon: (on) => <ClockBack size={24} stroke={on ? 2 : 1.6} color="currentColor" /> },
+  { key: "docs", label: "書類・出力", icon: (on) => <FileText size={24} strokeWidth={on ? 2 : 1.6} absoluteStrokeWidth color="currentColor" /> },
+];
+
+/**
+ * いちばん下のメニュー（検索・お気に入り・履歴・書類・出力）。dark はホームの写真の上（暗いすりガラス。上の角を丸め、選んでいる所の下に線）。
+ * 地図で場所を選ぶ・お知らせ・使い方・設定などは、ホームの右上のメニュー（≡）
+ */
+export function BottomNav({ active, onSelect, dark = false }: { active: NavKey; onSelect: (key: NavKey) => void; dark?: boolean }) {
+  const on = dark ? ON_DARK : ON;
+  const off = dark ? OFF_DARK : OFF;
+  // 選んでいる所の下の線は1本で、押した所へ滑る（進む向きの先の端が先に動き、後ろの端が少し遅れて追いつく＝線が伸びて縮む）。
+  // 向きは前に選んでいた所との差（描く途中で決める。app/globals.css の .nav-mark）
+  const index = NAV.findIndex((n) => n.key === active);
+  const [mark, setMark] = useState({ index, dir: 0 });
+  if (mark.index !== index) setMark({ index, dir: Math.sign(index - mark.index) });
+  return (
+    <nav
+      aria-label="画面の切り替え"
+      data-app-nav
+      className={`app-touch relative shrink-0 overflow-hidden pb-[max(0px,calc(env(safe-area-inset-bottom)-12px))] ${dark ? "rounded-t-[calc(26px*var(--app-zoom,1))] border-t border-white/15 backdrop-blur-xl backdrop-saturate-150" : "border-t border-[#e6ebf2] bg-white/95 backdrop-blur"}`}
+      style={dark ? { background: "var(--glass-nav-bg)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)" } : undefined}
+    >
+      <div className="relative mx-auto grid grid-cols-4" style={{ width: ART_W, zoom: ZOOM }}>
+        {NAV.map((n) => {
+          const sel = n.key === active;
+          return (
+            <button
+              key={n.key}
+              onClick={() => onSelect(n.key)}
+              aria-current={sel ? "page" : undefined}
+              className="nav-item relative flex min-h-[58px] min-w-0 flex-col items-center justify-center gap-[4px] px-[3px] py-[8px] active:opacity-60"
+              style={{ color: sel ? on : off }}
+            >
+              {n.icon(sel)}
+              <span className="max-w-full break-words text-center leading-[1.2]" style={{ fontSize: 11, fontWeight: sel ? 600 : 500 }}>
+                {n.label}
+              </span>
+            </button>
+          );
+        })}
+        {dark && index >= 0 && (
+          <span
+            aria-hidden
+            className="nav-mark pointer-events-none absolute rounded-full"
+            style={
+              {
+                bottom: 2,
+                height: 2.5,
+                left: `calc(${index} * 25% + (25% - 34px) / 2)`,
+                right: `calc(${3 - index} * 25% + (25% - 34px) / 2)`,
+                background: on,
+                "--nav-l": mark.dir > 0 ? "70ms" : "0ms",
+                "--nav-r": mark.dir < 0 ? "70ms" : "0ms",
+              } as CSSProperties
+            }
+          />
+        )}
+      </div>
+    </nav>
+  );
+}

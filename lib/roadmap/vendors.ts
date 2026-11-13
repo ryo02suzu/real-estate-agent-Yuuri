@@ -62,7 +62,7 @@ export const openMap =
 /**
  * geocloud 旧版（…/webgis/?mp=…）。&ll=緯度,経度&z= で開く。query の vlf=<地図ID>-<版>-<16進>で、表示するレイヤを選べる
  * （16進の各ビットが表示切替の上からの順。町田市で確認）。
- * 自動ブラウザには 403 を返すため、確認は iPhone の User-Agent で行った（川口・市川）。
+ * 自動の確認には 403 を返す（川口・市川。毎週のリンク確認では「要確認」になるので、手で開いて確かめる）。
  */
 export const geocloud =
   (webgisUrl: string, query: string, zoom = 18): Build =>
@@ -144,3 +144,25 @@ export const nasushiobaraMap =
   (layers: string, zoom = 16): Build =>
   (lat, lng) =>
     `https://maps.city.nasushiobara.tochigi.jp/#/?center=${lng.toFixed(6)}%2F${lat.toFixed(6)}&zoom=${zoom}&baseMap=gsi&layers=${layers}`;
+
+/**
+ * 県域統合型GIS「ぎふ」（gis-gifu.jp。wagmap と同じ仕組みで岐阜県と県内市町村が共同運用）。
+ * 可児市・岐阜市の公式リンクと同じ gprj=3 で mpx/mpy を経度・緯度として渡す（同意ページを経て地図に戻り、
+ * 地図画像の要求 cp= が渡した座標になることと、可児市役所が中心に来ることを確認）。1/1000 のタイルが無い地図があるので既定は 1/2500
+ */
+export const gisGifu =
+  (mid: number, scale = 2500): Build =>
+  (lat, lng) =>
+    `https://gis-gifu.jp/gifu/Map?mid=${mid}&mpx=${lng.toFixed(6)}&mpy=${lat.toFixed(6)}&mps=${scale}&gprj=3`;
+
+/**
+ * geogeo（ジオジオ）の公開型GIS（にいがたeマップ・eマップじょうえつ・新発田市市民公開地理情報システムなど）。
+ * /maps?mode=theme&lid=<大分類>&mid=<テーマ> に lat/lng/z を付けると、その地点を中心にピンを立てて開く。経度の名前は lng
+ * （lon は読まれず、テーマの最初の位置＝多くは市役所のあたりのまま開く。2026-11-09 に一関市の地図で市役所から離れた地点を開いて
+ * 比べ、geogeo の11の地図で lng のときだけページの init_mode が "latlng" になることを確かめた）。
+ * 利用規約のあるテーマは最初に同意の画面が出る。base はスキーム付き（十日町市は https の証明書が合わないので http）
+ */
+export const geogeo =
+  (base: string, lid: number, mid: number, zoom = 17): Build =>
+  (lat, lng) =>
+    `${base}/maps?mode=theme&lid=${lid}&mid=${mid}&lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&z=${zoom}`;

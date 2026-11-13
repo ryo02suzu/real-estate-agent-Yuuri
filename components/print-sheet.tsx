@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- 端末の中に保存した現地の写真（blob の URL）をそのまま印刷に並べるため */
 
 // 印刷・PDF 保存用の「調査メモ」。画面（地図・パネル・シート）は印刷せず、これだけを A4 に出す（app/globals.css の @media print）。
 // 役所調査に持っていけるよう、地図の URL・色の見方・都市計画・地番・問い合わせ先・窓口で聞くことと、回答を書き込む欄をまとめる
@@ -11,11 +12,11 @@ import { BUILDING_CREDIT } from "@/lib/roadmap/building-data";
 import { groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, HAZARD_TABLE_NOTE, hazardRows, wagamachiUrl } from "@/lib/roadmap/hazard";
 import { changeText, distanceText, kindText, priceText } from "@/lib/roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "@/lib/roadmap/land-price-data";
-import { schoolCredit, schoolLine } from "@/lib/roadmap/school";
-import { POI_SOURCE, poiWalkText } from "@/lib/roadmap/poi";
+import { schoolCredit, schoolGaps, schoolGapShort, schoolLine } from "@/lib/roadmap/school";
+import { POI_SOURCES, poiWalkText } from "@/lib/roadmap/poi";
 import { STATION_CREDIT, stationLine } from "@/lib/roadmap/walk";
 import { KOZU_CREDIT } from "@/lib/roadmap/kozu-data";
-import { chibanLabel, estimatedNote, kuikiLabel, parcelMark } from "@/lib/roadmap/parcel";
+import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark } from "@/lib/roadmap/parcel";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
 import { SANKO_NOTE, sankoCredit } from "@/lib/roadmap/sanko-data";
 import { HOUREI_CREDIT, houreiLine, houreiNote } from "@/lib/roadmap/hourei";
@@ -33,7 +34,11 @@ import type { PoiState } from "./poi-card";
 import type { StationState } from "./station-card";
 import { MapPreview } from "./map-preview";
 import type { RoadsState } from "./nearby-roads";
-import { parcelLines, type ParcelInfo } from "./parcel-card";
+import type { Triage } from "@/lib/app/triage";
+import { checklistKey, loadDone } from "@/lib/checklist";
+import { RECORD_ITEMS, RECORD_TOPICS, type PropertyRecords } from "@/lib/records";
+import { senderShort, type Sender } from "@/lib/sender";
+import { addressOffLot, parcelLines, type ParcelInfo } from "./parcel-card";
 import type { ZoningState } from "./zoning-card";
 
 type Ok = Extract<LookupResult, { status: "ok" }>;
@@ -58,6 +63,18 @@ export function PrintSheet(props: {
   schools: SchoolState;
   stations: StationState;
   pois: PoiState;
+  /** 要注意点と次にやること（見出しのすぐ下に出す） */
+  triage?: Triage;
+  /** あなたの確認の記録（端末に残したもの） */
+  records?: PropertyRecords;
+  /** 書類の差出人（スマホで入れたとき。右上に出す） */
+  sender?: Sender;
+  /** 現地の写真（スマホの写真メモ。端末の中の画像の URL。6枚まで並べる） */
+  photos?: string[];
+  /** 筆の面積の目安（スマホ。「約770㎡（約233坪）」） */
+  area?: string;
+  /** 2枚目を窓口で書き込む確認メモにする（スマホ） */
+  form?: boolean;
 }) {
   // document.body に出す（画面の作りの外に置き、印刷では画面の作りを丸ごと隠す）。サーバーでは何も出さない
   const client = useSyncExternalStore(
@@ -80,6 +97,12 @@ function Memo({
   schools,
   stations,
   pois,
+  triage,
+  records,
+  sender,
+  photos,
+  area,
+  form,
 }: {
   result: Ok;
   zoning: ZoningState;
@@ -91,6 +114,12 @@ function Memo({
   schools: SchoolState;
   stations: StationState;
   pois: PoiState;
+  triage?: Triage;
+  records?: PropertyRecords;
+  sender?: Sender;
+  photos?: string[];
+  area?: string;
+  form?: boolean;
 }) {
   const walks = stations.status === "ok" ? stations.stations : [];
   const facilities = pois.status === "ok" ? pois.pois : [];
@@ -116,16 +145,36 @@ function Memo({
         <div className="min-w-0">
           <p className="text-[10px] tracking-[0.1em] text-[#7a6a55]">道路種別・都市計画・災害リスクの調査メモ</p>
           <h1 className="text-[17px] font-bold leading-snug">
-            {result.matchedAddress}
+            {result.matchedAddress.normalize("NFKC")}
             {found ? ` ${chibanLabel(found.chibanRaw)}${parcelMark(found)}` : <span className="text-[13px] font-normal">{result.picked ? "（地図で選んだ地点）" : " 付近"}</span>}
           </h1>
         </div>
         <p className="shrink-0 text-right text-[10px] leading-[1.5] text-[#7a6a55]">
+          {senderShort(sender).map((l) => (
+            <span key={l} className="block font-semibold text-[#1d1b18]">
+              {l}
+            </span>
+          ))}
           調べた日時 {date}
           <br />
           MICHILU（michilu.vercel.app）
         </p>
       </header>
+
+      {triage && <TriageBlock triage={triage} done={loadDone(checklistKey(result.lat, result.lng))} />}
+      {records && <RecordsBlock records={records} />}
+      {photos && photos.length > 0 && (
+        <section className="mt-2.5 break-inside-avoid">
+          <h2 className="mb-1 border-l-[3px] border-[#9a7442] pl-1.5 text-[12.5px] font-bold">
+            現地の写真 <span className="text-[10px] font-normal text-[#7a6a55]">{photos.length > 6 ? `${photos.length}枚のうち6枚` : `${photos.length}枚`}（この端末で撮った写真。撮影場所などの情報は消してあります）</span>
+          </h2>
+          <div className="grid grid-cols-3 gap-1.5">
+            {photos.slice(0, 6).map((u, i) => (
+              <img key={u} src={u} alt={`現地の写真 ${i + 1}`} className="aspect-[4/3] w-full rounded object-cover" />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 物件：場所の表と地図 */}
       <section className="mt-2.5 flex gap-4">
@@ -154,6 +203,15 @@ function Memo({
               </>
             )
           )}
+          {area && (
+            <>
+              <dt className="text-[#7a6a55]">面積（目安）</dt>
+              <dd>
+                {area}
+                <span className="text-[10px] text-[#7a6a55]">（地図上の目安。登記の地積で確認）</span>
+              </dd>
+            </>
+          )}
           {bHit && (
             <>
               <dt className="text-[#7a6a55]">建物（参考）</dt>
@@ -176,11 +234,18 @@ function Memo({
               </dd>
             </>
           )}
-          {schools.status === "ok" && (
+          {(schools.status === "ok" || schools.status === "none") && (
             <>
               <dt className="text-[#7a6a55]">学区（参考）</dt>
               <dd>
-                {[schools.schools.elementary && `小学校：${schoolLine(schools.schools.elementary)}`, schools.schools.junior && `中学校：${schoolLine(schools.schools.junior)}`]
+                {[
+                  schools.status === "ok" && schools.schools.elementary && `小学校：${schoolLine(schools.schools.elementary)}`,
+                  schools.status === "ok" && schools.schools.junior && `中学校：${schoolLine(schools.schools.junior)}`,
+                  // 出せなかった学校区は、データなしとわけ・確かめる先
+                  ...schoolGaps(result.municipality.codes[0], schools.status === "ok" ? schools.schools : null).map(
+                    (g) => `${g.key === "es" ? "小学校" : "中学校"}：データなし（${schoolGapShort(g.why, result.municipality.name)}。教育委員会で確認）`,
+                  ),
+                ]
                   .filter(Boolean)
                   .join("　")}
               </dd>
@@ -329,13 +394,20 @@ function Memo({
           {parcels.status === "ok" && lines ? (
             <>
               <p className="text-[10px] text-[#7a6a55]">
-                {parcels.kind === "address" ? "住所の地点にある筆（参考。住居表示と地番は別）" : "物件の筆"}
+                {addressOffLot(parcels) === "large" ? "住所の地点にある筆（参考。隣地がとても多く、道路など物件の外の土地の可能性）" : parcels.kind === "address" ? "住所の地点にある筆（参考。住居表示と地番は別）" : "物件の筆"}
                 {parcels.parcel.estimated && `・公図から推定した位置（${estimatedNote(parcels.parcel.estimated)}）`}
                 {parcels.parcel.sanko && `・地番参考図（${SANKO_NOTE}）`}
               </p>
               <p className="font-semibold">{lines.target ?? `${kuikiLabel(parcels.parcel.kuiki)} ${chibanLabel(parcels.parcel.chibanRaw)}`}</p>
               <p className="mt-1 text-[10px] text-[#7a6a55]">境界が接している筆（{lines.neighbors.length}）</p>
-              <p className="text-[10.5px]">{lines.neighbors.length ? lines.neighbors.join("、") : "地図データの中には見つかりませんでした"}</p>
+              {/* 住所の地点の筆が道路などの可能性があるときは、その筆の隣地（道沿いの筆）を物件の隣地として並べない */}
+              <p className="text-[10.5px]">
+                {addressOffLot(parcels) === "large" && lines.neighbors.length
+                  ? "省略：住所の地点の筆が道路など物件の外の土地の可能性があるので、公図で物件の筆を確かめてから隣地を調べてください。"
+                  : lines.neighbors.length
+                    ? neighborList(lines.neighbors)
+                    : "地図データの中には見つかりませんでした"}
+              </p>
             </>
           ) : (
             <p className="text-[10.5px] text-[#7a6a55]">
@@ -421,6 +493,9 @@ function Memo({
         </Block>
       )}
 
+      {form ? (
+        <CounterForm where={dept ?? `${m.name}の建築の担当課`} place={`${result.matchedAddress.normalize("NFKC")}${found ? ` ${chibanLabel(found.chibanRaw)}` : ""}`} />
+      ) : (
       <Block title="窓口で聞くこと・回答メモ">
         <ol className="space-y-1">
           {ASK.map((a, i) => (
@@ -437,6 +512,7 @@ function Memo({
           <span className="w-[40%] border-b border-[#b9ad9b] pb-0.5">確認した日：</span>
         </p>
       </Block>
+      )}
 
       <footer className="mt-3 border-t border-[#d8ccb8] pt-1.5 text-[8.5px] leading-[1.55] text-[#7a6a55]">
         <p>
@@ -453,14 +529,136 @@ function Memo({
           {bHit && `建物の${BUILDING_CREDIT}。`}
           {prices.length > 0 && `地価の${LAND_PRICE_CREDIT}（標準地・基準地の価格で、物件の価格ではありません）。`}
           {schools.status === "ok" && `学区の${schoolCredit(schools.schools)}（指定校は教育委員会で確認）。`}
-          {walks.length > 0 && `駅の${STATION_CREDIT}（徒歩は道路距離 80m を1分。駅の出入口までではない）。`}
-          {facilities.length > 0 && `周辺施設は${POI_SOURCE}を加工して作成（施設の位置までの目安）。`}
+          {walks.length > 0 && `駅の${STATION_CREDIT}（徒歩は道路距離 80m を1分。駅の出入口（分からない駅は駅舎・駅の位置・ホーム）までの地図上の目安）。`}
+          {facilities.length > 0 && `周辺施設は${POI_SOURCES}を加工して作成（施設の位置までの目安）。`}
           {(p || parcels.status === "ok") && `筆の${PARCEL_CREDIT}。`}
           {(p?.estimated || (parcels.status === "ok" && parcels.parcel.estimated)) && `${KOZU_CREDIT}。`}
           {sanko && `参考図の筆の${sankoCredit(sanko)}。`}
         </p>
       </footer>
     </div>
+  );
+}
+
+/** 2枚目：窓口で書き込む確認メモ（スマホの調査メモ。道路種別に○を付ける・幅員・後退・位置指定・公道か私道か・ほかの制限） */
+function CounterForm({ where, place }: { where: string; place: string }) {
+  const rows: [string, string[]][] = [
+    ["道路の種別", ["□42条1項1号　□1項2号　□1項3号　□1項4号　□1項5号　□42条2項　□43条2項　□建築基準法上の道路ではない　□その他（　　　　　）"]],
+    ["幅員・境界", ["認定幅員　　　　m　／　現況幅員　　　　m", "道路境界　□確定　□未確定（　　　　　　　　　　）"]],
+    ["セットバック", ["□要（道路中心線から　　　m・後退距離　　　m）　□不要", "道路中心線　□確定　□未確定"]],
+    ["位置指定道路", ["指定番号　　　　　　　　指定年月日　　　　　　　　", "指定図面の写し　□もらった　□もらえない"]],
+    ["公道・私道", ["□公道（管理者：　　　　　　　）　□私道（所有者：　　　　　　　）"]],
+    ["ほかの制限", ["都市計画道路・地区計画・建築協定・がけの規定・壁面線 など：", ""]],
+  ];
+  return (
+    <section className="print-page-break mt-3 break-inside-avoid">
+      <h2 className="border-b-2 border-[#9a7442] pb-1 text-[15px] font-bold">窓口での確認メモ</h2>
+      <p className="mt-1 text-[10.5px] text-[#5d5143]">
+        物件：{place}　／　窓口：{where}
+      </p>
+      <table className="mt-2 w-full border-collapse text-[11px]">
+        <tbody>
+          {rows.map(([label, lines]) => (
+            <tr key={label} className="border-b border-[#d8ccb8] align-top">
+              <th className="w-[8.5em] py-2 pr-2 text-left font-semibold">{label}</th>
+              <td className="py-2">
+                {lines.map((l, i) => (
+                  <p key={i} className={`min-h-[1.9em] ${l ? "" : "border-b border-dotted border-[#b9ad9b]"}`}>
+                    {l}
+                  </p>
+                ))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-3 text-[11px] font-semibold">メモ</p>
+      {Array.from({ length: 6 }, (_, i) => (
+        <p key={i} className="h-[2.1em] border-b border-dotted border-[#b9ad9b]" />
+      ))}
+      <p className="mt-4 flex gap-6 text-[11px] text-[#5d5143]">
+        <span className="flex-1 border-b border-[#b9ad9b] pb-0.5">対応した窓口・担当者：</span>
+        <span className="w-[40%] border-b border-[#b9ad9b] pb-0.5">確認した日：　　年　　月　　日</span>
+      </p>
+      <p className="mt-2 text-[9.5px] text-[#7a6a55]">持っていくもの：{BRING.join("・")}</p>
+    </section>
+  );
+}
+
+/** 要注意点（▲ 要注意・・要確認）と、次にやること（窓口ごと。済んだものは ☑） */
+/** あなたの確認の記録（端末に残したもの。MICHILU の判定ではない） */
+function RecordsBlock({ records }: { records: PropertyRecords }) {
+  const md = (t: number) => {
+    const d = new Date(t);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+  const rows = RECORD_TOPICS.flatMap((t) =>
+    RECORD_ITEMS[t].subs.flatMap((s) => {
+      const r = records.items[t]?.[s.id];
+      return r ? [{ topic: RECORD_ITEMS[t].label, sub: s.label, r }] : [];
+    }),
+  );
+  if (!rows.length) return null;
+  return (
+    <section className="mt-2.5 rounded border border-[#d9cfbf] px-3 py-2">
+      <h2 className="text-[12px] font-bold">
+        あなたの確認の記録 <span className="text-[10px] font-normal text-[#7a6a55]">この端末に残した記録です（MICHILU の判定ではありません）</span>
+      </h2>
+      <table className="mt-1 w-full text-[10.5px]">
+        <tbody>
+          {rows.map(({ topic, sub, r }) => (
+            <tr key={`${topic}${sub}`} className="border-t border-[#eee6d8]">
+              <td className="w-[5.5em] py-0.5 text-[#7a6a55]">{topic}</td>
+              <td className="w-[10em] py-0.5">{sub}</td>
+              <td className="w-[6em] py-0.5">{r.done ? `確認済み ${md(r.at)}` : "未確認"}</td>
+              <td className="py-0.5">
+                {/* 確かめた答え（メモ）を先に太字で、方法・出典はかっこで（PC はこの記録を渡さないので出ない） */}
+                {r.note && <b className="font-semibold">{r.note}</b>}
+                {(r.method || r.source) && <span className="text-[#7a6a55]">{r.note ? "（" : ""}{[r.method, r.source].filter(Boolean).join("・")}{r.note ? "）" : ""}</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+function TriageBlock({ triage, done }: { triage: Triage; done: Set<string> }) {
+  return (
+    <section className="mt-2.5 flex gap-4 break-inside-avoid">
+      <div className="min-w-0 flex-1">
+        <h2 className="mb-1 border-l-[3px] border-[#9a7442] pl-1.5 text-[12.5px] font-bold">
+          問題になりそうな所 <span className="text-[10px] font-normal text-[#7a6a55]">{triage.headline}</span>
+        </h2>
+        {triage.issues.length ? (
+          <ul className="space-y-0.5 text-[10.5px] leading-[1.5]">
+            {triage.issues.map((i) => (
+              <li key={i.id}>
+                <span className={i.level === "warn" ? "font-bold text-[#a3321a]" : "font-bold"}>{i.level === "warn" ? "▲" : "・"}{i.title}</span>
+                {i.confirm && <span className="text-[#7a6a55]">（{i.confirm}）</span>}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-[10.5px] text-[#7a6a55]">{triage.pending.length ? `${triage.pending.join("・")}を確認中に印刷しました` : "データで見つかった注意はありません"}</p>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <h2 className="mb-1 border-l-[3px] border-[#9a7442] pl-1.5 text-[12.5px] font-bold">次にやること</h2>
+        <ul className="space-y-0.5 text-[10.5px] leading-[1.5]">
+          {triage.actions.map((a) => (
+            <li key={a.id}>
+              {done.has(a.id) ? "☑" : "□"} <b>{a.title}</b>
+              <span className="text-[#7a6a55]">
+                ：{a.where}
+                {a.phone ? ` ${a.phone}` : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
   );
 }
 

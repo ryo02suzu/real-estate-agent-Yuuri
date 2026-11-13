@@ -10,7 +10,8 @@ import SNAPSHOT from "./data/sheet-pages.json";
 import { MUNICIPALITIES } from "./index";
 import { extractFileLinks, findReplacements, type Replacement, type SheetUrl } from "./page-links";
 
-const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+// 役所のサイトには、MICHILU の自動の確認であることを名乗って取りに行く（ブラウザのふりはしない。断られた一覧ページは「つながらない」に入る）
+const UA = "Mozilla/5.0 (compatible; michilu-sheet-watch; +https://github.com/ryo02suzu/real-estate-agent-Yuuri)";
 const DATA_DIR = join(process.cwd(), "lib/roadmap/data");
 
 async function fetchPage(url: string): Promise<{ html: string; url: string } | null> {

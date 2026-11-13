@@ -14,6 +14,7 @@ import { chibanLabel, kuikiLabel, parcelMark, tileBounds, type Parcel } from "@/
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
 import { sankoCredit } from "@/lib/roadmap/sanko-data";
 import { TILE, tilesAround, toWorldPixel } from "@/lib/tiles";
+import { senderShort, type Sender } from "@/lib/sender";
 import { PrintIcon } from "./icons";
 import { Sheet } from "./sheet";
 
@@ -30,7 +31,7 @@ const TILE_PX = 192;
 const GSI_TERMS_URL = "https://www.gsi.go.jp/LAW/2930-index.html";
 
 /** 案内図のシート（画面で縮めて見せ、印刷・PDF 保存する） */
-export function GuideMapSheet({ result, open, onClose }: { result: Ok; open: boolean; onClose: () => void }) {
+export function GuideMapSheet({ result, open, onClose, sender }: { result: Ok; open: boolean; onClose: () => void; sender?: Sender }) {
   // 開いているあいだは、ブラウザのメニューから印刷しても案内図になるようにする
   useEffect(() => {
     if (!open) return;
@@ -44,13 +45,14 @@ export function GuideMapSheet({ result, open, onClose }: { result: Ok; open: boo
   // document.body に出す（PC のパネルは backdrop-blur で fixed の基準になり、その中では画面いっぱいに出せない）
   return createPortal(
     <Sheet title="案内図（A4）" open onClose={onClose}>
-      <GuideMapBody result={result} />
+      <GuideMapBody result={result} sender={sender} />
     </Sheet>,
     document.body,
   );
 }
 
-function GuideMapBody({ result }: { result: Ok }) {
+/** 案内図の中身（縮めた1枚・印刷のボタン・印刷用の1枚）。PC の調査デスクの書類の画面からも使う */
+export function GuideMapBody({ result, sender }: { result: Ok; sender?: Sender }) {
   const frame = useRef<HTMLDivElement>(null);
   const page = useRef<HTMLDivElement>(null);
   const scale = usePreviewScale(frame);
@@ -61,7 +63,7 @@ function GuideMapBody({ result }: { result: Ok }) {
       <div ref={frame} className="flex justify-center">
         <div className="overflow-hidden rounded border border-line shadow-soft" style={{ width: PAGE.w * scale, height: PAGE.h * scale }}>
           <div className="origin-top-left" style={{ transform: `scale(${scale})`, width: PAGE.w }}>
-            <GuideMapPage result={result} />
+            <GuideMapPage result={result} sender={sender} />
           </div>
         </div>
       </div>
@@ -83,7 +85,7 @@ function GuideMapBody({ result }: { result: Ok }) {
       {/* 印刷用の1枚（画面には出ない。document.body の直下に置き、印刷では画面の作りを丸ごと隠す） */}
       {createPortal(
         <div ref={page} className="print-guide bg-white">
-          <GuideMapPage result={result} />
+          <GuideMapPage result={result} sender={sender} />
         </div>,
         document.body,
       )}
@@ -92,7 +94,7 @@ function GuideMapBody({ result }: { result: Ok }) {
 }
 
 /** 案内図の1枚 */
-function GuideMapPage({ result }: { result: Ok }) {
+function GuideMapPage({ result, sender }: { result: Ok; sender?: Sender }) {
   const p = result.parcel;
   const found = p && !result.picked ? p : undefined;
   const [at] = useState(() => new Date());
@@ -103,7 +105,7 @@ function GuideMapPage({ result }: { result: Ok }) {
         <div className="min-w-0">
           <p className="text-[18px] font-bold leading-tight tracking-[0.3em]">案内図</p>
           <p className="mt-1 text-[14px] font-bold leading-snug">
-            {result.matchedAddress}
+            {result.matchedAddress.normalize("NFKC")}
             {found ? ` ${chibanLabel(found.chibanRaw)}${parcelMark(found)}` : <span className="text-[12px] font-normal"> 付近</span>}
           </p>
           {p && result.picked && (
@@ -114,6 +116,12 @@ function GuideMapPage({ result }: { result: Ok }) {
           )}
         </div>
         <p className="shrink-0 text-right text-[10px] leading-[1.5] text-[#7a6a55]">
+          {/* 差出人（スマホで入れたとき。PC は渡さないので出ない） */}
+          {senderShort(sender).map((l) => (
+            <span key={l} className="block text-[11px] font-semibold text-[#1d1b18]">
+              {l}
+            </span>
+          ))}
           作成日 {date}
           <br />
           MICHILU

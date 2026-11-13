@@ -17,11 +17,12 @@ import { pmtilesMoridoSource } from "@/lib/roadmap/morido-tiles";
 import { suidoFor, type SuidoLink } from "@/lib/roadmap/suido";
 import { TOCHI_YEAR, tochiAt, tochiCheck, tochiLine, type Tochi } from "@/lib/roadmap/tochi";
 import { contactLinkText, contactName, noContactText, utilitiesFor, type UtilityContact, type UtilityKind, type Utilities } from "@/lib/roadmap/utilities";
-import { pmtilesTochiSource } from "@/lib/roadmap/tochi-tiles";
+import { tochiSourceFor } from "@/lib/roadmap/tochi-tiles";
 import { statusFor, zoningAt, zoningChips, zoningRows, type Zoning, type ZoningStatus } from "@/lib/roadmap/zoning";
 import { ZONING_DATA } from "@/lib/roadmap/zoning-data";
 import { pmtilesZoningSource } from "@/lib/roadmap/zoning-tiles";
 import { AlertIcon, ChevronRightIcon, ZoningIcon } from "./icons";
+import { Fact } from "./fact";
 import { Notes } from "./notes";
 import { Sheet } from "./sheet";
 
@@ -47,7 +48,7 @@ export function useZoning(lat: number, lng: number, municipality: Municipality):
       // 盛土規制法・砂防指定地などの区域は読めなくても都市計画は出す
       withRetry(() => moridoAt(lat, lng, codes.split(",")[0], pmtilesMoridoSource)).catch(() => null),
       withRetry(() => houreiAt(lat, lng, codes.split(",")[0], pmtilesHoureiSource)).catch(() => null),
-      withRetry(() => tochiAt(lat, lng, codes.split(",")[0], pmtilesTochiSource)).catch(() => null),
+      withRetry(() => { const src = tochiSourceFor(codes.split(",")[0]); return src ? tochiAt(lat, lng, codes.split(",")[0], src) : Promise.resolve(null); }).catch(() => null),
     ])
       .then(([zoning, mod, morido, hourei, tochi]) => {
         if (!alive) return;
@@ -89,12 +90,39 @@ function tochiChips(t?: Tochi): string[] {
  * 用途地域などを1行に並べる。スマホは押すと詳しい一覧を下から出す。
  * PC は onOpen（パネルの中の都市計画のカードまで動かす）を渡す
  */
-export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: string; onOpen?: () => void }) {
+export function ZoningLine({ state, city, onOpen, tile }: { state: ZoningState; city: string; onOpen?: () => void; tile?: boolean }) {
   const [open, setOpen] = useState(false);
   // 砂防指定地・急傾斜地などの区域に入っていれば、用途地域の次に注意の印を出す
   const chips = state.status === "ok" ? zoningChips(state.zoning).flatMap((c, i) => (i === 0 ? [c, ...houreiChips(state.hourei), ...tochiChips(state.tochi)] : [c])) : [];
   return (
     <>
+      {tile ? (
+        // スマホの要点のマス：用途地域と建ぺい率・容積率を太字で、ほかは小さな印で
+        <Fact
+          icon={<ZoningIcon className="h-3.5 w-3.5" />}
+          label="都市計画"
+          onClick={() => setOpen(true)}
+          disabled={state.status !== "ok"}
+          value={
+            state.status === "loading"
+              ? "確認中…"
+              : state.status === "error"
+                ? "読み込めませんでした"
+                : chips.map((c, i) => (
+                    <span
+                      key={c}
+                      className={
+                        i === 0
+                          ? "shrink-0 whitespace-nowrap"
+                          : `shrink-0 whitespace-nowrap rounded px-1 text-[11px] font-normal leading-[18px] ${WARN_CHIP.test(c) ? "bg-[#f8ece6] text-[#8a4f3a]" : "bg-[#f3f1ed] text-ink"}`
+                      }
+                    >
+                      {c}
+                    </span>
+                  ))
+          }
+        />
+      ) : (
       <button
         onClick={() => (onOpen ? onOpen() : setOpen(true))}
         disabled={state.status !== "ok"}
@@ -119,6 +147,7 @@ export function ZoningLine({ state, city, onOpen }: { state: ZoningState; city: 
         )}
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
+      )}
       {state.status === "ok" && !onOpen && (
         <Sheet title="法令に基づく制限（参考）" open={open} onClose={() => setOpen(false)}>
           <ZoningDetail state={state} city={city} tabs />
@@ -151,8 +180,8 @@ const SUB = "mt-0.5 block text-[11.5px] leading-[1.55] text-muted dense:mt-0 den
 const TABS = ["都市計画", "その他の法令", "上下水道・ガス"];
 
 /** 都市計画と、その他の法令の下調べ。tabs：スマホのシート（タブで分ける） */
-function ZoningDetail({ state, city, tabs }: { state: Extract<ZoningState, { status: "ok" }>; city: string; tabs?: boolean }) {
-  const [tab, setTab] = useState(0);
+export function ZoningDetail({ state, city, tabs, initial = 0 }: { state: Extract<ZoningState, { status: "ok" }>; city: string; tabs?: boolean; /** 最初に開くタブ（0 都市計画・1 その他の法令・2 上下水道・ガス） */ initial?: number }) {
+  const [tab, setTab] = useState(initial);
   const warn = !!state.hourei?.hits.length || tochiChips(state.tochi).length > 0 || !!state.tochi?.forest;
   if (!tabs)
     return (

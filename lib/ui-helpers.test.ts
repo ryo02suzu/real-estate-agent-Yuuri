@@ -69,6 +69,22 @@ describe("buildSummary", () => {
     expect(text).not.toContain("地図で選んだ地点");
   });
 
+  it("学区のデータが無いときは「データなし（わけ）・教育委員会で確認」を書く（学区が無いとは書かない）", () => {
+    const kiryu = findMunicipality("10203")!;
+    const ok = { status: "ok" as const, lat: 36.413, lng: 139.327, matchedAddress: "群馬県桐生市元宿町", town: "元宿町", approximate: false, municipality: kiryu, links: buildLinks(kiryu, 36.413, 139.327) };
+    const junior = { kind: "中学校" as const, name: "中央中学校", owner: "桐生市", city: "10203" };
+    const text = buildSummary(ok, { schools: { junior } });
+    expect(text).toContain("・中学校：中央中学校（桐生市）");
+    expect(text).toContain("・小学校：データなし（国のデータに無い市。桐生市の教育委員会で確認）");
+    // 学区がまったく無い市（国のデータに無い）
+    const funabashi = findMunicipality("12204")!;
+    const none = buildSummary({ ...ok, matchedAddress: "千葉県船橋市本町", town: "本町", municipality: funabashi, links: buildLinks(funabashi, 35.7, 139.98) }, { schools: {} });
+    expect(none).toContain("・小学校：データなし（国のデータに無い市。船橋市の教育委員会で確認）");
+    expect(none).toContain("・中学校：データなし（国のデータに無い市。船橋市の教育委員会で確認）");
+    // 読み込み中・失敗（schools が無い）は何も書かない
+    expect(buildSummary(ok, {})).not.toContain("学区");
+  });
+
   it("地図で選んだ地点は、その地点を地理院地図で開く URL を添える", () => {
     const m = findMunicipality("11202")!;
     const text = buildSummary({
@@ -334,12 +350,34 @@ describe("buildSummary の地番", () => {
     };
     const parcels = (estimated?: "high" | "low") => ({ parcels: { target: "横浜市港北区日吉５丁目 1234", neighbors: ["1233"], reference: false, estimated } });
     const low = buildSummary(result, parcels("low"));
-    expect(low).toContain("【謄本・公図用の地番（公図から推定した位置・確度が低く、5m前後ずれることあり）】\n・物件：横浜市港北区日吉５丁目 1234");
+    expect(low).toContain("【謄本・公図用の地番（公図から推定した位置・確度が低く、5m前後（1割弱は30m以上）ずれることあり）】\n・物件：横浜市港北区日吉５丁目 1234");
     expect(low).toContain("国土地理院の基盤地図情報（道路縁）に合わせて MICHILU が推定の位置に置いたもの");
     expect(buildSummary(result, parcels("high"))).toContain("【謄本・公図用の地番（公図から推定した位置・数mずれることあり）】");
     const plain = buildSummary(result, parcels());
     expect(plain).toContain("【謄本・公図用の地番】");
     expect(plain).not.toContain("基盤地図情報");
+  });
+
+  it("住所の地点の筆が道路などの可能性（隣地がとても多い）なら、その筆の隣地は物件の隣地として並べず、わけを書く", () => {
+    const m = findMunicipality("13113")!;
+    const result = {
+      status: "ok" as const,
+      lat: 35.6617,
+      lng: 139.7002,
+      matchedAddress: "東京都渋谷区神南一丁目１９番１１号",
+      town: "神南一丁目",
+      approximate: false,
+      municipality: m,
+      links: buildLinks(m, 35.6617, 139.7002),
+    };
+    const neighbors = Array.from({ length: 40 }, (_, i) => `渋谷区神南１丁目 ${i + 1}`);
+    const off = buildSummary(result, { parcels: { target: "渋谷区神南１丁目 100", neighbors, reference: true, offLot: true } });
+    // 住所の全角の数字は半角にそろえる
+    expect(off).toContain("【MICHILU の調査結果】東京都渋谷区神南一丁目19番11号 付近");
+    expect(off).toContain("【謄本・公図用の地番（住所の地点の筆・参考。道路など物件の外の土地の可能性）】\n・物件：渋谷区神南１丁目 100\n・隣地：省略（この筆に接する筆は40筆。公図で物件の筆を確かめてから）");
+    expect(off).not.toContain("神南１丁目 1、");
+    const ref = buildSummary(result, { parcels: { target: "渋谷区神南１丁目 100", neighbors: neighbors.slice(0, 3), reference: true } });
+    expect(ref).toContain("【謄本・公図用の地番（住所の地点の筆・参考）】\n・物件：渋谷区神南１丁目 100\n・隣地：渋谷区神南１丁目 1、渋谷区神南１丁目 2、渋谷区神南１丁目 3");
   });
 
   it("市町村の地番参考図の筆は、参考図である旨と市町村ごとの出典を付ける", () => {

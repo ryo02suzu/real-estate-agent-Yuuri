@@ -6,8 +6,34 @@ import { KANAGAWA } from "./data/kanagawa";
 import { SAITAMA } from "./data/saitama";
 import { TOCHIGI } from "./data/tochigi";
 import { TOKYO } from "./data/tokyo";
+import { CHUBU_PENDING } from "./data/chubu";
+import { TOHOKU_PENDING } from "./data/tohoku";
+import { KINKI_PENDING } from "./data/kinki";
+import { HYOGO } from "./data/hyogo";
+import { KYOTO } from "./data/kyoto";
+import { MIE, MIE_CITIES } from "./data/mie";
+import { NARA } from "./data/nara";
+import { OSAKA } from "./data/osaka";
+import { SHIGA } from "./data/shiga";
+import { WAKAYAMA } from "./data/wakayama";
+import { MIYAGI } from "./data/miyagi";
+import { AOMORI } from "./data/aomori";
+import { YAMAGATA } from "./data/yamagata";
+import { FUKUSHIMA } from "./data/fukushima";
+import { IWATE } from "./data/iwate";
+import { AKITA } from "./data/akita";
+import { SHIZUOKA } from "./data/shizuoka";
+import { YAMANASHI } from "./data/yamanashi";
+import { NAGANO } from "./data/nagano";
+import { AICHI } from "./data/aichi";
+import { FUKUI } from "./data/fukui";
+import { GIFU } from "./data/gifu";
+import { ISHIKAWA } from "./data/ishikawa";
+import { NIIGATA } from "./data/niigata";
+import { TOYAMA } from "./data/toyama";
 import { legendFor, type LegendEntry } from "./legends";
 import type { RoadRead } from "./road-read";
+import { roadReadPermission } from "./road-read-permission";
 import { findSheet, type SheetHit, type SheetIndex } from "./sheets";
 
 /** 地図に何が載っているか */
@@ -36,6 +62,8 @@ export type MapLink = {
 export type Contact = {
   dept: string;
   phone?: string;
+  /** FAX 番号（公式のページに載っているものだけ。照会を送る画面の FAX の宛先に入る） */
+  fax?: string;
   email?: string;
   hours?: string;
   /** 電話で答えてくれるか等、問い合わせ時の注意 */
@@ -44,7 +72,36 @@ export type Contact = {
   noPhoneInquiry?: boolean;
 };
 
-export type Prefecture = "埼玉県" | "千葉県" | "神奈川県" | "東京都" | "群馬県" | "栃木県" | "茨城県";
+export type Prefecture =
+  | "埼玉県"
+  | "千葉県"
+  | "神奈川県"
+  | "東京都"
+  | "群馬県"
+  | "栃木県"
+  | "茨城県"
+  | "新潟県"
+  | "富山県"
+  | "石川県"
+  | "福井県"
+  | "山梨県"
+  | "長野県"
+  | "岐阜県"
+  | "静岡県"
+  | "愛知県"
+  | "青森県"
+  | "岩手県"
+  | "宮城県"
+  | "秋田県"
+  | "山形県"
+  | "福島県"
+  | "三重県"
+  | "滋賀県"
+  | "京都府"
+  | "大阪府"
+  | "兵庫県"
+  | "奈良県"
+  | "和歌山県";
 
 export type Municipality = {
   pref: Prefecture;
@@ -54,8 +111,9 @@ export type Municipality = {
   /**
    * ネットで道路種別がどこまで分かるか。
    * outside = 市町村内に都市計画区域が無い（建築基準法の接道義務＝43条は原則かからない）
+   * unknown = 公開の有無をまだ調べていない（登録したばかりの地方。国のデータは出すが、道路図は県か市の建築指導課へ）
    */
-  coverage: "full" | "partial" | "none" | "outside";
+  coverage: "full" | "partial" | "none" | "outside" | "unknown";
   maps: MapLink[];
   contact?: Contact;
   /** 区によって窓口が違う政令市用。muniCd → 窓口 */
@@ -63,7 +121,16 @@ export type Municipality = {
   note?: string;
 };
 
-export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI];
+export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI, ...SHIZUOKA, ...YAMANASHI, ...NAGANO, ...AICHI, ...GIFU, ...NIIGATA, ...TOYAMA, ...ISHIKAWA, ...FUKUI, ...CHUBU_PENDING, ...AOMORI, ...IWATE, ...MIYAGI, ...AKITA, ...YAMAGATA, ...FUKUSHIMA, ...TOHOKU_PENDING, ...MIE, ...MIE_CITIES, ...SHIGA, ...KYOTO, ...OSAKA, ...HYOGO, ...NARA, ...WAKAYAMA, ...KINKI_PENDING];
+
+/**
+ * 市区町村に都市計画区域が無い（全域が都市計画区域外）と分かっているか。coverage が outside か、注記にそう書いてある町村
+ * （長瀞町・清川村・嬬恋村のように、県や村の条例で接道の決まりがあるので coverage は outside ではない所）。
+ * 都市計画のデータ（国の GIS）に無い町村で「都市計画区域外」と言ってよいかに使う
+ */
+export function noCityPlanning(m: Municipality): boolean {
+  return m.coverage === "outside" || /全域が都市計画区域外/.test(m.note ?? "");
+}
 
 export function findMunicipality(muniCd: string): Municipality | undefined {
   return MUNICIPALITIES.find((m) => m.codes.includes(muniCd));
@@ -91,6 +158,7 @@ export type ResolvedLink = {
 
 /** 座標から、その市で開くべき地図のURL一覧を作る。town（逆ジオコーダの町名）は地区ごとの図を選ぶのに使う */
 export function buildLinks(m: Municipality, lat: number, lng: number, town?: string): ResolvedLink[] {
+  const permission = roadReadPermission(m.codes);
   return m.maps.map((link) => {
     const sheet = link.sheets && findSheet(link.sheets, lat, lng, town);
     const url = sheet ? sheet.url : link.build ? link.build(lat, lng) : link.url!;
@@ -107,7 +175,8 @@ export function buildLinks(m: Municipality, lat: number, lng: number, town?: str
       // 分割図の市で、どの図にも入らない場所（図の無い地域）は、一覧から探しても見つからないことを伝える
       tip: link.sheets && !sheet ? "この場所を含む図は見つかりませんでした。一覧に無ければ、下の問い合わせ先で確認してください。" : link.tip,
       sheet,
-      ...(link.read ? { read: link.read } : {}),
+      // 市のデータをアプリの中に表示するのは、利用規約・ライセンスで使ってよいと確かめた市だけ（road-read-permission.ts）
+      ...(link.read && permission ? { read: { ...link.read, credit: permission.credit } } : {}),
       ...(legend ? { legend } : {}),
     };
   });

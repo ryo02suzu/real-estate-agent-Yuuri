@@ -49,13 +49,13 @@ describe("自然公園地域・農業地域・森林地域", () => {
     expect(tochiCheck(koku!, "箱根町")).toBe("国有林は森林管理署で確認");
   });
 
-  it("どの区域にも入らない・関東の外", async () => {
+  it("どの区域にも入らない・対応エリアの外", async () => {
     const none = await tochiAt(LAT, LNG, "13101", fake([]));
     expect(none).toMatchObject({ park: undefined, agri: undefined, forest: undefined });
     expect(tochiLine(none!)).toBe("自然公園・農業振興地域・森林地域の外");
     expect(tochiForestText(none!)).toBe("森林地域の外");
     expect(tochiCheck(none!, "千代田区")).toBeUndefined();
-    expect(await tochiAt(LAT, LNG, "19201", fake([]))).toBeNull();
+    expect(await tochiAt(LAT, LNG, "34101", fake([]))).toBeNull(); // 広島市（対応エリアの外）
   });
 });
 

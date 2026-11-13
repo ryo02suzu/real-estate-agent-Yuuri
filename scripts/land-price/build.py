@@ -23,11 +23,16 @@ import subprocess
 import sys
 import tempfile
 import unicodedata
-import urllib.error
-import urllib.request
 import zipfile
 
-PREFS = ("08", "09", "10", "11", "12", "13", "14")
+import os as _os, sys as _sys
+
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), ".."))
+import ksj  # noqa: E402
+from regions import prefs  # noqa: E402
+
+# 対応している都道府県（lib/roadmap/data/regions.json。関東1都6県＋中部9県）
+PREFS = prefs()
 URL = "https://nlftp.mlit.go.jp/ksj/gml/data/{k}/{k}-{yy}/{k}-{yy}_{pref}_GML.zip"
 UA = {"User-Agent": "michilu-land-price (+https://github.com/ryo02suzu/real-estate-agent-Yuuri)"}
 ATTRIBUTION = (
@@ -44,21 +49,13 @@ def log(*a):
 
 
 def get(url: str, rng: str | None = None) -> bytes:
-    h = dict(UA)
-    if rng:
-        h["Range"] = rng
-    with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=180) as r:
-        return r.read()
+    """読む（通信の失敗・429・5xx は読み直す。scripts/ksj.py）"""
+    return ksj.get(url, UA, rng)
 
 
 def exists(url: str) -> bool:
-    try:
-        get(url, "bytes=0-15")
-        return True
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return False
-        raise
+    """ファイルがあるか（404 なら無い・ZIP ならある。確認用のページなどは待って読み直す。scripts/ksj.py）"""
+    return ksj.exists(url, UA)
 
 
 def latest(kind: str) -> int:
@@ -172,7 +169,7 @@ def build(l01: int, l02: int, out: str, work: str) -> dict:
             for pref in PREFS:
                 url = URL.format(k=kind, yy=f"{year % 100:02d}", pref=pref)
                 n = 0
-                for (lng, lat), props in points(kind, pref, read_zip(get(url))):
+                for (lng, lat), props in points(kind, pref, read_zip(ksj.get_zip(url, UA))):
                     geom = {"type": "Point", "coordinates": [round(lng, 6), round(lat, 6)]}
                     # 拡大した地図と物件のまわりを調べるのに使う（属性を全部）
                     f.write(json.dumps({"type": "Feature", "tippecanoe": {"layer": "lp", "minzoom": 13, "maxzoom": 13}, "geometry": geom, "properties": props}, ensure_ascii=False) + "\n")

@@ -1,11 +1,12 @@
-# 毎月5日の朝（日本時間 6:10）に、国土数値情報に新しい年度の小学校区・中学校区・学校のデータ（数年ごとに公開）が出たかを見て、
+# 毎週木曜日の朝（日本時間 6:10）に、国土数値情報に新しい年度の小学校区・中学校区・学校のデータ（数年ごとに公開）が出たかを見て、
 # 出ていれば市区町村の利用条件どおりに関東1都6県の通学区域のタイルを作り直し、アプリ（public/data/）に入れる。
 # テストが通れば main に直接入れる（本番は Vercel が main から自動で作り直す）。外部のストレージや鍵は要らない。
+# 週に1回見るのは、国や市区町村がデータを新しくしたら、なるべく早くアプリに入れるため（新しくなっていなければ何もしない）。
 name: 学区の地図データ（最新版）
 
 on:
   schedule:
-    - cron: "10 21 4 * *"
+    - cron: "10 21 * * 3"
   workflow_dispatch:
     inputs:
       force:
@@ -36,9 +37,12 @@ jobs:
       - run: pip install openpyxl==3.1.5
       - name: 新しい年度のデータが出たか
         id: c
+        env:
+          # 入力はコマンドに直接埋め込まず、環境変数で受ける
+          FORCE: ${{ inputs.force }}
         run: |
           python3 scripts/school-districts/build.py --check
-          if [ "${{ inputs.force }}" = "true" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+          if [ "$FORCE" = "true" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; fi
       - uses: actions/cache@v4
         if: steps.c.outputs.changed == 'true'
         id: tippecanoe

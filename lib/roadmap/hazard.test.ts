@@ -245,10 +245,10 @@ describe("市区町村のハザードマップ", () => {
     expect(wagamachiUrl("14104")).toBe("https://disaportal.gsi.go.jp/hazardmap/index.html?citycode=14100");
     expect(wagamachiUrl("13123")).toBe("https://disaportal.gsi.go.jp/hazardmap/index.html?citycode=13123");
   });
-  it("一覧は関東1都6県の市区町村で、URL は http(s)", () => {
+  it("一覧は対応している都道府県（関東1都6県・中部9県・東北6県・近畿2府5県）の市区町村で、URL は http(s)", () => {
     expect(index.updated).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     for (const [code, maps] of Object.entries(index.maps)) {
-      expect(code).toMatch(/^(0[89]|1[0-4])\d{3}$/);
+      expect(code).toMatch(/^(0[2-9]|1[0-9]|2[0-9]|30)\d{3}$/);
       for (const url of Object.values(maps)) expect(url).toMatch(/^https?:\/\//);
     }
   });

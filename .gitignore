@@ -47,9 +47,16 @@ discover.json
 
 # MapLibre のワーカー（npm run dev / build の前に node_modules から置く）
 /public/maplibre/
+/public/draco/
 
 # Python のキャッシュ（scripts/ の作業用スクリプト）
 __pycache__/
 
 # 作業用（npm run legends などの中間ファイル）
 /work/
+
+# ホームの街の焼き込みの作業場所（約 2GB）
+scripts/city-bake/work/
+
+# Claude Code の作業用の git worktree
+.claude/worktrees/

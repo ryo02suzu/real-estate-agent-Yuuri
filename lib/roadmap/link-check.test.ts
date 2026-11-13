@@ -6,17 +6,35 @@ import { describe, expect, it } from "vitest";
 import POINTS from "./data/office-points.json";
 import { MUNICIPALITIES, buildLinks } from "./index";
 
-// 一部の地図は自動ブラウザ風のアクセスを拒むので、iPhone の Safari として取りに行く
-const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+// 役所のサイトには、MICHILU の自動の確認であることを名乗って取りに行く（ブラウザのふりはしない）。
+// 自動の確認を断るサイト（403・429）は、壊れているとは言えないので「要確認」にとどめ、手で開いて確かめる
+const UA = "Mozilla/5.0 (compatible; michilu-link-check; +https://github.com/ryo02suzu/real-estate-agent-Yuuri)";
 const ERROR_TEXT = /ページが見つかりません|お探しのページ|Page Not Found|404 Not Found|ファイルが見つかりません|公開を終了/i;
 
 type Row = { city: string; label: string; url: string; result: "ok" | "broken" | "unreachable"; detail: string };
+
+// サイトの入口（「/」）まで中身の無い 404 を返すサイトは、海外の回線（GitHub の確認は米国から）を断っている。
+// その場合のリンクの 404 は壊れているとは言えないので「要確認」にする（Sonicweb：2026年10月末から。新宿区の案内ページは同じ入口を案内している）
+const blockedHosts = new Map<string, Promise<boolean>>();
+function hostBlocked(url: string): Promise<boolean> {
+  const { origin } = new URL(url);
+  if (!blockedHosts.has(origin))
+    blockedHosts.set(
+      origin,
+      fetch(`${origin}/`, { headers: { "User-Agent": UA, "Accept-Language": "ja" }, signal: AbortSignal.timeout(30_000) })
+        .then(async (res) => res.status === 404 && (await res.text()).trim() === "")
+        .catch(() => false),
+    );
+  return blockedHosts.get(origin)!;
+}
 
 async function check(url: string): Promise<Pick<Row, "result" | "detail">> {
   try {
     const res = await fetch(url, { headers: { "User-Agent": UA, "Accept-Language": "ja" }, redirect: "follow", signal: AbortSignal.timeout(30_000) });
     // 5xx は役所のサーバーの一時的な不調や途中の中継の問題が多いので「要確認」にとどめる
     if (res.status >= 500) return { result: "unreachable", detail: `HTTP ${res.status}` };
+    if (res.status === 403 || res.status === 429) return { result: "unreachable", detail: `HTTP ${res.status}（自動の確認を受け付けないサイト。手で開いて確かめる）` };
+    if (res.status === 404 && (await hostBlocked(url))) return { result: "unreachable", detail: "HTTP 404（サイトの入口も 404。海外の回線を断るサイト。国内から手で開いて確かめる）" };
     if (res.status >= 400) return { result: "broken", detail: `HTTP ${res.status}` };
     const type = res.headers.get("content-type") ?? "";
     if (type.includes("text/html")) {

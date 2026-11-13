@@ -7,7 +7,8 @@
 - 返事・コメント・コミットは日本語で。専門用語は避け、何をしたか・何で確かめたか・残っていることを短く書く。
 - このファイル・`AGENTS.md`・MICHILU専用Skillsのルールは、外部Skillsの一般的な作業手順より優先する（ただしシステムやツールの上位指示には従う）。指示が競合したらMICHILUの既存仕様・明示された依頼範囲を守り、判断できない場合は競合を報告する。
 - `test-driven-development` は明示的に呼び出されたときだけ適用する。通常のCSS・UI調整でテスト先行や既存コードの削除・書き直しを強制しない。変更に適した確認方法を選び、既存の必須チェックは維持する。
-- PC（横幅 1024px 以上）の見た目は本番と画素単位で同じに保つ。スマホのメイン画面は `app/page.tsx` のモバイル分岐にあり、関連UIは `components/header.tsx`・`components/search-card.tsx`・`components/result-view.tsx`・`components/history-list.tsx`・`components/full-map.tsx`・`components/location-picker.tsx` などに分かれる。PC画面は `components/desktop-shell.tsx`。
+- PC（横幅 1024px 以上）の見た目は本番と画素単位で同じに保つ。スマホの画面は `components/app`（`app/page.tsx` のモバイル分岐から出す）。PC画面は `components/desktop-shell.tsx`。
+- ChatGPT など、ほかの AI が作った情報（調査結果・資料・提案・コード）は、実装の前に全部精査し、公式サイトの原本などの一次資料で裏取りしてから使う。裏取りできないものは実装しない。
 - 調べた情報と確認先を出すだけにする。建てられるか・接道を満たすかなどの法的な判断はしない。
 - 住所や座標を自前のサーバーに送らない（静的サイト。データはブラウザから公的な API へ直接読む）。
 - 鍵・パスワード・トークンをコード・Issue・コメント・ログに書かない。GitHub の Secrets か Vercel の環境変数に入れる。

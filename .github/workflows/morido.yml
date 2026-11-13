@@ -1,11 +1,12 @@
-# 毎月7日の朝（日本時間 6:35）に、国土数値情報の宅地造成等工事規制区域・特定盛土等規制区域（盛土規制法の規制区域）に
+# 毎週土曜日の朝（日本時間 6:35）に、国土数値情報の宅地造成等工事規制区域・特定盛土等規制区域（盛土規制法の規制区域）に
 # 新しい年度・時点のデータが出たかを見て、出ていれば関東1都6県の区域のタイルを作り直し、アプリ（public/data/）に入れる。
 # テストが通れば main に直接入れる（本番は Vercel が main から自動で作り直す）。外部のストレージや鍵は要らない。
+# 週に1回見るのは、国や市区町村がデータを新しくしたら、なるべく早くアプリに入れるため（新しくなっていなければ何もしない）。
 name: 盛土規制法の区域の地図データ（最新版）
 
 on:
   schedule:
-    - cron: "35 21 6 * *"
+    - cron: "35 21 * * 5"
   workflow_dispatch:
     inputs:
       force:
@@ -35,9 +36,12 @@ jobs:
           python-version: "3.12"
       - name: 新しいデータが出たか
         id: c
+        env:
+          # 入力はコマンドに直接埋め込まず、環境変数で受ける
+          FORCE: ${{ inputs.force }}
         run: |
           python3 scripts/morido/build.py --check
-          if [ "${{ inputs.force }}" = "true" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+          if [ "$FORCE" = "true" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; fi
       - uses: actions/cache@v4
         if: steps.c.outputs.changed == 'true'
         id: tippecanoe

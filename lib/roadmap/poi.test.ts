@@ -5,7 +5,8 @@ import { buildDraft, draftText } from "../draft";
 import { buildSummary } from "../summary";
 import { buildLinks, findMunicipality } from "./index";
 import type { LngLat } from "./parcel";
-import { nearbyPois, nearestPois, poiCredit, poiLine, poiWalkText, POI_KINDS, POI_ORDER, POI_ZOOM, type Poi, type PoiSource, type PoiWalk } from "./poi";
+import { HOSPITAL_SOURCE } from "./facilities";
+import { nearbyPois, nearestPois, poiCredit, poiLine, poiWalkText, POI_EXTRA, POI_KINDS, POI_ORDER, POI_SOURCES, POI_ZOOM, type Poi, type PoiSource, type PoiWalk } from "./poi";
 import SRC from "./data/poi-source.json";
 import { decodePoiTile, poiTileSource } from "./poi-tiles";
 import { ROAD_CREDIT } from "./walk";
@@ -130,16 +131,17 @@ describe("周辺施設", () => {
   });
 
   it("徒歩の文字（80m を1分・切り上げ。10m 単位、1km からは 0.1km 単位）", () => {
-    const w = (meters: number, routed = true): PoiWalk => ({ kind: 1, label: "スーパー", name: "〇〇ストア", meters, minutes: Math.max(1, Math.ceil(meters / 80)), straight: meters, routed });
+    const w = (meters: number, routed = true): PoiWalk => ({ kind: 1, label: "スーパー", name: "〇〇ストア", meters, minutes: Math.max(1, Math.ceil(meters / 80)), straight: meters, routed, at: [139.6, 35.5] });
     expect(poiWalkText(w(452))).toBe("徒歩約6分（約450m）");
     expect(poiWalkText(w(3))).toBe("徒歩約1分（約10m）");
     expect(poiWalkText(w(1234))).toBe("徒歩約16分（約1.2km）");
     expect(poiLine(w(452))).toBe("スーパー：〇〇ストア 徒歩約6分（約450m）");
   });
 
-  it("種類の番号はタイルを作るスクリプトと同じ（12種類・順番にすべて入る）", () => {
-    expect(Object.keys(POI_KINDS).map(Number).sort((a, b) => a - b)).toEqual([...POI_ORDER].sort((a, b) => a - b));
+  it("種類の番号はタイルを作るスクリプトと同じ（生活環境の12種類と飲食店・順番にすべて入る）", () => {
+    expect(Object.keys(POI_KINDS).map(Number).sort((a, b) => a - b)).toEqual([...POI_ORDER, ...POI_EXTRA].sort((a, b) => a - b));
     expect(POI_ORDER).toHaveLength(12);
+    expect(POI_EXTRA).toEqual([13]);
   });
 });
 
@@ -179,8 +181,8 @@ describe("周辺施設を下書き・共有に書く", () => {
     links: buildLinks(m, 35.5, 139.6),
   };
   const pois: PoiWalk[] = [
-    { kind: 1, label: "スーパー", name: "〇〇ストア 菊名店", meters: 452, minutes: 6, straight: 380, routed: true },
-    { kind: 6, label: "公園", name: "大豆戸公園", meters: 900, minutes: 12, straight: 900, routed: false },
+    { kind: 1, label: "スーパー", name: "〇〇ストア 菊名店", meters: 452, minutes: 6, straight: 380, routed: true, at: [139.6, 35.5] },
+    { kind: 6, label: "公園", name: "大豆戸公園", meters: 900, minutes: 12, straight: 900, routed: false, at: [139.6, 35.5] },
   ];
 
   it("下書きに「周辺環境」の欄を足し、確かめる旨を1行（要確認）と OpenStreetMap の出典を付ける", () => {
@@ -194,7 +196,9 @@ describe("周辺施設を下書き・共有に書く", () => {
     expect(env.rows.filter((r) => r.check)).toHaveLength(1);
     const credits = draft.find((s) => s.title === "出典")!.rows.map((r) => r.value);
     expect(credits).toContain(poiCredit(true));
-    expect(poiCredit(true)).toBe(`周辺施設：© OpenStreetMap contributors（ODbL）を加工して作成。${ROAD_CREDIT}`);
+    expect(poiCredit(true)).toBe(`周辺施設：${POI_SOURCES}を加工して作成。${ROAD_CREDIT}`);
+    // 病院を国のデータにしていれば、その出典も
+    expect(POI_SOURCES).toBe(HOSPITAL_SOURCE ? `© OpenStreetMap contributors（ODbL）・病院は${HOSPITAL_SOURCE}` : "© OpenStreetMap contributors（ODbL）");
     expect(draftText(draft)).toContain("■周辺環境（販売図面の生活環境・参考）\nスーパー：〇〇ストア 菊名店 徒歩約6分（約450m）");
   });
 
@@ -210,7 +214,7 @@ describe("周辺施設を下書き・共有に書く", () => {
   it("共有の文に施設の一覧と出典・注意を入れる。施設が無ければ何も足さない", () => {
     const text = buildSummary(result, { pois });
     expect(text).toContain("【周辺施設（徒歩の目安・道路距離 80m を1分）】\n・スーパー：〇〇ストア 菊名店 徒歩約6分（約450m）\n・公園：大豆戸公園 直線約900m");
-    expect(text).toContain(`※周辺施設は© OpenStreetMap contributors（ODbL）を加工して作成。${ROAD_CREDIT}。`);
+    expect(text).toContain(`※周辺施設は${POI_SOURCES}を加工して作成。${ROAD_CREDIT}。`);
     expect(buildSummary(result, { pois: [] })).not.toContain("周辺施設");
     expect(buildDraft(result, { pois: [] }).some((s) => s.title.startsWith("周辺環境"))).toBe(false);
   });
@@ -244,6 +248,9 @@ describe.skipIf(!SRC.url)("アプリに入っている周辺施設のタイル",
 
   it("どの種類も入っていて、名前の付け違い（動物病院・整骨院・政策金融公庫）は入っていない", async () => {
     for (const k of POI_ORDER) expect(SRC.counts[String(k) as keyof typeof SRC.counts], POI_KINDS[k]).toBeGreaterThan(500);
+    // 飲食店は、タイルを作り直したデータから入る（作り直す前のデータには無い）
+    const counts = SRC.counts as Record<string, number>;
+    for (const k of POI_EXTRA) if (counts[String(k)] !== undefined) expect(counts[String(k)], POI_KINDS[k]).toBeGreaterThan(500);
     const around = await nearbyPois(35.6618, 139.6981, src(), 1200);
     expect(around.filter((p) => (p.kind === 4 || p.kind === 5) && /動物|整骨|接骨/.test(p.name))).toEqual([]);
     expect(around.filter((p) => p.kind === 8 && /公庫/.test(p.name))).toEqual([]);

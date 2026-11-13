@@ -10,7 +10,7 @@ import { ChevronRightIcon, MapIcon } from "./icons";
 import { Notes } from "./notes";
 import { Sheet } from "./sheet";
 
-export type RoadsState = { status: "none" } | { status: "loading" } | { status: "error" } | { status: "ok"; roads: NearbyRoad[]; label: string };
+export type RoadsState = { status: "none" } | { status: "loading" } | { status: "error" } | { status: "ok"; roads: NearbyRoad[]; label: string; /** データの出典（ライセンスが求める書き方） */ credit?: string };
 
 /** 結果の地図のうち、道路の種別を読める地図があれば、物件のまわりの道路を読む */
 export function useNearbyRoads(links: ResolvedLink[], lat: number, lng: number): RoadsState {
@@ -22,7 +22,7 @@ export function useNearbyRoads(links: ResolvedLink[], lat: number, lng: number):
     if (!read || !link) return;
     let alive = true;
     withRetry(() => readRoads(read, lat, lng))
-      .then((roads) => alive && setState({ key, value: { status: "ok", roads, label: link.label } }))
+      .then((roads) => alive && setState({ key, value: { status: "ok", roads, label: link.label, ...(read.credit ? { credit: read.credit } : {}) } }))
       .catch(() => alive && setState({ key, value: { status: "error" } }));
     return () => {
       alive = false;
@@ -122,6 +122,7 @@ function NearbyRoadsList({ state, compact }: { state: Extract<RoadsState, { stat
         <p>
           「{state.label}」のデータを読み、物件の地点から{ROAD_RADIUS_M}m以内にある道路を近い順に出しています。地図に色の無い道は載っていません。どれが前面道路か・幅員は地図と現地で確かめ、最終確認は窓口で行ってください。
         </p>
+        {state.credit && <p>{state.credit}</p>}
       </Notes>
     </div>
   );

@@ -1,0 +1,68 @@
+# 毎週月曜の朝（日本時間 8:00。地図リンクの確認の後）に、MICHILU が出す情報を全市区町村で調べ直し、結果を Issue に書く。
+#  - 対応している全市区町村の代表点（役所の座標。無ければ国土地理院の住所検索の点。お客様の住所は使わない）で、アプリと同じ読み方で
+#    用途地域・学区・最寄り駅・地価・ハザード・盛土規制法・砂防指定地など・自然公園など・地番を出す（lib/roadmap/audit-live.test.ts）
+#  - 見直し候補（データの無い種類を「指定なし」と言いそうな所、直線でいちばん近い駅が徒歩の上位に無い所など）、先週からの変わり目、
+#    データの時点と、データの自動更新（用途地域・地価・学区・駅など）の最後の結果を1つにまとめ（scripts/audit/report.mjs）、
+#    ラベル weekly-audit の Issue の本文を書き換える。新しい見直し候補・変わり目・失敗した自動更新があればコメントも足す（通知が届く）
+#  - 市区町村ごとの全部の結果（表と JSON）は、実行のページの audit-report（90日残す）。翌週はこれと比べる
+#  - Issue に「@claude」は書かないので、Claude の自動作業は動かない。鍵や外部のストレージは要らない
+name: 毎週の点検（全市区町村・データの時点）
+
+on:
+  schedule:
+    - cron: "0 23 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: weekly-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: 全市区町村を調べ直す
+        run: npx vitest run lib/roadmap/audit-live.test.ts
+        env:
+          AUDIT_LIVE: "1"
+          AUDIT_OUT: audit-report
+      - name: 先週の結果を読む
+        run: |
+          id=$(gh run list --workflow weekly-audit.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId' || true)
+          if [ -n "$id" ]; then gh run download "$id" -n audit-report -D prev || echo "先週の結果を読めませんでした"; fi
+      - name: 報告をまとめる
+        run: node scripts/audit/report.mjs audit-report/audit.json prev/audit.json audit-report
+      - name: 実行のページに出す
+        if: always()
+        run: |
+          if [ -f audit-report/summary.md ]; then cat audit-report/summary.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-report
+          path: audit-report/
+          retention-days: 90
+      - name: Issue に書く
+        run: |
+          gh label create weekly-audit --color 0e8a16 --description "毎週の点検の結果（自動）" 2>/dev/null || true
+          n=$(gh issue list --label weekly-audit --state open --limit 1 --json number --jq '.[0].number')
+          if [ -z "$n" ]; then
+            gh issue create --title "毎週の点検の結果（自動）" --label weekly-audit --body-file audit-report/summary.md
+          else
+            gh issue edit "$n" --body-file audit-report/summary.md
+            if [ "$(cat audit-report/notable.txt)" = "yes" ]; then gh issue comment "$n" --body-file audit-report/comment.md; fi
+          fi

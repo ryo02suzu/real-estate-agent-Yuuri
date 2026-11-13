@@ -1,14 +1,27 @@
 // 最寄り駅と徒歩の目安。物件の近くの駅（国土数値情報の鉄道データ。scripts/stations/build.py で public/data/ に置く）を選び、
-// 国土地理院のベクトルタイル（地理院地図Vector・z15）の道路中心線を道のりにして、物件から駅のホームの線までの道路距離を求める。
-// 徒歩の分数は不動産広告の決まり（道路距離 80m を1分、1分未満は切り上げ）で出すが、駅の出入口ではなく駅（ホーム）までの
-// 目安なので、広告に書くときは実際の道路距離で確かめる旨を添える。自前のサーバーは通さない（ブラウザから直接読む）
+// 国土地理院のベクトルタイル（地理院地図Vector・z15）の道路中心線を道のりにして、物件から駅の入口までの道路距離を求める。
+// 入口は OpenStreetMap の駅の出入口（無ければ駅舎の建物の中心、それも無ければ駅の点）。どれも無い駅だけ、ホームの線までで測り、
+// そう書く（ホームの端は入口から遠いことがあり、近い駅を取り違える。桐生と西桐生など）。
+// 徒歩の分数は不動産広告の決まり（道路距離 80m を1分、1分未満は切り上げ）で出すが、地図のデータから出した目安なので、
+// 広告に書くときは実際の道路距離で確かめる旨を添える。自前のサーバーは通さない（ブラウザから直接読む）
 import { VectorTile } from "@mapbox/vector-tile";
 import { PbfReader } from "pbf";
 import SOURCE from "./data/station-source.json";
 import type { LngLat } from "./parcel";
 
-/** 駅：名前、路線（[路線, 事業者]）、ホームの線の点 */
-export type Station = { n: string; l: [string, string][]; p: LngLat[] };
+/**
+ * 駅：名前、路線（[路線, 事業者]）、ホームの線の点、入口の点（e。OpenStreetMap）と、その種類（k。1 出入口・2 駅舎・3 駅の点）
+ */
+export type Station = { n: string; l: [string, string][]; p: LngLat[]; e?: LngLat[]; k?: 1 | 2 | 3 };
+
+/** どこまで測ったか（出入口・駅舎・駅の位置・ホーム） */
+export type StationTo = "entrance" | "building" | "station" | "platform";
+const TO: Record<1 | 2 | 3, StationTo> = { 1: "entrance", 2: "building", 3: "station" };
+/** 測る点（入口があれば入口、無ければホームの線） */
+const targetsOf = (s: Station): LngLat[] => (s.e?.length ? s.e : s.p);
+const toOf = (s: Station): StationTo => (s.e?.length && s.k ? TO[s.k] : "platform");
+/** 「出入口まで」「ホームまで」 */
+export const TO_LABEL: Record<StationTo, string> = { entrance: "出入口まで", building: "駅舎まで", station: "駅の位置まで", platform: "ホームまで" };
 export type StationWalk = {
   name: string;
   lines: [string, string][];
@@ -20,13 +33,17 @@ export type StationWalk = {
   straight: number;
   /** 道路の道のりで求めたか（false は直線距離の目安） */
   routed: boolean;
+  /** 駅の位置（いちばん近い出入口・ホームの点。地図の印） */
+  at?: LngLat;
+  /** どこまで測ったか（出入口・駅舎・駅の位置・ホーム）。古いデータでは無い（ホーム） */
+  to?: StationTo;
 };
 
-export const STATION_DATA = { url: SOURCE.url, year: SOURCE.year };
+export const STATION_DATA = { url: SOURCE.url, year: SOURCE.year, doorsDate: SOURCE.doorsDate };
 /** 道のりの出典（駅・学校までの徒歩の目安） */
 export const ROAD_CREDIT = "道のりは地理院地図Vector（国土地理院）の道路中心線から求めた目安";
-/** 出典（CC BY 4.0 と国土地理院の出典表示のとおり、加工したことを書く） */
-export const STATION_CREDIT = `出典：「国土数値情報（鉄道データ）」（国土交通省、https://nlftp.mlit.go.jp/ksj/）を加工して作成（${SOURCE.year}年）。${ROAD_CREDIT}`;
+/** 出典（CC BY 4.0 と国土地理院の出典表示のとおり、加工したことを書く。駅の入口は OpenStreetMap） */
+export const STATION_CREDIT = `出典：「国土数値情報（鉄道データ）」（国土交通省、https://nlftp.mlit.go.jp/ksj/）を加工して作成（${SOURCE.year}年）。駅の出入口：© OpenStreetMap contributors（ODbL・${SOURCE.doorsDate}時点）。${ROAD_CREDIT}`;
 
 /** 調べる駅：直線でこの距離（m）までの駅を、近い順にこの数まで */
 const MAX_STRAIGHT = 2000;
@@ -48,10 +65,11 @@ export function lineLabel([line, op]: [string, string]): string {
   return `${company}${line}`;
 }
 
-/** 「菊名駅（東急東横線・JR横浜線）徒歩約8分（約610m）」 */
+/** 「菊名駅（東急東横線・JR横浜線）徒歩約8分（約610m）」。ホームまでで測った駅は「（ホームまで約610m）」 */
 export function stationLine(s: StationWalk): string {
   const dist = s.meters >= 1000 ? `${(s.meters / 1000).toFixed(1)}km` : `${Math.round(s.meters / 10) * 10}m`;
-  return `${s.name}駅（${s.lines.map(lineLabel).join("・")}）${s.routed ? `徒歩約${s.minutes}分（約${dist}）` : `直線約${dist}`}`;
+  const to = s.to === "platform" ? TO_LABEL.platform : "";
+  return `${s.name}駅（${s.lines.map(lineLabel).join("・")}）${s.routed ? `徒歩約${s.minutes}分（${to}約${dist}）` : `直線${to ? `（${to}）` : ""}約${dist}`}`;
 }
 
 // ---- 平面の座標（物件のまわり。経緯度をそのまま m にする） ----
@@ -63,13 +81,23 @@ function projector(lat0: number, lng0: number) {
   return ([lng, lat]: LngLat): XY => [(lng - lng0) * mx, (lat - lat0) * M_LAT];
 }
 
-/** 近い駅（直線距離が MAX_STRAIGHT まで、近い順に MAX_STATIONS まで）。その中に無ければ、いちばん近い駅（20km まで）を1つ */
+/**
+ * 山のケーブルカー（鋼索線）だけの駅（高尾山・御岳山・筑波山頂など）。歩いて行けて道のりが出たときだけ最寄り駅に出し、
+ * 歩いて行ける範囲に駅が無いときの「直線でいちばん近い駅」にはしない（尾根の向こうの山頂の駅を最寄り駅と言わない。檜原村など）。
+ * 箱根の強羅のように、ケーブルカーの駅のそばの住宅は道のりで出る
+ */
+export const isCableOnly = (s: Station) => s.l.length > 0 && s.l.every(([line]) => /鋼索|ケーブル/.test(line));
+
+/**
+ * 近い駅（直線距離が MAX_STRAIGHT まで、近い順に MAX_STATIONS まで）。その中に無ければ、いちばん近い駅（20km まで。
+ * ケーブルカーだけの駅は除く）を1つ
+ */
 export function nearbyStations(lat: number, lng: number, stations: Station[], max = MAX_STRAIGHT): { station: Station; straight: number }[] {
   const xy = projector(lat, lng);
   const all: { station: Station; straight: number }[] = [];
   for (const s of stations) {
     let d = Infinity;
-    for (const p of s.p) {
+    for (const p of targetsOf(s)) {
       const [x, y] = xy(p);
       d = Math.min(d, Math.hypot(x, y));
     }
@@ -77,7 +105,7 @@ export function nearbyStations(lat: number, lng: number, stations: Station[], ma
   }
   all.sort((a, b) => a.straight - b.straight);
   const near = all.filter((n) => n.straight <= max).slice(0, MAX_STATIONS);
-  return near.length ? near : all.slice(0, 1).filter((n) => n.straight <= 20_000);
+  return near.length ? near : all.filter((n) => !isCableOnly(n.station)).slice(0, 1).filter((n) => n.straight <= 20_000);
 }
 
 // ---- 道のり（道路中心線のグラフで、物件から駅の点までの最短の道） ----
@@ -154,6 +182,29 @@ export function walkDistances(lines: LngLat[][], from: LngLat, targets: { id: nu
           if (d <= 2 && !adj[i].some(([k]) => k === j)) link(i, j, d);
         }
   });
+  // 道のつながり（島）ごとの点の数。敷地の中の通路など、ほかの道とつながっていない小さな島に下ろした点は、
+  // 大きな島（ふつうの道路網）にもつなぐ（守谷市役所のように、いちばん近い道が敷地の中だけの道のことがある）
+  const comp = new Int32Array(pos.length).fill(-1);
+  const compSize: number[] = [];
+  for (let i = 0; i < pos.length; i++) {
+    if (comp[i] >= 0) continue;
+    const c = compSize.length;
+    let n = 0;
+    const stack = [i];
+    comp[i] = c;
+    while (stack.length) {
+      const u = stack.pop()!;
+      n++;
+      for (const [v] of adj[u])
+        if (comp[v] < 0) {
+          comp[v] = c;
+          stack.push(v);
+        }
+    }
+    compSize.push(n);
+  }
+  const ISLAND = 100;
+  const bigSeg = (si: number) => compSize[comp[segs[si][0]]] >= ISLAND;
   type Near = { d: number; si: number; t: number; foot: XY };
   /** 格子の r0〜r1 周り目（0 は点のある格子）の辺と、点からの距離・辺の上のいちばん近い点（近い順） */
   const scan = (p: XY, r0: number, r1: number): Near[] => {
@@ -195,6 +246,11 @@ export function walkDistances(lines: LngLat[][], from: LngLat, targets: { id: nu
       // 同じ道路の続きの辺（下ろした点が近い）は1つでよい
       if (picked.some((q) => Math.hypot(q.foot[0] - c.foot[0], q.foot[1] - c.foot[1]) < 15)) continue;
       picked.push(c);
+    }
+    // 下ろした道がどれも小さな島なら、300m 以内のいちばん近い大きな島の道にもつなぐ（その間は直線で足す）
+    if (!picked.some((c) => bigSeg(c.si))) {
+      const big = scan(p, 0, 15).find((c) => bigSeg(c.si) && c.d <= 300);
+      if (big) picked.push(big);
     }
     const s = pos.length;
     pos.push(p);
@@ -320,7 +376,7 @@ function tileOfZ(lat: number, lng: number, z: number): [number, number] {
   return [Math.floor(((lng + 180) / 360) * n), Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n)];
 }
 
-/** 点を囲む範囲（+250m）の道路のタイル。多すぎる（25枚を超える。4km 四方くらい）ときは読まない */
+/** 点を囲む範囲（+250m）の道路のタイル */
 function roadTiles(pts: LngLat[]): [number, number][] {
   const pad = 0.003;
   const west = Math.min(...pts.map((p) => p[0])) - pad;
@@ -331,18 +387,47 @@ function roadTiles(pts: LngLat[]): [number, number][] {
   const [x1, y1] = tileOfZ(south, east, ROAD_ZOOM);
   const tiles: [number, number][] = [];
   for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) tiles.push([x, y]);
-  return tiles.length <= 25 ? tiles : [];
+  return tiles;
 }
 
+/** 一度に読む道路のタイルの数の上限（4km 四方くらい。1枚 20〜50KB） */
+const MAX_TILES = 25;
+
 /**
- * 物件から目的地（駅のホームの点・学校など）までの道路距離（m）。国土地理院の道路のタイルを読む（読んだタイルは駅と学校で使い回す）。
+ * 物件から目的地（駅の出入口・学校など）までの道路距離（m）。国土地理院の道路のタイルを読む（読んだタイルは駅と学校で使い回す）。
+ * 目的地の点のうち物件に近い方（いちばん近い点から 300m 以内）を囲む範囲を読み、多すぎる（MAX_TILES を超える）ときは、
+ * 遠い目的地から外す（近い目的地だけでも道のりを出す。前は全部をあきらめていて、江東区役所のように駅の多い所で徒歩が出なかった）。
  * タイルが読めない・遠すぎる・道がつながらない目的地は入れない
  */
 export async function walkTo(lat: number, lng: number, targets: { id: number; points: LngLat[] }[]): Promise<Map<number, number>> {
-  const tiles = roadTiles([[lng, lat], ...targets.flatMap((t) => t.points)]);
+  const k = Math.cos((lat * Math.PI) / 180);
+  const far = (q: LngLat) => Math.hypot((q[0] - lng) * k, q[1] - lat) * 110_950;
+  // 目的地ごとに、物件に近い方の点（いちばん近い点から 300m 以内）。近い目的地から順に
+  const near = targets
+    .map((t) => {
+      const d = t.points.map(far);
+      const min = Math.min(...d);
+      return { ...t, points: t.points.filter((_, i) => d[i] <= min + 300), min };
+    })
+    .sort((a, b) => a.min - b.min);
+  let used: typeof near = [];
+  let tiles: [number, number][] = [];
+  for (const t of near) {
+    const next = roadTiles([[lng, lat], ...[...used, t].flatMap((u) => u.points)]);
+    if (next.length > MAX_TILES) break;
+    used = [...used, t];
+    tiles = next;
+  }
+  if (!used.length) return new Map();
   const got = await Promise.allSettled(tiles.map(([x, y]) => roadTile(x, y)));
   const lines = got.flatMap((g) => (g.status === "fulfilled" ? g.value : []));
-  return lines.length ? walkDistances(lines, [lng, lat], targets) : new Map();
+  return lines.length ? walkDistances(lines, [lng, lat], used) : new Map();
+}
+
+/** 駅の点のうち、物件にいちばん近い点 */
+function nearestPoint(points: LngLat[], lat: number, lng: number): LngLat | undefined {
+  const k = Math.cos((lat * Math.PI) / 180);
+  return [...points].sort((a, b) => Math.hypot((a[0] - lng) * k, a[1] - lat) - Math.hypot((b[0] - lng) * k, b[1] - lat))[0];
 }
 
 /**
@@ -352,17 +437,27 @@ export async function walkTo(lat: number, lng: number, targets: { id: number; po
 export async function nearestStations(lat: number, lng: number): Promise<StationWalk[]> {
   const stations = await loadStations();
   const near = nearbyStations(lat, lng, stations);
+  /** 直線距離だけの目安（歩いて行ける範囲に駅が無いとき） */
+  const straightOnly = ({ station: s, straight }: { station: Station; straight: number }): StationWalk[] => [
+    { name: s.n, lines: s.l, meters: straight, minutes: walkMinutes(straight), straight, routed: false, at: nearestPoint(targetsOf(s), lat, lng), to: toOf(s) },
+  ];
   if (!near.length) return [];
   // 歩いて行ける範囲に駅が無い（いちばん近い駅でも遠い）ときは、直線距離だけ
-  if (near[0].straight > MAX_STRAIGHT) return [{ name: near[0].station.n, lines: near[0].station.l, meters: near[0].straight, minutes: walkMinutes(near[0].straight), straight: near[0].straight, routed: false }];
-  const dist = await walkTo(lat, lng, near.map((n, id) => ({ id, points: n.station.p })));
-  return near
-    .map((n, id) => {
-      const d = dist.get(id);
+  if (near[0].straight > MAX_STRAIGHT) return straightOnly(near[0]);
+  const dist = await walkTo(lat, lng, near.map((n, id) => ({ id, points: targetsOf(n.station) })));
+  const out = near
+    // ケーブルカーだけの駅は、道のりが出たときだけ（山の向こうの駅を直線の目安で出さない）
+    .filter((n, id) => !isCableOnly(n.station) || routedOk(dist.get(id), n.straight))
+    .map((n) => {
+      const d = dist.get(near.indexOf(n));
       const routed = routedOk(d, n.straight);
       const meters = routed ? d : n.straight;
-      return { name: n.station.n, lines: n.station.l, meters, minutes: walkMinutes(meters), straight: n.straight, routed };
+      return { name: n.station.n, lines: n.station.l, meters, minutes: walkMinutes(meters), straight: n.straight, routed, at: nearestPoint(targetsOf(n.station), lat, lng), to: toOf(n.station) };
     })
     .sort((a, b) => Number(b.routed) - Number(a.routed) || a.meters - b.meters)
     .slice(0, 3);
+  if (out.length) return out;
+  // 近くにケーブルカーの駅しか無く、道のりも出なかった：ケーブルカーではない、いちばん近い駅の直線距離
+  const far = nearbyStations(lat, lng, stations.filter((s) => !isCableOnly(s)), 0);
+  return far.length ? straightOnly(far[0]) : [];
 }

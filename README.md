@@ -23,7 +23,7 @@ npm run build    # 静的サイトを out/ に書き出す（Vercel 等にその
 |---|---|
 | `lib/roadmap/` | コアロジック。`lookup(address)` を呼ぶだけで、地図URL・公開レベル・問い合わせ先が返る |
 | `lib/roadmap/data/` | 都道府県ごとの市町村データ。`vendors.ts` が地図システムごとのURL形式 |
-| `app/page.tsx`, `components/` | 画面（ホーム・結果・使い方・対応市一覧）。PC は地図が中心（`desktop-shell.tsx`）、動く地図は `live-map.tsx`（MapLibre GL） |
+| `app/page.tsx`, `components/` | 画面（ホーム・結果・使い方・対応市一覧）。PC は「調査デスク」（`desktop-shell.tsx`・`components/desk/`。地図 ⇄ 3D とカルテ）、動く地図は `live-map.tsx`（MapLibre GL） |
 | `lib/roadmap/parcel.ts`, `parcel-tiles.ts` | 地番検索（登記所備付地図データの筆のタイルを読む）。置き場所は `data/parcel-source.json` |
 | `scripts/parcel-tiles/` | 地番の地図データの最新版を作るスクリプト（`.github/workflows/parcel-tiles.yml` から使う） |
 | `lib/roadmap/zoning.ts`, `zoning-tiles.ts` | 地点の都市計画（用途地域・建ぺい率・容積率・防火など）。タイルは `public/data/`、置き場所は `data/zoning-source.json`、市区町村ごとのデータの有無と時点は `data/zoning-status.json` |
@@ -32,7 +32,7 @@ npm run build    # 静的サイトを out/ に書き出す（Vercel 等にその
 | `lib/roadmap/road-read.ts` | 市の道路種別の地図データ（公開の ArcGIS レイヤ）を読み、物件のまわりの道路の種別・方角・距離を出す（埼玉県の20町・行田市・つくば市） |
 | `lib/history.ts` | 直近5件の検索履歴（端末の localStorage のみ） |
 | `docs/features.md` | UIの機能要件 |
-| `docs/saitama-research.md`, `docs/chiba-research.md`, `docs/kanagawa-research.md`, `docs/tokyo-research.md`, `docs/kanto-north-research.md` | 市区町村ごとの調査結果と出典 |
+| `docs/saitama-research.md`, `docs/chiba-research.md`, `docs/kanagawa-research.md`, `docs/tokyo-research.md`, `docs/kanto-north-research.md`, `docs/shizuoka-research.md`, `docs/yamanashi-research.md`, `docs/nagano-research.md`, `docs/aichi-research.md`, `docs/gifu-research.md`, `docs/niigata-research.md`, `docs/toyama-research.md`, `docs/ishikawa-research.md`, `docs/fukui-research.md` | 市区町村ごとの調査結果と出典 |
 
 ## ロジックの使い方
 

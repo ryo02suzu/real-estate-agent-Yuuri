@@ -23,6 +23,8 @@ import {
   SANKO_COLOR,
   LAND_PRICE_EVENT,
   LAND_PRICE_LAYERS,
+  OVERLAY_EVENT,
+  type OverlayKey,
   LAND_PRICE_MIN_ZOOM,
   PARCEL_HIT_LAYERS,
   PARCEL_LAYERS,
@@ -45,11 +47,11 @@ import { pmtilesBuildingSource } from "@/lib/roadmap/building-tiles";
 import { HAZARD_KINDS, HAZARD_LAYERS, hazardAt, hazardPointLabel, HAZARDS, type HazardKind } from "@/lib/roadmap/hazard";
 import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
 import { LAND_USAGE_COLORS, landPriceSummary, usageFromCode } from "@/lib/roadmap/land-price";
-import { chibanLabel, kuikiLabel } from "@/lib/roadmap/parcel";
+import { chibanLabel, isLotChiban, kuikiLabel, registryChiban } from "@/lib/roadmap/parcel";
 import { readRoadShapes, type RoadRead } from "@/lib/roadmap/road-read";
 import { sheetName, type SheetHit } from "@/lib/roadmap/sheets";
 import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
-import { BuildingIcon, ChevronRightIcon, FrameIcon, HazardIcon, InfoIcon, LandPriceIcon, LocateIcon, ParcelIcon, PinIcon, RoadIcon, ZoningIcon } from "./icons";
+import { BuildingIcon, ChevronRightIcon, FrameIcon, HazardIcon, InfoIcon, LandPriceIcon, LocateIcon, ParcelIcon, PinIcon, RoadIcon, TrainIcon, ZoningIcon } from "./icons";
 import { MapLegend, type LegendItem } from "./map-legend";
 
 // 描画のワーカーは public/maplibre/<版>/ に置いてある（scripts/copy-maplibre-worker.mjs）
@@ -69,9 +71,9 @@ const LOCALE = {
   "ScaleControl.Kilometers": "km",
 };
 
-// 物件のピン（components/icons.tsx の PinIcon と同じ形）
+// 物件のピン（components/icons.tsx の PinIcon と同じ形）。色は brand（PC は金色、スマホの紺の見た目では紺）
 const PIN_SVG =
-  '<svg viewBox="0 0 24 24" width="44" height="44" aria-hidden="true"><path fill="#8a6632" stroke="#fff" stroke-width="1.2" d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z"/></svg>';
+  '<svg viewBox="0 0 24 24" width="44" height="44" aria-hidden="true"><path fill="currentColor" stroke="#fff" stroke-width="1.2" d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z"/></svg>';
 
 type Point = { lat: number; lng: number };
 type Padding = { top: number; bottom: number; left: number; right: number };
@@ -191,13 +193,16 @@ const HAZARD_FOOT: Partial<Record<HazardKind, string>> = {
   keizoku: "「2週間以上」の色でも4週間以上のことがあります。",
 };
 
+/** PC（調査デスク）：「駅・学校」で地図に出す札（物件の画面がもう読んだ駅・学校・施設） */
+export type MapPlace = { key: string; name: string; sub?: string; kind: "station" | "school" | "poi"; lng: number; lat: number };
+
 export type LiveMapProps = {
   /** 物件の位置。無ければ関東全体を表示する */
   point?: Point;
   /** PDF の分割図の市で、物件が載っている図（範囲の枠を重ねる） */
   sheet?: SheetHit;
   /** 地番で見つけた筆・地図で選んだ地点の筆（強調する） */
-  parcel?: { kuiki: string; chibanRaw: string };
+  parcel?: { kuiki: string; chibanRaw: string; chibanRaws?: string[] };
   mode?: "pin" | "crosshair";
   /** pin: ピンを動かした・クリックした地点で調べる */
   onPick?: (lat: number, lng: number) => void;
@@ -223,7 +228,30 @@ export type LiveMapProps = {
   initialHazard?: HazardKind;
   /** 最初に見せる地価の地点（[経度, 緯度]。スマホの地価の一覧から「地図」で開いたとき）。物件と両方が見える範囲にする */
   initialLandPrice?: [number, number];
+  /** 重ねた色の濃さ（1 でいつもの濃さ。用途地域・道路種別・ハザードの元の不透明度に掛ける） */
+  overlayOpacity?: number;
+  /**
+   * スマホの物件の画面から開いた地図：タップした筆を、謄本・公図の請求に貼る地番として選ぶ・外す（「筆・地番」を表示しているとき。
+   * 吹き出しに「ここで調べる」と並べて出す）。地番は登記の地番
+   */
+  parcelPick?: { has: (kuiki: string, chiban: string) => boolean; toggle: (kuiki: string, chiban: string) => void };
+  /** 現在地（スマホの「現在地で調べる」。青い点と誤差の円を出す。位置は端末の中だけで使い、送らない） */
+  me?: { lat: number; lng: number; accuracy?: number };
+  /** PC（調査デスク）：道具の見た目をデスクの部品にそろえる（スマホは渡さない） */
+  skin?: "desk";
+  /** PC：「駅・学校」で出す札（渡したときだけ道具に出る） */
+  places?: MapPlace[];
 };
+
+/** 濃さを変えるレイヤとその不透明度の属性（ハザードのタイルはこれに加えて raster-opacity） */
+type OpacityProp = "fill-opacity" | "line-opacity" | "raster-opacity";
+const OPACITY_LAYERS: [string, OpacityProp][] = [
+  ["zoning-youto-fill", "fill-opacity"],
+  ["zoning-douro", "line-opacity"],
+  ["road-fill", "fill-opacity"],
+  ["road-outline", "line-opacity"],
+  ["road-line", "line-opacity"],
+];
 
 /** 地価の地点と物件が両方見える範囲へ（物件が無ければ地点へ寄る） */
 function fitLandPrice(map: MapLibreMap, [plng, plat]: [number, number], point?: Point) {
@@ -259,6 +287,11 @@ export default function LiveMap({
   legendTarget,
   initialHazard,
   initialLandPrice,
+  overlayOpacity,
+  parcelPick,
+  me,
+  skin,
+  places,
 }: LiveMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -267,6 +300,9 @@ export default function LiveMap({
   const [loaded, setLoaded] = useState(false);
   const [basemap, setBasemap] = useState<Basemap>("pale");
   const [locating, setLocating] = useState(false);
+  // 地図の「現在地」で取れた位置（青い点を出す。渡された現在地があればそちら）
+  const [located, setLocated] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
+  const meRef = useRef<Marker | null>(null);
   // 筆界と地番（登記所備付地図）・用途地域の塗り分けと都市計画道路・道路種別を表示するか（道路種別は読める市だけ）
   const [shown, setShown] = useState<Record<Overlay, boolean>>(() => ({ parcels: false, zoning: false, roads: false, buildings: false, landPrice: false, ...initial }));
   // 道路種別は読める市だけ、建物は PLATEAU のタイルがあるときだけ
@@ -289,6 +325,8 @@ export default function LiveMap({
   // 道路種別を読んでいる最中か（読み終えるまで「読み込んでいます」のまま）。件数の上限で読み切れなかったか
   const roadsLoading = useRef(false);
   const roadsTruncated = useRef(false);
+  // PC：駅・学校の札を出しているか
+  const [placesOn, setPlacesOn] = useState(false);
   // 重ねているハザードの種類（null は重ねていない）。「ハザード」を押し直したときは前の種類に戻す
   const [hazard, setHazard] = useState<HazardKind | null>(initialHazard ?? null);
   const lastHazard = useRef<HazardKind>(initialHazard ?? "flood");
@@ -299,9 +337,9 @@ export default function LiveMap({
     hazardRef.current = hazard;
   });
   // 地図のイベントからは最新の関数を呼ぶ
-  const cb = useRef({ onPick, onCenter, onFail });
+  const cb = useRef({ onPick, onCenter, onFail, parcelPick });
   useEffect(() => {
-    cb.current = { onPick, onCenter, onFail };
+    cb.current = { onPick, onCenter, onFail, parcelPick };
   });
   const pad: Padding = { top: 0, bottom: 0, left: 0, right: 0, ...padding };
   const padKey = `${pad.top},${pad.bottom},${pad.left},${pad.right}`;
@@ -310,10 +348,14 @@ export default function LiveMap({
   useEffect(() => {
     if (!container.current) return;
     let map: MapLibreMap;
+    // 見つけた筆・図の範囲の色は、画面の brand の色（PC は金色、スマホの紺の見た目では紺）
+    const css = getComputedStyle(container.current);
+    const fill = css.getPropertyValue("--color-brand-light").trim();
+    const line = css.getPropertyValue("--color-brand").trim();
     try {
       map = new MapLibreMap({
         container: container.current,
-        style: gsiStyle(),
+        style: gsiStyle("pale", fill && line ? { fill, line } : undefined),
         ...(point ? { center: [point.lng, point.lat] as [number, number], zoom: 17 } : { bounds: KANTO_BOUNDS, fitBoundsOptions: { padding: pad } }),
         minZoom: 5,
         maxZoom: 19.5,
@@ -494,6 +536,29 @@ export default function LiveMap({
             .then((r) => (l.textContent = hazardPointLabel(hk, r[hk]) ?? ""))
             .catch(() => (l.textContent = `${HAZARDS[hk].short}：読み込めませんでした`));
         }
+        // 物件の画面から開いた地図：タップした筆（地番のあるもの）を、コピーする地番として選ぶ・外す
+        const pp = cb.current.parcelPick;
+        if (pp && onRef.current.parcels && map.getZoom() >= PARCEL_MIN_ZOOM) {
+          const f = map.queryRenderedFeatures([e.point.x, e.point.y], { layers: PARCEL_PICK_LAYERS })[0];
+          const kuiki = String(f?.properties?.地番区域 ?? "");
+          const chiban = registryChiban(String(f?.properties?.地番 ?? ""));
+          if (kuiki && isLotChiban(chiban)) {
+            let on = pp.has(kuiki, chiban);
+            const sel = document.createElement("button");
+            sel.type = "button";
+            const paint = () => {
+              sel.className = `rounded-full border px-4 py-1.5 text-[13px] font-semibold ${on ? "border-brand bg-brand text-white" : "border-brand text-brand"}`;
+              sel.textContent = on ? `✓ ${chiban} を選んでいます（押すと外す）` : `${chiban} をコピー用に選ぶ`;
+            };
+            paint();
+            sel.onclick = () => {
+              pp.toggle(kuiki, chiban);
+              on = !on;
+              paint();
+            };
+            box.append(sel);
+          }
+        }
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "bg-gold rounded-full px-4 py-1.5 text-[13px] font-semibold text-white";
@@ -537,7 +602,7 @@ export default function LiveMap({
     if (!pinRef.current) {
       const el = document.createElement("div");
       el.innerHTML = PIN_SVG;
-      el.className = "cursor-grab drop-shadow-md active:cursor-grabbing";
+      el.className = "cursor-grab text-brand drop-shadow-md active:cursor-grabbing";
       el.title = "ドラッグして物件の場所を直せます";
       const pin = new Marker({ element: el, anchor: "bottom", draggable: true }).setLngLat([lng, lat]).addTo(map);
       pin.on("dragend", () => {
@@ -549,6 +614,47 @@ export default function LiveMap({
     // ピンを動かして選び直したときは、地図はそのまま。別の場所を調べたときだけ移動する
     if (map.getZoom() < 15 || !map.getBounds().contains([lng, lat])) map.flyTo({ center: [lng, lat], zoom: 17, duration: 1200 });
   }, [lat, lng, mode]);
+
+  // 現在地の青い点（脈打つ輪と、誤差の円。誤差の円はズームに合わせて大きさを変える）。指は地図に通す
+  const here = me ?? located;
+  const hereLat = here?.lat;
+  const hereLng = here?.lng;
+  const hereAcc = here?.accuracy;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (hereLat === undefined || hereLng === undefined) {
+      meRef.current?.remove();
+      meRef.current = null;
+      return;
+    }
+    if (!meRef.current) {
+      const el = document.createElement("div");
+      el.className = "map-me";
+      el.setAttribute("role", "img");
+      el.setAttribute("aria-label", "現在地");
+      el.innerHTML = '<span class="map-me-acc"></span><span class="map-me-pulse"></span><span class="map-me-dot"></span>';
+      meRef.current = new Marker({ element: el }).setLngLat([hereLng, hereLat]).addTo(map);
+    } else meRef.current.setLngLat([hereLng, hereLat]);
+    const el = meRef.current.getElement();
+    const size = () => {
+      // 誤差（m）を画面の大きさに（地図の1画素の長さ。緯度で変わる）
+      const mpp = (40075016.686 * Math.cos((hereLat * Math.PI) / 180)) / (512 * 2 ** map.getZoom());
+      el.style.setProperty("--acc", `${Math.min(600, Math.max(0, ((hereAcc ?? 0) * 2) / mpp))}px`);
+    };
+    size();
+    map.on("zoom", size);
+    return () => {
+      map.off("zoom", size);
+    };
+  }, [hereLat, hereLng, hereAcc]);
+  useEffect(
+    () => () => {
+      meRef.current?.remove();
+      meRef.current = null;
+    },
+    [],
+  );
 
   // 住所で調べ直したら（同じ住所でも）、地図を動かしていても物件の場所へ戻る
   const lastFocus = useRef(focusKey);
@@ -568,7 +674,7 @@ export default function LiveMap({
     labelRef.current = null;
     if (sheet) {
       const el = document.createElement("div");
-      el.className = "rounded-md bg-[#8a6632] px-2 py-0.5 text-[11px] font-semibold text-white shadow";
+      el.className = "rounded-md bg-brand px-2 py-0.5 text-[11px] font-semibold text-white shadow";
       el.textContent = sheet.whole ? "市全体の図" : `図 ${sheet.label}`;
       labelRef.current = new Marker({ element: el, anchor: "bottom-left" }).setLngLat([sheet.bounds[1], sheet.bounds[0]]).addTo(map);
     }
@@ -576,7 +682,7 @@ export default function LiveMap({
   }, [sheetKey, loaded]);
 
   // 見つけた筆の強調
-  const parcelKey = parcel ? `${parcel.kuiki}|${parcel.chibanRaw}` : "";
+  const parcelKey = parcel ? `${parcel.kuiki}|${(parcel.chibanRaws ?? [parcel.chibanRaw]).join(",")}` : "";
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !loaded) return;
@@ -604,6 +710,27 @@ export default function LiveMap({
     const shown = new Set(hazard ? HAZARDS[hazard].layers.map((l) => l.id) : []);
     for (const l of HAZARD_LAYERS) map.setLayoutProperty(hazardLayerId(l.id), "visibility", shown.has(l.id) ? "visible" : "none");
   }, [hazard, loaded]);
+
+  // 重ねた色の濃さ：レイヤごとの元の不透明度を最初に覚え、それに掛ける（スマホの全画面の地図のつまみ）
+  const baseOpacity = useRef(new Map<string, number>());
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded) return;
+    const o = overlayOpacity ?? 1;
+    const apply = (id: string, prop: OpacityProp) => {
+      if (!map.getLayer(id)) return;
+      const k = `${id}|${prop}`;
+      let base = baseOpacity.current.get(k);
+      if (base === undefined) {
+        const v: unknown = map.getPaintProperty(id, prop);
+        base = typeof v === "number" ? v : 1;
+        baseOpacity.current.set(k, base);
+      }
+      map.setPaintProperty(id, prop, base * o);
+    };
+    for (const [id, prop] of OPACITY_LAYERS) apply(id, prop);
+    for (const l of HAZARD_LAYERS) apply(hazardLayerId(l.id), "raster-opacity");
+  }, [overlayOpacity, loaded]);
 
   // PC：パネルの「地図に重ねる」。その種類を重ね、物件の辺り（町が見える大きさ）を見せる
   useEffect(() => {
@@ -708,8 +835,8 @@ export default function LiveMap({
   }, [on.roads, roadsKey, loaded]);
 
   /** 「筆・地番」などを押したとき。町を見ているくらいなら、描ける大きさまで寄る。すぐに「読み込んでいます」などを出し、地図が落ち着いたら中身を見て出し直す */
-  const toggleOverlay = (k: Overlay) => {
-    const next = !on[k];
+  const toggleOverlay = (k: Overlay, want?: boolean) => {
+    const next = want ?? !on[k];
     setShown((s) => ({ ...s, [k]: next }));
     const map = mapRef.current;
     const z = map?.getZoom() ?? 0;
@@ -718,6 +845,48 @@ export default function LiveMap({
     setNote(k, !next ? undefined : z < AUTO_ZOOM_FROM ? "zoom" : "loading");
     if (!next && (k === "zoning" || k === "roads")) setLegendOf(k, undefined);
   };
+
+  // PC：地図の外（3D の画面の層のボタン）から重ねを入れる・外す。最新の関数を呼ぶ
+  const outside = useRef({ toggleOverlay });
+  useEffect(() => {
+    outside.current = { toggleOverlay };
+  });
+  useEffect(() => {
+    const onSet = (e: Event) => {
+      const { key, on: want } = (e as CustomEvent<{ key: OverlayKey; on: boolean }>).detail;
+      if (key === "places") setPlacesOn(want);
+      else outside.current.toggleOverlay(key, want);
+    };
+    window.addEventListener(OVERLAY_EVENT, onSet);
+    return () => window.removeEventListener(OVERLAY_EVENT, onSet);
+  }, []);
+
+  // PC：駅・学校の札（地図の上の小さな札。押しても何もしない。物件の画面が読んだ地点だけ）
+  const placesKey = placesOn && places ? places.map((p) => `${p.key}@${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join("|") : "";
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !placesKey || !places) return;
+    const marks = places.map((p) => {
+      const el = document.createElement("div");
+      el.className = `desk-place is-${p.kind}`;
+      el.setAttribute("role", "img");
+      el.setAttribute("aria-label", `${p.name}${p.sub ? `（${p.sub}）` : ""}`);
+      const b = document.createElement("b");
+      b.textContent = p.name;
+      el.append(b);
+      if (p.sub) {
+        const sub = document.createElement("span");
+        sub.textContent = p.sub;
+        el.append(sub);
+      }
+      return new Marker({ element: el, anchor: "bottom" }).setLngLat([p.lng, p.lat]).addTo(map);
+    });
+    return () => {
+      for (const m of marks) m.remove();
+    };
+    // 地点の並びは placesKey で見る
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placesKey, loaded]);
 
   // 背景（淡色・標準・写真）
   useEffect(() => {
@@ -744,6 +913,7 @@ export default function LiveMap({
     navigator.geolocation.getCurrentPosition(
       (p) => {
         setLocating(false);
+        setLocated({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy });
         mapRef.current?.flyTo({ center: [p.coords.longitude, p.coords.latitude], zoom: 18, duration: 900 });
       },
       () => setLocating(false),
@@ -806,7 +976,7 @@ export default function LiveMap({
         compact={compact}
         foot={[
           hasSanko() && "緑の線は、市町村が公開している課税用の地番参考図の筆で、登記の地番・筆の形と違うことがあります。",
-          hasKozu() && "点線は、公図（任意座標）の形を道路の縁に合わせて置いた推定の位置です。数m（薄い点線は5m前後）ずれることがあります。",
+          hasKozu() && "点線は、公図（任意座標）の形を道路の縁に合わせて置いた推定の位置です。数m（薄い点線は5m前後。その1割弱は30m以上）ずれることがあります。",
           "謄本・公図で確かめてください",
         ]
           .filter(Boolean)
@@ -824,7 +994,7 @@ export default function LiveMap({
       />
     ),
     on.roads && legend.roads && roads && (
-      <MapLegend key="roads" title="道路種別の色" items={legend.roads} compact={compact} foot={`${roads.city}の地図データ（参考）。最終確認は窓口で`} />
+      <MapLegend key="roads" title="道路種別の色" items={legend.roads} compact={compact} foot={`${roads.city}の地図データ（参考）。最終確認は窓口で${roads.read.credit ? `。${roads.read.credit}` : ""}`} />
     ),
     on.landPrice && (
       <MapLegend
@@ -837,8 +1007,9 @@ export default function LiveMap({
     ),
   ];
 
-  const toolBase = "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] shadow-soft";
-  const tool = `${toolBase} bg-white/95 text-ink hover:bg-mint`;
+  const desk = skin === "desk";
+  const toolBase = desk ? "desk-tool is-on" : "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] shadow-soft";
+  const tool = desk ? "desk-tool" : `${toolBase} bg-white/95 text-ink hover:bg-mint`;
   return (
     <div className="absolute inset-0">
       {/* MapLibre の CSS が地図の箱を position: relative にするので、絶対配置ではなく大きさで広げる */}
@@ -848,13 +1019,13 @@ export default function LiveMap({
         <PinIcon className="pointer-events-none absolute left-1/2 top-1/2 h-11 w-11 -translate-x-1/2 -translate-y-full text-brand drop-shadow-md" />
       )}
       <div className={`absolute flex flex-col items-end gap-2 ${toolsClassName}`}>
-        <div className="flex rounded-full bg-white/95 p-0.5 shadow-soft" role="group" aria-label="背景の地図">
+        <div className={desk ? "desk-seg" : "flex rounded-full bg-white/95 p-0.5 shadow-soft"} role="group" aria-label="背景の地図">
           {(Object.keys(BASEMAPS) as Basemap[]).map((k) => (
             <button
               key={k}
               onClick={() => setBasemap(k)}
               aria-pressed={basemap === k}
-              className={`rounded-full px-3 py-1 text-[12px] ${basemap === k ? "bg-gold text-white" : "text-ink hover:bg-mint"}`}
+              className={desk ? "" : `rounded-full px-3 py-1 text-[12px] ${basemap === k ? "bg-gold text-white" : "text-ink hover:bg-mint"}`}
             >
               {BASEMAPS[k].label}
             </button>
@@ -904,6 +1075,12 @@ export default function LiveMap({
           <LandPriceIcon className={`h-4 w-4 ${on.landPrice ? "" : "text-brand"}`} />
           地価
         </button>
+        {places && places.length > 0 && (
+          <button onClick={() => setPlacesOn((v) => !v)} aria-pressed={placesOn} className={placesOn ? toolBase : tool} title="最寄り駅・小中学校・近くの施設を地図に出す（物件の画面で読んだ地点）">
+            <TrainIcon className={`h-4 w-4 ${placesOn ? "" : "text-brand"}`} />
+            駅・学校
+          </button>
+        )}
         <button
           onClick={toggleHazard}
           aria-pressed={!!hazard}
@@ -917,19 +1094,19 @@ export default function LiveMap({
         </button>
         {hazardMenu && (
           // 種類を選ぶ（iPhone で拡大されないよう、選択欄ではなくボタンを並べる）
-          <div role="group" aria-label="ハザードの種類" className="grid grid-cols-2 gap-0.5 rounded-2xl bg-white/95 p-1 shadow-soft">
+          <div role="group" aria-label="ハザードの種類" className={desk ? "desk-menu grid grid-cols-2 gap-0.5" : "grid grid-cols-2 gap-0.5 rounded-2xl bg-white/95 p-1 shadow-soft"}>
             {HAZARD_KINDS.map((k) => (
               <button
                 key={k}
                 onClick={() => pickHazard(k)}
                 aria-pressed={hazard === k}
                 title={HAZARDS[k].label}
-                className={`rounded-full px-2.5 py-1 text-[11.5px] leading-tight ${hazard === k ? "bg-gold text-white" : "text-ink hover:bg-mint"}`}
+                className={desk ? "" : `rounded-full px-2.5 py-1 text-[11.5px] leading-tight ${hazard === k ? "bg-gold text-white" : "text-ink hover:bg-mint"}`}
               >
                 {HAZARDS[k].short}
               </button>
             ))}
-            <button onClick={() => pickHazard(null)} className="rounded-full px-2.5 py-1 text-[11.5px] leading-tight text-muted hover:bg-mint">
+            <button onClick={() => pickHazard(null)} className={desk ? "is-off" : "rounded-full px-2.5 py-1 text-[11.5px] leading-tight text-muted hover:bg-mint"}>
               重ねない
             </button>
           </div>

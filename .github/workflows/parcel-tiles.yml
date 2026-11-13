@@ -1,6 +1,8 @@
 # 登記所備付地図データ（法務省）の最新版を、地番検索・筆界表示用のタイル（PMTiles）にして Cloudflare R2 に置く。
 # G空間情報センターの公開 API で都県ごとの地図XML（ログイン不要）を読み、都県ごとにタイルを作って（並行）、
-# 最後に関東1都6県を1つにまとめる。置き終えたら lib/roadmap/data/parcel-source.json を新しい置き場所に書き換え、
+# 最後に対応している全部の都道府県（lib/roadmap/data/regions.json。関東1都6県＋中部9県）を1つにまとめる。
+# region を指定すると、その地方の都道府県だけ作り直し、まとめる段ではほかの地方の前回のタイル（R2 の parcels/<年>/pref-*）を使う。
+# 置き終えたら lib/roadmap/data/parcel-source.json を新しい置き場所に書き換え、
 # テストが通れば main に入れる（本番は Vercel が main から作り直す）。
 #
 # 必要な設定（リポジトリの Settings → Secrets and variables → Actions）。無ければ何もしないで終わる:
@@ -12,8 +14,12 @@ on:
   workflow_dispatch:
     inputs:
       year:
-        description: 地図データの年度版（G空間情報センターの zip 名の末尾の年。空なら今年）
+        description: 地図データの年度版（G空間情報センターの zip 名の末尾の年。空なら一番新しいもの）
         required: false
+      region:
+        description: 作り直す地方（all = 全部、kanto = 関東1都6県、chubu = 中部9県。カンマ区切りで複数可）
+        required: false
+        default: all
   # 法務省の新しい版は毎年4月中旬に公開される。5月1日に作り直す
   schedule:
     - cron: "0 18 1 5 *"
@@ -42,12 +48,41 @@ jobs:
     outputs:
       ready: ${{ steps.c.outputs.ready }}
       year: ${{ steps.c.outputs.year }}
+      prefs: ${{ steps.p.outputs.prefs }}
+      all: ${{ steps.p.outputs.all }}
     steps:
+      - uses: actions/checkout@v4
+      - id: p
+        name: 作る都道府県（regions.json から）
+        env:
+          # 入力はコマンドに直接埋め込まず、環境変数で受けて形を確かめる（地方の名前は英小文字。カンマ区切りで複数可）
+          REGION: ${{ inputs.region || 'all' }}
+        run: |
+          region="$REGION"
+          if ! printf '%s' "$region" | grep -Eq '^[a-z]+(,[a-z]+)*$'; then echo "::error::地方の指定が分かりません"; exit 1; fi
+          all=$(jq -c '[.[] | .prefs | keys[]] | sort' lib/roadmap/data/regions.json)
+          if [ "$region" = "all" ]; then prefs="$all"; else
+            prefs=$(jq -c --arg r "$region" '[($r | split(",")[]) as $k | .[$k].prefs | keys[]] | sort' lib/roadmap/data/regions.json)
+          fi
+          [ "$(echo "$prefs" | jq 'length')" -gt 0 ] || { echo "::error::地方の指定が分かりません: $region"; exit 1; }
+          echo "prefs=$prefs" >> "$GITHUB_OUTPUT"
+          echo "all=$all" >> "$GITHUB_OUTPUT"
+          echo "作る都道府県: $prefs（全部: $all）"
       - id: c
         env:
           ACCOUNT: ${{ secrets.R2_ACCOUNT_ID }}
+          YEAR_INPUT: ${{ inputs.year || '' }}
         run: |
-          echo "year=${{ inputs.year || '' }}" | sed "s/=$/=$(date +%Y)/" >> "$GITHUB_OUTPUT"
+          # 年度版：入力が無ければ G空間情報センターの zip 名（「11105-0300-2025.zip」）の一番新しい年
+          year="$YEAR_INPUT"
+          if [ -n "$year" ] && ! printf '%s' "$year" | grep -Eq '^[0-9]{4}$'; then echo "::error::年度版は4桁の数字で入れてください"; exit 1; fi
+          if [ -z "$year" ]; then
+            year=$(curl -sS "https://www.geospatial.jp/ckan/api/3/action/package_search?fq=organization:moj-13tokyo&rows=1000" \
+              | jq -r '[.result.results[].resources[].name | select(test("^[0-9]{5}-[0-9]{4}-[0-9]{4}\\.zip$")) | .[-8:-4]] | max // empty')
+          fi
+          [ -n "$year" ] || { echo "::error::地図XMLの zip が見つかりません"; exit 1; }
+          echo "year=$year" >> "$GITHUB_OUTPUT"
+          echo "年度版: $year"
           if [ -n "$ACCOUNT" ] && [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ] && [ -n "$R2_PUBLIC_URL" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
@@ -63,7 +98,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pref: ["08", "09", "10", "11", "12", "13", "14"]
+        pref: ${{ fromJSON(needs.check.outputs.prefs) }}
     env:
       YEAR: ${{ needs.check.outputs.year }}
       R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
@@ -74,7 +109,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install mojxml==0.5.4
+      - run: pip install mojxml==0.5.4 shapely
+      # 市区町村の境界（国土数値情報 N03。別の市区町村の中に置かれた筆を外すのに使う）。一番新しい年を探す
+      - name: 市区町村の境界を取る
+        run: |
+          for y in $(date +%Y) $(( $(date +%Y) - 1 )) $(( $(date +%Y) - 2 )); do
+            url="https://nlftp.mlit.go.jp/ksj/gml/data/N03/N03-$y/N03-${y}0101_${{ matrix.pref }}_GML.zip"
+            if curl -fsSL -o work-n03.zip "$url"; then echo "境界: $url"; exit 0; fi
+          done
+          echo "::error::市区町村の境界（N03）を取れません"; exit 1
       - uses: actions/cache@v4
         id: tippecanoe
         with:
@@ -88,9 +131,24 @@ jobs:
           mkdir -p ~/tippecanoe-bin && cp /tmp/tippecanoe/tippecanoe /tmp/tippecanoe/tile-join ~/tippecanoe-bin/
       - run: echo "$HOME/tippecanoe-bin" >> "$GITHUB_PATH"
       - name: 都県のタイルを作る
-        run: python3 scripts/parcel-tiles/build_pref.py --pref ${{ matrix.pref }} --year "$YEAR" --out "work/pref-${{ matrix.pref }}.pmtiles" --work work
+        run: python3 scripts/parcel-tiles/build_pref.py --pref ${{ matrix.pref }} --year "$YEAR" --out "work/pref-${{ matrix.pref }}.pmtiles" --work work --boundary work-n03.zip
       - name: R2 に置く
-        run: aws s3 cp "work/pref-${{ matrix.pref }}.pmtiles" "s3://$R2_BUCKET/parcels/$YEAR/pref-${{ matrix.pref }}.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+        run: |
+          # R2 への書き込みも、送り終えたあと返事が来ないまま時間切れになることがある。3回までやり直す
+          for i in 1 2 3; do
+            aws s3 cp "work/pref-${{ matrix.pref }}.pmtiles" "s3://$R2_BUCKET/parcels/$YEAR/pref-${{ matrix.pref }}.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors && break
+            [ "$i" -lt 3 ] || exit 1
+            echo "書き込みに失敗。$((i * 30)) 秒後にやり直す"; sleep $((i * 30))
+          done
+      # 地番の索引（市区町村コードごとの JSON。アプリの地番検索が、町の代表点から遠い筆も最初に開くタイルで見つける。build_pref.py の write_index）
+      - name: 地番の索引を R2 に置く
+        run: |
+          ls work/index | head -3; echo "$(ls work/index | wc -l) 市区町村"
+          for i in 1 2 3; do
+            aws s3 cp work/index/ "s3://$R2_BUCKET/parcels/$YEAR/index/" --recursive --content-type application/json --endpoint-url "$R2_ENDPOINT" --only-show-errors && break
+            [ "$i" -lt 3 ] || exit 1
+            echo "書き込みに失敗。$((i * 30)) 秒後にやり直す"; sleep $((i * 30))
+          done
 
   merge:
     needs: [check, build]
@@ -115,19 +173,34 @@ jobs:
           make -C /tmp/tippecanoe -j"$(nproc)"
           mkdir -p ~/tippecanoe-bin && cp /tmp/tippecanoe/tippecanoe /tmp/tippecanoe/tile-join ~/tippecanoe-bin/
       - run: echo "$HOME/tippecanoe-bin" >> "$GITHUB_PATH"
-      - name: 関東1都6県を1つにまとめて R2 に置く
+      - name: 対応している全部の都道府県を1つにまとめて R2 に置く
+        env:
+          ALL: ${{ needs.check.outputs.all }}
         run: |
           mkdir -p work
-          aws s3 cp "s3://$R2_BUCKET/parcels/$YEAR/" work/ --recursive --exclude "*" --include "pref-*.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+          # R2 からの読み込みが途中で切れることがある（速度不足で接続が閉じる）。3回までやり直す
+          for i in 1 2 3; do
+            aws s3 cp "s3://$R2_BUCKET/parcels/$YEAR/" work/ --recursive --exclude "*" --include "pref-*.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors && break
+            [ "$i" -lt 3 ] || exit 1
+            echo "読み込みに失敗。$((i * 30)) 秒後にやり直す"; sleep $((i * 30))
+          done
           ls -la work
-          [ "$(ls work/pref-*.pmtiles | wc -l)" -eq 7 ] || { echo "::error::都県のタイルがそろっていません"; exit 1; }
-          tile-join -q --force --no-tile-size-limit -o "work/kanto-$YEAR.pmtiles" \
+          # 対応している全部の都道府県のタイルがそろっているか（今回作っていない地方は前回のものを使う）
+          missing=""
+          for p in $(echo "$ALL" | jq -r '.[]'); do [ -s "work/pref-$p.pmtiles" ] || missing="$missing $p"; done
+          [ -z "$missing" ] || { echo "::error::都道府県のタイルがそろっていません:$missing（先にその地方を作ってください）"; exit 1; }
+          files=$(for p in $(echo "$ALL" | jq -r '.[]'); do printf 'work/pref-%s.pmtiles ' "$p"; done)
+          tile-join -q --force --no-tile-size-limit -o "work/japan-$YEAR.pmtiles" \
             -n "MICHILU parcels $YEAR" \
             -A '<a href="https://front.geospatial.jp/moj-chizu-xml-readme/">「登記所備付地図データ」（法務省）</a>を加工して作成' \
-            work/pref-*.pmtiles
-          ls -la "work/kanto-$YEAR.pmtiles"
-          aws s3 cp "work/kanto-$YEAR.pmtiles" "s3://$R2_BUCKET/parcels/kanto-$YEAR.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
-            --content-type application/octet-stream --cache-control "public, max-age=86400"
+            $files
+          ls -la "work/japan-$YEAR.pmtiles"
+          for i in 1 2 3; do
+            aws s3 cp "work/japan-$YEAR.pmtiles" "s3://$R2_BUCKET/parcels/japan-$YEAR.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
+              --content-type application/octet-stream --cache-control "public, max-age=86400" && break
+            [ "$i" -lt 3 ] || exit 1
+            echo "書き込みに失敗。$((i * 30)) 秒後にやり直す"; sleep $((i * 30))
+          done
       - name: ブラウザから範囲指定で読めるようにする（CORS）
         run: |
           cat > cors.json <<'JSON'
@@ -136,20 +209,36 @@ jobs:
           aws s3api put-bucket-cors --bucket "$R2_BUCKET" --cors-configuration file://cors.json --endpoint-url "$R2_ENDPOINT"
       - name: 公開 URL で読めるか確かめる
         run: |
-          url="${R2_PUBLIC_URL%/}/parcels/kanto-$YEAR.pmtiles"
+          url="${R2_PUBLIC_URL%/}/parcels/japan-$YEAR.pmtiles"
           curl -sS -r 0-6 -H "Origin: https://michilu.vercel.app" -D headers.txt -o head.bin "$url"
           cat headers.txt
           grep -qi "^HTTP/.* 206" headers.txt || { echo "::error::範囲指定で読めません: $url"; exit 1; }
           grep -qi "^access-control-allow-origin:" headers.txt || { echo "::error::CORS のヘッダがありません"; exit 1; }
           [ "$(head -c 7 head.bin)" = "PMTiles" ] || { echo "::error::PMTiles ではありません"; exit 1; }
           echo "URL=$url" >> "$GITHUB_ENV"
+          # 地番の索引も公開 URL で読めるか（今回作った都県のうち最初の都県の、最初の市区町村で確かめる）
+          idx="${R2_PUBLIC_URL%/}/parcels/$YEAR/index/{code}.json"
+          first=$(aws s3 ls "s3://$R2_BUCKET/parcels/$YEAR/index/" --endpoint-url "$R2_ENDPOINT" | awk '{print $4}' | grep '\.json$' | head -1)
+          if [ -n "$first" ]; then
+            curl -fsS -H "Origin: https://michilu.vercel.app" -o idx.json "${R2_PUBLIC_URL%/}/parcels/$YEAR/index/$first"
+            jq -e '.v == 1 and (.k | type == "object")' idx.json > /dev/null || { echo "::error::地番の索引の形が違います: $first"; exit 1; }
+            echo "INDEX=$idx" >> "$GITHUB_ENV"
+          else
+            echo "::warning::地番の索引がありません（アプリは今までどおりの探し方を使う）"
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - name: アプリの置き場所を書き換え、テストが通れば main に入れる
         run: |
-          printf '{\n "url": "%s",\n "edition": "%s年4月公開版"\n}\n' "$URL" "$YEAR" > lib/roadmap/data/parcel-source.json
+          # 版の表示は法務省の年度版（毎年4月公開）。公図から推定した筆（kozu-source.json）と同じ書き方にそろえる
+          # （同じ版なら下書きで版を1回だけ書くため）
+          if [ -n "$INDEX" ]; then
+            printf '{\n "url": "%s",\n "edition": "%s年4月公開版",\n "index": "%s"\n}\n' "$URL" "$YEAR" "$INDEX" > lib/roadmap/data/parcel-source.json
+          else
+            printf '{\n "url": "%s",\n "edition": "%s年4月公開版"\n}\n' "$URL" "$YEAR" > lib/roadmap/data/parcel-source.json
+          fi
           if git diff --quiet; then echo "変更なし"; exit 0; fi
           npm ci
           npm test

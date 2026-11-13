@@ -21,6 +21,7 @@ import {
 import { LAND_PRICE_DATA } from "@/lib/roadmap/land-price-data";
 import { pmtilesLandPriceSource } from "@/lib/roadmap/land-price-tiles";
 import { ROSENKA_CHECK, ROSENKA_NOTE, rosenkaLinks, type RosenkaLink } from "@/lib/roadmap/rosenka";
+import { Fact } from "./fact";
 import { ChevronRightIcon, ExternalIcon, LandPriceIcon, MapIcon } from "./icons";
 import { Notes } from "./notes";
 import { Sheet } from "./sheet";
@@ -33,13 +34,13 @@ export type LandPriceState =
   | { status: "error" }
   | { status: "ok"; hits: LandPriceHit[]; /** 物件の場所で開く路線価の地図（全国地価マップ） */ rosenka: RosenkaLink[] };
 
-/** 物件の近くの地点（5つまで・4km 以内）。関東の外や近くに地点が無ければ hits が空 */
-export function useLandPrices(lat: number, lng: number): LandPriceState {
-  const key = `${lat},${lng}`;
+/** 物件の近くの地点（count まで・4km 以内。ふだんは5つ）。関東の外や近くに地点が無ければ hits が空 */
+export function useLandPrices(lat: number, lng: number, count = 5): LandPriceState {
+  const key = `${lat},${lng},${count}`;
   const [state, setState] = useState<{ key: string; value: LandPriceState }>();
   useEffect(() => {
     let alive = true;
-    withRetry(() => nearestLandPrices(lat, lng, pmtilesLandPriceSource, { count: 5, maxM: 4000 }))
+    withRetry(() => nearestLandPrices(lat, lng, pmtilesLandPriceSource, { count, maxM: 4000 }))
       .then((hits) => alive && setState({ key, value: { status: "ok", hits, rosenka: rosenkaLinks(lat, lng) } }))
       .catch(() => alive && setState({ key, value: { status: "error" } }));
     return () => {
@@ -66,17 +67,43 @@ export function LandPriceLine({
   onOpen,
   onShowMap,
   compact,
+  tile,
+  className,
 }: {
   state: LandPriceState;
   onOpen?: () => void;
   onShowMap?: (point: [number, number]) => void;
   compact?: boolean;
+  /** スマホの要点のマス（components/fact.tsx）。className はマスに付ける（入りきらないときに隠すなど） */
+  tile?: boolean;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   if (state.status === "ok" && state.hits.length === 0) return null;
   const top = state.status === "ok" ? state.hits[0] : undefined;
   return (
     <>
+      {tile ? (
+        <Fact
+          icon={<LandPriceIcon className="h-3.5 w-3.5" />}
+          label="近くの地価"
+          onClick={() => setOpen(true)}
+          disabled={state.status !== "ok"}
+          className={className}
+          value={
+            top ? (
+              <>
+                <span className="shrink-0 whitespace-nowrap">{priceText(top.price)}</span>
+                <span className={`shrink-0 whitespace-nowrap rounded px-1 text-[11px] font-normal leading-[18px] ${changeClass(top.change)}`}>{changeText(top.change)}</span>
+              </>
+            ) : state.status === "error" ? (
+              "読み込めませんでした"
+            ) : (
+              "確認中…"
+            )
+          }
+        />
+      ) : (
       <button
         onClick={() => (onOpen ? onOpen() : setOpen(true))}
         disabled={state.status !== "ok"}
@@ -100,6 +127,7 @@ export function LandPriceLine({
         )}
         {state.status === "ok" && <ChevronRightIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-muted" />}
       </button>
+      )}
       {state.status === "ok" && !onOpen && (
         <Sheet title="近くの地価（参考）" open={open} onClose={() => setOpen(false)}>
           <LandPriceDetail

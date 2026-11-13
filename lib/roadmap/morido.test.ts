@@ -48,9 +48,9 @@ describe("盛土規制法の区域", () => {
     expect(out?.area).toBeUndefined();
     expect(out?.authority).toBe("水戸市");
     expect(moridoValue(out!)).toBe("区域外（国のデータ）");
-    // 区域の無い所はタイルが無い（区域外）。関東の外は null
+    // 区域の無い所はタイルが無い（区域外）。対応エリア（データを取り込んである都道府県）の外は null
     expect((await moridoAt(LAT, LNG, "14212", { tile: async () => null }))?.authority).toBe("神奈川県");
-    expect(await moridoAt(LAT, LNG, "22100", { tile: async () => [area({})] })).toBeNull();
+    expect(await moridoAt(LAT, LNG, "34101", { tile: async () => [area({})] })).toBeNull(); // 広島市（対応エリアの外）
     expect([moridoAuthority("13101"), moridoAuthority("13201"), moridoAuthority("12204"), moridoAuthority("10202")]).toEqual(["東京都", "八王子市", "船橋市", "高崎市"]);
     expect(moridoDate("2024-07-31")).toBe("2024年7月31日");
   });

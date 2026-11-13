@@ -121,16 +121,26 @@ describe("重説・物件概要の下書き", () => {
     const text = draftText(
       buildDraft(base, {
         stations: [
-          { name: "半蔵門", lines: [["半蔵門線", "東京メトロ"]], meters: 778, minutes: 10, straight: 603, routed: true },
+          { name: "半蔵門", lines: [["半蔵門線", "東京メトロ"]], meters: 778, minutes: 10, straight: 603, routed: true, to: "entrance" },
           { name: "九段下", lines: [["東西線", "東京メトロ"], ["新宿線", "都営"]], meters: 826, minutes: 11, straight: 649, routed: true },
           { name: "石原", lines: [["秩父本線", "秩父鉄道"]], meters: 3956, minutes: 50, straight: 3956, routed: false },
         ],
       }),
     );
-    expect(text).toContain("交通：東京メトロ半蔵門線「半蔵門」駅 徒歩約10分（道路距離 約780m・駅の出入口までではない目安）【要確認】");
-    expect(text).toContain("交通：東京メトロ東西線・都営新宿線「九段下」駅 徒歩約11分");
+    expect(text).toContain("交通：東京メトロ半蔵門線「半蔵門」駅 徒歩約10分（道路距離 約780m（出入口まで）・地図から出した目安）【要確認】");
+    // どこまで測ったかの無い古い結果は、ホームまでとして書く
+    expect(text).toContain("交通：東京メトロ東西線・都営新宿線「九段下」駅 徒歩約11分（道路距離 約830m（ホームまで）・地図から出した目安）【要確認】");
     expect(text).toContain("交通：秩父鉄道秩父本線「石原」駅 直線約4.0km（歩いて行ける範囲に駅なし・直線距離）【要確認】");
     expect(text).toContain("駅の出典：「国土数値情報（鉄道データ）」");
+  });
+
+  it("学区のデータが無い学校区は、教育委員会で確かめる行を【要確認】で入れる", () => {
+    const kiryu = findMunicipality("10203")!;
+    const junior = { kind: "中学校" as const, name: "中央中学校", owner: "桐生市", city: "10203" };
+    const text = draftText(buildDraft({ ...base, municipality: kiryu, links: buildLinks(kiryu, 36.413, 139.327) }, { schools: { junior } }));
+    expect(text).toContain("中学校区：中央中学校（桐生市）");
+    expect(text).toContain("小学校区：桐生市の教育委員会で確認（データなし（国のデータに無い市））【要確認】");
+    expect(draftText(buildDraft(base, {}))).not.toContain("小学校区");
   });
 
   it("市町村が地番図を公開していれば、物件の表示に地番の参考図の URL を入れる", () => {
@@ -147,7 +157,9 @@ describe("重説・物件概要の下書き", () => {
     const station = { name: "半蔵門", lines: [["半蔵門線", "東京メトロ"]] as [string, string][], meters: 778, minutes: 10, straight: 603, routed: true };
     const text = draftText(buildDraft(base, { landPrice: [land], stations: [station] }));
     const line = text.split("\n").find((l) => l.startsWith("国土数値情報の出典："))!;
-    expect(line).toMatch(/^国土数値情報の出典：「国土数値情報」（国土交通省、https:\/\/nlftp\.mlit\.go\.jp\/ksj\/）を加工して作成（地価：地価公示データ・都道府県地価調査データ（.+）／駅：鉄道データ（\d{4}年））。道のりは/);
+    expect(line).toMatch(
+      /^国土数値情報の出典：「国土数値情報」（国土交通省、https:\/\/nlftp\.mlit\.go\.jp\/ksj\/）を加工して作成（地価：地価公示データ・都道府県地価調査データ（.+）／駅：鉄道データ（\d{4}年））。駅の出入口：© OpenStreetMap contributors（ODbL・\d{4}-\d{2}-\d{2}時点）。道のりは/,
+    );
     expect(text).not.toContain("駅の出典：");
   });
 
@@ -180,9 +192,32 @@ describe("重説・物件概要の下書き", () => {
         parcel: { kuiki: "横浜市港北区_大豆戸町___", chiban: "589-1", chibanRaw: "589-1", pieces: [], point: { lat: 35.51, lng: 139.62 }, estimated: "low" },
       }),
     );
-    expect(text).toContain("所在（地番）：横浜市港北区大豆戸町 589-1（推定・確度低）（公図から推定した位置（確度が低く、5m前後ずれることあり））【要確認】");
+    expect(text).toContain("所在（地番）：横浜市港北区大豆戸町 589-1（推定・確度低）（公図から推定した位置（確度が低く、5m前後（1割弱は30m以上）ずれることあり））【要確認】");
     expect(text).toContain("国土地理院の基盤地図情報（道路縁）に合わせて MICHILU が推定の位置に置いたもので、数mずれることがあります。どちらも法務局の証明ではありません");
     expect(text).toContain("■出典\n筆の出典：「登記所備付地図データ」（法務省）");
+  });
+});
+
+describe("住所の地点の筆", () => {
+  it("隣地がとても多い筆（地番の付いた公道など）は、物件の外の土地の可能性を添え、その筆の隣地（道沿いの筆）は物件の隣地として並べない", () => {
+    const neighbors = Array.from({ length: 25 }, (_, i) => `渋谷区神南１丁目 ${i + 30}-1`);
+    const text = draftText(buildDraft(base, { parcels: { target: "渋谷区神南１丁目 51-3", neighbors, reference: true, offLot: true } }));
+    expect(text).toContain("所在（地番）：渋谷区神南１丁目 51-3（住所の地点にある筆（参考）。隣地がとても多く、道路など物件の外の土地の可能性があるので、公図で確認）【要確認】");
+    expect(text).toContain("隣地の地番：省略（この筆に接する筆は25筆）（住所の地点の筆が道路など物件の外の土地の可能性があるので、公図で物件の筆を確かめてから隣地を調べる）【要確認】");
+    expect(text).not.toContain("30-1");
+  });
+
+  it("ふつうの住所の地点の筆は、隣地を20筆まで並べる", () => {
+    const neighbors = Array.from({ length: 25 }, (_, i) => `渋谷区神南１丁目 ${i + 30}-1`);
+    const text = draftText(buildDraft(base, { parcels: { target: "渋谷区神南１丁目 51-3", neighbors, reference: true } }));
+    expect(text).toContain("所在（地番）：渋谷区神南１丁目 51-3（住所の地点にある筆（参考）。住居表示と地番は別のもの）【要確認】");
+    expect(text).toContain("、ほか5筆（公図で確認）");
+  });
+
+  it("住所の全角の数字は半角にそろえる（地番と同じ幅で並ぶ）", () => {
+    const text = draftText(buildDraft({ ...base, matchedAddress: "東京都渋谷区神南一丁目１９番１１号" }, {}));
+    expect(text).toContain("所在（住所）：東京都渋谷区神南一丁目19番11号 付近");
+    expect(text).not.toContain("１９番");
   });
 });
 

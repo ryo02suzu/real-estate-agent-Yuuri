@@ -80,10 +80,12 @@ jobs:
         if: steps.ready.outputs.ok == 'true'
         env:
           IMPORT_REF: ${{ inputs.import_ref }}
+          # 入力はコマンドに直接埋め込まず、環境変数で受ける
+          FORCE: ${{ inputs.force }}
         run: |
           pip install -r scripts/sanko/requirements.txt
           # まだ R2 に置いていない（url が空）ときと、手で動かして force か import_ref を入れたときは作る
-          if [ "${{ inputs.force }}" = "true" ] || [ -n "$IMPORT_REF" ] || [ -z "$(jq -r '.url // ""' lib/roadmap/data/sanko-source.json)" ]; then
+          if [ "$FORCE" = "true" ] || [ -n "$IMPORT_REF" ] || [ -z "$(jq -r '.url // ""' lib/roadmap/data/sanko-source.json)" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             python3 scripts/sanko/build.py --check

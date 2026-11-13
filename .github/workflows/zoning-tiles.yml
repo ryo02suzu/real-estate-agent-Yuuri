@@ -1,11 +1,12 @@
-# 毎月2日の朝（日本時間 6:40）に、国土交通省「都市計画決定GISデータ」（G空間情報センターの全国データ）が更新されたかを見て、
+# 毎週火曜日の朝（日本時間 6:40）に、国土交通省「都市計画決定GISデータ」（G空間情報センターの全国データ）が更新されたかを見て、
 # 更新されていれば関東1都6県の用途地域・建ぺい率・容積率・防火地域などのタイルを作り直し、アプリ（public/data/）に入れる。
 # テストが通れば main に直接入れる（本番は Vercel が main から自動で作り直す）。外部のストレージや鍵は要らない。
+# 週に1回見るのは、国や市区町村がデータを新しくしたら、なるべく早くアプリに入れるため（新しくなっていなければ何もしない）。
 name: 都市計画の地図データ（最新版）
 
 on:
   schedule:
-    - cron: "40 21 1 * *"
+    - cron: "40 21 * * 1"
   workflow_dispatch:
     inputs:
       force:
@@ -36,9 +37,12 @@ jobs:
       - run: pip install openpyxl==3.1.5
       - name: 国のデータが更新されたか
         id: c
+        env:
+          # 入力はコマンドに直接埋め込まず、環境変数で受ける
+          FORCE: ${{ inputs.force }}
         run: |
           python3 scripts/zoning-tiles/build.py --check
-          if [ "${{ inputs.force }}" = "true" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+          if [ "$FORCE" = "true" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; fi
       - uses: actions/cache@v4
         if: steps.c.outputs.changed == 'true'
         id: tippecanoe

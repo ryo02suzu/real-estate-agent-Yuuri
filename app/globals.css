@@ -10,13 +10,57 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --font-latin: var(--font-jost), sans-serif;
+}
+
+/*
+ * 色。utility は変数を参照する（inline にしない）ので、スマホの新しい見た目（.theme-navy）の中では
+ * 下の .theme-navy で差し替えた色になる。PC はこの色のまま（金色）
+ */
+@theme {
   --color-ink: #242e37; /* 本文・ロゴ文字の墨色 */
   --color-muted: #6c6f74;
   --color-brand: #8a6632; /* ボタン地（白文字でコントラスト確保） */
   --color-brand-light: #c49a5c; /* ピン・線のゴールド */
   --color-mint: #f6f0e5; /* 淡いクリーム（旧ミント。クラス名はそのまま） */
   --color-line: #ebe4d8;
-  --font-latin: var(--font-jost), sans-serif;
+  /* 新しい見た目（紺）の色 */
+  --color-navy: #0f2f5f; /* いちばん大事なボタン・選んだタブ */
+  --color-navy-deep: #0a2248; /* 見出しの文字 */
+  --color-navy-soft: #3a5a8a; /* 補助の青 */
+  --color-sky: #f3f6fa; /* 画面の地 */
+  --color-mist: #e8eef5; /* 薄い塗り（チップ・丸いボタンの地） */
+  --color-steel: #5f6f86; /* 薄い文字 */
+  --color-hairline: #dde5ee; /* 枠線 */
+}
+
+/* スマホの新しい見た目：今までの部品（シート・カード）の色を、金色から紺に差し替える */
+.theme-navy {
+  --color-ink: #1b2a44;
+  --color-muted: #5f6f86;
+  --color-brand: #0f2f5f;
+  --color-brand-light: #3a5a8a;
+  --color-mint: #e8eef5;
+  --color-line: #dde5ee;
+}
+/*
+ * スマホの画面の字は、端末のアプリと同じ標準の字にする（iPhone・Mac は SF＋ヒラギノ角ゴ。Android と、標準の字が無い環境は
+ * Noto Sans JP。Android の標準の字は同じ Noto の系統）。数字・英字の Jost も使わない。PC の画面はそのまま（Noto Sans JP）。
+ * 太さは 400（本文）と 600〜700（見出し・行の名前・ボタン）の2段。ヒラギノは W3 と W6 の2つしか無いので、500 は 400 と同じに見える
+ */
+.theme-navy {
+  --font-app: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", var(--font-noto-sans-jp), "Noto Sans JP", sans-serif;
+  font-family: var(--font-app);
+}
+/* 結果の画面の数字・英字（.font-latin は @theme inline なので、変数ではなく rule で上書きする） */
+.theme-navy .font-latin {
+  font-family: var(--font-app);
+}
+.theme-navy .bg-gold {
+  background: linear-gradient(135deg, #1b4280 0%, #0f2f5f 55%, #0a2248 100%);
+}
+.theme-navy .shadow-soft {
+  box-shadow: 0 6px 24px rgba(15, 47, 95, 0.08);
 }
 
 /*
@@ -51,6 +95,18 @@
 }
 
 /*
+ * スマホの新しいホーム（components/app/home.tsx）を1画面に収める詰め方。ホームは幅で拡大・縮小するので、幅に対して背の低い画面
+ * （高さ÷幅が 1.985 より小さい。iPhone SE・8 Plus など）では、調べるカード・最近の検索・調査メニュー・バナーを少し詰める
+ * （写真の部分は写真の字と街並みなので詰められない。SE・8 Plus はそれでもスクロールする）。
+ * iPhone の mini・無印・Pro・Pro Max（ホーム画面に追加したアプリ）は詰めずに収まる。ホームの高さを変えたら 1.985 も見直す
+ */
+@custom-variant low {
+  @media (max-width: 520px) and (min-aspect-ratio: 1000/1985) {
+    @slot;
+  }
+}
+
+/*
  * シート（components/sheet.tsx）の中身が画面に入りきらないときの詰め方。Sheet が data-dense を付ける：
  * dense（"1"。行の間を詰める）→ denser（"2"。文字も少し小さくする）→ densest（"3"。見出しのまわりと行の高さも詰める）
  */
@@ -70,12 +126,1507 @@
   }
 }
 
+/*
+ * スマホ（ホーム画面に追加したアプリ）：時刻・電池の帯の後ろまで画面が広がる（app/layout.tsx の black-translucent）ので、
+ * アプリの中身は帯の下から始める。帯の所は body の背景色（ページの上の色。components/app/mobile-app.tsx）。
+ * Safari・PC では env(safe-area-inset-top) が 0 なので変わらない
+ */
+@media (max-width: 1023px) {
+  body {
+    padding-top: env(safe-area-inset-top);
+  }
+}
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-noto-sans-jp), "Hiragino Sans", "Noto Sans JP", sans-serif;
   font-feature-settings: "palt"; /* 約物を詰めて見た目を整える */
   letter-spacing: 0.01em;
+}
+/*
+ * スマホの幅：時刻・電池の帯（body の上の余白）は、読み込みの途中からホームの写真の上の空の色にする（読み込めたら
+ * components/app/mobile-app.tsx がページごとの色に入れ替える。前は読み込みの間だけクリーム色の帯が出ていた）。
+ * ホームの写真は時間帯で変わるので、<head> で決めた時間帯（html の data-home）の写真の色にする（components/app/home-photo.ts の HOME_TOP と同じ）
+ */
+@media (max-width: 1023px) {
+  body {
+    background-color: #386fab;
+  }
+  html[data-home="morning"] body {
+    background-color: #466995;
+  }
+  html[data-home="day"] body {
+    background-color: #37619a;
+  }
+  html[data-home="evening"] body {
+    background-color: #486183;
+  }
+  html[data-home="dusk"] body {
+    background-color: #0f162c;
+  }
+  html[data-home="night"] body {
+    background-color: #0c1322;
+  }
+}
+/*
+ * iPhone のホーム画面に追加したアプリ（iOS 26。上の時刻の帯を透かす black-translucent と viewport-fit=cover）では、
+ * 画面の高さ（100dvh・100%・下に付けた fixed）が、上の時刻の帯の高さ（約 60pt）だけ短く数えられる（WebKit の不具合
+ * https://bugs.webkit.org/show_bug.cgi?id=301994 ほか）。body が画面の下まで届かず、下に帯の色のすき間が出ていた。
+ * ホーム画面のアプリの iPhone だけ、高さを「100lvh（帯を含む画面の高さ）」と「100dvh＋上の帯の高さ」の小さいほうにする
+ * （不具合が直った iOS では 100dvh と同じ。帯の下から描く iOS では帯の高さが 0 になり、はみ出さない）。
+ * html も同じ高さにすると、画面に貼り付けた fixed（シート・地球の演出など）も下まで届く
+ */
+@media (max-width: 1023px) and (display-mode: standalone) {
+  @supports (-webkit-touch-callout: none) {
+    html {
+      min-height: min(100lvh, calc(100% + env(safe-area-inset-top)));
+    }
+    body {
+      height: min(100lvh, calc(100dvh + env(safe-area-inset-top)));
+    }
+  }
+}
+
+/*
+ * スマホのホームの動き（components/app/home.tsx）。上から順に浮き上がって現れる（.home-rise。遅れは style の animation-delay）。
+ * 動きを減らす設定の端末と PC の幅では動かさない。
+ * 終わったあとは動きを外す（backwards。終わりの形は元の見た目と同じ）：動きが残ったままの箱の中では、すりガラスの後ろがぼけない
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .home-rise {
+    animation: home-rise var(--m-slow) var(--m-out) backwards;
+    animation-delay: calc(var(--launch, 0ms) + var(--d, 0ms));
+  }
+  /* ロゴ：開いた最初の1回だけ浮き上がる。起動の演出（長い版）では、真ん中から飛んできたロゴ（.launch-logo）が着くまで隠す */
+  .home-logo-in {
+    animation: home-rise var(--m-slow) var(--m-out) backwards;
+    animation-delay: var(--launch, 0ms);
+  }
+  html[data-launch="full"] .home-logo-in {
+    animation: launch-wait 1.4s linear backwards;
+  }
+  /* 写真：ほかのページから戻ったときは、少し寄った所から落ち着く。起動の演出では奥から手前へ（長い版）・少し寄った所から（短い版） */
+  .home-cam {
+    transform-origin: 62% 58%;
+    animation: home-cam 1.3s var(--m-out) backwards;
+  }
+  html[data-launch="full"] .home-cam-first {
+    transform-origin: 62% 58%;
+    animation: launch-photo 1.6s cubic-bezier(0.22, 0.7, 0.18, 1) 0.8s backwards;
+  }
+  html[data-launch="quick"] .home-cam-first {
+    transform-origin: 62% 58%;
+    animation: home-cam 1.2s var(--m-out) backwards;
+  }
+}
+@keyframes home-cam {
+  from {
+    transform: scale(1.06);
+  }
+}
+@keyframes launch-photo {
+  from {
+    transform: scale(1.16) translateY(1.5%);
+  }
+}
+@keyframes launch-wait {
+  from,
+  to {
+    opacity: 0;
+  }
+}
+
+/*
+ * スマホの4ページの上の帯（components/app/page-head.tsx）：ページの名前が現れる動き（.pt-in。開いたとき・戻ったとき）。
+ * 細い線が左から伸び（.pt-rule）、英字が広い字間から締まり（.pt-en）、見出しは下の線から現れ（.pt-ja。箱の外は .pt-mask で隠す。
+ * ホームのひとことは1行ずつ .pt-ja2）、件数が浮き上がって数え上がる（.pt-count。数は page-head.tsx）。
+ * 起動の演出の間は、その分だけ遅れて始まる（--launch）
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .pt-in .pt-rule {
+    transform-origin: 0 50%;
+    animation: pt-rule 0.7s var(--m-out) backwards;
+    animation-delay: var(--launch, 0ms);
+  }
+  .pt-in .pt-en {
+    animation: pt-en 0.8s var(--m-out) backwards;
+    animation-delay: calc(var(--launch, 0ms) + 60ms);
+  }
+  .pt-in .pt-ja {
+    animation: pt-ja 0.72s cubic-bezier(0.16, 0.84, 0.24, 1) backwards;
+    animation-delay: calc(var(--launch, 0ms) + 90ms);
+  }
+  .pt-in .pt-ja2 {
+    animation-delay: calc(var(--launch, 0ms) + 170ms);
+  }
+  .pt-in .pt-count {
+    animation: pt-count 0.6s var(--m-out) backwards;
+    animation-delay: calc(var(--launch, 0ms) + 200ms);
+  }
+}
+@keyframes pt-rule {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+}
+@keyframes pt-en {
+  from {
+    opacity: 0;
+    letter-spacing: 0.72em;
+  }
+}
+@keyframes pt-ja {
+  from {
+    transform: translateY(108%);
+  }
+}
+@keyframes pt-count {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/*
+ * アプリを開いたときの演出（components/app/launch.tsx・launch-script.ts。html の data-launch が full か quick の間だけ。PC の幅では出さない）。
+ * 長い版（full）：紺の幕（.launch-veil）の真ん中で、ロゴのマークが左下から右上へ光で描かれ（.launch-m）、MICHILU の字が広い字間から
+ * 寄って並び（.launch-l。1文字ずつ）、光の帯がロゴを横切る（.launch-glint）。ロゴは左上の定位置（ホームのロゴと同じ位置・大きさ。
+ * 画面の拡大率 --app-zoom と、上の時刻の帯の高さから出す）へ飛び（.launch-logo）、同時に幕が上へ上がって街の写真が奥から落ち着き
+ * （.home-cam-first）、ひとこと・検索欄・最近の検索・下のメニューが順に現れる（--launch の分だけ遅れて始まる）。
+ * 着いたロゴは、ホームのロゴ（.home-logo-in）と入れ替わる。短い版（quick）：紺の幕がふわっと消え、中身が順に浮き上がる。
+ * 画面に触れたら、すぐ終わる（launch.tsx）
+ */
+html[data-launch="full"] {
+  --launch: 1000ms;
+}
+html[data-launch="quick"] {
+  --launch: 90ms;
+}
+.launch {
+  display: none;
+}
+@media (max-width: 1023px) {
+  html[data-launch="full"] .launch,
+  html[data-launch="quick"] .launch {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 95;
+    pointer-events: none;
+    animation: launch-end 2.5s linear forwards;
+  }
+  html[data-launch="quick"] .launch {
+    animation-duration: 1.25s;
+  }
+  .launch-veil {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 140%;
+    background:
+      radial-gradient(60% 24% at 50% 33%, rgba(70, 128, 220, 0.24) 0%, rgba(70, 128, 220, 0) 100%),
+      linear-gradient(180deg, #07101e 0%, #0a1830 38%, #0d1e3b 71.4%, rgba(13, 30, 59, 0) 100%);
+  }
+  html[data-launch="full"] .launch-veil {
+    /* 覆っている間は指を受け止める（触れると演出を終えるだけ。見えていないボタンは押さない。components/app/launch.tsx） */
+    pointer-events: auto;
+    animation: launch-lift 0.66s cubic-bezier(0.62, 0, 0.22, 1) 0.84s forwards;
+  }
+  html[data-launch="quick"] .launch-veil {
+    animation: launch-fade 0.5s ease-out forwards;
+  }
+  html[data-launch="full"] [data-app-nav] {
+    animation: launch-nav 0.7s var(--m-out) 1.06s backwards;
+  }
+  .launch-logo {
+    --lz: var(--app-zoom, 1);
+    --lw: calc(151.32px * var(--lz));
+    position: absolute;
+    left: calc((100vw - 393px * var(--lz)) / 2 + 20px * var(--lz));
+    top: calc(env(safe-area-inset-top, 0px) + 22px * var(--lz));
+    width: var(--lw);
+    height: calc(30px * var(--lz));
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.3));
+  }
+  html[data-launch="quick"] .launch-logo {
+    display: none;
+  }
+  html[data-launch="full"] .launch-logo {
+    /* 真ん中（少し上）で 1.5 倍から、定位置へ */
+    --dx: calc(50vw - (100vw - 393px * var(--lz)) / 2 - 95.66px * var(--lz));
+    --dy: calc(46dvh - env(safe-area-inset-top, 0px) - 37px * var(--lz));
+    animation:
+      launch-fly 0.62s cubic-bezier(0.62, 0, 0.18, 1) 0.78s backwards,
+      launch-out 0.18s linear 1.4s forwards;
+  }
+  .launch-m,
+  .launch-l,
+  .launch-glint {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background-image: url("/home/logo-mark-white.webp");
+    background-repeat: no-repeat;
+    background-size: var(--lw) 100%;
+  }
+  .launch-m {
+    left: 0;
+    width: 28%;
+    background-position: 0 0;
+    -webkit-mask-image: linear-gradient(62deg, #000 42%, transparent 58%);
+    mask-image: linear-gradient(62deg, #000 42%, transparent 58%);
+    -webkit-mask-size: 300% 100%;
+    mask-size: 300% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: 0 0;
+    mask-position: 0 0;
+  }
+  .launch-l {
+    background-position: calc(var(--x) * var(--lw) / -100) 0;
+  }
+  .launch-glint {
+    left: 0;
+    width: 100%;
+    background-position: 0 0;
+    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 9px rgba(140, 190, 255, 0.85));
+    -webkit-mask-image: linear-gradient(62deg, transparent 45%, #000 50%, transparent 55%);
+    mask-image: linear-gradient(62deg, transparent 45%, #000 50%, transparent 55%);
+    -webkit-mask-size: 300% 100%;
+    mask-size: 300% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: 0 0;
+    mask-position: 0 0;
+  }
+  html[data-launch="full"] .launch-m {
+    animation: launch-wipe 0.62s cubic-bezier(0.4, 0.15, 0.2, 1) 0.08s backwards;
+  }
+  html[data-launch="full"] .launch-l {
+    animation: launch-letter 0.74s var(--m-out) backwards;
+    animation-delay: calc(0.26s + (var(--i) + 3) * 28ms);
+  }
+  html[data-launch="full"] .launch-glint {
+    animation: launch-glint 0.74s cubic-bezier(0.45, 0, 0.3, 1) 0.5s backwards;
+  }
+}
+/* 触れて飛ばしたとき：幕とロゴは 0.2 秒で消え（その間も指は受け止める）、中身・写真・ロゴ・下のメニューは、すぐ終わりの形に */
+html.launch-skip {
+  --launch: 0ms;
+}
+@media (max-width: 1023px) {
+  html.launch-skip .launch {
+    pointer-events: auto;
+    opacity: 0;
+    transition: opacity 0.2s ease-out;
+  }
+  html.launch-skip .home-logo-in,
+  html.launch-skip .home-cam-first,
+  html.launch-skip [data-app-nav] {
+    animation: none;
+  }
+}
+@keyframes launch-end {
+  0%,
+  99.9% {
+    visibility: visible;
+  }
+  100% {
+    visibility: hidden;
+  }
+}
+@keyframes launch-lift {
+  to {
+    transform: translateY(-100%);
+  }
+}
+@keyframes launch-fade {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes launch-nav {
+  from {
+    transform: translateY(105%);
+  }
+}
+@keyframes launch-fly {
+  from {
+    transform: translate(var(--dx), var(--dy)) scale(1.5);
+  }
+}
+@keyframes launch-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes launch-wipe {
+  from {
+    -webkit-mask-position: 100% 0;
+    mask-position: 100% 0;
+  }
+}
+@keyframes launch-letter {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateX(calc(var(--i) * 7px * var(--lz)));
+  }
+}
+@keyframes launch-glint {
+  from {
+    -webkit-mask-position: 100% 0;
+    mask-position: 100% 0;
+  }
+}
+
+/*
+ * 長い版の壮大なオープニング（約4.5秒。html の data-grand：components/app/launch-city.js が街の光を描き始めたら付く。
+ * 描けない端末では付かず、上の約1.8秒の版になる）。時間割（秒）：
+ *   0〜1.9   光の道の街の上を、少し傾いて低く飛ぶ（地平線の一点から、光が道を伝って広がる。大通りを流れる車の光・星・地平線の光・
+ *            遠くの建物の光の柱）
+ *   1.9〜2.75 上がりながら真下を向くと、道の中から金色の M が走る（キャンバス。その M は画面の真ん中のロゴのマークにぴったり重なる）
+ *   2.68     M がロゴのマークに入れ替わり、光がはじけて輪が広がる（.launch-burst・.launch-ring。街にも M から光の波が広がる）。
+ *            続いて MICHILU の字が寄って並び、光の帯。街は最後の形のまま、ロゴの後ろにうっすら残る
+ *   3.48     幕が街の光と一緒に上がる（下の縁は、その時間帯の写真に合う色の光）。その時間帯の街の写真が奥から落ち着き、
+ *            朝・夕方は太陽の光、夜は月の光が広がる（.home-sunflare）
+ *   3.56〜4.18 ロゴが左上の定位置へ。中身は 3.6 秒から順に現れる（--launch）
+ * 触れて飛ばしたとき（html.launch-skip）は、幕・街の光・ロゴはこの時間割のまま（位置が飛ばない）全体が 0.2 秒で消え、
+ * 中身・写真・下のメニューの遅れだけを外す（:not(.launch-skip)。data-grand は演出が終わるまで外さない。外すと幕の時計が
+ * 約1.8秒の版に戻り、その場で終わって、同じ指が下のボタンを押してしまう）
+ */
+html[data-launch="full"][data-grand]:not(.launch-skip) {
+  --launch: 3600ms;
+}
+.launch-canvas,
+.launch-burst,
+.launch-ring {
+  display: none;
+}
+@media (max-width: 1023px) {
+  html[data-launch="full"] .launch-canvas {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  html[data-launch="full"][data-grand] .launch {
+    animation-duration: 5.2s;
+  }
+  /* 街の光は、最後の形のままロゴの後ろにうっすら残り、幕と一緒に上がる（幕と同じ距離・同じ曲線。下の端は幕の裾へなじませる） */
+  html[data-launch="full"][data-grand] .launch-canvas {
+    -webkit-mask-image: linear-gradient(180deg, #000 80%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 80%, transparent 100%);
+    animation: launch-lift-canvas 0.72s cubic-bezier(0.6, 0, 0.22, 1) 3.48s forwards;
+  }
+  html[data-launch="full"][data-grand] .launch-veil {
+    background:
+      radial-gradient(60% 24% at 50% 33%, rgba(70, 128, 220, 0.18) 0%, rgba(70, 128, 220, 0) 100%),
+      linear-gradient(180deg, #050b17 0%, #081428 38%, #0c1c38 71.4%, rgba(96, 62, 74, 0.72) 76%, rgba(255, 142, 72, 0.4) 86%, rgba(255, 170, 96, 0) 100%);
+    animation: launch-lift 0.72s cubic-bezier(0.6, 0, 0.22, 1) 3.48s forwards;
+  }
+  /* 幕の下の縁の光は、その時間帯の写真に合わせる（朝・夕方は暖かい光、昼は明るい青、夕方と夜のあいだは紫がかった青、夜は深い青） */
+  html[data-launch="full"][data-grand][data-home="day"] .launch-veil {
+    background:
+      radial-gradient(60% 24% at 50% 33%, rgba(70, 128, 220, 0.18) 0%, rgba(70, 128, 220, 0) 100%),
+      linear-gradient(180deg, #050b17 0%, #081428 38%, #0c1c38 71.4%, rgba(52, 92, 150, 0.72) 76%, rgba(150, 196, 255, 0.36) 86%, rgba(170, 210, 255, 0) 100%);
+  }
+  html[data-launch="full"][data-grand][data-home="dusk"] .launch-veil {
+    background:
+      radial-gradient(60% 24% at 50% 33%, rgba(70, 128, 220, 0.18) 0%, rgba(70, 128, 220, 0) 100%),
+      linear-gradient(180deg, #050b17 0%, #081428 38%, #0c1c38 71.4%, rgba(58, 54, 96, 0.72) 76%, rgba(160, 118, 190, 0.32) 86%, rgba(170, 130, 200, 0) 100%);
+  }
+  html[data-launch="full"][data-grand][data-home="night"] .launch-veil {
+    background:
+      radial-gradient(60% 24% at 50% 33%, rgba(70, 128, 220, 0.18) 0%, rgba(70, 128, 220, 0) 100%),
+      linear-gradient(180deg, #050b17 0%, #081428 38%, #0c1c38 71.4%, rgba(18, 30, 58, 0.72) 76%, rgba(90, 130, 205, 0.26) 86%, rgba(100, 140, 210, 0) 100%);
+  }
+  html[data-launch="full"][data-grand] .launch-logo {
+    animation:
+      launch-fly 0.62s cubic-bezier(0.62, 0, 0.18, 1) 3.56s backwards,
+      launch-out 0.18s linear 4.18s forwards;
+  }
+  html[data-launch="full"][data-grand] .launch-m {
+    animation: launch-mark-in 0.36s ease-out 2.66s backwards;
+  }
+  html[data-launch="full"][data-grand] .launch-l {
+    animation-delay: calc(2.84s + (var(--i) + 3) * 30ms);
+  }
+  html[data-launch="full"][data-grand] .launch-glint {
+    animation: launch-glint 0.74s cubic-bezier(0.45, 0, 0.3, 1) 3.08s backwards;
+  }
+  html[data-launch="full"][data-grand] .launch-burst,
+  html[data-launch="full"][data-grand] .launch-ring {
+    display: block;
+    position: absolute;
+    left: 13.5%;
+    top: 50%;
+    aspect-ratio: 1;
+    border-radius: 9999px;
+    pointer-events: none;
+    opacity: 0;
+  }
+  html[data-launch="full"][data-grand] .launch-burst {
+    height: 620%;
+    background: radial-gradient(closest-side, rgba(255, 250, 236, 0.95) 0%, rgba(255, 214, 150, 0.6) 22%, rgba(255, 160, 80, 0.22) 50%, rgba(255, 150, 70, 0) 100%);
+    mix-blend-mode: screen;
+    animation: launch-burst 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) 2.68s backwards;
+  }
+  html[data-launch="full"][data-grand] .launch-ring {
+    height: 300%;
+    border: 1.5px solid rgba(255, 222, 170, 0.85);
+    box-shadow:
+      0 0 12px rgba(255, 200, 130, 0.6),
+      inset 0 0 10px rgba(255, 200, 130, 0.4);
+    animation: launch-ring 0.95s cubic-bezier(0.15, 0.7, 0.3, 1) 2.7s backwards;
+  }
+  html[data-launch="full"][data-grand]:not(.launch-skip) [data-app-nav] {
+    animation: launch-nav 0.7s var(--m-out) 3.66s backwards;
+  }
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  html[data-launch="full"][data-grand]:not(.launch-skip) .home-logo-in {
+    animation: launch-wait 4.18s linear backwards;
+  }
+  html[data-launch="full"][data-grand]:not(.launch-skip) .home-cam-first {
+    animation: launch-photo 1.6s cubic-bezier(0.22, 0.7, 0.18, 1) 3.45s backwards;
+  }
+  html[data-launch="full"][data-grand]:not(.launch-skip) .home-sunflare {
+    animation: sunflare 1.45s ease-out 3.66s backwards;
+  }
+  html[data-launch="full"][data-grand]:not(.launch-skip) .sf-streak {
+    animation: sf-streak 1.45s cubic-bezier(0.2, 0.7, 0.2, 1) 3.66s backwards;
+  }
+}
+@keyframes launch-lift-canvas {
+  to {
+    transform: translateY(-140%);
+  }
+}
+@keyframes launch-mark-in {
+  from {
+    opacity: 0;
+    filter: brightness(2.6) drop-shadow(0 0 6px rgba(255, 210, 140, 0.95));
+  }
+}
+@keyframes launch-burst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.12);
+  }
+  16% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.45);
+  }
+}
+@keyframes launch-ring {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2);
+  }
+  14% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(3.2);
+  }
+}
+
+/*
+ * ホームの写真の太陽・月の光（長い版のオープニングで、幕が上がるときだけ）。写真と同じ切り方の箱（.home-stage。写真の縦横比 941:1672、
+ * 横は 62% の位置で切る）の中の、太陽・月の位置（写真ごと。朝日 75.3%・30.1%、夕日 82.1%・29.7%、月 79.5%・12.7%）に置く。
+ * 太陽も月も写っていない昼・夕方と夜のあいだは出さない。写真と一緒に動く（.home-cam-first の箱の中）
+ */
+/*
+ * ホームの写真（時間帯で 5 枚。components/app/home-photo.ts）。html の data-home（<head> で決める）の写真を背景として出し、
+ * 表示中に時間帯が変わったときは、新しい写真（data-part）を上に重ねる（components/app/home.tsx の useHomeSwap）。
+ * 写真の上に、写真ごとのぼかしを重ねる（背景の前の層）：上の端は時刻・電池の帯の色（写真の上の空の色）から写真へなじませ
+ * （帯と写真の境目に線が出ないように）、空の明るい朝・昼は左上（ロゴ・ひとこと）を少し暗くする。いちばん後ろの層が写真
+ * （画面より横長なら 62% の位置で左右を切る）。
+ * PC の幅では読み込まない（ホームは出ないが、最初の HTML にはある）
+ */
+.home-backdrop {
+  container-type: size;
+  background-color: #2a3a55;
+}
+.home-photo {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size:
+    100% 100%,
+    cover;
+  background-position:
+    0 0,
+    62% 50%;
+}
+html[data-home="morning"] .home-photo:not([data-part]),
+html[data-home="day"] .home-photo:not([data-part]),
+.home-photo[data-part="morning"],
+.home-photo[data-part="day"] {
+  background-size:
+    100% 100%,
+    100% 100%,
+    cover;
+  background-position:
+    0 0,
+    0 0,
+    62% 50%;
+}
+@media (max-width: 1023px) {
+  html[data-home="morning"] .home-backdrop {
+    background-color: #5b6f86;
+  }
+  html[data-home="day"] .home-backdrop {
+    background-color: #5d7a96;
+  }
+  html[data-home="evening"] .home-backdrop {
+    background-color: #5d5f6a;
+  }
+  html[data-home="dusk"] .home-backdrop {
+    background-color: #1c2232;
+  }
+  html[data-home="night"] .home-backdrop {
+    background-color: #12171f;
+  }
+  html[data-home="morning"] .home-photo:not([data-part]),
+  .home-photo[data-part="morning"] {
+    background-image: linear-gradient(180deg, rgb(97, 143, 195) 0, rgba(97, 143, 195, 0.6) 22px, rgba(97, 143, 195, 0) 64px), radial-gradient(90% 26% at 20% 11%, rgba(12, 26, 46, 0.3) 0%, rgba(12, 26, 46, 0.12) 55%, rgba(12, 26, 46, 0) 100%), url("/home/morning.webp");
+  }
+  html[data-home="day"] .home-photo:not([data-part]),
+  .home-photo[data-part="day"] {
+    background-image: linear-gradient(180deg, rgb(75, 131, 203) 0, rgba(75, 131, 203, 0.6) 22px, rgba(75, 131, 203, 0) 64px), radial-gradient(90% 26% at 20% 11%, rgba(10, 30, 60, 0.26) 0%, rgba(10, 30, 60, 0.1) 55%, rgba(10, 30, 60, 0) 100%), url("/home/day.webp");
+  }
+  html[data-home="evening"] .home-photo:not([data-part]),
+  .home-photo[data-part="evening"] {
+    background-image: linear-gradient(180deg, rgb(99, 131, 171) 0, rgba(99, 131, 171, 0.6) 22px, rgba(99, 131, 171, 0) 64px), url("/home/evening.webp");
+  }
+  html[data-home="dusk"] .home-photo:not([data-part]),
+  .home-photo[data-part="dusk"] {
+    background-image: linear-gradient(180deg, rgb(18, 24, 46) 0, rgba(18, 24, 46, 0.6) 22px, rgba(18, 24, 46, 0) 64px), url("/home/dusk.webp");
+  }
+  html[data-home="night"] .home-photo:not([data-part]),
+  .home-photo[data-part="night"] {
+    background-image: linear-gradient(180deg, rgb(14, 20, 31) 0, rgba(14, 20, 31, 0.6) 22px, rgba(14, 20, 31, 0) 64px), url("/home/night.webp");
+  }
+}
+.home-stage {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+@supports (width: 1cqw) {
+  .home-stage {
+    inset: auto;
+    width: max(100cqw, calc(100cqh * 0.5628));
+    aspect-ratio: 0.5628;
+    left: calc((100cqw - max(100cqw, calc(100cqh * 0.5628))) * 0.62);
+    top: calc((100cqh - max(calc(100cqw / 0.5628), 100cqh)) * 0.5);
+  }
+}
+.home-sunflare {
+  position: absolute;
+  left: 82.1%;
+  top: 29.7%;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  mix-blend-mode: screen;
+}
+html[data-home="morning"] .home-sunflare {
+  left: 75.3%;
+  top: 30.1%;
+}
+html[data-home="night"] .home-sunflare {
+  left: 79.5%;
+  top: 12.7%;
+}
+html[data-home="day"] .home-sunflare,
+html[data-home="dusk"] .home-sunflare {
+  display: none;
+}
+.home-sunflare > span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+}
+.sf-core {
+  width: 62cqw;
+  height: 62cqw;
+  background: radial-gradient(closest-side, rgba(255, 250, 236, 0.95) 0%, rgba(255, 216, 150, 0.62) 16%, rgba(255, 150, 70, 0.26) 44%, rgba(255, 120, 60, 0) 100%);
+}
+.sf-streak {
+  width: 170cqw;
+  height: 1.3cqw;
+  background: linear-gradient(90deg, rgba(255, 190, 120, 0) 0%, rgba(255, 220, 176, 0.8) 50%, rgba(255, 190, 120, 0) 100%);
+}
+.home-sunflare > .sf-g1 {
+  left: -20cqw;
+  top: -2.5cqw;
+  width: 10cqw;
+  height: 10cqw;
+  background: radial-gradient(closest-side, rgba(255, 200, 140, 0) 52%, rgba(255, 214, 160, 0.32) 80%, rgba(255, 200, 140, 0) 100%);
+}
+.home-sunflare > .sf-g2 {
+  left: -50cqw;
+  top: -6cqw;
+  width: 5.5cqw;
+  height: 5.5cqw;
+  background: radial-gradient(closest-side, rgba(170, 205, 255, 0.42) 0%, rgba(170, 205, 255, 0) 100%);
+}
+/* 夜は月の光：小さく、青白く。横に伸びる光と小さな光の輪は出さない */
+html[data-home="night"] .sf-core {
+  width: 26cqw;
+  height: 26cqw;
+  background: radial-gradient(closest-side, rgba(240, 246, 255, 0.9) 0%, rgba(205, 220, 255, 0.42) 22%, rgba(180, 200, 255, 0.12) 52%, rgba(180, 200, 255, 0) 100%);
+}
+html[data-home="night"] .sf-streak,
+html[data-home="night"] .sf-ghost {
+  display: none;
+}
+@keyframes sunflare {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  28% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+@keyframes sf-streak {
+  from {
+    transform: translate(-50%, -50%) scaleX(0.15);
+  }
+  to {
+    transform: translate(-50%, -50%) scaleX(1);
+  }
+}
+/*
+ * スマホのホームの写真がごくゆっくり寄って戻る（.home-drift。動きの演出がオンのとき）。検索欄に触れている間は写真を少し暗くし、
+ * 最近の検索を薄くする（.home-dim・.home-recent。:has で、触れている検索欄を見る）。components/app/home.tsx
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .home-drift {
+    animation: home-drift 48s ease-in-out infinite alternate;
+    transform-origin: 62% 55%;
+    will-change: transform;
+  }
+}
+@keyframes home-drift {
+  to {
+    transform: scale(1.07) translate(-1.2%, -0.8%);
+  }
+}
+.home-dim {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.home-recent {
+  transition: opacity 0.3s ease;
+}
+.theme-navy:has(.home-search input:focus) .home-dim {
+  opacity: 1;
+}
+.theme-navy:has(.home-search input:focus) .home-recent {
+  opacity: 0.45;
+}
+
+/*
+ * 検索したときの「地球から土地までズーム」（components/app/globe-flight.tsx）：現れる・消える・降りた所の光る輪。
+ * 降りたあと物件の画面がふわっと出る（.flight-arrive。終わったら動きを外す）
+ */
+.flight-in {
+  animation: flight-in 0.38s ease-out backwards;
+}
+@keyframes flight-in {
+  from {
+    opacity: 0;
+  }
+}
+.flight-out {
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+.flight-ring {
+  animation: flight-ring 1s cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
+  transform: translate(-50%, -50%);
+}
+@keyframes flight-ring {
+  from {
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 0.95;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(2.4);
+    opacity: 0;
+  }
+}
+.flight-arrive {
+  animation: flight-arrive 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+@keyframes flight-arrive {
+  from {
+    opacity: 0.25;
+    transform: scale(1.035);
+  }
+}
+
+/*
+ * 写真の上のすりガラスの色（components/app/home.tsx の LIGHT_GLASS・DARK_GLASS、frame.tsx の写真の上の下のメニュー）。
+ * ぼかしが使える端末では、後ろの写真が透ける薄い色（ぼかしと彩度で読みやすくする）。
+ * ぼかしが使えない端末と、「透明度を下げる」設定の端末では、白い字が写真の明暗に埋もれない濃い下地にする
+ */
+:root {
+  --glass-light-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.05) 100%);
+  --glass-dark-bg: linear-gradient(180deg, rgba(34, 38, 50, 0.42) 0%, rgba(22, 26, 36, 0.5) 100%);
+  --glass-nav-bg: rgba(20, 24, 32, 0.5);
+  /* お気に入りの物件を乗せる板（字が読みやすいよう、ホームの一覧より少し濃い） */
+  --glass-board-bg: linear-gradient(180deg, rgba(26, 32, 46, 0.5) 0%, rgba(18, 22, 34, 0.58) 100%);
+  /*
+   * 動きの速さと曲線（履歴のページと、そこへつながる動きで使う。ほかのページもこの値にそろえていく）。
+   * 速さは3つ：押した反応・小さな出入り（fast）、ふつうの出入り・閉じる・たたむ（base）、画面のつながり・大きく動くもの（slow）。
+   * 曲線は3つ：止まるとき（out。すっと出て、ゆっくり止まる）、消えるとき（in）、少しはずむ（pop。札・小さな印）
+   */
+  --m-fast: 0.2s;
+  --m-base: 0.34s;
+  --m-slow: 0.5s;
+  --m-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --m-in: cubic-bezier(0.4, 0, 1, 1);
+  --m-pop: cubic-bezier(0.3, 1.25, 0.4, 1);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass-light-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.14) 100%), rgba(12, 24, 45, 0.68);
+    --glass-dark-bg: linear-gradient(180deg, rgba(40, 44, 54, 0.78) 0%, rgba(28, 32, 42, 0.84) 100%);
+    --glass-nav-bg: rgba(22, 26, 34, 0.82);
+    --glass-board-bg: linear-gradient(180deg, rgba(40, 44, 54, 0.82) 0%, rgba(28, 32, 42, 0.88) 100%);
+  }
+}
+/*
+ * ホームの朝・夕方の写真は、太陽がちょうど検索欄の後ろに来る。白い字が明るい光に埋もれないよう、検索欄のすりガラスだけ少し紺を足す
+ * （ぼかしが使える端末だけ。使えない端末と「透明度を下げる」設定は、下の濃い下地のまま）
+ */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  @media (max-width: 1023px) and (prefers-reduced-transparency: no-preference) {
+    html[data-home="morning"] .home-search,
+    html[data-home="evening"] .home-search {
+      --glass-light-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.05) 100%), rgba(16, 30, 58, 0.26);
+    }
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-light-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.14) 100%), rgba(12, 24, 45, 0.68);
+    --glass-dark-bg: linear-gradient(180deg, rgba(40, 44, 54, 0.78) 0%, rgba(28, 32, 42, 0.84) 100%);
+    --glass-nav-bg: rgba(22, 26, 34, 0.82);
+    --glass-board-bg: linear-gradient(180deg, rgba(40, 44, 54, 0.82) 0%, rgba(28, 32, 42, 0.88) 100%);
+  }
+}
+
+/*
+ * スマホのお気に入りのページ（components/app/favorites.tsx）。画面いっぱいの富士山の写真（昼・夕方・夜で切り替え）と、ホームと同じすりガラス。
+ * 写真の箱（.fav-stage）は画面を覆う大きさにし、太陽・月の光（.fav-halo）・湖のきらめき（.fav-glint）・紅富士（.fav-alpen）・星（.fav-star）を絵と同じ位置に重ねる
+ * （箱の縦横比と切る位置は写真ごと：--fav-ar・--fav-x・--fav-y。コンテナの単位が使えない古い端末は、画面いっぱいの箱に写真を合わせるだけ）。
+ * スクロールした量（--fav-p。0〜1）で写真が上へ寄り（.fav-alive のとき）、暗くなる（.fav-dim）。
+ * 現れる動き（.fav-rise・.fav-row）は、すりガラスの箱そのものに付け、終わったら外す（backwards）。動きを減らす設定では動かさない
+ */
+.fav-stage {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 0;
+}
+@supports (width: 1cqw) {
+  .fav-backdrop {
+    container-type: size;
+  }
+  .fav-stage {
+    inset: auto;
+    width: max(100cqw, calc(100cqh * var(--fav-ar, 0.5582)));
+    aspect-ratio: var(--fav-ar, 0.5582);
+    left: calc((100cqw - max(100cqw, calc(100cqh * var(--fav-ar, 0.5582)))) * var(--fav-x, 0.25));
+    top: calc((100cqh - max(calc(100cqw / var(--fav-ar, 0.5582)), 100cqh)) * var(--fav-y, 0.4));
+  }
+}
+/*
+ * 写真を上へ寄せる枠：富士山の頂が検索欄の少し下に来るよう、頂を中心に少し大きくして上へ動かす
+ * （量は components/app/favorites.tsx の fujiFrame が画面の大きさから出す）。光や星も同じ枠の中なので、写真と一緒に動く
+ */
+.fav-frame {
+  position: absolute;
+  inset: 0;
+  transform: translateY(var(--fav-shift, 0px)) scale(var(--fav-scale, 1));
+  transform-origin: 50% var(--fav-origin, 50%);
+}
+/* 太陽・月のまわりの光（大きさと色は写真ごとに components/app/favorites.tsx が付ける） */
+.fav-halo {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  mix-blend-mode: screen;
+  opacity: 0.8;
+}
+.fav-glint {
+  position: absolute;
+  border-radius: 9999px;
+  background: var(--glint, #fff6dc);
+  box-shadow: 0 0 6px 2px var(--glint-glow, rgba(255, 214, 140, 0.85));
+  mix-blend-mode: screen;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+/* 夜の写真の星（写真の星の上に重ねて、瞬かせる。明るさは星ごとの --a） */
+.fav-star {
+  position: absolute;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 0 4px 1px rgba(205, 222, 255, 0.85);
+  mix-blend-mode: screen;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+/* 紅富士（雪の上に重ねる光。色は写真ごとに components/app/favorites.tsx が付ける。柔らかく重ねるので、空は白っぽくならない） */
+.fav-alpen {
+  position: absolute;
+  width: 50%;
+  aspect-ratio: 2.4;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  mix-blend-mode: soft-light;
+  opacity: 0;
+}
+.fav-dim {
+  background: rgba(3, 8, 20, 0.55);
+  opacity: calc(var(--fav-p, 0) * 0.85);
+}
+.fav-focus {
+  background: rgba(4, 10, 24, 0.32);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.theme-navy:has(.fav-search input:focus) .fav-focus {
+  opacity: 1;
+}
+.fav-thumb {
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 4px 14px rgba(5, 15, 35, 0.22);
+}
+.fav-row {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+.fav-row > .fav-row-in {
+  min-height: 0;
+  overflow: hidden;
+}
+.fav-row.fav-leaving {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateX(-18px);
+  border-color: transparent;
+}
+.fav-bar {
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition:
+    opacity 0.25s ease,
+    transform 0.3s ease;
+}
+[data-compact] .fav-bar {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.fav-toast-out {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .fav-alive .fav-stage {
+    transform: translate3d(0, calc(var(--fav-p, 0) * -48px), 0) scale(calc(1 + var(--fav-p, 0) * 0.1));
+    will-change: transform;
+  }
+  .fav-alive .fav-drift {
+    animation: fav-drift 44s ease-in-out infinite alternate;
+    transform-origin: 62% 45%;
+  }
+  .fav-alive .fav-halo {
+    animation: fav-halo 6.5s ease-in-out infinite alternate;
+  }
+  .fav-alive .fav-star {
+    animation-name: fav-twinkle;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+  }
+  .fav-alive .fav-alpen {
+    animation: fav-alpen 10s ease-in-out infinite alternate;
+  }
+  .fav-alive .fav-glint {
+    animation-name: fav-glint;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+  }
+  .fav-rise {
+    animation: home-rise var(--m-slow) var(--m-out) backwards;
+  }
+  .fav-row {
+    animation: fav-row 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    transition:
+      grid-template-rows 0.34s cubic-bezier(0.2, 0.7, 0.2, 1),
+      opacity 0.24s ease,
+      transform 0.34s cubic-bezier(0.2, 0.7, 0.2, 1),
+      border-color 0.2s ease;
+  }
+  .fav-star-off {
+    animation: fav-star-off 0.32s ease-in forwards;
+  }
+  .fav-thumb {
+    transition: transform 0.42s cubic-bezier(0.3, 1.3, 0.4, 1);
+  }
+  .fav-toast {
+    animation: fav-toast-in 0.42s cubic-bezier(0.2, 0.9, 0.25, 1.12) backwards;
+  }
+  .fav-empty-star {
+    animation: fav-float 3.6s ease-in-out infinite alternate;
+  }
+}
+@keyframes fav-drift {
+  to {
+    transform: scale(1.05) translate(-0.8%, -0.5%);
+  }
+}
+@keyframes fav-halo {
+  from {
+    opacity: 0.62;
+    transform: translate(-50%, -50%) scale(0.93);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.07);
+  }
+}
+@keyframes fav-twinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  50% {
+    opacity: var(--a, 0.9);
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@keyframes fav-alpen {
+  from {
+    opacity: 0.15;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fav-glint {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  50% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@keyframes fav-row {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes fav-star-off {
+  40% {
+    transform: scale(1.28) rotate(-14deg);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.2) rotate(-40deg);
+  }
+}
+@keyframes fav-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+}
+@keyframes fav-float {
+  from {
+    transform: translateY(2px);
+  }
+  to {
+    transform: translateY(-3px);
+  }
+}
+
+/*
+ * スマホの書類・出力のページ（components/app/docs.tsx）。画面いっぱいの机の写真（昼・夕方・夜で切り替え）と、ホームと同じすりガラス。
+ * 写真の箱（.docs-stage）は画面を覆う大きさにし（写真の縦横比 941:1672。横は --docs-x の位置で切る）、光のにじみ（.docs-glow）と
+ * ビルの屋上の赤い灯（.docs-beacon）を絵と同じ位置に重ねる。コンテナの単位が使えない古い端末は、画面いっぱいの箱に写真を合わせるだけ。
+ * 初めて開いたときは写真がふわっと落ち着き（.day-intro）、時間帯が変わったときは新しい写真がゆっくり重なる（.day-swap。お気に入りも同じ）。
+ * 現れる動き（.docs-rise・.docs-row）は、すりガラスの箱そのものに付け、終わったら外す（backwards）。動きを減らす設定では動かさない
+ */
+.docs-stage {
+  position: absolute;
+  inset: 0;
+}
+@supports (width: 1cqw) {
+  .docs-backdrop {
+    container-type: size;
+  }
+  .docs-stage {
+    inset: auto;
+    width: max(100cqw, calc(100cqh * 0.5628));
+    aspect-ratio: 941 / 1672;
+    left: calc((100cqw - max(100cqw, calc(100cqh * 0.5628))) * var(--docs-x, 0.5));
+    top: calc((100cqh - max(calc(100cqw / 0.5628), 100cqh)) * 0.5);
+  }
+}
+.docs-glow {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  mix-blend-mode: screen;
+  opacity: 0.8;
+}
+.docs-beacon {
+  position: absolute;
+  width: 1.8%;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(closest-side, rgba(255, 120, 100, 1) 0%, rgba(255, 48, 36, 0.55) 40%, rgba(255, 30, 20, 0) 100%);
+  mix-blend-mode: screen;
+  opacity: 0;
+}
+/*
+ * 書類・出力の「要注意点と次にやること」（いちばん使う書類）：白で浮かせず、ほかのボタンと同じすりガラスのまま少し明るく、上の縁に光。
+ * 押すと明るくなる。.docs-sheen は開いたとき1回だけ横切る光（動きの演出がオンのとき。動きを減らす設定では出ない）
+ */
+.docs-main {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.08) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 6px 18px rgba(0, 0, 0, 0.12);
+  transition: background 0.2s ease;
+}
+.docs-main:active {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.14) 100%);
+}
+.docs-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.24) 48%, rgba(255, 255, 255, 0) 66%);
+  transform: translateX(-120%);
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .docs-sheen {
+    animation: docs-sheen 1.5s cubic-bezier(0.4, 0, 0.2, 1) 0.9s 1 both;
+  }
+}
+@keyframes docs-sheen {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(120%);
+  }
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  /* 写真が現れる動き：すぐ見えるようにして（0.5秒）、写真ごとに合うカメラの動きでゆっくり落ち着く（1.5秒）。
+     お気に入りは富士山が下から持ち上がる、履歴は街の上から少し引く、書類・出力は机の上を横へ流れて止まる */
+  .day-intro {
+    animation:
+      day-fade 0.5s ease-out backwards,
+      day-cam 1.5s var(--m-out) backwards;
+  }
+  .fav-backdrop .day-intro {
+    transform-origin: 50% 40%;
+    animation-name: day-fade, fav-cam;
+  }
+  .hist-backdrop .day-intro {
+    transform-origin: 50% 42%;
+    animation-name: day-fade, hist-cam;
+  }
+  .docs-backdrop .day-intro {
+    transform-origin: 50% 45%;
+    animation-name: day-fade, docs-cam;
+  }
+  .day-swap {
+    animation: day-swap 1.6s ease-in-out backwards;
+  }
+  .docs-alive .docs-drift {
+    animation: docs-drift 46s ease-in-out infinite alternate;
+    transform-origin: 50% 40%;
+  }
+  .docs-alive .docs-glow {
+    animation-name: docs-glow;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+  }
+  .docs-alive .docs-beacon {
+    animation-name: docs-beacon;
+    animation-duration: 1.9s;
+    animation-timing-function: ease-out;
+    animation-iteration-count: infinite;
+  }
+  .docs-rise {
+    animation: home-rise var(--m-slow) var(--m-out) backwards;
+  }
+  .docs-row {
+    animation: fav-row 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  }
+}
+@keyframes day-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes day-cam {
+  from {
+    transform: scale(1.06);
+  }
+}
+@keyframes fav-cam {
+  from {
+    transform: translateY(2.5%) scale(1.08);
+  }
+}
+@keyframes hist-cam {
+  from {
+    transform: scale(1.1);
+  }
+}
+@keyframes docs-cam {
+  from {
+    transform: translateX(-2.5%) scale(1.06);
+  }
+}
+@keyframes day-swap {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hist-glow {
+  from {
+    opacity: 0.45;
+    transform: translate(-50%, -50%) scale(0.94);
+  }
+  to {
+    opacity: 0.85;
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+}
+@keyframes docs-drift {
+  to {
+    transform: scale(1.05) translate(-0.6%, -0.4%);
+  }
+}
+@keyframes docs-glow {
+  from {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+}
+/* 航空障害灯の点滅（ぱっと点いて、ゆっくり消える） */
+@keyframes docs-beacon {
+  0% {
+    opacity: 0;
+  }
+  7% {
+    opacity: 1;
+  }
+  32% {
+    opacity: 0.12;
+  }
+  45%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/*
+ * スマホの履歴のページ（components/app/history.tsx）。画面いっぱいの背景（届く背景の絵。届くまでは時間帯の色の仮の背景）と、
+ * ホーム・お気に入りと同じすりガラス。背景の箱（.hist-stage）は画面を覆う大きさにする（写真の縦横比 --hist-ar、切る位置 --hist-x・--hist-y。
+ * コンテナの単位が使えない古い端末は、画面いっぱいの箱に合わせるだけ）。スクロールした量（--hist-p。0〜1）で背景が上へ寄り
+ * （.hist-alive のとき）、暗くなる（.hist-dim）。絞り込みの欄に触れている間は少し暗くする（.hist-focus）。
+ * 行（.hist-row）は、なぞると前の面（.hist-front）が指について動き、なぞった分だけ後ろの操作（.hist-acts）が見える。
+ * 消すときは高さをたたむ（.hist-leaving）。現れる動き（.hist-rise・.hist-enter・.hist-chip・.hist-pop）は、すりガラスの箱そのものに付け、
+ * 終わったら外す（backwards）。動きを減らす設定では動かさない
+ */
+.hist-stage {
+  position: absolute;
+  inset: 0;
+}
+@supports (width: 1cqw) {
+  .hist-backdrop {
+    container-type: size;
+  }
+  .hist-stage {
+    inset: auto;
+    width: max(100cqw, calc(100cqh * var(--hist-ar, 0.5628)));
+    aspect-ratio: var(--hist-ar, 0.5628);
+    left: calc((100cqw - max(100cqw, calc(100cqh * var(--hist-ar, 0.5628)))) * var(--hist-x, 0.5));
+    top: calc((100cqh - max(calc(100cqw / var(--hist-ar, 0.5628)), 100cqh)) * var(--hist-y, 0.5));
+  }
+}
+.hist-dim {
+  background: rgba(3, 8, 20, 0.55);
+  opacity: calc(var(--hist-p, 0) * 0.8);
+}
+/* 朝日・夕日・月の光（≡ の「動きの演出」がオンのときだけ置く。写真の中の位置。明るさがゆっくり揺れる） */
+.hist-glow {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  mix-blend-mode: screen;
+  opacity: 0.6;
+  pointer-events: none;
+}
+.hist-focus {
+  background: rgba(4, 10, 24, 0.32);
+  opacity: 0;
+  transition: opacity var(--m-base) ease;
+}
+.theme-navy:has(.hist-search input:focus) .hist-focus {
+  opacity: 1;
+}
+/*
+ * 上の細いバーと大きな見出し：スクロールした量（--scroll。components/app/sky.tsx の useShrink が書く）に合わせて、
+ * 大きな見出し「履歴」とひとことが薄れていき、入れ替わりにバーが出る（指の動きにそのままついてくる。iPhone の「設定」「メール」と同じ）。
+ * 押せるのはバーが出きってから（data-compact）
+ */
+.hist-bar {
+  opacity: clamp(0, calc((var(--scroll, 0) - 56) / 40), 1);
+  pointer-events: none;
+}
+[data-compact] .hist-bar {
+  pointer-events: auto;
+}
+.hist-title {
+  opacity: clamp(0, calc(1 - var(--scroll, 0) / 50), 1);
+}
+.hist-lead {
+  opacity: clamp(0, calc(1 - (var(--scroll, 0) - 6) / 50), 1);
+}
+/* 物件の画面から戻ってきた行：一瞬明るくなって、ゆっくり戻る（どこから来たか分かるように） */
+.hist-back > .hist-row-in {
+  animation: hist-back 1.3s ease-out both;
+}
+@keyframes hist-back {
+  0%,
+  25% {
+    background-color: rgba(255, 255, 255, 0.16);
+  }
+  100% {
+    background-color: rgba(255, 255, 255, 0);
+  }
+}
+/* 物件を調べている途中の行 */
+.hist-busy > .hist-row-in {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+/* 行：長押しで字を選ばない。消すときは高さを 0 へ（grid の 1fr → 0fr） */
+.hist-row {
+  display: grid;
+  grid-template-rows: 1fr;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.hist-row > .hist-row-in {
+  min-height: 0;
+  overflow: hidden;
+}
+.hist-row.hist-leaving {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  border-color: transparent;
+  pointer-events: none;
+}
+/* 前の面は横の動きだけ指で受け取る（縦のスクロールはブラウザに任せる） */
+.hist-front {
+  touch-action: pan-y;
+}
+/* なぞると見える操作（コピー・消す）。前の面が動いた分だけ広がり、大きくなぞると「消す」が全体に広がる */
+.hist-act {
+  display: flex;
+  min-width: 0;
+  flex-basis: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+/* 絞り込みの文字に合う所（金色の字に、うすい下線と下地） */
+.hist-mark {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: rgba(255, 205, 90, 0.16);
+  box-shadow: inset 0 -1.5px 0 rgba(255, 205, 90, 0.6);
+  color: #ffd979;
+}
+/* 小さな押せる所の、指の当たる範囲を広げる（見た目は変えない） */
+.hist-hit::after {
+  content: "";
+  position: absolute;
+  inset: -5px -2px;
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .hist-alive .hist-stage {
+    transform: translate3d(0, calc(var(--hist-p, 0) * -44px), 0) scale(calc(1 + var(--hist-p, 0) * 0.08));
+    will-change: transform;
+  }
+  .hist-alive .hist-drift {
+    animation: docs-drift 46s ease-in-out infinite alternate;
+    transform-origin: 50% 42%;
+  }
+  .hist-alive .hist-glow {
+    animation: hist-glow 7.5s ease-in-out infinite alternate;
+  }
+  .hist-rise {
+    animation: home-rise var(--m-slow) var(--m-out) backwards;
+  }
+  .hist-enter {
+    animation: fav-row var(--m-slow) var(--m-out) backwards;
+  }
+  .hist-row {
+    transition:
+      grid-template-rows var(--m-base) var(--m-out),
+      opacity var(--m-fast) ease,
+      border-color var(--m-fast) ease;
+  }
+  /* なぞったあと：離した速さを引き継いで止まる（--sw-dur・--sw-ease は行ごとに history.tsx の settleFrom が決める。無ければいつもの止まり方） */
+  .hist-front,
+  .hist-acts {
+    transition:
+      transform var(--sw-dur, var(--m-base)) var(--sw-ease, var(--m-out)),
+      width var(--sw-dur, var(--m-base)) var(--sw-ease, var(--m-out));
+  }
+  .hist-act {
+    transition:
+      flex-grow var(--m-fast) var(--m-out),
+      padding var(--m-fast) var(--m-out);
+  }
+  .hist-drag .hist-front,
+  .hist-drag .hist-acts {
+    transition: none;
+  }
+  .hist-held {
+    animation: hist-held var(--m-base) var(--m-out);
+  }
+  .hist-chip {
+    animation: hist-chip var(--m-base) var(--m-pop) backwards;
+  }
+  .hist-pop {
+    animation: hist-pop var(--m-base) var(--m-out) backwards;
+  }
+  /* 上の細いバーの、いまの章（変わると下からふわっと入れ替わる） */
+  .hist-sub {
+    animation: hist-sub var(--m-fast) var(--m-out) backwards;
+  }
+}
+@keyframes hist-sub {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+/* 長押し：行が少し沈んで明るくなる（そのあとシートが出る） */
+@keyframes hist-held {
+  40% {
+    scale: 0.975;
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+}
+@keyframes hist-chip {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@keyframes hist-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@keyframes home-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* スマホの幅では、スクロールできない所を引っぱっても画面全体が跳ねないようにする（components/app/no-bounce.ts と合わせて） */
+@media (max-width: 1023px) {
+  html,
+  body {
+    overscroll-behavior: none;
+  }
+}
+
+/*
+ * スマホの新しい画面（ホーム・物件・タブのページ・下のメニュー）：押したときの灰色の四角、2回押しの拡大と押した反応の遅れ、
+ * 字や画像の長押しの選択メニューを出さない（押した感じは各部品で出す）。入力欄の字は選べる
+ */
+.app-touch {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.app-touch input,
+.app-touch textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+.app-touch img {
+  -webkit-touch-callout: none;
 }
 
 /* 住所や電話番号の数字は桁を揃える */
@@ -86,6 +1637,11 @@ body {
 /* 検索ボタンなどの金属調ゴールド */
 .bg-gold {
   background: linear-gradient(145deg, #e3c79a 0%, #b88a4d 55%, #8a6632 100%);
+}
+
+/* 新しい見た目の、いちばん大事なボタンの紺（少し光る） */
+.bg-navy-gradient {
+  background: linear-gradient(135deg, #1b4280 0%, #0f2f5f 55%, #0a2248 100%);
 }
 
 /* 白いカードの柔らかい影 */
@@ -127,10 +1683,13 @@ body {
 /*
  * 印刷・PDF 保存：結果が出ていれば、画面（地図・パネル・シート）は出さず、調査メモ（components/print-sheet.tsx）だけを A4 に出す。
  * 案内図のシートを開いているあいだ（body の data-print="guide"）は、調査メモの代わりに案内図（components/guide-map.tsx）を出す。
+ * 照会文のシートを開いているあいだ（data-print="letter"。スマホ）は、照会文の A4 の1枚（components/app/doc-view.tsx の PrintLetter）を出す。
+ * 照会文のシートの「印刷して FAX」（data-print="fax"）は、1枚目に FAX 送付状（components/app/inquiry-send.tsx の FaxCover）、2枚目から照会文。
  * 結果が出ていない画面（ホーム・候補選び）は、これまでどおり画面をそのまま印刷する
  */
 .print-sheet,
-.print-guide {
+.print-guide,
+.print-letter {
   display: none;
 }
 @media print {
@@ -147,7 +1706,7 @@ body {
   body:has(> .print-sheet) {
     display: block !important;
   }
-  body:has(> .print-sheet) > :not(.print-sheet, .print-guide) {
+  body:has(> .print-sheet) > :not(.print-sheet, .print-guide, .print-letter) {
     display: none !important;
   }
   .print-sheet {
@@ -164,4 +1723,1401 @@ body {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
+  /* 調査メモの2枚目（窓口での確認メモ。スマホ）は新しいページから */
+  .print-page-break {
+    break-before: page;
+  }
+  body[data-print="letter"] > .print-sheet {
+    display: none !important;
+  }
+  body[data-print="letter"] > .print-letter {
+    display: block;
+    padding: 0 3mm;
+  }
+  body[data-print="fax"] > .print-sheet {
+    display: none !important;
+  }
+  body[data-print="fax"] > .print-letter {
+    display: block;
+    padding: 0 3mm;
+  }
+  .print-fax-cover {
+    display: none;
+  }
+  body[data-print="fax"] .print-fax-cover {
+    display: block;
+    break-after: page;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+
+/*
+ * スマホの押した反応（components/app/tokens.ts の MOTION）：触れた瞬間に 0.98 倍に沈み（80ms）、離すと戻る（220ms）。発光しない。
+ * 動きを減らす設定では沈まない（色の変化だけ）
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .press {
+    transition:
+      transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 220ms ease,
+      box-shadow 220ms ease;
+  }
+  .press:active {
+    transform: scale(0.98);
+    transition-duration: 80ms;
+  }
+  .press-soft:active {
+    transform: scale(0.99);
+  }
+}
+
+/*
+ * 右上のメニュー（≡。components/app/app-menu.tsx）：画面いっぱいの暗いすりガラス。後ろのページ（写真）を強くぼかして紺に沈め、
+ * 左上と右下に淡い青の光。ぼかしが使えない端末と「透明度を下げる」設定では、透けない紺の地にする。
+ * 開くときは 0.26 秒でふわっと現れ、中身は上から順に浮き上がる（.menu-rise。遅れは style の --d）。閉じるときは 0.18 秒で消える。
+ * 動きを減らす設定では動かさない。浮き上がりは終わったら外す（backwards）。スマホだけで使う（PC はこの画面を使わない）
+ */
+.menu-veil {
+  background:
+    radial-gradient(70% 40% at 0% 0%, rgba(76, 130, 255, 0.2) 0%, rgba(76, 130, 255, 0) 100%),
+    radial-gradient(65% 38% at 100% 100%, rgba(40, 190, 255, 0.13) 0%, rgba(40, 190, 255, 0) 100%),
+    linear-gradient(180deg, rgba(8, 16, 34, 0.76) 0%, rgba(6, 12, 26, 0.86) 100%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  backdrop-filter: blur(28px) saturate(150%);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .menu-veil {
+    background:
+      radial-gradient(70% 40% at 0% 0%, rgba(76, 130, 255, 0.2) 0%, rgba(76, 130, 255, 0) 100%),
+      radial-gradient(65% 38% at 100% 100%, rgba(40, 190, 255, 0.13) 0%, rgba(40, 190, 255, 0) 100%),
+      linear-gradient(180deg, #0d1a35 0%, #070f21 100%);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .menu-veil {
+    background:
+      radial-gradient(70% 40% at 0% 0%, rgba(76, 130, 255, 0.2) 0%, rgba(76, 130, 255, 0) 100%),
+      linear-gradient(180deg, #0d1a35 0%, #070f21 100%);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+/*
+ * メニューを開いている間（html の data-menu。app-menu.tsx）は、後ろのページの動きを止め、光の重ね（screen・soft-light で重ねる層）を隠す。
+ * すりガラスは後ろを画面いっぱいにぼかすので、後ろが動くと毎回ぼかし直しになって電池を使う。光の重ねの層は、ぼかしの中で層の境目が
+ * 筋に見えることがある。閉じ始めたら元に戻す（止めた所から続きを動かす）
+ */
+html[data-menu="open"] .theme-navy.app-touch * {
+  animation-play-state: paused !important;
+}
+html[data-menu="open"] :is(.home-sunflare, .fav-halo, .fav-glint, .fav-star, .fav-alpen, .docs-glow, .docs-beacon, .hist-glow) {
+  visibility: hidden;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .menu-veil[data-menu="open"] {
+    animation: page-fade 260ms ease both;
+  }
+  .menu-veil[data-menu="closing"] {
+    animation: page-fade 180ms ease reverse both;
+    pointer-events: none;
+  }
+  .menu-veil[data-menu="open"] .menu-rise {
+    animation: home-rise var(--m-base) var(--m-out) backwards;
+    animation-delay: calc(60ms + var(--d, 0ms));
+  }
+}
+
+/*
+ * 下から出るシート（components/sheet.tsx）。スマホだけ：開く 320ms、閉じる 240ms。背景は黒 40% にフェード。
+ * 指で下にすべらせている間（data-drag）は動きを止め、離して戻るとき（data-settle）は 200ms で戻る。PC は今までどおり動かさない
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .sheet-backdrop {
+    animation: sheet-dim 320ms ease both;
+  }
+  .sheet-panel {
+    animation: sheet-up 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  [data-state="closing"] .sheet-backdrop {
+    animation: sheet-dim 240ms ease reverse both;
+  }
+  [data-state="closing"] .sheet-panel {
+    animation: sheet-up 240ms cubic-bezier(0.4, 0, 1, 1) reverse both;
+  }
+  .sheet-panel[data-drag] {
+    animation: none;
+    transition: none;
+  }
+  .sheet-panel[data-settle] {
+    animation: none;
+    transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sheet-dim {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* スマホのページの切り替え（下のメニュー）：8pt 下から浮き上がりながら現れる（180ms）。動きを減らす設定ではフェードだけ。
+ * 終わったあとは動きを外す（backwards）：動きが残ったままの箱の中では、すりガラスの後ろがぼけない */
+@media (max-width: 1023px) {
+  .page-in {
+    animation: page-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .page-in {
+      animation: page-fade 120ms ease backwards;
+    }
+  }
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* 3D の街の出典（components/app/sky.tsx の CityCredit）：街が切り替わるのと同じ 0.8 秒で現れる */
+.credit-in {
+  animation: page-fade 800ms ease both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .credit-in {
+    animation: none;
+  }
+}
+@keyframes page-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/*
+ * 時間連動の空（components/app/sky.tsx）。写真の不透明度・光は空の変数（lib/app/sky-vars.ts）で決まり、変わるときは数秒かけてなじむ。
+ * 見出しの字とロゴは空の明るさで紺↔白。動きを減らす設定では、なじませずに切り替える
+ */
+@media (max-width: 1023px) {
+  .sky-layer {
+    transition: opacity 1600ms linear, background 1600ms linear;
+  }
+  .sky-ink {
+    color: rgb(var(--sky-ink, 15, 27, 51));
+    transition: color 600ms ease;
+  }
+  .sky-ink-soft {
+    color: rgb(var(--sky-ink-soft, 38, 50, 74));
+    transition: color 600ms ease;
+  }
+  .sky-logo-navy {
+    opacity: calc(1 - var(--sky-dark, 0));
+    transition: opacity 600ms ease;
+  }
+  .sky-logo-white {
+    opacity: var(--sky-dark, 0);
+    transition: opacity 600ms ease;
+  }
+  /* スクロールで縮む帯：写真は半分の速さで上へ、見出しは 110px で薄れきる。上に残るバーは data-compact で下りてくる */
+  .shrink-photo {
+    transform: translateY(calc(var(--scroll, 0) * -0.5px));
+  }
+  .shrink-title {
+    opacity: calc(1 - var(--scroll, 0) / 110);
+    transform: translateY(calc(var(--scroll, 0) * -0.25px));
+  }
+  .compact-bar {
+    transform: translateY(-100%);
+    opacity: 0;
+    /* 隠れている間は見えない扱いにして、指も受けない（上へ滑って薄れたあと） */
+    visibility: hidden;
+    transition:
+      transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 200ms ease,
+      visibility 0s linear 200ms;
+  }
+  [data-compact="1"] .compact-bar {
+    transform: none;
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: reduce) {
+  .sky-layer,
+  .sky-ink,
+  .sky-ink-soft,
+  .sky-logo-navy,
+  .sky-logo-white {
+    transition: none;
+  }
+  .shrink-photo,
+  .shrink-title {
+    transform: none;
+  }
+  .compact-bar {
+    transition:
+      opacity 120ms ease,
+      visibility 0s linear 120ms;
+    transform: none;
+  }
+}
+
+/*
+ * 第3段階の操作感（スマホ）。お気に入りの星は保存できたときだけ弾む（components/app/star.tsx）。タブの中身は 160ms のクロスフェード。
+ * 下のメニューは押した項目のアイコンが 2pt 浮く。地図の板 → 結果の帯のつながり（View Transitions。未対応の端末ではそのまま切り替わる）
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .star-pop {
+    animation: star-pop 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .star-ring::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 9999px;
+    border: 2px solid rgba(245, 165, 36, 0.55);
+    animation: star-ring 360ms ease-out forwards;
+    pointer-events: none;
+  }
+  .tab-in {
+    animation: page-fade 160ms ease-out both;
+  }
+  .nav-item {
+    transition: color 0.3s ease;
+  }
+  .nav-item > :first-child {
+    transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  /* 下のメニューの選んでいる所の線（components/app/frame.tsx）：押した所へ滑る。進む向きの先の端が先に動き、後ろの端は少し遅れて
+     追いつく（--nav-l・--nav-r。線が伸びて縮む）。少しだけ行き過ぎて戻る */
+  .nav-mark {
+    transition:
+      left 0.46s cubic-bezier(0.3, 1.16, 0.4, 1) var(--nav-l, 0ms),
+      right 0.46s cubic-bezier(0.3, 1.16, 0.4, 1) var(--nav-r, 0ms);
+  }
+  .nav-item[aria-current="page"] > :first-child {
+    transform: translateY(-2px);
+  }
+  ::view-transition-old(place-panel),
+  ::view-transition-new(place-panel),
+  ::view-transition-old(place-title),
+  ::view-transition-new(place-title) {
+    animation-duration: 360ms;
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 240ms;
+  }
+}
+/*
+ * ホームの最近の検索 ⇄ 履歴のつながる動き（components/app/mobile-app.tsx の morphTo。html に .vt-recent が付いている間だけ）。
+ * 一覧の板・最近の3件の行・検索欄（名前は components/app/home.tsx の VT）は、相手のページの同じものへ 0.56 秒で滑って形を変える
+ * （板は暗いすりガラス ⇄ 白に色を変え、行は板に乗ったまま、動く向きの先頭の行から 18ms ずつ遅れて着く。向きは .vt-up・.vt-down）。
+ * ほかの画面は、前のページが少し手前に寄りながら薄れ、次のページが下から浮き上がる
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  html.vt-recent::view-transition-group(*) {
+    animation-duration: var(--m-slow);
+    animation-timing-function: var(--m-out);
+  }
+  /* 行は、動く向きの先頭の行から少しずつ遅れて動き出す（上へ＝履歴へは上の行から、下へ＝ホームへは下の行から。追いついて重ならない） */
+  html.vt-recent.vt-up::view-transition-group(vt-r1),
+  html.vt-recent.vt-down::view-transition-group(vt-r1) {
+    animation-delay: 18ms;
+  }
+  html.vt-recent.vt-up::view-transition-group(vt-r2),
+  html.vt-recent.vt-down::view-transition-group(vt-r0) {
+    animation-delay: 36ms;
+  }
+  /*
+   * 行と検索欄の中身（字）は、前のページの字が先に薄れてから次のページの字が出る（同時に重ねると、形の違う字が二重に見える）。
+   * 動く箱（group）は 0.56 秒で滑り続けるので、字だけが入れ替わる
+   */
+  html.vt-recent::view-transition-old(vt-r0),
+  html.vt-recent::view-transition-old(vt-r1),
+  html.vt-recent::view-transition-old(vt-r2),
+  html.vt-recent::view-transition-old(vt-search) {
+    animation: vt-text-out 0.16s var(--m-in) both;
+  }
+  html.vt-recent::view-transition-new(vt-r0),
+  html.vt-recent::view-transition-new(vt-r1),
+  html.vt-recent::view-transition-new(vt-r2),
+  html.vt-recent::view-transition-new(vt-search) {
+    animation: vt-text-in 0.3s cubic-bezier(0, 0, 0.2, 1) 0.1s both;
+  }
+  /* 下のメニューは、ページと一緒に薄れたり寄ったりしない（選んでいる所の色と線は、次のページの下のメニューの上で動く。.vt-tab と同じ） */
+  html.vt-recent [data-app-nav] {
+    view-transition-name: app-nav;
+  }
+  /* 一覧の板（暗いすりガラス ⇄ 白）は、行を除いた板だけの絵なので、箱いっぱいに合わせて形と色を変える */
+  html.vt-recent::view-transition-old(vt-card),
+  html.vt-recent::view-transition-new(vt-card) {
+    height: 100%;
+    animation-duration: 0.46s;
+    animation-timing-function: ease;
+  }
+  /* すりガラスの欄と板は、角を丸く切る（すりガラスの絵が四角いまま一瞬見えないように） */
+  html.vt-recent::view-transition-group(vt-search) {
+    border-radius: 9999px;
+    overflow: hidden;
+  }
+  html.vt-recent::view-transition-group(vt-card) {
+    border-radius: 22px;
+    overflow: hidden;
+  }
+  /* 前と次のページが重なって見える時間を短くする（字が二重に見えないように） */
+  html.vt-recent::view-transition-old(root) {
+    animation: vt-recent-out 0.26s var(--m-in) both;
+  }
+  html.vt-recent::view-transition-new(root) {
+    animation: vt-recent-in var(--m-slow) var(--m-out) 0.05s both;
+  }
+}
+/*
+ * 下のメニューでページを切り替えたとき（components/app/mobile-app.tsx の tabTo。html に .vt-tab が付いている間だけ）。
+ * ロゴの帯（app-brand）と下のメニュー（app-nav）は、次のページの絵をすぐ出す（4ページで同じなので止まって見える。下のメニューの
+ * 線と色は、その上で動く）。ページの名前（page-title）は前の名前が上へ抜け、次の名前は自分の動き（.pt-in）で下から現れる。
+ * 検索欄（vt-search。ホーム・お気に入り・履歴で同じ場所）は、すりガラスのまま字だけが入れ替わる。写真と中身は、前のページが
+ * 早めに薄れて次のページが現れる（中身は、それぞれのページの現れる動きで上から順に浮き上がる）。
+ * ホームの最近の検索 ⇄ 履歴のつながる動き（.vt-recent）でも、ロゴの帯・ページの名前・下のメニューは同じにする
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  html.vt-tab [data-app-nav] {
+    view-transition-name: app-nav;
+  }
+  /* 前のページは押した直後から薄れ始める（ゆっくり始まる曲線だと、押してから動くまでが遅く見える） */
+  html.vt-tab::view-transition-old(root) {
+    animation: vt-tab-out 0.24s cubic-bezier(0.2, 0, 0.4, 1) both;
+  }
+  html.vt-tab::view-transition-new(root) {
+    animation: vt-tab-in 0.38s var(--m-out) both;
+  }
+  html.vt-tab::view-transition-group(app-brand),
+  html.vt-recent::view-transition-group(app-brand),
+  html.vt-tab::view-transition-group(app-nav),
+  html.vt-recent::view-transition-group(app-nav),
+  html.vt-tab::view-transition-group(page-title),
+  html.vt-recent::view-transition-group(page-title),
+  html.vt-tab::view-transition-group(vt-search) {
+    animation: none;
+  }
+  html.vt-tab::view-transition-old(app-brand),
+  html.vt-recent::view-transition-old(app-brand),
+  html.vt-tab::view-transition-old(app-nav),
+  html.vt-recent::view-transition-old(app-nav) {
+    animation: none;
+    opacity: 0;
+  }
+  html.vt-tab::view-transition-new(app-brand),
+  html.vt-recent::view-transition-new(app-brand),
+  html.vt-tab::view-transition-new(app-nav),
+  html.vt-recent::view-transition-new(app-nav),
+  html.vt-tab::view-transition-new(page-title),
+  html.vt-recent::view-transition-new(page-title) {
+    animation: none;
+  }
+  /* 前の名前は、次の名前が下から出てくる前に抜けきる（重なって二重に見えないように） */
+  html.vt-tab::view-transition-old(page-title),
+  html.vt-recent::view-transition-old(page-title) {
+    animation: vt-title-out 0.2s cubic-bezier(0.3, 0, 0.5, 1) both;
+  }
+  /* 検索欄の字：前のページの字が先に薄れてから、次のページの字が出る（同時だと形の違う字が二重に見える） */
+  html.vt-tab::view-transition-old(vt-search) {
+    animation: vt-text-out 0.12s ease-out both;
+  }
+  html.vt-tab::view-transition-new(vt-search) {
+    animation: vt-text-in 0.26s ease-out 0.08s both;
+  }
+  html.vt-tab::view-transition-group(vt-search) {
+    border-radius: 9999px;
+    overflow: hidden;
+  }
+}
+@keyframes vt-tab-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-tab-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes vt-title-out {
+  to {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+
+/*
+ * お気に入りのいつもの画面 ⇄ すべて見る（components/app/favorites.tsx の toAll。html に .vt-fav が付いている間だけ）。
+ * 板・行・検索欄は相手の画面の同じものへ 0.5 秒で滑る。写真は同じなので、ほかの画面はふつうの重ね合わせで入れ替える（写真は動かない）
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  html.vt-fav::view-transition-group(*) {
+    animation-duration: 0.5s;
+    animation-timing-function: cubic-bezier(0.22, 0.9, 0.24, 1);
+  }
+  html.vt-fav::view-transition-old(vt-card),
+  html.vt-fav::view-transition-new(vt-card) {
+    height: 100%;
+  }
+}
+/*
+ * 履歴の並べ方・調べ方を変えたとき（components/app/history.tsx の animateList。html に .vt-hist が付いている間だけ）。
+ * 行（名前は hist-番号）は新しい位置へ 0.44 秒で滑り、消える行は薄れ、ほかの画面（章の見出し・板）はふつうの重ね合わせで入れ替える
+ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  html.vt-hist::view-transition-group(*) {
+    animation-duration: var(--m-slow);
+    animation-timing-function: var(--m-out);
+  }
+  html.vt-hist::view-transition-old(root),
+  html.vt-hist::view-transition-new(root) {
+    animation-duration: var(--m-base);
+  }
+  /* 並べ方の切り替え：前の絵は出さず、次の画面の札（白い札が CSS の動きで滑っている）をそのまま見せる（重ねると札が2つに見える） */
+  html.vt-hist::view-transition-old(hist-sort) {
+    animation: none;
+    opacity: 0;
+  }
+  html.vt-hist::view-transition-new(hist-sort) {
+    animation: none;
+  }
+}
+@keyframes vt-recent-out {
+  to {
+    opacity: 0;
+    transform: scale(1.03);
+  }
+}
+@keyframes vt-text-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-text-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes vt-recent-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+@keyframes star-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes star-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* 第4段階：その場で1段広がる段（高さが伸び、中身は少し遅れて現れる。中身は1つの要素で包む）、下部操作バー、物件の画面の固定のタブ */
+.expand {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.expand[data-open="1"] {
+  grid-template-rows: 1fr;
+}
+.expand > * {
+  min-height: 0;
+  overflow: hidden;
+}
+.expand > * > * {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.expand[data-open="1"] > * > * {
+  opacity: 1;
+  transition-delay: 60ms;
+}
+.action-bar {
+  z-index: 30;
+  transition:
+    opacity 200ms ease,
+    transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    visibility 0s linear 0s;
+}
+/* 隠れたら、下へ滑って薄れたあと見えなくする（下のメニューに重なったまま指を受けないよう、中の箱も指を受けない） */
+.action-bar[data-hidden="1"] {
+  opacity: 0;
+  transform: translateY(110%);
+  visibility: hidden;
+  pointer-events: none;
+  transition-delay: 0s, 0s, 240ms;
+}
+.action-bar[data-hidden="1"] > * {
+  pointer-events: none;
+}
+.action-bar[data-dim="1"] {
+  opacity: 0.55;
+}
+/* 帯が縮んだら、固定したタブの切り替えの後ろに地の色のすりガラスを敷く */
+.sticky-tabs::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 -8px 0;
+  background: rgba(243, 246, 251, 0.86);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+[data-compact="1"] .sticky-tabs::before {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .expand,
+  .expand > * > *,
+  .action-bar,
+  .sticky-tabs::before {
+    transition: none;
+  }
+  .action-bar[data-hidden="1"] {
+    transform: none;
+  }
+}
+
+/*
+ * 物件の画面（スマホ。components/app/mobile-app.tsx の PropertyView）。いちばん奥に街の模型（components/app/property-scene.tsx）、
+ * その上に地番の見出しと、ホーム・お気に入りと同じ暗いすりガラスのシート（ぼかしはシートの1枚だけ。札は透明のタイル）。
+ * 動き：見出しは上から順に浮き上がり、シートは下から上がってくる。タブを変えると中身が順に浮き上がる。白い札がタブの上を滑る。
+ * 模型の札（.pv-lbl）は模型の点に合わせて動き、隠れるときは薄れる。動きを減らす設定では、どれも動かさない
+ */
+.pv-sheet {
+  border-radius: 26px 26px 0 0;
+  background: var(--glass-board-bg);
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 -14px 40px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+}
+.pv-tabs::before {
+  inset: -2px 0 -6px 0;
+  background: linear-gradient(180deg, rgba(24, 29, 42, 0.97) 0%, rgba(24, 29, 42, 0.92) 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.pv-thumb {
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 4px 14px rgba(5, 15, 35, 0.22);
+}
+/* 模型の札 */
+.pv-lbl {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+  pointer-events: none;
+  will-change: transform, opacity;
+  transition: opacity 0.35s ease;
+}
+.pv-lbl.off {
+  opacity: 0;
+}
+.pv-chip {
+  zoom: var(--app-zoom, 1);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  line-height: 1.25;
+  color: #fff;
+  background: rgba(14, 20, 34, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+  font-feature-settings: normal;
+}
+.pv-chip i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f4c25a;
+  flex: none;
+}
+.pv-chip b {
+  font-weight: 700;
+}
+.pv-chip small {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.74);
+}
+.pv-lot .pv-chip {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 11px 4px 9px;
+  border-color: rgba(244, 194, 90, 0.55);
+}
+.pv-lot .pv-chip i {
+  box-shadow: 0 0 0 3px rgba(244, 194, 90, 0.25);
+}
+.pv-lot .pv-chip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 9px;
+  height: 9px;
+  background: rgba(14, 20, 34, 0.74);
+  border-right: 1px solid rgba(244, 194, 90, 0.55);
+  border-bottom: 1px solid rgba(244, 194, 90, 0.55);
+  transform: translateX(-50%) rotate(45deg);
+  border-radius: 0 0 2px 0;
+}
+.pv-nb .pv-chip {
+  font-size: 11px;
+  padding: 2px 7px;
+  font-variant-numeric: tabular-nums;
+  background: rgba(14, 20, 34, 0.6);
+  border-color: rgba(255, 210, 122, 0.45);
+  color: #ffe2a3;
+}
+/* 選んだ隣の土地（地番をコピーする筆）：金色にチェック */
+.pv-nb.pv-pick .pv-chip {
+  background: #ffd36b;
+  border-color: #ffd36b;
+  color: #2a1a04;
+}
+.pv-nb.pv-pick .pv-chip::before {
+  content: "✓";
+  font-weight: 800;
+  margin-right: -2px;
+}
+.pv-big .pv-chip {
+  font-size: 12.5px;
+  padding: 5px 12px 5px 9px;
+}
+
+/*
+ * 街の模型を大きく見る（components/app/big-model.tsx・mobile-app.tsx の enterBig）。html に data-pv-big が付いている間、
+ * シートは下へ滑って消え、見出し・上のボタン・出典・「大きく見る」は上へ薄れ、下のメニューと操作バーは下へ隠れる（模型は奥で画面いっぱいに）。
+ * 大きく見る画面の部品は、上・右・下の順に入ってくる。押した筆のカードは下から弾んで出る。閉じるときはすっと薄れる。
+ * 初めて模型を見たときの「横になぞると回せます」は、手が左右に揺れる。動きを減らす設定では、どれも動かさない（入れ替わるだけ）
+ */
+@media (max-width: 1023px) {
+  .pv-sheet,
+  .pv-title,
+  .pv-top,
+  .pv-credit,
+  .pv-bigbtn {
+    transition:
+      transform 0.6s cubic-bezier(0.2, 0.85, 0.2, 1),
+      opacity 0.42s ease;
+  }
+  html[data-pv-big] .pv-sheet {
+    transform: translateY(105vh);
+  }
+  html[data-pv-big] .pv-title,
+  html[data-pv-big] .pv-top,
+  html[data-pv-big] .pv-credit,
+  html[data-pv-big] .pv-bigbtn {
+    opacity: 0;
+    transform: translateY(-16px);
+    pointer-events: none;
+  }
+  html[data-pv-big] [data-app-nav] {
+    transform: translateY(130%);
+    transition: transform 0.45s cubic-bezier(0.2, 0.85, 0.2, 1);
+  }
+  html[data-pv-big] .action-bar,
+  html[data-pv-big] .compact-bar {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+  .bm-root.bm-closing {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+  }
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: reduce) {
+  .pv-sheet,
+  .pv-title,
+  .pv-top,
+  .pv-credit,
+  .pv-bigbtn {
+    transition: none;
+  }
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .bm-motion .bm-top {
+    animation: bm-from-top 0.55s cubic-bezier(0.2, 0.9, 0.25, 1.04) 0.16s backwards;
+  }
+  .bm-motion .bm-side {
+    animation: bm-from-side 0.55s cubic-bezier(0.2, 0.9, 0.25, 1.04) 0.26s backwards;
+  }
+  .bm-motion .bm-bottom {
+    animation: bm-from-bottom 0.55s cubic-bezier(0.2, 0.9, 0.25, 1.04) 0.32s backwards;
+  }
+  .bm-card {
+    animation: bm-card 0.46s cubic-bezier(0.2, 0.95, 0.3, 1.12) backwards;
+  }
+  .bm-hint {
+    animation:
+      page-fade 0.5s ease backwards,
+      bm-hint-out 0.6s ease 4.9s forwards;
+  }
+  .pv-rothint {
+    animation: page-fade 0.5s ease backwards;
+  }
+  .pv-rothand {
+    animation: pv-sway 1.4s ease-in-out infinite;
+  }
+}
+@keyframes bm-from-top {
+  from {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+}
+@keyframes bm-from-side {
+  from {
+    opacity: 0;
+    transform: translateX(22px);
+  }
+}
+@keyframes bm-from-bottom {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+@keyframes bm-card {
+  from {
+    opacity: 0;
+    transform: translateY(26px) scale(0.97);
+  }
+}
+@keyframes bm-hint-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes pv-sway {
+  0%,
+  100% {
+    transform: translateX(-4px) rotate(-8deg);
+  }
+  50% {
+    transform: translateX(4px) rotate(8deg);
+  }
+}
+
+/*
+ * 隣の土地の配置図（components/app/neighbor-plan.tsx）。開くと物件の筆が光り、隣の筆が北から時計回りに現れる（--np-d が方角の遅れ）。
+ * 押した筆は光って知らせる（.np-flash）。模型の隣の土地の札も、配置図・札で押した筆は弾んで知らせる（.pv-flash）。
+ * 読み込み中はゆっくり光る板（.np-skel）。動きを減らす設定では動かさない
+ */
+.np-nb {
+  transition:
+    fill 0.25s ease,
+    stroke 0.25s ease,
+    stroke-width 0.25s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.np-skel {
+  background-image: linear-gradient(100deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.07) 50%, rgba(255, 255, 255, 0) 70%) !important;
+  background-size: 220% 100% !important;
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .np-skel {
+    animation: np-shimmer 1.4s linear infinite;
+  }
+  .np-motion .np-nb {
+    animation: np-in 0.55s cubic-bezier(0.2, 0.8, 0.25, 1) backwards;
+    animation-delay: var(--np-d, 0ms);
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .np-motion .np-label {
+    animation: np-label-in 0.45s ease backwards;
+    animation-delay: var(--np-d, 0ms);
+  }
+  .np-motion .np-target {
+    animation: np-target 1.3s cubic-bezier(0.2, 0.8, 0.25, 1) backwards;
+  }
+  .np-motion .np-target-glow {
+    animation: np-glow 2.2s ease-out 0.2s backwards;
+  }
+  .np-nb.np-flash {
+    animation: np-flash 1s cubic-bezier(0.2, 0.8, 0.25, 1) both;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .pv-lbl.pv-flash .pv-chip {
+    animation: pv-flash 0.9s cubic-bezier(0.3, 1.5, 0.4, 1) both;
+  }
+}
+@keyframes np-shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+@keyframes np-in {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+}
+@keyframes np-label-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes np-target {
+  0% {
+    opacity: 0;
+    stroke-width: 9;
+  }
+  45% {
+    opacity: 1;
+  }
+}
+@keyframes np-glow {
+  0% {
+    stroke-opacity: 0.6;
+    stroke-width: 16;
+  }
+  100% {
+    stroke-opacity: 0.22;
+  }
+}
+@keyframes np-flash {
+  0% {
+    transform: scale(1);
+  }
+  18% {
+    transform: scale(1.06);
+    fill-opacity: 1;
+    stroke-width: 3.2;
+    filter: brightness(1.45);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes pv-flash {
+  0% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.32);
+    box-shadow: 0 0 0 6px rgba(255, 211, 107, 0.35), 0 6px 16px rgba(0, 0, 0, 0.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .pv-top {
+    animation: page-fade 0.5s ease backwards;
+  }
+  .pv-title > .pv-rise {
+    animation: pv-rise 0.7s cubic-bezier(0.2, 0.9, 0.25, 1.06) backwards;
+  }
+  .pv-title > .pv-rise:nth-child(2) {
+    animation-delay: 0.07s;
+  }
+  .pv-title > .pv-rise:nth-child(3) {
+    animation-delay: 0.14s;
+  }
+  .pv-title > .pv-rise:nth-child(4) {
+    animation-delay: 0.21s;
+  }
+  .pv-credit {
+    animation: page-fade 0.8s ease 0.6s backwards;
+  }
+  .pv-sheet {
+    animation: pv-sheet-in 0.8s cubic-bezier(0.2, 0.9, 0.25, 1.04) 0.12s backwards;
+  }
+  .pv-thumb {
+    transition: transform 0.42s cubic-bezier(0.3, 1.3, 0.4, 1);
+  }
+  .pv-pane > div > * {
+    animation: pv-rise 0.5s cubic-bezier(0.2, 0.9, 0.25, 1.06) backwards;
+  }
+  .pv-pane > div > :nth-child(2) {
+    animation-delay: 0.04s;
+  }
+  .pv-pane > div > :nth-child(3) {
+    animation-delay: 0.08s;
+  }
+  .pv-pane > div > :nth-child(4) {
+    animation-delay: 0.12s;
+  }
+  .pv-pane > div > :nth-child(5) {
+    animation-delay: 0.16s;
+  }
+  .pv-pane > div > :nth-child(n + 6) {
+    animation-delay: 0.2s;
+  }
+  .pv-ping::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1px solid #f4c25a;
+    animation: pv-ping 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) 0.6s 3 backwards;
+  }
+  .pv-swap {
+    animation: pv-swap 0.35s ease backwards;
+  }
+  .pv-water {
+    transform-origin: bottom;
+    animation: pv-water 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s backwards;
+  }
+  .pv-spark-line {
+    stroke-dasharray: 1;
+    animation: pv-draw 1.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.15s backwards;
+  }
+  .pv-spark-area {
+    animation: page-fade 0.8s ease 0.6s backwards;
+  }
+  .pv-check path {
+    stroke-dasharray: 20;
+    animation: pv-check 0.35s ease 0.05s backwards;
+  }
+}
+@keyframes pv-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@keyframes pv-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(48px);
+  }
+}
+@keyframes pv-ping {
+  from {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+@keyframes pv-swap {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes pv-water {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes pv-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes pv-check {
+  from {
+    stroke-dashoffset: 20;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/*
+ * 要注意点と次にやること（スマホ。components/app/todo-sheet.tsx）。開くと行が上から順に現れ（.td-in。--i が順番）、
+ * 進みの輪が伸びる。丸を押すと弾んで印が描かれ、行の名前に線が引かれる。切り替えの白い丸は滑り、切り替えた中身は横から入る。
+ * 問題から飛んだ先の行は光り、全部済んだら紺の板に光が走る。動きを減らす設定では動かさない（≡ の動きの演出を切ると行の現れ方だけ止める）
+ */
+.td-in {
+  animation: td-in 440ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(min(var(--i, 0), 14) * 26ms + 40ms);
+}
+[data-motion="0"] .td-in {
+  animation: none;
+}
+@keyframes td-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.td-pane[data-dir="r"] {
+  animation: td-pane-r 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.td-pane[data-dir="l"] {
+  animation: td-pane-l 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes td-pane-r {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+}
+@keyframes td-pane-l {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+}
+.td-seg-pill {
+  transition: transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.td-ring {
+  transition:
+    stroke-dashoffset 900ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    stroke 300ms ease;
+}
+.td-ring-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  box-shadow: 0 0 0 3px rgba(79, 209, 139, 0.75);
+  animation: td-ring-pulse 900ms ease-out forwards;
+  pointer-events: none;
+}
+@keyframes td-ring-pulse {
+  from {
+    opacity: 1;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+.td-cheer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 28%, rgba(255, 255, 255, 0.26) 48%, transparent 68%);
+  transform: translateX(-100%);
+  animation: td-cheer 1100ms cubic-bezier(0.2, 0.8, 0.2, 1) 120ms forwards;
+  pointer-events: none;
+}
+@keyframes td-cheer {
+  to {
+    transform: translateX(100%);
+  }
+}
+.td-bump {
+  display: inline-block;
+  animation: td-bump 380ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes td-bump {
+  40% {
+    transform: scale(1.22);
+  }
+}
+.td-box {
+  position: relative;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease;
+}
+.td-tick {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 280ms cubic-bezier(0.2, 0.8, 0.2, 1) 70ms;
+}
+.td-box[data-on="1"] .td-tick {
+  stroke-dashoffset: 0;
+}
+.td-pop {
+  animation: td-pop 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes td-pop {
+  0% {
+    transform: scale(0.78);
+  }
+  55% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.td-burst {
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  border: 2px solid #1f8f5a;
+  animation: td-burst 560ms ease-out forwards;
+  pointer-events: none;
+}
+@keyframes td-burst {
+  from {
+    opacity: 0.65;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.95);
+  }
+}
+.td-strike {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 58%;
+  background-size: 0% 1.5px;
+  transition:
+    background-size 380ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 200ms ease;
+}
+.td-strike[data-on="1"] {
+  background-size: 100% 1.5px;
+}
+.td-chev {
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.td-chev[data-open="1"] {
+  transform: rotate(180deg);
+}
+.td-flash {
+  animation: td-flash 1600ms ease-out forwards;
+}
+@keyframes td-flash {
+  0%,
+  30% {
+    background: rgba(245, 165, 36, 0.24);
+  }
+  100% {
+    background: rgba(245, 165, 36, 0);
+  }
+}
+.td-saved {
+  animation: td-saved 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes td-saved {
+  45% {
+    transform: scale(1.03);
+  }
+}
+.td-spin {
+  animation: td-spin 0.9s linear infinite;
+}
+@keyframes td-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .td-in,
+  .td-pane[data-dir],
+  .td-bump,
+  .td-pop,
+  .td-flash,
+  .td-saved,
+  .td-spin {
+    animation: none;
+  }
+  .td-burst,
+  .td-cheer,
+  .td-ring-pulse {
+    display: none;
+  }
+  .td-seg-pill,
+  .td-ring,
+  .td-tick,
+  .td-strike,
+  .td-chev {
+    transition: none;
+  }
+}
+
+/*
+ * レポートを作成（スマホ。components/app/app-sheets.tsx）。開くと要注意点のカードと書類のタイルが少しずつ大きくなって順に現れ
+ * （.rp-in。--i が順番）、「結果の文面」へは横に送り、戻るときは逆向き（.rp-pane）。動きを減らす設定では動かさない
+ */
+.rp-in {
+  animation: rp-in 460ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 34ms + 30ms);
+}
+[data-motion="0"] .rp-in {
+  animation: none;
+}
+@keyframes rp-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.965);
+  }
+}
+.rp-pane[data-dir="r"] {
+  animation: td-pane-r 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.rp-pane[data-dir="l"] {
+  animation: td-pane-l 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.rp-pane[data-dir="r"] .rp-in,
+.rp-pane[data-dir="l"] .rp-in {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rp-in,
+  .rp-pane[data-dir] {
+    animation: none;
+  }
+}
+/* 照会の文面（ひな形）のシートの「元に戻す」（components/app/template-editor.tsx）：下から少し浮き上がって出る。動きを減らす設定では出るだけ */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .iq-toast {
+    animation: fav-toast-in 0.42s cubic-bezier(0.2, 0.9, 0.25, 1.12) backwards;
+  }
+}
+
+/* 地図の現在地（スマホの「現在地で調べる」と、地図で選ぶ画面の「現在地」。components/live-map.tsx）：青い点・脈打つ輪・誤差の円 */
+.map-me {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+}
+.map-me-acc {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--acc, 0px);
+  height: var(--acc, 0px);
+  transform: translate(-50%, -50%);
+  border-radius: 9999px;
+  background: rgba(10, 132, 255, 0.1);
+  border: 1px solid rgba(10, 132, 255, 0.3);
+  transition:
+    width 200ms ease,
+    height 200ms ease;
+}
+.map-me-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: rgba(10, 132, 255, 0.38);
+  animation: map-me-pulse 2.2s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+}
+.map-me-dot {
+  position: absolute;
+  inset: 3px;
+  border-radius: 9999px;
+  background: #0a84ff;
+  border: 3px solid #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.32);
+}
+@keyframes map-me-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  to {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-me-pulse {
+    display: none;
+  }
+  .map-me-acc {
+    transition: none;
+  }
+}
+
+/* 現地の写真メモ（components/app/site-photos.tsx）：小さな写真が順に現れ、押すと暗い画面に大きく開く。送ると次の写真が少し寄って現れる */
+.sp-in {
+  animation: sp-in 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(min(var(--i, 0), 11) * 30ms);
+}
+@keyframes sp-in {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+}
+.sp-lb {
+  animation: sp-lb 220ms ease both;
+}
+@keyframes sp-lb {
+  from {
+    opacity: 0;
+  }
+}
+.sp-zoom {
+  animation: sp-zoom 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes sp-zoom {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-in,
+  .sp-lb,
+  .sp-zoom {
+    animation: none;
+  }
+}
+
+/* 地図で選ぶ画面（スマホ。components/location-picker.tsx）：地図の右下の拡大・縮小・縮尺・出典の印を、下のガラスの板の上に出す（板に重ならないように） */
+.picker-map .maplibregl-ctrl-bottom-right,
+.picker-map .maplibregl-ctrl-bottom-left {
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 136px);
 }

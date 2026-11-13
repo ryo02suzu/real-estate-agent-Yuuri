@@ -1,0 +1,142 @@
+[
+ {
+  "name": "plateau-13103-minato-ku-2025",
+  "set": "13103_minato-ku_pref_2025_citygml_1_op_bldg_3dtiles_13103_minato-ku_lod2",
+  "dmin": 0,
+  "dmax": 10000,
+  "kind": "lod2"
+ },
+ {
+  "name": "plateau-13103-minato-ku-2025",
+  "set": "13103_minato-ku_pref_2025_citygml_1_op_veg_SolitaryVegetationObject_3dtiles_lod3",
+  "dmin": 0,
+  "dmax": 10000,
+  "kind": "veg"
+ },
+ {
+  "name": "plateau-13103-minato-ku-2025",
+  "set": "13103_minato-ku_pref_2025_citygml_1_op_veg_PlantCover_3dtiles_lod3",
+  "dmin": 0,
+  "dmax": 10000,
+  "kind": "veg"
+ },
+ {
+  "name": "plateau-13113-shibuya-ku-2025",
+  "set": "13113_shibuya-ku_pref_2025_citygml_1_op_bldg_3dtiles_13113_shibuya-ku_lod2",
+  "dmin": 0,
+  "dmax": 10000,
+  "kind": "lod2"
+ },
+ {
+  "name": "plateau-13110-meguro-ku-2025",
+  "set": "13110_meguro-ku_pref_2025_citygml_1_op_bldg_3dtiles_13110_meguro-ku_lod2",
+  "dmin": 0,
+  "dmax": 10000,
+  "kind": "lod2"
+ },
+ {
+  "name": "plateau-13110-meguro-ku-2025",
+  "set": "13110_meguro-ku_pref_2025_citygml_1_op_bldg_3dtiles_13110_meguro-ku_lod1",
+  "dmin": 10000,
+  "dmax": 32000,
+  "kind": "lod1"
+ },
+ {
+  "name": "plateau-13109-shinagawa-ku-2025",
+  "set": "13109_shinagawa-ku_pref_2025_citygml_1_op_bldg_3dtiles_13109_shinagawa-ku_lod2",
+  "dmin": 0,
+  "dmax": 10000,
+  "kind": "lod2"
+ },
+ {
+  "name": "plateau-13109-shinagawa-ku-2025",
+  "set": "13109_shinagawa-ku_pref_2025_citygml_1_op_bldg_3dtiles_13109_shinagawa-ku_lod1",
+  "dmin": 10000,
+  "dmax": 32000,
+  "kind": "lod1"
+ },
+ {
+  "name": "plateau-13112-setagaya-ku-2025",
+  "set": "13112_setagaya-ku_pref_2025_citygml_1_op_bldg_3dtiles_13112_setagaya-ku_lod2",
+  "dmin": 0,
+  "dmax": 10000,
+  "kind": "lod2"
+ },
+ {
+  "name": "plateau-13112-setagaya-ku-2025",
+  "set": "13112_setagaya-ku_pref_2025_citygml_1_op_bldg_3dtiles_13112_setagaya-ku_lod1",
+  "dmin": 10000,
+  "dmax": 32000,
+  "kind": "lod1"
+ },
+ {
+  "name": "plateau-13111-ota-ku-2025",
+  "set": "13111_ota-ku_pref_2025_citygml_1_op_bldg_3dtiles_13111_ota-ku_lod2",
+  "dmin": 0,
+  "dmax": 10000,
+  "kind": "lod2"
+ },
+ {
+  "name": "plateau-13111-ota-ku-2025",
+  "set": "13111_ota-ku_pref_2025_citygml_1_op_bldg_3dtiles_13111_ota-ku_lod1",
+  "dmin": 10000,
+  "dmax": 32000,
+  "kind": "lod1"
+ },
+ {
+  "name": "plateau-13115-suginami-ku-2025",
+  "set": "13115_suginami-ku_city_2025_citygml_1_op_bldg_3dtiles_13115_suginami-ku_lod1",
+  "dmin": 0,
+  "dmax": 32000,
+  "kind": "lod1"
+ },
+ {
+  "name": "plateau-14130-kawasaki-shi-2022",
+  "set": "14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14132_saiwai-ku_lod1",
+  "dmin": 0,
+  "dmax": 32000,
+  "kind": "lod1"
+ },
+ {
+  "name": "plateau-14130-kawasaki-shi-2022",
+  "set": "14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14133_nakahara-ku_lod1",
+  "dmin": 0,
+  "dmax": 32000,
+  "kind": "lod1"
+ },
+ {
+  "name": "plateau-14130-kawasaki-shi-2022",
+  "set": "14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14134_takatsu-ku_lod1",
+  "dmin": 0,
+  "dmax": 32000,
+  "kind": "lod1"
+ },
+ {
+  "name": "plateau-14130-kawasaki-shi-2022",
+  "set": "14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14135_tama-ku_lod1",
+  "dmin": 0,
+  "dmax": 32000,
+  "kind": "lod1"
+ },
+ {
+  "name": "plateau-14130-kawasaki-shi-2022",
+  "set": "14130_kawasaki-shi_city_2022_citygml_4_op_bldg_3dtiles_14136_miyamae-ku_lod1",
+  "dmin": 0,
+  "dmax": 32000,
+  "kind": "lod1"
+ },
+ {
+  "name": "plateau-13219-komae-shi-2025",
+  "set": "13219_komae-shi_pref_2025_citygml_1_op_bldg_3dtiles_lod1",
+  "dmin": 0,
+  "dmax": 32000,
+  "kind": "lod1"
+ },
+ {
+  "name": "plateau-13208-chofu-shi-2025",
+  "set": "13208_chofu-shi_pref_2025_citygml_1_op_bldg_3dtiles_lod1",
+  "dmin": 0,
+  "dmax": 32000,
+  "kind": "lod1"
+ }
+]

@@ -17,6 +17,8 @@ export type RoadRead = {
   field?: string;
   /** 幅員の属性（最小・最大。0 は記録なし） */
   width?: [string, string];
+  /** 画面に出す出典（ライセンスが求める書き方。buildLinks が road-read-permission.ts から入れる） */
+  credit?: string;
 };
 
 export type NearbyRoad = {

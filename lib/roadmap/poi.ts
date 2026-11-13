@@ -3,6 +3,7 @@
 // 施設の入口ではなく施設の位置（面の施設は面の中ほど）までの目安で、OpenStreetMap に載っていない施設もあるので、広告に書くときは
 // 実際の道路距離と、施設が今もあるかを確かめる旨を添える
 import SOURCE from "./data/poi-source.json";
+import { HOSPITAL_SOURCE } from "./facilities";
 import type { LngLat } from "./parcel";
 import { ROAD_CREDIT, routedOk, walkMinutes, walkTo } from "./walk";
 
@@ -25,10 +26,13 @@ export const POI_KINDS: Record<number, string> = {
   10: "役所",
   11: "図書館",
   12: "商業施設",
+  13: "飲食店",
 };
 
 /** 画面・下書き・共有に出す順（販売図面の生活環境によく書く順） */
 export const POI_ORDER = [1, 2, 3, 12, 4, 5, 9, 6, 7, 8, 11, 10];
+/** 生活環境の一覧には出さない種類（スマホの周辺環境の「飲食店」と、まわりの飲食店の多さの目安に使う） */
+export const POI_EXTRA = [13];
 
 export type Poi = { kind: number; name: string; at: LngLat };
 
@@ -48,6 +52,8 @@ export type PoiWalk = {
   straight: number;
   /** 道路の道のりで求めたか（false は直線距離の目安） */
   routed: boolean;
+  /** 施設の位置（地図の印） */
+  at: LngLat;
 };
 
 /** 探す範囲（直線距離）。これより遠い施設は出さない（徒歩15分くらい） */
@@ -89,9 +95,14 @@ export async function nearbyPois(lat: number, lng: number, source: PoiSource, ma
  * 種類ごとに直線で近い3つまでの道のりを測り、いちばん近いものを選ぶ。道がつながらない・遠回りすぎるものは直線距離の目安
  */
 export async function nearestPois(lat: number, lng: number, source: PoiSource, walk = walkTo): Promise<PoiWalk[]> {
-  const pois = await nearbyPois(lat, lng, source);
+  return nearestOf(lat, lng, await nearbyPois(lat, lng, source), POI_ORDER, walk);
+}
+
+/** 読んだ施設（nearbyPois）から、kinds の種類ごとの最寄りと徒歩の目安（kinds の順） */
+export async function nearestOf(lat: number, lng: number, pois: (Poi & { straight: number })[], kinds: number[], walk = walkTo): Promise<PoiWalk[]> {
   const byKind = new Map<number, (Poi & { straight: number })[]>();
   for (const p of pois) {
+    if (!kinds.includes(p.kind)) continue;
     const list = byKind.get(p.kind) ?? [];
     // 同じ名前の施設（チェーン店の別の点・同じ施設の点と面）は近い方だけ
     if (list.length < CANDIDATES && !list.some((q) => q.name === p.name)) list.push(p);
@@ -105,14 +116,14 @@ export async function nearestPois(lat: number, lng: number, source: PoiSource, w
     candidates.map((c, id) => ({ id, points: [c.at] })),
   ).catch(() => new Map<number, number>());
   const out: PoiWalk[] = [];
-  for (const kind of POI_ORDER) {
+  for (const kind of kinds) {
     const list = byKind.get(kind);
     if (!list?.length) continue;
     const walks = list.map((c) => {
       const d = dist.get(candidates.indexOf(c));
       const routed = routedOk(d, c.straight);
       const meters = routed ? d : c.straight;
-      return { kind, label: POI_KINDS[kind], name: c.name, meters, minutes: walkMinutes(meters), straight: c.straight, routed };
+      return { kind, label: POI_KINDS[kind], name: c.name, meters, minutes: walkMinutes(meters), straight: c.straight, routed, at: c.at };
     });
     walks.sort((a, b) => Number(b.routed) - Number(a.routed) || a.meters - b.meters);
     out.push(walks[0]);
@@ -141,8 +152,11 @@ export const POI_NOTE = "施設の位置までの道路距離の目安（80m を
 /** OpenStreetMap の出典とライセンス（ODbL は「© OpenStreetMap contributors」とライセンスを示すよう求めている） */
 export const POI_SOURCE = "© OpenStreetMap contributors（ODbL）";
 
+/** 周辺施設の出典。病院を国のデータにしていれば（lib/roadmap/facilities.ts の withNationalHospitals）、それも */
+export const POI_SOURCES = HOSPITAL_SOURCE ? `${POI_SOURCE}・病院は${HOSPITAL_SOURCE}` : POI_SOURCE;
+
 /** 画面の出典（データの時点と道のりの出典も） */
-export const POI_CREDIT = `出典：© OpenStreetMap contributors（ODbL・${SOURCE.date}時点）を加工して作成。${ROAD_CREDIT}`;
+export const POI_CREDIT = `出典：© OpenStreetMap contributors（ODbL・${SOURCE.date}時点）${HOSPITAL_SOURCE ? `・病院は「${HOSPITAL_SOURCE}」（国土交通省）` : ""}を加工して作成。${ROAD_CREDIT}`;
 
 /** 下書き・共有の出典。道のりの出典は、駅の出典に入っていれば（withRoad=false）付けない */
-export const poiCredit = (withRoad: boolean) => `周辺施設：${POI_SOURCE}を加工して作成${withRoad ? `。${ROAD_CREDIT}` : ""}`;
+export const poiCredit = (withRoad: boolean) => `周辺施設：${POI_SOURCES}を加工して作成${withRoad ? `。${ROAD_CREDIT}` : ""}`;

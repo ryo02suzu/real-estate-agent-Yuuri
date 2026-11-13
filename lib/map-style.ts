@@ -229,20 +229,34 @@ export function showHazardOnMap(kind: HazardKind) {
   window.dispatchEvent(new CustomEvent<HazardKind>(HAZARD_EVENT, { detail: kind }));
 }
 
+/** PC（調査デスク）：地図の外から「筆・地番」「用途地域」などの重ねを入れる・外す（3D の画面の層のボタンから地図に切り替えたとき） */
+export const OVERLAY_EVENT = "michilu:map-overlay";
+export type OverlayKey = "parcels" | "zoning" | "roads" | "buildings" | "landPrice" | "places";
+export function setMapOverlay(key: OverlayKey, on: boolean) {
+  window.dispatchEvent(new CustomEvent<{ key: OverlayKey; on: boolean }>(OVERLAY_EVENT, { detail: { key, on } }));
+}
+
+/** 見つけた筆（地番区域と、データのままの地番。二重地番などで区画が分かれていれば、その全部） */
+type HitParcel = { kuiki: string; chibanRaw: string; chibanRaws?: string[] };
+
 /** 地番区域と地番で、ひとつの筆だけに絞る（見つけた筆を強調する）。何も無ければどれにも当たらない条件 */
-export function parcelFilter(p?: { kuiki: string; chibanRaw: string }): FilterSpecification {
+export function parcelFilter(p?: HitParcel): FilterSpecification {
   return p
-    ? ["all", ["==", ["get", "地番区域"], p.kuiki], ["==", ["get", "地番"], p.chibanRaw]]
+    ? ["all", ["==", ["get", "地番区域"], p.kuiki], ["in", ["get", "地番"], ["literal", p.chibanRaws ?? [p.chibanRaw]]]]
     : ["==", ["get", "地番"], "\u0000"];
 }
 
 /** 強調するレイヤ（id）ごとの絞り込み（推定の位置の筆は、参考図のある市町村の筆を除く） */
-export function parcelHitFilter(id: string, p?: { kuiki: string; chibanRaw: string }): FilterSpecification {
+export function parcelHitFilter(id: string, p?: HitParcel): FilterSpecification {
   const f = parcelFilter(p);
   return id.startsWith("kozu") ? withKozuFilter(f)! : f;
 }
 
-export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
+/** 見つけた筆・図の範囲の色（PC は金色。スマホの紺の見た目では紺を渡す） */
+export type Accent = { fill: string; line: string };
+const GOLD: Accent = { fill: "#c49a5c", line: "#8a6632" };
+
+export function gsiStyle(basemap: Basemap = "pale", accent: Accent = GOLD): StyleSpecification {
   const keys = Object.keys(BASEMAPS) as Basemap[];
   const buildings = hasBuildings();
   return {
@@ -327,15 +341,15 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         layout: { visibility: "none" },
         paint: { "line-color": DOURO_COLOR, "line-width": 2.5, "line-opacity": 0.8, "line-dasharray": [2, 1.5] },
       },
-      { id: "sheet-fill", type: "fill", source: "sheet", filter: ["==", ["get", "kind"], "frame"], paint: { "fill-color": "#c49a5c", "fill-opacity": 0.06 } },
+      { id: "sheet-fill", type: "fill", source: "sheet", filter: ["==", ["get", "kind"], "frame"], paint: { "fill-color": accent.fill, "fill-opacity": 0.06 } },
       {
         id: "sheet-grid",
         type: "line",
         source: "sheet",
         filter: ["==", ["get", "kind"], "grid"],
-        paint: { "line-color": "#8a6632", "line-width": 1, "line-opacity": 0.6, "line-dasharray": [3, 3] },
+        paint: { "line-color": accent.line, "line-width": 1, "line-opacity": 0.6, "line-dasharray": [3, 3] },
       },
-      { id: "sheet-line", type: "line", source: "sheet", filter: ["==", ["get", "kind"], "frame"], paint: { "line-color": "#8a6632", "line-width": 2.5 } },
+      { id: "sheet-line", type: "line", source: "sheet", filter: ["==", ["get", "kind"], "frame"], paint: { "line-color": accent.line, "line-width": 2.5 } },
       // 筆界（「筆・地番」で表示）。fude-fill は透明で、クリックした筆を拾うためのもの
       {
         id: "fude-fill",
@@ -512,7 +526,7 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         minzoom: 14,
         filter: parcelFilter(),
         layout: { visibility: "none" },
-        paint: { "fill-color": "#c49a5c", "fill-opacity": 0.28 },
+        paint: { "fill-color": accent.fill, "fill-opacity": 0.28 },
       },
       {
         id: "fude-hit-line",
@@ -522,7 +536,7 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
         minzoom: 14,
         filter: parcelFilter(),
         layout: { visibility: "none" },
-        paint: { "line-color": "#8a6632", "line-width": 3 },
+        paint: { "line-color": accent.line, "line-width": 3 },
       },
       ...(sankoOn
         ? ([
@@ -534,7 +548,7 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
               minzoom: 14,
               filter: parcelFilter(),
               layout: { visibility: "none" },
-              paint: { "fill-color": "#c49a5c", "fill-opacity": 0.28 },
+              paint: { "fill-color": accent.fill, "fill-opacity": 0.28 },
             },
             {
               id: "sanko-hit-line",
@@ -544,7 +558,7 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
               minzoom: 14,
               filter: parcelFilter(),
               layout: { visibility: "none" },
-              paint: { "line-color": "#8a6632", "line-width": 3 },
+              paint: { "line-color": accent.line, "line-width": 3 },
             },
           ] satisfies LayerSpecification[])
         : []),
@@ -558,7 +572,7 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
               minzoom: 14,
               filter: parcelFilter(),
               layout: { visibility: "none" },
-              paint: { "fill-color": "#c49a5c", "fill-opacity": 0.28 },
+              paint: { "fill-color": accent.fill, "fill-opacity": 0.28 },
             },
             {
               id: "kozu-hit-line",
@@ -568,7 +582,7 @@ export function gsiStyle(basemap: Basemap = "pale"): StyleSpecification {
               minzoom: 14,
               filter: parcelFilter(),
               layout: { visibility: "none" },
-              paint: { "line-color": "#8a6632", "line-width": 3, "line-dasharray": [2, 1] },
+              paint: { "line-color": accent.line, "line-width": 3, "line-dasharray": [2, 1] },
             },
           ] satisfies LayerSpecification[])
         : []),

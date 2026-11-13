@@ -23,13 +23,18 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import urllib.error
-import urllib.request
 import zipfile
 
 import openpyxl
 
-PREFS = ("08", "09", "10", "11", "12", "13", "14")
+import os as _os, sys as _sys
+
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), ".."))
+import ksj  # noqa: E402
+from regions import prefs  # noqa: E402
+
+# 対応している都道府県（lib/roadmap/data/regions.json。関東1都6県＋中部9県）
+PREFS = prefs()
 URL = "https://nlftp.mlit.go.jp/ksj/gml/data/{k}/{k}-{yy}/{k}-{yy}_{pref}_GML.zip"
 PAGE = "https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A27-{year}.html"
 UA = {"User-Agent": "michilu-school-districts (+https://github.com/ryo02suzu/real-estate-agent-Yuuri)"}
@@ -48,21 +53,13 @@ def log(*a):
 
 
 def get(url: str, rng: str | None = None) -> bytes:
-    h = dict(UA)
-    if rng:
-        h["Range"] = rng
-    with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=180) as r:
-        return r.read()
+    """読む（通信の失敗・429・5xx は読み直す。scripts/ksj.py）"""
+    return ksj.get(url, UA, rng)
 
 
 def exists(url: str) -> bool:
-    try:
-        get(url, "bytes=0-15")
-        return True
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return False
-        raise
+    """ファイルがあるか（404 なら無い・ZIP ならある。確認用のページなどは待って読み直す。scripts/ksj.py）"""
+    return ksj.exists(url, UA)
 
 
 def latest() -> int:
@@ -100,7 +97,14 @@ def allowed(year: int) -> dict[str, dict]:
         if not r[0] or str(r[0])[:2] not in PREFS:
             continue
         code = str(r[1]).zfill(5)
-        out[code] = {"es": ok(code, r[3], r[4], r[5]), "jh": ok(code, r[7], r[8], r[9]), "name": r[2]}
+        out[code] = {
+            "es": ok(code, r[3], r[4], r[5]),
+            "jh": ok(code, r[7], r[8], r[9]),
+            # 国のデータで公開しているか（「02公開不可」「03作成不可」は国のデータに無い）
+            "es_pub": str(r[3] or "").startswith("01"),
+            "jh_pub": str(r[7] or "").startswith("01"),
+            "name": r[2],
+        }
     return out
 
 
@@ -122,10 +126,15 @@ def build(year: int, out: str, work: str) -> dict:
     ok = allowed(year)
     skipped = sorted({f"{c} {v['name']}" for c, v in ok.items() if not (v["es"] and v["jh"])})
     log(f"入れない市区町村（小・中のどちらか）: {len(skipped)}: {', '.join(skipped)}")
+    # 小学校区・中学校区それぞれ、国のデータでは公開しているが利用条件で入れない市区町村（アプリは「利用条件で出せない」と書き、
+    # 公開していない・作っていない市区町村は「国のデータに無い」と書く）
+    skipped_by = {key: sorted(f"{c} {v['name']}" for c, v in ok.items() if v[f"{key}_pub"] and not v[key]) for key in ("es", "jh")}
+    # 小学校区・中学校区それぞれ、実際にタイルに入れた市区町村（アプリはここに無い市区町村を「データなし」と書く）
+    covered: dict[str, set[str]] = {"es": set(), "jh": set()}
     # 学校の位置（学校コード → 経度・緯度）
     where: dict[str, list[float]] = {}
     for pref in PREFS:
-        for f in read_zip(get(URL.format(k="P29", yy=yy, pref=pref)))["features"]:
+        for f in read_zip(ksj.get_zip(URL.format(k="P29", yy=yy, pref=pref), UA))["features"]:
             code = text(f["properties"].get("P29_002"))
             if code and f["geometry"] and f["geometry"]["type"] == "Point":
                 where[code] = [round(c, 6) for c in f["geometry"]["coordinates"]]
@@ -135,7 +144,7 @@ def build(year: int, out: str, work: str) -> dict:
     with open(seq, "w", encoding="utf-8") as fo:
         for kind, key in (("A27", "es"), ("A32", "jh")):
             for pref in PREFS:
-                for f in read_zip(get(URL.format(k=kind, yy=yy, pref=pref)))["features"]:
+                for f in read_zip(ksj.get_zip(URL.format(k=kind, yy=yy, pref=pref), UA))["features"]:
                     p = f["properties"]
                     city = str(p.get(f"{kind}_001") or "").zfill(5)
                     if not ok.get(city, {}).get(key):
@@ -154,6 +163,7 @@ def build(year: int, out: str, work: str) -> dict:
                         counts["located"] += 1
                     fo.write(json.dumps({"type": "Feature", "geometry": f["geometry"], "properties": {k: v for k, v in props.items() if v is not None}}, ensure_ascii=False) + "\n")
                     counts[key] += 1
+                    covered[key].add(city)
     log(f"小学校区 {counts['es']}・中学校区 {counts['jh']}（学校の位置あり {counts['located']}）")
     tippecanoe = shutil.which("tippecanoe") or "tippecanoe"
     subprocess.run(
@@ -166,6 +176,8 @@ def build(year: int, out: str, work: str) -> dict:
     os.remove(seq)
     log(f"{out}: {os.path.getsize(out) / 1e6:.1f}MB")
     counts["skipped"] = skipped
+    counts["skipped_by"] = skipped_by
+    counts["covered"] = {k: " ".join(sorted(v)) for k, v in covered.items()}
     return counts
 
 
@@ -207,7 +219,16 @@ def main() -> None:
     era = f"令和{year - 2018}年度" if year >= 2019 else f"{year}年度"
     with open(a.source, "w", encoding="utf-8") as f:
         json.dump(
-            {"url": f"/{rel}", "edition": f"{era}（{year}年度）", "year": year, "counts": {k: v for k, v in counts.items() if k != "skipped"}, "excluded": counts["skipped"]},
+            {
+                "url": f"/{rel}",
+                "edition": f"{era}（{year}年度）",
+                "year": year,
+                "counts": {k: v for k, v in counts.items() if k not in ("skipped", "skipped_by", "covered")},
+                "excluded": counts["skipped"],
+                "excludedBy": counts["skipped_by"],
+                # 行政コードを空白でつないだもの（政令市は市のコード）
+                "covered": counts["covered"],
+            },
             f,
             ensure_ascii=False,
             indent=1,

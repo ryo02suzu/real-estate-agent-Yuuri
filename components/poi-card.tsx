@@ -4,7 +4,8 @@
 // 徒歩の分数（道路距離 80m を1分）・道路距離。施設の位置までの目安で、OpenStreetMap に無い施設もあるので、広告には実際の道のりで確かめる旨を添える
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
-import { nearestPois, POI_CREDIT, POI_DATA, POI_NOTE, POI_SOURCE, poiWalkText, type PoiWalk } from "@/lib/roadmap/poi";
+import { facilitiesNear, withNationalHospitals } from "@/lib/roadmap/facilities";
+import { nearbyPois, nearestOf, POI_CREDIT, POI_DATA, POI_NOTE, POI_ORDER, POI_SOURCES, poiWalkText, type PoiWalk } from "@/lib/roadmap/poi";
 import { pmtilesPoiSource } from "@/lib/roadmap/poi-tiles";
 import { ShopIcon } from "./icons";
 import { Notes } from "./notes";
@@ -20,7 +21,11 @@ export function usePois(lat: number, lng: number): PoiState {
   useEffect(() => {
     if (!POI_DATA.url) return;
     let alive = true;
-    withRetry(() => nearestPois(lat, lng, pmtilesPoiSource))
+    withRetry(async () => {
+      // 病院は国のデータ（OpenStreetMap には近くの病院が無いことがある）
+      const [pois, facilities] = await Promise.all([nearbyPois(lat, lng, pmtilesPoiSource), facilitiesNear(lat, lng)]);
+      return nearestOf(lat, lng, withNationalHospitals(pois, facilities), POI_ORDER);
+    })
       .then((pois) => alive && setState({ key, value: { status: "ok", pois } }))
       .catch(() => alive && setState({ key, value: { status: "error" } }));
     return () => {
@@ -51,7 +56,7 @@ export function PoiList({ state }: { state: PoiState }) {
           </div>
         ))}
       </dl>
-      <Notes lead="施設の位置までの目安です。今もあるかと実際の道のりを確かめてください。" source={POI_SOURCE}>
+      <Notes lead="施設の位置までの目安です。今もあるかと実際の道のりを確かめてください。" source={POI_SOURCES}>
         <p>{POI_NOTE}。</p>
         <p>{POI_CREDIT}</p>
       </Notes>

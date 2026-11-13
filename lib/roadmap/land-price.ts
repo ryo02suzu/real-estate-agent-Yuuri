@@ -159,6 +159,11 @@ const ZONES: Record<string, string> = {
 };
 const PLANS: Record<string, string> = { 市街化: "市街化区域", 調区: "市街化調整区域", 非線引: "非線引き都市計画区域", 都計外: "都市計画区域外", 準都計: "準都市計画区域" };
 
+/** 地点の用途地域の略称（「1低専」）→ 正式な名前（「第一種低層住居専用地域」） */
+export function zoneName(short?: string): string | undefined {
+  return short ? (ZONES[short] ?? short) : undefined;
+}
+
 /** 一覧の見出しの1行（「地価公示 千代田-1・住宅地」） */
 export function landPriceTitle(p: Pick<LandPricePoint, "kind" | "no" | "usage">): string {
   return `${kindText(p.kind)} ${p.no}・${p.usage}`;

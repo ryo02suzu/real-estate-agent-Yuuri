@@ -41,11 +41,11 @@ describe("土砂災害などの法令の区域", () => {
     expect(houreiLine(h!)).toBe("急傾斜地崩壊危険区域・災害危険区域（国のデータ・参考）");
   });
 
-  it("区域の外・関東の外・国のデータに無い種類", async () => {
+  it("区域の外・関東と中部の外・国のデータに無い種類", async () => {
     const out = await houreiAt(LAT, LNG, "14201", fake([]));
     expect(out?.hits).toEqual([]);
     expect(houreiLine(out!)).toBe("砂防指定地・地すべり防止区域・急傾斜地崩壊危険区域・災害危険区域の外（国のデータ・参考）");
-    expect(await houreiAt(35, 138, "19201", fake([]))).toBeNull();
+    expect(await houreiAt(34.3853, 132.4553, "34101", fake([]))).toBeNull(); // 広島市（対応エリアの外）
     // 群馬県の砂防指定地、埼玉県の災害危険区域は国のデータに無い
     expect((await houreiAt(LAT, LNG, "10202", fake([])))?.missing).toEqual(["砂防指定地"]);
     expect((await houreiAt(LAT, LNG, "11201", fake([])))?.missing).toEqual(["災害危険区域"]);

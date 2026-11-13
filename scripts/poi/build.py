@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 OpenStreetMap（© OpenStreetMap contributors、ODbL）の関東の施設のうち、販売図面の「生活環境」に書くもの（スーパー・コンビニ・
-ドラッグストア・病院・診療所・公園・郵便局・銀行・幼稚園と保育園・役所・図書館・商業施設）を、点のベクトルタイル（PMTiles・z14 だけ）にする。
+ドラッグストア・病院・診療所・公園・郵便局・銀行・幼稚園と保育園・役所・図書館・商業施設）と飲食店を、点のベクトルタイル（PMTiles・z14 だけ）にする。
 アプリ（lib/roadmap/poi.ts）は物件のまわりのタイルだけを読み、種類ごとに近い施設を選んで、国土地理院の道路中心線で徒歩の目安を出す。
 
   python3 scripts/poi/build.py --pbf kanto-latest.osm.pbf --install   # public/data/poi-<日付>.pmtiles を置き、poi-source.json を書き換える
@@ -40,6 +40,8 @@ KINDS = {
     10: ("役所", [("amenity", "townhall")]),
     11: ("図書館", [("amenity", "library")]),
     12: ("商業施設", [("shop", "mall"), ("shop", "department_store")]),
+    # 飲食店（周辺環境の「飲食店」と、まわりの飲食店の多さの目安に使う。販売図面の生活環境の一覧には出さない）
+    13: ("飲食店", [("amenity", "restaurant"), ("amenity", "cafe"), ("amenity", "fast_food"), ("amenity", "food_court")]),
 }
 TAG_KIND = {kv: k for k, (_, kvs) in KINDS.items() for kv in kvs}
 # 薬局（amenity=pharmacy）のうちドラッグストアのチェーン（日本の OpenStreetMap ではドラッグストアの多くが pharmacy。調剤だけの薬局は入れない）
@@ -128,12 +130,13 @@ def data_date(pbf: str) -> str:
     return datetime.date.fromtimestamp(os.path.getmtime(pbf)).isoformat()
 
 
-def build(pbf: str, out: str, work: str) -> dict[int, int]:
+def build(pbfs: list[str], out: str, work: str) -> dict[int, int]:
     seq = os.path.join(work, "poi.geojsonl")
     with open(seq, "w", encoding="utf-8") as f:
         h = Handler(f)
-        # 面の施設（way）は点の位置が要るので、位置を覚えながら読む
-        h.apply_file(pbf, locations=True)
+        # 面の施設（way）は点の位置が要るので、位置を覚えながら読む（関東・中部など、切り出しごとに）
+        for pbf in pbfs:
+            h.apply_file(pbf, locations=True)
     for k, (label, _) in KINDS.items():
         log(f"{k:>2} {label}: {h.counts.get(k, 0)}")
     tippecanoe = shutil.which("tippecanoe") or "tippecanoe"
@@ -152,7 +155,7 @@ def build(pbf: str, out: str, work: str) -> dict[int, int]:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--pbf", required=True, help="OpenStreetMap の地域の切り出し（.osm.pbf）")
+    ap.add_argument("--pbf", required=True, nargs="+", help="OpenStreetMap の地域の切り出し（.osm.pbf。関東・中部など複数可）")
     ap.add_argument("--out", help="出力する .pmtiles")
     ap.add_argument("--install", action="store_true", help="public/data/ に置いて lib/roadmap/data/poi-source.json を書き換える")
     ap.add_argument("--source", default="lib/roadmap/data/poi-source.json")
@@ -160,7 +163,7 @@ def main() -> None:
     ap.add_argument("--date", help="データの日付（省略時は .osm.pbf の見出しの時点）")
     a = ap.parse_args()
     work = tempfile.mkdtemp(prefix="poi-")
-    date = a.date or data_date(a.pbf)
+    date = a.date or max(data_date(p) for p in a.pbf)
     if not a.install:
         if not a.out:
             sys.exit("--out を指定してください")

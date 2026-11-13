@@ -5,14 +5,14 @@ import { BUILDING_CREDIT } from "./roadmap/building-data";
 import { GROUND_NOTE, groundMaps, groupHazardMaps, HAZARD_CREDIT, HAZARD_MAP_LABELS, hazardRows, wagamachiUrl, type Elevation, type HazardMaps, type HazardReport } from "./roadmap/hazard";
 import { asOfText, changeText, distanceText, kindText, priceText, type LandPriceHit } from "./roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
-import { schoolCredit, schoolLine, type Schools } from "./roadmap/school";
+import { schoolCredit, schoolGaps, schoolGapShort, schoolLine, type Schools } from "./roadmap/school";
 import { SCHOOL_DATA } from "./roadmap/school-data";
-import { POI_SOURCE, poiLine, type PoiWalk } from "./roadmap/poi";
+import { POI_SOURCES, poiLine, type PoiWalk } from "./roadmap/poi";
 import { ROAD_CREDIT, STATION_CREDIT, stationLine, type StationWalk } from "./roadmap/walk";
 import { KOZU_CREDIT } from "./roadmap/kozu-data";
 import { rosenkaLinks } from "./roadmap/rosenka";
 import { SANKO_NOTE, sankoCredit } from "./roadmap/sanko-data";
-import { chibanLabel, estimatedNote, kuikiLabel, parcelMark, type Estimated } from "./roadmap/parcel";
+import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark, type Estimated } from "./roadmap/parcel";
 import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
 import { CHIBANZU_NOTE, chibanzuFor } from "./roadmap/chibanzu";
@@ -24,14 +24,16 @@ import { contactName, noContactText, UTILITIES_CHECKED, utilitiesFor } from "./r
 import { MORIDO_CREDIT, moridoLine, type Morido } from "./roadmap/morido";
 import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
 import { ZONING_CREDIT } from "./roadmap/zoning-data";
+import { triageLines, type Triage } from "./app/triage";
 
-const COVERAGE_SHORT = { full: "ネットで全種別が分かる", partial: "ネットで分かるのは一部", none: "ネット非公開（窓口で確認）", outside: "都市計画区域外（窓口で確認）" } as const;
+const COVERAGE_SHORT = { full: "ネットで全種別が分かる", partial: "ネットで分かるのは一部", none: "ネット非公開（窓口で確認）", outside: "都市計画区域外（窓口で確認）",
+  unknown: "公開の有無は調査中（県か市の建築指導課で確認）" } as const;
 
 /**
  * zoning：地点の都市計画、parcels：謄本・公図用の「所在 地番」の行（物件の筆と隣の筆。reference は住所の地点の筆で参考）、
  * roads：市の地図データで読んだ、物件のまわりの道路の種別、hazard：国のハザードマップのデータで読んだ地点の災害リスクと、
  * 市区町村のハザードマップのページ、landPrice：近くの地価公示・地価調査の地点（近い順）、schools：地点の小学校区・中学校区。
- * 読み込めていれば添える
+ * 読み込めていれば添える。triage：要注意点と次にやること（先頭に出す。done は済んだやること）
  */
 export function buildSummary(
   result: Extract<LookupResult, { status: "ok" }>,
@@ -45,9 +47,11 @@ export function buildSummary(
     schools,
     stations,
     pois,
+    triage,
+    done,
   }: {
     zoning?: { zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi };
-    parcels?: { target?: string; neighbors: string[]; reference: boolean; estimated?: Estimated; sanko?: string };
+    parcels?: { target?: string; neighbors: string[]; reference: boolean; offLot?: boolean; estimated?: Estimated; sanko?: string };
     roads?: NearbyRoad[];
     hazard?: { report: HazardReport; elevation: Elevation | null; maps: HazardMaps; muniCd: string };
     building?: BuildingResult;
@@ -55,13 +59,19 @@ export function buildSummary(
     schools?: Schools;
     stations?: StationWalk[];
     pois?: PoiWalk[];
+    triage?: Triage;
+    done?: ReadonlySet<string>;
   } = {},
 ): string {
   const m = result.municipality;
   const p = result.parcel;
-  const lines = [`【道路種別の確認先】${result.matchedAddress}${p && !result.picked ? ` ${chibanLabel(p.chibanRaw)}${parcelMark(p)}` : " 付近"}`];
+  // 住所の数字は半角にそろえる（国土地理院の住所は「１９番１１号」のように全角。画面の見出しと地番は半角）
+  const lines = [`【MICHILU の調査結果】${result.matchedAddress.normalize("NFKC")}${p && !result.picked ? ` ${chibanLabel(p.chibanRaw)}${parcelMark(p)}` : " 付近"}`];
   // 地図で選んだ地点・地番で探した筆は、その地点を地理院地図で開けるようにする
   if (result.picked || p) lines.push(`${result.picked ? "地図で選んだ地点" : "筆の位置"}：https://maps.gsi.go.jp/#18/${result.lat.toFixed(6)}/${result.lng.toFixed(6)}/`);
+  // 問題になりそうな所と次にやることを、結果の前に
+  if (triage) lines.push(...triageLines(triage, done));
+  lines.push("【道路種別の確認先】");
   if (p && result.picked) lines.push(`この地点の筆：${chibanLabel(p.chibanRaw)}（${kuikiLabel(p.kuiki)}）${parcelMark(p)}`);
   lines.push(`${m.pref}${m.name}：${COVERAGE_SHORT[m.coverage]}`);
   for (const l of result.links) lines.push(`・${l.label}${l.pinpoint ? "" : "（地図内で住所検索）"}\n  ${l.url}`);
@@ -138,16 +148,21 @@ export function buildSummary(
     lines.push("【周辺施設（徒歩の目安・道路距離 80m を1分）】");
     for (const w of pois) lines.push(`・${poiLine(w)}`);
   }
-  if (schools?.elementary || schools?.junior) {
+  // 出せなかった学校区（利用条件で出せない市・国のデータに無い市・地点の区域が無い）は、データなしと確かめる先を書く
+  const gaps = schools ? schoolGaps(m.codes[0], schools) : [];
+  if (schools && (schools.elementary || schools.junior || gaps.length)) {
     lines.push(`【学区（参考・${SCHOOL_DATA.edition}のデータ）】`);
     if (schools.elementary) lines.push(`・小学校：${schoolLine(schools.elementary)}`);
     if (schools.junior) lines.push(`・中学校：${schoolLine(schools.junior)}`);
+    for (const g of gaps) lines.push(`・${g.key === "es" ? "小学校" : "中学校"}：データなし（${schoolGapShort(g.why, m.name)}。${m.name}の教育委員会で確認）`);
   }
   const withParcels = !!parcels && (!!parcels.target || parcels.neighbors.length > 0);
   if (parcels && withParcels) {
-    lines.push(`【謄本・公図用の地番${parcels.reference ? "（住所の地点の筆・参考）" : ""}${parcels.estimated ? `（公図から推定した位置・${estimatedNote(parcels.estimated)}）` : parcels.sanko ? `（地番参考図・${SANKO_NOTE}）` : ""}】`);
+    lines.push(`【謄本・公図用の地番${parcels.offLot ? "（住所の地点の筆・参考。道路など物件の外の土地の可能性）" : parcels.reference ? "（住所の地点の筆・参考）" : ""}${parcels.estimated ? `（公図から推定した位置・${estimatedNote(parcels.estimated)}）` : parcels.sanko ? `（地番参考図・${SANKO_NOTE}）` : ""}】`);
     if (parcels.target) lines.push(`・物件：${parcels.target}`);
-    if (parcels.neighbors.length) lines.push(`・隣地：${parcels.neighbors.join("、")}`);
+    // 住所の地点の筆が道路などの可能性があるときは、その筆の隣地（道沿いの筆）を物件の隣地として書かない
+    if (parcels.neighbors.length && parcels.offLot) lines.push(`・隣地：省略（この筆に接する筆は${parcels.neighbors.length}筆。公図で物件の筆を確かめてから）`);
+    else if (parcels.neighbors.length) lines.push(`・隣地：${neighborList(parcels.neighbors)}`);
   }
   // 市町村の地番図（物件の場所で開く URL）。地図データに筆が無いときの確認先にもなる
   const chibanzu = chibanzuFor(m, result.lat, result.lng);
@@ -172,8 +187,8 @@ export function buildSummary(
   if (hit) lines.push(`※建物の${BUILDING_CREDIT}。`);
   if (prices.length) lines.push(`※地価の${LAND_PRICE_CREDIT}。物件そのものの価格ではありません。`);
   if (schools?.elementary || schools?.junior) lines.push(`※学区の${schoolCredit(schools)}。学区は見直されることがあります。指定校は教育委員会で確認を。`);
-  if (stations?.length) lines.push(`※駅の${STATION_CREDIT}。駅の出入口までではないので、広告には実際の道路距離で。`);
+  if (stations?.length) lines.push(`※駅の${STATION_CREDIT}。徒歩は駅の出入口（分からない駅は駅舎・駅の位置・ホーム）までの地図上の目安なので、広告には実際の道路距離で。`);
   if (pois?.length)
-    lines.push(`※周辺施設は${POI_SOURCE}を加工して作成${stations?.length ? "" : `。${ROAD_CREDIT}`}。施設の位置までの目安なので、広告には実際の道路距離と、施設が今もあるかを確かめて。`);
+    lines.push(`※周辺施設は${POI_SOURCES}を加工して作成${stations?.length ? "" : `。${ROAD_CREDIT}`}。施設の位置までの目安なので、広告には実際の道路距離と、施設が今もあるかを確かめて。`);
   return lines.join("\n");
 }

@@ -235,3 +235,31 @@ export const ShopIcon = ({ className }: P) => (
     <path d="M9 11V6a3 3 0 0 1 6 0v5" />
   </svg>
 );
+
+/** ホーム（家） */
+export const HomeIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h13V9.5M10 20v-5h4v5" />
+  </svg>
+);
+
+/** 保存・お気に入り（しおり） */
+export const BookmarkIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <path d="M6 4h12v17l-6-4-6 4z" />
+  </svg>
+);
+
+/** マイページ（人） */
+export const UserIcon = ({ className }: P) => (
+  <svg {...base} strokeWidth={1.8} className={className}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21a8 8 0 0 1 16 0" />
+  </svg>
+);
+
+export const ArrowRightIcon = ({ className }: P) => (
+  <svg {...base} className={className}>
+    <path d="M5 12h14M13 6l6 6-6 6" />
+  </svg>
+);

@@ -27,11 +27,16 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import urllib.error
-import urllib.request
 import zipfile
 
-PREFS = ("08", "09", "10", "11", "12", "13", "14")
+import os as _os, sys as _sys
+
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), ".."))
+import ksj  # noqa: E402
+from regions import prefs  # noqa: E402
+
+# 対応している都道府県（lib/roadmap/data/regions.json。関東1都6県＋中部9県）
+PREFS = prefs()
 BASE = "https://nlftp.mlit.go.jp/ksj/gml/data/{code}/{code}-{yy}/{code}-{yy}_{pref}_GML.zip"
 UA = {"User-Agent": "michilu-hourei (+https://github.com/ryo02suzu/real-estate-agent-Yuuri)"}
 ATTRIBUTION = (
@@ -53,37 +58,9 @@ def log(*a):
     print(*a, file=sys.stderr, flush=True)
 
 
-def get(url: str, rng: str | None = None) -> bytes:
-    h = dict(UA)
-    if rng:
-        h["Range"] = rng
-    with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=180) as r:
-        return r.read()
-
-
-def exists(url: str) -> bool:
-    try:
-        get(url, "bytes=0-15")
-        return True
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return False
-        raise
-
-
 def latest() -> dict[str, dict[str, int]]:
-    """データごと・都県ごとの一番新しい年度（無い都県は入れない）"""
-    this = datetime.date.today().year
-    out: dict[str, dict[str, int]] = {}
-    for code, ds in DATASETS.items():
-        years: dict[str, int] = {}
-        for pref in PREFS:
-            for year in range(this, ds["first"] - 1, -1):
-                if exists(BASE.format(code=code, yy=f"{year % 100:02d}", pref=pref)):
-                    years[pref] = year
-                    break
-        out[code] = years
-    return out
+    """データごと・都県ごとの一番新しい年度（無い都県は入れない。読み方は scripts/ksj.py）"""
+    return {code: ksj.newest(BASE, code, PREFS, ds["first"], UA) for code, ds in DATASETS.items()}
 
 
 def text(v) -> str | None:
@@ -138,7 +115,7 @@ def build(years: dict[str, dict[str, int]], out: str, work: str) -> dict:
             n = 0
             for pref, year in sorted(by_pref.items()):
                 url = BASE.format(code=code, yy=f"{year % 100:02d}", pref=pref)
-                with zipfile.ZipFile(io.BytesIO(get(url))) as z:
+                with zipfile.ZipFile(io.BytesIO(ksj.get_zip(url, UA))) as z:
                     for g, props in features(code, z):
                         props["p"] = pref
                         fo.write(json.dumps({"type": "Feature", "geometry": g, "properties": props}, ensure_ascii=False) + "\n")

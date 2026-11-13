@@ -42,15 +42,26 @@ jobs:
           git clone --depth 1 --branch "$TIPPECANOE_VERSION" https://github.com/felt/tippecanoe.git /tmp/tippecanoe
           make -C /tmp/tippecanoe -j"$(nproc)"
           mkdir -p ~/tippecanoe-bin && cp /tmp/tippecanoe/tippecanoe /tmp/tippecanoe/tile-join ~/tippecanoe-bin/
-      - name: OpenStreetMap の関東の切り出しを読む（約0.6GB）
+      - name: OpenStreetMap の対応している地方の切り出しを読む（regions.json の地方。各0.5〜0.6GB 前後）
+        # 配布元が止まっていることがある（2026年10月に openstreetmap.fr が 502）ので、Geofabrik と openstreetmap.fr の順に試す
         run: |
-          curl -sSfL --retry 3 --retry-delay 30 -o "$RUNNER_TEMP/kanto.osm.pbf" https://download.openstreetmap.fr/extracts/asia/japan/kanto-latest.osm.pbf
-          ls -la "$RUNNER_TEMP/kanto.osm.pbf"
+          for region in $(jq -r 'keys[]' lib/roadmap/data/regions.json); do
+            # 配布元での地方の名前（近畿は Geofabrik では kansai。regions.json の osm。無ければ地方の鍵のまま）
+            osm=$(jq -r --arg r "$region" '.[$r].osm // $r' lib/roadmap/data/regions.json)
+            for url in "https://download.geofabrik.de/asia/japan/$osm-latest.osm.pbf" "https://download.openstreetmap.fr/extracts/asia/japan/$osm-latest.osm.pbf"; do
+              if curl -sSfL --retry 2 --retry-delay 30 -o "$RUNNER_TEMP/$region.osm.pbf" "$url"; then
+                echo "読んだ所：$url"
+                break
+              fi
+              rm -f "$RUNNER_TEMP/$region.osm.pbf"
+            done
+            ls -la "$RUNNER_TEMP/$region.osm.pbf"
+          done
       - name: タイルを作ってアプリに入れる
         run: |
           pip install -r scripts/poi/requirements.txt
           export PATH="$HOME/tippecanoe-bin:$PATH"
-          python3 scripts/poi/build.py --pbf "$RUNNER_TEMP/kanto.osm.pbf" --install
+          python3 scripts/poi/build.py --pbf "$RUNNER_TEMP"/*.osm.pbf --install
           ls -la public/data
       - uses: actions/setup-node@v4
         with:

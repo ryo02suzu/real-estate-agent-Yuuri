@@ -14,6 +14,12 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // node_modules から置いた MapLibre のワーカー（scripts/copy-maplibre-worker.mjs）
     "public/maplibre/**",
+    // Claude Code の作業用の git worktree（別の作業の写し。リポジトリの中身ではない）
+    ".claude/worktrees/**",
+    // node_modules から置いた Draco の部品（scripts/copy-draco.mjs。3D の街の形をほどく）
+    "public/draco/**",
+    // ホームの街の焼き込み（ヘッドレスの Chromium で動かす道具。アプリには入らない）
+    "scripts/city-bake/**",
     // 外部 Agent Skills のサンプル/補助スクリプトはアプリのlint対象外
     ".claude/skills/**",
     ".agents/skills/**",
