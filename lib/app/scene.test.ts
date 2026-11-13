@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HistoryItem } from "../history";
-import { monthDay, placeholderScenes, placeParts, placeTitle, SCENES, stamp } from "./scene";
+import { monthDay, placeholderScenes, placeLine, placeParts, placeTitle, SCENES, stamp } from "./scene";
 
 const item = (address: string, city?: string, ll?: [number, number]): HistoryItem => ({ address, city, at: 0, ...(ll ? { ll } : {}) });
 
@@ -18,6 +18,13 @@ describe("最近の検索のカード", () => {
     // 番地だけ・市区町村だけでも空にしない
     expect(placeTitle(item("1-19-11")).title).toBe("1-19-11");
     expect(placeTitle(item("東京都渋谷区", "渋谷区")).title).toBe("渋谷区");
+  });
+
+  it("1行の名前：市区町村と町名に番地・地番を添える。地図で選んだ地点は町まで", () => {
+    expect(placeLine(item("東京都渋谷区神南一丁目19番11号", "渋谷区"))).toBe("渋谷区神南一丁目 19番11号");
+    expect(placeLine(item("地番 千葉県松戸市古ケ崎四丁目3556番1", "松戸市"))).toBe("松戸市古ケ崎四丁目 3556番1");
+    expect(placeLine(item("宮城県仙台市泉区館四丁目", "仙台市泉区", [38.32, 140.84]))).toBe("仙台市泉区館四丁目");
+    expect(placeLine(item("大阪府大阪市北区梅田3-1-1"))).toBe("大阪市北区梅田3-1-1");
   });
 
   it("カードの2行：市区町村を小さく上に、町名を大きく。市区町村が分からないときは空", () => {

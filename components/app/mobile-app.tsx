@@ -558,6 +558,28 @@ export function MobileApp(props: MobileAppProps) {
     setMenu(false);
     go(k);
   };
+  /** メニューの「開いている物件」：ほかのページを見ている間も残している物件の画面へ戻る（下のメニューの「検索」と同じ） */
+  const currentFromMenu = () => {
+    forgetBack();
+    setOpening(null);
+    setHistRestore(null);
+    setMenu(false);
+    go("home");
+  };
+  /**
+   * メニューの「続きから」：直近に見ていた物件を、履歴の行から開き直す（前に見ていたタブから続く。lib/resume.ts）。
+   * 動きの演出がオンなら、ホームから調べたときと同じく地球から降りる
+   */
+  const resumeFromMenu = (h: HistoryItem) => {
+    forgetBack();
+    setOpening(null);
+    setHistRestore(null);
+    setReport(false);
+    setMenu(false);
+    takeOff(h.address.replace(/^地番\s*/, ""));
+    setPage("home");
+    onPickHistory(h);
+  };
   const pickRecent = (h: HistoryItem) => {
     forgetBack();
     if (page === "home" && !shown) takeOff(h.address.replace(/^地番\s*/, ""));
@@ -1189,6 +1211,11 @@ export function MobileApp(props: MobileAppProps) {
           open={menu}
           onClose={() => setMenu(false)}
           covered={sheet !== null || news}
+          page={showHome ? "home" : page}
+          current={page !== "home" ? current : undefined}
+          onCurrent={currentFromMenu}
+          history={history}
+          onResume={resumeFromMenu}
           onSearch={searchFromMenu}
           onMap={() => {
             setMenu(false);

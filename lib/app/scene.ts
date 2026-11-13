@@ -80,6 +80,18 @@ export function placeTitle(h: HistoryItem): { title: string; full: string; chiba
   return { title: [p.city, p.town].filter(Boolean).join(" ") || p.full, full: p.full, chiban: p.chiban };
 }
 
+/**
+ * 物件の名前を1行で：市区町村と町名に、番地か地番を添える（同じ町の物件と見分けられるように。「渋谷区神南 1-19-11」）。
+ * 地図で選んだ地点は町まで（番地は無い）。書類・出力の物件のカードと、右上のメニューの「続きから」で使う
+ */
+export function placeLine(h: HistoryItem): string {
+  const { city, town, full } = placeParts(h);
+  if (!city || !town) return full;
+  const tail = full.startsWith(city) ? full.slice(city.length).trim() : full;
+  const num = h.ll ? "" : tail.startsWith(town) ? tail.slice(town.length).trim() : "";
+  return num ? `${city}${town} ${num}` : `${city}${town}`;
+}
+
 /** 「2026/04/26 14:32」 */
 export function stamp(t: number): string {
   const d = new Date(t);
