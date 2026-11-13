@@ -124,6 +124,7 @@ def load_skip_sheets(path: str = SHEETS_FILE) -> dict[str, list[dict]]:
     """外す筆の決まり（市区町村コードごと）。sheet（地図名）が「*」ならその市区町村コードのデータ全部。
     oaza（大字名）・chome（丁目名）があればその町の筆だけ、chiban（地番の一覧）があればその地番の筆だけ外す。
     shift（east・north：m）があれば外さず、その量だけ動かす（日本測地系と世界測地系の取り違えで約460mずれた地図や、座標の数字の誤りで約10kmずれた地図）。
+    shift に scale（倍率・回転・中心）があれば、縮尺を間違えて入った地図を大きさから直す（shifted_geometry）。
     法務省が直して地図名が変われば、何も外さなくなる"""
     if not os.path.exists(path):
         return {}
@@ -215,8 +216,25 @@ class Boundaries:
 
 
 def shifted_geometry(geom: dict, shift: dict) -> dict:
-    """形の座標を、東へ shift["east"] m・北へ shift["north"] m 動かす（緯度ごとに度に直す。地図1枚の中では誤差 0.1m 未満）"""
+    """形の座標を、東へ shift["east"] m・北へ shift["north"] m 動かす（緯度ごとに度に直す。地図1枚の中では誤差 0.1m 未満）。
+    shift["scale"]（{"k": 倍率, "rotate": 左回りの角度（度）, "origin": [経度, 緯度]}）があれば、縮尺を間違えて入った地図
+    （神戸市北区若葉台の図面は約2.5分の1）を、origin を中心に k 倍して回してから、origin を東へ east m・北へ north m 動かす
+    （origin のまわりの平らな m の座標で計算する。1km 四方の中では誤差 0.1m 未満）"""
     east, north = float(shift["east"]), float(shift["north"])
+    scale = shift.get("scale")
+    if scale:
+        k, th = float(scale["k"]), math.radians(float(scale["rotate"]))
+        lon0, lat0 = float(scale["origin"][0]), float(scale["origin"][1])
+        kx = 111320.0 * math.cos(math.radians(lat0))
+        a, b = k * math.cos(th), k * math.sin(th)
+
+        def move(coords):
+            if coords and isinstance(coords[0], (int, float)):
+                x, y = (coords[0] - lon0) * kx, (coords[1] - lat0) * 111320.0
+                return [lon0 + (a * x - b * y + east) / kx, lat0 + (b * x + a * y + north) / 111320.0, *coords[2:]]
+            return [move(c) for c in coords]
+
+        return {"type": geom["type"], "coordinates": move(geom["coordinates"])}
 
     def move(coords):
         if coords and isinstance(coords[0], (int, float)):
@@ -465,7 +483,7 @@ def main() -> None:
             log(f"  {code} {r['town']} 地図 {r['sheet']}: {k} 件")
     if shifted:
         by_i = {r["i"]: (code, r) for code, rs in skip_sheets.items() for r in rs}
-        log(f"位置がずれていた地図の筆（測地系の取り違え・座標の数字の誤り）を、正しい位置に動かした: {sum(shifted.values())} 件（{len(shifted)} 件の決まり）")
+        log(f"位置がずれていた地図の筆（測地系の取り違え・座標の数字の誤り・縮尺の誤り）を、正しい位置に動かした: {sum(shifted.values())} 件（{len(shifted)} 件の決まり）")
         for i, k in sorted(shifted.items()):
             code, r = by_i[i]
             log(f"  {code} {r['town']} 地図 {r['sheet']}: {k} 件（東へ {r['shift']['east']:.1f}m・北へ {r['shift']['north']:.1f}m）")

@@ -968,7 +968,7 @@ describe("地番参考図のある市町村", () => {
 describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-sheets.json）", () => {
   // タイルを作るとき（build_pref.py）に外す地図。書き方を間違えると何も外れないか、正しい地図まで外れる
   const data = JSON.parse(readFileSync(new URL("../../scripts/parcel-tiles/misplaced-sheets.json", import.meta.url), "utf8")) as {
-    sheets: { code: string; sheet: string; town: string; parcels: number; reason: string; oaza?: string; chome?: string; chiban?: string[]; shift?: { kind: "T1" | "T2" | "数字の誤り" | "照合"; east: number; north: number } }[];
+    sheets: { code: string; sheet: string; town: string; parcels: number; reason: string; oaza?: string; chome?: string; chiban?: string[]; shift?: { kind: "T1" | "T2" | "数字の誤り" | "照合" | "縮尺"; east: number; north: number; scale?: { k: number; rotate: number; origin: [number, number] } } }[];
   };
   it("測地系の取り違えで動かす地図（shift）は、地図ごと・向きと量が日本測地系と世界測地系の差（西または東へ約245〜300m・北または南へ、関東・中部・近畿で約325〜370m、東北の X 系で約300〜315m）", () => {
     for (const s of data.sheets.filter((x) => x.shift && (x.shift.kind === "T1" || x.shift.kind === "T2"))) {
@@ -1108,10 +1108,62 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     expect(withLp).toHaveLength(1);
     expect(withLp[0].reason).toMatch(/地価調査の地点「日野9丁目6071番29」は、この量で動かすとその筆（150㎡）の中に入る/);
   });
+  it("縮尺を間違えて入った地図（kind「縮尺」）は、倍率・回転・中心があり、理由に登記の地積・道路縁・地価の地点の根拠がある", () => {
+    // 神戸市北区若葉台の図面（1,081筆）は、約2.5分の1の大きさで入っていた（筆の面積が登記の地積の約6分の1）。
+    // 本体（991筆）は倍率・回転・平行移動で直し、本体から離れた2つのかたまり（90筆）は位置が決められないので外す
+    const xs = data.sheets.filter((s) => s.shift?.kind === "縮尺");
+    expect(xs.length).toBeGreaterThan(0);
+    for (const s of xs) {
+      const sc = s.shift!.scale!;
+      expect(sc).toBeDefined();
+      expect(sc.k).toBeGreaterThan(0.2);
+      expect(sc.k).toBeLessThan(5);
+      expect(Math.abs(sc.rotate)).toBeLessThan(10);
+      // 中心は日本の中（経度・緯度）
+      expect(sc.origin[0]).toBeGreaterThan(122);
+      expect(sc.origin[0]).toBeLessThan(154);
+      expect(sc.origin[1]).toBeGreaterThan(20);
+      expect(sc.origin[1]).toBeLessThan(46);
+      expect(s.reason).toMatch(/縮尺/);
+      expect(s.reason).toMatch(/地積/);
+      expect(s.reason).toMatch(/道路縁/);
+      expect(s.reason).toMatch(/地価公示|地価調査/);
+      expect(s.sheet).not.toBe("*");
+    }
+    // 縮尺の決まりのほかの種類は、倍率を持たない（平行移動だけ）
+    for (const s of data.sheets.filter((x) => x.shift && x.shift.kind !== "縮尺")) expect(s.shift!.scale).toBeUndefined();
+  });
+  it("神戸市北区若葉台の図面：本体 991筆は同じ倍率（約2.54倍）で直し、離れた 90筆は外す。筆は1回ずつ", () => {
+    const w = data.sheets.filter((s) => s.code === "28109" && s.sheet === "若葉台１～４丁目");
+    const moved = w.filter((s) => s.shift);
+    const dropped = w.filter((s) => !s.shift);
+    expect(moved.reduce((a, s) => a + s.parcels, 0)).toBe(991);
+    expect(dropped.reduce((a, s) => a + s.parcels, 0)).toBe(90);
+    const k = moved[0].shift!.scale!.k;
+    expect(k).toBeGreaterThan(2.4);
+    expect(k).toBeLessThan(2.7);
+    for (const s of moved) {
+      expect(s.shift!.kind).toBe("縮尺");
+      expect(s.shift).toEqual(moved[0].shift);
+    }
+    for (const s of dropped) expect(s.reason).toMatch(/外す/);
+    const seen = new Set<string>();
+    for (const s of w)
+      for (const l of s.chiban!) {
+        const key = `${s.oaza}|${s.chome ?? ""}|${l}`;
+        expect(seen.has(key)).toBe(false);
+        seen.add(key);
+      }
+    // 地価の地点の筆は本体にあり、理由に地点がその筆の中に入ることを書く
+    expect(moved.find((s) => s.chome === "２丁目")!.chiban).toContain("3-608");
+    expect(moved.find((s) => s.chome === "４丁目")!.chiban).toContain("22-56");
+    expect(moved[0].reason).toMatch(/若葉台2丁目3番608.*中に入る/);
+  });
   it("近畿（2026-11-12）：三田市のニュータウンの4枚は、道路縁と隣の地図で確かめた同じ量（西へ3.0m・南へ3.3m）を計算した量に足している", () => {
     const kinki = data.sheets.filter((s) => /^(2[4-9]|30)/.test(s.code) && s.shift);
-    // 11-12 の14枚と、11-13 に地価の地点で見つけた東員町（2枚）・木津川市（1枚）・生駒市北新町（1枚の一部・大字ごとに2つ）・松阪市飯南町（1枚）・津市あのつ台（1枚・照合）
-    expect(kinki).toHaveLength(21);
+    // 11-12 の14枚と、11-13 に地価の地点で見つけた東員町（2枚）・木津川市（1枚）・生駒市北新町（1枚の一部・大字ごとに2つ）・松阪市飯南町（1枚）・津市あのつ台（1枚・照合）・
+    // 神戸市北区若葉台（1枚の本体を縮尺ごと直す。大字・丁目ごとに6つ）
+    expect(kinki).toHaveLength(27);
     const sanda = kinki.filter((s) => s.code === "28219");
     expect(sanda.map((s) => s.sheet).sort()).toEqual(["あかしあ台１～５丁目", "すずかけ台１～４丁目", "ゆりのき台１～６丁目（修正後）", "北摂三田ニュータウン南地区"].sort());
     for (const s of sanda) {
