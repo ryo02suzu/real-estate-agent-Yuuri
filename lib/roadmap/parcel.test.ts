@@ -1070,9 +1070,43 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(s.reason).toMatch(/道路縁/);
       expect(s.reason).toMatch(/地番図|地番参考図|地籍図|地価公示|地価調査/);
       if (!/地価公示|地価調査/.test(s.reason.replace(/地価の地点は無い/, ""))) expect(s.reason).toMatch(/(地番図|地番参考図|地籍図).*同じ地番の筆/);
-      expect(s.chiban).toBeUndefined();
+      if (s.chiban) {
+        // 図面の図郭（区切り）ごとに量が違う所（横浜市港南区日野８・９丁目の図面）だけ、大字・丁目・地番の一覧で絞って、まとまりごとに動かす
+        expect(s.oaza).toBeDefined();
+        expect(s.chome).toBeDefined();
+        expect(s.reason).toMatch(/図郭/);
+        expect(s.reason).toMatch(/まとまり/);
+      }
       expect(s.sheet).not.toBe("*");
     }
+  });
+  it("横浜市港南区日野８・９丁目の図面（980筆）は、図郭ごとの5つのまとまりを、それぞれ道路縁で求めた量で動かす（量の差は 40m 未満・筆は1回ずつ）", () => {
+    // 図面全体は東へ約640m・南へ約100m ずれていた（地価調査「日野9丁目6071番29」の筆が国の地点から 625m 離れていた）。
+    // 1つの量で動かすと、まとまりによって道路縁から最大 36m ずれ、図郭をまたいで切れた筆の切れ端が 13m 離れる
+    const hino = data.sheets.filter((s) => s.code === "14111" && s.sheet === "10160_hosei_20121129095439");
+    expect(hino).toHaveLength(7);
+    expect(hino.reduce((a, s) => a + s.parcels, 0)).toBe(980);
+    const seen = new Set<string>();
+    for (const s of hino) {
+      expect(s.shift?.kind).toBe("照合");
+      expect(s.oaza).toBe("日野");
+      expect(["８丁目", "９丁目"]).toContain(s.chome);
+      for (const l of s.chiban!) {
+        const key = `${s.chome}|${l}`;
+        expect(seen.has(key)).toBe(false);
+        seen.add(key);
+      }
+      // 西へ約620〜665m・北へ約90〜115m
+      expect(s.shift!.east).toBeGreaterThan(-665);
+      expect(s.shift!.east).toBeLessThan(-620);
+      expect(s.shift!.north).toBeGreaterThan(90);
+      expect(s.shift!.north).toBeLessThan(115);
+    }
+    for (const a of hino) for (const b of hino) expect(Math.hypot(a.shift!.east - b.shift!.east, a.shift!.north - b.shift!.north)).toBeLessThan(40);
+    // 地価調査の地点の筆（6071-29）があるまとまりは、その量で地点が筆の中に入る
+    const withLp = hino.filter((s) => s.chiban!.includes("6071-29"));
+    expect(withLp).toHaveLength(1);
+    expect(withLp[0].reason).toMatch(/地価調査の地点「日野9丁目6071番29」は、この量で動かすとその筆（150㎡）の中に入る/);
   });
   it("近畿（2026-11-12）：三田市のニュータウンの4枚は、道路縁と隣の地図で確かめた同じ量（西へ3.0m・南へ3.3m）を計算した量に足している", () => {
     const kinki = data.sheets.filter((s) => /^(2[4-9]|30)/.test(s.code) && s.shift);
