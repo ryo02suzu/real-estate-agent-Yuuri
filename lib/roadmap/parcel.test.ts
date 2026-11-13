@@ -1059,17 +1059,17 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(s.sheet).not.toBe("*");
     }
   });
-  it("ほかの公的なデータとの照合で量を求めて動かす地図（kind「照合」）は、道路縁・地価の地点・市の地番図か町の境界の3つの根拠が理由にある", () => {
+  it("ほかの公的なデータとの照合で量を求めて動かす地図（kind「照合」）は、道路縁と、市の地番図か地価の地点の根拠が理由にある", () => {
     // 越谷市伊原２丁目の図面（569筆）は、市の地番図データの同じ地番 558筆とそろって 約390m ずれていた（測地系の取り違えとも数字の誤りとも量が合わない）。
     // 富士市増川新町・津市あのつ台１丁目の図面は、測地系の取り違えに近い向きだが、計算した量では道路縁・地価の地点から 25〜32m ずれる
     const xs = data.sheets.filter((s) => s.shift?.kind === "照合");
     expect(xs.map((s) => [s.code, s.sheet])).toContainEqual(["11222", "10236_hosei_20121129092003"]);
     for (const s of xs) {
       expect(Math.hypot(s.shift!.east, s.shift!.north)).toBeLessThan(2000);
-      // 道路縁と地価の地点のほかに、市の地番図との照合か国勢調査の町の境界のどちらかでも確かめている
-      expect(s.reason).toMatch(/地価公示|地価調査/);
+      // 道路縁のほかに、市の地番図との照合か地価の地点の、別の根拠がある（地価の地点が無い所は、市の地番図の同じ地番の筆とそろってずれていること）
       expect(s.reason).toMatch(/道路縁/);
-      expect(s.reason).toMatch(/地番図|地番参考図|国勢調査/);
+      expect(s.reason).toMatch(/地番図|地番参考図|地籍図|地価公示|地価調査/);
+      if (!/地価公示|地価調査/.test(s.reason.replace(/地価の地点は無い/, ""))) expect(s.reason).toMatch(/(地番図|地番参考図|地籍図).*同じ地番の筆/);
       expect(s.chiban).toBeUndefined();
       expect(s.sheet).not.toBe("*");
     }
