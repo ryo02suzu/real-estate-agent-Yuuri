@@ -968,10 +968,10 @@ describe("地番参考図のある市町村", () => {
 describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-sheets.json）", () => {
   // タイルを作るとき（build_pref.py）に外す地図。書き方を間違えると何も外れないか、正しい地図まで外れる
   const data = JSON.parse(readFileSync(new URL("../../scripts/parcel-tiles/misplaced-sheets.json", import.meta.url), "utf8")) as {
-    sheets: { code: string; sheet: string; town: string; parcels: number; reason: string; oaza?: string; chome?: string; chiban?: string[]; shift?: { kind: "T1" | "T2" | "数字の誤り"; east: number; north: number } }[];
+    sheets: { code: string; sheet: string; town: string; parcels: number; reason: string; oaza?: string; chome?: string; chiban?: string[]; shift?: { kind: "T1" | "T2" | "数字の誤り" | "照合"; east: number; north: number } }[];
   };
   it("測地系の取り違えで動かす地図（shift）は、地図ごと・向きと量が日本測地系と世界測地系の差（関東・中部・近畿で西または東へ約245〜300m・北または南へ約325〜370m）", () => {
-    for (const s of data.sheets.filter((x) => x.shift && x.shift.kind !== "数字の誤り")) {
+    for (const s of data.sheets.filter((x) => x.shift && (x.shift.kind === "T1" || x.shift.kind === "T2"))) {
       const { kind, east, north } = s.shift!;
       expect(["T1", "T2"]).toContain(kind);
       // T1：日本測地系の数字→世界測地系（北西へ動かす。今は南東へずれている）。T2：その逆（南東へ動かす）。
@@ -1005,7 +1005,7 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       return p <= 14 ? "IX" : [15, 19, 20, 22].includes(p) ? "VIII" : [18, 24, 25, 26, 27, 29, 30].includes(p) ? "VI" : p === 28 ? "V" : "VII";
     };
     const groups = new Map<string, [number, number][]>();
-    for (const s of data.sheets.filter((x) => x.shift && x.shift.kind !== "数字の誤り")) {
+    for (const s of data.sheets.filter((x) => x.shift && (x.shift.kind === "T1" || x.shift.kind === "T2"))) {
       // T2 は向きを逆にして T1 とまとめる
       const sign = s.shift!.kind === "T1" ? 1 : -1;
       const g = groups.get(zone(s.code)) ?? [];
@@ -1059,10 +1059,25 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(s.sheet).not.toBe("*");
     }
   });
+  it("ほかの公的なデータとの照合で量を求めて動かす地図（kind「照合」）は、道路縁・地価の地点・市の地番図か町の境界の3つの根拠が理由にある", () => {
+    // 越谷市伊原２丁目の図面（569筆）は、市の地番図データの同じ地番 558筆とそろって 約390m ずれていた（測地系の取り違えとも数字の誤りとも量が合わない）。
+    // 富士市増川新町・津市あのつ台１丁目の図面は、測地系の取り違えに近い向きだが、計算した量では道路縁・地価の地点から 25〜32m ずれる
+    const xs = data.sheets.filter((s) => s.shift?.kind === "照合");
+    expect(xs.map((s) => [s.code, s.sheet])).toContainEqual(["11222", "10236_hosei_20121129092003"]);
+    for (const s of xs) {
+      expect(Math.hypot(s.shift!.east, s.shift!.north)).toBeLessThan(2000);
+      // 道路縁と地価の地点のほかに、市の地番図との照合か国勢調査の町の境界のどちらかでも確かめている
+      expect(s.reason).toMatch(/地価公示|地価調査/);
+      expect(s.reason).toMatch(/道路縁/);
+      expect(s.reason).toMatch(/地番図|地番参考図|国勢調査/);
+      expect(s.chiban).toBeUndefined();
+      expect(s.sheet).not.toBe("*");
+    }
+  });
   it("近畿（2026-11-12）：三田市のニュータウンの4枚は、道路縁と隣の地図で確かめた同じ量（西へ3.0m・南へ3.3m）を計算した量に足している", () => {
     const kinki = data.sheets.filter((s) => /^(2[4-9]|30)/.test(s.code) && s.shift);
-    // 11-12 の14枚と、11-13 に地価の地点で見つけた東員町（2枚）・木津川市（1枚）・生駒市北新町（1枚の一部・大字ごとに2つ）
-    expect(kinki).toHaveLength(19);
+    // 11-12 の14枚と、11-13 に地価の地点で見つけた東員町（2枚）・木津川市（1枚）・生駒市北新町（1枚の一部・大字ごとに2つ）・松阪市飯南町（1枚）・津市あのつ台（1枚・照合）
+    expect(kinki).toHaveLength(21);
     const sanda = kinki.filter((s) => s.code === "28219");
     expect(sanda.map((s) => s.sheet).sort()).toEqual(["あかしあ台１～５丁目", "すずかけ台１～４丁目", "ゆりのき台１～６丁目（修正後）", "北摂三田ニュータウン南地区"].sort());
     for (const s of sanda) {
