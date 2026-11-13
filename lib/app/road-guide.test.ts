@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { linkTexts } from "../roadmap/link-texts";
 import { buildLinks, findMunicipality } from "../roadmap/municipalities";
-import { PHONE_COPY_HINT, roadGuide } from "./road-guide";
+import { PHONE_COPY_HINT, roadGuide, roadSheetTexts } from "./road-guide";
 
 // スマホの「道路」タブには、地図の開き方（市のページのどこを押すか）が出ていなかった（PC だけ）。
 // 入口のページを開く市では、開いたあとの道順が分からないと地図にたどり着けない
@@ -47,5 +47,23 @@ describe("スマホの「道路」タブの、地図の開き方（lib/app/road-
       expect(g.length, m.name).toBeGreaterThan(0);
       expect(g[0].tip.length, m.name).toBeGreaterThan(20);
     }
+  });
+  // 茨木市などの「非公開」の市で、くわしい話のシートに「市町村の地図を開いて確認してください」と出ていた（開ける地図が無い）
+  it("開ける道路種別の地図が無い市町村では、「地図を開いて確認」と言わず、窓口で確かめるよう書く（roadSheetTexts）", () => {
+    const ibaraki = roadSheetTexts(links("27211", 34.8164, 135.5686), "茨木市"); // 地図なし（窓口の端末で見る市）
+    expect(ibaraki.heading).toBe("茨木市の道路の調べ方の注意");
+    expect(ibaraki.unread).toBe("この市町村は、MICHILU から開ける道路種別の地図がありません。道路の種別は、道路のタブの問い合わせ先（窓口）で確かめてください。");
+    expect(ibaraki.lead).toBe("前面道路の種別と幅員は、現地と窓口で確かめてください。");
+    const takatsuki = roadSheetTexts(links("27207", 34.8461, 135.6173), "高槻市"); // 市道の参考の地図だけ
+    expect(takatsuki.heading).toBe("高槻市の地図の開き方と注意");
+    expect(takatsuki.unread).toMatch(/MICHILU から開ける道路種別の地図がありません/);
+    expect(takatsuki.lead).not.toMatch(/地図に色の無い道/);
+    const moriguchi = roadSheetTexts(links("27209", 34.7377, 135.5641), "守口市"); // 道路種別の地図がある
+    expect(moriguchi.heading).toBe("守口市の地図の開き方と注意");
+    expect(moriguchi.unread).toBe("この市町村は、地図の道路の種別を MICHILU で読めません。道路のタブから市町村の地図を開いて確認してください。");
+    expect(moriguchi.lead).toMatch(/^地図に色の無い道は載っていません。/);
+    // 位置指定道路だけの図（designated_only）も「道路種別の地図がある」に数える。調査中の市町村（地図なし）は窓口へ
+    const pending = roadSheetTexts([], "調査中の町");
+    expect(pending.unread).toMatch(/窓口）で確かめてください/);
   });
 });

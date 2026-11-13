@@ -116,14 +116,14 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     for (const m of KINKI_PENDING) expect(m.coverage).toBe("unknown");
   });
 
-  it("府県が扱う市町村・政令市・三重県の8市・奈良県の3市・滋賀県の7市・宇治市・和歌山市・兵庫県の11市は登録済み（212）。残りの15（大阪府の、市が道路を扱う市）は調査中", () => {
+  it("近畿の227市町村は全部登録済み（府県が扱う市町村・政令市と、市が道路を扱う38市）。調査中は 0", () => {
     const done: Record<string, number> = {};
     for (const m of MUNICIPALITIES) if (KINKI.includes(m.pref) && m.coverage !== "unknown") done[m.pref] = (done[m.pref] ?? 0) + 1;
-    expect(done).toEqual({ 三重県: 29, 滋賀県: 19, 京都府: 26, 大阪府: 28, 兵庫県: 41, 奈良県: 39, 和歌山県: 30 });
-    expect(KINKI_PENDING).toHaveLength(15);
+    expect(done).toEqual({ 三重県: 29, 滋賀県: 19, 京都府: 26, 大阪府: 43, 兵庫県: 41, 奈良県: 39, 和歌山県: 30 });
+    expect(KINKI_PENDING).toHaveLength(0);
     // 調査中に残るのは、市が道路を扱う市（特定行政庁など）だけ
     expect(KINKI_PENDING.every((m) => m.name.endsWith("市"))).toBe(true);
-    expect([...new Set(KINKI_PENDING.map((m) => m.pref))]).toEqual(["大阪府"]);
+    expect([...new Set(KINKI_PENDING.map((m) => m.pref))]).toEqual([]);
     // 政令市：京都市・大阪市・神戸市は全種別の図、堺市は載る種別を確かめられていないので一部
     expect(findMunicipality("26104")?.coverage).toBe("full");
     expect(findMunicipality("27127")?.coverage).toBe("full");
@@ -269,6 +269,52 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     expect(wakayama.contact?.noPhoneInquiry).toBeUndefined();
   });
 
+  it("大阪府の15市：市が道路を扱う。市のサイトの個別のページへはつながず、市の公式ページに載っている地図のサービスの入口を開く", () => {
+    const codes = ["27202", "27203", "27204", "27205", "27207", "27209", "27210", "27211", "27212", "27215", "27219", "27220", "27222", "27223", "27227"];
+    const cities = codes.map((c) => findMunicipality(c)!);
+    const by = Object.fromEntries(cities.map((m) => [m.name, m]));
+    expect(cities.map((m) => m.name)).toEqual(["岸和田市", "豊中市", "池田市", "吹田市", "高槻市", "守口市", "枚方市", "茨木市", "八尾市", "寝屋川市", "和泉市", "箕面市", "羽曳野市", "門真市", "東大阪市"]);
+    // 全種別：市のページ・手引きで載る種別を確かめられた3市。非公開：ネットに道路種別の地図が無い4市
+    expect(cities.filter((m) => m.coverage === "full").map((m) => m.name)).toEqual(["吹田市", "守口市", "枚方市"]);
+    expect(cities.filter((m) => m.coverage === "none").map((m) => m.name)).toEqual(["高槻市", "茨木市", "寝屋川市", "箕面市"]);
+    expect(cities.filter((m) => m.coverage === "partial").map((m) => m.name)).toEqual(["岸和田市", "豊中市", "池田市", "八尾市", "和泉市", "羽曳野市", "門真市", "東大阪市"]);
+    // 茨木市・寝屋川市は地図なし（窓口だけ）。高槻市・箕面市は市道の参考の地図だけ
+    expect(by["茨木市"].maps).toEqual([]);
+    expect(by["寝屋川市"].maps).toEqual([]);
+    expect(by["高槻市"].maps.map((l) => l.kind)).toEqual(["public_road"]);
+    expect(by["箕面市"].maps.map((l) => l.kind)).toEqual(["public_road"]);
+    // 個別のページへのリンクを制限する市（枚方・守口・茨木・八尾・寝屋川・岸和田）のサイトへは、つながない
+    const restricted = /city\.(hirakata|moriguchi|ibaraki|yao|neyagawa)\.osaka\.jp|city\.kishiwada\.lg\.jp/;
+    for (const m of cities) for (const link of m.maps) expect(link.build ? link.build(34.7, 135.5) : link.url!, `${m.name} ${link.label}`).not.toMatch(restricted);
+    // 地図のサービスの入口（wagmap・ALANDIS・Sonicweb・geocloud）。開いて確かめられていないので「確認済み」にしない
+    const service = /^https:\/\/(www2\.wagmap\.jp|webgis\.alandis\.jp|www\.sonicweb-asp\.jp|gis\.city\.toyonaka\.osaka\.jp)\//;
+    for (const m of cities) {
+      for (const link of m.maps.filter((l) => l.kind === "road_type")) {
+        expect(link.build ? link.build(34.7, 135.5) : link.url!, m.name).toMatch(service);
+        expect(link.verified, m.name).toBe(false);
+        expect(link.tip, m.name).toMatch(/MICHILU (の確認では|は中)/);
+      }
+    }
+    expect(by["八尾市"].maps[0].url).toBe("https://www.sonicweb-asp.jp/yao/agreement?theme=th_16");
+    expect(by["守口市"].maps[0].url).toBe("https://www.sonicweb-asp.jp/moriguchi/");
+    // 豊中市だけは、市のページのリンクと同じ形に物件の位置を付けて開く
+    expect(cities.flatMap((m) => m.maps.filter((l) => l.build).map(() => m.name))).toEqual(["豊中市"]);
+    expect(by["豊中市"].maps[0].build?.(34.781545, 135.46976)).toBe("https://gis.city.toyonaka.osaka.jp/webgis/?mp=21&bg=BG0&vlf=-1&ar=1&z=18&ll=34.781545%2C135.469760");
+    // 載る種別を、市のページ・手引きのとおりに書く
+    expect(by["吹田市"].maps[0].tip).toMatch(/第42条第1項第1号〜第5号の道路と第2項の道路.*令和3年4月現在/);
+    expect(by["守口市"].maps[0].tip).toMatch(/濃い緑＝42条1項1号、黄緑＝1項2号、緑＝1項3号、オレンジ＝1項4号、黄＝1項5号、水色＝42条2項/);
+    expect(by["枚方市"].maps[0].tip).toMatch(/42条1項1号〜5号・2項.*最小幅員が4m.*1項1号の道路/);
+    expect(by["八尾市"].maps[0].tip).toMatch(/42条1項5号の位置指定道路・42条2項の道路・43条2項の空地・道路扱いなし/);
+    expect(by["門真市"].maps[0].tip).toMatch(/1号・2号・4号・5号道路と2項道路（3号道路は挙がっていない）/);
+    expect(by["羽曳野市"].note).toMatch(/全部の道路種別の情報を出しているわけではない/);
+    expect(by["岸和田市"].maps[0].tip).toContain("2026年3月26日");
+    // 窓口：市の建築の課
+    expect(cities.map((m) => m.contact?.phone)).toEqual(["072-423-9571", "06-6858-2860", "072-754-6339", "06-6384-1972", "072-674-7567", "06-6992-1736", "072-841-1432", "072-620-1661", "072-924-8544", "072-825-2765", "0725-99-8141", "072-724-6972", "072-958-1111", "06-6902-6346", "06-4309-3240"]);
+    // 道路種別を電話などでは答えないと市のページに書かれている6市
+    expect(cities.filter((m) => m.contact?.noPhoneInquiry).map((m) => m.name)).toEqual(["豊中市", "吹田市", "高槻市", "守口市", "門真市", "東大阪市"]);
+    for (const c of codes) expect(MUNICIPALITIES.filter((m) => m.codes.includes(c)), c).toHaveLength(1);
+  });
+
   it("兵庫県の11市：市が道路を扱い、地図は市のページ（入口）から開く。凡例を確かめられた西宮市と、市が全部の道路を出すと書く三田市だけ全種別", () => {
     const codes = ["28201", "28202", "28203", "28204", "28206", "28207", "28210", "28214", "28216", "28217", "28219"];
     const cities = codes.map((c) => findMunicipality(c)!);
@@ -339,11 +385,11 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
 
   it("道路種別を電話で答えない窓口は、電話のボタンを控えめにする印が付く", () => {
     // 府県・市のページに、電話などでは答えないと書かれているところ
-    for (const code of ["27127", "27141", "27322", "26104", "26208", "25209", "24203", "30208", "29202", "29207", "29449", "25206", "25213", "26204", "28203", "28204", "28210", "28214"]) {
+    for (const code of ["27127", "27141", "27322", "26104", "26208", "25209", "24203", "30208", "29202", "29207", "29449", "25206", "25213", "26204", "28203", "28204", "28210", "28214", "27203", "27205", "27207", "27209", "27223", "27227"]) {
       expect(findMunicipality(code)?.contact?.noPhoneInquiry, code).toBe(true);
     }
     // 書かれていないところ（兵庫県の土木事務所・和歌山県の那賀のほかの窓口・奈良県の郡山と中和・市のページに書かれていない市）には付けない
-    for (const code of ["28221", "30202", "30206", "29203", "29206", "25201", "25202", "25203", "25204", "25207", "29201", "29205", "29209", "30201", "28201", "28202", "28206", "28207", "28216", "28217", "28219"]) {
+    for (const code of ["28221", "30202", "30206", "29203", "29206", "25201", "25202", "25203", "25204", "25207", "29201", "29205", "29209", "30201", "28201", "28202", "28206", "28207", "28216", "28217", "28219", "27202", "27204", "27210", "27211", "27212", "27215", "27219", "27220", "27222"]) {
       const m = findMunicipality(code);
       if (m && m.coverage !== "unknown") expect(m.contact?.noPhoneInquiry, code).toBeUndefined();
     }

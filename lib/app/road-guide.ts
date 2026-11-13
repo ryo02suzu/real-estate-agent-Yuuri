@@ -23,3 +23,22 @@ export function roadGuide(links: ResolvedLink[]): GuideItem[] {
     return tip ? [{ label: l.label, url: l.url, what: sub, tip }] : [];
   });
 }
+
+/**
+ * 「地図の色と幅員のくわしい話」のシートの、見出し・地図のデータを読めないときの一文・下の注意。
+ * 道路種別の地図（MICHILU から開けるもの）が無い市町村（非公開・調査中・区域外。市道の参考の地図だけの市も）に、
+ * 「市町村の地図を開いて確認」「地図に色の無い道は…」と言わない（開ける地図が無いので、窓口で確かめる）
+ */
+export function roadSheetTexts(links: ResolvedLink[], name: string): { heading: string; unread: string; lead: string } {
+  const hasTypeMap = links.some((l) => l.kind !== "public_road");
+  const hasGuide = roadGuide(links).length > 0;
+  return {
+    heading: hasGuide ? `${name}の地図の開き方と注意` : `${name}の道路の調べ方の注意`,
+    unread: hasTypeMap
+      ? "この市町村は、地図の道路の種別を MICHILU で読めません。道路のタブから市町村の地図を開いて確認してください。"
+      : "この市町村は、MICHILU から開ける道路種別の地図がありません。道路の種別は、道路のタブの問い合わせ先（窓口）で確かめてください。",
+    lead: hasTypeMap
+      ? "地図に色の無い道は載っていません。前面道路と幅員は、地図と現地で確かめ、最終確認は窓口で行ってください。"
+      : "前面道路の種別と幅員は、現地と窓口で確かめてください。",
+  };
+}
