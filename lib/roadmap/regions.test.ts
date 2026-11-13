@@ -116,14 +116,14 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     for (const m of KINKI_PENDING) expect(m.coverage).toBe("unknown");
   });
 
-  it("府県が扱う市町村・政令市・三重県の8市・奈良県の3市は登録済み（192）。残りの35（特定行政庁の市）は調査中", () => {
+  it("府県が扱う市町村・政令市・三重県の8市・奈良県の3市・滋賀県の7市は登録済み（199）。残りの28（特定行政庁の市）は調査中", () => {
     const done: Record<string, number> = {};
     for (const m of MUNICIPALITIES) if (KINKI.includes(m.pref) && m.coverage !== "unknown") done[m.pref] = (done[m.pref] ?? 0) + 1;
-    expect(done).toEqual({ 三重県: 29, 滋賀県: 12, 京都府: 25, 大阪府: 28, 兵庫県: 30, 奈良県: 39, 和歌山県: 29 });
-    expect(KINKI_PENDING).toHaveLength(35);
+    expect(done).toEqual({ 三重県: 29, 滋賀県: 19, 京都府: 25, 大阪府: 28, 兵庫県: 30, 奈良県: 39, 和歌山県: 29 });
+    expect(KINKI_PENDING).toHaveLength(28);
     // 調査中に残るのは、市が道路を扱う市（特定行政庁など）だけ
     expect(KINKI_PENDING.every((m) => m.name.endsWith("市"))).toBe(true);
-    expect(KINKI_PENDING.filter((m) => m.pref === "奈良県")).toEqual([]);
+    expect(KINKI_PENDING.filter((m) => m.pref === "奈良県" || m.pref === "滋賀県")).toEqual([]);
     // 政令市：京都市・大阪市・神戸市は全種別の図、堺市は載る種別を確かめられていないので一部
     expect(findMunicipality("26104")?.coverage).toBe("full");
     expect(findMunicipality("27127")?.coverage).toBe("full");
@@ -152,7 +152,7 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     for (const m of done) {
       for (const link of m.maps) {
         if (link.build) {
-          // 近畿で物件の位置で開く地図は、利用規約・利用条件への同意の先（MICHILU は同意の先を開いていない）か、
+          // 近畿で物件の位置で開く地図は、利用規約・利用条件への同意の先（MICHILU は同意の先を開いていない。近江八幡市の ArcGIS の地図も）か、
           // 海外の回線から開けない地図（Sonicweb）。どれも位置で開くことを確かめていないので「確認済み」にしない
           expect(link.verified, `${m.name} ${link.label}`).toBe(false);
           expect(link.tip, `${m.name} ${link.label}`).toMatch(/自分で(「同意する」を押す|同意する)|海外の回線から開けない/);
@@ -213,6 +213,40 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     expect(findMunicipality("29207")?.contact?.note).toContain("五條土木事務所");
   });
 
+  it("滋賀県の7市：市が道路を扱う。開けなかった地図は市のページ（入口）から、近江八幡市の地図は物件の位置で開く（同意は自分で）", () => {
+    const codes = ["25201", "25202", "25203", "25204", "25206", "25207", "25213"];
+    const cities = codes.map((c) => findMunicipality(c)!);
+    expect(cities.map((m) => m.name)).toEqual(["大津市", "彦根市", "長浜市", "近江八幡市", "草津市", "守山市", "東近江市"]);
+    // 凡例を公式の資料で確かめられた大津市・東近江市は全種別、凡例を確かめられていない・載っていない道がある市は一部、守山市は道路種別の地図が見つからない
+    expect(cities.map((m) => m.coverage)).toEqual(["full", "partial", "partial", "partial", "partial", "none", "full"]);
+    const [otsu, hikone, nagahama, omihachiman, kusatsu, moriyama, higashiomi] = cities;
+    // 地図のサイトを開いて確かめられていない6市は、市のページ（入口）だけ
+    for (const m of [otsu, hikone, nagahama, kusatsu, moriyama, higashiomi]) for (const link of m.maps) expect(link.build, `${m.name} ${link.label}`).toBeNull();
+    expect(otsu.maps[0]).toMatchObject({ kind: "road_type", url: "https://www.city.otsu.lg.jp/soshiki/035/1309/g/douro/67087.html" });
+    expect(otsu.maps[0].tip).toMatch(/緑＝1項1号.*水色＝2項.*色なし＝未判定/);
+    expect(higashiomi.maps[0]).toMatchObject({ kind: "road_type", url: "https://www.city.higashiomi.shiga.jp/machizukuri_kankyou/kenchiku/1003563/1003572.html" });
+    expect(higashiomi.maps[0].tip).toMatch(/自分で同意してから使う決まり/);
+    // 守山市はリンク先をトップページにするよう求めているので、トップページを開く（市道の参考の地図だけ）
+    expect(moriyama.maps).toHaveLength(1);
+    expect(moriyama.maps[0]).toMatchObject({ kind: "public_road", url: "https://www.city.moriyama.lg.jp/" });
+    for (const m of cities) for (const link of m.maps) if (m !== moriyama) expect(link.build ? link.build(35.1, 136.1) : link.url!, link.label).not.toMatch(/city\.moriyama\.lg\.jp/);
+    // 近江八幡市：ArcGIS の地図を物件の位置で開く形（地図の部品の ID は公開の設定から）
+    expect(omihachiman.maps.map((l) => l.kind)).toEqual(["road_type", "public_road", "public_road"]);
+    expect(omihachiman.maps[0].build?.(35.128, 136.098)).toBe("https://experience.arcgis.com/experience/cb6aedeac97e4198abc4c187f4dc7a2d/#widget_5=center:136.098000%2C35.128000%2C4326,scale:2500");
+    expect(omihachiman.maps[1].build?.(35.128, 136.098)).toBe("https://experience.arcgis.com/experience/7d34b331a7f54e188d87ba5e7e6cde19/#widget_14=center:136.098000%2C35.128000%2C4326,scale:2500");
+    expect(omihachiman.maps[2].build?.(35.128, 136.098)).toBe("https://experience.arcgis.com/experience/01a226fb775e4377a715d12754341278/#widget_15=center:136.098000%2C35.128000%2C4326,scale:2500");
+    for (const link of omihachiman.maps) expect(link.verified, link.label).toBe(false);
+    // 窓口：市の建築の課
+    expect(cities.map((m) => m.contact?.phone)).toEqual(["077-528-2774", "0749-30-6125", "0749-65-6543", "0748-36-5544", "077-561-2378", "077-582-1139", "0748-24-5656"]);
+    expect(cities.map((m) => m.contact?.fax)).toEqual(["077-523-1505", "0749-24-8517", "0749-65-6760", "0748-36-5595", "077-561-2486", "077-582-6947", "0748-24-1249"]);
+    // 草津市・東近江市は、道路種別を電話などでは答えない
+    expect(cities.filter((m) => m.contact?.noPhoneInquiry).map((m) => m.name)).toEqual(["草津市", "東近江市"]);
+    // 都市計画区域の外がある市は、そう書く
+    expect(otsu.note).toContain("葛川地区");
+    expect(nagahama.note).toContain("旧余呉町・旧西浅井町");
+    expect(higashiomi.note).toContain("旧永源寺町");
+  });
+
   it("奈良県の3市（奈良・橿原・生駒）：市が道路を扱い、地図は市のページ（入口）から開く。道路種別の案内があるのは橿原市だけ", () => {
     const [nara, kashihara, ikoma] = ["29201", "29205", "29209"].map((c) => findMunicipality(c)!);
     expect([nara, kashihara, ikoma].map((m) => m.name)).toEqual(["奈良市", "橿原市", "生駒市"]);
@@ -237,11 +271,11 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
 
   it("道路種別を電話で答えない窓口は、電話のボタンを控えめにする印が付く", () => {
     // 府県・市のページに、電話などでは答えないと書かれているところ
-    for (const code of ["27127", "27141", "27322", "26104", "26208", "25209", "24203", "30208", "29202", "29207", "29449"]) {
+    for (const code of ["27127", "27141", "27322", "26104", "26208", "25209", "24203", "30208", "29202", "29207", "29449", "25206", "25213"]) {
       expect(findMunicipality(code)?.contact?.noPhoneInquiry, code).toBe(true);
     }
     // 書かれていないところ（兵庫県の土木事務所・和歌山県の那賀のほかの窓口・奈良県の郡山と中和）には付けない
-    for (const code of ["28201", "28221", "30202", "30206", "29203", "29206"]) {
+    for (const code of ["28201", "28221", "30202", "30206", "29203", "29206", "25201", "25202", "25203", "25204", "25207", "29201", "29205", "29209"]) {
       const m = findMunicipality(code);
       if (m && m.coverage !== "unknown") expect(m.contact?.noPhoneInquiry, code).toBeUndefined();
     }
