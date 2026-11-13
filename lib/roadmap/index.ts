@@ -1,8 +1,9 @@
 import GSI_CODES from "./data/gsi-muni-codes.json";
 import { correctAddress, describeMatch, type AddressFix, type AddressMiss } from "./address-fix";
-import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, needsChoice, reverseGeocode, type GeocodeResult } from "./geocode";
+import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, matchedNumbers, needsChoice, numbersAgree, reverseGeocode, withoutNumbers, type GeocodeResult } from "./geocode";
 import { buildLinks, findMunicipality, resolveContact, type Contact, type Municipality, type ResolvedLink } from "./municipalities";
-import { parcelAt, searchParcel, splitChiban, townFromAddress, type Parcel, type ParcelSource } from "./parcel";
+import { normalizeChiban, parcelAt, searchParcel, splitChiban, splitLotHead, townFromAddress, type Parcel, type ParcelSource } from "./parcel";
+import { addressSub } from "./parcel-sub";
 import { loadParcelIndex, type ParcelIndex } from "./parcel-index";
 import { pmtilesParcelSource } from "./parcel-tiles";
 
@@ -34,7 +35,13 @@ export type LookupResult =
       /** 同じ町に同じ地番の筆がほかにもあった数（小字違いなど） */
       parcelOthers?: number;
       /** 地番で探したが見つからなかったときの案内と、枝番違いなどの近い地番 */
-      parcelMiss?: { chiban: string; reason: "not_found" | "no_map" | "error"; similar: string[] };
+      parcelMiss?: {
+        chiban: string;
+        reason: "not_found" | "no_map" | "error";
+        similar: string[];
+        /** 同じ地番が、入れた小字・地割・丁目とは別の所にあった（その区分の名前）。別の土地なので当てていない */
+        elsewhere?: string[];
+      };
       /**
        * 国土地理院は住居表示（「14番1号」「22番」）として当てたが、入力が登記の書き方（「14番1」）なので地番の筆を出した。
        * その住居表示の住所（別の場所のことがあるので、画面で住居表示として探し直せるようにする）
@@ -80,6 +87,9 @@ export async function lookup(
   }
   if (!fixed && needsChoice(address, candidates)) return { status: "choose", candidates: candidates.slice(0, 15) };
   let geo = candidates[0];
+  // 見つかった番地が入れた番地と食い違う（国土地理院が小字の漢数字を番地と読んだ）ときは、同じ町で番地の合う所を探し直す。
+  // 無ければ番地は当てず、町の代表点にする（別の番地を「その住所」として出さない）
+  if (!numbersAgree(address, geo.matchedAddress)) geo = await rematchNumbers(address, chiban, geo, candidates);
   // 「地番」と明示したのに住居表示の街区（「217番」）に当たったら、地番と取り違えないよう町の代表点から探す
   if (chiban?.explicit && isJukyo(geo.matchedAddress)) geo = (await geocodeCandidates(chiban.body))[0] ?? geo;
   const rev = await reverseGeocode(geo.lat, geo.lng);
@@ -106,7 +116,9 @@ export async function lookup(
     try {
       // 地番の索引（市区町村コードごと。あれば番号の入ったタイルを先に開く。無ければ null で今までの探し方）
       const index = town ? await loadIndex(rev.muniCd) : null;
-      const r = town ? await searchParcel({ city, town, chiban: chiban.chiban }, geo, parcels, { index }) : ({ status: "no_map" } as const);
+      // 入れた住所に、見つかった町より細かい区分（丁目・地割・小字）があれば、筆の地番区域と照らし合わせる（同じ地番の別の土地を当てない）
+      const sub = town ? addressSub(chiban.body, town, city) : null;
+      const r = town ? await searchParcel({ city, town, chiban: chiban.chiban, sub }, geo, parcels, { index }) : ({ status: "no_map" } as const);
       if (r.status === "found") {
         const { lat, lng } = r.parcel.point;
         const prev = (await reverseGeocode(lat, lng)) ?? rev;
@@ -128,7 +140,13 @@ export async function lookup(
         };
       }
       // 国土地理院が番地まで見つけた住所で、ついでに筆を探しただけなら、見つからなくても何も言わない
-      if (chiban.explicit || approximate) parcelMiss = { chiban: chiban.chiban, reason: r.status, similar: r.status === "not_found" ? r.similar : [] };
+      if (chiban.explicit || approximate)
+        parcelMiss = {
+          chiban: chiban.chiban,
+          reason: r.status,
+          similar: r.status === "not_found" ? r.similar : [],
+          ...(r.status === "not_found" && r.elsewhere?.length ? { elsewhere: r.elsewhere } : {}),
+        };
     } catch {
       if (chiban.explicit || approximate) parcelMiss = { chiban: chiban.chiban, reason: "error", similar: [] };
     }
@@ -146,6 +164,25 @@ export async function lookup(
     links: buildLinks(municipality, geo.lat, geo.lng, rev.town),
     contact: resolveContact(municipality, rev.muniCd),
   };
+}
+
+/**
+ * 見つかった番地が入れた番地と食い違うときの探し直し（geocode.ts の numbersAgree）。
+ * (1) ほかの候補に、同じ町で番地の合うものがあれば使う。(2) 地番の書き方の入力なら、小字を外して「町＋地番」で聞き直す
+ * （「松戸字三丁目1791番1」→「松戸1791番1」）。(3) どちらも無ければ、その町の代表点（番地は当てない。町までの一致になる）
+ */
+async function rematchNumbers(input: string, chiban: ReturnType<typeof splitChiban>, geo: GeocodeResult, candidates: GeocodeResult[]): Promise<GeocodeResult> {
+  const town = withoutNumbers(geo.matchedAddress);
+  const fits = (c: GeocodeResult) => withoutNumbers(c.matchedAddress) === town && matchedNumbers(c.matchedAddress).length > 0 && numbersAgree(input, c.matchedAddress);
+  const other = candidates.find(fits);
+  if (other) return other;
+  if (chiban) {
+    const [parent, branch] = splitLotHead(normalizeChiban(chiban.chiban))[1].split("-");
+    const again = (await geocodeCandidates(`${town}${parent}番${branch ?? ""}`)).find(fits);
+    if (again) return again;
+  }
+  const rep = (await geocodeCandidates(town)).find((c) => c.matchedAddress === town);
+  return rep ?? { ...geo, matchedAddress: town };
 }
 
 /** 国土地理院の住所が住居表示の街区・号（「1番」「1番1号」）まで一致しているか（「354番地」は地番による住所） */

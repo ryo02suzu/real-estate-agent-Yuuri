@@ -67,6 +67,7 @@ import {
   type Neighbor,
 } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
+import { elsewhereNote } from "@/lib/roadmap/parcel-sub";
 import { buildReport, type ReportDetail } from "@/lib/app/report";
 import { docText } from "@/lib/app/doc";
 import { inquiryDeptOf, inquiryInputOf } from "@/lib/app/inquiry-template";
@@ -2658,6 +2659,19 @@ function PlaceNote({
             ? "この地域は地番の地図データがありません。"
             : "地番の地図データを読み込めませんでした。"}
         {approximate && "町の中心を表示しています。"}
+        {!!parcelMiss.elsewhere?.length && (
+          <span className="mt-[5px] flex flex-wrap items-center gap-[5px]">
+            {elsewhereNote(parcelMiss.elsewhere)}
+            {parcelMiss.elsewhere.slice(0, 3).map((l) => (
+              <MiniButton
+                key={l}
+                onClick={() => onPick(`地番 ${result.matchedAddress}${l}${parcelMiss.chiban}`)}
+              >
+                {l}の {parcelMiss.chiban} を見る
+              </MiniButton>
+            ))}
+          </span>
+        )}
         {parcelMiss.similar.length > 0 && (
           <span className="mt-[5px] flex flex-wrap items-center gap-[5px]">
             近い地番：

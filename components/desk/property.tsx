@@ -26,6 +26,7 @@ import type { AddressFix } from "@/lib/roadmap";
 import { distanceText } from "@/lib/roadmap/land-price";
 import { chibanLabel, chibanQueryOf, isLotChiban, kuikiLabel, registryChiban, type Neighbor } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
+import { elsewhereNote } from "@/lib/roadmap/parcel-sub";
 import { roadShort } from "@/lib/roadmap/road-read";
 import { youtoShort } from "@/lib/roadmap/zoning";
 import { addressOffLot, pickKey, registryNeighbors, type ParcelPick } from "../parcel-card";
@@ -569,6 +570,12 @@ function PlaceNotes({ query, result, data, onPick, onFix, onLiteral }: { query: 
         <>
           {parcelMiss.reason === "not_found" ? `地番 ${parcelMiss.chiban} は見つかりません（${PARCEL_DATA.edition}の地図）。` : parcelMiss.reason === "no_map" ? "この地域は地番の地図データがありません。" : "地番の地図データを読み込めませんでした。"}
           {approximate && "町の中心を表示しています。"}
+          {!!parcelMiss.elsewhere?.length && (
+            <span className="block">
+              {elsewhereNote(parcelMiss.elsewhere)}
+              {parcelMiss.elsewhere.slice(0, 3).map((l) => mini(`${l}の ${parcelMiss.chiban} を見る`, () => onPick(`地番 ${result.matchedAddress}${l}${parcelMiss.chiban}`)))}
+            </span>
+          )}
           {parcelMiss.similar.length > 0 && <span className="block">近い地番：{parcelMiss.similar.slice(0, 4).map((c) => mini(c, () => onPick(`地番 ${result.matchedAddress}${c}`)))}</span>}
         </>
       ),

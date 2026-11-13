@@ -5,6 +5,7 @@ import { lookup, registryStyle } from "./index";
 import { loadParcelIndex } from "./parcel-index";
 import { mergeParcelSources, withoutCities } from "./parcel-tiles";
 import { sankoCovers } from "./sanko-data";
+import { addressSub } from "./parcel-sub";
 import {
   chibanLabel,
   cityMatches,
@@ -232,6 +233,43 @@ describe("筆の探索", () => {
   it("甲乙の付いた地番は、頭の文字まで同じ筆だけ（「乙987-1」を探して「甲987-1」は出さない）", async () => {
     const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: "取手市_白山_３丁目__", chiban: "甲987-1" }, { kuiki: "取手市_白山_３丁目__", chiban: "乙987-2" }] });
     expect(await searchParcel({ city: "取手市", town: "白山３丁目", chiban: "乙987-1" }, START, src, { maxTiles: 12 })).toEqual({ status: "not_found", similar: ["乙987-2"] });
+  });
+
+  it("入力に小字が書いてあれば、同じ地番でも小字の違う筆は当てない（鶴岡市羽黒町手向の字手向と字羽黒山）", async () => {
+    const sub = addressSub("山形県鶴岡市羽黒町手向字手向", "羽黒町手向", "鶴岡市");
+    // 代表点に近い方に、小字の違う同じ地番。入力の小字の筆は1枚先
+    const src = fakeSource({
+      [`${SX},${SY}`]: [{ kuiki: "鶴岡市_羽黒町手向__字羽黒山_", chiban: "147-1" }],
+      [`${SX + 1},${SY}`]: [{ kuiki: "鶴岡市_羽黒町手向__字手向_", chiban: "147-1" }],
+    });
+    const r = await searchParcel({ city: "鶴岡市", town: "羽黒町手向", chiban: "147-1", sub }, START, src);
+    expect(r.status === "found" && r.parcel.kuiki).toBe("鶴岡市_羽黒町手向__字手向_");
+    expect(r.status === "found" && r.others).toBe(0);
+    // 小字を書かなければ今までどおり（代表点に近い方を出し、ほかにもあることを数える）
+    const plain = await searchParcel({ city: "鶴岡市", town: "羽黒町手向", chiban: "147-1" }, START, src, { batch: 20 });
+    expect(plain.status === "found" && plain.parcel.kuiki).toBe("鶴岡市_羽黒町手向__字羽黒山_");
+    expect(plain.status === "found" && plain.others).toBe(1);
+  });
+
+  it("入力の小字・地割の筆が地図データに無ければ「見つからない」にして、同じ地番のある別の区分を知らせる", async () => {
+    const src = fakeSource({
+      [`${SX},${SY}`]: [
+        { kuiki: "花巻市_石鳥谷町好地_第９地割__", chiban: "24-2" },
+        { kuiki: "花巻市_石鳥谷町好地_第９地割__", chiban: "24-5" },
+        { kuiki: "花巻市_石鳥谷町好地_第１６地割__", chiban: "24-7" },
+      ],
+    });
+    const sub = addressSub("岩手県花巻市石鳥谷町好地第16地割", "石鳥谷町好地", "花巻市");
+    const r = await searchParcel({ city: "花巻市", town: "石鳥谷町好地", chiban: "24-2", sub }, START, src, { maxTiles: 12 });
+    // 枝番ちがいの候補も、入力と同じ地割のものだけ（第9地割の 24-5 は出さない）
+    expect(r).toEqual({ status: "not_found", similar: ["24-7"], elsewhere: ["第9地割"] });
+  });
+
+  it("地番区域に小字が書かれていなければ、入力に小字があっても当てる（比べられない）", async () => {
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: K, chiban: "391-3" }] });
+    const sub = addressSub("埼玉県熊谷市下奈良字東原", "下奈良", "熊谷市");
+    const r = await searchParcel({ city: "熊谷市", town: "下奈良", chiban: "391-3", sub }, START, src);
+    expect(r.status === "found" && r.parcel.kuiki).toBe(K);
   });
 
   it("代表点のまわりに地図が無くても、3枚離れた所の町の筆まで探しに行く", async () => {
@@ -522,6 +560,53 @@ describe("lookup で地番を探す", () => {
     const r = await lookup("埼玉県熊谷市下奈良391番地", { parcels: fakeSource({ [`${SX},${SY}`]: [{ kuiki: "熊谷市_下奈良___", chiban: "391-1" }] }) });
     expect(r.status === "ok" && r.approximate).toBe(true);
     expect(r.status === "ok" && r.parcelMiss).toEqual({ chiban: "391", reason: "not_found", similar: ["391-1"] });
+  });
+
+  /** 聞いた住所ごとに違う答えを返す住所検索（answers の鍵を含む問い合わせに、その住所と位置を返す。長い鍵を先に見る） */
+  const stubGsiBy = (answers: Record<string, { title: string; lat: number; lng: number } | null>, muniCd: string, town: string) =>
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () => {
+          if (!url.includes("AddressSearch")) return { results: { muniCd, lv01Nm: town } };
+          const q = decodeURIComponent(url.split("q=")[1]);
+          const key = Object.keys(answers)
+            .sort((a, b) => b.length - a.length)
+            .find((k) => q.includes(k));
+          const a = key ? answers[key] : null;
+          return a ? [{ geometry: { coordinates: [a.lng, a.lat] }, properties: { title: a.title } }] : [];
+        },
+      })),
+    );
+
+  // 2026-11-13 の総当たり：国土地理院が小字の「三丁目」を番地と読み「松戸3番地」（1.5km 先）を返し、それを一致として出していた
+  it("見つかった番地が入れた地番と食い違えば、小字を外して聞き直し、番地の合う所を出す（松戸字三丁目1791番1）", async () => {
+    stubGsiBy(
+      {
+        字三丁目: { title: "千葉県松戸市松戸３番地", lat: START.lat + 0.01, lng: START.lng + 0.01 },
+        "千葉県松戸市松戸1791番1": { title: "千葉県松戸市松戸１７９１番地", lat: START.lat, lng: START.lng },
+      },
+      "12207",
+      "松戸",
+    );
+    const r = await lookup("千葉県松戸市松戸字三丁目1791番1", { parcels: fakeSource({}), loadIndex: async () => null });
+    expect(r.status === "ok" && [r.matchedAddress, r.lat, r.lng, r.approximate]).toEqual(["千葉県松戸市松戸１７９１番地", START.lat, START.lng, false]);
+  });
+
+  it("聞き直しても番地の合う所が無ければ、番地は当てずに町の代表点にする（別の番地を出さない）", async () => {
+    stubGsiBy(
+      {
+        字八反田: { title: "静岡県藤枝市岡部町内谷８番地", lat: START.lat + 0.01, lng: START.lng + 0.01 },
+        "静岡県藤枝市岡部町内谷623番1": null,
+        "静岡県藤枝市岡部町内谷": { title: "静岡県藤枝市岡部町内谷", lat: START.lat, lng: START.lng },
+      },
+      "22214",
+      "岡部町内谷",
+    );
+    const r = await lookup("静岡県藤枝市岡部町内谷字八反田623番1", { parcels: fakeSource({}), loadIndex: async () => null });
+    expect(r.status === "ok" && [r.matchedAddress, r.lat, r.lng, r.approximate]).toEqual(["静岡県藤枝市岡部町内谷", START.lat, START.lng, true]);
+    expect(r.status === "ok" && r.parcelMiss?.reason).toBe("no_map");
   });
 
   /** 国土地理院の住所検索が title の住所を返す fetch（逆ジオコーダは世田谷区弦巻） */

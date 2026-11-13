@@ -5,6 +5,7 @@
 // （最大4回）、入れた住所をより細かく説明できたときだけ使う。何をどう直したか（「南大道り」→「南大通り」）を返して画面に小さく出す。
 // 直しきれずに別の町に当たったときも、そのことを返す（黙って別の町を出さない）。住所は国土地理院の API にだけ送る
 import GSI_CODES from "./data/gsi-muni-codes.json";
+import { newForm } from "./old-kanji";
 import { CHIWARI, addressNumbers, chiwariDigits, geocodeCandidates, type GeocodeResult } from "./geocode";
 
 type Muni = { pref: string; name: string; city: string; ward?: string };
@@ -44,16 +45,7 @@ const MUNIS: Muni[] = (() => {
   return out.sort((a, b) => b.name.length - a.name.length);
 })();
 
-/** 地名によく出る旧字・異体字 → いまの字（国土地理院は「髙」などを読み替えない） */
-const OLD: Record<string, string> = {
-  髙: "高", 﨑: "崎", 嵜: "崎", 邊: "辺", 邉: "辺", 澤: "沢", 濱: "浜", 冨: "富", 德: "徳", 國: "国", 櫻: "桜", 廣: "広",
-  舊: "旧", 學: "学", 驛: "駅", 圓: "円", 關: "関", 鐵: "鉄", 黑: "黒", 條: "条", 齋: "斎", 齊: "斉", 藏: "蔵", 萬: "万",
-  澁: "渋", 淺: "浅", 榮: "栄", 惠: "恵", 眞: "真", 實: "実", 壽: "寿", 龜: "亀", 嶋: "島", 嶌: "島", 峯: "峰", 曻: "昇",
-  兒: "児", 縣: "県", 塲: "場", 舩: "船", 增: "増", 槗: "橋",
-};
-const OLD_RE = new RegExp(`[${Object.keys(OLD).join("")}]`, "g");
-/** 旧字をいまの字に */
-export const newForm = (s: string) => s.replace(OLD_RE, (c) => OLD[c] ?? c);
+export { newForm };
 /** 名前を比べるときの形：ヶ・ケ・ヵ・が、竜・龍を同じに（1字ずつの置き換えなので、長さは変わらない） */
 const vary = (s: string) => newForm(s).replace(/[ヶヵケが]/g, "ケ").replace(/竜/g, "龍");
 /**

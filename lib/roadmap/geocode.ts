@@ -1,7 +1,7 @@
 // 国土地理院の無料API（APIキー不要・保存制限なし）で住所→座標→市区町村コードを引く。
 // 住所をサーバーに送らないよう、ブラウザから直接呼ぶ想定。
 import { PREF_NAME_RE } from "./regions";
-import { kanjiToInt } from "./parcel";
+import { kanjiToInt, normalizeChiban, splitChiban, splitLotHead } from "./parcel";
 
 export type GeocodeResult = {
   lat: number;
@@ -85,6 +85,49 @@ export function partialMatch(input: string, matchedAddress: string): boolean {
   const a = addressNumbers(input).slice(0, 3);
   const b = addressNumbers(matchedAddress);
   return b.length > 0 && a.length > b.length;
+}
+
+/** 見つかった住所の終わりの番地・号（「松戸３番地」→ [3]、「寺内二丁目１３番５７号」→ [13, 57]。町までの一致は空） */
+export function matchedNumbers(matchedAddress: string): number[] {
+  const tail = matchedAddress.normalize("NFKC").replace(CHIWARI, "").match(/\d[\d番地号の-]*$/)?.[0];
+  return (tail?.match(/\d+/g) ?? []).map(Number);
+}
+
+/** 見つかった住所から終わりの番地・号を外した、町までの部分（「千葉県松戸市松戸３番地」→「千葉県松戸市松戸」） */
+export const withoutNumbers = (matchedAddress: string) => matchedAddress.replace(/[0-9０-９][0-9０-９番地号の\-－]*$/, "");
+
+/**
+ * 見つかった住所の番地・号が、入れた番号と食い違わないか。国土地理院の住所検索は、小字の名前の数字を番地として読み、
+ * 別の番地を返すことがある（「松戸字三丁目1791番1」→「松戸3番地」、「東長沼字五号1719番7」→「東長沼5番地」、
+ * 「内谷字八反田623番1」→「内谷8番地」。1km 以上離れた所になる）。
+ * 見つかった番地・号の並びが、入力の番号の中に（丁目の番号を除いて）そのまま続きで入っているかを見る。
+ * 地番の書き方の入力（「…字三丁目1791番1」「…49号村上31番4」）では、その並びが地番の位置から始まっていること。
+ * 見つかった住所に丁目があれば、入力のその前の番号と同じこと（入力に丁目が無い「青木217-8」は通す）。
+ * 町までの一致・入力の番号を読み取れない（漢数字だけなど）ときは、食い違いとしない
+ */
+export function numbersAgree(input: string, matchedAddress: string): boolean {
+  const got = matchedNumbers(matchedAddress);
+  if (!got.length) return true;
+  const text = chiwariDigits(input.normalize("NFKC"))
+    .replace(/〒?\s*\d{3}-\d{4}/g, "")
+    .replace(/([一二三四五六七八九十]+)丁目/g, (_, k: string) => `${kanjiToInt(k)}丁目`);
+  // 入力の番号（丁目の番号かどうかの印つき）
+  const typed = [...text.matchAll(/(\d+)(丁目)?/g)].map((m) => ({ n: Number(m[1]), chome: !!m[2] }));
+  if (typed.filter((t) => !t.chome).length < got.length) return true;
+  const chome = matchedAddress.normalize("NFKC").match(/(\d+|[一二三四五六七八九十]+)丁目/);
+  const chomeNo = chome ? (/^\d+$/.test(chome[1]) ? Number(chome[1]) : kanjiToInt(chome[1])) : undefined;
+  // 地番の書き方（地番の前に、丁目・地割・号などの付かない番号が無い）なら、地番の位置から始まること
+  const lot = splitChiban(input);
+  const lotStyle = !!lot && !/\d/.test(lot.body.normalize("NFKC").replace(/第?\d+(?:丁目|丁|地割|号地|号|字|区|部|番割|番町|条)/g, ""));
+  const lotAt = lot && lotStyle ? typed.length - (splitLotHead(normalizeChiban(lot.chiban))[1].match(/\d+/g) ?? []).length : -1;
+  for (let i = 0; i + got.length <= typed.length; i++) {
+    if (lotAt >= 0 && i !== lotAt) continue;
+    if (!got.every((n, j) => typed[i + j].n === n && !typed[i + j].chome)) continue;
+    // 見つかった住所に丁目があれば、入力のその前の番号と同じこと（丁目を書かない「青木217-8」のような2つまでの番号は通す）
+    if (chomeNo !== undefined && (i > 0 ? typed[i - 1].n !== chomeNo : typed.length > 2)) continue;
+    return true;
+  }
+  return false;
 }
 
 export type ReverseResult = {
