@@ -116,14 +116,14 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     for (const m of KINKI_PENDING) expect(m.coverage).toBe("unknown");
   });
 
-  it("府県が扱う市町村・政令市・三重県の8市は登録済み（189）。残りの38（特定行政庁の市）は調査中", () => {
+  it("府県が扱う市町村・政令市・三重県の8市・奈良県の3市は登録済み（192）。残りの35（特定行政庁の市）は調査中", () => {
     const done: Record<string, number> = {};
     for (const m of MUNICIPALITIES) if (KINKI.includes(m.pref) && m.coverage !== "unknown") done[m.pref] = (done[m.pref] ?? 0) + 1;
-    expect(done).toEqual({ 三重県: 29, 滋賀県: 12, 京都府: 25, 大阪府: 28, 兵庫県: 30, 奈良県: 36, 和歌山県: 29 });
-    expect(KINKI_PENDING).toHaveLength(38);
+    expect(done).toEqual({ 三重県: 29, 滋賀県: 12, 京都府: 25, 大阪府: 28, 兵庫県: 30, 奈良県: 39, 和歌山県: 29 });
+    expect(KINKI_PENDING).toHaveLength(35);
     // 調査中に残るのは、市が道路を扱う市（特定行政庁など）だけ
     expect(KINKI_PENDING.every((m) => m.name.endsWith("市"))).toBe(true);
-    expect(KINKI_PENDING.filter((m) => m.pref === "奈良県").map((m) => m.name)).toEqual(["奈良市", "橿原市", "生駒市"]);
+    expect(KINKI_PENDING.filter((m) => m.pref === "奈良県")).toEqual([]);
     // 政令市：京都市・大阪市・神戸市は全種別の図、堺市は載る種別を確かめられていないので一部
     expect(findMunicipality("26104")?.coverage).toBe("full");
     expect(findMunicipality("27127")?.coverage).toBe("full");
@@ -197,7 +197,8 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
   });
 
   it("奈良県：県の道路システムに載る18市町村は一部（1項1号は載らない）、準備中の7市町は非公開、窓口は3つの土木事務所", () => {
-    const nara = MUNICIPALITIES.filter((m) => m.pref === "奈良県" && m.coverage !== "unknown");
+    // 市が道路を扱う3市（奈良市・橿原市・生駒市）は下の別のテストで見る
+    const nara = MUNICIPALITIES.filter((m) => m.pref === "奈良県" && m.coverage !== "unknown" && !["29201", "29205", "29209"].includes(m.codes[0]));
     expect(nara.filter((m) => m.coverage === "partial").map((m) => m.name).sort()).toEqual(
       ["大和高田市", "大和郡山市", "桜井市", "五條市", "御所市", "香芝市", "葛城市", "宇陀市", "平群町", "三郷町", "斑鳩町", "安堵町", "川西町", "三宅町", "田原本町", "高取町", "明日香村", "大淀町"].sort(),
     );
@@ -210,6 +211,28 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     // 県が管理する道路の事務所は、建築の窓口と分け方が違う（天理市は建築が郡山、道路が奈良）
     expect(findMunicipality("29204")?.contact?.note).toContain("奈良土木事務所");
     expect(findMunicipality("29207")?.contact?.note).toContain("五條土木事務所");
+  });
+
+  it("奈良県の3市（奈良・橿原・生駒）：市が道路を扱い、地図は市のページ（入口）から開く。道路種別の案内があるのは橿原市だけ", () => {
+    const [nara, kashihara, ikoma] = ["29201", "29205", "29209"].map((c) => findMunicipality(c)!);
+    expect([nara, kashihara, ikoma].map((m) => m.name)).toEqual(["奈良市", "橿原市", "生駒市"]);
+    expect([nara, kashihara, ikoma].map((m) => m.coverage)).toEqual(["none", "partial", "none"]);
+    // 地図のサイトを開いて確かめられていないので、物件の位置では開かず、市のページ（入口）だけ
+    for (const m of [nara, kashihara, ikoma]) for (const link of m.maps) expect(link.build, `${m.name} ${link.label}`).toBeNull();
+    expect(kashihara.maps.map((l) => l.kind)).toEqual(["road_type", "public_road"]);
+    expect(kashihara.maps[0].url).toBe("https://www.city.kashihara.nara.jp/soshiki/1010/gyomu/1/2/956.html");
+    expect(kashihara.maps[0].tip).toContain("凡例");
+    // 奈良市・生駒市は市道の参考の地図だけ（道路種別は建築の課で確かめる）
+    expect(nara.maps.map((l) => l.kind)).toEqual(["public_road"]);
+    expect(ikoma.maps.map((l) => l.kind)).toEqual(["public_road"]);
+    expect(ikoma.maps[0].tip).toMatch(/自分で「同意する」を押す/);
+    // 窓口：市の建築の課（県の土木事務所ではない）
+    expect([nara, kashihara, ikoma].map((m) => m.contact?.phone)).toEqual(["0742-34-4750", "0744-47-3517", "0743-74-1111"]);
+    expect([nara, kashihara, ikoma].map((m) => m.contact?.fax)).toEqual(["0742-32-5057", "0744-24-9718", "0743-74-1221"]);
+    // 生駒市は代表番号なので、内線を課の名前に添える
+    expect(ikoma.contact?.dept).toContain("内線 3460");
+    // 奈良市の都市計画区域は一部（月ヶ瀬・都祁を除く）
+    expect(nara.note).toContain("月ヶ瀬地区・都祁地区を除いた区域");
   });
 
   it("道路種別を電話で答えない窓口は、電話のボタンを控えめにする印が付く", () => {
