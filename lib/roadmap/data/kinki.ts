@@ -1,24 +1,7 @@
-// 近畿2府5県の市町村（227）のうち、道路種別の公式図・問い合わせ先をまだ調べ終えていない市町村（15。大阪府の15市）。coverage: "unknown"（調査中）でここに置き、
-// 調べた府県・市から data/<府県>.ts に移す（7府県の、府県が扱う市町村と政令市、三重県の8市、奈良県の3市、滋賀県の7市、宇治市、和歌山市、兵庫県の11市は移した。2026-11）。
+// 近畿2府5県の市町村（227）のうち、道路種別の公式図・問い合わせ先をまだ調べ終えていない市町村。2026-11-13 に大阪府の15市を登録して、
+// 近畿の「調査中」は 0 になった（調べた府県・市は data/<府県>.ts）。あとから調べ直しが要る市町村が出たら、coverage: "unknown" でここに置く。
 // 市区町村コードと名前は国土地理院の市区町村表（maps.gsi.go.jp/js/muni.js）から。
 // 政令市（京都市・大阪市・堺市・神戸市）は区のコードをまとめて1つ（逆ジオコーダは区のコードを返すので、市そのもののコード 26100・27100・27140・28100 は使わない）
 import type { Municipality } from "../municipalities";
 
-export const KINKI_PENDING: Municipality[] = [
-  // 大阪府（43のうち、大阪市・堺市のほかの特定行政庁の15市）
-  { pref: "大阪府", name: "岸和田市", codes: ["27202"], coverage: "unknown", maps: [] },
-  { pref: "大阪府", name: "豊中市", codes: ["27203"], coverage: "unknown", maps: [] },
-  { pref: "大阪府", name: "池田市", codes: ["27204"], coverage: "unknown", maps: [] },
-  { pref: "大阪府", name: "吹田市", codes: ["27205"], coverage: "unknown", maps: [] },
-  { pref: "大阪府", name: "高槻市", codes: ["27207"], coverage: "unknown", maps: [] },
-  { pref: "大阪府", name: "守口市", codes: ["27209"], coverage: "unknown", maps: [] },
-  { pref: "大阪府", name: "枚方市", codes: ["27210"], coverage: "unknown", maps: [] },
-  { pref: "大阪府", name: "茨木市", codes: ["27211"], coverage: "unknown", maps: [] },
-  { pref: "大阪府", name: "八尾市", codes: ["27212"], coverage: "unknown", maps: [] },
-  { pref: "大阪府", name: "寝屋川市", codes: ["27215"], coverage: "unknown", maps: [] },
-  { pref: "大阪府", name: "和泉市", codes: ["27219"], coverage: "unknown", maps: [] },
-  { pref: "大阪府", name: "箕面市", codes: ["27220"], coverage: "unknown", maps: [] },
-  { pref: "大阪府", name: "羽曳野市", codes: ["27222"], coverage: "unknown", maps: [] },
-  { pref: "大阪府", name: "門真市", codes: ["27223"], coverage: "unknown", maps: [] },
-  { pref: "大阪府", name: "東大阪市", codes: ["27227"], coverage: "unknown", maps: [] },
-];
+export const KINKI_PENDING: Municipality[] = [];

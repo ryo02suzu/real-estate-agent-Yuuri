@@ -194,7 +194,7 @@ export function RoadTab({ result, data, open, front, pick }: TabProps) {
       )}
 
       <GCard className="overflow-hidden">
-        <GRow icon={<RoadIcon size={18} stroke={1.7} color="#fff" />} title="地図の色と幅員のくわしい話" sub={guide.length || m.note ? "地図の開き方と注意・近くの道路・色の見方" : "近くの道路の種別・市町村の地図の色の見方"} onClick={() => open("roads")} minH={56} />
+        <GRow icon={<RoadIcon size={18} stroke={1.7} color="#fff" />} title="地図の色と幅員のくわしい話" sub={guide.length ? "地図の開き方と注意・近くの道路・色の見方" : m.note ? "道路の調べ方の注意・近くの道路・色の見方" : "近くの道路の種別・市町村の地図の色の見方"} onClick={() => open("roads")} minH={56} />
         {contact && (
           <GRow
             icon={<Phone size={17} strokeWidth={1.8} absoluteStrokeWidth color="#fff" />}

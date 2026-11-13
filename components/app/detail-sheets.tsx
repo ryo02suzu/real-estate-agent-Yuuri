@@ -7,7 +7,7 @@ import { noCityPlanning } from "@/lib/roadmap/municipalities";
 import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 import { buildingNotes } from "@/lib/app/legal";
-import { roadGuide } from "@/lib/app/road-guide";
+import { roadGuide, roadSheetTexts } from "@/lib/app/road-guide";
 import type { RecordTopic } from "@/lib/records";
 import { livingScores, SCORE_METHOD } from "@/lib/app/scores";
 import { chibanzuFor } from "@/lib/roadmap/chibanzu";
@@ -327,11 +327,13 @@ function RoadsSheet({ result, data }: { result: Ok; data: PropertyData }) {
   const m = result.municipality;
   // 地図ごとの開き方（開いたあとの道順）と、市の注意書き。PC は地図のボタンと市の名前の下に出している
   const guide = roadGuide(result.links);
+  // 開ける道路種別の地図が無い市町村（非公開・調査中など）では、「地図を開いて確認」と言わない
+  const texts = roadSheetTexts(result.links, m.name);
   return (
     <div>
       {(m.note || guide.length > 0) && (
         <section className="mb-3">
-          <h3 className="text-[14px] font-bold text-ink">{m.name}の地図の開き方と注意</h3>
+          <h3 className="text-[14px] font-bold text-ink">{texts.heading}</h3>
           {m.note && <p className="mt-1 text-[13px] leading-[1.6] text-ink">{m.note}</p>}
           {guide.length > 0 && (
             <ul className="mt-1 divide-y divide-line/70">
@@ -381,8 +383,8 @@ function RoadsSheet({ result, data }: { result: Ok; data: PropertyData }) {
           <LegendList legend={l.legend!} />
         </section>
       ))}
-      {roads.status === "none" && legends.length === 0 && <p className="text-[13px] text-muted">この市町村は、地図の道路の種別を MICHILU で読めません。道路のタブから市町村の地図を開いて確認してください。</p>}
-      <Notes lead="地図に色の無い道は載っていません。前面道路と幅員は、地図と現地で確かめ、最終確認は窓口で行ってください。" />
+      {roads.status === "none" && legends.length === 0 && <p className="text-[13px] text-muted">{texts.unread}</p>}
+      <Notes lead={texts.lead} />
     </div>
   );
 }
