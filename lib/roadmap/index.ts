@@ -1,5 +1,5 @@
 import GSI_CODES from "./data/gsi-muni-codes.json";
-import { correctAddress, describeMatch, type AddressFix, type AddressMiss } from "./address-fix";
+import { correctAddress, describeMatch, placeNotFound, type AddressFix, type AddressMiss } from "./address-fix";
 import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, matchedNumbers, needsChoice, numbersAgree, reverseGeocode, subAreaDropped, withoutNumbers, type GeocodeResult } from "./geocode";
 import { buildLinks, findMunicipality, resolveContact, type Contact, type Municipality, type ResolvedLink } from "./municipalities";
 import { kuikiAllows, kuikiHasSub, kuikiSubLabel, normalizeChiban, parcelAt, searchParcel, splitChiban, splitLotHead, townFromAddress, townKey, type Parcel, type ParcelSource } from "./parcel";
@@ -14,7 +14,14 @@ export { changedMarks, type AddressFix, type AddressMiss } from "./address-fix";
 
 export type LookupResult =
   | { status: "not_found" } // 住所が見つからない
-  | { status: "choose"; candidates: GeocodeResult[]; /** 書き間違いを直そうとして、近い名前の町が2つ以上あった */ near?: true } // 同名の場所が複数（都道府県から入れ直すか、候補から選ぶ）
+  | {
+      status: "choose";
+      candidates: GeocodeResult[];
+      /** 書き間違いを直そうとして、近い名前の町が2つ以上あった */
+      near?: true;
+      /** 市区町村を書かずに町名から入れた住所で、同じ町名が2つ以上の市区町村にあった（「東京都新宿3-1-1」は新宿区と葛飾区） */
+      omitted?: true;
+    } // 同名の場所が複数（都道府県から入れ直すか、候補から選ぶ）
   | { status: "unsupported"; lat: number; lng: number; muniCd: string; matchedAddress: string } // 未対応の市町村
   | {
       status: "ok";
@@ -98,7 +105,7 @@ export async function lookup(
   let candidates = await geocodeCandidates(query);
   // 書き間違い（市の抜け・町名の誤字・旧字・区の違い・合併前の市の名前）で町・市の中心や別の場所に当たったら、正式な名前で探し直す
   const fixed = exact ? null : await correctAddress(query, candidates);
-  if (fixed && "choices" in fixed) return { status: "choose", candidates: fixed.choices.slice(0, 15), near: true };
+  if (fixed && "choices" in fixed) return { status: "choose", candidates: fixed.choices.slice(0, 15), ...(fixed.omitted ? { omitted: true as const } : { near: true as const }) };
   if (fixed) candidates = fixed.candidates;
   if (candidates.length === 0) {
     // 住所検索がどの住所にも0件を返しているとき（障害など）は「見つからない」ではない
@@ -107,6 +114,9 @@ export async function lookup(
   }
   if (!fixed && needsChoice(address, candidates)) return { status: "choose", candidates: candidates.slice(0, 15) };
   let geo = candidates[0];
+  // 入れた市区町村・町名がどれも見つからず、都道府県（県庁のあたり）や名前の頭が似ているだけの別の町村に当たったときは、
+  // そこを物件の場所として出さない
+  if (placeNotFound(query, geo.matchedAddress)) return { status: "not_found" };
   // 見つかった番地が入れた番地と食い違う（国土地理院が小字の漢数字を番地と読んだ）ときは、同じ町で番地の合う所を探し直す。
   // 無ければ番地は当てず、町の代表点にする（別の番地を「その住所」として出さない）
   if (!numbersAgree(address, geo.matchedAddress)) geo = await rematchNumbers(address, chiban, geo, candidates);

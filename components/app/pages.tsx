@@ -70,7 +70,13 @@ export function NotOkPage({ query, result, onPick, onMap, onBack, backLabel, ban
       <>
         <Top
           title={result.near ? "近い名前の町が複数あります" : "当てはまる場所が複数あります"}
-          sub={result.near ? `「${query}」の町名を直して探します。物件の場所を選んでください` : "物件の場所を選んでください"}
+          sub={
+            result.near
+              ? `「${query}」の町名を直して探します。物件の場所を選んでください`
+              : result.omitted
+                ? "市区町村が書かれていないので、同じ町名の場所を探しました。物件の場所を選んでください"
+                : "物件の場所を選んでください"
+          }
           onBack={onBack}
           backLabel={backLabel}
         />
@@ -91,7 +97,10 @@ export function NotOkPage({ query, result, onPick, onMap, onBack, backLabel, ban
               </li>
             ))}
           </ul>
-          <Note className="mt-[10px]">無ければ、都道府県から入れ直すと一度で見つかります。{DISCLAIMER}</Note>
+          <Note className="mt-[10px]">
+            {result.omitted ? "無ければ、市区町村から入れ直すと一度で見つかります。" : "無ければ、都道府県から入れ直すと一度で見つかります。"}
+            {DISCLAIMER}
+          </Note>
         </div>
       </>
     );

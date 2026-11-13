@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changedMarks, correctAddress, describeMatch, fixMunicipality, similarTown, typedParts } from "./address-fix";
+import { changedMarks, correctAddress, describeMatch, fixMunicipality, placeNotFound, similarTown, typedParts } from "./address-fix";
 import type { GeocodeResult } from "./geocode";
 
 /** 国土地理院の住所検索の代わり（実際に返った住所の形をまねる）。表に無い住所を引いたら空 */
@@ -105,6 +105,113 @@ describe("住所の書き間違いを直して探し直す（correctAddress）",
   });
 });
 
+// 総点検で見つけた弱点：「東京都渋谷2-6-12」のように区を書かない住所が、渋谷区の中心（区役所のあたり）になり、
+// 「東京都丸の内1-9-1」は東京都の代表の地点（都庁のあたり）、「東京都日本橋1-4-1」は30km先の日の出町になっていた。
+// 下の表は、国土地理院の住所検索が実際に返した結果（2026-11-13）
+describe("市区町村を書かずに町名から入れた住所を、同じ都道府県の中で探す（correctAddress）", () => {
+  it("区の名前と同じ町（渋谷区渋谷）：当たった区の中の同じ名前の町にする", async () => {
+    const g = fakeGsi({
+      "東京都渋谷区渋谷2-6-12": ["東京都渋谷区渋谷二丁目６番１２号"],
+      "渋谷2-6-12": ["東京都渋谷区渋谷二丁目６番１２号", "大阪府池田市渋谷二丁目６番１２号"],
+    });
+    const r = await correctAddress("東京都渋谷2-6-12", at("東京都渋谷区"), g.search);
+    expect(r && "query" in r && r.query).toBe("東京都渋谷区渋谷2-6-12");
+    expect(r && "candidates" in r && r.candidates[0].matchedAddress).toBe("東京都渋谷区渋谷二丁目６番１２号");
+    expect(g.asked).toEqual(["東京都渋谷区渋谷2-6-12", "渋谷2-6-12"]);
+    expect(describeMatch("東京都渋谷2-6-12", "東京都渋谷区渋谷二丁目６番１２号", "東京都渋谷区渋谷2-6-12")).toEqual({ fix: { from: "渋谷", to: "渋谷区渋谷" } });
+  });
+
+  it("市の名前と同じ町（柏市柏・市川市市川）。「市」の字が入る町名も探す。号が無ければ番までの一致", async () => {
+    const kashiwa = fakeGsi({ "千葉県柏市柏1-1-1": ["千葉県柏市柏一丁目１番"], "柏1-1-1": ["千葉県柏市柏一丁目１番"], "柏1-1": ["千葉県柏市柏一丁目１番"] });
+    const a = await correctAddress("千葉県柏1-1-1", at("千葉県柏市"), kashiwa.search);
+    expect(a && "query" in a && a.query).toBe("千葉県柏市柏1-1-1");
+    const ichikawa = fakeGsi({ "千葉県市川市市川1-1-1": ["千葉県市川市市川一丁目１番"], "市川1-1-1": ["千葉県市川市市川一丁目１番"], "市川1-1": ["千葉県市川市市川一丁目１番"] });
+    const b = await correctAddress("千葉県市川1-1-1", at("千葉県市川市"), ichikawa.search);
+    expect(b && "query" in b && b.query).toBe("千葉県市川市市川1-1-1");
+    expect(b && "candidates" in b && b.candidates[0].matchedAddress).toBe("千葉県市川市市川一丁目１番");
+  });
+
+  it("都道府県にしか当たらなかった町（丸の内）：号まで持つ町しか返らないので、最後の番号を外してもう一度探す", async () => {
+    const g = fakeGsi({
+      "丸の内1-9-1": ["山形県米沢市丸の内一丁目９番１号", "山梨県甲府市丸の内一丁目９番１号", "愛知県名古屋市中区丸の内一丁目９番１号", "岡山県岡山市北区丸の内一丁目９番１号"],
+      "丸の内1-9": ["東京都千代田区丸の内一丁目９番", "愛知県名古屋市中区丸の内一丁目９番"],
+    });
+    const r = await correctAddress("東京都丸の内1-9-1", at("東京都"), g.search);
+    expect(r && "query" in r && r.query).toBe("東京都千代田区丸の内1-9-1");
+    expect(r && "candidates" in r && r.candidates[0].matchedAddress).toBe("東京都千代田区丸の内一丁目９番");
+    expect(g.asked).toEqual(["丸の内1-9-1", "丸の内1-9"]);
+  });
+
+  it("当たった区にその町が無ければ、同じ都道府県のほかの市区町村の町（豊島区ではなく北区豊島）。別の県の同じ町名は使わない", async () => {
+    const g = fakeGsi({ "東京都豊島区豊島1-1-1": ["東京都豊島区"], "豊島1-1-1": ["東京都北区豊島一丁目１番１号", "福井県福井市豊島一丁目１番１号"] });
+    const r = await correctAddress("東京都豊島1-1-1", at("東京都豊島区"), g.search);
+    expect(r && "query" in r && r.query).toBe("東京都北区豊島1-1-1");
+    expect(g.asked).toHaveLength(2);
+    // 名前の頭が似ているだけの別の町村（日の出町を指す「東京都日の出」）に当たったとき
+    const n = fakeGsi({ "日本橋1-4-1": ["東京都中央区日本橋一丁目４番１号", "大阪府大阪市中央区日本橋一丁目４番１号"] });
+    const b = await correctAddress("東京都日本橋1-4-1", at("東京都日の出"), n.search);
+    expect(b && "query" in b && b.query).toBe("東京都中央区日本橋1-4-1");
+  });
+
+  it("同じ町名が2つ以上の市区町村にあれば、決めずに選んでもらう（新宿区新宿と葛飾区新宿）", async () => {
+    const g = fakeGsi({
+      "東京都新宿区新宿3-1-1": ["東京都新宿区新宿三丁目１番１号"],
+      "新宿3-1-1": ["群馬県桐生市新宿三丁目１番１号", "東京都葛飾区新宿三丁目１番１号", "東京都新宿区新宿三丁目１番１号", "神奈川県逗子市新宿三丁目１番１号"],
+    });
+    const r = await correctAddress("東京都新宿3-1-1", at("東京都新宿区"), g.search);
+    expect(r && "choices" in r && r.omitted).toBe(true);
+    expect(r && "choices" in r && r.choices.map((c) => c.matchedAddress)).toEqual(["東京都新宿区新宿3-1-1", "東京都葛飾区新宿3-1-1"]);
+  });
+
+  it("番号の食い違う町・名前の違う町・番地の無い町は使わない。見つからなければ直さない", async () => {
+    const g = fakeGsi({
+      // 丁目が違う（3丁目）・名前が違う（西渋谷）・町まで（番号なし）
+      "渋谷2-6-12": ["東京都大田区渋谷三丁目６番", "東京都世田谷区西渋谷二丁目６番１２号", "東京都町田市渋谷"],
+      "渋谷2-6": [],
+    });
+    expect(await correctAddress("東京都渋谷2-6-12", at("東京都"), g.search)).toBeNull();
+    expect(g.asked).toEqual(["渋谷2-6-12", "渋谷2-6"]);
+    // 町が無い区（大田区に「大田」は無い）
+    const none = fakeGsi({ "東京都大田区大田5-1-1": ["東京都大田区"] });
+    expect(await correctAddress("東京都大田5-1-1", at("東京都大田区"), none.search)).toBeNull();
+  });
+
+  it("番地を書かずに市区町村の名前だけを入れたときは探さない（「東京都渋谷」は渋谷区、「千葉県市川」は市川市、「東京都日の出」は日の出町）", async () => {
+    expect(await correctAddress("東京都渋谷", at("東京都渋谷区"), never)).toBeNull();
+    expect(await correctAddress("千葉県市川", at("千葉県市川市"), never)).toBeNull();
+    expect(await correctAddress("東京都日の出", at("東京都日の出", "東京都日の出町"), never)).toBeNull();
+    // 市区町村をはっきり書いてあれば、町が無くてもほかの市区町村は探さない
+    expect(await correctAddress("東京都杉並区杉並1-1", at("東京都杉並区"), never)).toBeNull();
+    // 番地が無くても、都道府県にしか当たらなかった町は探す
+    const g = fakeGsi({ 丸の内: ["東京都千代田区丸の内", "愛知県名古屋市中区丸の内"] });
+    const r = await correctAddress("東京都丸の内", at("東京都"), g.search);
+    expect(r && "query" in r && r.query).toBe("東京都千代田区丸の内");
+  });
+
+  it("国土地理院への問い合わせは、ほかの直しと合わせて4回まで", async () => {
+    const g = fakeGsi({});
+    await correctAddress("東京都髙輪1-2-3", at("東京都"), g.search);
+    expect(g.asked.length).toBeLessThanOrEqual(4);
+    expect(g.asked).toEqual(["東京都高輪1-2-3", "高輪1-2-3", "高輪1-2"]);
+  });
+});
+
+describe("入れた場所が見つかっていないか（placeNotFound）", () => {
+  it("都道府県にしか当たらない・頭が似ているだけの別の町村に当たったときだけ", () => {
+    expect(placeNotFound("東京都丸の内1-9-1", "東京都")).toBe(true);
+    expect(placeNotFound("東京都存在しない町", "東京都")).toBe(true);
+    expect(placeNotFound("東京都日本橋1-4-1", "東京都日の出")).toBe(true);
+    // 入れたとおりの場所
+    expect(placeNotFound("東京都", "東京都")).toBe(false);
+    expect(placeNotFound("東京都日の出", "東京都日の出")).toBe(false);
+    expect(placeNotFound("東京都日の出1-1", "東京都日の出")).toBe(false);
+    // 都道府県を書いていない入力・市区町村まで当たった結果は、今までどおり
+    expect(placeNotFound("東京", "東京都")).toBe(false);
+    expect(placeNotFound("東京都千代田区存在しない町1-1", "東京都千代田区")).toBe(false);
+    expect(placeNotFound("東京都渋谷区神南1-19-11", "東京都渋谷区神南一丁目１９番１１号")).toBe(false);
+  });
+});
+
 describe("市区町村の名前を直す（fixMunicipality）", () => {
   it("市・区の抜け、合併前の市、1字違い。はっきり書いてあれば直さない", () => {
     expect(fixMunicipality("宇都宮南大通り1-2-3")).toBe("宇都宮市南大通り1-2-3");
@@ -114,6 +221,13 @@ describe("市区町村の名前を直す（fixMunicipality）", () => {
     expect(fixMunicipality("宇都宮市南大通り1-2-3")).toBeNull();
     expect(fixMunicipality("中央区銀座1-1")).toBeNull();
     expect(fixMunicipality("西多摩郡瑞穂町箱根ケ崎2335")).toBeNull();
+  });
+
+  it("1字の名前の市（堺市）は、続きがその市の区のときだけ「市」を足す（町名と区別できないので）", () => {
+    expect(fixMunicipality("大阪府堺堺区南瓦町3-1")).toBe("大阪府堺市堺区南瓦町3-1");
+    expect(fixMunicipality("堺北区百舌鳥赤畑町1-3-1")).toBe("堺市北区百舌鳥赤畑町1-3-1");
+    expect(fixMunicipality("大阪府堺1-1")).toBeNull();
+    expect(fixMunicipality("三重県津栄町1-1")).toBeNull();
   });
 });
 
@@ -156,6 +270,15 @@ describe("入れた住所と出す住所の違いの説明（describeMatch）", 
       found: "大字南矢幅第十二地割",
       kind: "town",
     });
+  });
+
+  // 総点検で見つけたもの：京都府の「大字植田小字堂ケ島」「字伊佐津小字ミゾクロ西」で、合っているのに「別の町を出しています」と出ていた
+  it("京都府などの「小字」「字」の印の有り無しだけの違いは、同じ町（miss と言わない）", () => {
+    expect(describeMatch("京都府相楽郡精華町大字植田小字堂ケ島14番", "京都府精華町大字植田堂ケ島１４番地")).toBeNull();
+    expect(describeMatch("京都府相楽郡精華町大字下狛小字上新庄73番19", "京都府精華町大字下狛上新庄７３番地")).toBeNull();
+    expect(describeMatch("京都府舞鶴市字伊佐津小字ミゾクロ西112番3", "京都府舞鶴市伊佐津")).toBeNull();
+    // 本当に別の町なら、今までどおり知らせる
+    expect(describeMatch("京都府舞鶴市字伊佐津小字ミゾクロ西112番3", "京都府舞鶴市引土")?.miss).toMatchObject({ found: "引土", kind: "town" });
   });
 
   it("小字の「字」を国土地理院が書かずに名前を残したとき（「高善寺字大川鉢」→「高善寺大川鉢」）は何も言わない", () => {

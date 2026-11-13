@@ -21,7 +21,7 @@ import type { HistoryItem } from "@/lib/history";
 import type { MapPlace } from "../live-map";
 import { propertyIdOf } from "@/lib/property-id";
 import { loadRecords, RECORDS_EVENT, type PropertyRecords, type RecordTopic } from "@/lib/records";
-import { partialMatch } from "@/lib/roadmap/geocode";
+import { branchUnmatched, partialMatch } from "@/lib/roadmap/geocode";
 import type { AddressFix } from "@/lib/roadmap";
 import { distanceText } from "@/lib/roadmap/land-price";
 import { chibanLabel, chibanQueryOf, isLotChiban, kuikiLabel, registryChiban, type Neighbor } from "@/lib/roadmap/parcel";
@@ -605,7 +605,10 @@ function PlaceNotes({ query, result, data, onPick, onPickPoint, onFix, onLiteral
       ),
     });
   } else if (!picked && !parcel && partialMatch(query, result.matchedAddress)) {
-    notes.push({ body: <>入力の最後の番号（号など）は国土地理院の住所のデータに無いため、「{displayAddress(result.matchedAddress)}」の代表の地点を出しています。{mini("場所を直す", onFix)}</> });
+    // 地番の枝番が合っていないとき（同じ番地でも枝番の違う土地は離れていることがある）は、はっきり知らせる
+    if (branchUnmatched(query, result.matchedAddress))
+      notes.push({ warn: true, body: <>入力の地番の枝番は国土地理院の住所のデータに無いため、「{displayAddress(result.matchedAddress)}」の代表の地点を出しています。同じ番地でも、枝番の違う土地は離れた所にあることがあります。公図などで場所を確かめてください。{mini("場所を直す", onFix)}</> });
+    else notes.push({ body: <>入力の最後の番号（号など）は国土地理院の住所のデータに無いため、「{displayAddress(result.matchedAddress)}」の代表の地点を出しています。{mini("場所を直す", onFix)}</> });
   } else if (picked && !parcel) {
     notes.push({ body: "地図で選んだ地点です（番地は分からないので町名まで）。" });
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addressNumbers, isApproximate, matchedNumbers, numbersAgree, partialMatch, subAreaDropped, withoutNumbers } from "./geocode";
+import { branchUnmatched, addressNumbers, isApproximate, matchedNumbers, numbersAgree, partialMatch, subAreaDropped, withoutNumbers } from "./geocode";
 
 describe("住所の一致の深さ", () => {
   it("番地がまったく無い一致は、町の中心（isApproximate）", () => {
@@ -91,5 +91,20 @@ describe("入力の番号の区分が、見つかった住所に無いか（subA
     expect(subAreaDropped("岩手県花巻市石鳥谷町好地第16地割24番2", "岩手県花巻市石鳥谷町好地第十六地割２４番地")).toBe(false);
     expect(subAreaDropped("埼玉県熊谷市下奈良391番地3", "埼玉県熊谷市下奈良３９１番地")).toBe(false);
     expect(subAreaDropped("山形県鶴岡市羽黒町手向字手向147番1", "山形県鶴岡市羽黒町手向１４７番地")).toBe(false);
+  });
+});
+
+// 総点検：地番の書き方の住所の約3割は、国土地理院が「〇〇番地」までしか持たない。枝番の違う土地は離れていることがある（最大 1.3km）
+describe("地番の枝番が合っていない一致（branchUnmatched）", () => {
+  it("見つかった住所が「番地」までで、入力に枝番がある", () => {
+    expect(branchUnmatched("青森県青森市大字新城字山田587番255", "青森県青森市大字新城山田５８７番地")).toBe(true);
+    expect(branchUnmatched("東京都八王子市片倉町939番92", "東京都八王子市片倉町９３９番地")).toBe(true);
+    expect(branchUnmatched("京都府宇治市羽戸山3丁目1番135", "京都府宇治市羽戸山三丁目１番地")).toBe(true);
+  });
+  it("番地まで合っている・住居表示の号が無いだけ・町までの一致は当てはまらない", () => {
+    expect(branchUnmatched("群馬県伊勢崎市昭和町3913番", "群馬県伊勢崎市昭和町３９１３番地")).toBe(false);
+    expect(branchUnmatched("東京都千代田区丸の内1-9-1", "東京都千代田区丸の内一丁目９番")).toBe(false);
+    expect(branchUnmatched("神奈川県大和市つきみ野4丁目4番8", "神奈川県大和市つきみ野四丁目４番")).toBe(false);
+    expect(branchUnmatched("埼玉県熊谷市大字三ケ尻9999番1", "埼玉県熊谷市三ケ尻")).toBe(false);
   });
 });

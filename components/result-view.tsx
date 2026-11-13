@@ -106,7 +106,9 @@ function Choose({
         「{query}」に当てはまる場所が複数あります
       </p>
       <p className="mt-1 text-[11px] text-muted">
-        物件の場所を選んでください。無ければ都道府県から入れ直すと一度で見つかります。
+        {result.omitted
+          ? "市区町村が書かれていないので、同じ町名の場所を探しました。物件の場所を選んでください。無ければ市区町村から入れ直すと一度で見つかります。"
+          : "物件の場所を選んでください。無ければ都道府県から入れ直すと一度で見つかります。"}
       </p>
       <ul className="mt-3 divide-y divide-line/70">
         {result.candidates.slice(0, 7).map((c) => (

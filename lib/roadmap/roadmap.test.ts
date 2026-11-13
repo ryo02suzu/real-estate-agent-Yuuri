@@ -1114,6 +1114,70 @@ describe("lookup", () => {
     expect(r.candidates[0].matchedAddress).toContain("横浜市");
   });
 
+  // 総点検で見つけた弱点：区・市を書かない住所が区役所・県庁のあたりになり、そこのデータ（用途地域・ハザードなど）を出していた
+  describe("市区町村を書かずに町名から入れた住所", () => {
+    /** 国土地理院の住所検索の代わり（聞かれた住所ごとに、実際に返った結果）。逆ジオコーダは rev を返す */
+    const stubGsi = (table: Record<string, string[]>, rev: unknown) => {
+      const asked: string[] = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          const q = decodeURIComponent(url.split("AddressSearch?q=")[1] ?? "");
+          if (url.includes("AddressSearch")) asked.push(q);
+          return {
+            ok: true,
+            json: async () => (url.includes("AddressSearch") ? (table[q] ?? []).map((title, i) => ({ geometry: { coordinates: [139.7 + i / 100, 35.66] }, properties: { title } })) : rev),
+          };
+        }),
+      );
+      return asked;
+    };
+
+    it("「東京都渋谷2-6-12」は、渋谷区の中心ではなく渋谷区渋谷二丁目6番12号を出し、区を足したことを知らせる", async () => {
+      stubGsi(
+        {
+          "東京都渋谷2-6-12": ["東京都渋谷区"],
+          "東京都渋谷区渋谷2-6-12": ["東京都渋谷区渋谷二丁目６番１２号"],
+          "渋谷2-6-12": ["東京都渋谷区渋谷二丁目６番１２号", "大阪府池田市渋谷二丁目６番１２号"],
+        },
+        { results: { muniCd: "13113", lv01Nm: "渋谷二丁目" } },
+      );
+      const r = await lookup("東京都渋谷2-6-12");
+      expect(r.status).toBe("ok");
+      if (r.status !== "ok") return;
+      expect(r.matchedAddress).toBe("東京都渋谷区渋谷二丁目６番１２号");
+      expect(r.approximate).toBe(false);
+      expect(r.fix).toMatchObject({ input: "東京都渋谷2-6-12", query: "東京都渋谷区渋谷2-6-12", from: "渋谷", to: "渋谷区渋谷" });
+      expect(r.miss).toBeUndefined();
+      expect(r.municipality.name).toBe("渋谷区");
+    });
+
+    it("同じ町名が2つの区にある「東京都新宿3-1-1」は、選んでもらう（omitted の印）", async () => {
+      stubGsi(
+        {
+          "東京都新宿3-1-1": ["東京都新宿区"],
+          "東京都新宿区新宿3-1-1": ["東京都新宿区新宿三丁目１番１号"],
+          "新宿3-1-1": ["群馬県桐生市新宿三丁目１番１号", "東京都葛飾区新宿三丁目１番１号", "東京都新宿区新宿三丁目１番１号"],
+        },
+        {},
+      );
+      const r = await lookup("東京都新宿3-1-1");
+      expect(r).toMatchObject({ status: "choose", omitted: true });
+      if (r.status !== "choose") return;
+      expect(r.near).toBeUndefined();
+      expect(r.candidates.map((c) => c.matchedAddress)).toEqual(["東京都新宿区新宿3-1-1", "東京都葛飾区新宿3-1-1"]);
+    });
+
+    it("町がどこにも見つからず都道府県にしか当たらなければ「見つからない」（県庁のあたりを物件の場所として出さない）", async () => {
+      const asked = stubGsi({ "東京都存在しない町1-2-3": ["東京都"] }, { results: { muniCd: "13104", lv01Nm: "西新宿二丁目" } });
+      expect(await lookup("東京都存在しない町1-2-3")).toEqual({ status: "not_found" });
+      expect(asked).toEqual(["東京都存在しない町1-2-3", "存在しない町1-2-3", "存在しない町1-2"]);
+      // 「東京都」とだけ入れたときは、入れたとおりなので今までどおり
+      stubGsi({ 東京都: ["東京都"] }, { results: { muniCd: "13104", lv01Nm: "西新宿二丁目" } });
+      expect((await lookup("東京都")).status).toBe("ok");
+    });
+  });
+
   it("番地を入れたのに町までしか一致しなければ approximate", async () => {
     stubFetch(
       [{ geometry: { coordinates: [139.38, 36.18] }, properties: { title: "埼玉県熊谷市三ケ尻" } }],
