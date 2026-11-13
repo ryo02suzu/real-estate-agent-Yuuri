@@ -199,12 +199,14 @@ describe("静岡県の道路図", () => {
     expect(resolveContact(hamamatsu, "22138")!.dept).toBe("都市整備部 建築行政課");
   });
 
-  it("湖西市は ArcGIS の地図から道路種別を文字で読める", () => {
+  it("湖西市は ArcGIS の地図を物件の位置で開く（市のデータをアプリの中に表示するのは、使ってよいと確かめてから）", () => {
     const m = findMunicipality("22221")!;
     expect(m.coverage).toBe("full");
     const [link] = buildLinks(m, 34.718, 137.531);
     expect(link.url).toBe("https://experience.arcgis.com/experience/dd07e699e2ce41ac8a265a386f59f6f3/page/page_40/#widget_950=center:137.531000%2C34.718000%2C4326,scale:2500");
-    expect(link.read?.field).toBe("a_type");
+    // 読み方の設定は残してあるが、利用規約で使ってよいと確かめるまで使わない（road-read-permission.ts）
+    expect(m.maps[0].read?.field).toBe("a_type");
+    expect(link.read).toBeUndefined();
   });
 
   it("PDF で公開している市（沼津・三島・裾野・袋井）は一覧ページを開く", () => {
@@ -989,7 +991,7 @@ describe("Sonicweb の道路台帳・認定路線網図", () => {
     };
     const kamisato = after("11385");
     expect(kamisato.first.label).toBe("埼玉県指定道路図（試行）");
-    expect(kamisato.first.read).toBeDefined(); // 県の地図の道路種別は読めたまま
+    expect(kamisato.first.read).toBeUndefined(); // 県の地図のデータは、県の利用規約（営利目的の利用・商用転用の禁止）のためアプリの中には表示しない
     expect(kamisato.rest).toEqual(["認定路線網図（町道） kamisato th_1"]);
     const tonosho = after("12349");
     expect(tonosho.first.url).toBe("https://ds.icba-info.jp/siteidouro/chiba/pref/");

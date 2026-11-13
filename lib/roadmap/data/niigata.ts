@@ -121,6 +121,14 @@ const KASHIWAZAKI: Municipality = {
       build: arcgisExperience("0e686a1a7bae470c820d1327324c0b76", "widget_6"),
       verified: true,
       tip: "道路を押すと指定道路調書（PDF）が開く。証明には使えないので建築住宅課の窓口で確かめる",
+      // 市が CC BY 2.1 JP で公開しているデータ（位置指定道路は 2020年3月30日時点、2項道路は 2020年5月7日時点）。
+      // 載っているのはこの2種別だけ（1号〜4号は市の地図にも無い）。色は市の地図の線の色
+      read: {
+        layers: [
+          { url: "https://services1.arcgis.com/XlTFoh9FvQbdpw6d/arcgis/rest/services/位置指定道路_NEW/FeatureServer/0", label: "位置指定道路（法第42条第1項第5号。2020年3月30日時点）", color: "#ffaa00" },
+          { url: "https://services1.arcgis.com/XlTFoh9FvQbdpw6d/arcgis/rest/services/法第42項道路_NEW20200507/FeatureServer/0", label: "法第42条第2項道路（2020年5月7日時点）", color: "#00c5ff" },
+        ],
+      },
     },
     { kind: "public_road", label: "柏崎市道（まちナビ柏崎・市道路線図）", build: arcgisWebApp("kashiwazaki.maps.arcgis.com", "4349877834834b94a74debf2267e4857"), verified: true },
   ],

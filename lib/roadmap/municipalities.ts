@@ -33,6 +33,7 @@ import { NIIGATA } from "./data/niigata";
 import { TOYAMA } from "./data/toyama";
 import { legendFor, type LegendEntry } from "./legends";
 import type { RoadRead } from "./road-read";
+import { roadReadPermission } from "./road-read-permission";
 import { findSheet, type SheetHit, type SheetIndex } from "./sheets";
 
 /** 地図に何が載っているか */
@@ -157,6 +158,7 @@ export type ResolvedLink = {
 
 /** 座標から、その市で開くべき地図のURL一覧を作る。town（逆ジオコーダの町名）は地区ごとの図を選ぶのに使う */
 export function buildLinks(m: Municipality, lat: number, lng: number, town?: string): ResolvedLink[] {
+  const permission = roadReadPermission(m.codes);
   return m.maps.map((link) => {
     const sheet = link.sheets && findSheet(link.sheets, lat, lng, town);
     const url = sheet ? sheet.url : link.build ? link.build(lat, lng) : link.url!;
@@ -173,7 +175,8 @@ export function buildLinks(m: Municipality, lat: number, lng: number, town?: str
       // 分割図の市で、どの図にも入らない場所（図の無い地域）は、一覧から探しても見つからないことを伝える
       tip: link.sheets && !sheet ? "この場所を含む図は見つかりませんでした。一覧に無ければ、下の問い合わせ先で確認してください。" : link.tip,
       sheet,
-      ...(link.read ? { read: link.read } : {}),
+      // 市のデータをアプリの中に表示するのは、利用規約・ライセンスで使ってよいと確かめた市だけ（road-read-permission.ts）
+      ...(link.read && permission ? { read: { ...link.read, credit: permission.credit } } : {}),
       ...(legend ? { legend } : {}),
     };
   });

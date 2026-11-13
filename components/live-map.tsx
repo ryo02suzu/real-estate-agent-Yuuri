@@ -994,7 +994,7 @@ export default function LiveMap({
       />
     ),
     on.roads && legend.roads && roads && (
-      <MapLegend key="roads" title="道路種別の色" items={legend.roads} compact={compact} foot={`${roads.city}の地図データ（参考）。最終確認は窓口で`} />
+      <MapLegend key="roads" title="道路種別の色" items={legend.roads} compact={compact} foot={`${roads.city}の地図データ（参考）。最終確認は窓口で${roads.read.credit ? `。${roads.read.credit}` : ""}`} />
     ),
     on.landPrice && (
       <MapLegend

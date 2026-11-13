@@ -3,7 +3,8 @@ import GSI_CODES from "./data/gsi-muni-codes.json";
 import { CHUBU_PENDING } from "./data/chubu";
 import { TOHOKU_PENDING } from "./data/tohoku";
 import { KINKI_PENDING } from "./data/kinki";
-import { findMunicipality, MUNICIPALITIES } from "./municipalities";
+import { buildLinks, findMunicipality, MUNICIPALITIES } from "./municipalities";
+import { ROAD_READ_PERMITTED, roadReadPermission } from "./road-read-permission";
 import { AREA_LABEL, PREF_NAME_RE, PREF_NAMES, REGION_ORDER, REGIONS, SUPPORTED_BOUNDS, isSupportedPref, regionOfMuni, regionOfPref } from "./regions";
 
 describe("対応している地方と都道府県", () => {
@@ -231,3 +232,37 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     expect(table["28221"]).toBe("丹波篠山市");
   });
 });
+
+describe("市の道路種別のデータをアプリの中に表示するのは、使ってよいと確かめた市だけ", () => {
+  const withRead = MUNICIPALITIES.filter((m) => m.maps.some((l) => l.read));
+
+  it("読み方の設定がある市区町村のうち、許可の一覧（road-read-permission.ts）にある市だけ、結果のリンクに読み方が付く", () => {
+    expect(withRead.length).toBe(27);
+    for (const m of withRead) {
+      const links = buildLinks(m, 36, 139);
+      const permitted = !!roadReadPermission(m.codes);
+      expect(links.some((l) => l.read), m.name).toBe(permitted);
+    }
+    // 利用規約で営利目的の利用・無断の複製や転載を禁じている所（埼玉県指定道路図の町・つくば市・行田市・日野市など）は入っていない
+    expect(withRead.filter((m) => roadReadPermission(m.codes)).map((m) => m.name)).toEqual(["柏崎市"]);
+  });
+
+  it("許可の一覧は、実在の市区町村コードで、根拠・出典・確かめた日がある。その市には読み方の設定がある", () => {
+    for (const [code, p] of Object.entries(ROAD_READ_PERMITTED)) {
+      const m = findMunicipality(code);
+      expect(m, code).toBeDefined();
+      expect(m!.maps.some((l) => l.read), m!.name).toBe(true);
+      expect(p.basis.length, code).toBeGreaterThan(10);
+      expect(p.credit, code).toMatch(/^出典：/);
+      expect(p.date, code).toMatch(/^20\d\d-\d\d-\d\d$/);
+    }
+  });
+
+  it("柏崎市（CC BY 2.1 JP）は、位置指定道路と2項道路を読み、出典を添える", () => {
+    const m = findMunicipality("15205")!;
+    const link = buildLinks(m, 37.37, 138.56).find((l) => l.read)!;
+    expect(link.read!.layers.map((l) => l.label)).toEqual(["位置指定道路（法第42条第1項第5号。2020年3月30日時点）", "法第42条第2項道路（2020年5月7日時点）"]);
+    expect(link.read!.credit).toContain("CC BY 2.1 JP");
+  });
+});
+
