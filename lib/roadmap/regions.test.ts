@@ -116,14 +116,14 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     for (const m of KINKI_PENDING) expect(m.coverage).toBe("unknown");
   });
 
-  it("府県が扱う市町村・政令市・三重県の8市・奈良県の3市・滋賀県の7市・宇治市・和歌山市は登録済み（201）。残りの26（大阪府と兵庫県の、市が道路を扱う市）は調査中", () => {
+  it("府県が扱う市町村・政令市・三重県の8市・奈良県の3市・滋賀県の7市・宇治市・和歌山市・兵庫県の11市は登録済み（212）。残りの15（大阪府の、市が道路を扱う市）は調査中", () => {
     const done: Record<string, number> = {};
     for (const m of MUNICIPALITIES) if (KINKI.includes(m.pref) && m.coverage !== "unknown") done[m.pref] = (done[m.pref] ?? 0) + 1;
-    expect(done).toEqual({ 三重県: 29, 滋賀県: 19, 京都府: 26, 大阪府: 28, 兵庫県: 30, 奈良県: 39, 和歌山県: 30 });
-    expect(KINKI_PENDING).toHaveLength(26);
+    expect(done).toEqual({ 三重県: 29, 滋賀県: 19, 京都府: 26, 大阪府: 28, 兵庫県: 41, 奈良県: 39, 和歌山県: 30 });
+    expect(KINKI_PENDING).toHaveLength(15);
     // 調査中に残るのは、市が道路を扱う市（特定行政庁など）だけ
     expect(KINKI_PENDING.every((m) => m.name.endsWith("市"))).toBe(true);
-    expect([...new Set(KINKI_PENDING.map((m) => m.pref))]).toEqual(["大阪府", "兵庫県"]);
+    expect([...new Set(KINKI_PENDING.map((m) => m.pref))]).toEqual(["大阪府"]);
     // 政令市：京都市・大阪市・神戸市は全種別の図、堺市は載る種別を確かめられていないので一部
     expect(findMunicipality("26104")?.coverage).toBe("full");
     expect(findMunicipality("27127")?.coverage).toBe("full");
@@ -269,6 +269,52 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     expect(wakayama.contact?.noPhoneInquiry).toBeUndefined();
   });
 
+  it("兵庫県の11市：市が道路を扱い、地図は市のページ（入口）から開く。凡例を確かめられた西宮市と、市が全部の道路を出すと書く三田市だけ全種別", () => {
+    const codes = ["28201", "28202", "28203", "28204", "28206", "28207", "28210", "28214", "28216", "28217", "28219"];
+    const cities = codes.map((c) => findMunicipality(c)!);
+    const [himeji, amagasaki, akashi, nishinomiya, ashiya, itami, kakogawa, takarazuka, takasago, kawanishi, sanda] = cities;
+    expect(cities.map((m) => m.name)).toEqual(["姫路市", "尼崎市", "明石市", "西宮市", "芦屋市", "伊丹市", "加古川市", "宝塚市", "高砂市", "川西市", "三田市"]);
+    expect(cities.map((m) => m.coverage)).toEqual(["partial", "partial", "partial", "full", "partial", "partial", "partial", "partial", "partial", "partial", "full"]);
+    // どの市にも、道路種別の地図への入口が先頭にある（市のページか、市の地図の入口）
+    for (const m of cities) expect(m.maps[0], m.name).toMatchObject({ kind: "road_type", build: null, verified: true });
+    for (const m of cities) expect(m.maps[0].url, m.name).toMatch(/^https:\/\/(www\.city\.[a-z]+\.(lg|hyogo)\.jp|www\.nishi\.or\.jp)\//);
+    // 物件の位置で開くのは尼崎市の市道の地図だけ（市のページのリンクと同じ形。開いて確かめられていないので「確認済み」にしない）
+    const built = cities.flatMap((m) => m.maps.filter((l) => l.build).map((l) => `${m.name} ${l.kind}`));
+    expect(built).toEqual(["尼崎市 public_road"]);
+    expect(amagasaki.maps[1].build?.(34.73354, 135.40649)).toBe("https://amagasaki.geocloud.jp/webgis/?t=DMgray&mp=8&op=100&vlf=000010&z=18&ll=34.733540%2C135.406490");
+    expect(amagasaki.maps[1].verified).toBe(false);
+    expect(amagasaki.maps[1].tip).toMatch(/読んで自分で同意する.*建築基準法の道路種別は載らない/);
+    // 西宮市：凡例（市の PDF）で全種別。台帳についての電話・メールは断っている
+    expect(nishinomiya.maps[0].url).toBe("https://www.nishi.or.jp/jigyoshajoho/kenchiku/kenchikukijyunhou/dorodaicho.html");
+    expect(nishinomiya.maps[0].tip).toMatch(/42条1項1号〜5号・2項・3項・非道路・未判断道路/);
+    expect(nishinomiya.maps[1].tip).toMatch(/営利目的に使うことはできない決まり/);
+    // 三田市：指定道路（4号・5号・2項）のほかの道路も出る。ネットのデータは最新とは限らない
+    expect(sanda.maps[0].tip).toMatch(/指定道路（4号・5号・2項）のほかの道路も含めて出る.*最新の道路種別は審査指導課の窓口で確かめる/);
+    // 宝塚市：同意のページ（今の住所）を開く。同意は自分で。南部だけ
+    expect(takarazuka.maps).toHaveLength(1);
+    expect(takarazuka.maps[0].url).toBe("https://www.city.takarazuka.hyogo.jp/1060685/1060715/1061613/1061615/kaihatsu/1027219/1046062.html");
+    expect(takarazuka.maps[0].tip).toMatch(/自分で「すべてに同意した上で閲覧する」を押す.*北部の道路種別は、ネットに出ていない/);
+    // 姫路市のリンクの決まり：姫路市へのリンクだと分かるように書く。都市計画区域の外（夢前町・安富町）を書く
+    for (const link of himeji.maps) expect(link.label).toContain("姫路市");
+    expect(himeji.note).toContain("夢前町・安富町");
+    expect(himeji.maps[0].tip).toMatch(/色塗りが無い所は、道路調査をしていない「未判定道路」/);
+    // 伊丹市：地図の住所が変わる予定なので、市のページから開く
+    expect(itami.maps[0].tip).toContain("2026年12月1日");
+    // 高砂市：市のページに調べ方が無く、国の一覧が根拠
+    expect(takasago.maps[0].tip).toMatch(/国の「指定道路図・指定道路調書のインターネット公開状況」（令和5年4月1日現在）/);
+    expect(kakogawa.maps[0].tip).toContain("最新の情報ではない");
+    expect(akashi.maps[0].tip).toMatch(/自分で同意する/);
+    expect(ashiya.maps[0].tip).toContain("建築基準法指定道路情報");
+    expect(kawanishi.maps[0].url).toBe("https://www.city.kawanishi.hyogo.jp/business/kaihatu/1004316/1009638/index.html");
+    // 窓口：市の建築の課（県の土木事務所ではない）
+    expect(cities.map((m) => m.contact?.phone)).toEqual(["079-221-2579", "06-6489-6650", "078-918-5046", "0798-35-3704", "0797-38-2114", "072-784-8065", "079-427-9260", "0797-77-2082", "079-443-9035", "072-740-1204", "079-559-5115"]);
+    expect(cities.map((m) => m.contact?.fax)).toEqual(["079-221-2548", "06-6489-6597", "078-918-5109", "0798-36-3795", "0797-38-2722", "072-784-8048", "079-441-7101", "0797-74-8997", undefined, undefined, "079-559-7400"]);
+    // 明石市・西宮市・加古川市・宝塚市は、道路種別を電話などでは答えない
+    expect(cities.filter((m) => m.contact?.noPhoneInquiry).map((m) => m.name)).toEqual(["明石市", "西宮市", "加古川市", "宝塚市"]);
+    // 県のデータ（HYOGO）と重なっていない
+    for (const c of codes) expect(MUNICIPALITIES.filter((m) => m.codes.includes(c)), c).toHaveLength(1);
+  });
+
   it("奈良県の3市（奈良・橿原・生駒）：市が道路を扱い、地図は市のページ（入口）から開く。道路種別の案内があるのは橿原市だけ", () => {
     const [nara, kashihara, ikoma] = ["29201", "29205", "29209"].map((c) => findMunicipality(c)!);
     expect([nara, kashihara, ikoma].map((m) => m.name)).toEqual(["奈良市", "橿原市", "生駒市"]);
@@ -293,11 +339,11 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
 
   it("道路種別を電話で答えない窓口は、電話のボタンを控えめにする印が付く", () => {
     // 府県・市のページに、電話などでは答えないと書かれているところ
-    for (const code of ["27127", "27141", "27322", "26104", "26208", "25209", "24203", "30208", "29202", "29207", "29449", "25206", "25213", "26204"]) {
+    for (const code of ["27127", "27141", "27322", "26104", "26208", "25209", "24203", "30208", "29202", "29207", "29449", "25206", "25213", "26204", "28203", "28204", "28210", "28214"]) {
       expect(findMunicipality(code)?.contact?.noPhoneInquiry, code).toBe(true);
     }
-    // 書かれていないところ（兵庫県の土木事務所・和歌山県の那賀のほかの窓口・奈良県の郡山と中和）には付けない
-    for (const code of ["28201", "28221", "30202", "30206", "29203", "29206", "25201", "25202", "25203", "25204", "25207", "29201", "29205", "29209", "30201"]) {
+    // 書かれていないところ（兵庫県の土木事務所・和歌山県の那賀のほかの窓口・奈良県の郡山と中和・市のページに書かれていない市）には付けない
+    for (const code of ["28221", "30202", "30206", "29203", "29206", "25201", "25202", "25203", "25204", "25207", "29201", "29205", "29209", "30201", "28201", "28202", "28206", "28207", "28216", "28217", "28219"]) {
       const m = findMunicipality(code);
       if (m && m.coverage !== "unknown") expect(m.contact?.noPhoneInquiry, code).toBeUndefined();
     }
