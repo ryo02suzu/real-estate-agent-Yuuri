@@ -983,9 +983,15 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(north).toBeLessThanOrEqual(kind === "T1" ? 400 : -315);
       // 理由の向き（「地図全体が南東へ…ずれている」）が動かす向きの逆になっている
       expect(s.reason).not.toMatch(kind === "T1" ? /地図全体が北西へ/ : /地図全体が南東へ/);
-      expect(s.oaza).toBeUndefined();
-      expect(s.chome).toBeUndefined();
-      expect(s.chiban).toBeUndefined();
+      expect(s.reason).not.toMatch(kind === "T1" ? /北西へ約\d+mずれている/ : /南東へ約\d+mずれている/);
+      if (s.chiban) {
+        // 地図の一部だけがずれていた所（生駒市北新町の地図。20筆だけ）は、大字と地番の一覧で絞って動かし、残りは動かさないと理由に書く
+        expect(s.oaza).toBeDefined();
+        expect(s.reason).toMatch(/残りの.*動かさない/);
+      } else {
+        expect(s.oaza).toBeUndefined();
+        expect(s.chome).toBeUndefined();
+      }
       expect(s.sheet).not.toBe("*");
       expect(s.reason).toMatch(/測地系/);
     }
@@ -1039,7 +1045,8 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
   });
   it("近畿（2026-11-12）：三田市のニュータウンの4枚は、道路縁と隣の地図で確かめた同じ量（西へ3.0m・南へ3.3m）を計算した量に足している", () => {
     const kinki = data.sheets.filter((s) => /^(2[4-9]|30)/.test(s.code) && s.shift);
-    expect(kinki).toHaveLength(14);
+    // 11-12 の14枚と、11-13 に地価の地点で見つけた東員町（2枚）・木津川市（1枚）・生駒市北新町（1枚の一部・大字ごとに2つ）
+    expect(kinki).toHaveLength(19);
     const sanda = kinki.filter((s) => s.code === "28219");
     expect(sanda.map((s) => s.sheet).sort()).toEqual(["あかしあ台１～５丁目", "すずかけ台１～４丁目", "ゆりのき台１～６丁目（修正後）", "北摂三田ニュータウン南地区"].sort());
     for (const s of sanda) {
@@ -1049,6 +1056,25 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(s.shift!.north).toBeGreaterThanOrEqual(342.9);
       expect(s.shift!.north).toBeLessThanOrEqual(343.2);
       expect(s.reason).toMatch(/4枚に同じ量（西へ 3\.0m・南へ 3\.3m）を足して/);
+    }
+  });
+  it("地価の地点で見つけたずれ（2026-11-13）：渋川市の地図 10109 は地図ごと動かす決まり1つだけ、生駒市北新町の地図はずれた20筆だけを動かす", () => {
+    // 渋川市：前は「ほかの地図の筆と重なる部分だけ外す」決まり3つ（531筆）だった。重なりは地図全体のずれのせいで、動かすと重なりは 0.2%
+    const shibukawa = data.sheets.filter((s) => s.code === "10208" && s.sheet === "10109_hosei_20121211082249");
+    expect(shibukawa).toHaveLength(1);
+    expect(shibukawa[0].shift?.kind).toBe("T2");
+    expect(shibukawa[0].chiban).toBeUndefined();
+    expect(shibukawa[0].reason).toMatch(/渋川字梅ノ木2062番37/);
+    // 生駒市北新町：同じ地図の 2000〜2007番などは今の位置で正しい（動かすと東旭ケ丘の筆とほぼ全部重なる）ので動かさない
+    const ikoma = data.sheets.filter((s) => s.code === "29209" && s.sheet === "XF2kitasinmati17A01");
+    expect(ikoma.map((s) => [s.oaza, s.chiban?.length])).toEqual([
+      ["北新町", 14],
+      ["谷田町", 6],
+    ]);
+    for (const s of ikoma) {
+      expect(s.shift?.kind).toBe("T2");
+      expect(s.chiban).not.toContain("2001");
+      expect(s.chiban!.every((l) => /^(20(1[1-9]|2[0-2])(-\d)?|161[0-5])$/.test(l))).toBe(true);
     }
   });
   it("どれも対応エリア（関東1都6県・中部9県・東北6県・近畿2府5県）の5桁の市区町村コード・地図名・町・筆の数・理由がある。同じ決まりは1回だけ（町・地番で絞るときも）", () => {
