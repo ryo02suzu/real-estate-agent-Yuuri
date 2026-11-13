@@ -1228,7 +1228,8 @@ describe("八千代市の分割図", () => {
   it("八千代市役所（大和田新田）は No.19 の図", () => {
     const [link] = buildLinks(findMunicipality("12221")!, 35.7224, 140.0997);
     expect(link.sheet?.label).toBe("No.19");
-    expect(link.url).toMatch(/46100\.pdf$/);
+    // 2026-10-30 の差し替え（令和8年10月14日時点）で No.19 は 50999.pdf
+    expect(link.url).toMatch(/50999\.pdf$/);
   });
 });
 
