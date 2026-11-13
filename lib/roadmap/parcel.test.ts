@@ -690,6 +690,31 @@ describe("lookup で地番を探す", () => {
     expect(same.status === "ok" && same.parcel?.chiban).toBe("17-12");
   });
 
+  it("地割の住所で、国土地理院の住所に地割が無くても、地番の地図で同じ地割の筆を見つけたら「町名が見つからない」とは言わない", async () => {
+    // 花巻市石鳥谷町好地第16地割24番2：国土地理院は「石鳥谷町好地」までしか返さない。筆は「第16地割」の地番区域で見つかる
+    const stub = (title: string) =>
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => ({
+          ok: true,
+          json: async () =>
+            url.includes("AddressSearch")
+              ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title } }]
+              : { results: { muniCd: "03205", lv01Nm: "石鳥谷町好地" } },
+        })),
+      );
+    stub("岩手県花巻市石鳥谷町好地");
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: "花巻市_石鳥谷町好地_第１６地割__", chiban: "24-2" }, { kuiki: "花巻市_石鳥谷町好地_第９地割__", chiban: "24-2" }] });
+    const r = await lookup("岩手県花巻市石鳥谷町好地第16地割24番2", { parcels: src, loadIndex: async () => null });
+    expect(r.status === "ok" && r.parcel?.kuiki).toBe("花巻市_石鳥谷町好地_第１６地割__");
+    expect(r.status === "ok" && r.miss).toBeUndefined();
+    // 地番区域に地割が書かれていない（区分を確かめられない）筆しか無ければ、今までどおり知らせる
+    const plain = fakeSource({ [`${SX},${SY}`]: [{ kuiki: "花巻市_石鳥谷町好地___", chiban: "24-2" }] });
+    const r2 = await lookup("岩手県花巻市石鳥谷町好地第16地割24番2", { parcels: plain, loadIndex: async () => null });
+    expect(r2.status === "ok" && r2.parcel?.chiban).toBe("24-2");
+    expect(r2.status === "ok" && r2.miss).toEqual({ typed: "石鳥谷町好地第16地割", found: "石鳥谷町好地", kind: "town" });
+  });
+
   it("国土地理院が番地まで見つけた住所は、筆が見つからなくても何も言わない", async () => {
     vi.stubGlobal(
       "fetch",

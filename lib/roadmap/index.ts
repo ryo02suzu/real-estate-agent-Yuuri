@@ -2,8 +2,8 @@ import GSI_CODES from "./data/gsi-muni-codes.json";
 import { correctAddress, describeMatch, type AddressFix, type AddressMiss } from "./address-fix";
 import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, matchedNumbers, needsChoice, numbersAgree, reverseGeocode, subAreaDropped, withoutNumbers, type GeocodeResult } from "./geocode";
 import { buildLinks, findMunicipality, resolveContact, type Contact, type Municipality, type ResolvedLink } from "./municipalities";
-import { kuikiSubLabel, normalizeChiban, parcelAt, searchParcel, splitChiban, splitLotHead, townFromAddress, type Parcel, type ParcelSource } from "./parcel";
-import { addressSub, elsewhereLabel, sameTownName, typedChome, type Elsewhere } from "./parcel-sub";
+import { kuikiAllows, kuikiHasSub, kuikiSubLabel, normalizeChiban, parcelAt, searchParcel, splitChiban, splitLotHead, townFromAddress, townKey, type Parcel, type ParcelSource } from "./parcel";
+import { addressSub, elsewhereLabel, sameTownName, typedChome, type AddressSub, type Elsewhere } from "./parcel-sub";
 import { loadParcelIndex, type ParcelIndex } from "./parcel-index";
 import { pmtilesParcelSource } from "./parcel-tiles";
 
@@ -64,6 +64,20 @@ export type LookupResult =
  * 番地まで見つからない住所（「熊谷市下奈良391番地3」のように地番で書く土地）や、「地番」と書いた入力は、
  * 登記所備付地図の筆を探して、その筆の場所を使う
  */
+/**
+ * 国土地理院の住所に無い細かい区分（岩手の「第16地割」・小字など）を、地番の地図の区分で確かめて筆を見つけたときは、
+ * 「入れた町名が見つからず、名前の近い別の町を出しています」とは言わない（出す場所はその筆で、町の代表点ではない）。
+ * 入れた町名が見つかった町の名前の続き（「石鳥谷町好地」＋「第16地割」）で、筆の地番区域にその区分が書かれていて合うときだけ
+ */
+function withoutVerifiedMiss<T extends { miss?: AddressMiss }>(notes: T, sub: AddressSub | null, kuiki: string, town: string | null): T {
+  const m = notes.miss;
+  if (!m || m.kind !== "town" || !sub || !town) return notes;
+  if (!townKey(m.typed).startsWith(townKey(m.found)) || !kuikiHasSub(kuiki, sub) || !kuikiAllows(kuiki, sub, town)) return notes;
+  const rest = { ...notes };
+  delete rest.miss;
+  return rest;
+}
+
 export async function lookup(
   address: string,
   {
@@ -144,7 +158,7 @@ export async function lookup(
           matchedAddress: geo.matchedAddress.replace(/[0-9０-９][0-9０-９番地号の\-－]*$/, ""),
           town: prev.town,
           approximate: false,
-          ...notes,
+          ...withoutVerifiedMiss(notes, sub, r.parcel.kuiki, town),
           parcel: r.parcel,
           parcelOthers: r.others,
           ...(r.alts?.length ? { parcelAlts: r.alts.map((a) => ({ label: kuikiSubLabel(a.kuiki), lat: a.point.lat, lng: a.point.lng })) } : {}),
