@@ -57,7 +57,7 @@ import {
   type Resume,
 } from "@/lib/resume";
 import type { AddressFix, LookupResult } from "@/lib/roadmap";
-import { partialMatch } from "@/lib/roadmap/geocode";
+import { branchUnmatched, partialMatch } from "@/lib/roadmap/geocode";
 import { groupHazardMaps, wagamachiUrl } from "@/lib/roadmap/hazard";
 import {
   isLotChiban,
@@ -2840,8 +2840,15 @@ function PlaceNote({
   ) {
     // 号などが住所のデータに無く、その手前（番まで）の代表の地点を出しているとき
     const matched = displayAddress(result.matchedAddress);
-    short = `住所は「${matched}」までの一致です`;
-    text = `入力した住所の最後の番号（号など）は国土地理院の住所のデータに無いため、「${matched}」の代表の地点を出しています。建物の位置と違うときは「場所を直す」で直してください。`;
+    if (branchUnmatched(query, result.matchedAddress)) {
+      // 地番の枝番が合っていない：同じ番地でも枝番の違う土地は離れていることがあるので、はっきり知らせる
+      warn = true;
+      short = `枝番は合っていません（「${matched}」までの一致）`;
+      text = `入力した地番の枝番は国土地理院の住所のデータに無いため、「${matched}」の代表の地点を出しています。同じ番地でも、枝番の違う土地は離れた所にあることがあります。公図などで場所を確かめ、違うときは「場所を直す」で直してください。`;
+    } else {
+      short = `住所は「${matched}」までの一致です`;
+      text = `入力した住所の最後の番号（号など）は国土地理院の住所のデータに無いため、「${matched}」の代表の地点を出しています。建物の位置と違うときは「場所を直す」で直してください。`;
+    }
   } else if (picked && !parcel) {
     short = "地図で選んだ地点です（町名まで）";
     text = "地図で選んだ地点です（番地は分からないので町名まで）。";

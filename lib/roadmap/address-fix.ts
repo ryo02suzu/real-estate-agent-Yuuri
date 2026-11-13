@@ -3,7 +3,9 @@
 // 「髙田馬場」（旧字）・「横浜市中区みなとみらい」（区の違い）・「大宮市」（合併前の市の名前）・「宇津宮市」（市の名前の誤字）では、
 // 町・市の中心や、別の県の似た名前に当たる。関東の市区町村の名前と、国土地理院が返した正式な町名に合わせて探し直し
 // （最大4回）、入れた住所をより細かく説明できたときだけ使う。何をどう直したか（「南大道り」→「南大通り」）を返して画面に小さく出す。
-// 直しきれずに別の町に当たったときも、そのことを返す（黙って別の町を出さない）。住所は国土地理院の API にだけ送る
+// 直しきれずに別の町に当たったときも、そのことを返す（黙って別の町を出さない）。住所は国土地理院の API にだけ送る。
+// 都道府県のあとに市区町村を書かずに町名から入れた住所（「東京都渋谷2-6-12」「東京都丸の内1-9-1」）も、同じ都道府県の中の
+// その町を探して出す（fixOmittedMunicipality。同じ町名が2つ以上の市区町村にあれば選んでもらう）
 import GSI_CODES from "./data/gsi-muni-codes.json";
 import { newForm } from "./old-kanji";
 import { CHIWARI, addressNumbers, chiwariDigits, geocodeCandidates, type GeocodeResult } from "./geocode";
@@ -174,8 +176,10 @@ export function fixMunicipality(query: string): string | null {
   const out = new Set<string>();
   for (const m of pool) {
     const stem = m.city.slice(0, -1);
-    if ([...stem].length < 2 || !t.place.startsWith(stem)) continue;
+    if (!stem || !t.place.startsWith(stem)) continue;
     const rest = t.place.slice(stem.length);
+    // 1字の名前（堺市・津市）は、続きがその市の区の名前（「堺堺区南瓦町」）のときだけ（「堺町」「津田」などの町名と区別できないので）
+    if ([...stem].length < 2 && !(m.ward && rest.startsWith(m.ward))) continue;
     // 「中央区」と「中央市」のように、続く字が別の名前の終わりなら別の市区町村
     if (rest && !/^[市区町村郡]/.test(rest)) out.add(m.city + rest);
   }
@@ -237,6 +241,76 @@ async function fixWard(query: string, cands: GeocodeResult[], search: (q: string
   return { query: `${o.pref}${o.muni}${town}${t.num}`, candidates: got };
 }
 
+/** 町名が同じか（書き方の揺れと、終わりの「町」の有り無しだけを同じと見る。1字違いの別の町は同じと見ない） */
+const sameNameTown = (typed: string, official: string) => {
+  const a = loose(typed);
+  const b = loose(official);
+  return a === b || a === `${b}町` || b === `${a}町`;
+};
+
+/**
+ * 都道府県のあとに、市区町村を書かずに町名から入れた（「東京都渋谷2-6-12」「東京都丸の内1-9-1」「千葉県柏1-1-1」）とき。
+ * 国土地理院の住所検索は、名前の頭が合う市区町村（渋谷区・柏市）か都道府県にしか当たらず、その中心（区役所・県庁のあたり）を返す。
+ * (1) 当たった市区町村に同じ名前の町があるか（「渋谷区渋谷」「柏市柏」「港区港南」）と、(2) 都道府県を外した町名と番地で
+ * 見つかる同じ都道府県の町（「北区豊島」）を探す。(2) は番地・号までぴったり持つ町しか返らないので、まだ全部の番号が
+ * 合っていなければ、(3) 最後の番号（号・枝番）を外してもう一度探す（「丸の内1-9」→「千代田区丸の内一丁目９番」）。
+ * 番号のいちばん合う町を使い、同じだけ合う町が2つ以上の市区町村にある（「新宿3-1-1」は新宿区と葛飾区）なら選んでもらう（choices）。
+ * 番号の食い違う町・名前の違う町は使わない。国土地理院への問い合わせは3回まで（search が回数を数える）
+ */
+async function fixOmittedMunicipality(
+  query: string,
+  cands: GeocodeResult[],
+  search: (q: string) => Promise<GeocodeResult[]>,
+): Promise<{ query: string; candidates: GeocodeResult[] } | { choices: GeocodeResult[]; omitted: true } | null> {
+  const off = cands[0] && splitOfficial(cands[0].matchedAddress);
+  // 旧字（「髙輪」）は今の字にして探す（国土地理院は名前を文字どおりに照合する）
+  const t = typedParts(newForm(query));
+  if (!off || !t.pref || !t.place || off.pref !== t.pref || typedMunis(query).length) return null;
+  // 市区町村の中の町まで当たっているなら触らない（町名の書き間違いは fixTown）
+  if (off.muni && off.town) return null;
+  const want = addressNumbers(t.num).slice(0, 3);
+  // 番地が無く、市区町村の名前だけを入れた（「東京都渋谷」は渋谷区、「東京都日の出」は日の出町）ときも触らない
+  if (!want.length && (off.muni || sameNameTown(t.place, off.town))) return null;
+  // 「市川」「区界」のように「市」「区」の字が入る町名は townOf で読めないので、入れた場所の名前をそのまま町名として探す
+  const town = (off.muni ? townOf(t.place, off) : null) ?? t.place;
+  // 市区町村＋町ごとに、番号のいちばん合う候補（k = 合った番号の数）
+  const best = new Map<string, { c: GeocodeResult; o: Official; k: number }>();
+  const add = (list: GeocodeResult[], least: number) => {
+    for (const c of list) {
+      const o = splitOfficial(c.matchedAddress);
+      if (!o || o.pref !== t.pref || !o.muni || !o.town || !sameNameTown(town, o.town)) continue;
+      const got = addressNumbers(o.num);
+      if (got.length < least || got.length > want.length || got.some((n, i) => n !== want[i])) continue;
+      const key = `${o.muni}|${o.town}`;
+      const had = best.get(key);
+      if (!had || had.k < got.length) best.set(key, { c, o, k: got.length });
+    }
+  };
+  const top = () => Math.max(-1, ...[...best.values()].map((x) => x.k));
+  const find = (q: string) => search(q).catch(() => []);
+  // (1) は当たった市区町村の中なので、番地が無く町まででも使う（市区町村の中心よりは近い）。(2)(3) は番号が1つは合うこと
+  if (off.muni) add(await find(`${off.pref}${off.muni}${town}${t.num}`), 0);
+  add(await find(`${town}${want.join("-")}`), want.length ? 1 : 0);
+  if (want.length >= 2 && top() < want.length) add(await find(`${town}${want.slice(0, -1).join("-")}`), 1);
+  if (!best.size) return null;
+  const hits = [...best.values()].filter((x) => x.k === top());
+  const q = (o: Official) => `${o.pref}${o.muni}${o.town}${t.num}`;
+  if (hits.length > 1) return { choices: hits.map((x) => ({ ...x.c, matchedAddress: q(x.o) })), omitted: true };
+  return { query: q(hits[0].o), candidates: [hits[0].c] };
+}
+
+/**
+ * 入れた場所が見つかっていない：都道府県のあとに入れた市区町村・町名がどれも見つからず、都道府県の代表の地点（県庁のあたり）や、
+ * 名前の頭が似ているだけの別の町村（「東京都日本橋1-4-1」に、日の出町を指す「東京都日の出」）が返った。
+ * そこを物件の場所として出さないために使う。「東京都」「東京都日の出」のように、入れたとおりの場所が返ったときは当てはまらない
+ */
+export function placeNotFound(input: string, matched: string): boolean {
+  const off = splitOfficial(matched);
+  const t = typedParts(input);
+  if (!off || off.muni || !t.pref || !t.place) return false;
+  return !(off.town && sameNameTown(t.place, off.town));
+}
+
 /**
  * 結果が入れた住所をどこまで説明できているか：0 = 別の市区町村・住所でない、1 = 市区町村まで（町が見つからない）、
  * 2 = 別の町、3 = 入れた町（書き方違いを含む）、そのあと番地の数が1つ合うごとに +2
@@ -265,7 +339,7 @@ export async function correctAddress(
   first: GeocodeResult[],
   search: (q: string) => Promise<GeocodeResult[]> = geocodeCandidates,
   maxCalls = 4,
-): Promise<{ query: string; candidates: GeocodeResult[] } | { choices: GeocodeResult[] } | null> {
+): Promise<{ query: string; candidates: GeocodeResult[] } | { choices: GeocodeResult[]; omitted?: true } | null> {
   const q0 = input.normalize("NFKC").replace(/\s+/g, " ").trim();
   // 施設の名前などに当たった（住所の形でない）ときは触らない
   if (first[0] && !splitOfficial(first[0].matchedAddress)) return null;
@@ -289,6 +363,12 @@ export async function correctAddress(
   await attempt(muniFix);
   const old = newForm(cur.q);
   await attempt(old === cur.q ? null : old);
+  // 市区町村を書かずに町名から入れた住所（市区町村・都道府県にしか当たっていないときだけ。問い合わせは残りの回数まで）
+  if (cur.score < full && calls < maxCalls) {
+    const o = await fixOmittedMunicipality(cur.q, cur.cands, (q) => (calls >= maxCalls ? Promise.resolve([]) : (calls++, search(q))));
+    if (o && "choices" in o) return o;
+    if (o) take(o.query, o.candidates);
+  }
   if (cur.score < full) {
     const t = fixTown(cur.q, cur.cands);
     if (t && "choices" in t) return { choices: t.choices };
@@ -324,13 +404,17 @@ export function describeMatch(input: string, matched: string, used?: string): { 
   const off = splitOfficial(matched);
   if (!off) return null;
   const t = typedParts(input);
-  // 小字（「下奈良字東原」の「字東原」）は国土地理院の住所に無いので外して比べる
-  const place = off.town.includes("字") ? t.place : t.place.replace(/(.)字[^字]+$/, "$1");
+  // 小字（「下奈良字東原」の「字東原」、京都府などの「伊佐津小字ミゾクロ西」の「小字ミゾクロ西」）は国土地理院の住所に無いので外して比べる
+  const place = off.town.includes("字") ? t.place : t.place.replace(/(.)小?字[^字]+$/, "$1");
   if (!place) return null;
   const official = off.muni + off.town;
   // 国土地理院は小字の「字」を書かずに名前だけ残すことがある（「高善寺字大川鉢」→「高善寺大川鉢」）
   const plain = t.place.replace(/(.)字/g, "$1");
   if (!used && (townForm(official).endsWith(townForm(place)) || townForm(official).endsWith(townForm(plain)))) return null;
+  // 京都府などは「大字植田小字堂ケ島」「字伊佐津」と書き、国土地理院は「大字植田堂ケ島」「伊佐津」と「小字」「字」を書かない。
+  // 「字」「小字」の印の有り無しだけの違いは、同じ町（別の町に当たったとは言わない）
+  const bare = (x: string) => townForm(x).replace(/小?字/g, "");
+  if (!used && bare(official).endsWith(bare(place))) return null;
   if (used) return { fix: fixLabel(place, off) };
   const town = townOf(place, off);
   if (!off.town) return town ? { miss: { typed: town, found: off.muni, kind: "city" } } : null;

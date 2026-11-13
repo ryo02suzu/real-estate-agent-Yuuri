@@ -100,6 +100,17 @@ export function partialMatch(input: string, matchedAddress: string): boolean {
   return b.length > 0 && a.length > b.length;
 }
 
+/**
+ * 番までの一致（partialMatch）のうち、地番の枝番が合っていないもの：見つかった住所が「〇〇番地」（登記の地番の書き方）で、
+ * 入力にはその先の番号（枝番）がある（「新城字山田587番255」が「新城山田５８７番地」までの一致）。
+ * 住居表示の「号」が無いだけ（同じ街区の中）と違い、同じ番地でも枝番の違う土地は離れた所にあることがある
+ * （2026-11-13 の総点検：地番の書き方の住所 175件で、国の地点から中央値 44m・200m を超えるもの 9件・最大 1.3km）。
+ * 画面の案内を「号などが無い」ではなく「枝番が合っていない」にするために使う
+ */
+export function branchUnmatched(input: string, matchedAddress: string): boolean {
+  return partialMatch(input, matchedAddress) && /番地$/.test(matchedAddress.normalize("NFKC"));
+}
+
 /** 見つかった住所の終わりの番地・号（「松戸３番地」→ [3]、「寺内二丁目１３番５７号」→ [13, 57]。町までの一致は空） */
 export function matchedNumbers(matchedAddress: string): number[] {
   const tail = matchedAddress.normalize("NFKC").replace(CHIWARI, "").match(/\d[\d番地号の-]*$/)?.[0];
