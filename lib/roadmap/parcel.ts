@@ -224,6 +224,26 @@ export function kuikiChome(kuiki: string): number | null {
 }
 
 /**
+ * 町（大字）の地番区域に、小字の名前として書かれているもの（索引にある、同じ大字の地番区域の小字の名前。そろえた形）。
+ * 入力の小字がこの中にあれば、その小字は地番区域の一部なので、小字の書かれていない地番区域の同じ地番は別の土地
+ * （富山市大町には「字当後割」の地番区域があり、「大町字当後割17番1」を小字の無い「大町」の 17-1 に当てると 561m 先の別の土地だった。
+ * 入力の小字が町の地番区域に無いとき（磐梯町大字磐梯の「字金上壇」など）は、小字の無い地番区域の筆が正しいことが多いので当てる）
+ */
+export function townNames(index: { k: Record<string, unknown> } | null | undefined, town: string): Set<string> {
+  const out = new Set<string>();
+  if (!index) return out;
+  const base = townKey(town).replace(/\d+丁目$/, "");
+  if (!base) return out;
+  for (const kuiki of Object.keys(index.k)) {
+    const [, oaza = "", chome = "", koaza = ""] = kuiki.split("_");
+    if (townKey(oaza) !== base) continue;
+    const name = `${subParse(chome)?.name ?? ""}${subParse(koaza)?.name ?? ""}`;
+    if (name) out.add(name);
+  }
+  return out;
+}
+
+/**
  * 町（大字）の地番区域が、番号の区分（地割・号・字・区など。丁目は除く）で分かれているか：索引にある、同じ大字の地番区域の区分の数え方。
  * 入力にその数え方の番号があるのに、筆の地番区域に書かれていなければ、その筆は入力の土地ではない
  * （越前市横市町には「１字」「７字」の地番区域があり、「横市町10字四ノ縄1番4」を区分の無い地番区域の 1-4 に当てると 709m 先の別の土地だった）。
@@ -391,13 +411,18 @@ export async function searchParcel(
   const elsewhere = new Set<string>();
   // 町（大字）の地番区域が分かれている番号の区分（地割・号・字など）。入力にその番号があれば、書かれていない地番区域の筆は当てない
   const counters = townCounters(index, q.town);
+  // 町の地番区域にある小字の名前。入力の小字がこの中にあれば、小字の書かれていない地番区域の筆は当てない
+  const names = townNames(index, q.town);
   /** 入力の丁目・番号の区分が、その地番区域で確かめられるか（丁目が違う・丁目が無い、町が使う区分が書かれていなければ別の土地） */
   const strictOk = (kuiki: string): boolean => {
     if (q.chome != null && kuikiChome(kuiki) !== q.chome) return false;
-    if (q.sub && counters.size) {
+    if (q.sub && (counters.size || names.size)) {
       const [, , chome = "", koaza = ""] = kuiki.split("_");
-      const have = new Set([...Object.keys(subParse(chome)?.nums ?? {}), ...Object.keys(subParse(koaza)?.nums ?? {})]);
+      const a = subParse(chome);
+      const b = subParse(koaza);
+      const have = new Set([...Object.keys(a?.nums ?? {}), ...Object.keys(b?.nums ?? {})]);
       for (const c of Object.keys(q.sub.nums)) if (c !== "丁目" && counters.has(c) && !have.has(c)) return false;
+      if (q.sub.name && names.has(q.sub.name) && !(a?.name || b?.name)) return false;
     }
     return true;
   };

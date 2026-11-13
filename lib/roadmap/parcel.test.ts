@@ -292,6 +292,20 @@ describe("筆の探索", () => {
     expect(r.status === "found" && [r.parcel.kuiki, r.others]).toEqual(["東金市_田間___", 1]);
   });
 
+  it("入力の小字が町の地番区域にあれば、小字の書かれていない地番区域の同じ地番は当てない（富山市大町字当後割17番1）。町の地番区域に無い小字なら当てる", async () => {
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: "富山市_大町___", chiban: "17-1" }] });
+    const index: { k: Record<string, [number, number, number, number][]> } = {
+      k: { "富山市_大町___": [[SX, SY, 1, 99]], "富山市_大町__字当後割_": [[SX + 3, SY, 1, 99]], "富山市_大町__字下田割_": [[SX + 4, SY, 1, 99]] },
+    };
+    const sub = addressSub("富山県富山市大町字当後割", "大町", "富山市");
+    const r = await searchParcel({ city: "富山市", town: "大町", chiban: "17-1", sub }, START, src, { maxTiles: 12, index });
+    expect(r.status === "not_found" && r.elsewhere).toEqual([""]);
+    // 町の地番区域に無い小字（磐梯町大字磐梯の「字金上壇」のような所）は、小字の無い地番区域の筆を当てる
+    const other = addressSub("富山県富山市大町字天神", "大町", "富山市");
+    const ok = await searchParcel({ city: "富山市", town: "大町", chiban: "17-1", sub: other }, START, src, { maxTiles: 12, index });
+    expect(ok.status === "found" && ok.parcel.kuiki).toBe("富山市_大町___");
+  });
+
   it("町の地番区域が番号の区分（字・地割・号）で分かれていれば、入力の番号が書かれていない地番区域の同じ地番は当てない（越前市横市町10字四ノ縄1番4）", async () => {
     const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: "越前市_横市町___", chiban: "1-4" }, { kuiki: "越前市_横市町_１字__", chiban: "1-4" }] });
     const index: { k: Record<string, [number, number, number, number][]> } = {
