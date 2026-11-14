@@ -985,13 +985,15 @@ describe("公図から推定した筆のデータの置き場所（data/kozu-sou
 
   // 関東のほかの地方を足すと、地方（まとまり）ごとのタイルを1つにまとめて置く（scripts/kozu-tiles/sets.py）。sets はその内訳
   it("まとまりごとの内訳（sets）があれば、ファイル名は R2 の kozu/ の下の PMTiles で、市区町村は全体の一覧と同じ", () => {
-    const sets = (KOZU_SOURCE as { sets?: Record<string, { file: string; codes: string[]; edition: string }> }).sets;
+    const sets = (KOZU_SOURCE as { sets?: Record<string, { file: string; codes: string[]; edition: string; high_only?: boolean }> }).sets;
     if (!sets) return;
     const all: string[] = [];
     for (const [name, s] of Object.entries(sets)) {
       expect(name).toMatch(/^[a-z][a-z0-9]{1,15}$/);
       expect(s.file).toMatch(/^[a-z0-9-]+\.pmtiles$/);
       expect(s.edition).toMatch(/^\d{4}年\d{1,2}月公開版$/);
+      // 関東の外のまとまりは、確度の高い推定だけ（確度の低い推定は、大阪府で測って3割が別の場所だった。docs/features.md の 126）
+      if (name !== "kanto") expect(s.high_only).toBe(true);
       all.push(...s.codes);
     }
     expect(all.sort()).toEqual([...KOZU_SOURCE.codes].sort());

@@ -902,10 +902,12 @@ def valid_wkt(text: str):
     return g if g.is_valid else g.buffer(0)
 
 
-def resolve(src: str, out: str, stats_out: str | None) -> None:
+def resolve(src: str, out: str, stats_out: str | None, high_only: bool = False) -> None:
     """ジョブごとの結果（src の kozu-*.geojsonl・frags-*.jsonl・stats-*.json。.gz でもよい）をまとめる。
-    ジョブ（図面の組・市区町村）をまたいで大きく重なった切れ端は、確かなほうだけ残し、タイルにする筆（地番区域・地番・q）を書き出す"""
-    frags = [d for p in sorted(glob.glob(os.path.join(src, "frags-*.jsonl*"))) for d in read_lines(p)]
+    ジョブ（図面の組・市区町村）をまたいで大きく重なった切れ端は、確かなほうだけ残し、タイルにする筆（地番区域・地番・q）を書き出す。
+    high_only：確度の高い推定（q=1）だけを書き出す。関東の外のまとまりで使う（大阪府の全部を作って国の地価の地点で測ると、
+    確度の高い推定は 135地点すべて 30m 以内だったが、確度の低い推定は 138地点の 30% が別の地番の所だった。関東は 7.6%）"""
+    frags = [d for p in sorted(glob.glob(os.path.join(src, "frags-*.jsonl*"))) for d in read_lines(p) if not high_only or d["q"] == 1]
     frags.sort(key=lambda d: conflict_order(d["q"], d["sc"], d["n"]))
     # 切れ端の形は平面直角座標（m）なので、同じ系の都府県どうしでだけ重なりを調べる（系が違うと、座標の数字が同じでも別の場所）
     by_zone: dict[int, list[dict]] = {}
@@ -921,7 +923,7 @@ def resolve(src: str, out: str, stats_out: str | None) -> None:
         for p in sorted(glob.glob(os.path.join(src, "kozu-*.geojsonl*"))):
             for d in read_lines(p):
                 pr = d["properties"]
-                if pr["f"] in dropped:
+                if pr["f"] in dropped or (high_only and pr["q"] != 1):
                     continue
                 code = pr["f"].split(":")[0]
                 per_code.setdefault(code, {"placed_parcels": 0})["placed_parcels"] += 1
@@ -949,7 +951,9 @@ def resolve(src: str, out: str, stats_out: str | None) -> None:
         "errors": {lab: st["error"] for lab, st in jobs.items() if st.get("error")},
         "by_code": totals,
     }
-    log(f"筆 {summary['parcels']} のうち {n} を置いた（{n / max(1, summary['parcels']):.0%}）・市区町村 {len(summary['codes'])}/{len(totals)}")
+    if high_only:
+        summary["high_only"] = True
+    log(f"筆 {summary['parcels']} のうち {n} を置いた（{n / max(1, summary['parcels']):.0%}）・市区町村 {len(summary['codes'])}/{len(totals)}" + ("（確度の高い推定だけ）" if high_only else ""))
     if summary["cut"]:
         log(f"::warning::時間切れ: {', '.join(summary['cut'])}")
     for lab, e in summary["errors"].items():
@@ -969,6 +973,7 @@ def main() -> None:
     ap.add_argument("--stats", help="数を書く JSON")
     ap.add_argument("--minutes", type=float, help="この分数が過ぎたら、そこまでに置けたもので終える（GitHub Actions のジョブの時間の上限より短く）")
     ap.add_argument("--resolve", help="ジョブごとの結果の置き場。まとめて --out に書き出す")
+    ap.add_argument("--high-only", action="store_true", help="--resolve のとき、確度の高い推定（q=1）だけを書き出す（関東の外のまとまり）")
     ap.add_argument("--work", default="work")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 2)
     ap.add_argument("--sheets", help="この地図名だけ（試すとき。カンマ区切り）")
@@ -979,7 +984,7 @@ def main() -> None:
     if a.resolve:
         if not a.out:
             ap.error("--out が要ります")
-        resolve(a.resolve, a.out, a.stats)
+        resolve(a.resolve, a.out, a.stats, a.high_only)
         return
     if not a.codes or not a.out:
         ap.error("--codes と --out が要ります")
