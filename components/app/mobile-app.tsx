@@ -939,7 +939,8 @@ export function MobileApp(props: MobileAppProps) {
 
   return (
     <div
-      className="theme-navy app-touch relative flex min-h-0 w-full flex-1 flex-col overflow-hidden"
+      className="mobile-shell theme-navy app-touch relative flex min-h-0 w-full flex-1 flex-col overflow-hidden"
+      data-property-view={ok && page === "home" ? "true" : undefined}
       style={{
         fontFeatureSettings: "normal",
         letterSpacing: 0,
@@ -965,7 +966,7 @@ export function MobileApp(props: MobileAppProps) {
           style={{ visibility: page === "home" ? "visible" : "hidden" }}
         />
       )}
-      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className="mobile-content relative flex min-h-0 flex-1 flex-col">
         <div
           ref={scroller}
           data-scroller
@@ -1060,7 +1061,7 @@ export function MobileApp(props: MobileAppProps) {
         {/* 下部操作バーの置き場（物件の画面が中身を入れる） */}
         <div
           ref={setBarSlot}
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-30"
+          className="mobile-action-slot pointer-events-none absolute inset-x-0 bottom-0 z-30"
         />
         {/* 履歴のページのお知らせ（コピーしました など）と、消したあとの「元に戻す」（下のメニューのすぐ上に浮かせる。一覧はスクロールするので） */}
         {page === "history" && (
@@ -1971,7 +1972,9 @@ function PropertyView({
   }, []);
 
   const changeTab = (t: TabKey) => {
-    if (t === tab) return;
+    const landscape = !!root.current &&
+      getComputedStyle(root.current).getPropertyValue("--app-landscape").trim() === "1";
+    if (t === tab && !landscape) return;
     setTab(t);
     // 読んでいたパネル内で切り替える。先頭の模型へ戻すと、横向きではタブが画面外に隠れる。
     // 本文を深く読んでいた場合だけ、パネルの先頭まで戻して次の項目を見せる。
@@ -1986,7 +1989,8 @@ function PropertyView({
         0,
         el.scrollTop + panel.getBoundingClientRect().top - el.getBoundingClientRect().top - 56 * zoom,
       );
-      if (el.scrollTop > panelTop) {
+      // 横向きではタブが画面下端に見えていても、押した本文を読める位置へ送る。
+      if (landscape || el.scrollTop > panelTop) {
         el.scrollTo({
           top: panelTop,
           behavior: reducedMotion() ? "auto" : "smooth",
