@@ -2,7 +2,7 @@ import { open, stat } from "node:fs/promises";
 import type { Source } from "pmtiles";
 import { describe, expect, it } from "vitest";
 import SRC from "./data/school-source.json";
-import { SCHOOL_ZOOM, schoolCredit, schoolDistanceText, schoolGaps, schoolGapShort, schoolGapText, schoolLine, schoolShort, schoolsAt, withSchoolWalks, type SchoolArea } from "./school";
+import { SCHOOL_ZOOM, schoolCredit, schoolDistanceText, schoolGaps, schoolGapShort, schoolGapText, schoolLabel, schoolLine, schoolNotes, schoolShort, schoolsAt, withSchoolWalks, type SchoolArea } from "./school";
 import { schoolGap, schoolSearchUrl } from "./school-data";
 import { schoolTileSource } from "./school-tiles";
 import { tileOf } from "./parcel";
@@ -42,8 +42,117 @@ describe("地点の学区", () => {
     expect(r?.junior?.distance).toBeUndefined();
   });
 
+  it("住所で決まる指定校ではない学校（学びの多様化学校・入学者選考のある学校）は、指定校として出さない", async () => {
+    // 白石市：白石南小学校・白石南中学校は学びの多様化学校（不登校特例校）。国のデータでは市の全域が区域になっている
+    const cover = [square(LAT, LNG, 0.05)];
+    const south = area({ name: "白石南小学校", city: "04206", polygons: cover });
+    const obara = area({ name: "小原小学校", city: "04206", polygons: cover });
+    for (const order of [
+      [south, obara],
+      [obara, south],
+    ]) {
+      const r = await schoolsAt(LAT, LNG, { tile: async (x, y) => (x === TX && y === TY ? order : []) });
+      // ほかの学校の区域と重なっていれば、ほかの学校を出す（知らせも要らない）
+      expect(r?.elementary?.name).toBe("小原小学校");
+      expect(r?.elementary?.overlaps).toBeUndefined();
+      expect(r?.unassigned).toBeUndefined();
+      expect(schoolNotes(r!)).toEqual([]);
+    }
+    // その学校の区域しか無い地点（白石市の福岡深谷・福岡八宮のあたりの小学校区）は、指定校を出さずに知らせる
+    const fukuoka = area({ kind: "中学校", name: "福岡中学校", city: "04206", polygons: cover });
+    const southJh = area({ kind: "中学校", name: "白石南中学校", city: "04206", polygons: cover });
+    const hole = await schoolsAt(LAT, LNG, { tile: async (x, y) => (x === TX && y === TY ? [southJh, fukuoka, south] : []) });
+    expect(hole?.elementary).toBeUndefined();
+    expect(hole?.junior?.name).toBe("福岡中学校");
+    expect(hole?.unassigned).toEqual([{ kind: "小学校", name: "白石南小学校", what: "学びの多様化学校（不登校の児童生徒のための学校）で、住所で決まる指定校ではありません" }]);
+    expect(schoolNotes(hole!)).toEqual([
+      "国のデータでは、この地点の小学校区は白石南小学校の区域だけです。白石南小学校は学びの多様化学校（不登校の児童生徒のための学校）で、住所で決まる指定校ではありません。指定校は教育委員会で確かめてください。",
+    ]);
+    expect(schoolGaps("04206", hole)).toEqual([{ key: "es", label: "小学校区", why: "outside" }]);
+    // 道のりを足しても、知らせは残る
+    expect((await withSchoolWalks(LAT, LNG, hole!, async () => new Map()))?.unassigned).toHaveLength(1);
+    // 川口市：川口市立高等学校附属中学校は入学者選考のある中高一貫校
+    const fuzoku = area({ kind: "中学校", name: "川口市立高等学校附属中学校", city: "11203", polygons: cover });
+    const aoki = area({ kind: "中学校", name: "青木中学校", city: "11203", polygons: cover });
+    const k = await schoolsAt(LAT, LNG, { tile: async (x, y) => (x === TX && y === TY ? [fuzoku, aoki] : []) });
+    expect(k?.junior?.name).toBe("青木中学校");
+    expect(k?.junior?.overlaps).toBeUndefined();
+    // 同じ名前でも、ほかの市の学校はふつうに出す
+    const other = await schoolsAt(LAT, LNG, { tile: async (x, y) => (x === TX && y === TY ? [area({ name: "白石南小学校", city: "99999" })] : []) });
+    expect(other?.elementary?.name).toBe("白石南小学校");
+  });
+
   it("データの無い所（タイルが無い）は null", async () => {
     expect(await schoolsAt(LAT, LNG, { tile: async () => null })).toBeNull();
+  });
+
+  it("学校区が重なっている所は、いちばん狭い区域の学校を出し、ほかの学校は知らせる（データの順に左右されない）", async () => {
+    // 国のデータには、市内のどこからでも通える学校・入学者の選考のある学校の区域が、市の全域に重ねてある所がある
+    // （川口市立高等学校附属中学校・白石市の白石南小中学校）。先に出た1つを出していたので、地点によって近所の学校と入れ替わっていた
+    const wide = area({ kind: "中学校", name: "市立高等学校附属中学校", owner: "川口市立", city: "11203", polygons: [square(LAT, LNG, 0.01)] });
+    const local = area({ kind: "中学校", name: "青木中学校", owner: "川口市", city: "11203", polygons: [square(LAT, LNG, 0.002)], point: [LNG + 0.001, LAT] });
+    for (const order of [
+      [wide, local],
+      [local, wide],
+    ]) {
+      const r = await schoolsAt(LAT, LNG, { tile: async (x, y) => (x === TX && y === TY ? order : []) });
+      expect(r?.junior?.name).toBe("青木中学校");
+      expect(r?.junior?.overlaps).toEqual(["市立高等学校附属中学校"]);
+      expect(r?.elementary).toBeUndefined();
+      expect(schoolNotes(r!)).toEqual([
+        "国のデータでは、この地点はほかの学校の区域にも入っています（中学校は市立高等学校附属中学校）。選べる区域・分校・統合の前後の学校・市内のどこからでも通える学校のことがあり、どちらが指定校かは、このデータでは決められません。指定校は教育委員会で確かめてください。",
+      ]);
+    }
+    // 広さが同じ区域どうし（どちらとも言えない）は、データの順のまま出し、もう一方を知らせる
+    const a = area({ name: "東小学校", polygons: [square(LAT, LNG, 0.002)] });
+    const b = area({ name: "西小学校", polygons: [square(LAT, LNG, 0.002)] });
+    const same = await schoolsAt(LAT, LNG, { tile: async (x, y) => (x === TX && y === TY ? [a, b] : []) });
+    expect(same?.elementary?.name).toBe("東小学校");
+    expect(same?.elementary?.overlaps).toEqual(["西小学校"]);
+    // タイルに区域の広さ（ha）が入っていれば、それで比べる。タイルは区域を切って入れてあるので、どちらの区域もタイルを覆っている所
+    // （山あいの広い学校区）は、タイルの中の形では同じ広さに見える
+    const cover = [square(LAT, LNG, 0.05)];
+    const main = area({ name: "本校小学校", city: "07204", polygons: cover, area: 28601 });
+    const branch = area({ name: "分校小学校", city: "07204", polygons: cover, area: 8023 });
+    for (const order of [
+      [main, branch],
+      [branch, main],
+    ]) {
+      const r = await schoolsAt(LAT, LNG, { tile: async (x, y) => (x === TX && y === TY ? order : []) });
+      expect(r?.elementary?.name).toBe("分校小学校");
+      expect(r?.elementary?.overlaps).toEqual(["本校小学校"]);
+    }
+    // 広さの入っていない区域が混じっていれば（前の版のタイル）、タイルの中の形で比べる
+    const mixed = await schoolsAt(LAT, LNG, { tile: async (x, y) => (x === TX && y === TY ? [main, area({ name: "分校小学校", city: "07204", polygons: [square(LAT, LNG, 0.01)] })] : []) });
+    expect(mixed?.elementary?.name).toBe("分校小学校");
+    // 重なっていなければ overlaps は無く、注意も無い
+    const one = await schoolsAt(LAT, LNG, { tile: async (x, y) => (x === TX && y === TY ? [a] : []) });
+    expect(one?.elementary?.overlaps).toBeUndefined();
+    expect(schoolNotes(one!)).toEqual([]);
+    // 穴のある区域（穴の中の広さは引く）
+    const ring = area({ name: "まわり小学校", polygons: [[square(LAT, LNG + 0.004, 0.006)[0], square(LAT, LNG + 0.004, 0.0005)[0]]] });
+    const small = area({ name: "まんなか小学校", polygons: [square(LAT, LNG, 0.001)] });
+    expect((await schoolsAt(LAT, LNG, { tile: async (x, y) => (x === TX && y === TY ? [ring, small] : []) }))?.elementary?.name).toBe("まんなか小学校");
+  });
+
+  it("通学区域の指定が無い千代田区の中学校は、国のデータの学校名（九段中等教育学校）を出さず、選べる学校と決まりを出す", async () => {
+    // 区の公式「区立中学校の通学区域と学校選択」：通学区域を設けず、麹町中学校・神田一橋中学校から選ぶ。九段中等教育学校は受検で合格した人だけ
+    const r = await schoolsAt(LAT, LNG, {
+      tile: async (x, y) =>
+        x === TX && y === TY
+          ? [area({ kind: "中学校", name: "九段中等教育学校", owner: "千代田区", city: "13101", point: [LNG, LAT + 0.001] }), area({ name: "富士見小学校", owner: "千代田区立", city: "13101" })]
+          : [],
+    });
+    expect(r?.junior).toMatchObject({ name: "麹町中学校・神田一橋中学校から選択", owner: "千代田区", choice: true });
+    expect(r?.junior?.point).toBeUndefined();
+    expect(r?.junior?.distance).toBeUndefined();
+    expect(schoolNotes(r!)).toEqual(["千代田区の区立中学校は通学区域が無く、麹町中学校・神田一橋中学校から選びます（学校選択制）。九段中等教育学校は、受検で合格した人が入る学校です。"]);
+    expect(schoolShort(r!.junior!.name)).toBe("麹町中・神田一橋中から選択");
+    expect(schoolLine(r!.junior!)).toBe("麹町中学校・神田一橋中学校から選択（千代田区）");
+    expect(r?.elementary?.name).toBe("富士見小学校");
+    // ほかの市区町村の同じ名前の学校は、そのまま
+    const other = await schoolsAt(LAT, LNG, { tile: async (x, y) => (x === TX && y === TY ? [area({ kind: "中学校", name: "九段中等教育学校", city: "13104" })] : []) });
+    expect(other?.junior?.name).toBe("九段中等教育学校");
   });
 
   it("文字", () => {
@@ -53,6 +162,12 @@ describe("地点の学区", () => {
     expect(schoolLine({ kind: "小学校", name: "九段小学校", owner: "千代田区立", city: "13101", distance: 316 })).toBe("九段小学校（千代田区立・直線約320m）");
     expect(schoolLine({ kind: "中学校", name: "青木中学校", city: "11203" })).toBe("青木中学校");
     expect(schoolShort("戸塚第二小学校")).toBe("戸塚第二小");
+    // 国のデータで学校区が重なっている所は、見出しは「〜ほか」、書類の1行にもほかの学校を書く
+    expect(schoolLabel({ name: "山田小学校" })).toBe("山田小");
+    expect(schoolLabel({ name: "山田小学校", overlaps: ["谷上小学校"] })).toBe("山田小ほか");
+    expect(schoolLine({ kind: "小学校", name: "山田小学校", owner: "神戸市立", city: "28100", distance: 316, overlaps: ["谷上小学校"] })).toBe(
+      "山田小学校（神戸市立・直線約320m）。国のデータでは谷上小学校の区域にも入っています",
+    );
     expect(schoolShort("九段中等教育学校")).toBe("九段中等教育学校");
     expect(schoolLine({ kind: "小学校", name: "九段小学校", owner: "千代田区立", city: "13101", distance: 316, walk: { meters: 452, minutes: 6 } })).toBe(
       "九段小学校（千代田区立・徒歩約6分・約450m）",
@@ -127,6 +242,42 @@ describe("アプリに入っている学区のタイル", () => {
     expect((await schoolsAt(35.8115, 139.7225, src))?.elementary?.name).toBe("青木中央小学校");
     expect((await schoolsAt(35.4437, 139.638, src))?.junior?.name).toBe("横浜吉田中学校");
     expect(await schoolsAt(36.1473, 139.3886, src)).toBeNull();
+  });
+
+  it("実物のタイル：千代田区は中学校を選ぶ区、川口市・白石市は重なる区域でも近所の学校が出る", async () => {
+    // 千代田区九段南・神田（国のデータは区の全域が九段中等教育学校の区域）
+    for (const [lat, lng] of [
+      [35.694, 139.7536],
+      [35.6952, 139.7672],
+    ]) {
+      const r = await schoolsAt(lat, lng, src);
+      expect(r?.junior?.name).toBe("麹町中学校・神田一橋中学校から選択");
+      expect(r?.elementary?.name).toMatch(/小学校$/);
+    }
+    // 川口市役所・東川口（市の全域に「川口市立高等学校附属中学校」＝入学者選考のある中高一貫校の区域が重なる）
+    const k1 = await schoolsAt(35.8077, 139.7241, src);
+    expect(k1?.junior?.name).toBe("青木中学校");
+    const k2 = await schoolsAt(35.8752, 139.744, src);
+    expect(k2?.junior?.name).toBe("戸塚西中学校");
+    for (const k of [k1, k2]) expect(k?.junior?.overlaps).toBeUndefined();
+    // 白石市役所（市の全域に「白石南小学校」「白石南中学校」＝学びの多様化学校の区域が重なる）
+    const s1 = await schoolsAt(38.0025, 140.6198, src);
+    expect(s1?.elementary?.name).toBe("白石第一小学校");
+    expect(s1?.junior?.name).toBe("白石中学校");
+    expect(schoolNotes(s1!)).toEqual([]);
+    // 白石市小原（郊外。小原小学校の区域も白石南小学校の区域も、タイルを覆っていて、タイルの中の形では広さを比べられない所）
+    const s2 = await schoolsAt(37.9529, 140.4822, src);
+    expect(s2?.elementary?.name).toBe("小原小学校");
+    expect(s2?.junior?.name).toBe("小原中学校");
+    // 白石市福岡深谷（国のデータの小学校区が、白石南小学校の区域しか無い所）。指定校は出さず、知らせる
+    const s3 = await schoolsAt(38.055, 140.56375, src);
+    expect(s3?.elementary).toBeUndefined();
+    expect(s3?.junior?.name).toBe("福岡中学校");
+    expect(schoolNotes(s3!)[0]).toContain("この地点の小学校区は白石南小学校の区域だけです");
+    // 重なりの無い所は今までどおり
+    const n = await schoolsAt(35.7128, 139.7046, src);
+    expect(n?.elementary?.overlaps).toBeUndefined();
+    expect(schoolNotes(n!)).toEqual([]);
   });
 
   it("日光市は、旧今市市・旧藤原町は教育委員会に確かめるよう添える", async () => {

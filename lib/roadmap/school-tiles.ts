@@ -27,6 +27,7 @@ function decode(data: ArrayBuffer, x: number, y: number): SchoolArea[] {
       note: str(p.nt),
       point: typeof p.x === "number" && typeof p.y === "number" ? ([p.x, p.y] as LngLat) : undefined,
       polygons,
+      area: typeof p.ar === "number" && p.ar > 0 ? p.ar : undefined,
     });
   }
   return out;

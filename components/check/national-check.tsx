@@ -253,7 +253,9 @@ function Report({ result }: { result: Ok }) {
 function Appraisal({ a }: { a: AppraisalPoint }) {
   const rows: [string, ReactNode][] = [
     ["標準地", `${a.no}（${a.use ?? ""}・${a.y}年1月1日）`],
-    ["公示価格", `${yenPerM2(a.p)}${a.ch !== undefined ? `（前年比 ${a.ch > 0 ? "+" : ""}${a.ch}%）` : ""}`],
+    // 鑑定評価書の「1㎡当たりの価格」は、1人目の鑑定評価員の評価額。公示価格（2人の評価をもとに土地鑑定委員会が決める）と同じとは限らない
+    // （2026-11-14 の点検：国土数値情報の公示価格と比べて、標準地の約36%で違った。差は最大 4.1%）。公示価格は地価のカードに出している
+    ["鑑定評価額（1人目）", `${yenPerM2(a.p)}${a.ch !== undefined ? `（前年比 ${a.ch > 0 ? "+" : ""}${a.ch}%）` : ""}。公示価格とは違うことがあります`],
     ["所在", [a.addr, a.jukyo && `（${a.jukyo}）`].filter(Boolean).join("")],
     ["路線価", a.rosen?.p ? `${yenPerM2(a.rosen.p)}（${a.rosen.y}年）` : a.rosen?.rate ? `倍率 ${a.rosen.rate}` : "—"],
     ["地積・形状", [a.area && `${a.area}m²`, a.shape, a.frontage && a.depth && `間口:奥行 ${a.frontage}:${a.depth}`].filter(Boolean).join("・")],

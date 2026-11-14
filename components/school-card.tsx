@@ -5,7 +5,7 @@
 // 令和5年度のデータで、学区は見直されることがあり、学校選択制の市区町村もあるので、指定校は教育委員会で確かめるよう添える
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
-import { schoolGapShort, schoolGapText, schoolShort, schoolsAt, schoolWayText, withSchoolWalks, type SchoolGapItem, type SchoolHit, type Schools } from "@/lib/roadmap/school";
+import { schoolGapShort, schoolGapText, schoolLabel, schoolNotes, schoolsAt, schoolWayText, withSchoolWalks, type SchoolGapItem, type SchoolHit, type Schools } from "@/lib/roadmap/school";
 import { ROAD_CREDIT } from "@/lib/roadmap/walk";
 import { SCHOOL_DATA, schoolSearchUrl } from "@/lib/roadmap/school-data";
 import { pmtilesSchoolSource } from "@/lib/roadmap/school-tiles";
@@ -66,7 +66,7 @@ function Row({ label, s, missing }: { label: string; s?: SchoolHit; missing?: st
  * 無い学校区の行に短いわけを書き、下に説明と、市区町村の通学区域を探すリンクを出す
  */
 export function SchoolDetail({ schools, gap }: { schools: Schools; gap?: { items: SchoolGapItem[]; city: string } }) {
-  const note = schools.elementary?.note ?? schools.junior?.note;
+  const notes = schoolNotes(schools);
   const why = (key: "es" | "jh") => {
     const g = gap?.items.find((x) => x.key === key);
     return g && `データなし（${schoolGapShort(g.why, gap!.city)}）`;
@@ -78,9 +78,13 @@ export function SchoolDetail({ schools, gap }: { schools: Schools; gap?: { items
         <Row label="中学校区" s={schools.junior} missing={why("jh")} />
       </dl>
       {gap && gap.items.length > 0 && <SchoolGapNote items={gap.items} city={gap.city} />}
-      {note && <p className="mt-1 text-[12.5px] leading-[1.6] text-[#8a4f3a]">{note}</p>}
+      {notes.map((note) => (
+        <p key={note} className="mt-1 text-[12.5px] leading-[1.6] text-[#8a4f3a]">
+          {note}
+        </p>
+      ))}
       <Notes
-        lead="学区は見直されることがあります。指定校は教育委員会で確かめてください。"
+        lead={`${SCHOOL_DATA.edition.replace(/（.*$/, "")}のデータです。その後の学区の見直し・学校の統合は入っていません。指定校は教育委員会で確かめてください。`}
         source={
           <a href="https://nlftp.mlit.go.jp/ksj/" target="_blank" rel="noreferrer" className="underline">
             国土数値情報（国土交通省）
@@ -124,7 +128,7 @@ export function SchoolButton({ state, onOpen, tile, className }: { state: School
   const [open, setOpen] = useState(false);
   if (state.status === "none" || state.status === "error") return null;
   const s = state.status === "ok" ? state.schools : undefined;
-  const names = s && [s.elementary && schoolShort(s.elementary.name), s.junior && schoolShort(s.junior.name)].filter(Boolean).join("・");
+  const names = s && [s.elementary && schoolLabel(s.elementary), s.junior && schoolLabel(s.junior)].filter(Boolean).join("・");
   return (
     <>
       {tile ? (
@@ -147,7 +151,7 @@ export function SchoolButton({ state, onOpen, tile, className }: { state: School
           <>
             <span className="shrink-0 text-muted">学区</span>
             <span className="truncate">
-              {s ? [s.elementary && schoolShort(s.elementary.name), s.junior && schoolShort(s.junior.name)].filter(Boolean).join("・") : "確認中…"}
+              {s ? names : "確認中…"}
             </span>
           </>
         ) : (

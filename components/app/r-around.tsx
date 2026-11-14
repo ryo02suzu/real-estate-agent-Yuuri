@@ -7,7 +7,7 @@ import { ChevronRight, Cross, ShoppingCart, SquareArrowOutUpRight, Store } from 
 import type { ReactNode } from "react";
 import { livingScores, totalScore } from "@/lib/app/scores";
 import { POI_SOURCES, type PoiWalk } from "@/lib/roadmap/poi";
-import { schoolGaps, schoolGapShort, schoolShort } from "@/lib/roadmap/school";
+import { schoolGaps, schoolGapShort, schoolLabel } from "@/lib/roadmap/school";
 import { lineLabel } from "@/lib/roadmap/walk";
 import { G, GCard, GNote, GRow, NUM, TILE } from "./g-ui";
 import { AwardFill, CapFill, CutleryFill, PillIcon, TrainOutline, TreeFill } from "./icons";
@@ -147,8 +147,8 @@ function schoolRow(schools: TabProps["data"]["schools"], muniCd: string, city: s
   const s = schools.status === "ok" ? schools.schools : null;
   const e = s?.elementary;
   const j = s?.junior;
-  if (e) return { title: schoolShort(e.name), sub: `小学校区・中学校区は${j ? schoolShort(j.name) : "データなし"}` };
-  if (j) return { title: "小学校区はデータなし", sub: `中学校区は${schoolShort(j.name)}・小学校は教育委員会で確認` };
+  if (e) return { title: schoolLabel(e), sub: `小学校区・中学校区は${j ? schoolLabel(j) : "データなし"}` };
+  if (j) return { title: "小学校区はデータなし", sub: `中学校区は${schoolLabel(j)}・小学校は教育委員会で確認` };
   const why = schoolGaps(muniCd, s).find((g) => g.key === "es")?.why ?? "outside";
   return { title: "学区のデータなし", sub: `${schoolGapShort(why, city)}・教育委員会で確認` };
 }

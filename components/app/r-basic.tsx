@@ -13,7 +13,7 @@ import type { Triage } from "@/lib/app/triage";
 import { usageShort } from "@/lib/roadmap/building";
 import { bySide, sideText } from "@/lib/app/neighbor-plan";
 import { chibanLabel, isLotChiban, kuikiLabelFrom, parcelMark, pickedChibanText, type Neighbor } from "@/lib/roadmap/parcel";
-import { schoolGaps, schoolGapShort, schoolShort } from "@/lib/roadmap/school";
+import { schoolGaps, schoolGapShort, schoolLabel } from "@/lib/roadmap/school";
 import { noCityPlanning } from "@/lib/roadmap/municipalities";
 import { noneLabel, YOUTO_COLORS, youtoShort, zoningArea } from "@/lib/roadmap/zoning";
 import { addressOffLot, pickKey, registryNeighbors } from "../parcel-card";
@@ -140,7 +140,7 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
           />
           <GCell
             label="小学校区"
-            value={schools.status === "loading" ? <GFaint /> : school ? schoolShort(school.name) : <GFaint>{schools.status === "error" ? "読み込めず" : "データなし"}</GFaint>}
+            value={schools.status === "loading" ? <GFaint /> : school ? schoolLabel(school) : <GFaint>{schools.status === "error" ? "読み込めず" : "データなし"}</GFaint>}
             sub={school ? (school.walk ? `徒歩${school.walk.minutes}分` : school.owner ? `${school.owner}立` : "小学校区") : schoolWhy ? schoolGapShort(schoolWhy, result.municipality.name) : ""}
             onClick={schools.status === "ok" || schools.status === "none" ? () => open("schools") : undefined}
           />

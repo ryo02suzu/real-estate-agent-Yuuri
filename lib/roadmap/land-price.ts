@@ -41,8 +41,10 @@ export type LandPricePoint = {
   /** 周辺の土地の利用の状況 */
   env?: string;
   station?: string;
-  /** 最寄り駅までの道路距離（m） */
+  /** 最寄り駅までの道路距離（m）。駅のすぐ近くの地点は、距離ではなく stationNear の区分で入る */
   stationM?: number;
+  /** 駅のすぐ近くの地点の区分（国のデータの書き方のまま。「近接」「接面」「駅前広場接面」） */
+  stationNear?: StationNear;
   /** 用途地域（「1低専」「商業」）・防火・区域区分・建蔽率・容積率 */
   zone?: string;
   fire?: string;
@@ -52,6 +54,9 @@ export type LandPricePoint = {
   /** 価格の推移（古い順。調べていない年は無し） */
   history: { year: number; price: number }[];
 };
+
+/** 駅のすぐ近くの地点の区分（地価公示は「交通施設との近接状況」、地価調査は距離の欄の印：駅接面 0・駅近接 1） */
+export type StationNear = "近接" | "接面" | "駅前広場接面";
 
 /** タイル (x, y)（z13）の地点。タイルが無ければ null（関東の外） */
 export type LandPriceSource = { tile(x: number, y: number): Promise<LandPricePoint[] | null> };
@@ -176,6 +181,17 @@ export function landPriceSummary(p: Pick<LandPricePoint, "kind" | "no" | "usage"
 
 export type LandPriceRow = { label: string; value: string };
 
+/** 最寄り駅と距離の書き方。「半蔵門（約500m）」「京橋（近接）」。short は一覧の1行用（「半蔵門 500m」「京橋 近接」）。
+ *  国のデータでは、すぐ近くの地点は距離ではなく区分（近接・接面・駅前広場接面）で入っているので、その言い方のまま出す。
+ *  最寄りが駅ではない地点（鉄道の無い所のバス停・港・国道）もあるので、「駅に近接」とは書かない */
+export function stationText(p: Pick<LandPricePoint, "station" | "stationM" | "stationNear">, short = false): string {
+  if (!p.station) return "";
+  if (p.stationNear) return short ? `${p.station} ${p.stationNear}` : `${p.station}（${p.stationNear}）`;
+  if (p.stationM) return short ? `${p.station} ${p.stationM.toLocaleString("ja-JP")}m` : `${p.station}（約${p.stationM.toLocaleString("ja-JP")}m）`;
+  // 区分の入っていない前の版のタイルで、距離が 0 の地価公示の地点（近接か駅前広場接面のどちらか）
+  return short ? p.station : `${p.station}（すぐ近く）`;
+}
+
 /** 地点の詳しい行（入っている項目だけ） */
 export function landPriceRows(p: LandPricePoint): LandPriceRow[] {
   const rows: LandPriceRow[] = [];
@@ -186,7 +202,7 @@ export function landPriceRows(p: LandPricePoint): LandPriceRow[] {
   const building = [p.structure && (STRUCTURES[p.structure] ?? p.structure), floors].filter(Boolean).join(" ");
   if (p.use) rows.push({ label: "利用の現況", value: building ? `${p.use}（${building}）` : p.use });
   if (p.roadType || p.roadWidth) rows.push({ label: "前面道路", value: [p.roadDir && `${p.roadDir}側`, p.roadWidth && `幅員${p.roadWidth}m`, p.roadType].filter(Boolean).join("・") });
-  if (p.station) rows.push({ label: "最寄り駅", value: p.stationM ? `${p.station}（約${p.stationM.toLocaleString("ja-JP")}m）` : `${p.station}（駅前）` });
+  if (p.station) rows.push({ label: "最寄り駅", value: stationText(p) });
   const plan = [p.zone && (ZONES[p.zone] ?? p.zone), p.bcr && p.far ? `建蔽率${p.bcr}%・容積率${p.far}%` : "", p.fire && (p.fire === "準防" ? "準防火地域" : `${p.fire}地域`), p.plan && PLANS[p.plan] !== "市街化区域" ? (PLANS[p.plan] ?? p.plan) : ""]
     .filter(Boolean)
     .join("・");

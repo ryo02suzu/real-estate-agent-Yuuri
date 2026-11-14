@@ -2,7 +2,7 @@
 // 置き場所（data/reinfolib-source.json）はテスト用に差し替え、ファイル・タイルの中身はテストの中で作る（通信しない）
 import { describe, expect, it, vi } from "vitest";
 import { appraisalFor, methodRows, type AppraisalFile } from "./appraisal";
-import { facilityCounts, nearestFacilities, nearbyFacilities, notForPublic, withNationalHospitals, type Facility } from "./facilities";
+import { closedHospital, facilityCounts, nearestFacilities, nearbyFacilities, notForPublic, withNationalHospitals, type Facility } from "./facilities";
 import { liquefactionAt, liquefactionText } from "./liquefaction";
 import { meshBounds, meshCenter } from "./mesh";
 import type { LngLat, Polygon } from "./parcel";
@@ -214,6 +214,13 @@ describe("医療機関と幼稚園", () => {
     const near = await nearbyFacilities(...TOKYO, allTiles(withHoliday));
     const got = await nearestFacilities(...TOKYO, near, undefined, async (_a, _b, t) => new Map(t.map((x) => [x.id, 1000])));
     expect(got.find((g) => g.query === "internal")?.name).not.toBe("立石休日応急診療所");
+  });
+
+  it("国のデータ（2020年度）のあとに閉院したと確かめた病院は出さない", () => {
+    // 新潟労災病院（上越市）は令和8年3月31日に閉院。国のデータには「独立行政法人労働者健康安全機構新潟労災病院」で載っている
+    expect(closedHospital("独立行政法人労働者健康安全機構新潟労災病院")).toBe(true);
+    expect(closedHospital("新潟県立中央病院")).toBe(false);
+    expect(closedHospital("関東労災病院")).toBe(false);
   });
 
   it("まわり（1.2km）の施設を近い順に", async () => {

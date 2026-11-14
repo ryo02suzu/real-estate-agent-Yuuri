@@ -87,7 +87,7 @@ FIELDS = {
     "L01": dict(
         usage="L01_002", seq="L01_003", year="L01_007", price="L01_008", change="L01_009", status="L01_010", city="L01_001", name="L01_024",
         addr="L01_025", jukyo="L01_026", area="L01_027", use_big="L01_028", use="L01_029", struct="L01_031", above="L01_038", below="L01_039",
-        road="L01_040", road_dir="L01_041", road_w="L01_042", env="L01_047", station="L01_048", station_m="L01_050", zone="L01_051",
+        road="L01_040", road_dir="L01_041", road_w="L01_042", env="L01_047", station="L01_048", near="L01_049", station_m="L01_050", zone="L01_051",
         fire="L01_052", plan="L01_053", bcr="L01_057", far="L01_058", hist0=62, hist_base=1921,
     ),
     "L02": dict(
@@ -97,6 +97,24 @@ FIELDS = {
         fire="L02_048", plan="L02_049", bcr="L02_051", far="L02_052", hist0=56, hist_base=1927,
     ),
 }
+
+
+# 地価調査の基準地番号に付く字。都道府県の公式の一覧表のとおり（大阪府・京都府は「(府)」：
+# 大阪府「基準地価格一覧表」・京都府「京都府地価調査基準地一覧表」）。北海道（「(道)」）は対象の外なので入れていない
+PREF_MARK = {"13": "(都)", "26": "(府)", "27": "(府)"}
+NEAR = ("近接", "接面", "駅前広場接面")
+
+
+def station_near(kind: str, near, meters) -> str | None:
+    """駅のすぐ近くの地点の区分（「近接」「接面」「駅前広場接面」）。国のデータでは、距離の代わりにこの区分で入っている。
+    地価公示（L01）：交通施設との近接状況（L01_049。無ければ「_」）。そのとき距離（L01_050）は 0。
+    地価調査（L02）：最寄り駅迄の道路距離（L02_046）が「駅接面の場合は 0・駅近接の場合は 1」（国土数値情報の属性の説明）"""
+    if kind == "L01":
+        v = nfkc(near)
+        return v if v in NEAR else None
+    if meters is None:
+        return None
+    return "接面" if meters == 0 else "近接" if meters == 1 else None
 
 
 def points(kind: str, pref: str, data: dict):
@@ -112,8 +130,8 @@ def points(kind: str, pref: str, data: dict):
         year = int(p[F["year"]])
         seq = int(str(p.get(F["seq"]) or "0") or 0)
         name = nfkc(p.get(F["name"])) or ""
-        # 地価調査の基準地番号は「千代田(都)5-1」「横浜中(県)-1」
-        no = f"{name}{'' if kind == 'L01' else '(都)' if pref == '13' else '(県)'}{USAGE[usage]}-{seq}"
+        # 地価調査の基準地番号は「千代田(都)5-1」「横浜中(県)-1」「都島(府)-1」（国のデータには (都)(府)(県) の字が入っていない）
+        no = f"{name}{'' if kind == 'L01' else PREF_MARK.get(pref, '(県)')}{USAGE[usage]}-{seq}"
         hist = []
         for y in range(year - HISTORY + 1, year + 1):
             v = num(p.get(f"{kind}_{y - F['hist_base']:03d}"))
@@ -142,6 +160,7 @@ def points(kind: str, pref: str, data: dict):
             "env": nfkc(p.get(F["env"])),
             "sta": nfkc(p.get(F["station"])),
             "sd": int(num(p.get(F["station_m"])) or 0),
+            "sn": station_near(kind, p.get(F.get("near", "")), num(p.get(F["station_m"]))),
             "zn": nfkc(p.get(F["zone"])),
             "fi": nfkc(p.get(F["fire"])),
             "pl": nfkc(p.get(F["plan"])),
@@ -151,6 +170,10 @@ def points(kind: str, pref: str, data: dict):
             "h": ",".join(str(v) for v in hist),
         }
         if not out["sta"]:
+            out.pop("sd")
+            out["sn"] = None
+        elif out["sn"]:
+            # 近い駅は距離の数字ではなく区分で出す（地価調査の「1」は距離ではなく「近接」の印）
             out.pop("sd")
         yield f["geometry"]["coordinates"], {k: v for k, v in out.items() if v is not None}
 
