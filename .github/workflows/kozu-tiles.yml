@@ -268,6 +268,8 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"missing={len(miss)}\n")
           PY
+          # まとめ方のテスト（やり直した市区町村は新しい回の結果だけを使う・確度の高い推定だけの書き出し）
+          python3 scripts/kozu-tiles/kozu.py --self-test
           # 関東の外のまとまりは、確度の高い推定だけを出す（確度の低い推定は、国の地価の地点で測って取り違えが多かった。docs/features.md の 126）
           high=""
           if [ "$QUALITY" = "high" ] || { [ "$QUALITY" = "auto" ] && [ "$NAME" != "kanto" ]; }; then high="--high-only"; fi
