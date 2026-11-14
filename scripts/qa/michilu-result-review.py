@@ -18,7 +18,7 @@ REPORT = {
     "preview_url": os.environ.get("PREVIEW_URL", ""), "deployment_tested": False,
     "real_iphone": False, "os": platform.platform(), "checks": [],
     "limitations": ["PC checks cover homepage only, not pixel or full functional regression.",
-                    "200% means computed-font simulation, not iOS Dynamic Type.",
+                    "200% means a one-time computed-font simulation on the existing DOM, not iOS Dynamic Type; later-mounted panels are not fully covered.",
                     "Data/API success, all F01-F12, physical keyboard and normal-motion quality remain separate gates."]
 }
 
@@ -54,6 +54,12 @@ async def layout(page):
           if(width>1&&height>1)overlaps.push({selector,width,height});
         }
       }
+      const compact=document.querySelector('.compact-bar'), hint=document.querySelector('.pv-rothint');
+      const visible=e=>e&&getComputedStyle(e).visibility!=='hidden'&&Number(getComputedStyle(e).opacity)>0;
+      const cb=box(compact), hb=box(hint);
+      const compactHintOverlap=!!(visible(compact)&&visible(hint)&&cb&&hb&&
+        Math.min(cb.right,hb.right)-Math.max(cb.left,hb.left)>1&&
+        Math.min(cb.bottom,hb.bottom)-Math.max(cb.top,hb.top)>1);
       const pane=document.querySelector('.pv-pane'), r=box(pane);
       let run=0,longest=0;
       if(pane&&r){
@@ -67,6 +73,7 @@ async def layout(page):
         width:innerWidth,height:innerHeight,
         horizontalOverflow:document.documentElement.scrollWidth>innerWidth+1,
         titleOverlaps:overlaps,
+        compactHintOverlap,
         unobscuredPaneRunPx:longest,
         scrollerTop:document.querySelector('[data-scroller]')?.scrollTop,
         maps:[...document.querySelectorAll('.maplibregl-map')].map(e=>({
@@ -130,14 +137,14 @@ async def delayed_input(browser, engine):
         print(json.dumps(rec, ensure_ascii=False), flush=True)
 
 
-async def result_case(browser, engine, width, height, text200=False):
-    name = f"{engine}-{width}x{height}" + ("-text200" if text200 else "")
+async def result_case(browser, engine, width, height, text200=False, motion="reduce"):
+    name = f"{engine}-{width}x{height}" + ("-text200" if text200 else "") + ("-normal-motion" if motion == "no-preference" else "")
     rec = {"name": name, "engine": engine, "browser_version": browser.version,
            "page_errors": [], "quality_failures": [], "tabs": []}
     REPORT["checks"].append(rec)
     ctx = await browser.new_context(viewport={"width":width,"height":height}, locale="ja-JP",
                                     device_scale_factor=1,is_mobile=width<1024,has_touch=width<1024,
-                                    reduced_motion="reduce")
+                                    reduced_motion=motion)
     page = await ctx.new_page()
     page.on("pageerror", lambda e: rec["page_errors"].append(str(e)[:1200]))
     try:
@@ -179,6 +186,7 @@ async def result_case(browser, engine, width, height, text200=False):
             assert all(p["receives"] for p in geo["hit44"]), f"{label}: 44px target obscured or outside viewport"
             if label == "道路":
                 rec["road_layout"] = await layout(page)
+                assert not rec["road_layout"]["compactHintOverlap"], "Map hint overlaps the compact address header"
                 await capture(page, name + "-road")
                 # Review heuristic: at least four 24px lines can be read without fixed chrome covering them.
                 if width > height and rec["road_layout"]["unobscuredPaneRunPx"] < 96:
@@ -235,3 +243,4 @@ async def main():
 
 
 asyncio.run(main())
+

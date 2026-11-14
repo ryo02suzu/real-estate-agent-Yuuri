@@ -14,9 +14,9 @@ jobs:
     timeout-minutes: 20
     env:
       REVIEW_URL: http://127.0.0.1:3000
-      PREVIEW_URL: https://michilu-6lm54nw85-sourirettes-projects.vercel.app
-      REVIEW_SHA: 44ba2d7934ce8a12ddedeaafa1bde3171d24513b
-      REVIEW_PHASE: flight-44ba2d7
+      PREVIEW_URL: https://michilu-l2wydnq5m-sourirettes-projects.vercel.app
+      REVIEW_SHA: a0fa8ce4c6655e502035ee235d8167cd3fdd6940
+      REVIEW_PHASE: flight-a0fa8ce
     steps:
       - uses: actions/checkout@v4
         with:
@@ -349,7 +349,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: michilu-flight-44ba2d7-${{ github.run_id }}
+          name: michilu-flight-a0fa8ce-${{ github.run_id }}
           path: flight-review/
           if-no-files-found: warn
           retention-days: 14

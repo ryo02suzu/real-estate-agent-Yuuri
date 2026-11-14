@@ -2,7 +2,7 @@ name: MICHILU UI review evidence
 on:
   push:
     branches: [qa/michilu-ui-v2-review]
-    paths: [.github/workflows/michilu-ui-review.yml, scripts/qa/michilu-result-review.py]
+    paths: [.github/workflows/michilu-ui-review.yml, scripts/qa/michilu-result-review.py, scripts/qa/michilu-landscape-controls-review.py]
 permissions:
   contents: read
 concurrency:
@@ -14,9 +14,9 @@ jobs:
     timeout-minutes: 25
     env:
       REVIEW_URL: http://127.0.0.1:3000
-      PREVIEW_URL: https://michilu-6lm54nw85-sourirettes-projects.vercel.app
-      REVIEW_SHA: 44ba2d7934ce8a12ddedeaafa1bde3171d24513b
-      REVIEW_PHASE: mobile-result-44ba2d7
+      PREVIEW_URL: https://michilu-l2wydnq5m-sourirettes-projects.vercel.app
+      REVIEW_SHA: a0fa8ce4c6655e502035ee235d8167cd3fdd6940
+      REVIEW_PHASE: mobile-result-a0fa8ce
     steps:
       - uses: actions/checkout@v4
         with:
@@ -110,11 +110,25 @@ jobs:
           "$RUNNER_TEMP/michilu-browser/bin/pip" install playwright==1.62.0
           "$RUNNER_TEMP/michilu-browser/bin/playwright" install --with-deps chromium webkit
       - name: Verify input, result tabs and readable layout (not Vercel Preview)
+        id: standard
         run: |
-          "$RUNNER_TEMP/michilu-browser/bin/python" qa-source/scripts/qa/michilu-result-review.py
+          cp qa-source/scripts/qa/michilu-result-review.py /tmp/result-review.py
+          "$RUNNER_TEMP/michilu-browser/bin/python" /tmp/result-review.py
+      - name: Preserve standard size report
+        if: always()
+        run: |
+          test ! -f ui-review/report.json || cp ui-review/report.json ui-review/standard-report.json
+      - name: Verify short landscape, controls, rotation and normal motion
+        if: always() && (steps.standard.outcome == 'success' || steps.standard.outcome == 'failure')
+        run: |
+          "$RUNNER_TEMP/michilu-browser/bin/python" qa-source/scripts/qa/michilu-landscape-controls-review.py
+      - name: Preserve landscape report
+        if: always()
+        run: |
+          test ! -f /tmp/landscape-controls-report.json || cp /tmp/landscape-controls-report.json ui-review/landscape-controls-report.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: michilu-result-44ba2d7-${{ github.run_id }}
+          name: michilu-result-a0fa8ce-${{ github.run_id }}
           path: ui-review/
           retention-days: 14
