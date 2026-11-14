@@ -44,6 +44,16 @@ export type FacilityWalk = Facility & {
  */
 export const notForPublic = (name: string) => /株式会社|有限会社|\(株\)|（株）|健康管理|医務室|保健所|保健センター|刑務所|拘置所|少年院|自衛隊|駐屯地/.test(name);
 
+/**
+ * 国のデータ（医療機関は 2020年度が最新）のあとに閉院したと、公式の資料で確かめた病院（名前の一部）。最寄りの病院として出さない。
+ * 閉院・移転は国のデータに入らないので、分かったものをここに足す（全部は追えない。画面には「今もあるか確かめてください」と出している）
+ */
+const CLOSED_HOSPITALS: { name: RegExp; source: string }[] = [
+  // 上越市。病院の公式サイトの「閉院に向けた診療計画」：令和8年3月13日で全ての診療を休止・令和8年3月31日に閉院
+  { name: /新潟労災病院/, source: "https://niigatah.johas.go.jp/about/doc/closing-schedule_2.pdf" },
+];
+export const closedHospital = (name: string) => CLOSED_HOSPITALS.some((c) => c.name.test(name));
+
 /** 休日・夜間だけの診療所（ふだんの最寄りには選ばない） */
 export const offHours = (name: string) => /休日|夜間|応急/.test(name);
 
@@ -54,6 +64,7 @@ export function decodeFacility(f: VectorTileFeature, x: number, y: number): Faci
   const name = String(p.n ?? "").trim();
   if (g.type !== "Point" || !FACILITY_KINDS[kind] || !name) return null;
   if (kind <= 3 && notForPublic(name)) return null;
+  if (kind === 1 && closedHospital(name)) return null;
   const out: Facility = { kind, name, at: g.coordinates as LngLat };
   if (p.a) out.address = String(p.a);
   if (p.d) out.departments = String(p.d).split("・");

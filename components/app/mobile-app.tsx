@@ -63,6 +63,7 @@ import {
   isLotChiban,
   chibanLabel,
   chibanQueryOf,
+  estimatedSentence,
   registryChiban,
   type Neighbor,
 } from "@/lib/roadmap/parcel";
@@ -2355,7 +2356,7 @@ function PropertyView({
                   >
                     {lotParcel.sanko
                       ? "この筆の形は、市町村の地番参考図から作ったものです。登記所の地図とは違うことがあります。公図・地積測量図で確かめてください。"
-                      : `この筆の位置は、公図（任意座標）を道路の縁に合わせて推定したものです（確かさ：${lotParcel.estimated === "high" ? "高め" : "低め"}）。数mずれることがあります。公図・地積測量図で確かめてください。`}
+                      : `この筆の位置は、公図（任意座標）を道路の縁に合わせて推定したものです（確かさ：${lotParcel.estimated === "high" ? "高め" : "低め"}）。${estimatedSentence(lotParcel.estimated ?? "high")}公図・地積測量図で確かめてください。`}
                   </p>
                 </div>
               </Expand>

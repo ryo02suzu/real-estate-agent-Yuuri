@@ -11,11 +11,12 @@ import {
   landPriceSummary,
   nearestLandPrices,
   priceText,
+  stationText,
   tsuboText,
   type LandPricePoint,
   type LandPriceSource,
 } from "./land-price";
-import { landPriceTileSource } from "./land-price-tiles";
+import { decodeLandPrice, landPriceTileSource } from "./land-price-tiles";
 import { tileOf } from "./parcel";
 
 const pt = (lng: number, lat: number, props: Partial<LandPricePoint> = {}): LandPricePoint => ({
@@ -84,6 +85,55 @@ describe("地価の文字", () => {
       "法令上の制限：第二種住居地域・建蔽率60%・容積率400%・防火地域",
       "価格の推移：2025年 396万円→2026年 441万円",
     ]);
+  });
+});
+
+describe("駅のすぐ近くの地点・地価調査の番号（国と府の公式の書き方）", () => {
+  // 国土数値情報の説明：地価調査の「最寄り駅迄の道路距離」は「駅接面の場合は 0・駅近接の場合は 1」。地価公示は「交通施設との近接状況」
+  // （近接・接面・駅前広場接面）。1 を距離として「約1m」と出していた（140地点）
+  it("駅の区分があれば、距離ではなく区分で出す", () => {
+    expect(stationText({ station: "京橋", stationNear: "近接" })).toBe("京橋（近接）");
+    expect(stationText({ station: "高円寺", stationNear: "接面" })).toBe("高円寺（接面）");
+    expect(stationText({ station: "東京", stationNear: "駅前広場接面" })).toBe("東京（駅前広場接面）");
+    // 最寄りが駅ではない地点（鉄道の無い所のバス停・国道）もあるので、「駅に」とは書かない
+    expect(stationText({ station: "清水バス停", stationNear: "近接" })).toBe("清水バス停（近接）");
+    expect(stationText({ station: "国道13号", stationNear: "接面" })).toBe("国道13号（接面）");
+    expect(stationText({ station: "半蔵門", stationM: 500 })).toBe("半蔵門（約500m）");
+    expect(stationText({ station: "半蔵門", stationM: 1500 })).toBe("半蔵門（約1,500m）");
+    // 一覧の1行
+    expect(stationText({ station: "京橋", stationNear: "近接" }, true)).toBe("京橋 近接");
+    expect(stationText({ station: "半蔵門", stationM: 500 }, true)).toBe("半蔵門 500m");
+    // 区分の入っていない前の版のタイルの、距離 0 の地価公示
+    expect(stationText({ station: "東京", stationM: 0 })).toBe("東京（すぐ近く）");
+    expect(stationText({ station: "東京", stationM: 0 }, true)).toBe("東京");
+    expect(stationText({})).toBe("");
+  });
+
+  it("タイルの読み込み：新しいタイルは sn、前の版のタイルは地価調査の距離の印（0・1）から区分を読む", () => {
+    const at: [number, number] = [139.7, 35.7];
+    // 新しいタイル（sn があり、距離は入っていない）
+    expect(decodeLandPrice({ k: 0, no: "千代田5-2", sta: "東京", sn: "駅前広場接面", y: 2026 }, at)).toMatchObject({ stationNear: "駅前広場接面", stationM: undefined });
+    expect(decodeLandPrice({ k: 1, no: "中央(都)5-1", sta: "馬喰町", sn: "近接", y: 2026 }, at)).toMatchObject({ stationNear: "近接", stationM: undefined });
+    // 前の版のタイル：地価調査の 1 は「近接」、0 は「接面」。距離としては出さない
+    expect(decodeLandPrice({ k: 1, no: "中央(都)5-1", sta: "馬喰町", sd: 1, y: 2026 }, at)).toMatchObject({ stationNear: "近接", stationM: undefined });
+    expect(decodeLandPrice({ k: 1, no: "杉並(都)5-1", sta: "高円寺", sd: 0, y: 2026 }, at)).toMatchObject({ stationNear: "接面", stationM: undefined });
+    expect(decodeLandPrice({ k: 1, no: "杉並(都)-3", sta: "荻窪", sd: 350, y: 2026 }, at)).toMatchObject({ stationNear: undefined, stationM: 350 });
+    // 地価公示は、前の版のタイルでは区分が分からない（距離 0 のまま）。1m は本当の距離ではありえないが、印ではないので変えない
+    expect(decodeLandPrice({ k: 0, no: "千代田5-2", sta: "東京", sd: 0, y: 2026 }, at)).toMatchObject({ stationNear: undefined, stationM: 0 });
+    // 駅名の無い地点、知らない区分
+    expect(decodeLandPrice({ k: 1, no: "檜原(都)-1", sd: 0, y: 2026 }, at).stationNear).toBeUndefined();
+    expect(decodeLandPrice({ k: 0, no: "千代田-1", sta: "半蔵門", sn: "？", sd: 500, y: 2026 }, at)).toMatchObject({ stationNear: undefined, stationM: 500 });
+  });
+
+  it("地価調査の番号は、大阪府・京都府では「(府)」（前の版のタイルの「(県)」を読み替える）", () => {
+    const at: [number, number] = [135.5, 34.7];
+    expect(decodeLandPrice({ k: 1, no: "都島(県)-1", a: "大阪府 大阪市都島区友渕町1丁目4番", y: 2026 }, at).no).toBe("都島(府)-1");
+    expect(decodeLandPrice({ k: 1, no: "上京(県)-3", a: "京都府 京都市上京区室町通", y: 2026 }, at).no).toBe("上京(府)-3");
+    expect(decodeLandPrice({ k: 1, no: "岸和田(府)-8", a: "大阪府 岸和田市", y: 2026 }, at).no).toBe("岸和田(府)-8");
+    // ほかの県・東京都はそのまま。地価公示には付かない
+    expect(decodeLandPrice({ k: 1, no: "神戸中央(県)5-1", a: "兵庫県 神戸市中央区", y: 2026 }, at).no).toBe("神戸中央(県)5-1");
+    expect(decodeLandPrice({ k: 1, no: "千代田(都)5-1", a: "東京都 千代田区", y: 2026 }, at).no).toBe("千代田(都)5-1");
+    expect(decodeLandPrice({ k: 0, no: "大阪北5-1", a: "大阪府 大阪市北区", y: 2026 }, at).no).toBe("大阪北5-1");
   });
 });
 
@@ -156,6 +206,31 @@ describe("アプリに入っている地価のタイル", () => {
     expect(r.some((h) => h.kind === "調査" && /^千代田\(都\)\d*-\d+$/.test(h.no))).toBe(true);
     // 同じ地点は1回だけ
     expect(new Set(r.map((h) => `${h.kind}|${h.no}`)).size).toBe(r.length);
+  });
+
+  it("実物のタイル：大阪府・京都府の地価調査は「(府)」、駅の区分（近接・駅前広場接面）は距離ではなく区分で読める", async () => {
+    const points = SRC.points as Record<string, number>;
+    if (points["L02-27"]) {
+      // 大阪市都島区都島中通（府の一覧表では「都島(府)-1」）、京都市上京区（「上京(府)-3」）
+      const osaka = await nearestLandPrices(34.7040116, 135.5329549, src, { count: 10 });
+      expect(osaka.filter((h) => h.kind === "調査").length).toBeGreaterThan(0);
+      expect(osaka.some((h) => h.no === "都島(府)-1")).toBe(true);
+      const kyoto = await nearestLandPrices(35.0208152, 135.757885, src, { count: 10 });
+      expect(kyoto.some((h) => h.no === "上京(府)-3")).toBe(true);
+      for (const h of [...osaka, ...kyoto]) expect(h.no).not.toContain("(県)");
+    }
+    // 千代田区大手町（地価調査「千代田(都)5-24」・国のデータの距離の欄は「1」＝駅近接）
+    const ote = (await nearestLandPrices(35.6877664, 139.7643971, src, { count: 10 })).find((h) => h.no === "千代田(都)5-24");
+    expect(ote?.station).toBe("大手町");
+    expect(ote?.stationNear).toBe("近接");
+    expect(ote?.stationM).toBeUndefined();
+    expect(landPriceRows(ote!).find((r) => r.label === "最寄り駅")?.value).toBe("大手町（近接）");
+    // 丸の内（地価公示「千代田5-2」・国のデータは「駅前広場接面」）。区分の入ったタイルなら区分で、前の版なら「（すぐ近く）」
+    const maru = (await nearestLandPrices(35.6810911, 139.7639358, src, { count: 10 })).find((h) => h.no === "千代田5-2");
+    expect(maru?.station).toBe("東京");
+    expect(landPriceRows(maru!).find((r) => r.label === "最寄り駅")?.value).toMatch(/^東京（(駅前広場接面|すぐ近く)）$/);
+    // 「約1m」「約0m」とは出ない
+    for (const h of [ote!, maru!]) expect(stationText(h)).not.toMatch(/約[01]m/);
   });
 
   it("横浜市・千葉市・さいたま市でも見つかり、対応エリアの外（広島市）は空", async () => {

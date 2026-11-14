@@ -17,6 +17,7 @@ import argparse
 import datetime
 import io
 import json
+import math
 import os
 import re
 import shutil
@@ -25,7 +26,10 @@ import sys
 import tempfile
 import zipfile
 
-import openpyxl
+try:
+    import openpyxl
+except ImportError:  # --self-test（区域の広さの計算のテスト）だけなら要らない
+    openpyxl = None
 
 import os as _os, sys as _sys
 
@@ -74,6 +78,8 @@ def latest() -> int:
 
 def allowed(year: int) -> dict[str, dict]:
     """商用で使える市区町村（行政コード → 小学校区・中学校区それぞれ使えるか）。データセットのページから利用条件の Excel を探して読む"""
+    if openpyxl is None:
+        raise SystemExit("openpyxl が要ります（pip install openpyxl）")
     page = get(PAGE.format(year=year)).decode("utf-8", "replace")
     m = re.search(r'href="([^"]*Terms_of_use_municipality_data[^"]*\.xlsx)"', page)
     if not m:
@@ -121,6 +127,37 @@ def text(v) -> str | None:
     return v if v and v != "_" else None
 
 
+def area_m2(geom: dict | None) -> float:
+    """区域の広さ（m²。緯度で東西を縮めた平面での計算。区域どうしの大小を比べるためのもので、測量の面積ではない）"""
+    if not geom:
+        return 0.0
+    polys = geom["coordinates"] if geom["type"] == "MultiPolygon" else [geom["coordinates"]] if geom["type"] == "Polygon" else []
+    total = 0.0
+    for poly in polys:
+        for i, ring in enumerate(poly):
+            if len(ring) < 3:
+                continue
+            k = 111320 * math.cos(math.radians(sum(q[1] for q in ring) / len(ring))) * 110940
+            a = abs(sum(ring[j][0] * ring[(j + 1) % len(ring)][1] - ring[(j + 1) % len(ring)][0] * ring[j][1] for j in range(len(ring)))) / 2 * k
+            total += a if i == 0 else -a
+    return total
+
+
+def self_test() -> None:
+    """区域の広さの計算のテスト（通信・tippecanoe は要らない）"""
+    # 緯度 35度で、東西 0.01度（約 912m）× 南北 0.01度（約 1,109m）の四角 ＝ 約 101ha
+    sq = [[139.0, 35.0], [139.01, 35.0], [139.01, 35.01], [139.0, 35.01], [139.0, 35.0]]
+    a = area_m2({"type": "Polygon", "coordinates": [sq]})
+    assert 1.00e6 < a < 1.02e6, a
+    # 穴は引く・複数の区域は足す
+    hole = [[139.002, 35.002], [139.004, 35.002], [139.004, 35.004], [139.002, 35.004], [139.002, 35.002]]
+    b = area_m2({"type": "Polygon", "coordinates": [sq, hole]})
+    assert abs((a - b) / a - 0.04) < 0.001, (a, b)
+    assert abs(area_m2({"type": "MultiPolygon", "coordinates": [[sq], [hole]]}) - (a + (a - b))) < 1, "multi"
+    assert area_m2(None) == 0.0 and area_m2({"type": "Point", "coordinates": [139, 35]}) == 0.0
+    print("ok")
+
+
 def build(year: int, out: str, work: str) -> dict:
     yy = f"{year % 100:02d}"
     ok = allowed(year)
@@ -144,7 +181,15 @@ def build(year: int, out: str, work: str) -> dict:
     with open(seq, "w", encoding="utf-8") as fo:
         for kind, key in (("A27", "es"), ("A32", "jh")):
             for pref in PREFS:
-                for f in read_zip(ksj.get_zip(URL.format(k=kind, yy=yy, pref=pref), UA))["features"]:
+                feats = read_zip(ksj.get_zip(URL.format(k=kind, yy=yy, pref=pref), UA))["features"]
+                # 学校ごとの区域の広さ（区域がいくつかに分かれていれば合計）。国のデータには、市内のどこからでも通える学校などの区域が
+                # 市の全域に重ねてある所があり、アプリは重なった所でいちばん狭い区域の学校（近所の学校）を出す。タイルは区域を切って
+                # 入れるので、タイルの中の形からは広さが分からない（どちらもタイルを覆っていると同じに見える）。それで広さを入れておく
+                school = lambda p: (str(p.get(f"{kind}_001") or "").zfill(5), text(p.get(f"{kind}_003")) or text(p.get(f"{kind}_004")))  # noqa: E731
+                size: dict[tuple, float] = {}
+                for f in feats:
+                    size[school(f["properties"])] = size.get(school(f["properties"]), 0.0) + area_m2(f["geometry"])
+                for f in feats:
                     p = f["properties"]
                     city = str(p.get(f"{kind}_001") or "").zfill(5)
                     if not ok.get(city, {}).get(key):
@@ -157,6 +202,8 @@ def build(year: int, out: str, work: str) -> dict:
                         "a": text(p.get(f"{kind}_005")),
                         "c": city,
                         "nt": NOTES.get(city),
+                        # 区域の広さ（ha。1ha に満たなければ 1）
+                        "ar": max(1, round(size[school(p)] / 10000)),
                     }
                     if code in where:
                         props["x"], props["y"] = where[code]
@@ -182,6 +229,8 @@ def build(year: int, out: str, work: str) -> dict:
 
 
 def main() -> None:
+    if "--self-test" in sys.argv[1:]:
+        return self_test()
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="新しい年のデータが出たかだけ調べる（GITHUB_OUTPUT があれば changed= を書く）")
     ap.add_argument("--install", action="store_true", help="最新の年で作り、public/data/ に置いて school-source.json を書き換える")

@@ -8,7 +8,7 @@ import { useState } from "react";
 import { TSUBO_M2 } from "@/lib/app/area";
 import { DEAL_CHIP, DEAL_KIND_NOTE, dealCaveat, dealFacts, dealLand, dealPlan, dealRoad, dealTitle, dealWhen } from "@/lib/app/deal-view";
 import { DEALS_CREDIT, DEALS_DATA, DEALS_NOTE, dealKind, dealSummary, totalText, unitPrice, type DealKind, type DealRecord } from "@/lib/roadmap/deals";
-import { distanceText, type LandPriceHit, type LandUsage } from "@/lib/roadmap/land-price";
+import { distanceText, stationText, type LandPriceHit, type LandUsage } from "@/lib/roadmap/land-price";
 import { G, GHead, GNote, GStat, NUM, TILE } from "./g-ui";
 import { HoldHeight } from "./hold-height";
 import { manYen, yen } from "./r-ui";
@@ -112,7 +112,7 @@ function DealRow({ hit, onClick }: { hit: LandPriceHit; onClick: () => void }) {
           {(hit.jukyo || hit.address || "所在不明").replace(/^(東京都|.{2,3}県)/, "")}
         </span>
         <span className="mt-[2px] block truncate leading-[1.3]" style={{ fontSize: 12, color: G.faint }}>
-          {hit.usage}・{hit.bearing}へ{distanceText(hit.distance)}・{hit.year}年{hit.station ? `・${hit.station}${hit.stationM ? ` ${hit.stationM.toLocaleString("ja-JP")}m` : ""}` : ""}
+          {hit.usage}・{hit.bearing}へ{distanceText(hit.distance)}・{hit.year}年{hit.station ? `・${stationText(hit, true)}` : ""}
         </span>
       </span>
       <span className="shrink-0 text-right">

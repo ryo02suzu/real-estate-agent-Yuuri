@@ -61,6 +61,8 @@ jobs:
         run: |
           pip install -r scripts/poi/requirements.txt
           export PATH="$HOME/tippecanoe-bin:$PATH"
+          # 名前の絞り込み（郵便局に宅配の営業所を入れない など）のテスト
+          python3 scripts/poi/build.py --self-test
           python3 scripts/poi/build.py --pbf "$RUNNER_TEMP"/*.osm.pbf --install
           ls -la public/data
       - uses: actions/setup-node@v4

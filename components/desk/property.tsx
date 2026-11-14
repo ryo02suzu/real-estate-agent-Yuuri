@@ -24,7 +24,7 @@ import { loadRecords, RECORDS_EVENT, type PropertyRecords, type RecordTopic } fr
 import { branchUnmatched, partialMatch } from "@/lib/roadmap/geocode";
 import type { AddressFix } from "@/lib/roadmap";
 import { distanceText } from "@/lib/roadmap/land-price";
-import { chibanLabel, chibanQueryOf, isLotChiban, kuikiLabel, registryChiban, type Neighbor } from "@/lib/roadmap/parcel";
+import { chibanLabel, chibanQueryOf, estimatedSentence, isLotChiban, kuikiLabel, registryChiban, type Neighbor } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { altsNote, awayLabel, awayNote, elsewhereNote } from "@/lib/roadmap/parcel-sub";
 import { roadShort } from "@/lib/roadmap/road-read";
@@ -613,7 +613,7 @@ function PlaceNotes({ query, result, data, onPick, onPickPoint, onFix, onLiteral
     notes.push({ body: "地図で選んだ地点です（番地は分からないので町名まで）。" });
   }
   const sp = data.parcels.status === "ok" ? data.parcels.parcel : undefined;
-  if (sp?.estimated) notes.push({ warn: true, body: `この筆の位置は、公図（任意座標）を道路の縁に合わせて推定したものです（確かさ：${sp.estimated === "high" ? "高め" : "低め"}）。数mずれることがあります。` });
+  if (sp?.estimated) notes.push({ warn: true, body: `この筆の位置は、公図（任意座標）を道路の縁に合わせて推定したものです（確かさ：${sp.estimated === "high" ? "高め" : "低め"}）。${estimatedSentence(sp.estimated)}` });
   if (sp?.sanko) notes.push({ warn: true, body: "この筆の形は、市町村の地番参考図から作ったものです。登記所の地図とは違うことがあります。" });
   if (result.parcelOthers)
     notes.push({

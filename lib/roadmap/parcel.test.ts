@@ -12,6 +12,7 @@ import {
   estimatedMark,
   parcelMark,
   estimatedNote,
+  estimatedSentence,
   kuikiLabel,
   kuikiLabelFrom,
   adjacentParcels,
@@ -477,6 +478,9 @@ describe("地点の筆", () => {
     expect(c).toMatchObject({ chibanRaw: "1240", estimated: "low" });
     expect(estimatedMark(c!)).toBe("（推定・確度低）");
     expect(estimatedNote("low")).toContain("5m");
+    // 物件の上の帯の文も、確度の低い推定は測った結果どおり（「数mずれることがあります」のままだった）
+    expect(estimatedSentence("high")).toBe("数mずれることがあります。");
+    expect(estimatedSentence("low")).toBe("5m前後ずれることがあり、1割弱は30m以上離れた別の場所に置かれています。");
     const r = await searchParcel({ city: "横浜市港北区", town: "日吉5丁目", chiban: "1234" }, START, src);
     expect(r.status === "found" && r.parcel.estimated).toBe("high");
     const r2 = await searchParcel({ city: "横浜市港北区", town: "日吉5丁目", chiban: "1240" }, START, src);

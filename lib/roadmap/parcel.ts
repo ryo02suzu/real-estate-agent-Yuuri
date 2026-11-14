@@ -755,6 +755,11 @@ export function estimatedNote(e: Estimated): string {
   return e === "low" ? "確度が低く、5m前後（1割弱は30m以上）ずれることあり" : "数mずれることあり";
 }
 
+/** 画面の案内の文（物件の上の帯）。確度の低い推定は、国の地価の地点で測った結果（docs/features.md の 120）のとおりに書く */
+export function estimatedSentence(e: Estimated): string {
+  return e === "low" ? "5m前後ずれることがあり、1割弱は30m以上離れた別の場所に置かれています。" : "数mずれることがあります。";
+}
+
 /** 地番区域を「熊谷市下奈良」「川口市青木２丁目」のように読める形に */
 export function kuikiLabel(kuiki: string): string {
   return kuiki.split("_").filter(Boolean).join("");
