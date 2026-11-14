@@ -2,7 +2,7 @@ name: MICHILU approved v2 Japan map review
 on:
   push:
     branches: [qa/michilu-ui-v2-review]
-    paths: [.github/workflows/michilu-v2-spec-review.yml]
+    paths: [.github/workflows/michilu-v2-spec-review.yml, scripts/qa/michilu-v2-spec-review.py]
 permissions:
   contents: read
 concurrency:
@@ -16,8 +16,13 @@ jobs:
       REVIEW_URL: http://127.0.0.1:3000
       PREVIEW_URL: https://michilu-dbqcxx8b5-sourirettes-projects.vercel.app
       REVIEW_SHA: d331a25e728b03e75b18664555a9fcfd1db609b1
-      REVIEW_PHASE: approved-v2-d331a25-japan-map
+      REVIEW_PHASE: approved-v2-d331a25-details-network
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+          path: qa-tools
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -105,123 +110,11 @@ jobs:
           "$RUNNER_TEMP/michilu-browser/bin/pip" install playwright==1.62.0
           "$RUNNER_TEMP/michilu-browser/bin/playwright" install --with-deps chromium webkit
       - name: Exercise the built app (not Vercel Preview)
-        shell: bash
-        run: |
-          "$RUNNER_TEMP/michilu-browser/bin/python" - <<'PY'
-          import asyncio, json, os, re, platform
-          from urllib.parse import urlparse
-          from pathlib import Path
-          from playwright.async_api import async_playwright
-          out = Path("ui-review")
-          out.mkdir(exist_ok=True)
-          report = {"url": os.environ["REVIEW_URL"], "sha": os.environ["REVIEW_SHA"], "phase": os.environ["REVIEW_PHASE"], "deployment_tested": False, "preview_url": os.environ["PREVIEW_URL"], "os": platform.platform(), "real_iphone": False, "checks": []}
-          async def snapshot(page, name, record):
-              await page.screenshot(path=str(out / (name + ".png")), full_page=True)
-              (out / (name + ".txt")).write_text(await page.locator("body").inner_text(), encoding="utf-8")
-              record["layout"] = await page.evaluate("""() => ({
-                width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,
-                horizontalOverflow:document.documentElement.scrollWidth>innerWidth+1,
-                maps:[...document.querySelectorAll('.maplibregl-map')].map(e=>({class:e.className,box:e.getBoundingClientRect().toJSON(),position:getComputedStyle(e).position,height:getComputedStyle(e).height,canvases:[...e.querySelectorAll('canvas')].map(c=>({box:c.getBoundingClientRect().toJSON(),width:c.width,height:c.height}))})),
-                inputs:[...document.querySelectorAll('input')].filter(e=>e.getBoundingClientRect().width).map(e=>({name:e.getAttribute('aria-label')||e.id,fontSize:getComputedStyle(e).fontSize,box:e.getBoundingClientRect().toJSON()})),
-                controls:[...document.querySelectorAll('button,a')].filter(e=>e.getBoundingClientRect().width).map(e=>({text:e.getAttribute('aria-label')||e.innerText,box:e.getBoundingClientRect().toJSON()}))
-              })""")
-          async def run():
-              async with async_playwright() as pw:
-                  for engine in ["chromium", "webkit"]:
-                      browser = await getattr(pw, engine).launch(args=["--enable-unsafe-swiftshader"] if engine == "chromium" else [])
-                      sizes = [(375,667),(390,844),(402,874),(430,932),(844,390),(1024,768),(1440,900)] if engine == "chromium" else [(375,667),(390,844),(402,874),(430,932),(844,390)]
-                      for width,height in sizes:
-                          name = f"{engine}-{width}x{height}"
-                          record = {"name":name,"browser_version":browser.version,"console_errors":[],"failed_requests":[]}
-                          report["checks"].append(record)
-                          record["console_messages"]=[]
-                          record["range_responses"]=[]
-                          ctx = await browser.new_context(viewport={"width":width,"height":height},device_scale_factor=1,locale="ja-JP",is_mobile=width<1024,has_touch=width<1024)
-                          page = await ctx.new_page()
-                          page.on("console",lambda msg,r=record:r["console_messages"].append({"type":msg.type,"text":msg.text[:600]}) if msg.type in ["warning","error"] else None)
-                          page.on("response",lambda res,r=record:r["range_responses"].append({"url":res.url,"status":res.status,"range":res.headers.get("content-range")}) if ".pmtiles" in res.url else None)
-                          page.on("pageerror", lambda error,r=record:r["console_errors"].append(str(error)))
-                          page.on("requestfailed", lambda req,r=record:r["failed_requests"].append({"url":req.url,"failure":req.failure}))
-                          try:
-                              response=await page.goto(report["url"],wait_until="domcontentloaded",timeout=40000)
-                              record["http_status"]=response.status if response else None
-                              if urlparse(page.url).netloc != urlparse(report["url"]).netloc:
-                                  raise AssertionError("App navigation left the review origin (authentication/redirect)")
-                              await page.locator("input#address").wait_for(state="visible",timeout=20000)
-                              assert "MICHILU" in await page.title(), "Expected the MICHILU app title"
-                              await page.evaluate("document.fonts.ready")
-                              await page.wait_for_timeout(1800)
-                              await snapshot(page,name+"-home",record)
-                              # Failure gate: blank MapLibre canvases passed the old screenshot-only QA.
-                              # This checks the app's real layout; never apply an artificial CSS override.
-                              if width < 1024 and urlparse(page.url).netloc == urlparse(report["url"]).netloc:
-                                  await page.locator(".mui-japan-map").wait_for(state="visible", timeout=20000)
-                                  record["map_geometry"] = await page.locator(".mui-japan-map").first.evaluate(
-                                      "(e)=>({width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height,position:getComputedStyle(e).position})"
-                                  )
-                                  canvas = page.locator(".mui-japan-map canvas.maplibregl-canvas").first
-                                  await canvas.wait_for(state="visible", timeout=20000)
-                                  record["canvas_geometry"] = await canvas.evaluate(
-                                      "(e)=>({width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height})"
-                                  )
-                                  assert record["map_geometry"]["width"] > 200 and record["map_geometry"]["height"] > 150, "Mobile map layout is empty or collapsed"
-                                  assert record["canvas_geometry"]["width"] > 200 and record["canvas_geometry"]["height"] > 150, "Mobile MapLibre canvas is empty or collapsed"
-                              assert not record["layout"]["horizontalOverflow"], "Horizontal overflow on home"
-                              assert not record["console_errors"], "Uncaught exception on home"
-                              record["status"]="app_home_captured"
-                              if width==390:
-                                  await page.get_by_role("textbox",name=re.compile("住所")).first.fill("東京都新宿区西新宿2丁目8番1号")
-                                  await snapshot(page,name+"-input",{})
-                                  await page.get_by_role("button",name="検索",exact=True).first.click()
-                                  await page.wait_for_function("location.search.includes('q=')",timeout=35000)
-                                  await page.get_by_role("region", name="調査結果", exact=True).wait_for(state="visible", timeout=35000)
-                                  await page.wait_for_timeout(6000)
-                                  await snapshot(page,name+"-result",record)
-                                  record["result_url"]=page.url
-                                  record["result_text"]=(await page.locator("body").inner_text())[:12000]
-                                  detail=page.get_by_role("button",name=re.compile("^都市計画")).first
-                                  assert await detail.count() and await detail.is_visible() and await detail.is_enabled(), "Urban-planning detail is not available"
-                                  if await detail.count() and await detail.is_visible() and await detail.is_enabled():
-                                      await detail.click()
-                                      await page.wait_for_timeout(600)
-                                      await snapshot(page,name+"-detail",{})
-                                      record["detail_clicked"]=True
-                                      back=page.get_by_role("button",name="一覧に戻る",exact=True).first
-                                      if await back.count() and await back.is_visible():
-                                          await back.click()
-                                          await page.wait_for_timeout(400)
-                                          await snapshot(page,name+"-returned",{})
-                                          record["detail_returned"]=True
-                                  assert record.get("detail_returned"), "Detail did not return to the result list"
-                                  record["status"]="search_detail_return_passed"
-                                  # Explicit browser simulations; not physical iPhone keyboard or OS text size.
-                                  if width==390:
-                                      await page.locator("#address").focus()
-                                      await page.set_viewport_size({"width":390,"height":430})
-                                      await page.wait_for_timeout(400)
-                                      await snapshot(page,name+"-keyboard-viewport-simulation",{})
-                                      await page.set_viewport_size({"width":390,"height":844})
-                                      await page.locator("#address").blur()
-                                      await page.evaluate("""() => [...document.querySelectorAll('body *')].map(e=>[e,parseFloat(getComputedStyle(e).fontSize)]).forEach(([e,size])=>{
-                                        if(size) e.style.fontSize=(size*2)+'px';
-                                      })""")
-                                      await snapshot(page,name+"-text-200pct-simulation",{})
-                          except Exception as e:
-                              record["status"]="blocked"
-                              record["error"]=str(e)[:1200]
-                              try: await snapshot(page,name+"-blocked",{})
-                              except Exception: pass
-                          await ctx.close()
-                          (out/"report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
-                      await browser.close()
-              print(json.dumps({"phase":report["phase"],"sha":report["sha"],"checks":[{k:v for k,v in r.items() if k not in ["layout","failed_requests"]} for r in report["checks"]]},ensure_ascii=False))
-          asyncio.run(run())
-          if any(r.get('status') == 'blocked' for r in report['checks']):
-              raise SystemExit('Browser review contains blocked cases; see report.json')
-          PY
+        run: '"$RUNNER_TEMP/michilu-browser/bin/python" qa-tools/scripts/qa/michilu-v2-spec-review.py'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: michilu-v2-d331a25-${{ github.run_id }}
           path: ui-review/
           retention-days: 14
+
