@@ -902,12 +902,38 @@ def valid_wkt(text: str):
     return g if g.is_valid else g.buffer(0)
 
 
+def job_key(path: str) -> tuple[int, int]:
+    """ジョブの結果のファイル名（kozu-<回の番号>-<ジョブの番号>.geojsonl.gz など）の、回とジョブの番号。新しい回ほど大きい。番号の無い名前は (0, 0)"""
+    m = re.search(r"-(\d+)-(\d+)\.[a-z]", os.path.basename(path))
+    return (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+
+
 def resolve(src: str, out: str, stats_out: str | None, high_only: bool = False) -> None:
     """ジョブごとの結果（src の kozu-*.geojsonl・frags-*.jsonl・stats-*.json。.gz でもよい）をまとめる。
     ジョブ（図面の組・市区町村）をまたいで大きく重なった切れ端は、確かなほうだけ残し、タイルにする筆（地番区域・地番・q）を書き出す。
     high_only：確度の高い推定（q=1）だけを書き出す。関東の外のまとまりで使う（大阪府の全部を作って国の地価の地点で測ると、
     確度の高い推定は 135地点すべて 30m 以内だったが、確度の低い推定は 138地点の 30% が別の地番の所だった。関東は 7.6%）"""
-    frags = [d for p in sorted(glob.glob(os.path.join(src, "frags-*.jsonl*"))) for d in read_lines(p) if not high_only or d["q"] == 1]
+    # 同じ市区町村を調べ直した結果が足してあれば、新しい回のものだけを使う（時間切れで途中までだった市区町村を、あとの回でやり直したとき）。
+    # 前の回の結果も置き場に残っているので、そのまま読むと同じ切れ端が二重になり、互いに重なるものとして両方とも外れてしまう。
+    # ①市区町村の全部を1つのジョブで調べたもの（名前が市区町村コードだけ）は、いちばん新しいジョブの結果だけにする。
+    # ②図面を組に分けた市区町村（「12219-2of3」）は、切れ端ごとに、いちばん新しいジョブのものにする
+    stat_files = sorted(glob.glob(os.path.join(src, "stats-*.json")), key=job_key)
+    whole: dict[str, tuple[int, int]] = {}
+    for p in stat_files:
+        for lab in json.load(open(p, encoding="utf-8")):
+            if "-" not in lab:
+                whole[lab] = job_key(p)
+    frag_files = sorted(glob.glob(os.path.join(src, "frags-*.jsonl*")), key=job_key)
+    newest: dict[str, tuple[int, int]] = {}
+    for p in frag_files:
+        for d in read_lines(p):
+            newest[d["f"]] = job_key(p)
+
+    def current(path: str, name: str) -> bool:
+        j = job_key(path)
+        return whole.get(name.split(":")[0], j) == j and newest.get(name, j) == j
+
+    frags = [d for p in frag_files for d in read_lines(p) if current(p, d["f"]) and (not high_only or d["q"] == 1)]
     frags.sort(key=lambda d: conflict_order(d["q"], d["sc"], d["n"]))
     # 切れ端の形は平面直角座標（m）なので、同じ系の都府県どうしでだけ重なりを調べる（系が違うと、座標の数字が同じでも別の場所）
     by_zone: dict[int, list[dict]] = {}
@@ -920,10 +946,10 @@ def resolve(src: str, out: str, stats_out: str | None, high_only: bool = False) 
     per_code: dict[str, dict] = {}
     n = 0
     with open(out, "w", encoding="utf-8") as fo:
-        for p in sorted(glob.glob(os.path.join(src, "kozu-*.geojsonl*"))):
+        for p in sorted(glob.glob(os.path.join(src, "kozu-*.geojsonl*")), key=job_key):
             for d in read_lines(p):
                 pr = d["properties"]
-                if pr["f"] in dropped or (high_only and pr["q"] != 1):
+                if pr["f"] in dropped or (high_only and pr["q"] != 1) or not current(p, pr["f"]):
                     continue
                 code = pr["f"].split(":")[0]
                 per_code.setdefault(code, {"placed_parcels": 0})["placed_parcels"] += 1
@@ -932,7 +958,7 @@ def resolve(src: str, out: str, stats_out: str | None, high_only: bool = False) 
                 n += 1
     # 市区町村ごとの数（図面の組を足す）と、時間切れ・失敗したもの
     jobs = {}
-    for p in sorted(glob.glob(os.path.join(src, "stats-*.json"))):
+    for p in stat_files:
         jobs.update(json.load(open(p, encoding="utf-8")))
     totals: dict[str, dict] = {}
     for lab, st in jobs.items():
@@ -962,7 +988,53 @@ def resolve(src: str, out: str, stats_out: str | None, high_only: bool = False) 
         json.dump(summary, open(stats_out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
 
+def self_test() -> None:
+    """まとめ（resolve）のテスト：やり直した市区町村は新しい回の結果だけを使う・確度の高い推定だけの書き出し。通信はしない"""
+    import tempfile
+
+    def square(x: float) -> str:
+        return f"POLYGON (({x} 0, {x + 10} 0, {x + 10} 10, {x} 10, {x} 0))"
+
+    def feat(name: str, q: int, chiban: str) -> dict:
+        ring = [[135.6, 34.5], [135.6001, 34.5], [135.6001, 34.5001], [135.6, 34.5]]
+        return {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [ring]}, "properties": {"地番区域": "南河内郡河南町_テスト", "地番": chiban, "q": q, "sc": 0.9, "f": name}}
+
+    def frag(name: str, q: int, x: float) -> dict:
+        return {"f": name, "q": q, "sc": 0.9, "n": 10, "g": square(x)}
+
+    with tempfile.TemporaryDirectory() as d:
+        def job(run: int, idx: int, stats: dict, frags: list[dict], feats: list[dict]) -> None:
+            json.dump(stats, open(os.path.join(d, f"stats-{run}-{idx}.json"), "w", encoding="utf-8"), ensure_ascii=False)
+            with gzip.open(os.path.join(d, f"frags-{run}-{idx}.jsonl.gz"), "wt", encoding="utf-8") as f:
+                f.write("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in frags))
+            with gzip.open(os.path.join(d, f"kozu-{run}-{idx}.geojsonl.gz"), "wt", encoding="utf-8") as f:
+                f.write("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in feats))
+
+        # 前の回（回の番号 9999・ジョブ 9）：河南町は時間切れで切れ端 A（確度が高い）だけ。同じジョブの千早赤阪村の切れ端 C はそのまま使う
+        job(9999, 9, {"27382": {"fragments": 3, "searched": 1, "parcels": 30, "cut": True}, "27383": {"fragments": 1, "searched": 1, "parcels": 10}},
+            [frag("27382:a", 1, 0), frag("27383:c", 2, 500)], [feat("27382:a", 1, "1"), feat("27383:c", 2, "9")])
+        # やり直しの回（回の番号 10000・ジョブ 0。番号の桁が増えても新しい回と読む）：河南町の全部。A（同じ名前・同じ形）と、新しく置けた B（確度が低い）
+        job(10000, 0, {"27382": {"fragments": 3, "searched": 3, "parcels": 30}}, [frag("27382:a", 1, 0), frag("27382:b", 2, 100)], [feat("27382:a", 1, "1"), feat("27382:b", 2, "2")])
+        assert job_key(os.path.join(d, "kozu-10000-0.geojsonl.gz")) > job_key(os.path.join(d, "kozu-9999-9.geojsonl.gz")) and job_key("kozu-02384.geojsonl") == (0, 0)
+        out, st = os.path.join(d, "out.geojsonl"), os.path.join(d, "out.json")
+        resolve(d, out, st)
+        got = sorted(json.loads(x)["properties"]["地番"] for x in open(out, encoding="utf-8"))
+        # A は1つだけ（二重にならない・両方とも外れない）、B と C もある
+        assert got == ["1", "2", "9"], got
+        summary = json.load(open(st, encoding="utf-8"))
+        assert summary["cut"] == [] and summary["placed_parcels"] == 3 and summary["by_code"]["27382"]["searched"] == 3, summary
+        assert "high_only" not in summary
+        # 確度の高い推定だけ：A だけ
+        resolve(d, out, st, high_only=True)
+        rows = [json.loads(x)["properties"] for x in open(out, encoding="utf-8")]
+        assert [(r["地番"], r["q"]) for r in rows] == [("1", 1)], rows
+        assert json.load(open(st, encoding="utf-8")).get("high_only") is True
+    print("ok")
+
+
 def main() -> None:
+    if "--self-test" in sys.argv[1:]:
+        return self_test()
     ap = argparse.ArgumentParser()
     ap.add_argument("--plan", help="都府県コード（カンマ区切り。02〜30）。ジョブの分け方を JSON で書き出すだけ")
     ap.add_argument("--chunk-mb", type=float, default=100, help="1つのジョブで扱う地図XMLの zip の大きさの目安（MB）")
