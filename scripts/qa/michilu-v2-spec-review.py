@@ -48,7 +48,7 @@ async def detail_roundtrip(page, name, record, key, label):
         assert entry["text"].strip(), "Detail body is empty"
         assert not entry["layout"]["horizontalOverflow"], "Horizontal overflow in detail"
         if key == "urban":
-            await detail.get_by_role("button", name="その他の法令", exact=True).click()
+            await detail.get_by_role("tab", name="その他の法令", exact=True).click()
             await page.wait_for_timeout(400)
             await snapshot(page, name + "-detail-other-laws", {})
             entry["other_laws_text"] = (await detail.inner_text())[:16000]

@@ -7,7 +7,8 @@ permissions:
   contents: read
 concurrency:
   group: michilu-v2-spec-review
-  cancel-in-progress: false
+  # A newer QA revision supersedes the older diagnostic run on this branch.
+  cancel-in-progress: true
 jobs:
   browser:
     runs-on: ubuntu-latest
