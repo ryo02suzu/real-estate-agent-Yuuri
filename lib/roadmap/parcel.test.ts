@@ -1083,6 +1083,32 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     expect(n5).toBeGreaterThan(341);
     expect(n5).toBeLessThan(348);
   });
+  it("東北の全部の図面の点検で足した8枚（2026-11-14）は、写真・地図で確かめた根拠が理由にあり、戸沢村だけ逆向き（T1）", () => {
+    // 道路縁の少ない所（区画整理の新しい街区・田・山林）は、道路縁で比べる機械の判定が保留になる。
+    // 保留の図面は、タイルを作るのと同じ動かし方で国土地理院の航空写真・地図に重ねて確かめたものだけを足した（docs/features.md の 119）
+    const want: [string, string, "T1" | "T2", number][] = [
+      ["05361", "10384_hosei_20121106102829", "T2", 287],
+      ["07461", "10028_hosei_20121029101450", "T2", 40],
+      ["06207", "11365_hosei_20121114121715", "T2", 877],
+      ["07445", "12354_hosei_20121019090152", "T2", 425],
+      ["05201", "11042_hosei_20121108090642", "T2", 439],
+      ["07402", "11529_hosei_20121015133545", "T2", 97],
+      ["07402", "11528_hosei_20121015133528", "T2", 26],
+      ["06367", "10816_hosei_20121122125744", "T1", 155],
+    ];
+    for (const [code, sheet, kind, parcels] of want) {
+      const s = data.sheets.find((x) => x.code === code && x.sheet === sheet);
+      expect(s, `${code} ${sheet}`).toBeDefined();
+      expect(s!.shift?.kind).toBe(kind);
+      expect(s!.parcels).toBe(parcels);
+      expect(s!.reason).toMatch(/国土地理院の(地図|航空写真)/);
+      expect(s!.reason).toMatch(/東北の全部の図面の点検/);
+    }
+    expect(want.reduce((a, w) => a + w[3], 0)).toBe(2346);
+    // 同じ図面の決まりが2つ無い（2回動かさない）
+    const keys = data.sheets.filter((x) => x.shift && !x.chiban).map((x) => `${x.code}|${x.sheet}`);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
   it("座標の数字の誤り（kind「数字の誤り」）で動かす地図は、平面直角座標の 1,000m の倍数だけずれていて、理由に確かめた根拠がある", () => {
     // いわき市中央台高久１丁目の図面（62筆）は、平面直角座標の北向きの数字が 1万m 大きく、約10km 北の平絹谷の上にあった。
     // 緯度経度で動かす量は、座標の北と真北の向きの差・縮尺のため、1万m ちょうどにはならない（東へ -114.8m・北へ -10,029.9m）
