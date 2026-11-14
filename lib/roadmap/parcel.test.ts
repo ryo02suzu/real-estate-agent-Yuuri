@@ -1051,7 +1051,9 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       return p <= 6 ? "X" : p <= 14 ? "IX" : [15, 19, 20, 22].includes(p) ? "VIII" : [18, 24, 25, 26, 27, 29, 30].includes(p) ? "VI" : p === 28 ? "V" : "VII";
     };
     const groups = new Map<string, [number, number][]>();
-    for (const s of data.sheets.filter((x) => x.shift && (x.shift.kind === "T1" || x.shift.kind === "T2"))) {
+    // 計算した量に残りを足した地図は、ここでは比べない（会津若松市北会津町水季の里の1枚だけ。計算した量から約9m。理由に書いてある）
+    const adjusted = (x: { code: string; sheet: string }) => x.code === "07202" && x.sheet === "12391_hosei_20121019092001";
+    for (const s of data.sheets.filter((x) => x.shift && (x.shift.kind === "T1" || x.shift.kind === "T2") && !adjusted(x))) {
       // T2 は向きを逆にして T1 とまとめる
       const sign = s.shift!.kind === "T1" ? 1 : -1;
       const g = groups.get(zone(s.code)) ?? [];
@@ -1147,7 +1149,8 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
   });
   it("ほかの公的なデータとの照合で量を求めて動かす地図（kind「照合」）は、道路縁と、市の地番図か地価の地点の根拠が理由にある", () => {
     // 越谷市伊原２丁目の図面（569筆）は、市の地番図データの同じ地番 558筆とそろって 約390m ずれていた（測地系の取り違えとも数字の誤りとも量が合わない）。
-    // 富士市増川新町・津市あのつ台１丁目の図面は、測地系の取り違えに近い向きだが、計算した量では道路縁・地価の地点から 25〜32m ずれる
+    // 富士市増川新町の図面は、測地系の取り違えに近い向きだが、計算した量では道路縁・地価の地点から約32m ずれる（地価の地点から逆算した量と道路縁の量が 1.3m で合う）。
+    // 津市あのつ台１丁目の図面は、2026-11-14 に計算どおりの量（T1）に直した（道路縁で量を探すと、約25m 離れた所に同じくらい合う所が2つあり、取り違えていた）
     const xs = data.sheets.filter((s) => s.shift?.kind === "照合");
     expect(xs.map((s) => [s.code, s.sheet])).toContainEqual(["11222", "10236_hosei_20121129092003"]);
     for (const s of xs) {
@@ -1245,21 +1248,73 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     expect(moved.find((s) => s.chome === "４丁目")!.chiban).toContain("22-56");
     expect(moved[0].reason).toMatch(/若葉台2丁目3番608.*中に入る/);
   });
-  it("近畿（2026-11-12）：三田市のニュータウンの4枚は、道路縁と隣の地図で確かめた同じ量（西へ3.0m・南へ3.3m）を計算した量に足している", () => {
+  it("近畿：三田市のニュータウンの4枚は、計算どおりの量で動かす（2026-11-12 に足した「西へ3.0m・南へ3.3m」は、確かめの道具の見かけの差だったので外した）", () => {
     const kinki = data.sheets.filter((s) => /^(2[4-9]|30)/.test(s.code) && s.shift);
-    // 11-12 の14枚と、11-13 に地価の地点で見つけた東員町（2枚）・木津川市（1枚）・生駒市北新町（1枚の一部・大字ごとに2つ）・松阪市飯南町（1枚）・津市あのつ台（1枚・照合）・
-    // 神戸市北区若葉台（1枚の本体を縮尺ごと直す。大字・丁目ごとに6つ）
-    expect(kinki).toHaveLength(27);
+    // 11-12 の14枚と、11-13 に地価の地点で見つけた東員町（2枚）・木津川市（1枚）・生駒市北新町（1枚の一部・大字ごとに2つ）・松阪市飯南町（1枚）・津市あのつ台１丁目（1枚）・
+    // 神戸市北区若葉台（1枚の本体を縮尺ごと直す。大字・丁目ごとに6つ）、11-14 に拾い直した津市（みのりヶ丘・あのつ台三丁目・五丁目）と松阪市（清生町・垣鼻町・田原町）の4枚
+    expect(kinki).toHaveLength(31);
     const sanda = kinki.filter((s) => s.code === "28219");
     expect(sanda.map((s) => s.sheet).sort()).toEqual(["あかしあ台１～５丁目", "すずかけ台１～４丁目", "ゆりのき台１～６丁目（修正後）", "北摂三田ニュータウン南地区"].sort());
+    expect(sanda.reduce((a, s) => a + s.parcels, 0)).toBe(11320);
     for (const s of sanda) {
-      // 計算した量（東へ約 -245.0m・北へ約 346.4m）に、4枚とも同じ量を足した
-      expect(s.shift!.east).toBeGreaterThanOrEqual(-248.2);
-      expect(s.shift!.east).toBeLessThanOrEqual(-247.9);
-      expect(s.shift!.north).toBeGreaterThanOrEqual(342.9);
-      expect(s.shift!.north).toBeLessThanOrEqual(343.2);
-      expect(s.reason).toMatch(/4枚に同じ量（西へ 3\.0m・南へ 3\.3m）を足して/);
+      // 計算した量（東へ約 -245.0m・北へ約 346.4m）そのまま。動かす量は真東・真北の m で、タイルを作る仕組み（build_pref.shifted_geometry）もそのとおりに動かす。
+      // 確かめの道具は、その量を図面の座標（平面直角座標）の東・北として当てて測っていたので、三田市（2つの向きの差が 0.49度）では約3.7m の見かけの差が出た
+      expect(s.shift!.kind).toBe("T1");
+      expect(s.shift!.east).toBeGreaterThanOrEqual(-245.15);
+      expect(s.shift!.east).toBeLessThanOrEqual(-244.95);
+      expect(s.shift!.north).toBeGreaterThanOrEqual(346.25);
+      expect(s.shift!.north).toBeLessThanOrEqual(346.45);
+      expect(s.reason).toMatch(/確かめの道具の見かけの差/);
+      expect(s.reason).toMatch(/タイルを作る仕組みと同じ動かし方で測り直す/);
+      expect(s.reason).toMatch(/一番合う所は動かした位置そのもの/);
     }
+  });
+  it("2026-11-14 の仕上げ：東北の4枚・花巻市の4枚・三重県の4枚を足し、津市あのつ台１丁目は計算どおりの量に直す", () => {
+    const want: [string, string, "T1" | "T2", number][] = [
+      ["04207", "10211_hosei_20121019113909", "T2", 577],
+      ["07202", "12391_hosei_20121019092001", "T2", 174],
+      ["07205", "10347_hosei_20121031084806", "T2", 582],
+      ["03206", "20979_hosei_20121116105005", "T2", 220],
+      ["03205", "10570_hosei_20121114120327", "T2", 1645],
+      ["03205", "10335_hosei_20121112122908", "T2", 670],
+      ["03205", "10337_hosei_20121112123144", "T2", 379],
+      ["03205", "10338_hosei_20121112123201", "T2", 657],
+      ["24201", "H30190024201005", "T1", 47],
+      ["24201", "津市あのつ台三丁目", "T1", 15],
+      ["24201", "津市あのつ台五丁目地区", "T1", 26],
+      ["24204", "清生町・垣鼻町・田原町地区", "T1", 208],
+    ];
+    for (const [code, sheet, kind, parcels] of want) {
+      const s = data.sheets.find((x) => x.code === code && x.sheet === sheet);
+      expect(s, `${code} ${sheet}`).toBeDefined();
+      expect(s!.shift?.kind).toBe(kind);
+      expect(s!.parcels).toBe(parcels);
+      // 写真・地図か、隣の地図との位置合わせの、道路縁のほかの根拠が理由にある
+      expect(s!.reason).toMatch(/国土地理院の航空写真/);
+      expect(s!.reason).toMatch(/重な/);
+      expect(s!.chiban).toBeUndefined();
+    }
+    expect(want.reduce((a, w) => a + w[3], 0)).toBe(5200);
+    // 花巻市大迫町亀ケ森の4枚は、4枚いっしょに動かす（1枚だけ動かすと、動かしていない相手と重なる）
+    for (const s of data.sheets.filter((x) => x.code === "03205" && /^(10570|10335|10337|10338)_/.test(x.sheet))) expect(s.reason).toMatch(/4枚を一緒に動か/);
+    // 会津若松市北会津町水季の里だけ、計算した量（東へ 291.8m・北へ -354.6m）に残り（東へ 8m・北へ 4m）を足している。道路縁・隣の地図・重なりの3つがそろう所
+    const aizu = data.sheets.find((x) => x.code === "07202" && x.sheet === "12391_hosei_20121019092001")!;
+    expect(aizu.shift).toEqual({ kind: "T2", east: 299.8, north: -350.6 });
+    expect(aizu.reason).toMatch(/計算した量は東へ 291\.8m・北へ -354\.6m/);
+    expect(aizu.reason).toMatch(/道路縁と、隣の地図の筆の境と、ほかの地図との重なりの3つがそろって/);
+    expect(aizu.reason).toMatch(/測り方の見かけの差ではない/);
+    // 津市あのつ台１丁目：照合で決めた量（東へ -241.5m・北へ 331.9m）は約25m ずれていた。同じ団地の三丁目・五丁目と同じ、計算どおりの量に
+    const ano = data.sheets.filter((x) => x.code === "24201" && /あのつ台/.test(x.sheet));
+    expect(ano.map((x) => x.sheet).sort()).toEqual(["津市あのつ台１丁目", "津市あのつ台三丁目", "津市あのつ台五丁目地区"].sort());
+    for (const s of ano) {
+      expect(s.shift!.kind).toBe("T1");
+      expect(Math.abs(s.shift!.east - -260.4)).toBeLessThan(0.11);
+      expect(Math.abs(s.shift!.north - 348.55)).toBeLessThan(0.11);
+    }
+    expect(ano.find((x) => x.sheet === "津市あのつ台１丁目")!.reason).toMatch(/同じくらい合う所が2つあり/);
+    // 測地系の取り違え（T1・T2）で足した量があるのは、この1枚だけ（三田市の4枚に足していた量は外した）
+    const added = data.sheets.filter((x) => (x.shift?.kind === "T1" || x.shift?.kind === "T2") && /その量を足して|同じ量（西へ/.test(x.reason));
+    expect(added.map((x) => `${x.code}|${x.sheet}`)).toEqual(["07202|12391_hosei_20121019092001"]);
   });
   it("地価の地点で見つけたずれ（2026-11-13）：渋川市の地図 10109 は地図ごと動かす決まり1つだけ、生駒市北新町の地図はずれた20筆だけを動かす", () => {
     // 渋川市：前は「ほかの地図の筆と重なる部分だけ外す」決まり3つ（531筆）だった。重なりは地図全体のずれのせいで、動かすと重なりは 0.2%
