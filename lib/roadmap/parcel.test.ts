@@ -968,14 +968,29 @@ describe("隣の筆", () => {
 });
 
 describe("公図から推定した筆のデータの置き場所（data/kozu-source.json）", () => {
-  it("置き場所は空（まだ作っていない）か R2 の PMTiles。データのある市区町村は5桁のコード", () => {
+  it("置き場所は空（まだ作っていない）か R2 の PMTiles。データのある市区町村は、対応している都府県（02〜30）の5桁のコード", () => {
     expect(KOZU_SOURCE.url === "" || /^https:\/\/.+\.pmtiles$/.test(KOZU_SOURCE.url)).toBe(true);
-    for (const c of KOZU_SOURCE.codes) expect(c).toMatch(/^(0[89]|1[0-4])\d{3}$/);
+    for (const c of KOZU_SOURCE.codes) expect(c).toMatch(/^(0[2-9]|[12]\d|30)\d{3}$/);
+    expect(new Set(KOZU_SOURCE.codes).size).toBe(KOZU_SOURCE.codes.length);
     if (KOZU_SOURCE.url) {
       expect(KOZU_SOURCE.edition).toMatch(/^\d{4}年\d{1,2}月公開版$/);
       // 1都3県の公図の地域の多く（置けた筆のある市区町村）
       expect(KOZU_SOURCE.codes.length).toBeGreaterThan(50);
     }
+  });
+
+  // 関東のほかの地方を足すと、地方（まとまり）ごとのタイルを1つにまとめて置く（scripts/kozu-tiles/sets.py）。sets はその内訳
+  it("まとまりごとの内訳（sets）があれば、ファイル名は R2 の kozu/ の下の PMTiles で、市区町村は全体の一覧と同じ", () => {
+    const sets = (KOZU_SOURCE as { sets?: Record<string, { file: string; codes: string[]; edition: string }> }).sets;
+    if (!sets) return;
+    const all: string[] = [];
+    for (const [name, s] of Object.entries(sets)) {
+      expect(name).toMatch(/^[a-z][a-z0-9]{1,15}$/);
+      expect(s.file).toMatch(/^[a-z0-9-]+\.pmtiles$/);
+      expect(s.edition).toMatch(/^\d{4}年\d{1,2}月公開版$/);
+      all.push(...s.codes);
+    }
+    expect(all.sort()).toEqual([...KOZU_SOURCE.codes].sort());
   });
 });
 
