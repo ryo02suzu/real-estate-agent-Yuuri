@@ -37,8 +37,9 @@ def load_sets(source: dict) -> dict[str, dict]:
     return {"kanto": {"file": os.path.basename(url), "codes": list(source.get("codes") or []), "edition": source.get("edition") or ""}}
 
 
-def update(source: dict, name: str, file: str, codes: list[str], edition: str) -> dict:
-    """この回のまとまりを入れ替えた一覧（edition は一番新しい版、codes は全部のまとまりの市区町村）"""
+def update(source: dict, name: str, file: str, codes: list[str], edition: str, high_only: bool = False) -> dict:
+    """この回のまとまりを入れ替えた一覧（edition は一番新しい版、codes は全部のまとまりの市区町村）。
+    high_only：このまとまりは確度の高い推定だけ（kozu.py --resolve --high-only で作った）。一覧に印を残す"""
     if not re.fullmatch(r"[a-z][a-z0-9]{1,15}", name) or name == "kozu":
         raise ValueError(f"まとまりの名前が使えません: {name}")
     if not re.fullmatch(r"[a-z0-9-]+\.pmtiles", file):
@@ -51,7 +52,7 @@ def update(source: dict, name: str, file: str, codes: list[str], edition: str) -
         # この回に作った市区町村は、ほかのまとまりからは外す（一覧の上だけ。タイルの中身は、そのまとまりを作り直すまで残る）
         rest = [c for c in v.get("codes", []) if c not in mine]
         sets[k] = {**v, "codes": rest}
-    sets[name] = {"file": file, "codes": sorted(mine), "edition": edition}
+    sets[name] = {"file": file, "codes": sorted(mine), "edition": edition, **({"high_only": True} if high_only else {})}
     sets = dict(sorted(sets.items()))
     editions = sorted({v.get("edition") or "" for v in sets.values()} - {""}, key=edition_key)
     return {
@@ -95,6 +96,11 @@ def self_test() -> None:
     # ほかのまとまりにあった市区町村を作ったら、一覧の上ではこの回のまとまりに移す
     c = update(json.loads(text), "kitakanto", "kitakanto-20261201-0900.pmtiles", ["08201", "11101"], "2026年4月公開版")
     assert c["sets"]["kanto"]["codes"] == ["13101"] and c["sets"]["kitakanto"]["codes"] == ["08201", "11101"]
+    # 確度の高い推定だけのまとまりは、印を残す（作り直して全部を出すようにしたら、印は消える）
+    e = update(json.loads(text), "kinki", "kinki-20261114-2200.pmtiles", ["27102"], "2026年4月公開版", high_only=True)
+    assert e["sets"]["kinki"] == {"file": "kinki-20261114-2200.pmtiles", "codes": ["27102"], "edition": "2026年4月公開版", "high_only": True}
+    assert "high_only" not in e["sets"]["kanto"] and "high_only" not in e["sets"]["tohoku"]
+    assert "high_only" not in update(e, "kinki", "kinki-20261201-0900.pmtiles", ["27102"], "2026年4月公開版")["sets"]["kinki"]
     # まだ何も無いとき（url が空）は、この回のまとまりだけ
     d = update({"url": "", "edition": "", "codes": []}, "kanto", "kanto-20261018-0922.pmtiles", ["13101"], "2026年4月公開版")
     assert list(d["sets"]) == ["kanto"] and d["codes"] == ["13101"]
@@ -135,9 +141,9 @@ def main() -> None:
     if not (a.source and a.name and a.file and a.stats and a.edition):
         ap.error("--source・--name・--file・--stats・--edition が要ります")
     source = json.load(open(a.source, encoding="utf-8")) if os.path.exists(a.source) else {}
-    codes = json.load(open(a.stats, encoding="utf-8"))["codes"]
+    stats = json.load(open(a.stats, encoding="utf-8"))
     with open(a.out, "w", encoding="utf-8") as f:
-        json.dump(update(source, a.name, a.file, codes, a.edition), f, ensure_ascii=False, indent=1)
+        json.dump(update(source, a.name, a.file, stats["codes"], a.edition, bool(stats.get("high_only"))), f, ensure_ascii=False, indent=1)
         f.write("\n")
 
 

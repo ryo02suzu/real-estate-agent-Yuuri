@@ -35,6 +35,11 @@ on:
         description: アプリの置き場所（kozu-source.json）を書き換える。外すと、まとまりのタイルを R2 に置くだけ（確かさを確かめる前の試し）
         type: boolean
         default: true
+      quality:
+        description: 出す筆の確かさ。auto＝関東（kanto）は全部、ほかのまとまりは確度の高い推定だけ（大阪府で測ると、確度の低い推定は3割が別の場所だった）。all＝全部。high＝確度の高い推定だけ
+        type: choice
+        options: [auto, all, high]
+        default: auto
       year:
         description: 地図データの年度版（G空間情報センターの zip 名の末尾の年。空なら一番新しい年）
         required: false
@@ -72,6 +77,8 @@ env:
   # まとまりの名前（予定の実行は関東の1都3県）。公開するか（予定の実行は公開する）
   NAME: ${{ inputs.name || 'kanto' }}
   PUBLISH: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
+  # 出す筆の確かさ（予定の実行は auto）
+  QUALITY: ${{ inputs.quality || 'auto' }}
   # ジョブごとの結果の置き場（失敗したジョブだけやり直しても、同じ所に置く。前の回の置き場に足すこともできる）
   PARTS: ${{ inputs.parts || format('kozu/run-{0}', github.run_id) }}
 
@@ -261,7 +268,11 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"missing={len(miss)}\n")
           PY
-          python3 scripts/kozu-tiles/kozu.py --resolve work/parts --out work/kozu.geojsonl --stats work/kozu-stats.json
+          # 関東の外のまとまりは、確度の高い推定だけを出す（確度の低い推定は、国の地価の地点で測って取り違えが多かった。docs/features.md の 126）
+          high=""
+          if [ "$QUALITY" = "high" ] || { [ "$QUALITY" = "auto" ] && [ "$NAME" != "kanto" ]; }; then high="--high-only"; fi
+          echo "出す筆の確かさ: $QUALITY ${high:+（確度の高い推定だけ）}"
+          python3 scripts/kozu-tiles/kozu.py --resolve work/parts --out work/kozu.geojsonl --stats work/kozu-stats.json $high
           rm -rf work/parts
       - name: タイルにして R2 に置く
         run: |
