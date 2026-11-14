@@ -63,13 +63,49 @@ from shapely.strtree import STRtree
 
 UA = {"User-Agent": "michilu-kozu (+https://github.com/ryo02suzu/real-estate-agent-Yuuri)"}
 CKAN = "https://www.geospatial.jp/ckan/api/3/action/package_search"
-ORGS = {"08": "moj-08ibaraki", "09": "moj-09tochigi", "10": "moj-10gunma", "11": "moj-11saitama", "12": "moj-12chiba", "13": "moj-13tokyo", "14": "moj-14kanagawa"}
+# G空間情報センターの、法務省の地図XMLの組織（都府県ごと）。対応している4地方（関東・中部・東北・近畿）
+ORGS = {
+    "02": "moj-02aomori", "03": "moj-03iwate", "04": "moj-04miyagi", "05": "moj-05akita", "06": "moj-06yamagata", "07": "moj-07fukushima",
+    "08": "moj-08ibaraki", "09": "moj-09tochigi", "10": "moj-10gunma", "11": "moj-11saitama", "12": "moj-12chiba", "13": "moj-13tokyo", "14": "moj-14kanagawa",
+    "15": "moj-15niigata", "16": "moj-16toyama", "17": "moj-17ishikawa", "18": "moj-18fukui", "19": "moj-19yamanashi", "20": "moj-20nagano",
+    "21": "moj-21gifu", "22": "moj-22shizuoka", "23": "moj-23aichi", "24": "moj-24mie",
+    "25": "moj-25shiga", "26": "moj-26kyoto", "27": "moj-27osaka", "28": "moj-28hyogo", "29": "moj-29nara", "30": "moj-30wakayama",
+}  # fmt: skip
 ESTAT = "https://www.e-stat.go.jp/gis/statmap-search/data?dlserveyId=A002005212020&code={code}&coordSys=1&format=shape&downloadType=5&datum=2011"
 FGD = "https://cyberjapandata.gsi.go.jp/xyz/experimental_fgd/18/{x}/{y}.geojson"
 GEOCODE = "https://msearch.gsi.go.jp/address-search/AddressSearch?q={q}"
-# 関東1都6県は平面直角座標系の第IX系（島しょ部を除く）
-TO_M = Transformer.from_crs("EPSG:4326", "EPSG:6677", always_xy=True)
-TO_LL = Transformer.from_crs("EPSG:6677", "EPSG:4326", always_xy=True)
+# 平面直角座標系の系（平成14年国土交通省告示第9号。都府県コード → 系の番号。東京都の島しょ部は別の系だが、本土と同じ第IX系で置く）。
+# 置く計算は m の座標でするので、都府県に合った系を使う（系が違うと縮尺・向きが少しずれ、1m の判定に響く）
+ZONES = {
+    "02": 10, "03": 10, "04": 10, "05": 10, "06": 10, "07": 9,
+    "08": 9, "09": 9, "10": 9, "11": 9, "12": 9, "13": 9, "14": 9,
+    "15": 8, "16": 7, "17": 7, "18": 6, "19": 8, "20": 8, "21": 7, "22": 8, "23": 7, "24": 6,
+    "25": 6, "26": 6, "27": 6, "28": 5, "29": 6, "30": 6,
+}  # fmt: skip
+
+
+def zone_of(code: str) -> int:
+    """市区町村コード（か都府県コード）の平面直角座標系の系。表に無い都府県は第IX系（今までどおり）"""
+    return ZONES.get(code[:2], 9)
+
+
+def zone_epsg(zone: int) -> str:
+    """JGD2011 の平面直角座標系（第I系 = EPSG:6669 … 第XIX系 = EPSG:6687）"""
+    return f"EPSG:{6668 + zone}"
+
+
+# 緯度経度 ⇔ 平面直角座標（m）。市区町村を置き始める前に use_zone で、その都府県の系に切り替える（子プロセスは fork で引き継ぐ）
+TO_M = Transformer.from_crs("EPSG:4326", zone_epsg(9), always_xy=True)
+TO_LL = Transformer.from_crs(zone_epsg(9), "EPSG:4326", always_xy=True)
+
+
+def use_zone(code: str) -> int:
+    """市区町村コードの都府県の系に切り替える。系の番号を返す"""
+    global TO_M, TO_LL
+    zone = zone_of(code)
+    TO_M = Transformer.from_crs("EPSG:4326", zone_epsg(zone), always_xy=True)
+    TO_LL = Transformer.from_crs(zone_epsg(zone), "EPSG:4326", always_xy=True)
+    return zone
 ROADLIKE = re.compile(r"^(道|水|無地番|長狭物不明)")
 KANJI = "〇一二三四五六七八九"
 TAU = 6.0  # 道路縁からの距離の上限（m）
@@ -871,7 +907,13 @@ def resolve(src: str, out: str, stats_out: str | None) -> None:
     ジョブ（図面の組・市区町村）をまたいで大きく重なった切れ端は、確かなほうだけ残し、タイルにする筆（地番区域・地番・q）を書き出す"""
     frags = [d for p in sorted(glob.glob(os.path.join(src, "frags-*.jsonl*"))) for d in read_lines(p)]
     frags.sort(key=lambda d: conflict_order(d["q"], d["sc"], d["n"]))
-    dropped = drop_overlaps([(d["f"], valid_wkt(d["g"])) for d in frags])
+    # 切れ端の形は平面直角座標（m）なので、同じ系の都府県どうしでだけ重なりを調べる（系が違うと、座標の数字が同じでも別の場所）
+    by_zone: dict[int, list[dict]] = {}
+    for d in frags:
+        by_zone.setdefault(zone_of(d["f"]), []).append(d)
+    dropped: set[str] = set()
+    for ds in by_zone.values():
+        dropped |= drop_overlaps([(d["f"], valid_wkt(d["g"])) for d in ds])
     log(f"切れ端 {len(frags)}・ジョブをまたいで重なり外した {len(dropped)}")
     per_code: dict[str, dict] = {}
     n = 0
@@ -918,7 +960,7 @@ def resolve(src: str, out: str, stats_out: str | None) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--plan", help="都県コード（カンマ区切り）。ジョブの分け方を JSON で書き出すだけ")
+    ap.add_argument("--plan", help="都府県コード（カンマ区切り。02〜30）。ジョブの分け方を JSON で書き出すだけ")
     ap.add_argument("--chunk-mb", type=float, default=100, help="1つのジョブで扱う地図XMLの zip の大きさの目安（MB）")
     ap.add_argument("--codes", help="市区町村コード（カンマ区切り。政令市は区。「12219:2/3」は図面を3組に分けた2組目）")
     ap.add_argument("--year", help="地図XMLの年（省略時は一番新しい年）")
@@ -955,6 +997,7 @@ def main() -> None:
                 continue
             t0 = time.time()
             zp = None
+            use_zone(code)
             try:
                 zp = moj_zip(code, a.year, a.work)
                 sheets, public = read_zip(zp)

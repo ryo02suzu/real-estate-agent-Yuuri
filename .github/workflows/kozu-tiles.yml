@@ -7,6 +7,12 @@
 # 1都3県で約80ジョブ・初めは1日ほどかかる（公開リポジトリなので GitHub Actions の分は無料）。国土地理院から読んだ道路縁は
 # R2 に残るので、2回目からは速い。地図データの新しい版（毎年4月）が出たあと、地番の地図データ（5月1日）に続けて作り直す。
 #
+# 関東のほかの地方は、都府県をいくつかの「まとまり」（name。kanto・kitakanto・tohoku・chubu・kinki など）に分けて作る。
+# まとまりごとのタイル（kozu/<name>-<日時>.pmtiles）を作り、ほかのまとまりのタイルと tile-join で1つ（kozu/kozu-<日時>.pmtiles）にして
+# アプリの置き場所にする（kozu-source.json の sets に、まとまりごとのファイルと市区町村を残す）。同じ name で作り直すと、その分だけ入れ替わる。
+# 新しい地方は、まず publish を外して作り（まとまりのタイルを R2 に置くだけで、アプリの置き場所は変えない）、国の地価の地点で
+# 確かさを確かめてから、merge_only と publish で公開する（docs/features.md の 120）。
+#
 # 時間切れ・失敗したジョブがあっても、置けた分でまとめて main に入れ、ジョブごとの結果（parts）は消さずに残す。
 # まとめのログの「結果の無いジョブ」を Run workflow の chunks に、parts に置き場（kozu/run-…）を入れて動かすと、
 # そのジョブだけやり直して前の結果に足し、まとめ直す。merge_only なら置き直さずにまとめ直すだけ。
@@ -20,8 +26,15 @@ on:
   workflow_dispatch:
     inputs:
       prefs:
-        description: 都県コード（カンマ区切り。13 東京・14 神奈川・11 埼玉・12 千葉・08 茨城・09 栃木・10 群馬）
+        description: 都府県コード（カンマ区切り。02〜30。13 東京・14 神奈川・11 埼玉・12 千葉・08 茨城・09 栃木・10 群馬 など）
         default: "13,14,11,12"
+      name:
+        description: この回のまとまりの名前（英小文字。タイルのファイル名に使う。kanto・kitakanto・tohoku・chubu・kinki など。同じ名前で作り直すと、その分だけ入れ替わる）
+        default: kanto
+      publish:
+        description: アプリの置き場所（kozu-source.json）を書き換える。外すと、まとまりのタイルを R2 に置くだけ（確かさを確かめる前の試し）
+        type: boolean
+        default: true
       year:
         description: 地図データの年度版（G空間情報センターの zip 名の末尾の年。空なら一番新しい年）
         required: false
@@ -56,6 +69,9 @@ env:
   AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
   TIPPECANOE_VERSION: "2.79.0"
   PREFS: ${{ inputs.prefs || '13,14,11,12' }}
+  # まとまりの名前（予定の実行は関東の1都3県）。公開するか（予定の実行は公開する）
+  NAME: ${{ inputs.name || 'kanto' }}
+  PUBLISH: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
   # ジョブごとの結果の置き場（失敗したジョブだけやり直しても、同じ所に置く。前の回の置き場に足すこともできる）
   PARTS: ${{ inputs.parts || format('kozu/run-{0}', github.run_id) }}
 
@@ -72,6 +88,8 @@ jobs:
         run: |
           # 同じ日にまとめ直しても前のファイルを上書きしない（ブラウザが読みかけのタイルと混ざらない）
           echo "stamp=$(TZ=Asia/Tokyo date +%Y%m%d-%H%M)" >> "$GITHUB_OUTPUT"
+          # まとまりの名前はファイル名に使う（「kozu」は1つにまとめたファイルの名前）
+          if ! [[ "$NAME" =~ ^[a-z][a-z0-9]{1,15}$ ]] || [ "$NAME" = "kozu" ]; then echo "::error::name は英小文字と数字（2〜16字）で、kozu 以外にしてください: $NAME"; exit 1; fi
           if [ -n "$ACCOUNT" ] && [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ] && [ -n "$R2_PUBLIC_URL" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
@@ -248,16 +266,54 @@ jobs:
       - name: タイルにして R2 に置く
         run: |
           # z16 は全ての筆を入れる（地番検索に使う。地番の筆のタイルと同じ形）。z14・15 は表示用で、混んだタイルは間引いてよい
-          tippecanoe -o "work/kanto-$STAMP.pmtiles" --force -l kozu -Z14 -z16 -P \
+          tippecanoe -o "work/$NAME-$STAMP.pmtiles" --force -l kozu -Z14 -z16 -P \
             --drop-densest-as-needed --maximum-tile-bytes=2500000 \
             --no-line-simplification --no-tiny-polygon-reduction-at-maximum-zoom -q \
-            -n "MICHILU kozu (estimated) $STAMP" \
+            -n "MICHILU kozu (estimated) $NAME $STAMP" \
             -A '<a href="https://front.geospatial.jp/moj-chizu-xml-readme/">「登記所備付地図データ」（法務省）</a>を基盤地図情報（国土地理院）に合わせて加工して作成' \
             work/kozu.geojsonl
-          ls -la "work/kanto-$STAMP.pmtiles"
-          aws s3 cp "work/kanto-$STAMP.pmtiles" "s3://$R2_BUCKET/kozu/kanto-$STAMP.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
+          ls -la "work/$NAME-$STAMP.pmtiles"
+          aws s3 cp "work/$NAME-$STAMP.pmtiles" "s3://$R2_BUCKET/kozu/$NAME-$STAMP.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
             --content-type application/octet-stream --cache-control "public, max-age=86400"
-          aws s3 cp work/kozu-stats.json "s3://$R2_BUCKET/kozu/kanto-$STAMP.json" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+          aws s3 cp work/kozu-stats.json "s3://$R2_BUCKET/kozu/$NAME-$STAMP.json" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+          echo "FILE=$NAME-$STAMP.pmtiles" >> "$GITHUB_ENV"
+          echo "まとまりのタイル: ${R2_PUBLIC_URL%/}/kozu/$NAME-$STAMP.pmtiles" >> "$GITHUB_STEP_SUMMARY"
+      # ほかのまとまり（kozu-source.json の sets）のタイルと1つにする。まとまりが1つだけなら、そのタイルをそのまま使う
+      - name: ほかのまとまりのタイルと1つにまとめる
+        if: env.PUBLISH == 'true'
+        run: |
+          python3 scripts/kozu-tiles/sets.py --self-test
+          python3 scripts/kozu-tiles/sets.py --source lib/roadmap/data/kozu-source.json --name "$NAME" --file "$FILE" \
+            --stats work/kozu-stats.json --edition "${YEAR}年4月公開版" --out work/sets.json
+          cat work/sets.json | head -c 600; echo
+          n=$(jq '.sets | length' work/sets.json)
+          if [ "$n" -le 1 ]; then
+            echo "FINAL=$FILE" >> "$GITHUB_ENV"
+          else
+            files=""
+            for f in $(jq -r '.sets[].file' work/sets.json); do
+              if [ ! -s "work/$f" ]; then
+                for i in 1 2 3; do
+                  aws s3 cp "s3://$R2_BUCKET/kozu/$f" "work/$f" --endpoint-url "$R2_ENDPOINT" --only-show-errors && break
+                  [ "$i" -lt 3 ] || exit 1
+                  echo "読み込みに失敗。$((i * 30)) 秒後にやり直す"; sleep $((i * 30))
+                done
+              fi
+              files="$files work/$f"
+            done
+            tile-join -q --force --no-tile-size-limit -o "work/kozu-$STAMP.pmtiles" \
+              -n "MICHILU kozu (estimated) $STAMP" \
+              -A '<a href="https://front.geospatial.jp/moj-chizu-xml-readme/">「登記所備付地図データ」（法務省）</a>を基盤地図情報（国土地理院）に合わせて加工して作成' \
+              $files
+            ls -la "work/kozu-$STAMP.pmtiles"
+            for i in 1 2 3; do
+              aws s3 cp "work/kozu-$STAMP.pmtiles" "s3://$R2_BUCKET/kozu/kozu-$STAMP.pmtiles" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
+                --content-type application/octet-stream --cache-control "public, max-age=86400" && break
+              [ "$i" -lt 3 ] || exit 1
+              echo "書き込みに失敗。$((i * 30)) 秒後にやり直す"; sleep $((i * 30))
+            done
+            echo "FINAL=kozu-$STAMP.pmtiles" >> "$GITHUB_ENV"
+          fi
       - name: ブラウザから範囲指定で読めるようにする（CORS）
         run: |
           cat > cors.json <<'JSON'
@@ -266,7 +322,8 @@ jobs:
           aws s3api put-bucket-cors --bucket "$R2_BUCKET" --cors-configuration file://cors.json --endpoint-url "$R2_ENDPOINT"
       - name: 公開 URL で読めるか確かめる
         run: |
-          url="${R2_PUBLIC_URL%/}/kozu/kanto-$STAMP.pmtiles"
+          # 公開するときは1つにまとめたファイル、試しのときはまとまりのファイル
+          url="${R2_PUBLIC_URL%/}/kozu/${FINAL:-$FILE}"
           curl -sS -r 0-6 -H "Origin: https://michilu.vercel.app" -D headers.txt -o head.bin "$url"
           cat headers.txt
           grep -qi "^HTTP/.* 206" headers.txt || { echo "::error::範囲指定で読めません: $url"; exit 1; }
@@ -278,9 +335,10 @@ jobs:
           node-version: 22
           cache: npm
       - name: アプリの置き場所を書き換え、テストが通れば main に入れる
+        if: env.PUBLISH == 'true'
         run: |
-          codes=$(jq -c .codes work/kozu-stats.json)
-          printf '{\n "url": "%s",\n "edition": "%s年4月公開版",\n "codes": %s\n}\n' "$URL" "$YEAR" "$codes" > lib/roadmap/data/kozu-source.json
+          # 置き場所（1つにまとめたファイル）・版・データのある市区町村（全部のまとまり）と、まとまりごとのファイル
+          python3 scripts/kozu-tiles/sets.py --finish work/sets.json --url "$URL" --out lib/roadmap/data/kozu-source.json
           head -c 400 lib/roadmap/data/kozu-source.json
           if git diff --quiet; then echo "変更なし"; exit 0; fi
           npm ci
@@ -295,6 +353,6 @@ jobs:
             git pull --rebase -X theirs && git push && break
             sleep 10
           done
-      - name: ジョブごとの結果を消す（結果の無いジョブがあれば、やり直して足せるよう残す）
-        if: needs.build.result == 'success' && steps.resolve.outputs.missing == '0'
+      - name: ジョブごとの結果を消す（結果の無いジョブがあれば、やり直して足せるよう残す。公開しない試しのときも残す）
+        if: needs.build.result == 'success' && steps.resolve.outputs.missing == '0' && env.PUBLISH == 'true'
         run: aws s3 rm "s3://$R2_BUCKET/$PARTS/" --recursive --endpoint-url "$R2_ENDPOINT" --only-show-errors

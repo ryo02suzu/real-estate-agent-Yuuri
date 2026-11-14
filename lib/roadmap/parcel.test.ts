@@ -968,14 +968,29 @@ describe("隣の筆", () => {
 });
 
 describe("公図から推定した筆のデータの置き場所（data/kozu-source.json）", () => {
-  it("置き場所は空（まだ作っていない）か R2 の PMTiles。データのある市区町村は5桁のコード", () => {
+  it("置き場所は空（まだ作っていない）か R2 の PMTiles。データのある市区町村は、対応している都府県（02〜30）の5桁のコード", () => {
     expect(KOZU_SOURCE.url === "" || /^https:\/\/.+\.pmtiles$/.test(KOZU_SOURCE.url)).toBe(true);
-    for (const c of KOZU_SOURCE.codes) expect(c).toMatch(/^(0[89]|1[0-4])\d{3}$/);
+    for (const c of KOZU_SOURCE.codes) expect(c).toMatch(/^(0[2-9]|[12]\d|30)\d{3}$/);
+    expect(new Set(KOZU_SOURCE.codes).size).toBe(KOZU_SOURCE.codes.length);
     if (KOZU_SOURCE.url) {
       expect(KOZU_SOURCE.edition).toMatch(/^\d{4}年\d{1,2}月公開版$/);
       // 1都3県の公図の地域の多く（置けた筆のある市区町村）
       expect(KOZU_SOURCE.codes.length).toBeGreaterThan(50);
     }
+  });
+
+  // 関東のほかの地方を足すと、地方（まとまり）ごとのタイルを1つにまとめて置く（scripts/kozu-tiles/sets.py）。sets はその内訳
+  it("まとまりごとの内訳（sets）があれば、ファイル名は R2 の kozu/ の下の PMTiles で、市区町村は全体の一覧と同じ", () => {
+    const sets = (KOZU_SOURCE as { sets?: Record<string, { file: string; codes: string[]; edition: string }> }).sets;
+    if (!sets) return;
+    const all: string[] = [];
+    for (const [name, s] of Object.entries(sets)) {
+      expect(name).toMatch(/^[a-z][a-z0-9]{1,15}$/);
+      expect(s.file).toMatch(/^[a-z0-9-]+\.pmtiles$/);
+      expect(s.edition).toMatch(/^\d{4}年\d{1,2}月公開版$/);
+      all.push(...s.codes);
+    }
+    expect(all.sort()).toEqual([...KOZU_SOURCE.codes].sort());
   });
 });
 
@@ -1067,6 +1082,32 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     expect(e5).toBeLessThan(-244);
     expect(n5).toBeGreaterThan(341);
     expect(n5).toBeLessThan(348);
+  });
+  it("東北の全部の図面の点検で足した8枚（2026-11-14）は、写真・地図で確かめた根拠が理由にあり、戸沢村だけ逆向き（T1）", () => {
+    // 道路縁の少ない所（区画整理の新しい街区・田・山林）は、道路縁で比べる機械の判定が保留になる。
+    // 保留の図面は、タイルを作るのと同じ動かし方で国土地理院の航空写真・地図に重ねて確かめたものだけを足した（docs/features.md の 119）
+    const want: [string, string, "T1" | "T2", number][] = [
+      ["05361", "10384_hosei_20121106102829", "T2", 287],
+      ["07461", "10028_hosei_20121029101450", "T2", 40],
+      ["06207", "11365_hosei_20121114121715", "T2", 877],
+      ["07445", "12354_hosei_20121019090152", "T2", 425],
+      ["05201", "11042_hosei_20121108090642", "T2", 439],
+      ["07402", "11529_hosei_20121015133545", "T2", 97],
+      ["07402", "11528_hosei_20121015133528", "T2", 26],
+      ["06367", "10816_hosei_20121122125744", "T1", 155],
+    ];
+    for (const [code, sheet, kind, parcels] of want) {
+      const s = data.sheets.find((x) => x.code === code && x.sheet === sheet);
+      expect(s, `${code} ${sheet}`).toBeDefined();
+      expect(s!.shift?.kind).toBe(kind);
+      expect(s!.parcels).toBe(parcels);
+      expect(s!.reason).toMatch(/国土地理院の(地図|航空写真)/);
+      expect(s!.reason).toMatch(/東北の全部の図面の点検/);
+    }
+    expect(want.reduce((a, w) => a + w[3], 0)).toBe(2346);
+    // 同じ図面の決まりが2つ無い（2回動かさない）
+    const keys = data.sheets.filter((x) => x.shift && !x.chiban).map((x) => `${x.code}|${x.sheet}`);
+    expect(new Set(keys).size).toBe(keys.length);
   });
   it("座標の数字の誤り（kind「数字の誤り」）で動かす地図は、平面直角座標の 1,000m の倍数だけずれていて、理由に確かめた根拠がある", () => {
     // いわき市中央台高久１丁目の図面（62筆）は、平面直角座標の北向きの数字が 1万m 大きく、約10km 北の平絹谷の上にあった。
