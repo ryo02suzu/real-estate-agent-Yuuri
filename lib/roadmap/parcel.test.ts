@@ -1109,6 +1109,20 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     const keys = data.sheets.filter((x) => x.shift && !x.chiban).map((x) => `${x.code}|${x.sheet}`);
     expect(new Set(keys).size).toBe(keys.length);
   });
+  it("大仙市の11枚（2026-11-14）は、同じ日に変換された図面で、10枚は南東へ・角間川町の1枚だけ北西へ動かす", () => {
+    // 大仙市では、2012-11-27 に変換された図面（地図名 10688〜10714_hosei_20121127…）のうち 11枚が測地系の取り違えでずれていた。
+    // 角間川町の 2,227筆だけは逆向き（日本測地系の数字がそのまま入っている）。航空写真で、道の両側の縁に筆の境が沿うことを確かめた
+    const xs = data.sheets.filter((s) => s.code === "05212");
+    expect(xs).toHaveLength(11);
+    expect(xs.reduce((a, s) => a + s.parcels, 0)).toBe(5753);
+    for (const s of xs) {
+      expect(s.sheet).toMatch(/^10(6|7)\d\d_hosei_20121127\d{6}$/);
+      expect(s.shift?.kind).toBe(s.sheet.startsWith("10695_") ? "T1" : "T2");
+      expect(s.reason).toMatch(/国土地理院の航空写真/);
+      expect(s.reason).toMatch(/11枚を一緒に動かしたときの重なり/);
+    }
+    expect(new Set(xs.map((s) => s.sheet)).size).toBe(11);
+  });
   it("座標の数字の誤り（kind「数字の誤り」）で動かす地図は、平面直角座標の 1,000m の倍数だけずれていて、理由に確かめた根拠がある", () => {
     // いわき市中央台高久１丁目の図面（62筆）は、平面直角座標の北向きの数字が 1万m 大きく、約10km 北の平絹谷の上にあった。
     // 緯度経度で動かす量は、座標の北と真北の向きの差・縮尺のため、1万m ちょうどにはならない（東へ -114.8m・北へ -10,029.9m）
