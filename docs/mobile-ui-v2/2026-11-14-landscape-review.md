@@ -36,3 +36,10 @@ systematic-debuggingは前回の原因特定（上下固定要素による本文
 - mainは別経路でPR40〜43が反映され74f18b8へ進んだ。a0fa8ceは7c0fb8e基点なので、最新main統合後の回帰も必要。
 - PR27はmain反映済み。最後の実Claude run41187312208/job124496745785のmodelUsageはOpus5.5と禁止Haiku5.5を含み、モデル要件は失敗。PR28未反映につき新規呼出し保留。設定のeffort=maxだけでは各担当の実動を証明できず、Ultracode Workflow/サブエージェント実行証跡は未確認。
 - PR23/44はDraftを維持。15分監視は追加しない。mainマージ/自動マージ/本番デプロイは行わない。
+
+## 22:54 JST の追記
+- Actions [43601401533](https://github.com/ryo02suzu/real-estate-agent-Yuuri/actions/runs/43601401533) の標準18＋追加12＝30ケースが成功。artifact 14116925938 のJSONでも対象a0fa8ceと30成功を確認した。
+- PR44の最新main統合候補（GitHub一時merge commit f6bbb8d / main74f18b8）は [CI 43601129938](https://github.com/ryo02suzu/real-estate-agent-Yuuri/actions/runs/43601129938) 成功、2057 passed / 32 skipped。ブラウザQAはa0fa8ce単体であり、統合候補の全機能QAではない。
+- Issue22本文と過去の承認記録を再照合した。承認された導線は日本地図→検索地点→調査概要→詳細。現在main側の地球演出への方針変更は確認できない。PR44は横向き可読性の補助修正であり、PR23の仕様v2を置き換えず、仕様v2の完成証拠として扱わない。
+- PR23 head d331a25e728b03e75b18664555a9fcfd1db609b1 は変更なし。対応Preview https://michilu-dbqcxx8b5-sourirettes-projects.vercel.app はREADY。承認仕様を対象にした独立QAで地図の高さ0、画面幅、検索→都市計画詳細→戻るを再確認する。地図レイアウトを書き換える診断用CSSは除去し、本来の画面で判定する。
+- PR27は反映済み、Actionsログのインストール行でCLI2.1.316を確認。Workflowと2担当の起動はClaudeの報告にはあるが、残存Actionsログには実ツール呼出しを検証できるセッション証跡がない。最終modelUsageの禁止Haiku混入は別途確認できるため、要件成功とは扱わない。
