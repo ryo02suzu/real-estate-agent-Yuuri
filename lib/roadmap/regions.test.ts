@@ -567,7 +567,9 @@ describe("岡山県の、市が扱う市（登録した市）", () => {
     expect(m.maps[0].tip).toContain("1項1号");
     expect(m.contact?.phone).toBe("086-803-1446");
     expect(m.contact?.noPhoneInquiry).toBe(true);
-    expect(CHUGOKU_PENDING.filter((x) => x.pref === "岡山県").map((x) => x.name)).toEqual(["津山市", "玉野市", "笠岡市", "総社市", "新見市"]);
+    // 市が扱う7市を全部登録したので、調査中の一覧に岡山県は残っていない
+    expect(CHUGOKU_PENDING.filter((x) => x.pref === "岡山県")).toEqual([]);
+    expect(OKAYAMA_CITIES.map((x) => x.name)).toEqual(["岡山市", "倉敷市", "津山市", "玉野市", "笠岡市", "総社市", "新見市"]);
   });
 
   it("倉敷市：市の「倉敷市建築基準法指定道路図」（2025年10月から）。どの種別まで載るかは確かめられていないので「一部」。電話では答えない", () => {
@@ -587,6 +589,79 @@ describe("岡山県の、市が扱う市（登録した市）", () => {
     expect(m.contact?.phone).toBe("086-426-3501");
     expect(m.contact?.fax).toBe("086-427-3536");
     expect(m.contact?.noPhoneInquiry).toBe(true);
+  });
+
+  const city = (name: string) => OKAYAMA_CITIES.find((x) => x.name === name)!;
+
+  it("津山・玉野・笠岡・総社・新見：道路種別の地図は市のページに見つからず none。窓口を出す（電話を断ると書いている市は無い）", () => {
+    const codes: Record<string, string> = { 津山市: "33203", 玉野市: "33204", 笠岡市: "33205", 総社市: "33208", 新見市: "33210" };
+    for (const [name, code] of Object.entries(codes)) {
+      const m = city(name);
+      expect(m.codes, name).toEqual([code]);
+      expect(findMunicipality(code)?.name, name).toBe(name);
+      expect(m.coverage, name).toBe("none");
+      expect(m.note, name).toContain("道路種別の地図は、市のページに見つからなかった");
+      expect(m.note, name).toContain("都市計画区域の外");
+      expect(m.contact?.phone, name).toMatch(/^08\d{2}-\d{2}-\d{4}$/);
+      expect(m.contact?.noPhoneInquiry, name).toBeUndefined();
+      // 地図があっても、市道の図だけ（道路種別の図ではない、と道順に書く）
+      for (const l of m.maps) {
+        expect(l.kind, name).toBe("public_road");
+        expect(l.build, name).toBeNull();
+        expect(l.tip, name).toMatch(/種別を示す(地図|図)ではない/);
+      }
+    }
+    expect(Object.keys(codes).filter((n) => city(n).maps.length === 0)).toEqual(["津山市", "新見市"]);
+  });
+
+  it("津山市：道路調査はメール・FAX で地図を送ると後日回答（先に必ず電話で相談）", () => {
+    const m = city("津山市");
+    expect(m.contact).toMatchObject({ phone: "0868-32-2099", fax: "0868-32-2155", email: "tokei@city.tsuyama.lg.jp" });
+    expect(m.contact!.dept).toContain("都市計画課 建築指導審査係");
+    expect(m.contact!.note).toContain("先に必ず電話で相談する");
+  });
+
+  it("玉野市：市道は玉野市統合型GIS の認定路線網図（岡山県の地図システムの上。中は確かめていない）", () => {
+    const m = city("玉野市");
+    expect(m.maps[0].url).toBe("http://www.gis.pref.okayama.jp/tamano/Portal");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("「玉野市マップ」→ マップ選択で「玉野市認定路線網図」");
+    expect(m.maps[0].tip).toContain("自分で同意");
+    expect(m.maps[0].tip).toContain("令和4年4月1日現在");
+    expect(m.contact).toMatchObject({ phone: "0863-32-5538", fax: "0863-32-5519" });
+  });
+
+  it("笠岡市：市役所の開庁時間は 9:00〜16:30。市道は道路台帳閲覧システム（今の担当は建設管理課。古い資料の課名は使わない）", () => {
+    const m = city("笠岡市");
+    expect(m.contact!.phone).toBe("0865-69-2141");
+    expect(m.contact!.hours).toContain("9:00〜16:30");
+    expect(m.maps[0].url).toBe("https://webgis.alandis.jp/kasaoka33/portal/consent01.html");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("建設管理課 管理係（0865-69-2146）");
+    // 日付の無い古い資料にあった課の名前（今の組織の一覧に無い）
+    expect(JSON.stringify(m)).not.toContain("建設企画課");
+    expect(m.note).toContain("島しょ部");
+  });
+
+  it("総社市：市道の道路台帳は市のページから（不動産取引などに使うときは現地などで確かめる、と市が書いている）", () => {
+    const m = city("総社市");
+    expect(m.maps[0].url).toBe("https://www.city.soja.okayama.jp/soshiki/29/3820.html");
+    expect(m.maps[0].verified).toBe(true);
+    expect(m.maps[0].tip).toContain("不動産取引や建築確認申請などに使うときは、必ず現地と土地の資料で確かめ");
+    expect(m.maps[0].tip).toContain("権利関係を表すものではない");
+    expect(m.contact).toMatchObject({ phone: "0866-92-8289", fax: "0866-92-8383" });
+  });
+
+  it("新見市：位置指定道路は建築係の台帳、市道は建設課の道路台帳で確かめる（市の建築設計用資料）", () => {
+    const m = city("新見市");
+    expect(m.contact!.phone).toBe("0867-72-6118");
+    expect(m.contact!.dept).toContain("都市整備課 建築係");
+    expect(m.contact!.note).toContain("建築係の台帳で位置を確かめる");
+    expect(m.contact!.note).toContain("建設課 維持管理係 0867-72-6131");
+    expect(m.contact!.note).toContain("必ず現地でも確かめる");
+    // 市の説明の引用（MICHILU の判断ではない）
+    expect(m.note).toContain("と説明している");
+    expect(m.note).toContain("大佐・神郷・哲多町・哲西町は、全域が都市計画区域の外");
   });
 });
 
@@ -1126,7 +1201,7 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: CHUGOKU_PENDING,
       total: 20,
       outside: ["瀬戸内市", "新庄村", "奈義町", "西粟倉村", "久米南町", "美咲町"],
-      cities: ["津山市", "玉野市", "笠岡市", "総社市", "新見市"],
+      cities: [],
       offices: { 備前県民局: 5, 備中県民局: 6, 美作県民局: 9 },
     },
     {
