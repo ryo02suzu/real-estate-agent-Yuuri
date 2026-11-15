@@ -24,7 +24,7 @@ export function LocationPicker({
   onClose,
   onPick,
 }: {
-  /** 最初に表示する地点（無ければ関東全体） */
+  /** 最初に表示する地点（無ければ日本の全体） */
   start?: { lat: number; lng: number };
   /** 現在地から開いたとき（ホームの「現在地で調べる」）。青い点と誤差の円を出し、見出しと案内を変える。位置は送らない（町名は国土地理院に聞く） */
   here?: { lat: number; lng: number; accuracy?: number };

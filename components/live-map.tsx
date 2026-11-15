@@ -18,7 +18,8 @@ import {
   DOURO_COLOR,
   HAZARD_EVENT,
   hazardLayerId,
-  KANTO_BOUNDS,
+  JAPAN_BOUNDS,
+  JAPAN_CENTER,
   KOZU_COLORS,
   SANKO_COLOR,
   LAND_PRICE_EVENT,
@@ -150,7 +151,10 @@ const OVERLAY_KEYS = Object.keys(OVERLAYS) as Overlay[];
 /** 何も出ていない理由：引きすぎ・読み込み中・データの無い地域・読み込みの失敗。partial は道路種別を一部しか読めなかったとき */
 type OverlayNote = "zoom" | "loading" | "none" | "error" | "partial";
 
-/** これより引いて（関東全体などを）見ているときは、筆・用途地域を表示しても寄らない（寄った先が物件の辺りとは限らない） */
+/** 幅の狭い地図（縦長のスマホ）。物件を選ぶ前は、日本の全体の範囲に合わせず、本州の真ん中をいちばん引いた縮尺で見せる */
+const narrowView = (el: HTMLElement) => el.clientWidth < 640;
+
+/** これより引いて（日本の全体などを）見ているときは、筆・用途地域を表示しても寄らない（寄った先が物件の辺りとは限らない） */
 const AUTO_ZOOM_FROM = 12;
 
 /** 道路種別を読む範囲は、見ている範囲より縦横それぞれこの割合だけ広く（少し動かしただけで読み直さない） */
@@ -197,7 +201,7 @@ const HAZARD_FOOT: Partial<Record<HazardKind, string>> = {
 export type MapPlace = { key: string; name: string; sub?: string; kind: "station" | "school" | "poi"; lng: number; lat: number };
 
 export type LiveMapProps = {
-  /** 物件の位置。無ければ関東全体を表示する */
+  /** 物件の位置。無ければ日本の全体（北海道〜九州）を表示する */
   point?: Point;
   /** PDF の分割図の市で、物件が載っている図（範囲の枠を重ねる） */
   sheet?: SheetHit;
@@ -356,7 +360,11 @@ export default function LiveMap({
       map = new MapLibreMap({
         container: container.current,
         style: gsiStyle("pale", fill && line ? { fill, line } : undefined),
-        ...(point ? { center: [point.lng, point.lat] as [number, number], zoom: 17 } : { bounds: KANTO_BOUNDS, fitBoundsOptions: { padding: pad } }),
+        ...(point
+          ? { center: [point.lng, point.lat] as [number, number], zoom: 17 }
+          : narrowView(container.current)
+            ? { center: JAPAN_CENTER, zoom: 5 }
+            : { bounds: JAPAN_BOUNDS, fitBoundsOptions: { padding: pad } }),
         minZoom: 5,
         maxZoom: 19.5,
         // 道路図と見比べるので、いつも北が上（回転・傾きなし）
@@ -596,7 +604,8 @@ export default function LiveMap({
     if (lat === undefined || lng === undefined) {
       pinRef.current?.remove();
       pinRef.current = null;
-      map.fitBounds(KANTO_BOUNDS, { duration: 800 });
+      if (narrowView(map.getContainer())) map.easeTo({ center: JAPAN_CENTER, zoom: 5, duration: 800 });
+      else map.fitBounds(JAPAN_BOUNDS, { duration: 800 });
       return;
     }
     if (!pinRef.current) {
@@ -840,7 +849,7 @@ export default function LiveMap({
     setShown((s) => ({ ...s, [k]: next }));
     const map = mapRef.current;
     const z = map?.getZoom() ?? 0;
-    // 関東全体のように引いた地図では寄らない（寄った先が物件の辺りとは限らない）
+    // 日本の全体のように引いた地図では寄らない（寄った先が物件の辺りとは限らない）
     if (next && z >= AUTO_ZOOM_FROM && z < OVERLAYS[k].zoomBelow) map?.easeTo({ zoom: OVERLAYS[k].zoomTo, duration: 700 });
     setNote(k, !next ? undefined : z < AUTO_ZOOM_FROM ? "zoom" : "loading");
     if (!next && (k === "zoning" || k === "roads")) setLegendOf(k, undefined);

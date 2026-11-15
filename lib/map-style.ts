@@ -22,11 +22,20 @@ export const BASEMAPS: Record<Basemap, { label: string; url: string; minzoom: nu
   photo: { label: "写真", url: "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg", minzoom: 2 },
 };
 
-/** 関東1都6県（伊豆・小笠原諸島を除く）の範囲 [[西, 南], [東, 北]] */
-export const KANTO_BOUNDS: [[number, number], [number, number]] = [
-  [138.4, 34.9],
-  [140.9, 37.16],
+/**
+ * 物件を選ぶ前に見せる範囲 [[西, 南], [東, 北]]：北海道・本州・四国・九州（五島列島・対馬まで）。全国に対応したので、関東だけではなく日本の全体。
+ * 沖縄・奄美・小笠原は入れない（入れると縦長のスマホでは縮尺が地図の一番引いた所（ズーム5）より小さくなり、本州が小さくなる）
+ */
+export const JAPAN_BOUNDS: [[number, number], [number, number]] = [
+  [128.6, 30.9],
+  [145.9, 45.6],
 ];
+
+/**
+ * 縦長のスマホで物件を選ぶ前に見せる所：本州の真ん中（岐阜・福井のあたり）を中心に、いちばん引いた縮尺（ズーム5）。
+ * 範囲（JAPAN_BOUNDS）に合わせると、幅の狭い画面では範囲の真ん中（日本海の上）が中心になり、九州と北海道が切れる
+ */
+export const JAPAN_CENTER: [number, number] = [136.9, 36.2];
 
 const ATTRIBUTION = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">地理院タイル</a>';
 // 登記所備付地図データの利用規約どおり、出典と加工したことを書く
