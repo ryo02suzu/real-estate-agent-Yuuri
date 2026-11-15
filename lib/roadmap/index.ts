@@ -2,7 +2,7 @@ import { correctAddress, describeMatch, placeNotFound, type AddressFix, type Add
 import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, matchedNumbers, needsChoice, numbersAgree, reverseGeocode, subAreaDropped, withoutNumbers, type GeocodeResult } from "./geocode";
 import { MUNI_CODES } from "./muni-codes";
 import { buildLinks, findMunicipality, resolveContact, type Contact, type Municipality, type ResolvedLink } from "./municipalities";
-import { kuikiAllows, kuikiHasSub, kuikiSubLabel, lotHead, normalizeChiban, parcelAt, searchParcel, splitChiban, splitLotHead, townFromAddress, townKey, type Parcel, type ParcelSource } from "./parcel";
+import { indexHasTown, kuikiAllows, kuikiHasSub, kuikiSubLabel, lotHead, normalizeChiban, parcelAt, searchParcel, splitChiban, splitLotHead, townFromAddress, townKey, type Parcel, type ParcelSource } from "./parcel";
 import { addressSub, elsewhereLabel, sameTownName, typedChome, type AddressSub, type Elsewhere } from "./parcel-sub";
 import { loadParcelIndex, type ParcelIndex } from "./parcel-index";
 import { pmtilesParcelSource } from "./parcel-tiles";
@@ -152,6 +152,10 @@ export async function lookup(
     try {
       // 地番の索引（市区町村コードごと。あれば番号の入ったタイルを先に開く。無ければ null で今までの探し方）
       const index = town ? await loadIndex(rev.muniCd) : null;
+      // 国土地理院に無い町名を、似た名前の別の町に直していても（「朝倉字田島丙219番1」の朝倉 → 朝倉横町・「洲之内字森長甲289番」の洲之内 → 洲之内乙）、
+      // 地番の地図に入力の町名の地番区域（高知市「朝倉」・西条市「洲之内」）があれば、入力の町名で探す（筆の地番は「丙219-1」「甲289」）
+      const typedTown = !!town && notes.fix?.to === town && !!notes.fix.from && !indexHasTown(index, town) && indexHasTown(index, notes.fix.from);
+      if (typedTown) town = notes.fix!.from;
       // 「大田町大田ロ818番4」（町名にロまで入って返る）・「中山町中山子4番6」（地番の頭の子が町名の側に残る）を、筆の地番区域と地番の形に直す
       const head = town ? lotHead(body, town, lot, index) : null;
       if (head) ({ town, chiban: lot, body } = head);
@@ -169,6 +173,9 @@ export async function lookup(
         const prev = (await reverseGeocode(lat, lng)) ?? rev;
         away = awayFrom(r.parcel.point, geo, town, prev.town);
         const m = findMunicipality(prev.muniCd) ?? municipality;
+        // 入力の町名で筆が見つかったら、「町名を直した」とは言わない（町名は合っていた）
+        const foundNotes = { ...notes };
+        if (typedTown) delete foundNotes.fix;
         if (!away) return {
           status: "ok",
           lat,
@@ -176,7 +183,7 @@ export async function lookup(
           matchedAddress: geo.matchedAddress.replace(/[0-9０-９][0-9０-９番地号の\-－]*$/, ""),
           town: prev.town,
           approximate: false,
-          ...withoutVerifiedMiss(notes, sub, r.parcel.kuiki, town),
+          ...withoutVerifiedMiss(foundNotes, sub, r.parcel.kuiki, town),
           parcel: r.parcel,
           parcelOthers: r.others,
           ...(r.alts?.length ? { parcelAlts: r.alts.map((a) => ({ label: kuikiSubLabel(a.kuiki), lat: a.point.lat, lng: a.point.lng })) } : {}),

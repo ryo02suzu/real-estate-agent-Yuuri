@@ -772,6 +772,31 @@ describe("lookup で地番を探す", () => {
     expect(r.lng).toBeLessThan(e);
   });
 
+  it("「洲之内字森長甲289番」：国土地理院が町名を似た別の町（洲之内乙）に直しても、地番の地図に入力の町（洲之内）があれば、そこの「甲289」を当てる", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          url.includes("AddressSearch")
+            ? url.includes(encodeURIComponent("洲之内乙"))
+              ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "愛媛県西条市洲之内乙" } }]
+              : [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "愛媛県西条市洲之内乙" } }, { geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "愛媛県西条市洲之内甲" } }]
+            : { results: { muniCd: "38206", lv01Nm: "洲之内" } },
+      })),
+    );
+    const K = "西条市_洲之内___";
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: K, chiban: "乙289" }], [`${SX + 1},${SY}`]: [{ kuiki: K, chiban: "甲289" }] });
+    const index = { v: 1, k: { [K]: [[SX, SY, 289, 289], [SX + 1, SY, 289, 289]] } } as unknown as Awaited<ReturnType<typeof loadParcelIndex>>;
+    const r = await lookup("愛媛県西条市洲之内字森長甲289番", { parcels: src, loadIndex: async () => index });
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.parcel?.chiban).toBe("甲289");
+    expect(r.parcel?.kuiki).toBe(K);
+    // 町名は合っていたので「直した」とは言わない
+    expect(r.fix).toBeUndefined();
+  });
+
   it("地割の住所で、国土地理院の住所に地割が無くても、地番の地図で同じ地割の筆を見つけたら「町名が見つからない」とは言わない", async () => {
     // 花巻市石鳥谷町好地第16地割24番2：国土地理院は「石鳥谷町好地」までしか返さない。筆は「第16地割」の地番区域で見つかる
     const stub = (title: string) =>

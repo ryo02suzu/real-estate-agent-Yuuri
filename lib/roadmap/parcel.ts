@@ -357,6 +357,11 @@ export function splitLotHead(chiban: string): [string, string] {
  * ②「中山町中山子4番6」：地番の頭の十二支（子）や「4号」は、入力を読むときは町名の側に残る（町名の終わりの字と見分けられない）。
  *   町が「中山町中山」と分かり、入力がその町名のすぐ後ろに十二支1字か「◯号」だけを書いていれば、地番の頭にする（頭の無い同じ番号の別の筆を当てない）
  */
+/** 地番の索引に、その町（大字・丁目）の地番区域があるか */
+export function indexHasTown(index: { k: Record<string, unknown> } | null | undefined, town: string): boolean {
+  return !!index && !!town && Object.keys(index.k).some((k) => townMatches(k, town));
+}
+
 export function lotHead(
   body: string,
   town: string,
@@ -366,8 +371,7 @@ export function lotHead(
   const [head] = splitLotHead(chiban);
   if (head && index && town.endsWith(head)) {
     const base = town.slice(0, -head.length);
-    const has = (t: string) => Object.keys(index.k).some((k) => townMatches(k, t));
-    if (base && !has(town) && has(base)) return { town: base, chiban, body };
+    if (base && !indexHasTown(index, town) && indexHasTown(index, base)) return { town: base, chiban, body };
   }
   if (!head && town) {
     const b = body.normalize("NFKC").replace(/\s/g, "");
