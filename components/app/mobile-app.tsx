@@ -2818,12 +2818,12 @@ function PlaceNote({
     warn = true;
     short =
       off === "large" && data.parcels.status === "ok"
-        ? `住所の地点が道路などの筆の可能性（地番 ${registryChiban(data.parcels.parcel.chibanRaw)}）`
+        ? `住所の地点が道路などの筆の可能性（${chibanLabel(data.parcels.parcel.chibanRaw)}）`
         : `住所の地点が${off}の筆の上です`;
     text = (
       <>
         {off === "large" && data.parcels.status === "ok"
-          ? `住所の地点の筆（地番 ${registryChiban(data.parcels.parcel.chibanRaw)}）は隣地が${registryNeighbors(data.parcels).length}筆あり、道路など物件の外の土地の可能性があります。${chibanArea ? "番地が地番の地域なら、地番で探すと土地（筆）が出ます。" : "「場所を直す」で建物の位置を選ぶと、物件の土地の地番・面積が出ます。"}`
+          ? `住所の地点の筆（${chibanLabel(data.parcels.parcel.chibanRaw)}）は隣地が${registryNeighbors(data.parcels).length}筆あり、道路など物件の外の土地の可能性があります。${chibanArea ? "番地が地番の地域なら、地番で探すと土地（筆）が出ます。" : "「場所を直す」で建物の位置を選ぶと、物件の土地の地番・面積が出ます。"}`
           : `住所の地点が${off}の上です。番地が地番の地域なら、地番で探すと土地（筆）が出ます。`}
         {asChiban && (
           <span className="mt-[5px] flex">

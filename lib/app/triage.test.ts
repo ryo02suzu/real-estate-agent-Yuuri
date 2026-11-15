@@ -88,6 +88,12 @@ describe("要注意点（問題になりそうな所）", () => {
     expect(at("道-5")).toContain("on-road");
     expect(at("51-3", 40)).toContain("off-lot");
     expect(at("51-3")).toContain("address-parcel");
+    // 見出しの地番。地番の無い土地（筆界未定地など）は「地番 筆界未定地-1」と書かない
+    const title = (chibanRaw: string, n = 2) => triageOf(loaded({ parcels: { status: "ok", parcel: { ...parcel, chibanRaw }, kind: "address", neighbors: Array.from({ length: n }, (_, i) => `那覇市泉崎１丁目 ${i + 1}`) } })).issues.find((i) => i.id === "off-lot" || i.id === "address-parcel")?.title;
+    expect(title("51-3", 40)).toBe("住所の地点の筆（地番 51-3）は隣地が40筆");
+    expect(title("51-3")).toBe("住所の地点の筆は地番 51-3（参考）");
+    expect(title("筆界未定地-1", 260)).toBe("住所の地点の筆（筆界未定地）は隣地が260筆");
+    expect(title("筆界未定地-1")).toBe("住所の地点の筆は筆界未定地（参考）");
     // 町の中心（筆を探していない）
     const town = triageOf(loaded({ result: { ...base, approximate: true }, parcels: { status: "none", approximate: true } }));
     expect(town.issues.map((i) => i.id)).toContain("approximate");

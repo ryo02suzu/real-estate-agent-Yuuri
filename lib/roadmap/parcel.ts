@@ -745,12 +745,24 @@ async function addSiblings(f: ParcelFeature, pieces: ParcelPiece[], source: Parc
 /** 同じ地番の区画の並び（「51-3W1」「51-3W2」…「51-3W10」） */
 const byPieceMark = (a: string, b: string) => a.localeCompare(b, "ja", { numeric: true });
 
-/** 画面での地番の呼び方。道路・水路など地番の無い所は「道路（地番なし）」など */
+/**
+ * 画面での地番の呼び方。道路・水路など地番の無い所は「道路（地番なし）」など。
+ * 地図データの「筆界未定地-1」「無地番-2」の後ろの番号はデータの中の通し番号で、登記の地番ではないので出さない。
+ * 筆界未定地に含まれる地番がデータに書いてあれば（「筆界未定地(704+645-2)」）、それを添える
+ */
 export function chibanLabel(chiban: string): string {
-  if (/^道/.test(chiban)) return "道路（地番なし）";
-  if (/^水/.test(chiban)) return "水路（地番なし）";
-  if (/^筆界未定/.test(chiban)) return "筆界未定地";
+  if (/^(?:道|市道|町道|村道|区道|県道|府道|都道|国道|里道|赤道|農道|林道)/.test(chiban)) return "道路（地番なし）";
+  if (/^(?:水|河川)/.test(chiban)) return "水路（地番なし）";
+  if (/^筆界未定/.test(chiban)) {
+    const lots = (chiban.match(/\(([^)]*)\)/)?.[1] ?? "")
+      .split("+")
+      .map((s) => registryChiban(s.trim()))
+      .filter(isLotChiban);
+    return lots.length ? `筆界未定地（${lots.join("・")}）` : "筆界未定地";
+  }
   if (/^無地番/.test(chiban)) return "無地番の土地";
+  if (/^長狭物/.test(chiban)) return "道路・水路など（地番なし）";
+  if (!isLotChiban(chiban.normalize("NFKC"))) return "地番の無い土地";
   return `地番 ${registryChiban(chiban)}`;
 }
 
