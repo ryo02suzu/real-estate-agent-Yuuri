@@ -53,6 +53,8 @@ async def check(browser, engine, failed_keys, width, height):
     await page.route("**/*.pmtiles", tiles)
     try:
         await page.goto(report["url"], wait_until="domcontentloaded", timeout=40000)
+        # The map canvas is created by a client effect, after hydration.
+        await page.locator(".mui-japan-map canvas.maplibregl-canvas").first.wait_for(state="visible", timeout=20000)
         await page.locator("#address").fill("東京都新宿区西新宿2丁目8番1号")
         await page.get_by_role("button", name="検索", exact=True).first.click()
         row = page.get_by_role("button", name=re.compile("^都市計画")).first

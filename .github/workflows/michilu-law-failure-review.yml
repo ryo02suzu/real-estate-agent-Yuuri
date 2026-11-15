@@ -15,9 +15,9 @@ jobs:
     timeout-minutes: 20
     env:
       REVIEW_URL: http://127.0.0.1:3000
-      PREVIEW_URL: https://michilu-dbqcxx8b5-sourirettes-projects.vercel.app
-      REVIEW_SHA: d331a25e728b03e75b18664555a9fcfd1db609b1
-      REVIEW_PHASE: law-failure-baseline-d331a25
+      PREVIEW_URL: ""
+      REVIEW_SHA: bd27ce53a9b86dcfe3ea64b8a70d57c1b3f870d5
+      REVIEW_PHASE: law-failure-candidate-bd27ce5
     steps:
       - uses: actions/checkout@v4
         with:

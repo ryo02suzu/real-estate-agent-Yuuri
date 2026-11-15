@@ -15,9 +15,9 @@ jobs:
     timeout-minutes: 20
     env:
       REVIEW_URL: http://127.0.0.1:3000
-      PREVIEW_URL: https://michilu-dbqcxx8b5-sourirettes-projects.vercel.app
-      REVIEW_SHA: d331a25e728b03e75b18664555a9fcfd1db609b1
-      REVIEW_PHASE: approved-v2-d331a25-map-render-details
+      PREVIEW_URL: ""
+      REVIEW_SHA: bd27ce53a9b86dcfe3ea64b8a70d57c1b3f870d5
+      REVIEW_PHASE: approved-v2-bd27ce5-map-render-details
     steps:
       - uses: actions/checkout@v4
         with:
@@ -115,7 +115,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: michilu-v2-d331a25-${{ github.run_id }}
+          name: michilu-v2-bd27ce5-${{ github.run_id }}
           path: ui-review/
           retention-days: 14
 
