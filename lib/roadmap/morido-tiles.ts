@@ -33,16 +33,22 @@ function decode(data: ArrayBuffer, x: number, y: number): MoridoArea[] {
 
 /** PMTiles（URL かファイルの読み方）から規制区域のタイルを読む。読んだタイルは覚えておく */
 export function moridoTileSource(src: string | Source): MoridoSource {
-  const archive = new PMTiles(src);
+  let archive = new PMTiles(src);
   const cache = new Map<string, Promise<MoridoArea[] | null>>();
   return {
     tile(x, y) {
       const key = `${x}/${y}`;
       let p = cache.get(key);
       if (!p) {
-        p = archive.getZxy(MORIDO_ZOOM, x, y).then((res) => (res ? decode(res.data, x, y) : null));
+        const readingArchive = archive;
+        p = readingArchive.getZxy(MORIDO_ZOOM, x, y).then((res) => (res ? decode(res.data, x, y) : null));
         // 失敗したタイルは覚えない（通信が戻れば読み直す）
-        p.catch(() => cache.delete(key));
+        p.catch(() => {
+          if (cache.get(key) === p) cache.delete(key);
+          // PMTiles はヘッダー・目次の失敗も覚えるため、タイルの記憶を消すだけでは復旧しない。
+          // 古い並行リクエストの失敗で、新しく作った読み込み元を戻さない。
+          if (archive === readingArchive) archive = new PMTiles(src);
+        });
         cache.set(key, p);
         if (cache.size > 30) cache.delete(cache.keys().next().value!);
       }
