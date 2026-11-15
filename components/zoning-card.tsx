@@ -8,6 +8,7 @@
 // スマホのシートは「都市計画」「その他の法令」「上下水道・ガス」のタブに分け（それぞれ1画面に収める）、PC のカードは続けて出す
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
+import { loadOtherLaws, type LawKey } from "@/lib/other-laws-load";
 import type { Municipality } from "@/lib/roadmap";
 import { HOUREI_SHORT, houreiAt, houreiCautionAll, houreiChips, houreiGroups, houreiNotesLine, PREF_NAMES, type Hourei } from "@/lib/roadmap/hourei";
 import { pmtilesHoureiSource } from "@/lib/roadmap/hourei-tiles";
@@ -28,13 +29,13 @@ import { RetryRow } from "./panel-row";
 import { Sheet } from "./sheet";
 
 /**
- * morido：盛土規制法の区域、hourei：砂防指定地・急傾斜地崩壊危険区域などの区域、tochi：自然公園・農業振興地域（読めなければ無し）、
+ * morido：盛土規制法の区域、hourei：砂防指定地・急傾斜地崩壊危険区域などの区域、tochi：自然公園・農業振興地域（通信失敗は lawErrors に残す）、
  * iseki：埋蔵文化財の確認先、suido：上下水道の台帳の地図、utilities：水道・下水道・都市ガスの照会先
  */
 export type ZoningState =
   | { status: "loading" }
   | { status: "error"; /** 読み込み直す */ retry?: () => void }
-  | { status: "ok"; zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi; iseki?: Iseki; suido?: SuidoLink[]; utilities?: Utilities };
+  | { status: "ok"; zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi; iseki?: Iseki; suido?: SuidoLink[]; utilities?: Utilities; lawErrors?: LawKey[]; retryLaws?: () => void; retryingLaws?: boolean };
 
 /** 地点の都市計画を読む（市区町村のデータの有無と時点も） */
 export function useZoning(lat: number, lng: number, municipality: Municipality): ZoningState {
@@ -46,16 +47,35 @@ export function useZoning(lat: number, lng: number, municipality: Municipality):
   useEffect(() => {
     let alive = true;
     const failed: ZoningState = { status: "error", retry: () => setAttempt((n) => n + 1) };
+    const readLaws = (keys?: LawKey[]) => loadOtherLaws({
+      morido: () => moridoAt(lat, lng, codes.split(",")[0], pmtilesMoridoSource),
+      hourei: () => houreiAt(lat, lng, codes.split(",")[0], pmtilesHoureiSource),
+      tochi: () => tochiAt(lat, lng, codes.split(",")[0], pmtilesTochiSource),
+    }, keys);
+    let lawErrors: LawKey[] = [];
+    let retryingLaws = false;
+    const retryLaws = async () => {
+      if (!alive || retryingLaws || !lawErrors.length) return;
+      retryingLaws = true;
+      setState((current) => current?.key === key && current.value.status === "ok"
+        ? { key, value: { ...current.value, retryingLaws: true } } : current);
+      const laws = await readLaws(lawErrors);
+      if (!alive) return;
+      lawErrors = laws.lawErrors;
+      retryingLaws = false;
+      // 都市計画・取得済みの法令・開いている詳細タブは保持する。
+      setState((current) => current?.key === key && current.value.status === "ok"
+        ? { key, value: { ...current.value, ...laws, retryingLaws: false } } : current);
+    };
     Promise.all([
       withRetry(() => zoningAt(lat, lng, pmtilesZoningSource)),
       import("@/lib/roadmap/data/zoning-status.json"),
-      // 盛土規制法・砂防指定地などの区域は読めなくても都市計画は出す
-      withRetry(() => moridoAt(lat, lng, codes.split(",")[0], pmtilesMoridoSource)).catch(() => null),
-      withRetry(() => houreiAt(lat, lng, codes.split(",")[0], pmtilesHoureiSource)).catch(() => null),
-      withRetry(() => tochiAt(lat, lng, codes.split(",")[0], pmtilesTochiSource)).catch(() => null),
+      // 盛土規制法・砂防指定地などの通信失敗は、対象外の null と分けて残す。
+      readLaws(),
     ])
-      .then(([zoning, mod, morido, hourei, tochi]) => {
+      .then(([zoning, mod, laws]) => {
         if (!alive) return;
+        lawErrors = laws.lawErrors;
         const st = statusFor(codes.split(","), mod.default as Record<string, ZoningStatus>);
         const iseki = isekiFor(municipality, lat, lng);
         const suido = suidoFor(municipality, lat, lng);
@@ -63,7 +83,7 @@ export function useZoning(lat: number, lng: number, municipality: Municipality):
         setState({
           key,
           value: zoning
-            ? { status: "ok", zoning, st, morido: morido ?? undefined, hourei: hourei ?? undefined, tochi: tochi ?? undefined, iseki, suido, utilities }
+            ? { status: "ok", zoning, st, ...laws, retryLaws, iseki, suido, utilities }
             : failed,
         });
       })
@@ -224,7 +244,7 @@ function ZoningDetail({ state, city, tabs, initialTab = 0 }: { state: Extract<Zo
         ))}
       </div>
       {tab === 0 && <ZoningPart state={state} city={city} />}
-      {tab === 1 && <OtherPart state={state} city={city} />}
+      {tab === 1 && <OtherPart state={state} city={city} showLoadErrors />}
       {tab === 2 && <UtilityPart utilities={state.utilities} suido={state.suido} city={city} />}
     </div>
   );
@@ -271,20 +291,27 @@ function ZoningPart({ state: { zoning, st }, city }: { state: Extract<ZoningStat
 }
 
 /** その他の法令の下調べ：盛土規制法・砂防指定地や急傾斜地などの区域・自然公園と農業振興地域と森林・埋蔵文化財と、その出典・特記事項 */
-function OtherPart({ state: { morido, hourei, tochi, iseki }, city }: { state: Extract<ZoningState, { status: "ok" }>; city: string }) {
+function OtherPart({ state: { morido, hourei, tochi, iseki, lawErrors, retryLaws, retryingLaws }, city, showLoadErrors }: { state: Extract<ZoningState, { status: "ok" }>; city: string; showLoadErrors?: boolean }) {
+  // PC のカードは従来どおり。失敗の案内と再読み込みはスマホの詳細に出す。
+  const errors = showLoadErrors ? lawErrors ?? [] : [];
   const notes = hourei && houreiNotesLine(hourei.pref);
   return (
     <div>
       <dl className="divide-y divide-line/70">
-        {morido && <MoridoRow morido={morido} />}
-        {hourei && <HoureiRow hourei={hourei} />}
-        {tochi && <TochiRow tochi={tochi} city={city} />}
+        {errors.includes("morido") ? <LawErrorRow label="盛土規制法" city={city} /> : morido && <MoridoRow morido={morido} />}
+        {errors.includes("hourei") ? <LawErrorRow label="土砂災害等の区域" city={city} /> : hourei && <HoureiRow hourei={hourei} />}
+        {errors.includes("tochi") ? <LawErrorRow label="自然公園・農振・森林" city={city} /> : tochi && <TochiRow tochi={tochi} city={city} />}
         {iseki && <IsekiRow iseki={iseki} />}
       </dl>
+      {errors.length > 0 && retryLaws && (
+        <button type="button" onClick={retryLaws} disabled={retryingLaws} className="my-2 min-h-11 rounded-lg border border-line px-3 py-2 text-[13px] text-brand disabled:text-muted">
+          {retryingLaws ? "法令データを再読み込み中" : "法令データを再読み込み"}
+        </button>
+      )}
       <Notes
         lead="国のデータの概略の区域です。重要事項説明は、区域を指定した都県・市の資料で確かめてください。"
         source={
-          (morido || hourei || tochi) && (
+          (morido || hourei || tochi || errors.length > 0) && (
             <a href="https://nlftp.mlit.go.jp/ksj/" target="_blank" rel="noreferrer" className="underline">
               国土数値情報（国土交通省）
             </a>
@@ -309,6 +336,19 @@ function OtherPart({ state: { morido, hourei, tochi, iseki }, city }: { state: E
         {/* 都県が利用条件で求める特記事項（東京都は急傾斜地と地すべりで文が違うので、どちらの文かを添える） */}
         {notes && <p>{notes}</p>}
       </Notes>
+    </div>
+  );
+}
+
+/** 読めなかった区域は「区域外」にせず、確認先と再読み込みの案内を残す。 */
+function LawErrorRow({ label, city }: { label: string; city: string }) {
+  return (
+    <div className={ROW} data-testid="law-load-error">
+      <dt className={LABEL}>{label}</dt>
+      <dd className="min-w-0 flex-1">
+        <span className={`block ${VALUE} text-ink`}>データを読み込めませんでした</span>
+        <span className={SUB}>区域の有無は未確認です。{city}・都県の担当窓口の資料で確かめてください。</span>
+      </dd>
     </div>
   );
 }
