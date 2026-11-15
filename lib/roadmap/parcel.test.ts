@@ -1224,7 +1224,7 @@ describe("地番参考図のある市町村", () => {
 describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-sheets.json）", () => {
   // タイルを作るとき（build_pref.py）に外す地図。書き方を間違えると何も外れないか、正しい地図まで外れる
   const data = JSON.parse(readFileSync(new URL("../../scripts/parcel-tiles/misplaced-sheets.json", import.meta.url), "utf8")) as {
-    sheets: { code: string; sheet: string; town: string; parcels: number; reason: string; oaza?: string; chome?: string; chiban?: string[]; shift?: { kind: "T1" | "T2" | "数字の誤り" | "照合" | "縮尺"; east: number; north: number; scale?: { k: number; rotate: number; origin: [number, number] } } }[];
+    sheets: { code: string; sheet: string; town: string; parcels: number; reason: string; oaza?: string; chome?: string; chiban?: string[]; shift?: { kind: "T1" | "T2" | "数字の誤り" | "照合" | "縮尺" | "回転"; east: number; north: number; scale?: { k: number; rotate: number; origin: [number, number] } } }[];
   };
   it("測地系の取り違えで動かす地図（shift）は、地図ごと・向きと量が日本測地系と世界測地系の差（西または東へ約245〜300m・北または南へ、関東・中部・近畿で約325〜370m、東北の X 系で約300〜315m。九州・中国・四国・北海道・沖縄はその地方の量）", () => {
     // 地方ごとの東西・南北の量（m。T1 の向きで、東は負・北は正）。国土地理院の換算の簡易式で各地の値を出し、平面直角座標で計算した量との差（約10m）を見込んだ幅
@@ -1348,8 +1348,8 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(s!.reason).toMatch(/東北の全部の図面の点検/);
     }
     expect(want.reduce((a, w) => a + w[3], 0)).toBe(2346);
-    // 同じ図面の決まりが2つ無い（2回動かさない）
-    const keys = data.sheets.filter((x) => x.shift && !x.chiban).map((x) => `${x.code}|${x.sheet}`);
+    // 同じ図面（丁目で分けた図面は同じ丁目）の決まりが2つ無い（2回動かさない）
+    const keys = data.sheets.filter((x) => x.shift && !x.chiban).map((x) => `${x.code}|${x.sheet}|${x.oaza ?? ""}|${x.chome ?? ""}`);
     expect(new Set(keys).size).toBe(keys.length);
   });
   it("大仙市の11枚（2026-11-14）は、同じ日に変換された図面で、10枚は南東へ・角間川町の1枚だけ北西へ動かす", () => {
@@ -1454,8 +1454,43 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(s.reason).toMatch(/地価公示|地価調査/);
       expect(s.sheet).not.toBe("*");
     }
-    // 縮尺の決まりのほかの種類は、倍率を持たない（平行移動だけ）
-    for (const s of data.sheets.filter((x) => x.shift && x.shift.kind !== "縮尺")) expect(s.shift!.scale).toBeUndefined();
+    // 縮尺・回転の決まりのほかの種類は、倍率を持たない（平行移動だけ）
+    for (const s of data.sheets.filter((x) => x.shift && x.shift.kind !== "縮尺" && x.shift.kind !== "回転")) expect(s.shift!.scale).toBeUndefined();
+  });
+  it("回って入った図面（kind「回転」）：旭川市忠和の図面（8,863筆）を、丁目で分けた3つの部分ごとの量で回して直す。丁目・地番で絞る決まりが先、図面全体の決まりが最後", () => {
+    const sheet = "神居町忠和３条～８条・図郭座標有";
+    const xs = data.sheets.filter((s) => s.shift?.kind === "回転");
+    expect(xs.length).toBeGreaterThan(0);
+    for (const s of xs) {
+      const sc = s.shift!.scale!;
+      // 縮尺はほぼ1倍（回転だけの誤り）。回転は 10〜30度
+      expect(sc.k).toBeGreaterThan(0.995);
+      expect(sc.k).toBeLessThan(1.005);
+      expect(Math.abs(sc.rotate)).toBeGreaterThan(10);
+      expect(Math.abs(sc.rotate)).toBeLessThan(30);
+      expect(s.reason).toMatch(/道路縁/);
+      expect(s.reason).toMatch(/地価公示|地価調査/);
+      expect(s.reason).toMatch(/町丁/);
+      expect(s.reason).toMatch(/航空写真/);
+    }
+    const chuwa = data.sheets.filter((s) => s.code === "01204" && s.sheet === sheet);
+    expect(chuwa).toHaveLength(18);
+    expect(chuwa.reduce((a, s) => a + s.parcels, 0)).toBe(8863);
+    // 中心は全部同じ（図面の真ん中）
+    for (const s of chuwa) expect(s.shift!.scale!.origin).toEqual(chuwa[0].shift!.scale!.origin);
+    // build_pref.skip_rule は先に当たった決まりを使うので、図面全体の決まり（大字・丁目・地番で絞らない）は最後の1つだけ
+    const whole = chuwa.filter((s) => !s.oaza && !s.chome && !s.chiban);
+    expect(whole).toHaveLength(1);
+    expect(chuwa[chuwa.length - 1]).toBe(whole[0]);
+    expect(whole[0].parcels).toBe(6794);
+    // 約10m 食い違う部分（12の丁目と神居町忠和の22筆）は、別の量で直す
+    const a = chuwa.filter((s) => s.town.includes("約10m 食い違う部分"));
+    expect(a.reduce((n, s) => n + s.parcels, 0)).toBe(1702);
+    for (const s of a) expect(s.shift).toEqual(a[0].shift);
+    expect(a[0].shift).not.toEqual(whole[0].shift);
+    // 地価の4地点のうち「忠和8条3丁目66番658」は約10m 食い違う部分、ほかの3地点は残りの部分
+    expect(a.some((s) => s.oaza === "忠和八条" && s.chome === "３丁目")).toBe(true);
+    expect(whole[0].reason).toMatch(/66番658/);
   });
   it("神戸市北区若葉台の図面：本体 991筆は同じ倍率（約2.54倍）で直し、離れた 90筆は外す。筆は1回ずつ", () => {
     const w = data.sheets.filter((s) => s.code === "28109" && s.sheet === "若葉台１～４丁目");
@@ -1681,6 +1716,16 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     expect(data.sheets.find((x) => x.code === "26206" && x.sheet === "０７年度１／５００土地改良")!.reason).toMatch(/稗田野町.*217/);
     // 山林の図面（豊田市怒田沢町）は地形図で確かめた
     expect(data.sheets.find((x) => x.code === "23211" && x.sheet === "怒田沢町Ｂ")!.reason).toMatch(/地形図/);
+  });
+  it("2026-11-15：旭川市 永山町１４〜１６丁目の図面（234筆）は、北海道の XII 系で北西へ約404mずれている（T2。南東へ動かす）", () => {
+    const s = data.sheets.find((x) => x.code === "01204" && x.sheet === "旭川市永山東（１０００）・図郭有１７条");
+    expect(s).toBeDefined();
+    expect(s!.parcels).toBe(234);
+    expect(s!.shift?.kind).toBe("T2");
+    expect(Math.hypot(s!.shift!.east, s!.shift!.north)).toBeGreaterThan(395);
+    expect(Math.hypot(s!.shift!.east, s!.shift!.north)).toBeLessThan(410);
+    expect(s!.reason).toMatch(/0\.5%/);
+    expect(s!.reason).toMatch(/航空写真/);
   });
   it("2026-11-15：札幌市手稲区 金山の図面（523筆）は、北海道の XII 系で北西へ約404mずれている（T2。南東へ動かす）", () => {
     const s = data.sheets.find((x) => x.code === "01109" && x.sheet === "整附Ｂ（１／５００）数値Ｈ１７");
