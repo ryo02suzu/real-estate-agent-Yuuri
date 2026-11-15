@@ -23,7 +23,7 @@ import { EHIME } from "./data/ehime";
 import { KAGAWA, KAGAWA_CITIES } from "./data/kagawa";
 import { SHIMANE } from "./data/shimane";
 import { TOTTORI } from "./data/tottori";
-import { YAMAGUCHI } from "./data/yamaguchi";
+import { YAMAGUCHI, YAMAGUCHI_CITIES } from "./data/yamaguchi";
 import { OKAYAMA, OKAYAMA_CITIES } from "./data/okayama";
 import { HIROSHIMA, HIROSHIMA_CITIES } from "./data/hiroshima";
 import { MUNI_CODES } from "./muni-codes";
@@ -484,7 +484,7 @@ describe("市の道路種別のデータをアプリの中に表示するのは�
 describe("全国対応で足した地方（中国・四国・九州沖縄・北海道）", () => {
   // 地方ごとの市町村：調査中の一覧（data/<地方>.ts）と、調べ終えて登録した道県（data/<道県>.ts）を合わせたもの
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
-    ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...CHUGOKU_PENDING], 107],
+    ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...YAMAGUCHI_CITIES, ...CHUGOKU_PENDING], 107],
     ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...KAGAWA_CITIES, ...SHIKOKU_PENDING], 95],
     ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...MIYAZAKI_CITIES, ...OKINAWA_CITIES, ...KYUSHU_PENDING], 274],
     ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING], 179],
@@ -735,6 +735,25 @@ describe("沖縄県の、市が扱う市（登録した市）", () => {
   });
 });
 
+describe("山口県の、市が扱う市（登録した市）", () => {
+  it("下関市：市の地図「しものせき情報マップ」の指定道路図。非道路・色の無い路線・4m未満は建築指導課へ", () => {
+    const m = YAMAGUCHI_CITIES.find((x) => x.name === "下関市")!;
+    expect(m.codes).toEqual(["35201"]);
+    expect(m.coverage).toBe("full");
+    expect(m.maps[0].kind).toBe("road_type");
+    // 市のページと同じ入口のリンク（地図の中は開いて確かめていない）
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://www2.wagmap.jp/shimonoseki/Portal");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("「道路情報」→「指定道路」に印を付け");
+    expect(m.maps[0].tip).toContain("「非道路」（破線）");
+    expect(m.contact?.phone).toBe("083-231-2065");
+    expect(m.contact?.fax).toBe("083-231-4798");
+    expect(m.contact?.noPhoneInquiry).toBeUndefined();
+    expect(CHUGOKU_PENDING.filter((x) => x.pref === "山口県").map((x) => x.name)).toEqual(["宇部市", "山口市", "萩市", "防府市", "岩国市", "長門市", "周南市", "山陽小野田市"]);
+  });
+});
+
 describe("福岡県の、市が扱う市（登録した市）", () => {
   it("北九州市：市の「建築基準法道路種別地図」が物件の位置で開く。判定のくわしいことは電話では答えない", () => {
     const m = FUKUOKA_CITIES.find((x) => x.name === "北九州市")!;
@@ -748,7 +767,23 @@ describe("福岡県の、市が扱う市（登録した市）", () => {
     expect(m.maps[0].tip).toContain("不動産取引など権利・義務が発生するものや建築確認申請の資料には使えない");
     expect(m.contact?.phone).toBe("093-582-2535");
     expect(m.contact?.noPhoneInquiry).toBe(true);
-    expect(KYUSHU_PENDING.filter((x) => x.pref === "福岡県").map((x) => x.name)).toEqual(["福岡市", "大牟田市", "久留米市"]);
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "福岡県").map((x) => x.name)).toEqual(["福岡市", "大牟田市"]);
+  });
+
+  it("久留米市：市の公式ホームページの「指定道路図」（くるめMAP と、地区ごとの PDF）。道路種別の電話での問い合わせは断っている", () => {
+    const m = FUKUOKA_CITIES.find((x) => x.name === "久留米市")!;
+    expect(m.codes).toEqual(["40203"]);
+    expect(m.coverage).toBe("full");
+    expect(m.maps[0].kind).toBe("road_type");
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://www.city.kurume.fukuoka.jp/1050kurashi/2080juutaku/3030taterutoki/2013-0924-1402-207.html");
+    // 市の決まり：久留米市公式ホームページだと明記する
+    expect(m.maps[0].label).toContain("久留米市公式ホームページ");
+    expect(m.maps[0].tip).toContain("町名から地区（A-2〜C-3）を選んで PDF を開く");
+    expect(m.maps[0].tip).toContain("指定道路の表示が無い道は、建築指導課の窓口で確かめる");
+    expect(m.contact?.phone).toBe("0942-30-9089");
+    expect(m.contact?.fax).toBe("0942-30-9743");
+    expect(m.contact?.noPhoneInquiry).toBe(true);
   });
 });
 
@@ -891,8 +926,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: CHUGOKU_PENDING,
       total: 10,
       outside: ["上関町", "阿武町"],
-      // 特定行政庁の7市と、限定特定行政庁の長門市・山陽小野田市
-      cities: ["下関市", "宇部市", "山口市", "萩市", "防府市", "岩国市", "長門市", "周南市", "山陽小野田市"],
+      // 特定行政庁の7市と、限定特定行政庁の長門市・山陽小野田市のうち、まだ調べている途中の市（下関市は登録した。下の「山口県の、市が扱う市」）
+      cities: ["宇部市", "山口市", "萩市", "防府市", "岩国市", "長門市", "周南市", "山陽小野田市"],
       offices: { 柳井土木建築事務所: 6, 周南土木建築事務所: 2, 宇部土木建築事務所: 2 },
     },
     {
@@ -964,7 +999,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       total: 56,
       // 都市計画区域も準都市計画区域も無い村だけ（準都市計画区域のある うきは市・大木町・香春町・糸田町・大任町・福智町・上毛町 は区域外にしない）
       outside: ["東峰村", "赤村"],
-      cities: ["福岡市", "大牟田市", "久留米市"],
+      // 市が扱う4市のうち、まだ調べている途中の市（北九州市・久留米市は登録した）
+      cities: ["福岡市", "大牟田市"],
       offices: { 福岡県土整備事務所: 9, 那珂県土整備事務所: 5, 朝倉県土整備事務所: 3, 久留米県土整備事務所: 3, 南筑後県土整備事務所: 4, 八女県土整備事務所: 3, 飯塚県土整備事務所: 3, 直方県土整備事務所: 4, 田川県土整備事務所: 8, 北九州県土整備事務所: 7, 京築県土整備事務所: 7 },
     },    {
       pref: "佐賀県",

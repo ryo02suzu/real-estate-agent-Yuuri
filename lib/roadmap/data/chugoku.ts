@@ -34,8 +34,7 @@ export const CHUGOKU_PENDING: Municipality[] = [
   { pref: "広島県", name: "三次市", codes: ["34209"], coverage: "unknown", maps: [] },
   { pref: "広島県", name: "東広島市", codes: ["34212"], coverage: "unknown", maps: [] },
   { pref: "広島県", name: "廿日市市", codes: ["34213"], coverage: "unknown", maps: [] },
-  // 山口県（残り 9）
-  { pref: "山口県", name: "下関市", codes: ["35201"], coverage: "unknown", maps: [] },
+  // 山口県（残り 8）
   { pref: "山口県", name: "宇部市", codes: ["35202"], coverage: "unknown", maps: [] },
   { pref: "山口県", name: "山口市", codes: ["35203"], coverage: "unknown", maps: [] },
   { pref: "山口県", name: "萩市", codes: ["35204"], coverage: "unknown", maps: [] },
