@@ -1,7 +1,13 @@
 # 毎週火曜日の朝（日本時間 6:40）に、国土交通省「都市計画決定GISデータ」（G空間情報センターの全国データ）が更新されたかを見て、
-# 更新されていれば関東1都6県の用途地域・建ぺい率・容積率・防火地域などのタイルを作り直し、アプリ（public/data/）に入れる。
-# テストが通れば main に直接入れる（本番は Vercel が main から自動で作り直す）。外部のストレージや鍵は要らない。
+# 更新されていれば、対応している都道府県（lib/roadmap/data/regions.json。準備中の地方も入れる）の用途地域・建ぺい率・容積率・
+# 防火地域などのタイルを作り直す。テストが通れば main に直接入れる（本番は Vercel が main から自動で作り直す）。
 # 週に1回見るのは、国や市区町村がデータを新しくしたら、なるべく早くアプリに入れるため（新しくなっていなければ何もしない）。
+#
+# タイルの置き場は Cloudflare R2（地番の地図データと同じバケットの zoning/）。全国の分を1つのファイルにすると 100MB を超え、
+# GitHub に入れられない（1ファイル 100MB まで）ため。R2 の設定（地番の地図データ parcel-tiles.yml と同じ）が無いときは、
+# 今までどおりアプリ（public/data/）に入れる（100MB を超えたら止める）:
+#   Secrets:   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+#   Variables: R2_PUBLIC_URL（バケットの公開 URL）、R2_BUCKET（省略時 michilu-chiban）
 name: 都市計画の地図データ（最新版）
 
 on:
@@ -24,11 +30,19 @@ concurrency:
 
 env:
   TIPPECANOE_VERSION: "2.79.0"
+  R2_BUCKET: ${{ vars.R2_BUCKET || 'michilu-chiban' }}
+  R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: auto
+  # 新しい AWS CLI が既定で付けるチェックサムを R2 は受け付けないことがある
+  AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+  AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
 
 jobs:
   zoning:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -55,10 +69,11 @@ jobs:
           git clone --depth 1 --branch "$TIPPECANOE_VERSION" https://github.com/felt/tippecanoe.git /tmp/tippecanoe
           make -C /tmp/tippecanoe -j"$(nproc)"
           mkdir -p ~/tippecanoe-bin && cp /tmp/tippecanoe/tippecanoe /tmp/tippecanoe/tile-join ~/tippecanoe-bin/
-      - name: タイルを作ってアプリに入れる
+      - name: タイルを作る
         if: steps.c.outputs.changed == 'true'
         run: |
           export PATH="$HOME/tippecanoe-bin:$PATH"
+          # いったんアプリ（public/data/）に置く形で作る（zoning-source.json は「/data/zoning-<日付>.pmtiles」になる）
           python3 scripts/zoning-tiles/build.py --install --work "$RUNNER_TEMP/zoning"
           ls -la public/data
       - uses: actions/setup-node@v4
@@ -66,12 +81,64 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: テストが通れば main に入れる
+      - name: 作ったタイルでテストする（東京駅などの地点の結果・データの形）
         if: steps.c.outputs.changed == 'true'
         run: |
           if git diff --quiet && [ -z "$(git status --porcelain public/data)" ]; then echo "変更なし"; exit 0; fi
           npm ci
-          npm test
+          # 置き場を R2 に変える前に、作ったファイルそのものを読んで確かめる（lib/roadmap/zoning-data.test.ts）
+          file="public$(jq -r .url lib/roadmap/data/zoning-source.json)"
+          [ -s "$file" ] || { echo "::error::作ったタイルがありません: $file"; exit 1; }
+          ZONING_PMTILES_FILE="$file" npm test
+      - name: R2 に置いて、置き場所を書き換える（R2 の設定があるとき）
+        if: steps.c.outputs.changed == 'true'
+        env:
+          ACCOUNT: ${{ secrets.R2_ACCOUNT_ID }}
+        run: |
+          if git diff --quiet && [ -z "$(git status --porcelain public/data)" ]; then echo "変更なし"; exit 0; fi
+          rel=$(jq -r .url lib/roadmap/data/zoning-source.json)
+          file="public$rel"
+          name=$(basename "$file")
+          size=$(stat -c %s "$file")
+          echo "タイル: $name（$((size / 1000000)) MB）"
+          if [ -z "$ACCOUNT" ] || [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$R2_PUBLIC_URL" ]; then
+            echo "::warning::R2 の設定が無いので、アプリ（public/data/）に入れます"
+            [ "$size" -lt 95000000 ] || { echo "::error::タイルが 95MB を超えていて GitHub に入れられません。R2 の設定を入れてください"; exit 1; }
+            exit 0
+          fi
+          endpoint="https://$ACCOUNT.r2.cloudflarestorage.com"
+          # R2 への書き込みは、送り終えたあと返事が来ないまま時間切れになることがある。3回までやり直す
+          for i in 1 2 3; do
+            aws s3 cp "$file" "s3://$R2_BUCKET/zoning/$name" --endpoint-url "$endpoint" --only-show-errors \
+              --content-type application/octet-stream --cache-control "public, max-age=86400" && break
+            [ "$i" -lt 3 ] || exit 1
+            echo "書き込みに失敗。$((i * 30)) 秒後にやり直す"; sleep $((i * 30))
+          done
+          # ブラウザから範囲指定で読めるようにする（CORS。地番の地図データと同じ決まり）
+          cat > cors.json <<'JSON'
+          {"CORSRules":[{"AllowedOrigins":["*"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["Range","If-Match","If-None-Match"],"ExposeHeaders":["Content-Range","Content-Length","ETag","Accept-Ranges"],"MaxAgeSeconds":86400}]}
+          JSON
+          aws s3api put-bucket-cors --bucket "$R2_BUCKET" --cors-configuration file://cors.json --endpoint-url "$endpoint"
+          rm -f cors.json
+          # 公開 URL で読めるか（範囲指定・CORS・PMTiles の先頭・大きさ）
+          url="${R2_PUBLIC_URL%/}/zoning/$name"
+          curl -sS -r 0-6 -H "Origin: https://michilu.vercel.app" -D headers.txt -o head.bin "$url"
+          cat headers.txt
+          grep -qi "^HTTP/.* 206" headers.txt || { echo "::error::範囲指定で読めません: $url"; exit 1; }
+          grep -qi "^access-control-allow-origin:" headers.txt || { echo "::error::CORS のヘッダがありません"; exit 1; }
+          [ "$(head -c 7 head.bin)" = "PMTiles" ] || { echo "::error::PMTiles ではありません"; exit 1; }
+          grep -qi "^content-range: bytes 0-6/$size" headers.txt || { echo "::error::R2 のファイルの大きさが、作ったファイルと違います"; exit 1; }
+          rm -f headers.txt head.bin
+          # 置き場所を R2 の URL にして、アプリ（public/data/）のファイルは外す（前の版の R2 のファイルは残す。開いたままの画面が読み続けられる）
+          jq --indent 1 --arg u "$url" '.url = $u' lib/roadmap/data/zoning-source.json > zs.json && mv zs.json lib/roadmap/data/zoning-source.json
+          rm -f public/data/zoning-*.pmtiles
+          cat lib/roadmap/data/zoning-source.json
+      - name: テストが通れば main に入れる
+        if: steps.c.outputs.changed == 'true'
+        run: |
+          if git diff --quiet && [ -z "$(git status --porcelain public/data)" ]; then echo "変更なし"; exit 0; fi
+          # 置き場所を書き換えたあとの形（zoning-source.json）も確かめる
+          npx vitest run lib/roadmap/zoning-data.test.ts lib/roadmap/zoning.test.ts
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A public/data lib/roadmap/data/zoning-source.json lib/roadmap/data/zoning-status.json

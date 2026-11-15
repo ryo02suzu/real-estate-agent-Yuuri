@@ -48,17 +48,13 @@ PAUSE = 0.25
 import os as _os, sys as _sys
 
 _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), ".."))
-from regions import REGIONS, prefs  # noqa: E402
+from regions import prefs  # noqa: E402
 
-# 対応している都道府県（lib/roadmap/data/regions.json。関東1都6県＋中部9県）
+# 対応している都道府県（lib/roadmap/data/regions.json。準備中の地方も入れる）
 PREFS = prefs()
-# 対応している地方の範囲をまとめたもの（regions.json の bounds）と、そのまわり 0.1度（県境の近くの物件も、となりの県の分まで読める）
-BBOX = (
-    min(r["bounds"][0][0] for r in REGIONS.values()) - 0.1,
-    min(r["bounds"][0][1] for r in REGIONS.values()) - 0.1,
-    max(r["bounds"][1][0] for r in REGIONS.values()) + 0.1,
-    max(r["bounds"][1][1] for r in REGIONS.values()) + 0.1,
-)
+# 陸地のあるタイル（ズーム 11）の一覧（都道府県ごと。scripts/reinfolib/land_tiles.py が国土数値情報の行政区域データから作る）。
+# API はタイルごとに読むので、対応している地方をまとめた四角の中を全部読むと、全国では海の上のタイルが大半になる
+LAND_TILES = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "land-tiles-z11.json")
 DATASETS = ("liq", "zousei", "rireki", "ridership", "appraisal", "pop", "fac")
 NEEDS_KEY = {"liq", "zousei", "rireki", "ridership", "appraisal"}
 
@@ -148,11 +144,28 @@ def tile_bounds(z: int, x: int, y: int):
     return x / n * 360 - 180, lat(y + 1), (x + 1) / n * 360 - 180, lat(y)
 
 
-def tiles_in(z: int, bbox=BBOX):
-    w, s, e, n = bbox
-    x0, y0 = tile_of(n, w, z)
-    x1, y1 = tile_of(s, e, z)
-    return [(x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)]
+def land_tiles(pref_codes=PREFS, path: str = LAND_TILES) -> list:
+    """対応している都道府県の、陸地のあるタイル（ズーム 11）。となりの都道府県と重なるタイルは1回だけ"""
+    with open(path, encoding="utf-8") as f:
+        d = json.load(f)
+    if d.get("z") != 11:
+        raise SystemExit("陸地のタイルの一覧のズームが 11 ではありません")
+    missing = [p for p in pref_codes if p not in d["prefs"]]
+    if missing:
+        raise SystemExit(f"陸地のタイルの一覧に無い都道府県: {missing}（scripts/reinfolib/land_tiles.py で作り直す）")
+    return sorted({(x, y) for p in pref_codes for x, y in d["prefs"][p]})
+
+
+def tiles_in(z: int, pref_codes=PREFS):
+    """対応している都道府県の陸地にかかるタイル（ズーム z）。一覧（ズーム 11）より粗いズームは親のタイル、細かいズームは子のタイル"""
+    base = land_tiles(pref_codes)
+    if z == 11:
+        return base
+    if z < 11:
+        k = 11 - z
+        return sorted({(x >> k, y >> k) for x, y in base})
+    k = 2 ** (z - 11)
+    return sorted((x * k + i, y * k + j) for x, y in base for i in range(k) for j in range(k))
 
 
 # 地域メッシュ（JIS X 0410）の区画の大きさ（秒）。1次・2次・3次・2分の1・4分の1（lib/roadmap/mesh.ts と同じ）
@@ -834,7 +847,15 @@ def self_test():
     assert around["5339461132"][:7] == [100, 90, 80, 70, 60, 50, 40], around["5339461132"]
     assert around["5339461132"][7:] == [111, 222, 71, 429], around["5339461132"]
     assert len(around) == 25
-    # 液状化・駅のタイルの範囲
+    # 液状化・駅のタイルの範囲（陸地のあるタイルだけ。東京駅・大阪駅のタイルは入り、太平洋の上のタイルは入らない）
+    t11 = set(tiles_in(11, ("13", "27")))
+    assert len(t11) > 20, len(t11)
+    assert tile_of(35.681236, 139.767125, 11) in t11 and tile_of(34.702485, 135.495951, 11) in t11
+    assert tile_of(33.0, 143.5, 11) not in set(tiles_in(11))
+    # 粗いズームは親のタイル（重なりなし）、細かいズームは子のタイル
+    t9 = tiles_in(9, ("13",))
+    assert len(t9) == len(set(t9)) and tile_of(35.681236, 139.767125, 9) in set(t9)
+    assert len(tiles_in(12, ("13",))) == 4 * len(tiles_in(11, ("13",)))
     assert len(tiles_in(11)) > 100
     # 駅別乗降客数：重複コード 2 の行は数を持たない
     p = {"S12_054": "1", "S12_055": "1", "S12_057": 628118, "S12_056": "", "S12_050": "2", "S12_051": "1", "S12_053": 0}

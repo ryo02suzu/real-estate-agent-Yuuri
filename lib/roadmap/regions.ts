@@ -2,12 +2,26 @@
 import REGIONS_JSON from "./data/regions.json";
 
 export type RegionKey = keyof typeof REGIONS_JSON;
-/** osm：OpenStreetMap の切り出しの配布元での地方の名前（近畿は Geofabrik では kansai）。無ければ地方の鍵と同じ */
-export type Region = { name: string; prefs: Record<string, string>; bounds: [[number, number], [number, number]]; osm?: string };
+/**
+ * osm：OpenStreetMap の切り出しの配布元での地方の名前（近畿は Geofabrik では kansai）。無ければ地方の鍵と同じ。
+ * preparing：準備中（国のデータを作って確かめている途中）。データを作るスクリプトは準備中の地方も作るが、アプリは対応エリアに入れない
+ */
+export type Region = { name: string; prefs: Record<string, string>; bounds: [[number, number], [number, number]]; osm?: string; preparing?: boolean };
 
-export const REGIONS = REGIONS_JSON as unknown as Record<RegionKey, Region>;
-/** 対応している地方の順（候補の並びや一覧の順に使う） */
-export const REGION_ORDER = Object.keys(REGIONS) as RegionKey[];
+/** 準備中の地方も入れた全部（データを作るスクリプトと同じ範囲。データの形を確かめるテストに使う） */
+export const ALL_REGIONS = REGIONS_JSON as unknown as Record<RegionKey, Region>;
+/** 準備中の地方も入れた全部の都道府県コード（2桁）→ 名前 */
+export const ALL_PREF_NAMES: Record<string, string> = Object.assign({}, ...Object.values(ALL_REGIONS).map((r) => r.prefs));
+
+/** 対応している地方の順（候補の並びや一覧の順に使う）。準備中の地方は入れない */
+export const REGION_ORDER = (Object.keys(ALL_REGIONS) as RegionKey[]).filter((k) => !ALL_REGIONS[k].preparing);
+/** 対応している地方（準備中の地方の鍵は入っていない。REGION_ORDER の鍵で引く） */
+export const REGIONS = Object.fromEntries(REGION_ORDER.map((k) => [k, ALL_REGIONS[k]])) as Record<RegionKey, Region>;
+
+/** その地方に対応しているか（準備中の地方は false）。市町村の一覧（municipalities.ts）が、準備中の地方の市町村を入れないのに使う */
+export function isOpenRegion(k: RegionKey): boolean {
+  return REGION_ORDER.includes(k);
+}
 
 /** 都道府県コード（2桁）→ 名前。対応している都道府県だけ */
 export const PREF_NAMES: Record<string, string> = Object.assign({}, ...REGION_ORDER.map((k) => REGIONS[k].prefs));
@@ -55,8 +69,11 @@ function prefCount(prefs: Record<string, string>): string {
     .join("");
 }
 
-/** 「関東1都6県・中部9県・東北6県・近畿2府5県」のような対応エリアの言い方 */
-export const AREA_LABEL = REGION_ORDER.map((k) => `${REGIONS[k].name}${prefCount(REGIONS[k].prefs)}`).join("・");
+/** 全部の都道府県（47）に対応しているか */
+const NATIONWIDE = Object.keys(PREF_NAMES).length === 47;
 
-/** 地方の名前だけの短い言い方（例「関東・中部」。PC のホームの小さな枠に入れる） */
-export const AREA_SHORT = REGION_ORDER.map((k) => REGIONS[k].name).join("・");
+/** 「関東1都6県・中部9県・東北6県・近畿2府5県」のような対応エリアの言い方。全部の都道府県に対応したら「全国47都道府県」 */
+export const AREA_LABEL = NATIONWIDE ? "全国47都道府県" : REGION_ORDER.map((k) => `${REGIONS[k].name}${prefCount(REGIONS[k].prefs)}`).join("・");
+
+/** 地方の名前だけの短い言い方（例「関東・中部」。PC のホームの小さな枠に入れる）。全部の都道府県に対応したら「全国」 */
+export const AREA_SHORT = NATIONWIDE ? "全国" : REGION_ORDER.map((k) => REGIONS[k].name).join("・");

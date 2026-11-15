@@ -3,9 +3,14 @@ import GSI_CODES from "./data/gsi-muni-codes.json";
 import { CHUBU_PENDING } from "./data/chubu";
 import { TOHOKU_PENDING } from "./data/tohoku";
 import { KINKI_PENDING } from "./data/kinki";
+import { CHUGOKU_PENDING } from "./data/chugoku";
+import { SHIKOKU_PENDING } from "./data/shikoku";
+import { KYUSHU_PENDING } from "./data/kyushu";
+import { HOKKAIDO_PENDING } from "./data/hokkaido";
+import { MUNI_CODES } from "./muni-codes";
 import { buildLinks, findMunicipality, MUNICIPALITIES } from "./municipalities";
 import { ROAD_READ_PERMITTED, roadReadPermission } from "./road-read-permission";
-import { AREA_LABEL, PREF_NAME_RE, PREF_NAMES, REGION_ORDER, REGIONS, SUPPORTED_BOUNDS, isSupportedPref, regionOfMuni, regionOfPref } from "./regions";
+import { ALL_PREF_NAMES, ALL_REGIONS, AREA_LABEL, PREF_NAME_RE, PREF_NAMES, REGION_ORDER, REGIONS, SUPPORTED_BOUNDS, isOpenRegion, isSupportedPref, regionOfMuni, regionOfPref, type RegionKey } from "./regions";
 
 describe("対応している地方と都道府県", () => {
   it("関東1都6県・中部9県・東北6県・近畿2府5県", () => {
@@ -437,3 +442,71 @@ describe("市の道路種別のデータをアプリの中に表示するのは�
   });
 });
 
+// 全国へ広げる土台（docs/features.md の 129）。残りの4地方は「準備中」（regions.json の preparing）で足し、国のデータを作って確かめ終えた地方から
+// preparing を外して対応エリアに入れる。準備中のあいだは、アプリからは今までどおり対応エリアの外
+describe("準備中の地方（中国・四国・九州沖縄・北海道）", () => {
+  const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
+    ["chugoku", CHUGOKU_PENDING, 107],
+    ["shikoku", SHIKOKU_PENDING, 95],
+    ["kyushu", KYUSHU_PENDING, 274],
+    ["hokkaido", HOKKAIDO_PENDING, 179],
+  ];
+  const table = Object.assign({}, ...Object.values(GSI_CODES as Record<string, Record<string, string>>)) as Record<string, string>;
+
+  it("地方の一覧（regions.json）は全国の8地方・47都道府県。データを作るスクリプトは準備中の地方も作る", () => {
+    expect(Object.keys(ALL_REGIONS)).toEqual(["kanto", "chubu", "tohoku", "kinki", "chugoku", "shikoku", "kyushu", "hokkaido"]);
+    expect(Object.keys(ALL_PREF_NAMES)).toHaveLength(47);
+    expect(new Set(Object.keys(ALL_PREF_NAMES))).toEqual(new Set(Array.from({ length: 47 }, (_, i) => String(i + 1).padStart(2, "0"))));
+    expect(ALL_PREF_NAMES["01"]).toBe("北海道");
+    expect(ALL_PREF_NAMES["34"]).toBe("広島県");
+    expect(ALL_PREF_NAMES["47"]).toBe("沖縄県");
+    expect(ALL_REGIONS.kyushu.name).toBe("九州・沖縄");
+    // 範囲：与那国島（西の端 122.93）・波照間島（南の端 24.04）・択捉島（東の端 148.9）・宗谷岬（北の端 45.52）が入る
+    const b = Object.values(ALL_REGIONS).map((r) => r.bounds);
+    expect(Math.min(...b.map((x) => x[0][0]))).toBeLessThan(122.93);
+    expect(Math.min(...b.map((x) => x[0][1]))).toBeLessThan(24.04);
+    expect(Math.max(...b.map((x) => x[1][0]))).toBeGreaterThan(148.9);
+    expect(Math.max(...b.map((x) => x[1][1]))).toBeGreaterThan(45.53);
+  });
+
+  it("市町村の数：中国 107・四国 95・九州沖縄 274・北海道 179（政令市は区のコードをまとめて1つ。北方領土の6村は入れない）", () => {
+    for (const [, list, n] of NEW) expect(list).toHaveLength(n);
+    const count = (pref: string) => NEW.flatMap(([, l]) => l).filter((m) => m.pref === pref).length;
+    expect(count("広島県")).toBe(23);
+    expect(count("福岡県")).toBe(60);
+    expect(count("沖縄県")).toBe(41);
+    const find = (name: string) => NEW.flatMap(([, l]) => l).find((m) => m.name === name)!;
+    expect(find("札幌市").codes).toHaveLength(10);
+    expect(find("岡山市").codes).toHaveLength(4);
+    expect(find("広島市").codes).toHaveLength(8);
+    expect(find("北九州市").codes).toHaveLength(7);
+    expect(find("福岡市").codes).toHaveLength(7);
+    expect(find("熊本市").codes).toHaveLength(5);
+    // コードは重ならず、国土地理院の市区町村表にある。政令市そのもののコードと北方領土の6村は表に入れていない
+    const codes = NEW.flatMap(([, l]) => l).flatMap((m) => m.codes);
+    expect(new Set(codes).size).toBe(codes.length);
+    for (const c of codes) expect(table[c], c).toBeDefined();
+    for (const c of ["01100", "33100", "34100", "40100", "40130", "43100", "01695", "01696", "01697", "01698", "01699", "01700"]) expect(table[c], c).toBeUndefined();
+    expect(table["01101"]).toBe("札幌市 中央区");
+    expect(table["40133"]).toBe("福岡市 中央区");
+    expect(table["47201"]).toBe("那覇市");
+  });
+
+  it("準備中の地方は、アプリの対応エリアに入れない（市町村の一覧・コード表・地方の一覧とも）。準備を終えた地方は全部入る", () => {
+    for (const [key, list] of NEW) {
+      const open = isOpenRegion(key);
+      expect(open).toBe(!ALL_REGIONS[key].preparing);
+      expect(REGION_ORDER.includes(key)).toBe(open);
+      for (const [code, name] of Object.entries(ALL_REGIONS[key].prefs)) {
+        expect(code in PREF_NAMES, name).toBe(open);
+        expect(name in MUNI_CODES, name).toBe(open);
+        expect(PREF_NAME_RE.test(`${name}のどこか`), name).toBe(open);
+      }
+      // 調査中の一覧にある市町村は、地方を開いたら全部引ける（調べ終えて data/<道県>.ts に移した市町村も、コードは同じ）
+      for (const m of list) expect(findMunicipality(m.codes[0]) !== undefined, m.name).toBe(open);
+    }
+    // 対応している都道府県のコード表は、今までどおり全部使う
+    for (const name of Object.values(PREF_NAMES)) expect(MUNI_CODES[name], name).toBeDefined();
+    expect(Object.keys(MUNI_CODES)).toHaveLength(Object.keys(PREF_NAMES).length);
+  });
+});

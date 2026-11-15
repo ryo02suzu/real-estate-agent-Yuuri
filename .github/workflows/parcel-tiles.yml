@@ -1,7 +1,9 @@
 # 登記所備付地図データ（法務省）の最新版を、地番検索・筆界表示用のタイル（PMTiles）にして Cloudflare R2 に置く。
 # G空間情報センターの公開 API で都県ごとの地図XML（ログイン不要）を読み、都県ごとにタイルを作って（並行）、
-# 最後に対応している全部の都道府県（lib/roadmap/data/regions.json。関東1都6県＋中部9県）を1つにまとめる。
+# 最後に対応している全部の都道府県（lib/roadmap/data/regions.json）を1つにまとめる。
 # region を指定すると、その地方の都道府県だけ作り直し、まとめる段ではほかの地方の前回のタイル（R2 の parcels/<年>/pref-*）を使う。
+# 準備中の地方（regions.json の preparing）の都道府県は、タイルがあればまとめに入れ、まだ無ければ入れずに進める
+# （新しい地方を作っている途中でも、対応している地方の作り直しが止まらない）。
 # 置き終えたら lib/roadmap/data/parcel-source.json を新しい置き場所に書き換え、
 # テストが通れば main に入れる（本番は Vercel が main から作り直す）。
 #
@@ -17,7 +19,7 @@ on:
         description: 地図データの年度版（G空間情報センターの zip 名の末尾の年。空なら一番新しいもの）
         required: false
       region:
-        description: 作り直す地方（all = 全部、kanto = 関東1都6県、chubu = 中部9県。カンマ区切りで複数可）
+        description: 作り直す地方（all = 全部。kanto・chubu・tohoku・kinki・chugoku・shikoku・kyushu・hokkaido。カンマ区切りで複数可）
         required: false
         default: all
   # 法務省の新しい版は毎年4月中旬に公開される。5月1日に作り直す
@@ -50,6 +52,7 @@ jobs:
       year: ${{ steps.c.outputs.year }}
       prefs: ${{ steps.p.outputs.prefs }}
       all: ${{ steps.p.outputs.all }}
+      optional: ${{ steps.p.outputs.optional }}
     steps:
       - uses: actions/checkout@v4
       - id: p
@@ -60,14 +63,17 @@ jobs:
         run: |
           region="$REGION"
           if ! printf '%s' "$region" | grep -Eq '^[a-z]+(,[a-z]+)*$'; then echo "::error::地方の指定が分かりません"; exit 1; fi
-          all=$(jq -c '[.[] | .prefs | keys[]] | sort' lib/roadmap/data/regions.json)
-          if [ "$region" = "all" ]; then prefs="$all"; else
+          # all＝対応している地方の都道府県（まとめるとき必ず要る）。optional＝準備中の地方の都道府県（タイルがあればまとめに入れる）
+          all=$(jq -c '[.[] | select(.preparing | not) | .prefs | keys[]] | sort' lib/roadmap/data/regions.json)
+          optional=$(jq -c '[.[] | select(.preparing) | .prefs | keys[]] | sort' lib/roadmap/data/regions.json)
+          if [ "$region" = "all" ]; then prefs=$(jq -c '[.[] | .prefs | keys[]] | sort' lib/roadmap/data/regions.json); else
             prefs=$(jq -c --arg r "$region" '[($r | split(",")[]) as $k | .[$k].prefs | keys[]] | sort' lib/roadmap/data/regions.json)
           fi
           [ "$(echo "$prefs" | jq 'length')" -gt 0 ] || { echo "::error::地方の指定が分かりません: $region"; exit 1; }
           echo "prefs=$prefs" >> "$GITHUB_OUTPUT"
           echo "all=$all" >> "$GITHUB_OUTPUT"
-          echo "作る都道府県: $prefs（全部: $all）"
+          echo "optional=$optional" >> "$GITHUB_OUTPUT"
+          echo "作る都道府県: $prefs（対応している地方: $all／準備中の地方: $optional）"
       - id: c
         env:
           ACCOUNT: ${{ secrets.R2_ACCOUNT_ID }}
@@ -153,7 +159,8 @@ jobs:
   merge:
     needs: [check, build]
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # 全国（47都道府県）をまとめると、読み込み・まとめ・書き込みで2時間を超えることがある
+    timeout-minutes: 300
     env:
       YEAR: ${{ needs.check.outputs.year }}
       R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
@@ -176,6 +183,7 @@ jobs:
       - name: 対応している全部の都道府県を1つにまとめて R2 に置く
         env:
           ALL: ${{ needs.check.outputs.all }}
+          OPTIONAL: ${{ needs.check.outputs.optional }}
         run: |
           mkdir -p work
           # R2 からの読み込みが途中で切れることがある（速度不足で接続が閉じる）。3回までやり直す
@@ -190,6 +198,12 @@ jobs:
           for p in $(echo "$ALL" | jq -r '.[]'); do [ -s "work/pref-$p.pmtiles" ] || missing="$missing $p"; done
           [ -z "$missing" ] || { echo "::error::都道府県のタイルがそろっていません:$missing（先にその地方を作ってください）"; exit 1; }
           files=$(for p in $(echo "$ALL" | jq -r '.[]'); do printf 'work/pref-%s.pmtiles ' "$p"; done)
+          # 準備中の地方の都道府県は、タイルがあるものだけ入れる
+          for p in $(echo "${OPTIONAL:-[]}" | jq -r '.[]'); do
+            if [ -s "work/pref-$p.pmtiles" ]; then files="$files work/pref-$p.pmtiles"; else echo "::warning::準備中の地方の都道府県 $p のタイルがまだ無いので、入れずにまとめます"; fi
+          done
+          echo "まとめるファイル: $(echo $files | wc -w)"
+          df -h . | tail -1
           tile-join -q --force --no-tile-size-limit -o "work/japan-$YEAR.pmtiles" \
             -n "MICHILU parcels $YEAR" \
             -A '<a href="https://front.geospatial.jp/moj-chizu-xml-readme/">「登記所備付地図データ」（法務省）</a>を加工して作成' \

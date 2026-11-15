@@ -29,6 +29,7 @@ import fiona
 
 # G空間情報センターの法務省の組織名（都道府県ごと）。API（organization_list / package_search）で実在を確かめたものだけ入れる
 ORGS = {
+    "01": "moj-01hokkaido",
     "02": "moj-02aomori",
     "03": "moj-03iwate",
     "04": "moj-04miyagi",
@@ -58,6 +59,23 @@ ORGS = {
     "28": "moj-28hyogo",
     "29": "moj-29nara",
     "30": "moj-30wakayama",
+    "31": "moj-31tottori",
+    "32": "moj-32shimane",
+    "33": "moj-33okayama",
+    "34": "moj-34hiroshima",
+    "35": "moj-35yamaguchi",
+    "36": "moj-36tokushima",
+    "37": "moj-37kagawa",
+    "38": "moj-38ehime",
+    "39": "moj-39kochi",
+    "40": "moj-40fukuoka",
+    "41": "moj-41saga",
+    "42": "moj-42nagasaki",
+    "43": "moj-43kumamoto",
+    "44": "moj-44oita",
+    "45": "moj-45miyazaki",
+    "46": "moj-46kagoshima",
+    "47": "moj-47okinawa",
 }
 CKAN = "https://www.geospatial.jp/ckan/api/3/action/package_search"
 UA = {"User-Agent": "michilu-parcel-tiles (+https://github.com/ryo02suzu/real-estate-agent-Yuuri)"}
