@@ -1,12 +1,12 @@
 {
  "url": "/data/stations-2025.json",
  "year": 2025,
- "count": 6524,
+ "count": 9028,
  "doors": {
-  "entrance": 2416,
-  "building": 1753,
-  "node": 2116,
-  "platform": 239
+  "entrance": 2573,
+  "building": 2621,
+  "node": 3398,
+  "platform": 436
  },
- "doorsDate": "2026-11-08"
+ "doorsDate": "2026-11-14"
 }
