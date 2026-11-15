@@ -10,7 +10,7 @@ import { HOKKAIDO_PENDING } from "./data/hokkaido";
 import { HOKKAIDO_CITIES } from "./data/hokkaido-cities";
 import { HOKKAIDO } from "./data/hokkaido-pref";
 import { OKINAWA } from "./data/okinawa";
-import { KAGOSHIMA } from "./data/kagoshima";
+import { KAGOSHIMA, KAGOSHIMA_CITIES } from "./data/kagoshima";
 import { MIYAZAKI } from "./data/miyazaki";
 import { OITA } from "./data/oita";
 import { KUMAMOTO } from "./data/kumamoto";
@@ -486,7 +486,7 @@ describe("全国対応で足した地方（中国・四国・九州沖縄・北�
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
     ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...CHUGOKU_PENDING], 107],
     ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING], 95],
-    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KYUSHU_PENDING], 274],
+    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...KYUSHU_PENDING], 274],
     ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING], 179],
   ];
   const table = Object.assign({}, ...Object.values(GSI_CODES as Record<string, Record<string, string>>)) as Record<string, string>;
@@ -568,6 +568,31 @@ describe("岡山県の、市が扱う市（登録した市）", () => {
     expect(m.contact?.phone).toBe("086-803-1446");
     expect(m.contact?.noPhoneInquiry).toBe(true);
     expect(CHUGOKU_PENDING.filter((x) => x.pref === "岡山県").map((x) => x.name)).toEqual(["倉敷市", "津山市", "玉野市", "笠岡市", "総社市", "新見市"]);
+  });
+});
+
+describe("鹿児島県の、市が扱う市（登録した市）", () => {
+  it("鹿児島市：市の地図（かごしまiマップ）の「市道網図・建築基準法道路」。市道は路線名で出るので、市の表で種別を読む", () => {
+    const m = KAGOSHIMA_CITIES.find((x) => x.name === "鹿児島市")!;
+    expect(m.codes).toEqual(["46201"]);
+    expect(m.coverage).toBe("full");
+    expect(m.maps[0].kind).toBe("road_type");
+    // 市の資料「建築基準法第42条に基づく道路種別の確認について」に載っているリンク（利用条件の同意の先は開かない）
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://www2.wagmap.jp/kagoshima/PositionSelect?mid=9");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("自分で「同意する」を押して進む");
+    // 市道は路線名で出る。種別は市の表で読む。国道・県道は出ない
+    expect(m.maps[0].tip).toContain("幅員4m以上は1項1号");
+    expect(m.maps[0].tip).toContain("国道・県道は地図に出ない");
+    expect(m.maps[0].tip).toContain("無印");
+    // 審査係（位置指定道路は指導係）。電話を断ってはいないので、電話のボタンは普通に出す
+    expect(m.contact?.phone).toBe("099-216-1359");
+    expect(m.contact?.fax).toBe("099-216-1389");
+    expect(m.contact?.noPhoneInquiry).toBeUndefined();
+    expect(m.contact?.note).toContain("できる限り来庁");
+    expect(m.contact?.note).toContain("099-216-1516");
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "鹿児島県").map((x) => x.name)).toEqual(["鹿屋市", "薩摩川内市", "霧島市"]);
   });
 });
 
@@ -809,8 +834,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: KYUSHU_PENDING,
       total: 39,
       outside: ["三島村", "十島村", "長島町", "東串良町", "大和村", "宇検村", "伊仙町", "与論町"],
-      // 特定行政庁の鹿児島市と、限定特定行政庁の鹿屋市・薩摩川内市・霧島市
-      cities: ["鹿児島市", "鹿屋市", "薩摩川内市", "霧島市"],
+      // 限定特定行政庁の鹿屋市・薩摩川内市・霧島市（特定行政庁の鹿児島市は登録した。下の「鹿児島市」）
+      cities: ["鹿屋市", "薩摩川内市", "霧島市"],
       offices: { 鹿児島地域振興局: 4, 南薩地域振興局: 4, 北薩地域振興局: 4, "姶良・伊佐地域振興局 建設部 土木建築課 建築係": 2, 伊佐市駐在: 1, 大隅地域振興局: 8, "熊毛支庁 建設部": 3, 屋久島事務所: 1, "大島支庁 建設部": 9, 徳之島事務所: 3 },
     },    {
       pref: "沖縄県",
