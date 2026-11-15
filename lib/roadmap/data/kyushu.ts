@@ -9,10 +9,6 @@ export const KYUSHU_PENDING: Municipality[] = [
   { pref: "福岡県", name: "大牟田市", codes: ["40202"], coverage: "unknown", maps: [] },
   // 佐賀県（残り 1）
   { pref: "佐賀県", name: "佐賀市", codes: ["41201"], coverage: "unknown", maps: [] },
-  // 長崎県（残り 3）
-  { pref: "長崎県", name: "長崎市", codes: ["42201"], coverage: "unknown", maps: [] },
-  { pref: "長崎県", name: "佐世保市", codes: ["42202"], coverage: "unknown", maps: [] },
-  { pref: "長崎県", name: "大村市", codes: ["42205"], coverage: "unknown", maps: [] },
   // 熊本県（残り 3）
   { pref: "熊本県", name: "熊本市", codes: ["43101", "43102", "43103", "43104", "43105"], coverage: "unknown", maps: [] },
   { pref: "熊本県", name: "八代市", codes: ["43202"], coverage: "unknown", maps: [] },

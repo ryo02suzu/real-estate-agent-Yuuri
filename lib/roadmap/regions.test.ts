@@ -14,11 +14,11 @@ import { KAGOSHIMA, KAGOSHIMA_CITIES } from "./data/kagoshima";
 import { MIYAZAKI, MIYAZAKI_CITIES } from "./data/miyazaki";
 import { OITA, OITA_CITIES } from "./data/oita";
 import { KUMAMOTO } from "./data/kumamoto";
-import { NAGASAKI } from "./data/nagasaki";
+import { NAGASAKI, NAGASAKI_CITIES } from "./data/nagasaki";
 import { SAGA } from "./data/saga";
 import { FUKUOKA, FUKUOKA_CITIES } from "./data/fukuoka";
 import { KOCHI } from "./data/kochi";
-import { TOKUSHIMA } from "./data/tokushima";
+import { TOKUSHIMA, TOKUSHIMA_CITIES } from "./data/tokushima";
 import { EHIME } from "./data/ehime";
 import { KAGAWA, KAGAWA_CITIES } from "./data/kagawa";
 import { SHIMANE } from "./data/shimane";
@@ -485,8 +485,8 @@ describe("全国対応で足した地方（中国・四国・九州沖縄・北�
   // 地方ごとの市町村：調査中の一覧（data/<地方>.ts）と、調べ終えて登録した道県（data/<道県>.ts）を合わせたもの
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
     ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...YAMAGUCHI_CITIES, ...CHUGOKU_PENDING], 107],
-    ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...KAGAWA_CITIES, ...SHIKOKU_PENDING], 95],
-    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...MIYAZAKI_CITIES, ...OKINAWA_CITIES, ...KYUSHU_PENDING], 274],
+    ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...KAGAWA_CITIES, ...TOKUSHIMA_CITIES, ...SHIKOKU_PENDING], 95],
+    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...MIYAZAKI_CITIES, ...OKINAWA_CITIES, ...NAGASAKI_CITIES, ...KYUSHU_PENDING], 274],
     ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING], 179],
   ];
   const table = Object.assign({}, ...Object.values(GSI_CODES as Record<string, Record<string, string>>)) as Record<string, string>;
@@ -754,6 +754,63 @@ describe("山口県の、市が扱う市（登録した市）", () => {
   });
 });
 
+describe("長崎県の、市が扱う市（登録した市）", () => {
+  it("長崎市：市の地図「ながさきマップ」と、窓口のシステム。どの種別まで載るかは確かめられていないので「一部」", () => {
+    const m = NAGASAKI_CITIES.find((x) => x.name === "長崎市")!;
+    expect(m.codes).toEqual(["42201"]);
+    expect(m.coverage).toBe("partial");
+    expect(m.maps[0].kind).toBe("road_type");
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://www.sonicweb-asp.jp/nagasakicity/");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("どの種別まで載っているかも確かめられていない");
+    expect(m.maps[0].tip).toContain("長崎市指定道路情報案内システム");
+    expect(m.contact?.phone).toBe("095-829-1174");
+    expect(m.contact?.fax).toBe("095-829-1168");
+  });
+
+  it("佐世保市：指定道路図（1項5号・2項・3項）と市道網図。ほかの種別の確かめ方も書く。色の無い路線は電話などでは答えない", () => {
+    const m = NAGASAKI_CITIES.find((x) => x.name === "佐世保市")!;
+    expect(m.codes).toEqual(["42202"]);
+    expect(m.coverage).toBe("partial");
+    expect(m.maps.map((x) => x.kind)).toEqual(["designated_only", "public_road"]);
+    // 市のページ（承認の画面の手前）を開く。2つの地図は別のページ
+    expect(m.maps[0].url).toBe("https://www.city.sasebo.lg.jp/tosiseibi/kentiku/shiteidourozu_h25.html");
+    expect(m.maps[1].url).toBe("https://www.city.sasebo.lg.jp/doboku/dokanri/doboku-johomap.html");
+    expect(m.maps[0].tip).toContain("1項3号（市の調査が済んだ路線だけ）・1項4号は、あんしん建築課の窓口の端末で確かめる");
+    expect(m.contact?.phone).toBe("0956-25-9629");
+    expect(m.contact?.noPhoneInquiry).toBe(true);
+  });
+
+  it("大村市：市のページ「建築基準法指定道路図」（利用条件の画面）。同意の先は使わない", () => {
+    const m = NAGASAKI_CITIES.find((x) => x.name === "大村市")!;
+    expect(m.codes).toEqual(["42205"]);
+    expect(m.coverage).toBe("partial");
+    expect(m.maps[0].kind).toBe("designated_only");
+    // 「同意する（閲覧ページへ）」の手前の画面
+    expect(m.maps[0].url).toBe("https://www.city.omura.nagasaki.jp/kenchikushidou/machi/kenchiku/doro/teigi/siteidourozu.html");
+    expect(m.maps[0].tip).toContain("自分で「同意する（閲覧ページへ）」を押して進む");
+    expect(m.contact?.phone).toBe("0957-53-4111（内線482）");
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "長崎県")).toEqual([]);
+  });
+});
+
+describe("徳島県の、市が扱う市（登録した市）", () => {
+  it("徳島市：道路種別の地図は市のページに見つからない（非公開の扱い）。市道の図は、市の決まりに合わせてトップページから", () => {
+    const m = TOKUSHIMA_CITIES.find((x) => x.name === "徳島市")!;
+    expect(m.codes).toEqual(["36201"]);
+    expect(m.coverage).toBe("none");
+    expect(m.maps.map((x) => x.kind)).toEqual(["public_road"]);
+    // 市は、原則としてトップページへリンクするよう求めている（「リンクについて」）
+    expect(m.maps[0].url).toBe("https://www.city.tokushima.tokushima.jp/");
+    expect(m.maps[0].label).toContain("徳島市ホームページ");
+    expect(m.maps[0].tip).toContain("建築基準法の道路種別の図ではない");
+    expect(m.contact?.phone).toBe("088-621-5272（指導担当） 088-621-5274（審査担当）");
+    expect(m.contact?.fax).toBe("088-621-5273");
+    expect(SHIKOKU_PENDING.filter((x) => x.pref === "徳島県")).toEqual([]);
+  });
+});
+
 describe("福岡県の、市が扱う市（登録した市）", () => {
   it("北九州市：市の「建築基準法道路種別地図」が物件の位置で開く。判定のくわしいことは電話では答えない", () => {
     const m = FUKUOKA_CITIES.find((x) => x.name === "北九州市")!;
@@ -976,8 +1033,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: SHIKOKU_PENDING,
       total: 23,
       outside: ["阿波市", "勝浦町", "上勝町", "佐那河内村", "神山町", "那賀町", "海陽町", "板野町", "上板町", "東みよし町"],
-      // 特定行政庁は徳島市だけ
-      cities: ["徳島市"],
+      // 特定行政庁は徳島市だけ（登録した。下の「徳島県の、市が扱う市」）
+      cities: [],
       offices: { 徳島県土整備事務所: 10, 吉野川県土整備事務所: 4, 阿南県土整備事務所: 5, 美馬県土整備事務所: 2, 三好県土整備事務所: 2 },
     },
     {
@@ -1017,8 +1074,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: KYUSHU_PENDING,
       total: 18,
       outside: ["小値賀町"],
-      // 特定行政庁の長崎市・佐世保市と、限定特定行政庁の大村市（同じ限定特定行政庁の五島市は、県のページに受け持ちの分かれ方があるので登録済み）
-      cities: ["長崎市", "佐世保市", "大村市"],
+      // 特定行政庁の長崎市・佐世保市と、限定特定行政庁の大村市は登録した（下の「長崎県の、市が扱う市」。五島市は、県のページに受け持ちの分かれ方があるので県の一覧に入れてある）
+      cities: [],
       offices: { 長崎振興局: 2, 県央振興局: 1, 島原振興局: 3, 県北振興局: 8, "五島振興局 建設部": 1, 上五島支所: 1, 壱岐振興局: 1, 対馬振興局: 1 },
     },    {
       pref: "熊本県",
