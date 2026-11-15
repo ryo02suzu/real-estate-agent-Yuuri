@@ -1401,8 +1401,8 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     const kinki = data.sheets.filter((s) => /^(2[4-9]|30)/.test(s.code) && s.shift);
     // 11-12 の14枚と、11-13 に地価の地点で見つけた東員町（2枚）・木津川市（1枚）・生駒市北新町（1枚の一部・大字ごとに2つ）・松阪市飯南町（1枚）・津市あのつ台１丁目（1枚）・
     // 神戸市北区若葉台（1枚の本体を縮尺ごと直す。大字・丁目ごとに6つ）、11-14 に拾い直した津市（みのりヶ丘・あのつ台三丁目・五丁目）と松阪市（清生町・垣鼻町・田原町）の4枚、
-    // 11-15 に全部の図面の点検（v4）で見つけた神戸市西区岩岡町古郷・加古川市志方町畑の2枚
-    expect(kinki).toHaveLength(33);
+    // 11-15 に全部の図面の点検（v4）で見つけた神戸市西区岩岡町古郷・加古川市志方町畑の2枚と、加西市中山町・丹波篠山市今田町本荘の2枚
+    expect(kinki).toHaveLength(35);
     const sanda = kinki.filter((s) => s.code === "28219");
     expect(sanda.map((s) => s.sheet).sort()).toEqual(["あかしあ台１～５丁目", "すずかけ台１～４丁目", "ゆりのき台１～６丁目（修正後）", "北摂三田ニュータウン南地区"].sort());
     expect(sanda.reduce((a, s) => a + s.parcels, 0)).toBe(11320);
@@ -1491,6 +1491,28 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(s!.chiban).toBeUndefined();
     }
     expect(want.reduce((a, w) => a + w[3], 0)).toBe(2830);
+  });
+  it("2026-11-15：全部の図面の点検（v4）の続きで見つけた2枚（加西市中山町・丹波篠山市今田町本荘）を、計算どおりの量で動かす（写真に重ねて確かめた）", () => {
+    // 同じ回に見つけた候補のうち、豊岡市日高町日置・南あわじ市（2枚）・淡路市・たつの市の5枚は、写真で今の位置が正しいと確かめた（動かさない）
+    const want: [string, string, "T1" | "T2", number][] = [
+      ["28220", "平成１４年度１／５００地籍図Ｂ", "T1", 365],
+      ["28221", "篠山市平成１５年度１／５００土地改良", "T2", 1028],
+    ];
+    for (const [code, sheet, kind, parcels] of want) {
+      const s = data.sheets.find((x) => x.code === code && x.sheet === sheet);
+      expect(s, `${code} ${sheet}`).toBeDefined();
+      expect(s!.shift?.kind).toBe(kind);
+      expect(s!.parcels).toBe(parcels);
+      // 兵庫県（V 系）の量：東西 約245〜247m・南北 約346m（約424m）
+      expect(Math.hypot(s!.shift!.east, s!.shift!.north)).toBeGreaterThan(420);
+      expect(Math.hypot(s!.shift!.east, s!.shift!.north)).toBeLessThan(430);
+      expect(s!.reason).toMatch(/道路縁に筆の境が沿う割合/);
+      expect(s!.reason).toMatch(/国土地理院の航空写真に重ねて確かめた/);
+      expect(s!.chiban).toBeUndefined();
+    }
+    for (const [code, sheet] of [["28209", "豊岡市日高町日置字姫路"], ["28224", "南あわじ市平成１６年度５００地籍図Ａ"], ["28224", "南あわじ市福良乙１６"], ["28226", "淡路市昭和５６年度５００土地改良Ａ"], ["28229", "28229_2010_0"]]) {
+      expect(data.sheets.some((x) => x.code === code && x.sheet === sheet), `${code} ${sheet}`).toBe(false);
+    }
   });
   it("地価の地点で見つけたずれ（2026-11-13）：渋川市の地図 10109 は地図ごと動かす決まり1つだけ、生駒市北新町の地図はずれた20筆だけを動かす", () => {
     // 渋川市：前は「ほかの地図の筆と重なる部分だけ外す」決まり3つ（531筆）だった。重なりは地図全体のずれのせいで、動かすと重なりは 0.2%
