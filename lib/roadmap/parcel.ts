@@ -164,14 +164,19 @@ export function kanjiToInt(k: string): number {
   return n + cur;
 }
 
-/** 町・大字の名前をそろえる（「大字」を外す、「ヶ」と「ケ」、「二丁目」と「２丁目」） */
+/**
+ * 町・大字の名前をそろえる（「大字」「字」を外す、「ヶ」と「ケ」、「二丁目」と「２丁目」）。
+ * 「大字」「字」は名前の途中にあっても外す：法務省の地図の地番区域は、沖縄県では「平良字西里」「玉城字前川」、
+ * 合併前の町の名前が付く所では「山内町大字三間坂」（武雄市）のように途中に「字」「大字」が入るが、国土地理院の住所は「平良西里」「山内町三間坂」
+ */
 export function townKey(s: string): string {
   return s
     .normalize("NFKC")
     .replace(/\s/g, "")
     .replace(/[ヶヵケ]/g, "ケ")
-    .replace(/^大字/, "")
+    .replace(/大字/g, "")
     .replace(/^字/, "")
+    .replace(/(?<=\D)字(?=\D)/g, "")
     .replace(/([一二三四五六七八九十]+)丁目/g, (_, k: string) => `${kanjiToInt(k)}丁目`);
 }
 
@@ -359,7 +364,8 @@ export function splitLotHead(chiban: string): [string, string] {
  */
 /** 地番の索引に、その町（大字・丁目）の地番区域があるか */
 export function indexHasTown(index: { k: Record<string, unknown> } | null | undefined, town: string): boolean {
-  return !!index && !!town && Object.keys(index.k).some((k) => townMatches(k, town));
+  const t = townKey(town);
+  return !!index && !!t && Object.keys(index.k).some((k) => townMatches(k, t));
 }
 
 export function lotHead(

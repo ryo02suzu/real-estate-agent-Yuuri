@@ -797,6 +797,36 @@ describe("lookup で地番を探す", () => {
     expect(r.fix).toBeUndefined();
   });
 
+  it("地番区域の名前の途中の「字」「大字」（沖縄県「平良字西里」・武雄市「山内町大字三間坂」）も外してそろえ、国土地理院の町名（平良西里・山内町三間坂）に当てる", async () => {
+    expect(townKey("平良字西里")).toBe("平良西里");
+    expect(townKey("玉城字前川")).toBe("玉城前川");
+    expect(townKey("山内町大字三間坂")).toBe("山内町三間坂");
+    expect(townKey("大字三間坂")).toBe("三間坂");
+    expect(townKey("字安謝")).toBe("安謝");
+    // 名前の終わりの「字」は外さない（「十字」など）
+    expect(townKey("十字")).toBe("十字");
+    expect(townMatches("宮古島市_平良字西里___", townKey("平良西里"))).toBe(true);
+    expect(townMatches("武雄市_山内町大字三間坂___", townKey("山内町三間坂"))).toBe(true);
+    expect(townMatches("宮古島市_平良字西里___", townKey("平良東仲宗根"))).toBe(false);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          url.includes("AddressSearch")
+            ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "沖縄県宮古島市平良西里" } }]
+            : { results: { muniCd: "47214", lv01Nm: "平良西里" } },
+      })),
+    );
+    const K = "宮古島市_平良字西里___";
+    const src = fakeSource({ [`${SX + 1},${SY}`]: [{ kuiki: K, chiban: "246" }] });
+    const index = { v: 1, k: { [K]: [[SX + 1, SY, 246, 246]] } } as unknown as Awaited<ReturnType<typeof loadParcelIndex>>;
+    const r = await lookup("沖縄県宮古島市平良字西里246番", { parcels: src, loadIndex: async () => index });
+    expect(r.status === "ok" && r.parcel?.kuiki).toBe(K);
+    expect(r.status === "ok" && r.parcel?.chiban).toBe("246");
+    expect(r.status === "ok" && r.parcelMiss).toBeFalsy();
+  });
+
   it("地割の住所で、国土地理院の住所に地割が無くても、地番の地図で同じ地割の筆を見つけたら「町名が見つからない」とは言わない", async () => {
     // 花巻市石鳥谷町好地第16地割24番2：国土地理院は「石鳥谷町好地」までしか返さない。筆は「第16地割」の地番区域で見つかる
     const stub = (title: string) =>
