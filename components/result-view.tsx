@@ -508,7 +508,7 @@ function Place({
           <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
           <span>
             {off === "large" && parcels?.status === "ok"
-              ? `住所の地点の筆（地番 ${registryChiban(parcels.parcel.chibanRaw)}）は隣地が${registryNeighbors(parcels).length}筆あり、道路など物件の外の土地の可能性があります。${chibanArea ? "番地が地番の地域なら、地番で探すと土地（筆）が出ます。" : "地図のピンを建物の位置へ動かすと、物件の土地の地番が出ます。"}`
+              ? `住所の地点の筆（${chibanLabel(parcels.parcel.chibanRaw)}）は隣地が${registryNeighbors(parcels).length}筆あり、道路など物件の外の土地の可能性があります。${chibanArea ? "番地が地番の地域なら、地番で探すと土地（筆）が出ます。" : "地図のピンを建物の位置へ動かすと、物件の土地の地番が出ます。"}`
               : `住所の地点が${off}の上です。番地が地番の地域なら、地番で探すと土地（筆）が出ます。`}
             {asChiban && (
               <span className="mt-0.5 flex">

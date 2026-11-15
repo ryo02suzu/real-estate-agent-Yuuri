@@ -567,6 +567,22 @@ describe("地点の筆", () => {
     expect(kuikiLabel("川口市_青木_２丁目__")).toBe("川口市青木２丁目");
   });
 
+  it("地番の無い土地は、データの中の通し番号（「筆界未定地-1」の 1）を地番のように出さない（2026-11-15。那覇市泉崎１丁目で「地番 筆界未定地-1」と出ていた）", () => {
+    expect(chibanLabel("筆界未定地-1")).toBe("筆界未定地");
+    expect(chibanLabel("筆界未定地-100")).toBe("筆界未定地");
+    // 筆界未定地に含まれる地番がデータに書いてあれば添える
+    expect(chibanLabel("筆界未定地(704+645-2)")).toBe("筆界未定地（704・645-2）");
+    expect(chibanLabel("長狭物不明-18")).toBe("道路・水路など（地番なし）");
+    expect(chibanLabel("市道-15")).toBe("道路（地番なし）");
+    expect(chibanLabel("白地-06095")).toBe("地番の無い土地");
+    // 頭に字の付いた地番は地番のまま
+    expect(chibanLabel("甲289")).toBe("地番 甲289");
+    expect(chibanLabel("ロ818-4")).toBe("地番 ロ818-4");
+    expect(chibanLabel("子4-6")).toBe("地番 子4-6");
+    // 全角の数字の地番も地番のまま
+    expect(chibanLabel("１２３")).toBe("地番 １２３");
+  });
+
   it("地図データの「51-3W2」（二重地番）・「100V1」（めがね地番）・「1000X(1/2)」（分属管理地番）は、登記の地番で出す", () => {
     expect(registryChiban("51-3W2")).toBe("51-3");
     expect(registryChiban("28-1")).toBe("28-1");

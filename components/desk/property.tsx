@@ -598,7 +598,7 @@ function PlaceNotes({ query, result, data, onPick, onPickPoint, onFix, onLiteral
       warn: true,
       body: (
         <>
-          {off === "large" && data.parcels.status === "ok" ? `住所の地点の筆（地番 ${registryChiban(data.parcels.parcel.chibanRaw)}）は隣地が${registryNeighbors(data.parcels).length}筆あり、道路など物件の外の土地の可能性があります。` : `住所の地点が${off}の上です。`}
+          {off === "large" && data.parcels.status === "ok" ? `住所の地点の筆（${chibanLabel(data.parcels.parcel.chibanRaw)}）は隣地が${registryNeighbors(data.parcels).length}筆あり、道路など物件の外の土地の可能性があります。` : `住所の地点が${off}の上です。`}
           {chibanArea ? "番地が地番の地域なら、地番で探すと土地（筆）が出ます。" : "地図のピンを建物の位置へ動かすと、物件の土地の地番が出ます。"}
           {asChiban && mini(`「${asChiban}」で探す`, () => onPick(asChiban))}
         </>
