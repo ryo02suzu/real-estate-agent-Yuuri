@@ -31,7 +31,7 @@ import { SHIMANE } from "./data/shimane";
 import { TOTTORI } from "./data/tottori";
 import { YAMAGUCHI } from "./data/yamaguchi";
 import { OKAYAMA } from "./data/okayama";
-import { HIROSHIMA } from "./data/hiroshima";
+import { HIROSHIMA, HIROSHIMA_CITIES } from "./data/hiroshima";
 import { HYOGO, HYOGO_CITIES } from "./data/hyogo";
 import { KYOTO, KYOTO_CITIES } from "./data/kyoto";
 import { MIE, MIE_CITIES } from "./data/mie";
@@ -171,7 +171,7 @@ const BASE: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GU
  * 2026-11-15 に4地方とも公開した。regions.json で preparing（準備中）にした地方は、対応エリア（MUNICIPALITIES）に入れない
  */
 const ADDED: [RegionKey, Municipality[]][] = [
-  ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...CHUGOKU_PENDING]],
+  ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...CHUGOKU_PENDING]],
   ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING]],
   ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...KYUSHU_PENDING]],
   ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING]],

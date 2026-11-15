@@ -25,7 +25,7 @@ import { SHIMANE } from "./data/shimane";
 import { TOTTORI } from "./data/tottori";
 import { YAMAGUCHI } from "./data/yamaguchi";
 import { OKAYAMA } from "./data/okayama";
-import { HIROSHIMA } from "./data/hiroshima";
+import { HIROSHIMA, HIROSHIMA_CITIES } from "./data/hiroshima";
 import { MUNI_CODES } from "./muni-codes";
 import { buildLinks, findMunicipality, MUNICIPALITIES, type Municipality } from "./municipalities";
 import { ROAD_READ_PERMITTED, roadReadPermission } from "./road-read-permission";
@@ -484,7 +484,7 @@ describe("市の道路種別のデータをアプリの中に表示するのは�
 describe("全国対応で足した地方（中国・四国・九州沖縄・北海道）", () => {
   // 地方ごとの市町村：調査中の一覧（data/<地方>.ts）と、調べ終えて登録した道県（data/<道県>.ts）を合わせたもの
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
-    ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...CHUGOKU_PENDING], 107],
+    ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...CHUGOKU_PENDING], 107],
     ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING], 95],
     ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...KYUSHU_PENDING], 274],
     ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING], 179],
@@ -573,7 +573,7 @@ describe("北海道の、市が扱う市（登録した市）", () => {
   });
 });
 
-describe("広島県（県が扱う15市町を登録。市が扱う8市は調査中）", () => {
+describe("広島県（県が扱う15市町と広島市を登録。市が扱う残りの7市は調査中）", () => {
   it("県が扱う15市町：指定道路図（参考図）のある12市町と、都市計画区域の無い3町", () => {
     expect(HIROSHIMA).toHaveLength(15);
     const withMap = HIROSHIMA.filter((m) => m.maps.length > 0);
@@ -594,12 +594,36 @@ describe("広島県（県が扱う15市町を登録。市が扱う8市は調査�
     for (const m of HIROSHIMA) expect(m.contact?.noPhoneInquiry, m.name).toBe(true);
   });
 
-  it("受け持ちの建設事務所：西部 10・東部 3・北部 2。市が扱う8市は調査中の一覧に残る", () => {
+  it("受け持ちの建設事務所：西部 10・東部 3・北部 2。市が扱う市のうち、まだの7市は調査中の一覧に残る", () => {
     const by = (word: string) => HIROSHIMA.filter((m) => m.contact!.dept.includes(word)).map((m) => m.name);
     expect(by("西部建設事務所")).toHaveLength(10);
     expect(by("東部建設事務所").sort()).toEqual(["世羅町", "府中市", "神石高原町"].sort());
     expect(by("北部建設事務所").sort()).toEqual(["安芸高田市", "庄原市"].sort());
-    expect(CHUGOKU_PENDING.filter((m) => m.pref === "広島県").map((m) => m.name)).toEqual(["広島市", "呉市", "三原市", "尾道市", "福山市", "三次市", "東広島市", "廿日市市"]);
+    expect(CHUGOKU_PENDING.filter((m) => m.pref === "広島県").map((m) => m.name)).toEqual(["呉市", "三原市", "尾道市", "福山市", "三次市", "東広島市", "廿日市市"]);
+  });
+
+  it("広島市：道路のことは区ごとの区役所 建築課。市の決まりに合わせて、地図は市のトップページから進む", () => {
+    const m = HIROSHIMA_CITIES.find((x) => x.name === "広島市")!;
+    expect(m.codes).toEqual(["34101", "34102", "34103", "34104", "34105", "34106", "34107", "34108"]);
+    // 道路種別の地図はネットに見つからなかった（道路の幅と名称の地図だけ）
+    expect(m.coverage).toBe("none");
+    expect(m.maps.map((l) => l.kind)).toEqual(["public_road"]);
+    // 市は「広島市ホームページのトップページに対してリンクをお願いします」と書いている（リンク・著作権・免責事項）
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://www.city.hiroshima.lg.jp/");
+    expect(m.maps[0].label).toContain("広島市ホームページのトップページから進む");
+    expect(m.maps[0].tip).toContain("種別を示す地図ではない");
+    // 8区とも、区役所の建築課（電話・FAX）。区の名前と所在地が合っている
+    const wards = { "34101": "中区", "34102": "東区", "34103": "南区", "34104": "西区", "34105": "安佐南区", "34106": "安佐北区", "34107": "安芸区", "34108": "佐伯区" };
+    expect(Object.keys(m.contactByCode!)).toEqual(Object.keys(wards));
+    for (const [code, ward] of Object.entries(wards)) {
+      const c = m.contactByCode![code];
+      expect(c.dept, ward).toBe(`${ward}役所 建築課（${c.dept.match(/（(.+)）$/)![1]}）`);
+      expect(c.dept.match(/（(.+)）$/)![1].startsWith(ward), ward).toBe(true);
+      expect(c.phone, ward).toMatch(/^082-\d{3}-\d{4}$/);
+      expect(c.fax, ward).toMatch(/^082-\d{3}-\d{4}$/);
+    }
+    expect(new Set(Object.values(m.contactByCode!).map((c) => c.phone)).size).toBe(8);
   });
 });
 

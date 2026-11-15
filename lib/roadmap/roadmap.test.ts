@@ -1093,7 +1093,7 @@ describe("lookup", () => {
     expect(r.status).toBe("unsupported");
   });
 
-  it("全国対応で足した地方の市町村も対応（広島市は、道路の調べ方が調査中）", async () => {
+  it("全国対応で足した地方の市町村も対応（広島市は区ごとの区役所 建築課。福岡市は、道路の調べ方が調査中）", async () => {
     stubFetch(
       [{ geometry: { coordinates: [132.4553, 34.3853] }, properties: { title: "広島県広島市中区国泰寺町一丁目" } }],
       { results: { muniCd: "34101", lv01Nm: "国泰寺町一丁目" } },
@@ -1102,7 +1102,20 @@ describe("lookup", () => {
     expect(r.status).toBe("ok");
     if (r.status === "ok") {
       expect(r.municipality.name).toBe("広島市");
-      expect(r.municipality.coverage).toBe("unknown");
+      expect(r.municipality.coverage).toBe("none");
+      // 窓口は、物件のある区の区役所 建築課
+      expect(r.contact?.dept).toBe("中区役所 建築課（中区国泰寺町一丁目4-21）");
+      expect(r.contact?.phone).toBe("082-504-2579");
+    }
+    stubFetch(
+      [{ geometry: { coordinates: [130.4017, 33.5902] }, properties: { title: "福岡県福岡市中央区天神一丁目" } }],
+      { results: { muniCd: "40133", lv01Nm: "天神一丁目" } },
+    );
+    const f = await lookup("福岡県福岡市中央区天神1-8-1");
+    expect(f.status).toBe("ok");
+    if (f.status === "ok") {
+      expect(f.municipality.name).toBe("福岡市");
+      expect(f.municipality.coverage).toBe("unknown");
     }
   });
 
