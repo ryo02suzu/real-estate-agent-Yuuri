@@ -634,7 +634,40 @@ describe("大分県の、市が扱う市（登録した市）", () => {
     // 電話を断っているのは、指定道路調書の内容の問い合わせだけ
     expect(m.contact?.noPhoneInquiry).toBeUndefined();
     expect(m.contact?.note).toContain("電話では受け付けていない");
-    expect(KYUSHU_PENDING.filter((x) => x.pref === "大分県").map((x) => x.name)).toEqual(["別府市", "中津市", "日田市", "佐伯市", "宇佐市"]);
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "大分県").map((x) => x.name)).toEqual(["日田市", "佐伯市", "宇佐市"]);
+  });
+
+  it("別府市：市のページ「建築基準法の道路種別」（利用上の注意の画面）。同意の先は開かない", () => {
+    const m = OITA_CITIES.find((x) => x.name === "別府市")!;
+    expect(m.codes).toEqual(["44202"]);
+    expect(m.coverage).toBe("full");
+    expect(m.maps[0].kind).toBe("road_type");
+    expect(m.maps[0].build).toBeNull();
+    // 「上記事項に同意しPDFを利用する」の手前の画面
+    expect(m.maps[0].url).toBe("https://www.city.beppu.oita.jp/seikatu/sumai_tosi/sumai/kijunhou_douro.html");
+    expect(m.maps[0].tip).toContain("自分で「上記事項に同意しPDFを利用する」を押して進む");
+    // 紫色＝未調査、×＝建築基準法上の道路の取り扱いになっていない
+    expect(m.maps[0].tip).toContain("紫色の道路は未調査");
+    expect(m.maps[0].tip).toContain("×の道路は、建築基準法上の道路の取り扱いになっていない");
+    expect(m.contact?.phone).toBe("0977-21-1487");
+    expect(m.contact?.noPhoneInquiry).toBeUndefined();
+  });
+
+  it("中津市：市ホームページの「道路種別の電子閲覧」（1項3号・1項5号・2項だけ）。不動産取引の資料には使えない・電話は断っている", () => {
+    const m = OITA_CITIES.find((x) => x.name === "中津市")!;
+    expect(m.codes).toEqual(["44203"]);
+    // 国道・県道・市道などは表示していないので「一部の種別」
+    expect(m.coverage).toBe("partial");
+    expect(m.maps[0].kind).toBe("designated_only");
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://www.city-nakatsu.jp/doc/2018020500071/");
+    // 市の決まり：中津市のホームページだと明記する
+    expect(m.maps[0].label).toContain("中津市ホームページ");
+    expect(m.maps[0].tip).toContain("MICHILU はフォームの先を開いていない");
+    expect(m.maps[0].tip).toContain("国道・県道・市道・農道・里道・管理道などは表示していない");
+    expect(m.maps[0].tip).toContain("不動産取引のための資料");
+    expect(m.contact?.phone).toBe("0979-62-9029");
+    expect(m.contact?.noPhoneInquiry).toBe(true);
   });
 });
 
@@ -858,8 +891,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: KYUSHU_PENDING,
       total: 12,
       outside: ["姫島村", "九重町"],
-      // 特定行政庁の6市のうち、まだ調べている途中の市（大分市は登録した。下の「大分市」）
-      cities: ["別府市", "中津市", "日田市", "佐伯市", "宇佐市"],
+      // 特定行政庁の6市のうち、まだ調べている途中の市（大分市・別府市・中津市は登録した。下の「大分県の、市が扱う市」）
+      cities: ["日田市", "佐伯市", "宇佐市"],
       offices: { 別府土木事務所: 4, 大分土木事務所: 1, 臼杵土木事務所: 2, 豊後大野土木事務所: 2, 日田土木事務所: 2, 中津土木事務所: 1 },
     },    {
       pref: "宮崎県",

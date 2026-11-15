@@ -18,9 +18,7 @@ export const KYUSHU_PENDING: Municipality[] = [
   { pref: "熊本県", name: "熊本市", codes: ["43101", "43102", "43103", "43104", "43105"], coverage: "unknown", maps: [] },
   { pref: "熊本県", name: "八代市", codes: ["43202"], coverage: "unknown", maps: [] },
   { pref: "熊本県", name: "天草市", codes: ["43215"], coverage: "unknown", maps: [] },
-  // 大分県（残り 5）
-  { pref: "大分県", name: "別府市", codes: ["44202"], coverage: "unknown", maps: [] },
-  { pref: "大分県", name: "中津市", codes: ["44203"], coverage: "unknown", maps: [] },
+  // 大分県（残り 3）
   { pref: "大分県", name: "日田市", codes: ["44204"], coverage: "unknown", maps: [] },
   { pref: "大分県", name: "佐伯市", codes: ["44205"], coverage: "unknown", maps: [] },
   { pref: "大分県", name: "宇佐市", codes: ["44211"], coverage: "unknown", maps: [] },
