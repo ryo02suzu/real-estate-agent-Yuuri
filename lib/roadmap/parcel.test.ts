@@ -20,6 +20,8 @@ import {
   neighborList,
   pickedChibanText,
   isLotChiban,
+  lotHead,
+  splitLotHead,
   registryChiban,
   chibanQueryOf,
   parcelAt,
@@ -695,6 +697,136 @@ describe("lookup で地番を探す", () => {
     expect(same.status === "ok" && same.parcel?.chiban).toBe("17-12");
   });
 
+  it("地番の頭の十二支・「◯号」（伊予市中山町中山「子4-6」「4号30」）を地番として扱い、町が分かってから入力の町名の後ろの字を地番の頭にする", async () => {
+    // 地図データの地番：十二支・「◯号」の付いた地番も地番（前は「道」などと同じ地番の無い形として扱っていた）
+    expect(isLotChiban("子4-6")).toBe(true);
+    expect(isLotChiban("寅4")).toBe(true);
+    expect(isLotChiban("4号30")).toBe(true);
+    expect(isLotChiban("道-5")).toBe(false);
+    expect(splitLotHead("4号30")).toEqual(["4号", "30"]);
+    expect(splitLotHead("子4-6")).toEqual(["子", "4-6"]);
+    expect(splitLotHead("123-4")).toEqual(["", "123-4"]);
+    // 入力を読むときは、町名の終わりの字（王子・金子）を地番の頭として取り出さない
+    expect(splitChiban("東京都北区王子5番")).toMatchObject({ body: "東京都北区王子", chiban: "5" });
+    expect(splitChiban("愛媛県伊予市中山町中山子4番6")).toMatchObject({ body: "愛媛県伊予市中山町中山子", chiban: "4-6" });
+    // 町が「中山町中山」と分かってから、すぐ後ろの子・4号を地番の頭にする
+    expect(lotHead("愛媛県伊予市中山町中山子", "中山町中山", "4-6", null)).toEqual({ town: "中山町中山", chiban: "子4-6", body: "愛媛県伊予市中山町中山" });
+    expect(lotHead("愛媛県伊予市中山町中山4号", "中山町中山", "30", null)).toEqual({ town: "中山町中山", chiban: "4号30", body: "愛媛県伊予市中山町中山" });
+    expect(lotHead("東京都北区王子", "王子", "5", null)).toBeNull();
+    expect(lotHead("愛媛県伊予市中山町中山字東", "中山町中山", "4-6", null)).toBeNull();
+    // 町名にロまで入って返る所：索引にその町が無く、ロを外した町があれば、外した町で探す（ある町なら直さない）
+    const ota = { k: { "大田市_大田町大田___": [] } };
+    expect(lotHead("島根県大田市大田町大田", "大田町大田ロ", "ロ818-4", ota)).toEqual({ town: "大田町大田", chiban: "ロ818-4", body: "島根県大田市大田町大田" });
+    expect(lotHead("島根県大田市大田町大田", "大田町大田ロ", "ロ818-4", { k: { "大田市_大田町大田ロ___": [] } })).toBeNull();
+    expect(lotHead("島根県大田市大田町大田", "大田町大田ロ", "ロ818-4", null)).toBeNull();
+  });
+
+  it("「中山町中山子4番6」：頭の無い同じ番号の筆（4-6）ではなく「子4-6」を当て、「町名を直した」とは言わない", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          url.includes("AddressSearch")
+            ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "愛媛県伊予市中山町中山" } }]
+            : { results: { muniCd: "38210", lv01Nm: "中山町中山" } },
+      })),
+    );
+    const K = "伊予市_中山町中山___";
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: K, chiban: "4-6" }], [`${SX + 1},${SY}`]: [{ kuiki: K, chiban: "子4-6" }] });
+    const index = { v: 1, k: { [K]: [[SX, SY, 4, 4], [SX + 1, SY, 4, 4]] } } as unknown as Awaited<ReturnType<typeof loadParcelIndex>>;
+    const r = await lookup("愛媛県伊予市中山町中山子4番6", { parcels: src, loadIndex: async () => index });
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.parcel?.chiban).toBe("子4-6");
+    const [w, , e] = tileBounds(SX + 1, SY);
+    expect(r.lng).toBeGreaterThan(w);
+    expect(r.lng).toBeLessThan(e);
+    expect(r.fix).toBeUndefined();
+    // 子を書かなければ、今までどおり頭の無い 4-6
+    const plain = await lookup("愛媛県伊予市中山町中山4番6", { parcels: src, loadIndex: async () => index });
+    expect(plain.status === "ok" && plain.parcel?.chiban).toBe("4-6");
+  });
+
+  it("「大田町大田ロ818番4」：国土地理院が町名を「大田町大田ロ」と返しても、地番区域「大田町大田」の「ﾛ818-4」を当てる（前は「地図データが無い」と出ていた）", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          url.includes("AddressSearch")
+            ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "島根県大田市大田町大田ロ" } }]
+            : { results: { muniCd: "32205", lv01Nm: "大田町大田" } },
+      })),
+    );
+    const K = "大田市_大田町大田___";
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: K, chiban: "ｲ818-4" }], [`${SX + 1},${SY}`]: [{ kuiki: K, chiban: "ﾛ818-4" }] });
+    const index = { v: 1, k: { [K]: [[SX, SY, 818, 818], [SX + 1, SY, 818, 818]] } } as unknown as Awaited<ReturnType<typeof loadParcelIndex>>;
+    const r = await lookup("島根県大田市大田町大田ロ818番4", { parcels: src, loadIndex: async () => index });
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.parcel?.chiban).toBe("ロ818-4");
+    expect(r.parcelMiss).toBeUndefined();
+    const [w, , e] = tileBounds(SX + 1, SY);
+    expect(r.lng).toBeGreaterThan(w);
+    expect(r.lng).toBeLessThan(e);
+  });
+
+  it("「洲之内字森長甲289番」：国土地理院が町名を似た別の町（洲之内乙）に直しても、地番の地図に入力の町（洲之内）があれば、そこの「甲289」を当てる", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          url.includes("AddressSearch")
+            ? url.includes(encodeURIComponent("洲之内乙"))
+              ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "愛媛県西条市洲之内乙" } }]
+              : [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "愛媛県西条市洲之内乙" } }, { geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "愛媛県西条市洲之内甲" } }]
+            : { results: { muniCd: "38206", lv01Nm: "洲之内" } },
+      })),
+    );
+    const K = "西条市_洲之内___";
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: K, chiban: "乙289" }], [`${SX + 1},${SY}`]: [{ kuiki: K, chiban: "甲289" }] });
+    const index = { v: 1, k: { [K]: [[SX, SY, 289, 289], [SX + 1, SY, 289, 289]] } } as unknown as Awaited<ReturnType<typeof loadParcelIndex>>;
+    const r = await lookup("愛媛県西条市洲之内字森長甲289番", { parcels: src, loadIndex: async () => index });
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.parcel?.chiban).toBe("甲289");
+    expect(r.parcel?.kuiki).toBe(K);
+    // 町名は合っていたので「直した」とは言わない
+    expect(r.fix).toBeUndefined();
+  });
+
+  it("地番区域の名前の途中の「字」「大字」（沖縄県「平良字西里」・武雄市「山内町大字三間坂」）も外してそろえ、国土地理院の町名（平良西里・山内町三間坂）に当てる", async () => {
+    expect(townKey("平良字西里")).toBe("平良西里");
+    expect(townKey("玉城字前川")).toBe("玉城前川");
+    expect(townKey("山内町大字三間坂")).toBe("山内町三間坂");
+    expect(townKey("大字三間坂")).toBe("三間坂");
+    expect(townKey("字安謝")).toBe("安謝");
+    // 名前の終わりの「字」は外さない（「十字」など）
+    expect(townKey("十字")).toBe("十字");
+    expect(townMatches("宮古島市_平良字西里___", townKey("平良西里"))).toBe(true);
+    expect(townMatches("武雄市_山内町大字三間坂___", townKey("山内町三間坂"))).toBe(true);
+    expect(townMatches("宮古島市_平良字西里___", townKey("平良東仲宗根"))).toBe(false);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          url.includes("AddressSearch")
+            ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "沖縄県宮古島市平良西里" } }]
+            : { results: { muniCd: "47214", lv01Nm: "平良西里" } },
+      })),
+    );
+    const K = "宮古島市_平良字西里___";
+    const src = fakeSource({ [`${SX + 1},${SY}`]: [{ kuiki: K, chiban: "246" }] });
+    const index = { v: 1, k: { [K]: [[SX + 1, SY, 246, 246]] } } as unknown as Awaited<ReturnType<typeof loadParcelIndex>>;
+    const r = await lookup("沖縄県宮古島市平良字西里246番", { parcels: src, loadIndex: async () => index });
+    expect(r.status === "ok" && r.parcel?.kuiki).toBe(K);
+    expect(r.status === "ok" && r.parcel?.chiban).toBe("246");
+    expect(r.status === "ok" && r.parcelMiss).toBeFalsy();
+  });
+
   it("地割の住所で、国土地理院の住所に地割が無くても、地番の地図で同じ地割の筆を見つけたら「町名が見つからない」とは言わない", async () => {
     // 花巻市石鳥谷町好地第16地割24番2：国土地理院は「石鳥谷町好地」までしか返さない。筆は「第16地割」の地番区域で見つかる
     const stub = (title: string) =>
@@ -1318,13 +1450,15 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     const added = data.sheets.filter((x) => (x.shift?.kind === "T1" || x.shift?.kind === "T2") && /その量を足して|同じ量（西へ/.test(x.reason));
     expect(added.map((x) => `${x.code}|${x.sheet}`)).toEqual(["07202|12391_hosei_20121019092001"]);
   });
-  it("2026-11-15：全部の図面の点検（直した道具 v4）で見つけた7枚を、計算どおりの量で動かす（写真に重ねて確かめた）", () => {
+  it("2026-11-15：全部の図面の点検（直した道具 v4）で見つけた8枚を、計算どおりの量で動かす（写真に重ねて確かめた）", () => {
     const want: [string, string, "T1" | "T2", number][] = [
       ["11235", "10129_hosei_20121031102223", "T1", 773],
       ["12233", "11188_hosei_20121114095241", "T2", 145],
       ["13104", "10058_hosei_20121129090005", "T1", 12],
       ["13120", "10167_hosei_20121129080756", "T1", 384],
       ["14103", "10062_hosei_20121129080359", "T1", 7],
+      // 機械の判定の目安（際立ち 1.6 倍）にわずかに届かず保留になっていたが、写真と測り直しで確かめた
+      ["14137", "10011_hosei_20121217080723", "T1", 121],
       ["28111", "岩岡町古郷昭和４９年度土地改良", "T1", 1362],
       ["28210", "志方町畑字野深", "T1", 26],
     ];
@@ -1340,7 +1474,7 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(s!.reason).toMatch(/国土地理院の航空写真に重ねて確かめた/);
       expect(s!.chiban).toBeUndefined();
     }
-    expect(want.reduce((a, w) => a + w[3], 0)).toBe(2709);
+    expect(want.reduce((a, w) => a + w[3], 0)).toBe(2830);
   });
   it("地価の地点で見つけたずれ（2026-11-13）：渋川市の地図 10109 は地図ごと動かす決まり1つだけ、生駒市北新町の地図はずれた20筆だけを動かす", () => {
     // 渋川市：前は「ほかの地図の筆と重なる部分だけ外す」決まり3つ（531筆）だった。重なりは地図全体のずれのせいで、動かすと重なりは 0.2%
