@@ -26,12 +26,4 @@ export const CHUGOKU_PENDING: Municipality[] = [
   { pref: "岡山県", name: "笠岡市", codes: ["33205"], coverage: "unknown", maps: [] },
   { pref: "岡山県", name: "総社市", codes: ["33208"], coverage: "unknown", maps: [] },
   { pref: "岡山県", name: "新見市", codes: ["33210"], coverage: "unknown", maps: [] },
-  // 広島県（残り 7）
-  { pref: "広島県", name: "呉市", codes: ["34202"], coverage: "unknown", maps: [] },
-  { pref: "広島県", name: "三原市", codes: ["34204"], coverage: "unknown", maps: [] },
-  { pref: "広島県", name: "尾道市", codes: ["34205"], coverage: "unknown", maps: [] },
-  { pref: "広島県", name: "福山市", codes: ["34207"], coverage: "unknown", maps: [] },
-  { pref: "広島県", name: "三次市", codes: ["34209"], coverage: "unknown", maps: [] },
-  { pref: "広島県", name: "東広島市", codes: ["34212"], coverage: "unknown", maps: [] },
-  { pref: "広島県", name: "廿日市市", codes: ["34213"], coverage: "unknown", maps: [] },
 ];

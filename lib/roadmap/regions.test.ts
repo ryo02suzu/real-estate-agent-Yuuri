@@ -941,7 +941,7 @@ describe("北海道の、市が扱う市（登録した市）", () => {
   });
 });
 
-describe("広島県（県が扱う15市町と広島市を登録。市が扱う残りの7市は調査中）", () => {
+describe("広島県（県が扱う15市町と、市が扱う8市を登録）", () => {
   it("県が扱う15市町：指定道路図（参考図）のある12市町と、都市計画区域の無い3町", () => {
     expect(HIROSHIMA).toHaveLength(15);
     const withMap = HIROSHIMA.filter((m) => m.maps.length > 0);
@@ -962,12 +962,13 @@ describe("広島県（県が扱う15市町と広島市を登録。市が扱う�
     for (const m of HIROSHIMA) expect(m.contact?.noPhoneInquiry, m.name).toBe(true);
   });
 
-  it("受け持ちの建設事務所：西部 10・東部 3・北部 2。市が扱う市のうち、まだの7市は調査中の一覧に残る", () => {
+  it("受け持ちの建設事務所：西部 10・東部 3・北部 2。市が扱う8市は登録したので、調査中の一覧に広島県は残っていない", () => {
     const by = (word: string) => HIROSHIMA.filter((m) => m.contact!.dept.includes(word)).map((m) => m.name);
     expect(by("西部建設事務所")).toHaveLength(10);
     expect(by("東部建設事務所").sort()).toEqual(["世羅町", "府中市", "神石高原町"].sort());
     expect(by("北部建設事務所").sort()).toEqual(["安芸高田市", "庄原市"].sort());
-    expect(CHUGOKU_PENDING.filter((m) => m.pref === "広島県").map((m) => m.name)).toEqual(["呉市", "三原市", "尾道市", "福山市", "三次市", "東広島市", "廿日市市"]);
+    expect(CHUGOKU_PENDING.filter((m) => m.pref === "広島県")).toEqual([]);
+    expect(HIROSHIMA_CITIES.map((m) => m.name)).toEqual(["広島市", "呉市", "三原市", "尾道市", "福山市", "三次市", "東広島市", "廿日市市"]);
   });
 
   it("広島市：道路のことは区ごとの区役所 建築課。市の決まりに合わせて、地図は市のトップページから進む", () => {
@@ -992,6 +993,124 @@ describe("広島県（県が扱う15市町と広島市を登録。市が扱う�
       expect(c.fax, ward).toMatch(/^082-\d{3}-\d{4}$/);
     }
     expect(new Set(Object.values(m.contactByCode!).map((c) => c.phone)).size).toBe(8);
+  });
+
+  const city = (name: string) => HIROSHIMA_CITIES.find((x) => x.name === name)!;
+
+  it("7市とも：コードは1つで、都市計画区域が市の一部（国の都市別一覧）。地図サイトはここから開けないので、場所を指定して開く形は使わない", () => {
+    const codes: Record<string, string> = { 呉市: "34202", 三原市: "34204", 尾道市: "34205", 福山市: "34207", 三次市: "34209", 東広島市: "34212", 廿日市市: "34213" };
+    for (const [name, code] of Object.entries(codes)) {
+      const m = city(name);
+      expect(m.codes, name).toEqual([code]);
+      expect(findMunicipality(code)?.name, name).toBe(name);
+      expect(m.note, name).toContain(`${name}の一部は都市計画区域の外`);
+      for (const l of m.maps) {
+        expect(l.build, `${name} ${l.label}`).toBeNull();
+        // 外の地図サイト（wagmap・sonicweb・alandis）は中を確かめていない。市のページそのものを開くリンクだけ確かめ済み
+        expect(l.verified, `${name} ${l.label}`).toBe((l.url ?? "").includes(".hiroshima.jp/"));
+        if (!l.verified) expect(l.tip, `${name} ${l.label}`).toContain("MICHILU は地図の中を開いて確かめていない");
+      }
+      // 同じ市の地図のリンクは、URL が重ならない（画面の並びのキーに使う）
+      expect(new Set(m.maps.map((l) => l.url)).size, name).toBe(m.maps.length);
+      // 電話を断ると書いている市は無い（遠慮を求める市は、注意書きに入れる）
+      expect(m.contact?.noPhoneInquiry, name).toBeUndefined();
+    }
+  });
+
+  it("呉市：市の地図に「建築基準法道路情報」（利用条件のページから）と「道路情報」。どの種別まで載るかは確かめられていないので partial", () => {
+    const m = city("呉市");
+    expect(m.coverage).toBe("partial");
+    expect(m.maps.map((l) => l.kind)).toEqual(["road_type", "public_road"]);
+    // 市「地図情報」のページが出しているリンク（利用条件に同意して進む形）
+    expect(m.maps[0].url).toBe("https://www2.wagmap.jp/kurecity/Agreement?IsPost=False&MapId=9&RequestPage=%2fkurecity%2fPositionSelect%3fmid%3d9");
+    expect(m.maps[0].tip).toContain("自分で同意");
+    expect(m.maps[0].tip).toContain("どの種別まで載っているかも確かめられていない");
+    expect(m.maps[1].url).toBe("https://www2.wagmap.jp/kurecity/Portal");
+    expect(m.maps[1].tip).toContain("令和4年3月現在");
+    expect(m.maps[1].tip).toContain("種別を示す地図ではない");
+    // 市のページは「Tel：0823-25-3511,3512」と書いている
+    expect(m.contact).toMatchObject({ phone: "0823-25-3511 0823-25-3512", fax: "0823-24-6831" });
+    expect(m.contact!.dept).toContain("建築指導課 建築確認グループ");
+    // 市が書いている2項道路の基準（MICHILU の判断ではなく、市の説明の引用）
+    expect(m.note).toContain("1.8m");
+    expect(m.note).toContain("市「敷地と道路について」");
+  });
+
+  it("三原市：道路種別の地図は見つからず none。建築基準法上の道路は、計画地の地図を FAX などで送ると答えてもらえる", () => {
+    const m = city("三原市");
+    expect(m.coverage).toBe("none");
+    expect(m.maps.map((l) => l.kind)).toEqual(["public_road"]);
+    expect(m.maps[0].url).toBe("https://www2.wagmap.jp/mihara/");
+    expect(m.maps[0].tip).toContain("道路台帳図");
+    expect(m.maps[0].tip).toContain("道路を証明するものではない");
+    expect(m.maps[0].tip).toContain("種別を示す地図ではない");
+    expect(m.contact).toMatchObject({ phone: "0848-67-6122", fax: "0848-64-6057" });
+    expect(m.contact!.note).toContain("FAX");
+  });
+
+  it("尾道市：道路種別の地図は見つからず none。市の決まりに合わせて、市道の図は市のトップページから進む", () => {
+    const m = city("尾道市");
+    expect(m.coverage).toBe("none");
+    expect(m.maps.map((l) => l.kind)).toEqual(["public_road"]);
+    // 市は「リンク設定はトップページへお願いします。他のページへのリンクは…ご遠慮ください」と書いている（リンク・著作権・免責事項）
+    expect(m.maps[0].url).toBe("https://www.city.onomichi.hiroshima.jp/");
+    expect(m.maps[0].label).toContain("尾道市ホームページのトップページから進む");
+    expect(m.maps[0].tip).toContain("「組織でさがす」→「用地課」→「尾道市道路台帳（路線網図）Web版」");
+    expect(m.maps[0].tip).toContain("令和6年3月末時点");
+    expect(m.contact).toMatchObject({ phone: "0848-38-9245", fax: "0848-38-9295", email: "k-shidou@city.onomichi.hiroshima.jp" });
+    // 電話は断っていない（先に地図を FAX・メールで送ってほしい、という求め）
+    expect(m.contact!.note).toContain("先に FAX やメールで地図を送る");
+  });
+
+  it("福山市：市の地図の「指定道路」に載っているのは位置指定道路（designated_only・partial）。調べられていない道は道路調査依頼書", () => {
+    const m = city("福山市");
+    expect(m.coverage).toBe("partial");
+    expect(m.maps.map((l) => l.kind)).toEqual(["designated_only"]);
+    expect(m.maps[0].url).toBe("https://www.sonicweb-asp.jp/fukuyama/");
+    expect(m.maps[0].tip).toContain("位置指定道路（1項5号）");
+    expect(m.maps[0].tip).toContain("参考図");
+    expect(m.contact).toMatchObject({ phone: "084-928-1104", fax: "084-928-1735" });
+    expect(m.contact!.note).toContain("道路調査依頼書");
+    expect(m.contact!.note).toContain("3週間ほど");
+  });
+
+  it("三次市：市が建築確認を扱うのは小さい木造の建築物だけ。道路種別は市の都市建築課へ。市道の名称の図は営利目的に使えない", () => {
+    const m = city("三次市");
+    expect(m.coverage).toBe("none");
+    expect(m.maps.map((l) => l.kind)).toEqual(["public_road"]);
+    // 市のページ（注意事項が書いてある案内のページ）を開く。市のサイトはリンク自由（リンクしたら知らせる決まり）
+    expect(m.maps[0].url).toBe("https://www.city.miyoshi.hiroshima.jp/soshiki/26/37056.html");
+    expect(m.maps[0].tip).toContain("認定路線網図で得られた情報を営利目的で利用することはできません");
+    expect(m.maps[0].tip).toContain("種別を示す地図ではない");
+    expect(m.contact).toMatchObject({ phone: "0824-62-6385", fax: "0824-62-6166", email: "toshikenchiku@city.miyoshi.hiroshima.jp" });
+    expect(m.contact!.hours).toContain("9:00〜17:00");
+    // 県の表の注：木造の建築物のうち、3階以上・300㎡超・16m超を除く。それ以外は県の北部建設事務所
+    expect(m.note).toContain("地上3階以上・延べ面積300㎡超・高さ16m超のどれにも当たらないもの");
+    expect(m.note).toContain("北部建設事務所 建築課（0824-63-5209）");
+  });
+
+  it("東広島市：指定道路図を市の地図で公開。指定道路以外の道路も種別を色分けで出している（full）", () => {
+    const m = city("東広島市");
+    expect(m.coverage).toBe("full");
+    expect(m.maps.map((l) => l.kind)).toEqual(["road_type"]);
+    expect(m.maps[0].url).toBe("https://www.sonicweb-asp.jp/higashihiroshima/");
+    expect(m.maps[0].tip).toContain("表示テーマ「指定道路」");
+    expect(m.maps[0].tip).toContain("自分で同意");
+    expect(m.maps[0].tip).toContain("証明書は出していない");
+    expect(m.contact).toMatchObject({ phone: "082-420-0956", fax: "082-421-7220" });
+    // 電話は「遠慮してほしい」（断ってはいない）。注意書きに入れる
+    expect(m.contact!.note).toContain("電話での問い合わせは、聞き間違いなどのおそれがあるので遠慮してほしい");
+  });
+
+  it("廿日市市：市の地図情報システムに「建築基準法道路情報」。どの種別まで載るかは確かめられていないので partial", () => {
+    const m = city("廿日市市");
+    expect(m.coverage).toBe("partial");
+    expect(m.maps.map((l) => l.kind)).toEqual(["road_type"]);
+    expect(m.maps[0].url).toBe("https://webgis.alandis.jp/hatsukaichi34/webgis/");
+    expect(m.maps[0].tip).toContain("どの種別まで載っているかも確かめられていない");
+    expect(m.contact!.phone).toBe("0829-30-9191");
+    expect(m.contact!.fax).toBeUndefined();
+    expect(m.contact!.hours).toContain("受け付けは17:00まで");
   });
 });
 
