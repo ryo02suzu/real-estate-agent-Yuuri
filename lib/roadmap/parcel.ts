@@ -236,6 +236,16 @@ export function kuikiChome(kuiki: string): number | null {
 }
 
 /**
+ * 大字・丁目の欄が空で、小字の欄に町の名前が丁目まで入っている地番区域（陸別町「足寄郡陸別町___字陸別本通一丁目_」）で、
+ * 小字の欄の名前が国土地理院の町（townKey でそろえた形。「陸別本通1丁目」）そのもので、その丁目が入力の丁目か。
+ * kuikiChome は「字◯丁目」を小字の名前として丁目に数えないので、町の名前そのものの丁目はここで確かめる
+ */
+function koazaTownChome(kuiki: string, town: string, chome: number): boolean {
+  const [, oaza = "", ch = "", koaza = ""] = kuiki.split("_");
+  return !oaza && !ch && !!koaza && !!town && townKey(koaza) === town && town.endsWith(`${chome}丁目`);
+}
+
+/**
  * 町（大字）の地番区域に、小字の名前として書かれているもの（索引にある、同じ大字の地番区域の小字の名前。そろえた形）。
  * 入力の小字がこの中にあれば、その小字は地番区域の一部なので、小字の書かれていない地番区域の同じ地番は別の土地
  * （富山市大町には「字当後割」の地番区域があり、「大町字当後割17番1」を小字の無い「大町」の 17-1 に当てると 561m 先の別の土地だった。
@@ -460,7 +470,7 @@ export async function searchParcel(
   const names = townNames(index, q.town);
   /** 入力の丁目・番号の区分が、その地番区域で確かめられるか（丁目が違う・丁目が無い、町が使う区分が書かれていなければ別の土地） */
   const strictOk = (kuiki: string): boolean => {
-    if (q.chome != null && kuikiChome(kuiki) !== q.chome) return false;
+    if (q.chome != null && kuikiChome(kuiki) !== q.chome && !koazaTownChome(kuiki, town, q.chome)) return false;
     if (q.sub && (counters.size || names.size)) {
       const [, , chome = "", koaza = ""] = kuiki.split("_");
       const a = subParse(chome);

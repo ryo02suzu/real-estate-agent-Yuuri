@@ -14,6 +14,7 @@ import {
   parcelMark,
   estimatedNote,
   estimatedSentence,
+  kuikiChome,
   kuikiLabel,
   kuikiLabelFrom,
   adjacentParcels,
@@ -843,6 +844,31 @@ describe("lookup で地番を探す", () => {
     expect(r.status === "ok" && r.parcelMiss).toBeFalsy();
   });
 
+  it("大字・丁目の欄が空で、小字の欄に町の名前が丁目まで入っている地番区域（陸別町「字陸別本通一丁目」）でも、住所の丁目で筆を見つける", async () => {
+    // 北海道足寄郡陸別町字陸別本通1丁目11番3：法務省の地図データの地番区域は「足寄郡陸別町___字陸別本通一丁目_」。
+    // 国土地理院の町は「陸別本通一丁目」。小字の欄の「一丁目」を丁目と数えず、別の区域の筆として「町まで」になっていた（2026-11-15）
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          url.includes("AddressSearch")
+            ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "北海道陸別町陸別本通一丁目" } }]
+            : { results: { muniCd: "01648", lv01Nm: "陸別本通一丁目" } },
+      })),
+    );
+    const K = "足寄郡陸別町___字陸別本通一丁目_";
+    const K2 = "足寄郡陸別町___字陸別本通二丁目_";
+    const src = fakeSource({ [`${SX + 1},${SY}`]: [{ kuiki: K, chiban: "11-3" }, { kuiki: K2, chiban: "11-3" }] });
+    const index = { v: 1, k: { [K]: [[SX + 1, SY, 11, 11]], [K2]: [[SX + 1, SY, 11, 11]] } } as unknown as Awaited<ReturnType<typeof loadParcelIndex>>;
+    const r = await lookup("北海道足寄郡陸別町字陸別本通1丁目11番3", { parcels: src, loadIndex: async () => index });
+    expect(r.status === "ok" && r.parcel?.kuiki).toBe(K);
+    expect(r.status === "ok" && r.parcel?.chiban).toBe("11-3");
+    expect(r.status === "ok" && r.parcelMiss).toBeFalsy();
+    // 小字の名前としての丁目（「字五丁目」。町の名前ではない）は、今までどおり丁目に数えない
+    expect(kuikiChome("川口市_青木__字五丁目_")).toBeNull();
+  });
+
   it("地割の住所で、国土地理院の住所に地割が無くても、地番の地図で同じ地割の筆を見つけたら「町名が見つからない」とは言わない", async () => {
     // 花巻市石鳥谷町好地第16地割24番2：国土地理院は「石鳥谷町好地」までしか返さない。筆は「第16地割」の地番区域で見つかる
     const stub = (title: string) =>
@@ -1401,8 +1427,8 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     const kinki = data.sheets.filter((s) => /^(2[4-9]|30)/.test(s.code) && s.shift);
     // 11-12 の14枚と、11-13 に地価の地点で見つけた東員町（2枚）・木津川市（1枚）・生駒市北新町（1枚の一部・大字ごとに2つ）・松阪市飯南町（1枚）・津市あのつ台１丁目（1枚）・
     // 神戸市北区若葉台（1枚の本体を縮尺ごと直す。大字・丁目ごとに6つ）、11-14 に拾い直した津市（みのりヶ丘・あのつ台三丁目・五丁目）と松阪市（清生町・垣鼻町・田原町）の4枚、
-    // 11-15 に全部の図面の点検（v4）で見つけた神戸市西区岩岡町古郷・加古川市志方町畑の2枚
-    expect(kinki).toHaveLength(33);
+    // 11-15 に全部の図面の点検（v4）で見つけた神戸市西区岩岡町古郷・加古川市志方町畑の2枚と、加西市中山町・丹波篠山市今田町本荘の2枚
+    expect(kinki).toHaveLength(35);
     const sanda = kinki.filter((s) => s.code === "28219");
     expect(sanda.map((s) => s.sheet).sort()).toEqual(["あかしあ台１～５丁目", "すずかけ台１～４丁目", "ゆりのき台１～６丁目（修正後）", "北摂三田ニュータウン南地区"].sort());
     expect(sanda.reduce((a, s) => a + s.parcels, 0)).toBe(11320);
@@ -1491,6 +1517,28 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(s!.chiban).toBeUndefined();
     }
     expect(want.reduce((a, w) => a + w[3], 0)).toBe(2830);
+  });
+  it("2026-11-15：全部の図面の点検（v4）の続きで見つけた2枚（加西市中山町・丹波篠山市今田町本荘）を、計算どおりの量で動かす（写真に重ねて確かめた）", () => {
+    // 同じ回に見つけた候補のうち、豊岡市日高町日置・南あわじ市（2枚）・淡路市・たつの市の5枚は、写真で今の位置が正しいと確かめた（動かさない）
+    const want: [string, string, "T1" | "T2", number][] = [
+      ["28220", "平成１４年度１／５００地籍図Ｂ", "T1", 365],
+      ["28221", "篠山市平成１５年度１／５００土地改良", "T2", 1028],
+    ];
+    for (const [code, sheet, kind, parcels] of want) {
+      const s = data.sheets.find((x) => x.code === code && x.sheet === sheet);
+      expect(s, `${code} ${sheet}`).toBeDefined();
+      expect(s!.shift?.kind).toBe(kind);
+      expect(s!.parcels).toBe(parcels);
+      // 兵庫県（V 系）の量：東西 約245〜247m・南北 約346m（約424m）
+      expect(Math.hypot(s!.shift!.east, s!.shift!.north)).toBeGreaterThan(420);
+      expect(Math.hypot(s!.shift!.east, s!.shift!.north)).toBeLessThan(430);
+      expect(s!.reason).toMatch(/道路縁に筆の境が沿う割合/);
+      expect(s!.reason).toMatch(/国土地理院の航空写真に重ねて確かめた/);
+      expect(s!.chiban).toBeUndefined();
+    }
+    for (const [code, sheet] of [["28209", "豊岡市日高町日置字姫路"], ["28224", "南あわじ市平成１６年度５００地籍図Ａ"], ["28224", "南あわじ市福良乙１６"], ["28226", "淡路市昭和５６年度５００土地改良Ａ"], ["28229", "28229_2010_0"]]) {
+      expect(data.sheets.some((x) => x.code === code && x.sheet === sheet), `${code} ${sheet}`).toBe(false);
+    }
   });
   it("地価の地点で見つけたずれ（2026-11-13）：渋川市の地図 10109 は地図ごと動かす決まり1つだけ、生駒市北新町の地図はずれた20筆だけを動かす", () => {
     // 渋川市：前は「ほかの地図の筆と重なる部分だけ外す」決まり3つ（531筆）だった。重なりは地図全体のずれのせいで、動かすと重なりは 0.2%
