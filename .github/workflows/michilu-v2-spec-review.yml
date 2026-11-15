@@ -17,7 +17,7 @@ jobs:
       REVIEW_URL: http://127.0.0.1:3000
       PREVIEW_URL: https://michilu-dbqcxx8b5-sourirettes-projects.vercel.app
       REVIEW_SHA: d331a25e728b03e75b18664555a9fcfd1db609b1
-      REVIEW_PHASE: approved-v2-d331a25-details-network
+      REVIEW_PHASE: approved-v2-d331a25-map-render-details
     steps:
       - uses: actions/checkout@v4
         with:
@@ -108,7 +108,7 @@ jobs:
       - name: Install isolated browser tools
         run: |
           python3 -m venv "$RUNNER_TEMP/michilu-browser"
-          "$RUNNER_TEMP/michilu-browser/bin/pip" install playwright==1.62.0
+          "$RUNNER_TEMP/michilu-browser/bin/pip" install playwright==1.62.0 Pillow==13.0.0
           "$RUNNER_TEMP/michilu-browser/bin/playwright" install --with-deps chromium webkit
       - name: Exercise the built app (not Vercel Preview)
         run: '"$RUNNER_TEMP/michilu-browser/bin/python" qa-tools/scripts/qa/michilu-v2-spec-review.py'

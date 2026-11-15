@@ -1,6 +1,9 @@
 import asyncio, json, os, re, platform
+from collections import Counter
+from io import BytesIO
 from urllib.parse import urlparse
 from pathlib import Path
+from PIL import Image
 from playwright.async_api import async_playwright
 out = Path("ui-review")
 out.mkdir(exist_ok=True)
@@ -19,6 +22,53 @@ def response_event(response, record):
         record["http_errors"].append(info)
     if ".pmtiles" in response.url:
         record["range_responses"].append({**info, "range": response.headers.get("content-range")})
+    url = urlparse(response.url)
+    if url.hostname == "cyberjapandata.gsi.go.jp" and re.match(r"/xyz/(pale|std)/", url.path):
+        record["basemap_responses"].append(info)
+
+def map_image_stats(png):
+    # A positive WebGL canvas can still contain only the fallback background.
+    # Inspect an actual screenshot of the unobscured map, excluding all app panels.
+    image = Image.open(BytesIO(png)).convert("RGB")
+    pixels = list(image.get_flattened_data())
+    colors = Counter(tuple(v // 16 for v in pixel) for pixel in pixels)
+    total = image.width * image.height
+    # JapanMap's #e6f2f2 fallback is distinct from the GSI raster sea. Requiring
+    # coverage also rejects partially loaded maps, which a color-count check misses.
+    background = sum(max(abs(v - c) for v, c in zip(pixel, (230, 242, 242))) <= 4 for pixel in pixels)
+    return {"significant_colors": sum(count / total > 0.0005 for count in colors.values()),
+            "dominant_ratio": max(colors.values()) / total,
+            "unrendered_background_ratio": background / total}
+
+async def wait_for_map_pixels(page, name, record):
+    started = asyncio.get_running_loop().time()
+    ready_frames = 0
+    while True:
+        panel = await page.locator(".mui-panel").bounding_box()
+        viewport = page.viewport_size
+        side = await page.locator('[data-side="1"]').count() > 0
+        left = panel["x"] + panel["width"] + 16 if side else 16
+        top = 24 if side else 86
+        bottom = viewport["height"] - 36 if side else panel["y"] - 16
+        clip = {"x":left,"y":top,"width":viewport["width"] - left - 16,"height":bottom - top}
+        assert clip["width"] >= 40 and clip["height"] >= 40, "No unobscured home map region"
+        png = await page.screenshot(clip=clip)
+        stats = map_image_stats(png)
+        stats["successful_basemap_responses"] = sum(r["status"] == 200 for r in record["basemap_responses"])
+        stats["wait_ms"] = round((asyncio.get_running_loop().time() - started) * 1000)
+        stats["clip"] = clip
+        record["map_render"] = stats
+        painted = (stats["successful_basemap_responses"] > 0
+                   and stats["significant_colors"] >= 8 and stats["dominant_ratio"] < 0.985
+                   and stats["unrendered_background_ratio"] < 0.02)
+        ready_frames = ready_frames + 1 if painted else 0
+        stats["consecutive_ready_frames"] = ready_frames
+        ready = ready_frames >= 2
+        if ready or stats["wait_ms"] >= 20000:
+            (out / (name + "-map-region.png")).write_bytes(png)
+            assert ready, "Map is still blank/partially rendered after tile and screenshot readiness checks"
+            return
+        await page.wait_for_timeout(500)
 
 DETAILS = [("urban", "^都市計画"), ("hazard", "^災害リスク"),
            ("parcel", "^地番"), ("utility", "^上下水道"),
@@ -87,7 +137,7 @@ async def run():
             if engine == "chromium": sizes += [(1024,768),(1440,900)]
             for width,height in sizes:
                 name = f"{engine}-{width}x{height}"
-                record = {"name":name,"browser_version":browser.version,"page_errors":[],"failed_requests":[],"http_errors":[],"stage":"home"}
+                record = {"name":name,"browser_version":browser.version,"page_errors":[],"failed_requests":[],"http_errors":[],"basemap_responses":[],"stage":"home"}
                 report["checks"].append(record)
                 record["console_messages"]=[]
                 record["range_responses"]=[]
@@ -106,6 +156,8 @@ async def run():
                     assert "MICHILU" in await page.title(), "Expected the MICHILU app title"
                     await page.evaluate("document.fonts.ready")
                     await page.wait_for_timeout(1800)
+                    if width < 1024:
+                        await wait_for_map_pixels(page,name,record)
                     await snapshot(page,name+"-home",record)
                     # Failure gate: blank MapLibre canvases passed the old screenshot-only QA.
                     # This checks the app's real layout; never apply an artificial CSS override.
