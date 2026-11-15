@@ -567,7 +567,26 @@ describe("岡山県の、市が扱う市（登録した市）", () => {
     expect(m.maps[0].tip).toContain("1項1号");
     expect(m.contact?.phone).toBe("086-803-1446");
     expect(m.contact?.noPhoneInquiry).toBe(true);
-    expect(CHUGOKU_PENDING.filter((x) => x.pref === "岡山県").map((x) => x.name)).toEqual(["倉敷市", "津山市", "玉野市", "笠岡市", "総社市", "新見市"]);
+    expect(CHUGOKU_PENDING.filter((x) => x.pref === "岡山県").map((x) => x.name)).toEqual(["津山市", "玉野市", "笠岡市", "総社市", "新見市"]);
+  });
+
+  it("倉敷市：市の「倉敷市建築基準法指定道路図」（2025年10月から）。どの種別まで載るかは確かめられていないので「一部」。電話では答えない", () => {
+    const m = OKAYAMA_CITIES.find((x) => x.name === "倉敷市")!;
+    expect(m.codes).toEqual(["33202"]);
+    expect(m.coverage).toBe("partial");
+    expect(m.maps.map((x) => x.kind)).toEqual(["road_type", "public_road"]);
+    // 市のページと同じリンク（利用規約の同意の画面）。同意の先は開かない
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("http://www.gis.pref.okayama.jp/kurashiki/Agreement?IsPost=False&MapId=70001&RequestPage=%2fkurashiki%2fPositionSelect%3fmid%3d70001");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("自分で同意して進み");
+    // 確かめられていないことは、そう書く
+    expect(m.maps[0].tip).toContain("どの種別まで載っているかは、MICHILU では確かめられていない");
+    // 市道の地図は、市のページ「倉敷地理情報」から
+    expect(m.maps[1].url).toBe("https://www.city.kurashiki.okayama.jp/cityinfo/digital/1011799/1002306.html");
+    expect(m.contact?.phone).toBe("086-426-3501");
+    expect(m.contact?.fax).toBe("086-427-3536");
+    expect(m.contact?.noPhoneInquiry).toBe(true);
   });
 });
 
@@ -699,7 +718,7 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: CHUGOKU_PENDING,
       total: 20,
       outside: ["瀬戸内市", "新庄村", "奈義町", "西粟倉村", "久米南町", "美咲町"],
-      cities: ["倉敷市", "津山市", "玉野市", "笠岡市", "総社市", "新見市"],
+      cities: ["津山市", "玉野市", "笠岡市", "総社市", "新見市"],
       offices: { 備前県民局: 5, 備中県民局: 6, 美作県民局: 9 },
     },
     {
