@@ -1187,7 +1187,76 @@ describe("沖縄県の、市が扱う市（登録した市）", () => {
     expect(m.contact?.phone).toBe("098-951-3244");
     expect(m.contact?.fax).toBe("098-951-3245");
     expect(m.contact?.noPhoneInquiry).toBe(true);
-    expect(KYUSHU_PENDING.filter((x) => x.pref === "沖縄県").map((x) => x.name)).toEqual(["宜野湾市", "浦添市", "沖縄市", "うるま市"]);
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "沖縄県").map((x) => x.name)).toEqual([]);
+  });
+
+  it("特定行政庁の5市が全部そろった（どこも全域が都市計画区域）", () => {
+    const codes: Record<string, string> = { 那覇市: "47201", 宜野湾市: "47205", 浦添市: "47208", 沖縄市: "47211", うるま市: "47213" };
+    expect(OKINAWA_CITIES.map((m) => m.name)).toEqual(Object.keys(codes));
+    for (const [name, code] of Object.entries(codes)) {
+      expect(OKINAWA_CITIES.find((x) => x.name === name)!.codes, name).toEqual([code]);
+      expect(findMunicipality(code)?.name, name).toBe(name);
+    }
+    for (const name of ["宜野湾市", "浦添市", "沖縄市", "うるま市"]) {
+      const m = OKINAWA_CITIES.find((x) => x.name === name)!;
+      expect(m.note, name).toContain(`${name}は、全域が都市計画区域`);
+      expect(noCityPlanning(m), name).toBe(false);
+    }
+  });
+
+  it("宜野湾市：地図サービスのトップページ（リンクはトップページだけ自由）。規約は営利目的の利用を禁じている。電話は原則断る", () => {
+    const m = OKINAWA_CITIES.find((x) => x.name === "宜野湾市")!;
+    expect(m.coverage).toBe("partial");
+    expect(m.maps).toHaveLength(1);
+    expect(m.maps[0].kind).toBe("road_type");
+    expect(m.maps[0].url).toBe("https://www.gis.city.ginowan.okinawa.jp/ginowan/Portal");
+    expect(m.maps[0].label).toContain("宜野湾市地図情報システム");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("営利目的でサービスを利用することと、商用転用を禁じている");
+    expect(m.maps[0].tip).toContain("令和8年1月時点");
+    expect(m.contact?.phone).toBe("098-893-4123");
+    expect(m.contact?.noPhoneInquiry).toBe(true);
+    expect(m.contact?.note).toContain("2項道路後退誓約書");
+  });
+
+  it("浦添市：市のページの指定道路図（1項1号〜5号・2項。索引図の番号ごとの PDF）と、市道のうらそえマップ。電話では答えない", () => {
+    const m = OKINAWA_CITIES.find((x) => x.name === "浦添市")!;
+    expect(m.coverage).toBe("full");
+    expect(m.maps.map((l) => l.kind)).toEqual(["road_type", "public_road"]);
+    expect(m.maps[0].url).toBe("https://www.city.urasoe.lg.jp/doc/609e7c273d59ae2434bfead4/");
+    expect(m.maps[0].verified).toBe(true);
+    expect(m.maps[0].tip).toContain("法42条1項1号〜5号・2項道路");
+    expect(m.maps[0].tip).toContain("まだ市道に認定されていない道路は載っていない");
+    expect(m.maps[1].url).toBe("https://www2.wagmap.jp/urasoe/Portal");
+    // 2つの地図のリンクは別のもの
+    expect(new Set(m.maps.map((l) => l.url)).size).toBe(2);
+    expect(m.contact?.phone).toBe("098-876-1252");
+    expect(m.contact?.fax).toBe("098-876-7071");
+    expect(m.contact?.noPhoneInquiry).toBe(true);
+  });
+
+  it("沖縄市：道路種別の地図は無い。窓口で判定（2週間以内が目安）", () => {
+    const m = OKINAWA_CITIES.find((x) => x.name === "沖縄市")!;
+    expect(m.coverage).toBe("none");
+    expect(m.maps).toEqual([]);
+    expect(m.contact?.phone).toBe("098-939-1212（代表）");
+    expect(m.contact?.note).toContain("2週間以内に答えるよう努めている");
+    expect(m.contact?.note).toContain("098-934-3846");
+    expect(m.contact?.noPhoneInquiry).toBeUndefined();
+  });
+
+  it("うるま市：うるマップ（道路台帳の確定している道路。中は確かめられていないので「一部」）。窓口は建築行政課", () => {
+    const m = OKINAWA_CITIES.find((x) => x.name === "うるま市")!;
+    expect(m.coverage).toBe("partial");
+    expect(m.maps[0].kind).toBe("road_type");
+    expect(m.maps[0].url).toBe("https://gis.city.uruma.lg.jp/uruma/Portal");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("どの種別まで載っているかも確かめられていない");
+    expect(m.contact?.dept).toContain("建築行政課");
+    expect(m.contact?.phone).toBe("098-923-7601");
+    expect(m.contact?.fax).toBe("098-923-7642");
+    // 前の「うるま市道路種別マップ」は公開をやめた
+    expect(m.contact?.note).toContain("役目を終えた");
   });
 });
 
@@ -1790,8 +1859,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: KYUSHU_PENDING,
       total: 36,
       outside: ["国頭村", "大宜味村", "東村", "今帰仁村", "恩納村", "宜野座村", "金武町", "伊江村", "伊平屋村", "伊是名村", "久米島町", "渡嘉敷村", "座間味村", "粟国村", "渡名喜村", "南大東村", "北大東村", "多良間村", "竹富町", "与那国町"],
-      // 特定行政庁の5市のうち、まだ調べている途中の市（那覇市は登録した。下の「沖縄県の、市が扱う市」）
-      cities: ["宜野湾市", "浦添市", "沖縄市", "うるま市"],
+      // 特定行政庁の5市は、全部登録した（下の「沖縄県の、市が扱う市」）
+      cities: [],
       offices: { 北部土木事務所: 12, 中部土木事務所: 6, 南部土木事務所: 13, 宮古土木事務所: 2, 八重山土木事務所: 3 },
     },
     {
