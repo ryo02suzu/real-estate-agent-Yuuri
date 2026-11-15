@@ -4,6 +4,7 @@
 // タイルの読み込みは ParcelSource に任せる（実物は parcel-tiles.ts、テストでは作り物を渡す）。
 import { SANKO_MARK } from "./sanko-data";
 import { subCompatible, subNorm, subParse, type AddressSub } from "./parcel-sub";
+import type { ParcelIndex } from "./parcel-index";
 
 /** 筆を探すタイルのズーム（このズームのタイルに全ての筆が入っている） */
 export const PARCEL_ZOOM = 16;
@@ -445,7 +446,7 @@ export async function searchParcel(
     radius?: number;
     batch?: number;
     /** 地番の索引（lib/roadmap/parcel-index.ts）。あれば、その町で番号が入っているタイルを先に開く */
-    index?: { k: Record<string, [number, number, number, number][]> } | null;
+    index?: Pick<ParcelIndex, "k" | "h"> | null;
   } = {},
 ): Promise<ParcelSearch> {
   const [sx, sy] = tileOf(start.lat, start.lng);
@@ -579,16 +580,26 @@ export async function searchParcel(
     if (!Number.isNaN(num)) {
       const tiles = indexTiles;
       const key = new Set<string>();
-      for (const [kuiki, entries] of Object.entries(index.k)) {
-        if (!townMatches(kuiki, town)) continue;
-        for (const [x, y, lo, hi] of entries) {
-          const k = `${x},${y}`;
-          if (lo <= num && num <= hi && !key.has(k)) {
-            key.add(k);
-            tiles.push([x, y]);
+      // 頭ごとに分けた索引（index.h）なら、探す地番の頭（「子39-2」の子）と同じ頭の範囲のタイルだけを開ける。同じ町に「甲39」「丁39」「子39」「39」が
+      // 並ぶ所（伊予市中山町中山は番号 39 の入るタイルが 55 枚）で、近い 24 枚に入らない遠いタイルの筆も見つけるため。
+      // 小字の欄にイロハがある地番区域（かほく市「白尾」＋「ハ」）の筆は頭が無いので、小字が探す頭と同じ地番区域は頭の無い範囲を使う
+      const headOk = (kuiki: string, entryHead: string) =>
+        !index.h || entryHead === wantHead || (!!wantHead && !entryHead && kuikiParts(kuiki).koaza.normalize("NFKC") === wantHead);
+      const collect = (byHead: boolean) => {
+        for (const [kuiki, entries] of Object.entries(index.k)) {
+          if (!townMatches(kuiki, town)) continue;
+          for (const [x, y, lo, hi, entryHead = ""] of entries) {
+            const k = `${x},${y}`;
+            if (lo <= num && num <= hi && !key.has(k) && (!byHead || headOk(kuiki, entryHead))) {
+              key.add(k);
+              tiles.push([x, y]);
+            }
           }
         }
-      }
+      };
+      collect(true);
+      // 頭で絞って1枚も無ければ（頭の書き方の違いなど）、頭を見ずに番号だけで選ぶ
+      if (!tiles.length) collect(false);
       tiles.sort((a, b) => (a[0] - sx) ** 2 + (a[1] - sy) ** 2 - ((b[0] - sx) ** 2 + (b[1] - sy) ** 2));
       for (let i = 0; i < Math.min(tiles.length, 24) && !hits.size; i += 8) await visit(tiles.slice(i, Math.min(i + 8, 24)));
     }
