@@ -4,8 +4,7 @@
 import type { Municipality } from "../municipalities";
 
 export const KYUSHU_PENDING: Municipality[] = [
-  // 福岡県（残り 4）
-  { pref: "福岡県", name: "北九州市", codes: ["40101", "40103", "40105", "40106", "40107", "40108", "40109"], coverage: "unknown", maps: [] },
+  // 福岡県（残り 3）
   { pref: "福岡県", name: "福岡市", codes: ["40131", "40132", "40133", "40134", "40135", "40136", "40137"], coverage: "unknown", maps: [] },
   { pref: "福岡県", name: "大牟田市", codes: ["40202"], coverage: "unknown", maps: [] },
   { pref: "福岡県", name: "久留米市", codes: ["40203"], coverage: "unknown", maps: [] },

@@ -16,7 +16,7 @@ import { OITA } from "./data/oita";
 import { KUMAMOTO } from "./data/kumamoto";
 import { NAGASAKI } from "./data/nagasaki";
 import { SAGA } from "./data/saga";
-import { FUKUOKA } from "./data/fukuoka";
+import { FUKUOKA, FUKUOKA_CITIES } from "./data/fukuoka";
 import { KOCHI } from "./data/kochi";
 import { TOKUSHIMA } from "./data/tokushima";
 import { EHIME } from "./data/ehime";
@@ -486,7 +486,7 @@ describe("全国対応で足した地方（中国・四国・九州沖縄・北�
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
     ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...CHUGOKU_PENDING], 107],
     ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING], 95],
-    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...KYUSHU_PENDING], 274],
+    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KYUSHU_PENDING], 274],
     ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING], 179],
   ];
   const table = Object.assign({}, ...Object.values(GSI_CODES as Record<string, Record<string, string>>)) as Record<string, string>;
@@ -550,6 +550,23 @@ describe("全国対応で足した地方（中国・四国・九州沖縄・北�
     // 対応している都道府県のコード表は、今までどおり全部使う
     for (const name of Object.values(PREF_NAMES)) expect(MUNI_CODES[name], name).toBeDefined();
     expect(Object.keys(MUNI_CODES)).toHaveLength(Object.keys(PREF_NAMES).length);
+  });
+});
+
+describe("福岡県の、市が扱う市（登録した市）", () => {
+  it("北九州市：市の「建築基準法道路種別地図」が物件の位置で開く。判定のくわしいことは電話では答えない", () => {
+    const m = FUKUOKA_CITIES.find((x) => x.name === "北九州市")!;
+    expect(m.codes).toEqual(["40101", "40103", "40105", "40106", "40107", "40108", "40109"]);
+    expect(m.coverage).toBe("full");
+    expect(m.maps[0].kind).toBe("road_type");
+    // ArcGIS Experience の地図ウィジェット（widget_6）に、経度・緯度・縮尺を渡す（2026-11-15 に、その場所が中心に開くことを確かめた）
+    expect(buildLinks(m, 33.8834, 130.8752)[0].url).toBe("https://experience.arcgis.com/experience/6e6a6058a22a4e998a5e5470fc429a8e/#widget_6=center:130.875200%2C33.883400%2C4326,scale:2500");
+    expect(m.maps[0].tip).toContain("自分で「上記の利用条件に同意します」に印を付けて");
+    expect(m.maps[0].tip).toContain("1号道路・2号道路は、原則マーキングされていない");
+    expect(m.maps[0].tip).toContain("不動産取引など権利・義務が発生するものや建築確認申請の資料には使えない");
+    expect(m.contact?.phone).toBe("093-582-2535");
+    expect(m.contact?.noPhoneInquiry).toBe(true);
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "福岡県").map((x) => x.name)).toEqual(["福岡市", "大牟田市", "久留米市"]);
   });
 });
 
@@ -721,7 +738,7 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       total: 56,
       // 都市計画区域も準都市計画区域も無い村だけ（準都市計画区域のある うきは市・大木町・香春町・糸田町・大任町・福智町・上毛町 は区域外にしない）
       outside: ["東峰村", "赤村"],
-      cities: ["北九州市", "福岡市", "大牟田市", "久留米市"],
+      cities: ["福岡市", "大牟田市", "久留米市"],
       offices: { 福岡県土整備事務所: 9, 那珂県土整備事務所: 5, 朝倉県土整備事務所: 3, 久留米県土整備事務所: 3, 南筑後県土整備事務所: 4, 八女県土整備事務所: 3, 飯塚県土整備事務所: 3, 直方県土整備事務所: 4, 田川県土整備事務所: 8, 北九州県土整備事務所: 7, 京築県土整備事務所: 7 },
     },    {
       pref: "佐賀県",

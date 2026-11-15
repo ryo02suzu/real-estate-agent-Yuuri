@@ -22,7 +22,7 @@ import { OITA } from "./data/oita";
 import { KUMAMOTO } from "./data/kumamoto";
 import { NAGASAKI } from "./data/nagasaki";
 import { SAGA } from "./data/saga";
-import { FUKUOKA } from "./data/fukuoka";
+import { FUKUOKA, FUKUOKA_CITIES } from "./data/fukuoka";
 import { KOCHI } from "./data/kochi";
 import { TOKUSHIMA } from "./data/tokushima";
 import { EHIME } from "./data/ehime";
@@ -173,7 +173,7 @@ const BASE: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GU
 const ADDED: [RegionKey, Municipality[]][] = [
   ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...CHUGOKU_PENDING]],
   ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING]],
-  ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...KYUSHU_PENDING]],
+  ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KYUSHU_PENDING]],
   ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING]],
 ];
 
