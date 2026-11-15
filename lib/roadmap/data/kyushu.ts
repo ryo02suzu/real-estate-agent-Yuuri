@@ -9,14 +9,8 @@ export const KYUSHU_PENDING: Municipality[] = [
   // 熊本県（残り 2）
   { pref: "熊本県", name: "熊本市", codes: ["43101", "43102", "43103", "43104", "43105"], coverage: "unknown", maps: [] },
   { pref: "熊本県", name: "八代市", codes: ["43202"], coverage: "unknown", maps: [] },
-  // 宮崎県（残り 3）
-  { pref: "宮崎県", name: "都城市", codes: ["45202"], coverage: "unknown", maps: [] },
-  { pref: "宮崎県", name: "延岡市", codes: ["45203"], coverage: "unknown", maps: [] },
+  // 宮崎県（残り 1）
   { pref: "宮崎県", name: "日向市", codes: ["45206"], coverage: "unknown", maps: [] },
-  // 鹿児島県（残り 3）
-  { pref: "鹿児島県", name: "鹿屋市", codes: ["46203"], coverage: "unknown", maps: [] },
-  { pref: "鹿児島県", name: "薩摩川内市", codes: ["46215"], coverage: "unknown", maps: [] },
-  { pref: "鹿児島県", name: "霧島市", codes: ["46218"], coverage: "unknown", maps: [] },
   // 沖縄県（残り 4）
   { pref: "沖縄県", name: "宜野湾市", codes: ["47205"], coverage: "unknown", maps: [] },
   { pref: "沖縄県", name: "浦添市", codes: ["47208"], coverage: "unknown", maps: [] },
