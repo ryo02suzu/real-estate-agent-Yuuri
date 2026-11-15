@@ -1487,8 +1487,9 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     const kinki = data.sheets.filter((s) => /^(2[4-9]|30)/.test(s.code) && s.shift);
     // 11-12 の14枚と、11-13 に地価の地点で見つけた東員町（2枚）・木津川市（1枚）・生駒市北新町（1枚の一部・大字ごとに2つ）・松阪市飯南町（1枚）・津市あのつ台１丁目（1枚）・
     // 神戸市北区若葉台（1枚の本体を縮尺ごと直す。大字・丁目ごとに6つ）、11-14 に拾い直した津市（みのりヶ丘・あのつ台三丁目・五丁目）と松阪市（清生町・垣鼻町・田原町）の4枚、
-    // 11-15 に全部の図面の点検（v4）で見つけた神戸市西区岩岡町古郷・加古川市志方町畑の2枚と、加西市中山町・丹波篠山市今田町本荘の2枚
-    expect(kinki).toHaveLength(35);
+    // 11-15 に全部の図面の点検（v4）で見つけた神戸市西区岩岡町古郷・加古川市志方町畑の2枚と、加西市中山町・丹波篠山市今田町本荘の2枚、
+    // 同じ点検の続きで見つけた亀岡市（ヒエ田野町・宮前町宮川・本梅町井手）の3枚と京田辺市（普賢寺の水取・打田の工区）の2枚
+    expect(kinki).toHaveLength(40);
     const sanda = kinki.filter((s) => s.code === "28219");
     expect(sanda.map((s) => s.sheet).sort()).toEqual(["あかしあ台１～５丁目", "すずかけ台１～４丁目", "ゆりのき台１～６丁目（修正後）", "北摂三田ニュータウン南地区"].sort());
     expect(sanda.reduce((a, s) => a + s.parcels, 0)).toBe(11320);
@@ -1640,6 +1641,46 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     expect(s!.reason).toMatch(/航空写真/);
     // 重なっていた隣の図面（愛宕山）は、今の位置が正しい（動かさない）
     expect(data.sheets.some((x) => x.code === "39201" && x.sheet === "愛宕山（数値）２４Ｒ０１")).toBe(false);
+  });
+  it("2026-11-15：全部の図面の点検（v4・481市区町村まで）の続きで見つけた11枚を、計算どおりの量で動かす（写真・地形図に重ねて確かめた）", () => {
+    const want: [string, string, "T1" | "T2", number][] = [
+      ["14212", "10543_hosei_20121120084303", "T2", 172],
+      ["11217", "10043_hosei_20121129101506", "T2", 1209],
+      ["12208", "24239_hosei_20121106095425", "T2", 1220],
+      ["12208", "24339_hosei_20121106100443", "T2", 316],
+      ["26206", "０７年度１／５００土地改良", "T1", 302],
+      ["26206", "１２年度１／５００土地改良", "T1", 546],
+      ["26206", "０５年度１／５００土地改良", "T1", 98],
+      ["26211", "普賢寺水取工区", "T1", 135],
+      ["26211", "普賢寺打田工区", "T1", 226],
+      ["23211", "怒田沢町Ｂ", "T1", 48],
+      ["23211", "竹元町Ｂ", "T2", 261],
+    ];
+    for (const [code, sheet, kind, parcels] of want) {
+      const all = data.sheets.filter((x) => x.code === code && x.sheet === sheet);
+      // 地図ごと動かす決まり1つだけ（前の「重なる部分だけ外す」決まりは置き換えた）
+      expect(all, `${code} ${sheet}`).toHaveLength(1);
+      const s = all[0];
+      expect(s.shift?.kind, sheet).toBe(kind);
+      expect(s.parcels, sheet).toBe(parcels);
+      expect(s.chiban, sheet).toBeUndefined();
+      expect(s.oaza, sheet).toBeUndefined();
+      expect(Math.hypot(s.shift!.east, s.shift!.north), sheet).toBeGreaterThan(430);
+      expect(Math.hypot(s.shift!.east, s.shift!.north), sheet).toBeLessThan(465);
+      expect(s.reason, sheet).toMatch(/道路縁に筆の境が沿う割合/);
+      // 町の名前が重ならない（「宮前町宮川・宮前町宮川・…」と書かない）
+      const names = s.town.split(" ")[1].split("（")[0].split("・");
+      expect(new Set(names).size, s.town).toBe(names.length);
+    }
+    expect(want.reduce((a, w) => a + w[3], 0)).toBe(4533);
+    // 前は重なる部分だけを外していた4枚：重なりは地図全体のずれのせいだった
+    for (const [code, sheet] of [["14212", "10543_hosei_20121120084303"], ["11217", "10043_hosei_20121129101506"], ["12208", "24239_hosei_20121106095425"], ["12208", "24339_hosei_20121106100443"]]) {
+      expect(data.sheets.find((x) => x.code === code && x.sheet === sheet)!.reason).toMatch(/前は、ほかの地図の筆と重なる部分（.+の \d+筆）だけを外していた/);
+    }
+    // 亀岡市の「ヒエ田野町」は国勢調査では「稗田野町」。字を読み替えて数えた
+    expect(data.sheets.find((x) => x.code === "26206" && x.sheet === "０７年度１／５００土地改良")!.reason).toMatch(/稗田野町.*217/);
+    // 山林の図面（豊田市怒田沢町）は地形図で確かめた
+    expect(data.sheets.find((x) => x.code === "23211" && x.sheet === "怒田沢町Ｂ")!.reason).toMatch(/地形図/);
   });
   it("2026-11-15：札幌市手稲区 金山の図面（523筆）は、北海道の XII 系で北西へ約404mずれている（T2。南東へ動かす）", () => {
     const s = data.sheets.find((x) => x.code === "01109" && x.sheet === "整附Ｂ（１／５００）数値Ｈ１７");
