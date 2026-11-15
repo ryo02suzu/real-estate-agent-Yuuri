@@ -5,8 +5,6 @@ import type { Municipality } from "../municipalities";
 export const SHIKOKU_PENDING: Municipality[] = [
   // 徳島県（残り 1）
   { pref: "徳島県", name: "徳島市", codes: ["36201"], coverage: "unknown", maps: [] },
-  // 香川県（残り 1）
-  { pref: "香川県", name: "高松市", codes: ["37201"], coverage: "unknown", maps: [] },
   // 愛媛県（残り 5）
   { pref: "愛媛県", name: "松山市", codes: ["38201"], coverage: "unknown", maps: [] },
   { pref: "愛媛県", name: "今治市", codes: ["38202"], coverage: "unknown", maps: [] },

@@ -15,9 +15,9 @@ import { KYUSHU_PENDING } from "./data/kyushu";
 import { HOKKAIDO_PENDING } from "./data/hokkaido";
 import { HOKKAIDO_CITIES } from "./data/hokkaido-cities";
 import { HOKKAIDO } from "./data/hokkaido-pref";
-import { OKINAWA } from "./data/okinawa";
+import { OKINAWA, OKINAWA_CITIES } from "./data/okinawa";
 import { KAGOSHIMA, KAGOSHIMA_CITIES } from "./data/kagoshima";
-import { MIYAZAKI } from "./data/miyazaki";
+import { MIYAZAKI, MIYAZAKI_CITIES } from "./data/miyazaki";
 import { OITA, OITA_CITIES } from "./data/oita";
 import { KUMAMOTO } from "./data/kumamoto";
 import { NAGASAKI } from "./data/nagasaki";
@@ -26,7 +26,7 @@ import { FUKUOKA, FUKUOKA_CITIES } from "./data/fukuoka";
 import { KOCHI } from "./data/kochi";
 import { TOKUSHIMA } from "./data/tokushima";
 import { EHIME } from "./data/ehime";
-import { KAGAWA } from "./data/kagawa";
+import { KAGAWA, KAGAWA_CITIES } from "./data/kagawa";
 import { SHIMANE } from "./data/shimane";
 import { TOTTORI } from "./data/tottori";
 import { YAMAGUCHI } from "./data/yamaguchi";
@@ -172,8 +172,8 @@ const BASE: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GU
  */
 const ADDED: [RegionKey, Municipality[]][] = [
   ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...CHUGOKU_PENDING]],
-  ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING]],
-  ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...KYUSHU_PENDING]],
+  ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...KAGAWA_CITIES, ...SHIKOKU_PENDING]],
+  ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...MIYAZAKI_CITIES, ...OKINAWA_CITIES, ...KYUSHU_PENDING]],
   ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING]],
 ];
 

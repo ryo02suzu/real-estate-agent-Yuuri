@@ -9,9 +9,9 @@ import { KYUSHU_PENDING } from "./data/kyushu";
 import { HOKKAIDO_PENDING } from "./data/hokkaido";
 import { HOKKAIDO_CITIES } from "./data/hokkaido-cities";
 import { HOKKAIDO } from "./data/hokkaido-pref";
-import { OKINAWA } from "./data/okinawa";
+import { OKINAWA, OKINAWA_CITIES } from "./data/okinawa";
 import { KAGOSHIMA, KAGOSHIMA_CITIES } from "./data/kagoshima";
-import { MIYAZAKI } from "./data/miyazaki";
+import { MIYAZAKI, MIYAZAKI_CITIES } from "./data/miyazaki";
 import { OITA, OITA_CITIES } from "./data/oita";
 import { KUMAMOTO } from "./data/kumamoto";
 import { NAGASAKI } from "./data/nagasaki";
@@ -20,7 +20,7 @@ import { FUKUOKA, FUKUOKA_CITIES } from "./data/fukuoka";
 import { KOCHI } from "./data/kochi";
 import { TOKUSHIMA } from "./data/tokushima";
 import { EHIME } from "./data/ehime";
-import { KAGAWA } from "./data/kagawa";
+import { KAGAWA, KAGAWA_CITIES } from "./data/kagawa";
 import { SHIMANE } from "./data/shimane";
 import { TOTTORI } from "./data/tottori";
 import { YAMAGUCHI } from "./data/yamaguchi";
@@ -485,8 +485,8 @@ describe("全国対応で足した地方（中国・四国・九州沖縄・北�
   // 地方ごとの市町村：調査中の一覧（data/<地方>.ts）と、調べ終えて登録した道県（data/<道県>.ts）を合わせたもの
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
     ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...CHUGOKU_PENDING], 107],
-    ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING], 95],
-    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...KYUSHU_PENDING], 274],
+    ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...KAGAWA_CITIES, ...SHIKOKU_PENDING], 95],
+    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...MIYAZAKI_CITIES, ...OKINAWA_CITIES, ...KYUSHU_PENDING], 274],
     ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING], 179],
   ];
   const table = Object.assign({}, ...Object.values(GSI_CODES as Record<string, Record<string, string>>)) as Record<string, string>;
@@ -671,6 +671,70 @@ describe("大分県の、市が扱う市（登録した市）", () => {
   });
 });
 
+describe("香川県の、市が扱う市（登録した市）", () => {
+  it("高松市：市の地図「たかまっぷ」の道路種別マップ。規約に合わせてトップページを開く。営利目的の利用を禁じていることを書く", () => {
+    const m = KAGAWA_CITIES.find((x) => x.name === "高松市")!;
+    expect(m.codes).toEqual(["37201"]);
+    expect(m.coverage).toBe("full");
+    expect(m.maps).toHaveLength(1);
+    expect(m.maps[0].kind).toBe("road_type");
+    // 利用規約：「たかまっぷ」のトップページはリンクフリー（「たかまっぷ」へのリンクだと明記する）
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://www.city.takamatsu.kagawa.jp/kurashi/takamap/index.html");
+    expect(m.maps[0].label).toContain("たかまっぷ");
+    expect(m.maps[0].tip).toContain("自分で「同意する」を押して進む");
+    // 市のページの色の説明
+    expect(m.maps[0].tip).toContain("緑色の両矢印線＝1項1号");
+    expect(m.maps[0].tip).toContain("茶色の両矢印線＝法外道路");
+    // 規約の禁止事項
+    expect(m.maps[0].tip).toContain("営利目的でサービスを使うこと");
+    expect(m.contact?.phone).toBe("087-839-2488");
+    expect(m.contact?.fax).toBe("087-839-2452");
+    expect(SHIKOKU_PENDING.filter((x) => x.pref === "香川県")).toEqual([]);
+  });
+});
+
+describe("宮崎県の、市が扱う市（登録した市）", () => {
+  it("宮崎市：市の地図（建築基準法指定道路。2項・1項4号・1項5号）。照会はスマート申請で、来庁・電話などはできるだけ遠慮", () => {
+    const m = MIYAZAKI_CITIES.find((x) => x.name === "宮崎市")!;
+    expect(m.codes).toEqual(["45201"]);
+    // 1項1号・2号は地図に載らない（市の確かめ方の順で確かめる）ので「一部の種別」
+    expect(m.coverage).toBe("partial");
+    expect(m.maps[0].kind).toBe("designated_only");
+    // 市のページと同じ入口のリンク（地図の中は開いて確かめていない）
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://webgis.alandis.jp/miyazaki45/portal/");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("「建築基準法指定道路」を選び");
+    expect(m.maps[0].tip).toContain("建築基準法の道路種別の照会");
+    expect(m.contact?.phone).toBe("0985-21-1813");
+    expect(m.contact?.fax).toBe("0985-21-1815");
+    // 来庁も遠慮するよう求めているので、「電話では答えない（窓口へ）」の印は付けず、注意書きに書く
+    expect(m.contact?.noPhoneInquiry).toBeUndefined();
+    expect(m.contact?.note).toContain("できるだけ遠慮するよう市が求めている");
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "宮崎県").map((x) => x.name)).toEqual(["都城市", "延岡市", "日向市"]);
+  });
+});
+
+describe("沖縄県の、市が扱う市（登録した市）", () => {
+  it("那覇市：市の地図「なはMAP」の道路種別マップ。どの種別まで色分けされるかは確かめられていないので「一部」。電話では受けない", () => {
+    const m = OKINAWA_CITIES.find((x) => x.name === "那覇市")!;
+    expect(m.codes).toEqual(["47201"]);
+    expect(m.coverage).toBe("partial");
+    expect(m.maps[0].kind).toBe("road_type");
+    // 市のページと同じリンク（利用条件の同意の画面）。同意の先は開かない
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://www.sonicweb-asp.jp/naha/agreement?theme=th_56");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("表示テーマを「道路種別マップ」に変えて");
+    expect(m.maps[0].tip).toContain("どの種別まで色分けされているかは、MICHILU では確かめられていない");
+    expect(m.contact?.phone).toBe("098-951-3244");
+    expect(m.contact?.fax).toBe("098-951-3245");
+    expect(m.contact?.noPhoneInquiry).toBe(true);
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "沖縄県").map((x) => x.name)).toEqual(["宜野湾市", "浦添市", "沖縄市", "うるま市"]);
+  });
+});
+
 describe("福岡県の、市が扱う市（登録した市）", () => {
   it("北九州市：市の「建築基準法道路種別地図」が物件の位置で開く。判定のくわしいことは電話では答えない", () => {
     const m = FUKUOKA_CITIES.find((x) => x.name === "北九州市")!;
@@ -704,7 +768,51 @@ describe("北海道の、市が扱う市（登録した市）", () => {
     expect(m.contact?.noPhoneInquiry).toBe(true);
     // 登録した市は、調査中の一覧から外してある
     expect(HOKKAIDO_PENDING.map((x) => x.name)).not.toContain("札幌市");
-    expect(HOKKAIDO_PENDING).toHaveLength(38);
+    expect(HOKKAIDO_PENDING).toHaveLength(36);
+  });
+
+  it("旭川市：市ホームページの「旭川市建築行政地図情報システム」（指定道路図）。ユーザー登録と同意は使う人が自分でする", () => {
+    const m = HOKKAIDO_CITIES.find((x) => x.name === "旭川市")!;
+    expect(m.codes).toEqual(["01204"]);
+    expect(m.coverage).toBe("full");
+    expect(m.maps[0].kind).toBe("road_type");
+    expect(m.maps[0].build).toBeNull();
+    // 規約と条件のページ（「規約と条件に同意して利用する」の手前）
+    expect(m.maps[0].url).toBe("https://www.city.asahikawa.hokkaido.jp/500/522/53901/5439004/d079307.html");
+    // 市の決まり：旭川市ホームページへのリンクだと明記する
+    expect(m.maps[0].label).toContain("旭川市ホームページ");
+    expect(m.maps[0].tip).toContain("本名でのユーザー登録が要る");
+    expect(m.maps[0].tip).toContain("国道・道道は表示していない");
+    expect(m.maps[0].tip).toContain("取引の資料にするもの");
+    expect(m.contact?.phone).toBe("0166-25-8597");
+    expect(m.contact?.fax).toBe("0166-27-3466");
+    // 電話は断っていない（位置が分かる資料を FAX・メールで示す）
+    expect(m.contact?.noPhoneInquiry).toBeUndefined();
+    expect(m.contact?.note).toContain("FAX・メールなどで示す");
+    expect(HOKKAIDO_PENDING.map((x) => x.name)).not.toContain("旭川市");
+  });
+
+  it("函館市：市の地図（ArcGIS）が、物件の位置で、道路種別の層を出して開く。市道の地図も位置で開く。電話での確認は原則しない", () => {
+    const m = HOKKAIDO_CITIES.find((x) => x.name === "函館市")!;
+    expect(m.codes).toEqual(["01202"]);
+    expect(m.coverage).toBe("full");
+    expect(m.maps.map((x) => x.kind)).toEqual(["road_type", "public_road"]);
+    // 函館市役所のあたり。center=経度,緯度,4326 と scale、道路種別の4つの層（showLayers）を渡す（2026-11-15 に、その場所が画面に入ることを確かめた）
+    const url = m.maps[0].build!(41.7687, 140.729);
+    expect(url).toBe(
+      "https://hakodate-tokei.maps.arcgis.com/apps/webappviewer/index.html?id=24f3abd1e4de4d649aee5ee73fbc6d10&center=140.729000,41.768700,4326&scale=2500&showLayers=" +
+        encodeURIComponent("道路種別_建築基準法v2_503;道路種別_建築基準法v2_3271;道路種別_建築基準法v2_3427;道路種別_建築基準法v2_166"),
+    );
+    expect(m.maps[0].verified).toBe(true);
+    expect(m.maps[0].tip).toContain("自分で「上記の利用条件に同意します」に印を付けて OK を押す");
+    // 層が出ないときの手順と、規約の禁止事項も書く
+    expect(m.maps[0].tip).toContain("レイヤーリスト");
+    expect(m.maps[0].tip).toContain("営利目的での利用");
+    // 市道の地図（ArcGIS Experience の地図ウィジェット widget_6）
+    expect(m.maps[1].build!(41.7687, 140.729)).toBe("https://experience.arcgis.com/experience/63b98f8dd0cb41c49fef5f987a295e84/#widget_6=center:140.729000%2C41.768700%2C4326,scale:2500");
+    expect(m.contact?.phone).toBe("0138-21-3394");
+    expect(m.contact?.noPhoneInquiry).toBe(true);
+    expect(HOKKAIDO_PENDING.map((x) => x.name)).not.toContain("函館市");
   });
 });
 
@@ -813,8 +921,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: SHIKOKU_PENDING,
       total: 16,
       outside: ["直島町"],
-      // 特定行政庁は高松市だけ
-      cities: ["高松市"],
+      // 特定行政庁は高松市だけ（登録した。下の「香川県の、市が扱う市」）
+      cities: [],
       offices: { 長尾土木事務所: 3, 中讃土木事務所: 8, 西讃土木事務所: 2, 小豆総合事務所: 2, 建築指導課: 1 },
     },
     {
@@ -900,7 +1008,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: KYUSHU_PENDING,
       total: 22,
       outside: ["西米良村", "木城町", "諸塚村", "椎葉村", "美郷町", "日之影町", "五ヶ瀬町"],
-      cities: ["宮崎市", "都城市", "延岡市", "日向市"],
+      // 市が扱う4市のうち、まだ調べている途中の市（宮崎市は登録した。下の「宮崎県の、市が扱う市」）
+      cities: ["都城市", "延岡市", "日向市"],
       // 問い合わせ先は本務の事務所（国富町・綾町＝宮崎、西都市・西米良村＝高鍋、串間市＝日南）
       offices: { 宮崎土木事務所: 2, 高鍋土木事務所: 7, 日南土木事務所: 2, 都城土木事務所: 1, 小林土木事務所: 3, 日向土木事務所: 4, 西臼杵支庁: 3 },
     },    {
@@ -918,8 +1027,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: KYUSHU_PENDING,
       total: 36,
       outside: ["国頭村", "大宜味村", "東村", "今帰仁村", "恩納村", "宜野座村", "金武町", "伊江村", "伊平屋村", "伊是名村", "久米島町", "渡嘉敷村", "座間味村", "粟国村", "渡名喜村", "南大東村", "北大東村", "多良間村", "竹富町", "与那国町"],
-      // 特定行政庁の5市
-      cities: ["那覇市", "宜野湾市", "浦添市", "沖縄市", "うるま市"],
+      // 特定行政庁の5市のうち、まだ調べている途中の市（那覇市は登録した。下の「沖縄県の、市が扱う市」）
+      cities: ["宜野湾市", "浦添市", "沖縄市", "うるま市"],
       offices: { 北部土木事務所: 12, 中部土木事務所: 6, 南部土木事務所: 13, 宮古土木事務所: 2, 八重山土木事務所: 3 },
     },
     {
@@ -929,8 +1038,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       total: 140,
       // 都市計画区域の無い80町村から、準都市計画区域のあるニセコ町を除いた79
       outside: ["上砂川町", "由仁町", "月形町", "浦臼町", "妹背牛町", "秩父別町", "雨竜町", "北竜町", "沼田町", "新篠津村", "島牧村", "寿都町", "黒松内町", "蘭越町", "真狩村", "留寿都村", "喜茂別町", "京極町", "泊村", "神恵内村", "積丹町", "仁木町", "赤井川村", "豊浦町", "平取町", "新冠町", "様似町", "えりも町", "松前町", "知内町", "鹿部町", "上ノ国町", "厚沢部町", "乙部町", "奥尻町", "当麻町", "比布町", "愛別町", "東川町", "中富良野町", "南富良野町", "占冠村", "和寒町", "剣淵町", "音威子府村", "中川町", "幌加内町", "小平町", "苫前町", "初山別村", "遠別町", "天塩町", "猿払村", "中頓別町", "豊富町", "礼文町", "利尻町", "利尻富士町", "幌延町", "津別町", "清里町", "小清水町", "訓子府町", "置戸町", "佐呂間町", "湧別町", "西興部村", "士幌町", "上士幌町", "鹿追町", "中札内村", "更別村", "豊頃町", "陸別町", "浜中町", "鶴居村", "別海町", "標津町", "羅臼町"],
-      // 特定行政庁の10市と、限定特定行政庁の29市町のうち、まだ調べている38市町（札幌市は登録した。data/hokkaido-cities.ts）
-      cities: ["函館市", "小樽市", "旭川市", "室蘭市", "釧路市", "帯広市", "北見市", "岩見沢市", "網走市", "留萌市", "苫小牧市", "稚内市", "江別市", "紋別市", "士別市", "名寄市", "三笠市", "根室市", "千歳市", "砂川市", "深川市", "富良野市", "登別市", "恵庭市", "伊達市", "北広島市", "石狩市", "当別町", "森町", "長沼町", "東神楽町", "美幌町", "遠軽町", "白老町", "音更町", "芽室町", "幕別町", "中標津町"],
+      // 特定行政庁の10市と、限定特定行政庁の29市町のうち、まだ調べている36市町（札幌市・旭川市・函館市は登録した。data/hokkaido-cities.ts）
+      cities: ["小樽市", "室蘭市", "釧路市", "帯広市", "北見市", "岩見沢市", "網走市", "留萌市", "苫小牧市", "稚内市", "江別市", "紋別市", "士別市", "名寄市", "三笠市", "根室市", "千歳市", "砂川市", "深川市", "富良野市", "登別市", "恵庭市", "伊達市", "北広島市", "石狩市", "当別町", "森町", "長沼町", "東神楽町", "美幌町", "遠軽町", "白老町", "音更町", "芽室町", "幕別町", "中標津町"],
       offices: { 空知総合振興局: 19, 石狩振興局: 1, 後志総合振興局: 19, 胆振総合振興局: 6, 日高振興局: 7, 渡島総合振興局: 9, 檜山振興局: 7, 上川総合振興局: 18, 留萌振興局: 7, 宗谷総合振興局: 9, オホーツク総合振興局: 13, 十勝総合振興局: 15, 釧路総合振興局: 7, 根室振興局: 3 },
     },
   ];
