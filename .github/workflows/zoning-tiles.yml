@@ -98,15 +98,17 @@ jobs:
           if git diff --quiet && [ -z "$(git status --porcelain public/data)" ]; then echo "変更なし"; exit 0; fi
           rel=$(jq -r .url lib/roadmap/data/zoning-source.json)
           file="public$rel"
-          name=$(basename "$file")
           size=$(stat -c %s "$file")
-          echo "タイル: $name（$((size / 1000000)) MB）"
+          echo "タイル: $(basename "$file")（$((size / 1000000)) MB）"
           if [ -z "$ACCOUNT" ] || [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$R2_PUBLIC_URL" ]; then
             echo "::warning::R2 の設定が無いので、アプリ（public/data/）に入れます"
             [ "$size" -lt 95000000 ] || { echo "::error::タイルが 95MB を超えていて GitHub に入れられません。R2 の設定を入れてください"; exit 1; }
             exit 0
           fi
           endpoint="https://$ACCOUNT.r2.cloudflarestorage.com"
+          # R2 に置く名前は、元データの日付に作った日時を足す（zoning-<元データの日付>-<作った日時>.pmtiles）。同じ元データから作り直しても
+          # 前のファイルを上書きしない（ブラウザが読みかけのタイルと混ざらない。地番・公図のタイルと同じ考え方）
+          name="$(basename "$file" .pmtiles)-$(TZ=Asia/Tokyo date +%Y%m%d%H%M).pmtiles"
           # R2 への書き込みは、送り終えたあと返事が来ないまま時間切れになることがある。3回までやり直す
           for i in 1 2 3; do
             aws s3 cp "$file" "s3://$R2_BUCKET/zoning/$name" --endpoint-url "$endpoint" --only-show-errors \

@@ -25,6 +25,8 @@ import unicodedata
 import urllib.request
 import zipfile
 
+import io
+
 import fiona
 
 # G空間情報センターの法務省の組織名（都道府県ごと）。API（organization_list / package_search）で実在を確かめたものだけ入れる
@@ -105,6 +107,36 @@ def list_zips(pref: str, year: str) -> list[tuple[str, str, int]]:
         return []
     y = max(found) if year == "latest" else year
     return sorted(found.get(y, {}).values())
+
+
+# 地図XML を読むときに使うメモリは、XML の大きさのおよそ9〜10倍（愛媛県西条市の 497MB の XML で 4.6GB）。mojxml2ogr はふつう
+# CPU の数だけ同時に読むので、数百MB の XML がいくつもある zip（福岡県の 40210・愛媛県の 38206 など）は、メモリが足りなくなって
+# GitHub Actions の実行機ごと止まる（「The runner has received a shutdown signal」）。同時に読む分の見積もりが上限を超える zip は、1つずつ読む
+MOJ_MEM_PER_BYTE = 10
+MOJ_MEM_BUDGET = 9e9  # 実行機のメモリ（16GB）のうち、同時に読む XML に使ってよい見積もりの上限
+
+
+def xml_sizes(zp: str) -> list[int]:
+    """zip の中の地図XML の大きさ（大きい順）。zip の中に、図面ごとの zip が入っている形もある"""
+    sizes: list[int] = []
+    with zipfile.ZipFile(zp) as z:
+        for i in z.infolist():
+            name = i.filename.lower()
+            if name.endswith(".xml"):
+                sizes.append(i.file_size)
+            elif name.endswith(".zip"):
+                try:
+                    with zipfile.ZipFile(io.BytesIO(z.read(i))) as zz:
+                        sizes.extend(j.file_size for j in zz.infolist() if j.filename.lower().endswith(".xml"))
+                except zipfile.BadZipFile:
+                    pass
+    return sorted(sizes, reverse=True)
+
+
+def moj_worker(sizes: list[int], cpus: int | None = None) -> str:
+    """mojxml2ogr の読み方：同時に読んでもメモリが足りるなら multiprocess（速い）、足りなくなりそうなら single（1つずつ）"""
+    n = cpus or os.cpu_count() or 4
+    return "single" if MOJ_MEM_PER_BYTE * sum(sizes[:n]) > MOJ_MEM_BUDGET else "multiprocess"
 
 
 def download(url: str, path: str) -> None:
@@ -486,8 +518,11 @@ def main() -> None:
             fgb = zp[:-4] + ".fgb"
             t = time.time()
             download(url, zp)
-            # 任意座標系・地区外は入れない（位置が合わない／筆ではない）
-            subprocess.run(["mojxml2ogr", fgb, zp], check=True, stdout=subprocess.DEVNULL)
+            # 任意座標系・地区外は入れない（位置が合わない／筆ではない）。大きい XML がいくつもある zip は、1つずつ読む（メモリ）
+            worker = moj_worker(xml_sizes(zp))
+            if worker != "multiprocess":
+                log(f"  {name}: 大きい XML があるので1つずつ読む（--worker {worker}）")
+            subprocess.run(["mojxml2ogr", "--worker", worker, fgb, zp], check=True, stdout=subprocess.DEVNULL)
             n = append_features(fgb, out, boundaries, dropped, skip_sheets, skipped, shifted, index, name[:5])
             total += n
             os.remove(zp)

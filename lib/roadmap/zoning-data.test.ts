@@ -16,7 +16,8 @@ const hasYouto = (code: string) => statusFor([code], STATUS as Record<string, Zo
 
 describe("都市計画のタイルの置き場所（zoning-source.json）", () => {
   it("アプリの中（/data/）か、R2 の zoning/ の下の PMTiles。版と元データの更新日時がある", () => {
-    expect(SRC.url).toMatch(/^(\/data|https:\/\/[a-z0-9.-]+\.r2\.dev\/zoning)\/zoning-\d{8}\.pmtiles$/);
+    // R2 の名前は「zoning-<元データの日付>.pmtiles」か、作った日時を足した「zoning-<元データの日付>-<作った日時>.pmtiles」
+    expect(SRC.url).toMatch(/^(\/data\/zoning-\d{8}|https:\/\/[a-z0-9.-]+\.r2\.dev\/zoning\/zoning-\d{8}(-\d{12})?)\.pmtiles$/);
     expect(SRC.edition).toMatch(/\d+年/);
     expect(SRC.sourceModified).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });

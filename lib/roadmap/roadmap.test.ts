@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import GSI_CODES from "./data/gsi-muni-codes.json";
 import { GeocoderUnavailable, MUNICIPALITIES, buildLinks, findMunicipality, lookup, lookupPoint, muniName, resolveContact } from "./index";
+import { ALL_MUNICIPALITIES } from "./municipalities";
 
 // 熊谷市役所（宮町二丁目47）の国土地理院の座標
 const KUMAGAYA_CITY_HALL = { lat: 36.147129, lng: 139.38858 };
@@ -77,8 +78,15 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
     兵庫県: ["06", "072", "078", "079", "0790", "0791", "0794", "0795", "0796", "0797", "0798", "0799"],
     奈良県: ["0742", "0743", "0744", "0745", "0746", "07468", "0747"],
     和歌山県: ["073", "0735", "0736", "0737", "0738", "0739"],
+    // 中国・四国・九州沖縄・北海道：同じ一覧（令和8年3月1日現在）から、登録した県の分を足していく
+    広島県: ["082", "0823", "0824", "0826", "0827", "0829", "084", "0845", "0846", "0847", "08477", "0848"],
+    岡山県: ["086", "0863", "0865", "0866", "0867", "0868", "0869"],
+    山口県: ["0820", "0827", "083", "0833", "0834", "0835", "0836", "0837", "0838", "08387", "08388", "08396"],
+    鳥取県: ["0857", "0858", "0859"],
+    島根県: ["08512", "08514", "0852", "0853", "0854", "0855", "0856"],
   };
-  const contacts = MUNICIPALITIES.flatMap((m) =>
+  // 準備中の地方（まだ対応エリアに入れていない）の登録も、同じ決まりで確かめる
+  const contacts = ALL_MUNICIPALITIES.flatMap((m) =>
     [m.contact, ...Object.values(m.contactByCode ?? {})].filter((c) => c?.phone).map((c) => ({ m, phone: c!.phone! })),
   );
 
@@ -98,13 +106,13 @@ describe("電話番号の区切り（市外局番の桁数）", () => {
 });
 
 describe("MUNICIPALITIES", () => {
-  it("市区町村コードが重複していない", () => {
-    const codes = MUNICIPALITIES.flatMap((m) => m.codes);
+  it("市区町村コードが重複していない（準備中の地方も入れて）", () => {
+    const codes = ALL_MUNICIPALITIES.flatMap((m) => m.codes);
     expect(new Set(codes).size).toBe(codes.length);
   });
 
-  it("どの地図リンクも URL を作れる", () => {
-    for (const m of MUNICIPALITIES) {
+  it("どの地図リンクも URL を作れる（準備中の地方も入れて）", () => {
+    for (const m of ALL_MUNICIPALITIES) {
       for (const link of m.maps) {
         expect(link.build !== null || typeof link.url === "string", `${m.name} ${link.label}`).toBe(true);
       }
@@ -112,7 +120,7 @@ describe("MUNICIPALITIES", () => {
   });
 
   it("すべての市町村（政令市は全区）に問い合わせ先がある（道路図が調査中の市町村は地図も問い合わせ先もまだ無い）", () => {
-    for (const m of MUNICIPALITIES) {
+    for (const m of ALL_MUNICIPALITIES) {
       if (m.coverage === "unknown") {
         expect(m.maps, m.name).toEqual([]);
         continue;

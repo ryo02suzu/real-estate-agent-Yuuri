@@ -22,6 +22,9 @@ on:
         description: 作り直す地方（all = 全部。kanto・chubu・tohoku・kinki・chugoku・shikoku・kyushu・hokkaido。カンマ区切りで複数可）
         required: false
         default: all
+      prefs:
+        description: 作り直す都道府県だけ（コードのカンマ区切り。例「38,40」。失敗した県のやり直し用。入れると「地方」より優先）
+        required: false
   # 法務省の新しい版は毎年4月中旬に公開される。5月1日に作り直す
   schedule:
     - cron: "0 18 1 5 *"
@@ -60,6 +63,7 @@ jobs:
         env:
           # 入力はコマンドに直接埋め込まず、環境変数で受けて形を確かめる（地方の名前は英小文字。カンマ区切りで複数可）
           REGION: ${{ inputs.region || 'all' }}
+          ONLY_PREFS: ${{ inputs.prefs || '' }}
         run: |
           region="$REGION"
           if ! printf '%s' "$region" | grep -Eq '^[a-z]+(,[a-z]+)*$'; then echo "::error::地方の指定が分かりません"; exit 1; fi
@@ -70,6 +74,13 @@ jobs:
             prefs=$(jq -c --arg r "$region" '[($r | split(",")[]) as $k | .[$k].prefs | keys[]] | sort' lib/roadmap/data/regions.json)
           fi
           [ "$(echo "$prefs" | jq 'length')" -gt 0 ] || { echo "::error::地方の指定が分かりません: $region"; exit 1; }
+          # 都道府県を直接指定したとき（失敗した県のやり直し）。regions.json にある都道府県だけ
+          if [ -n "$ONLY_PREFS" ]; then
+            if ! printf '%s' "$ONLY_PREFS" | grep -Eq '^[0-9]{2}(,[0-9]{2})*$'; then echo "::error::都道府県の指定が分かりません（2桁のコードのカンマ区切り）"; exit 1; fi
+            known=$(jq -c '[.[] | .prefs | keys[]] | sort' lib/roadmap/data/regions.json)
+            prefs=$(jq -cn --arg s "$ONLY_PREFS" --argjson known "$known" '[$s | split(",")[] | select(. as $p | $known | index($p))] | unique')
+            [ "$(echo "$prefs" | jq 'length')" -gt 0 ] || { echo "::error::regions.json に無い都道府県です: $ONLY_PREFS"; exit 1; }
+          fi
           echo "prefs=$prefs" >> "$GITHUB_OUTPUT"
           echo "all=$all" >> "$GITHUB_OUTPUT"
           echo "optional=$optional" >> "$GITHUB_OUTPUT"
