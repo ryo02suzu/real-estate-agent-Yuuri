@@ -29,7 +29,8 @@ class ModelAuditTest(unittest.TestCase):
             with self.subTest(model=model):
                 self.assertEqual(audit_messages(success(model))["models"], [model])
 
-    def test_allowed_fallback(self):
+    def test_both_allowed_models_in_usage(self):
+        # IDの許可範囲の検査。自動フォールバックの許可を意味しない。
         messages = success()
         messages[1]["message"]["model"] = FABLE
         messages[-1]["modelUsage"][FABLE] = {}

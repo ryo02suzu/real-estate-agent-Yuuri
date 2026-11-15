@@ -60,7 +60,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # 開発の指定モデルはOpus 5.5/Fable 5.1のみ。Sonnet/Haikuへ切り替えない。
-          # メインはOpus 5.5、許可する唯一の代替はFable 5.1。
+          # メインはOpus 5.5。利用不可なら停止し、Fable 5.1への切替は明示指定時だけ。
           # subagentとeffortにも同じ制限を適用する。利用できなければ他モデルで続行しない。
           # Ultracodeはモデルのeffortではなく動的ワークフロー。maxは維持して併用する。
           # 初期検証はsmall（5未満を目安。厳密な上限ではない）で並列過多を防ぐ。
@@ -70,7 +70,6 @@ jobs:
               "model": "claude-opus-5-5",
               "availableModels": ["claude-opus-5-5", "claude-fable-5-1"],
               "enforceAvailableModels": true,
-              "fallbackModel": ["claude-fable-5-1"],
               "switchModelsOnFlag": false,
               "ultracode": true,
               "enableWorkflows": true,
@@ -85,7 +84,6 @@ jobs:
             }
           claude_args: |
             --model claude-opus-5-5
-            --fallback-model claude-fable-5-1
             --effort max
             --allowedTools "Bash(npm run lint:*),Bash(npm run typecheck:*),Bash(npm test:*),Bash(npm run build:*),Bash(npx vitest run:*)"
       # 実使用に禁止モデルが混じったとき、成功した Claude 応答でもジョブを失敗させる。

@@ -8,7 +8,8 @@
 
 ## 制限の適用
 
-- 許可 ID は `claude-opus-5-5` と `claude-fable-5-1` のみ。親は Opus、許可する代替は Fable。利用不可なら指定外モデルで継続しない。
+- 許可 ID は `claude-opus-5-5` と `claude-fable-5-1` のみ。親は Opus。利用不可なら停止する。Fable への切替は明示指定時だけで、自動では切り替えない。
+- Action の `fallbackModel` 設定と CLI の `--fallback-model` は指定しない。2026-11-15 に残存していた Fable への自動フォールバックを削除した。
 - `.github/claude-managed-settings.json` を、使い捨ての Ubuntu runner の `/etc/claude-code/managed-settings.json` に配置する。`availableModelsMatch: exact` と `deniedModels` は managed 設定専用であり、Action の `settings` に書くだけでは効かない。
 - `requiredMinimumVersion: 2.1.316`、許可リストの厳密化、Sonnet/Haiku ファミリー禁止を併用する。背景処理に使われる Haiku の別名も **Opus の ID に解決**する。Haiku モデルの使用を許可する設定ではない。
 - `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1` とモデル ID を併用し、Workflow 内の担当を含む子エージェントに適用する。`CLAUDE_CODE_EFFORT_LEVEL=max` と既存の `--effort max` を維持する。もし auto mode が使われる場合のクライアント側分類モデルも Opus に固定するが、権限モードやサーバー側審査は変更しない。
@@ -24,7 +25,7 @@ Action の `execution_file` にある構造化された初期化モデル、assi
 
 ## 検証と反映の条件
 
-モデルを呼ばない検査は `python3 -m unittest discover -s .github/scripts -p 'test_*.py'`。許可モデル、許可された代替、背景 Haiku 混入、Sonnet・未許可バージョン、記録欠落、不正データ、ログへの情報漏えいを確認する。通常の CI にもこの検査を追加する。
+モデルを呼ばない検査は `python3 -m unittest discover -s .github/scripts -p 'test_*.py'`。許可モデル、両許可 ID の実使用記録、背景 Haiku 混入、Sonnet・未許可バージョン、記録欠落、不正データ、ログへの情報漏えいを確認する。通常の CI にもこの検査を追加する。
 
 この設定 PR は main に反映されるまで Issue/PR コメント経由の Claude 実行には適用されない。main への反映はユーザーの明示承認を待つ。承認後の最初の小さな実行で、managed 設定の適用・CLI バージョン・`modelUsage`・親と担当の model/effort・Workflow の開始終了を再確認する。新しい実行での実証が済むまでは「完全に防止できた」と報告しない。
 
