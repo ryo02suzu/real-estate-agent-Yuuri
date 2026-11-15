@@ -738,6 +738,86 @@ describe("lookup で地番を探す", () => {
     expect(lotHead("島根県大田市大田町大田", "大田町大田ロ", "ロ818-4", null)).toBeNull();
   });
 
+  it("町名・小字の名前の終わりの字（丁・カタカナ）を、地番の頭と読み違えない（和歌山市「十番丁4番」「元寺町北ノ丁12番」・仁淀川町「森字ナロ2521番7」）", async () => {
+    // 「番丁」の丁は町名の終わり（前は「十番」＋地番「丁4」と読み、番で終わる町名を住居表示とみて、地番として読まなかった）
+    expect(splitChiban("和歌山県和歌山市十番丁4番")).toMatchObject({ body: "和歌山県和歌山市十番丁", chiban: "4" });
+    expect(splitChiban("和歌山県和歌山市十一番丁5番地の2")).toMatchObject({ body: "和歌山県和歌山市十一番丁", chiban: "5-2" });
+    expect(splitChiban("香川県綾歌郡宇多津町浜五番丁47番9")).toMatchObject({ body: "香川県綾歌郡宇多津町浜五番丁", chiban: "47-9" });
+    // 「番町」・住居表示・丁目の後ろの地番の頭は、今までどおり
+    expect(splitChiban("東京都千代田区五番町12番3")).toMatchObject({ body: "東京都千代田区五番町", chiban: "12-3" });
+    expect(splitChiban("渋谷区神南1-1-1")).toBeNull();
+    expect(splitChiban("取手市白山3丁目乙987番1")).toMatchObject({ body: "取手市白山3丁目", chiban: "乙987-1" });
+    // 「北ノ丁」の丁は、入力を読むときは地番の頭として取り出し（甲乙丙丁の丁と見分けられない）、町が分かってから町名に戻す
+    expect(splitChiban("和歌山県和歌山市元寺町北ノ丁12番")).toMatchObject({ body: "和歌山県和歌山市元寺町北ノ", chiban: "丁12" });
+    const K = "和歌山市_元寺町北ノ丁___";
+    const one = (e: [number, number, number, number] | [number, number, number, number, string]) => e;
+    expect(lotHead("和歌山県和歌山市元寺町北ノ", "元寺町北ノ丁", "丁12", { h: 1, k: { [K]: [one([1, 2, 1, 26])] } })).toEqual({
+      town: "元寺町北ノ丁",
+      chiban: "12",
+      body: "和歌山県和歌山市元寺町北ノ丁",
+    });
+    // その町に丁の付く地番があれば、本当の地番の頭（直さない）
+    expect(lotHead("和歌山県和歌山市元寺町北ノ", "元寺町北ノ丁", "丁12", { h: 1, k: { [K]: [one([1, 2, 1, 26]), one([1, 2, 12, 12, "丁"])] } })).toBeNull();
+    // 頭の無い地番にその番号が入っていなければ直さない
+    expect(lotHead("和歌山県和歌山市元寺町北ノ", "元寺町北ノ丁", "丁99", { h: 1, k: { [K]: [one([1, 2, 1, 26])] } })).toBeNull();
+    // 頭ごとに分けていない前の形の索引では、頭の地番があるか確かめられないので直さない
+    expect(lotHead("和歌山県和歌山市元寺町北ノ", "元寺町北ノ丁", "丁12", { k: { [K]: [one([1, 2, 1, 26])] } })).toBeNull();
+    // カタカナの小字の終わりの字（「ナロ」のロ）
+    const MORI = { h: 1 as const, k: { "吾川郡仁淀川町_森___": [one([1, 2, 2000, 2600])] } };
+    expect(lotHead("高知県吾川郡仁淀川町森字ナ", "森", "ロ2521-7", MORI)).toEqual({ town: "森", chiban: "2521-7", body: "高知県吾川郡仁淀川町森字ナロ" });
+    // 前が漢字（「鷲原ロ140番」）は本当の地番の頭のことが多いので、索引に頭の地番が無くても直さない（頭の無い別の筆と取り違えない）
+    expect(lotHead("島根県鹿足郡津和野町鷲原", "鷲原", "ロ140", { h: 1, k: { "鹿足郡津和野町_鷲原___": [one([1, 2, 100, 200])] } })).toBeNull();
+    // 番外は名前の終わりにならない
+    expect(lotHead("茨城県土浦市中村南4丁目ア", "中村南4丁目", "番外26-203", { h: 1, k: { "土浦市_中村南_４丁目__": [one([1, 2, 1, 30])] } })).toBeNull();
+    // 前が「字」なら、頭の字は小字の名前そのもの（相模原市「太井字丁407番9」）
+    expect(lotHead("神奈川県相模原市緑区太井字", "太井", "丁407-9", { h: 1, k: { "相模原市緑区_太井___": [one([1, 2, 400, 410])] } })).toEqual({
+      town: "太井",
+      chiban: "407-9",
+      body: "神奈川県相模原市緑区太井字丁",
+    });
+    // 地番区域の小字の欄の名前と合えば（登米市「迫町佐沼字鉄砲丁30番」と小字「鉄砲丁」）、前が漢字でも名前の終わり
+    const SANUMA = { h: 1 as const, k: { "登米市_迫町佐沼__鉄砲丁": [one([1, 2, 1, 40])], "登米市_迫町佐沼__中江": [one([1, 3, 1, 40])] } };
+    expect(lotHead("宮城県登米市迫町佐沼字鉄砲", "迫町佐沼", "丁30", SANUMA)).toEqual({ town: "迫町佐沼", chiban: "30", body: "宮城県登米市迫町佐沼字鉄砲丁" });
+    expect(lotHead("宮城県登米市迫町佐沼字大", "迫町佐沼", "丁30", SANUMA)).toBeNull();
+    // 漢数字の「◯番」で終わる字の後ろの頭は、地番の頭（会津坂下町「字市中二番甲3646番1」。前は住居表示とみて読まなかった）
+    expect(splitChiban("福島県河沼郡会津坂下町字市中二番甲3646番1")).toMatchObject({ body: "福島県河沼郡会津坂下町字市中二番", chiban: "甲3646-1" });
+    expect(splitChiban("宮城県仙台市若林区東八番丁197番2")).toMatchObject({ body: "宮城県仙台市若林区東八番丁", chiban: "197-2" });
+    // 漢数字の住居表示（「一丁目二番三」）は、今までどおり地番として読まない
+    expect(splitChiban("東京都千代田区丸の内一丁目二番3")).toBeNull();
+  });
+
+  it("「元寺町北ノ丁12番」「十番丁4番」（和歌山市）：町名の終わりの丁を地番の頭にせず、その町の地番 12・4 の筆を当てる（前は筆が出なかった）", async () => {
+    const stub = (title: string, town: string) =>
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => ({
+          ok: true,
+          json: async () =>
+            url.includes("AddressSearch")
+              ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title } }]
+              : { results: { muniCd: "30201", lv01Nm: town } },
+        })),
+      );
+    const KN = "和歌山市_元寺町北ノ丁___";
+    const KJ = "和歌山市_十番丁___";
+    const src = fakeSource({
+      [`${SX},${SY}`]: [{ kuiki: KN, chiban: "11" }, { kuiki: KJ, chiban: "3" }],
+      [`${SX + 1},${SY}`]: [{ kuiki: KN, chiban: "12" }, { kuiki: KJ, chiban: "4" }],
+    });
+    const index = { v: 1, h: 1, k: { [KN]: [[SX, SY, 11, 11], [SX + 1, SY, 12, 12]], [KJ]: [[SX, SY, 3, 3], [SX + 1, SY, 4, 4]] } } as unknown as Awaited<
+      ReturnType<typeof loadParcelIndex>
+    >;
+    stub("和歌山県和歌山市元寺町北ノ丁１２番地", "元寺町北ノ丁");
+    const r = await lookup("和歌山県和歌山市元寺町北ノ丁12番", { parcels: src, loadIndex: async () => index });
+    expect(r.status === "ok" && r.parcel?.chiban).toBe("12");
+    expect(r.status === "ok" && r.parcel?.kuiki).toBe(KN);
+    expect(r.status === "ok" && r.parcelMiss).toBeFalsy();
+    stub("和歌山県和歌山市十番丁４番地", "十番丁");
+    const j = await lookup("和歌山県和歌山市十番丁4番", { parcels: src, loadIndex: async () => index });
+    expect(j.status === "ok" && j.parcel?.chiban).toBe("4");
+    expect(j.status === "ok" && j.parcel?.kuiki).toBe(KJ);
+  });
+
   it("「中山町中山子4番6」：頭の無い同じ番号の筆（4-6）ではなく「子4-6」を当て、「町名を直した」とは言わない", async () => {
     vi.stubGlobal(
       "fetch",

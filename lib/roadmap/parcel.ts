@@ -123,10 +123,18 @@ export function splitChiban(input: string): { body: string; chiban: string; expl
   // 地番の頭の甲乙丙・イロハ・番外（「白山3丁目乙987番1」）は地番の一部として取り出す
   const m = s.match(new RegExp(`^(.*?)(${LOT_PREFIX_INPUT}?)(\\d+)(?:\\s*(?:番地の?|番の?|の|${DASH})\\s*(\\d+))?\\s*(?:番地?)?$`));
   if (!m) return null;
-  const body = m[1].trim();
+  let body = m[1].trim();
+  let head = m[2];
+  // 名前が漢数字の「◯番」で終わる町・字。「番丁」（和歌山市「十番丁」・丸亀市「十番丁」・仙台市「東八番丁」・宇多津町「浜五番丁」）の丁は、
+  // 地番の頭（甲乙丙丁の丁）ではなく町名の終わり。ほかの頭（会津坂下町「字市中二番甲3646番1」の甲）は地番の頭。どちらも住居表示ではない
+  const kanjiBan = /[一二三四五六七八九十]番$/.test(body);
+  if (head === "丁" && kanjiBan) {
+    body += head;
+    head = "";
+  }
   // 前にも番号が続く（「1-2-3」「1丁目2番3」）のは住居表示
-  if (!body || new RegExp(`(\\d|${DASH}|番)$`).test(body)) return null;
-  return { body, chiban: `${m[2]}${m[3]}${m[4] ? `-${m[4]}` : ""}`, explicit };
+  if (!body || (!(head && kanjiBan) && new RegExp(`(\\d|${DASH}|番)$`).test(body))) return null;
+  return { body, chiban: `${head}${m[3]}${m[4] ? `-${m[4]}` : ""}`, explicit };
 }
 
 /**
@@ -372,6 +380,12 @@ export function splitLotHead(chiban: string): [string, string] {
  *   索引にその町の地番区域が無く、頭の字を外した町の地番区域があれば、外した町で探す
  * ②「中山町中山子4番6」：地番の頭の十二支（子）や「4号」は、入力を読むときは町名の側に残る（町名の終わりの字と見分けられない）。
  *   町が「中山町中山」と分かり、入力がその町名のすぐ後ろに十二支1字か「◯号」だけを書いていれば、地番の頭にする（頭の無い同じ番号の別の筆を当てない）
+ * ③「元寺町北ノ丁12番」（和歌山市）・「森字ナロ2521番7」（仁淀川町）：町名・小字の名前の終わりの字（丁・ロ）を、入力を読むときに地番の頭
+ *   （甲乙丙丁の丁・イロハのロ）として取り出している。頭ごとに分けた索引で、その町にその頭の地番も、小字の欄がその字の地番区域も無く、
+ *   頭の無い地番にその番号が入っていて、さらに国土地理院の町名がその字で終わる（町名の一部）か、入力でその字の前がカタカナ
+ *   （カタカナの名前の終わり）か「字」（「太井字丁407番9」の小字「丁」）か、地番区域の小字の欄の名前と合う（「字鉄砲丁」）なら、
+ *   頭を名前の側に戻して探す。前が漢字の「鷲原ロ140番」のような書き方は、本当の地番の頭のことが多い（データに無い所の頭の地番を、
+ *   頭の無い別の筆と取り違えない）ので直さない
  */
 /** 地番の索引に、その町（大字・丁目）の地番区域があるか */
 export function indexHasTown(index: { k: Record<string, unknown> } | null | undefined, town: string): boolean {
@@ -383,12 +397,36 @@ export function lotHead(
   body: string,
   town: string,
   chiban: string,
-  index: { k: Record<string, unknown> } | null | undefined,
+  index: Pick<ParcelIndex, "k" | "h"> | null | undefined,
 ): { town: string; chiban: string; body: string } | null {
-  const [head] = splitLotHead(chiban);
+  const [head, rest] = splitLotHead(chiban);
   if (head && index && town.endsWith(head)) {
     const base = town.slice(0, -head.length);
     if (base && !indexHasTown(index, town) && indexHasTown(index, base)) return { town: base, chiban, body };
+  }
+  // ③ 名前の終わりの字（丁・カタカナ）を地番の頭として取り出していた。番外・仮は名前の終わりにならないので見ない
+  if (head && head !== "番外" && head !== "仮" && index?.h && town) {
+    const b = body.normalize("NFKC").replace(/\s/g, "");
+    const t = townKey(town);
+    const num = Number.parseInt(rest, 10);
+    // その町に、この頭の地番（小字の欄がこの字の地番区域も）があるか・頭の無い地番にこの番号が入っているか・
+    // 小字の欄の名前が、入力の名前の終わり（頭の字まで）と同じ地番区域があるか（「字鉄砲丁30番」と小字「鉄砲丁」）
+    let headed = false;
+    let headless = false;
+    let koazaName = false;
+    for (const [kuiki, entries] of Object.entries(index.k)) {
+      if (!townMatches(kuiki, t)) continue;
+      const koaza = kuikiParts(kuiki).koaza.normalize("NFKC").replace(/^字/, "");
+      if (koaza === head) headed = true;
+      else if (koaza.length > head.length && koaza.endsWith(head) && `${b}${head}`.endsWith(koaza)) koazaName = true;
+      for (const [, , lo, hi, h = ""] of entries) {
+        if (h === head) headed = true;
+        else if (!h && lo <= num && num <= hi) headless = true;
+      }
+    }
+    // 名前の終わりと分かる：国土地理院の町名がその字で終わる・前がカタカナ・前が「字」（「太井字丁407番9」の小字「丁」）・小字の欄の名前と合う
+    const nameEnd = town.endsWith(head) || /[ァ-ヴー字]$/.test(b) || koazaName;
+    if (nameEnd && !headed && headless) return { town, chiban: rest, body: `${b}${head}` };
   }
   if (!head && town) {
     const b = body.normalize("NFKC").replace(/\s/g, "");
