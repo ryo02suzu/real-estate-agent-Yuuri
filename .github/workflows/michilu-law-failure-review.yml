@@ -16,8 +16,8 @@ jobs:
     env:
       REVIEW_URL: http://127.0.0.1:3000
       PREVIEW_URL: ""
-      REVIEW_SHA: bd27ce53a9b86dcfe3ea64b8a70d57c1b3f870d5
-      REVIEW_PHASE: law-failure-candidate-bd27ce5
+      REVIEW_SHA: 6d5ab10f9d700df122553e6bac8665f30000ae32
+      REVIEW_PHASE: law-failure-candidate-6d5ab10
     steps:
       - uses: actions/checkout@v4
         with:
