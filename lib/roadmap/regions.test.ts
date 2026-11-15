@@ -750,7 +750,40 @@ describe("山口県の、市が扱う市（登録した市）", () => {
     expect(m.contact?.phone).toBe("083-231-2065");
     expect(m.contact?.fax).toBe("083-231-4798");
     expect(m.contact?.noPhoneInquiry).toBeUndefined();
-    expect(CHUGOKU_PENDING.filter((x) => x.pref === "山口県").map((x) => x.name)).toEqual(["宇部市", "山口市", "萩市", "防府市", "岩国市", "長門市", "周南市", "山陽小野田市"]);
+    expect(CHUGOKU_PENDING.filter((x) => x.pref === "山口県")).toEqual([]);
+  });
+
+  it("山口県の9市は全部登録した。地図のある7市は市のページと同じ入口のリンク（中は開けていないので verified は false）", () => {
+    expect(YAMAGUCHI_CITIES.map((x) => x.name)).toEqual(["下関市", "宇部市", "山口市", "萩市", "防府市", "岩国市", "長門市", "周南市", "山陽小野田市"]);
+    const of = (name: string) => YAMAGUCHI_CITIES.find((x) => x.name === name)!;
+    // 道路種別の地図が市のページに見つからなかった市は「非公開」の扱い（地図なし）
+    for (const name of ["萩市", "長門市"]) expect([of(name).coverage, of(name).maps.length], name).toEqual(["none", 0]);
+    // 地図のリンクは、市のページに載っているもの
+    expect(of("宇部市").maps.map((x) => x.url)).toEqual(["https://www.sonicweb-asp.jp/ube/agreement?theme=th_6", "https://www.sonicweb-asp.jp/ube/agreement?theme=th_5"]);
+    expect(of("山口市").maps[0].url).toBe("https://www2.wagmap.jp/yamaguchi");
+    expect(of("防府市").maps[0].url).toBe("https://www2.wagmap.jp/hofu/");
+    expect(of("岩国市").maps[0].url).toBe("https://www2.wagmap.jp/iwakuni/Portal");
+    expect(of("周南市").maps[0].url).toBe("https://webgis.alandis.jp/shunan35/portal/index.html");
+    expect(of("山陽小野田市").maps[0].url).toBe("https://www.sonicweb-asp.jp/sanyo-onoda/");
+    for (const m of YAMAGUCHI_CITIES) for (const link of m.maps) expect([link.build, link.verified], m.name).toEqual([null, false]);
+    // 種別を確かめられていない地図は「一部」とし、そのことを道順に書く
+    for (const name of ["宇部市", "山口市", "周南市", "山陽小野田市"]) {
+      expect(of(name).coverage, name).toBe("partial");
+      expect(of(name).maps[0].tip, name).toContain("確かめられていない");
+    }
+    // 市が、不動産取引の資料や43条の判断には使えないと書いている地図
+    expect(of("岩国市").maps[0].tip).toContain("権利の発生する不動産取引などのための資料");
+    expect(of("防府市").maps[0].tip).toContain("43条の敷地と道路の関係を判断する資料には使えない");
+    // 窓口
+    expect(of("宇部市").contact?.phone).toBe("0836-34-8436");
+    expect(of("山口市").contact?.phone).toBe("083-934-2847");
+    expect(of("萩市").contact?.fax).toBe("0838-26-6756");
+    expect(of("岩国市").contact?.phone).toBe("0827-29-5165");
+    expect(of("長門市").contact?.phone).toBe("0837-23-1149");
+    expect(of("周南市").contact?.phone).toBe("0834-22-8423");
+    expect(of("山陽小野田市").contact?.phone).toBe("0836-82-1215");
+    // 山陽小野田市は全域が都市計画区域
+    expect(of("山陽小野田市").note).toContain("全域が都市計画区域");
   });
 });
 
@@ -983,8 +1016,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: CHUGOKU_PENDING,
       total: 10,
       outside: ["上関町", "阿武町"],
-      // 特定行政庁の7市と、限定特定行政庁の長門市・山陽小野田市のうち、まだ調べている途中の市（下関市は登録した。下の「山口県の、市が扱う市」）
-      cities: ["宇部市", "山口市", "萩市", "防府市", "岩国市", "長門市", "周南市", "山陽小野田市"],
+      // 特定行政庁の7市と、限定特定行政庁の長門市・山陽小野田市は、全部登録した（下の「山口県の、市が扱う市」）
+      cities: [],
       offices: { 柳井土木建築事務所: 6, 周南土木建築事務所: 2, 宇部土木建築事務所: 2 },
     },
     {
