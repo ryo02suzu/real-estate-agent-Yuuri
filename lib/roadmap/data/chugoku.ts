@@ -20,8 +20,7 @@ export const CHUGOKU_PENDING: Municipality[] = [
   { pref: "島根県", name: "安来市", codes: ["32206"], coverage: "unknown", maps: [] },
   { pref: "島根県", name: "江津市", codes: ["32207"], coverage: "unknown", maps: [] },
   { pref: "島根県", name: "雲南市", codes: ["32209"], coverage: "unknown", maps: [] },
-  // 岡山県（残り 7）
-  { pref: "岡山県", name: "岡山市", codes: ["33101", "33102", "33103", "33104"], coverage: "unknown", maps: [] },
+  // 岡山県（残り 6）
   { pref: "岡山県", name: "倉敷市", codes: ["33202"], coverage: "unknown", maps: [] },
   { pref: "岡山県", name: "津山市", codes: ["33203"], coverage: "unknown", maps: [] },
   { pref: "岡山県", name: "玉野市", codes: ["33204"], coverage: "unknown", maps: [] },

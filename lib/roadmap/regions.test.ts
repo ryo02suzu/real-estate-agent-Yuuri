@@ -24,7 +24,7 @@ import { KAGAWA } from "./data/kagawa";
 import { SHIMANE } from "./data/shimane";
 import { TOTTORI } from "./data/tottori";
 import { YAMAGUCHI } from "./data/yamaguchi";
-import { OKAYAMA } from "./data/okayama";
+import { OKAYAMA, OKAYAMA_CITIES } from "./data/okayama";
 import { HIROSHIMA, HIROSHIMA_CITIES } from "./data/hiroshima";
 import { MUNI_CODES } from "./muni-codes";
 import { buildLinks, findMunicipality, MUNICIPALITIES, type Municipality } from "./municipalities";
@@ -484,7 +484,7 @@ describe("市の道路種別のデータをアプリの中に表示するのは�
 describe("全国対応で足した地方（中国・四国・九州沖縄・北海道）", () => {
   // 地方ごとの市町村：調査中の一覧（data/<地方>.ts）と、調べ終えて登録した道県（data/<道県>.ts）を合わせたもの
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
-    ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...CHUGOKU_PENDING], 107],
+    ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...CHUGOKU_PENDING], 107],
     ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING], 95],
     ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KYUSHU_PENDING], 274],
     ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING], 179],
@@ -550,6 +550,24 @@ describe("全国対応で足した地方（中国・四国・九州沖縄・北�
     // 対応している都道府県のコード表は、今までどおり全部使う
     for (const name of Object.values(PREF_NAMES)) expect(MUNI_CODES[name], name).toBeDefined();
     expect(Object.keys(MUNI_CODES)).toHaveLength(Object.keys(PREF_NAMES).length);
+  });
+});
+
+describe("岡山県の、市が扱う市（登録した市）", () => {
+  it("岡山市：市の地図情報の参考図（1項2号〜5号・2項）。電話・ファックス・メールでは答えない", () => {
+    const m = OKAYAMA_CITIES.find((x) => x.name === "岡山市")!;
+    expect(m.codes).toEqual(["33101", "33102", "33103", "33104"]);
+    // 1項1号は載らないので「一部の種別」
+    expect(m.coverage).toBe("partial");
+    expect(m.maps[0].kind).toBe("designated_only");
+    // 市のページと同じリンク（利用規約の同意の画面）。同意の先は開かない
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("http://www.gis.pref.okayama.jp/okayamacity/Agreement?IsPost=False&MapId=60000&RequestPage=%2fokayamacity%2fPositionSelect%3fmid%3d60000");
+    expect(m.maps[0].tip).toContain("自分で同意して進み");
+    expect(m.maps[0].tip).toContain("1項1号");
+    expect(m.contact?.phone).toBe("086-803-1446");
+    expect(m.contact?.noPhoneInquiry).toBe(true);
+    expect(CHUGOKU_PENDING.filter((x) => x.pref === "岡山県").map((x) => x.name)).toEqual(["倉敷市", "津山市", "玉野市", "笠岡市", "総社市", "新見市"]);
   });
 });
 
@@ -656,7 +674,7 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: CHUGOKU_PENDING,
       total: 20,
       outside: ["瀬戸内市", "新庄村", "奈義町", "西粟倉村", "久米南町", "美咲町"],
-      cities: ["岡山市", "倉敷市", "津山市", "玉野市", "笠岡市", "総社市", "新見市"],
+      cities: ["倉敷市", "津山市", "玉野市", "笠岡市", "総社市", "新見市"],
       offices: { 備前県民局: 5, 備中県民局: 6, 美作県民局: 9 },
     },
     {
