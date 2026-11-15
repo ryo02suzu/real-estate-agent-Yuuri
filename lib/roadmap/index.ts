@@ -1,5 +1,5 @@
 import { correctAddress, describeMatch, placeNotFound, type AddressFix, type AddressMiss } from "./address-fix";
-import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, matchedNumbers, needsChoice, numbersAgree, reverseGeocode, subAreaDropped, withoutNumbers, type GeocodeResult } from "./geocode";
+import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, matchedNumbers, needsChoice, numbersAgree, reverseGeocode, streetSide, subAreaDropped, withoutNumbers, type GeocodeResult } from "./geocode";
 import { MUNI_CODES } from "./muni-codes";
 import { buildLinks, findMunicipality, resolveContact, type Contact, type Municipality, type ResolvedLink } from "./municipalities";
 import { indexHasTown, kuikiAllows, kuikiHasSub, kuikiSubLabel, lotHead, normalizeChiban, parcelAt, searchParcel, splitChiban, splitLotHead, townFromAddress, townKey, type Parcel, type ParcelSource } from "./parcel";
@@ -99,6 +99,8 @@ export async function lookup(
     loadIndex?: (code: string) => Promise<ParcelIndex | null>;
   } = {},
 ): Promise<LookupResult> {
+  // 「本通14北5-35」（丁目を書かない、通りの北・南に分かれた丁目）を「本通14丁目北5-35」に（南北の取り違えを防ぐ）
+  address = streetSide(address);
   const chiban = splitChiban(address);
   // 「地番」の語は外して調べる（国土地理院が番地まで持っていれば、その位置から筆を探せる）
   const query = chiban?.explicit ? `${chiban.body}${chiban.chiban}` : address;
