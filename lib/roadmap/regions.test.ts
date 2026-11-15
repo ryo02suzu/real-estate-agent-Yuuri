@@ -9,9 +9,9 @@ import { KYUSHU_PENDING } from "./data/kyushu";
 import { HOKKAIDO_PENDING } from "./data/hokkaido";
 import { HOKKAIDO_CITIES } from "./data/hokkaido-cities";
 import { HOKKAIDO } from "./data/hokkaido-pref";
-import { OKINAWA } from "./data/okinawa";
+import { OKINAWA, OKINAWA_CITIES } from "./data/okinawa";
 import { KAGOSHIMA, KAGOSHIMA_CITIES } from "./data/kagoshima";
-import { MIYAZAKI } from "./data/miyazaki";
+import { MIYAZAKI, MIYAZAKI_CITIES } from "./data/miyazaki";
 import { OITA, OITA_CITIES } from "./data/oita";
 import { KUMAMOTO } from "./data/kumamoto";
 import { NAGASAKI } from "./data/nagasaki";
@@ -486,7 +486,7 @@ describe("全国対応で足した地方（中国・四国・九州沖縄・北�
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
     ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...CHUGOKU_PENDING], 107],
     ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...KAGAWA_CITIES, ...SHIKOKU_PENDING], 95],
-    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...KYUSHU_PENDING], 274],
+    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...MIYAZAKI_CITIES, ...OKINAWA_CITIES, ...KYUSHU_PENDING], 274],
     ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING], 179],
   ];
   const table = Object.assign({}, ...Object.values(GSI_CODES as Record<string, Record<string, string>>)) as Record<string, string>;
@@ -691,6 +691,47 @@ describe("香川県の、市が扱う市（登録した市）", () => {
     expect(m.contact?.phone).toBe("087-839-2488");
     expect(m.contact?.fax).toBe("087-839-2452");
     expect(SHIKOKU_PENDING.filter((x) => x.pref === "香川県")).toEqual([]);
+  });
+});
+
+describe("宮崎県の、市が扱う市（登録した市）", () => {
+  it("宮崎市：市の地図（建築基準法指定道路。2項・1項4号・1項5号）。照会はスマート申請で、来庁・電話などはできるだけ遠慮", () => {
+    const m = MIYAZAKI_CITIES.find((x) => x.name === "宮崎市")!;
+    expect(m.codes).toEqual(["45201"]);
+    // 1項1号・2号は地図に載らない（市の確かめ方の順で確かめる）ので「一部の種別」
+    expect(m.coverage).toBe("partial");
+    expect(m.maps[0].kind).toBe("designated_only");
+    // 市のページと同じ入口のリンク（地図の中は開いて確かめていない）
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://webgis.alandis.jp/miyazaki45/portal/");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("「建築基準法指定道路」を選び");
+    expect(m.maps[0].tip).toContain("建築基準法の道路種別の照会");
+    expect(m.contact?.phone).toBe("0985-21-1813");
+    expect(m.contact?.fax).toBe("0985-21-1815");
+    // 来庁も遠慮するよう求めているので、「電話では答えない（窓口へ）」の印は付けず、注意書きに書く
+    expect(m.contact?.noPhoneInquiry).toBeUndefined();
+    expect(m.contact?.note).toContain("できるだけ遠慮するよう市が求めている");
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "宮崎県").map((x) => x.name)).toEqual(["都城市", "延岡市", "日向市"]);
+  });
+});
+
+describe("沖縄県の、市が扱う市（登録した市）", () => {
+  it("那覇市：市の地図「なはMAP」の道路種別マップ。どの種別まで色分けされるかは確かめられていないので「一部」。電話では受けない", () => {
+    const m = OKINAWA_CITIES.find((x) => x.name === "那覇市")!;
+    expect(m.codes).toEqual(["47201"]);
+    expect(m.coverage).toBe("partial");
+    expect(m.maps[0].kind).toBe("road_type");
+    // 市のページと同じリンク（利用条件の同意の画面）。同意の先は開かない
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://www.sonicweb-asp.jp/naha/agreement?theme=th_56");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("表示テーマを「道路種別マップ」に変えて");
+    expect(m.maps[0].tip).toContain("どの種別まで色分けされているかは、MICHILU では確かめられていない");
+    expect(m.contact?.phone).toBe("098-951-3244");
+    expect(m.contact?.fax).toBe("098-951-3245");
+    expect(m.contact?.noPhoneInquiry).toBe(true);
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "沖縄県").map((x) => x.name)).toEqual(["宜野湾市", "浦添市", "沖縄市", "うるま市"]);
   });
 });
 
@@ -967,7 +1008,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: KYUSHU_PENDING,
       total: 22,
       outside: ["西米良村", "木城町", "諸塚村", "椎葉村", "美郷町", "日之影町", "五ヶ瀬町"],
-      cities: ["宮崎市", "都城市", "延岡市", "日向市"],
+      // 市が扱う4市のうち、まだ調べている途中の市（宮崎市は登録した。下の「宮崎県の、市が扱う市」）
+      cities: ["都城市", "延岡市", "日向市"],
       // 問い合わせ先は本務の事務所（国富町・綾町＝宮崎、西都市・西米良村＝高鍋、串間市＝日南）
       offices: { 宮崎土木事務所: 2, 高鍋土木事務所: 7, 日南土木事務所: 2, 都城土木事務所: 1, 小林土木事務所: 3, 日向土木事務所: 4, 西臼杵支庁: 3 },
     },    {
@@ -985,8 +1027,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: KYUSHU_PENDING,
       total: 36,
       outside: ["国頭村", "大宜味村", "東村", "今帰仁村", "恩納村", "宜野座村", "金武町", "伊江村", "伊平屋村", "伊是名村", "久米島町", "渡嘉敷村", "座間味村", "粟国村", "渡名喜村", "南大東村", "北大東村", "多良間村", "竹富町", "与那国町"],
-      // 特定行政庁の5市
-      cities: ["那覇市", "宜野湾市", "浦添市", "沖縄市", "うるま市"],
+      // 特定行政庁の5市のうち、まだ調べている途中の市（那覇市は登録した。下の「沖縄県の、市が扱う市」）
+      cities: ["宜野湾市", "浦添市", "沖縄市", "うるま市"],
       offices: { 北部土木事務所: 12, 中部土木事務所: 6, 南部土木事務所: 13, 宮古土木事務所: 2, 八重山土木事務所: 3 },
     },
     {
