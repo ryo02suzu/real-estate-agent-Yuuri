@@ -19,7 +19,7 @@ import { SAGA } from "./data/saga";
 import { FUKUOKA, FUKUOKA_CITIES } from "./data/fukuoka";
 import { KOCHI } from "./data/kochi";
 import { TOKUSHIMA, TOKUSHIMA_CITIES } from "./data/tokushima";
-import { EHIME } from "./data/ehime";
+import { EHIME, EHIME_CITIES } from "./data/ehime";
 import { KAGAWA, KAGAWA_CITIES } from "./data/kagawa";
 import { SHIMANE, SHIMANE_CITIES } from "./data/shimane";
 import { TOTTORI, TOTTORI_CITIES } from "./data/tottori";
@@ -485,7 +485,7 @@ describe("全国対応で足した地方（中国・四国・九州沖縄・北�
   // 地方ごとの市町村：調査中の一覧（data/<地方>.ts）と、調べ終えて登録した道県（data/<道県>.ts）を合わせたもの
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
     ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...YAMAGUCHI_CITIES, ...TOTTORI_CITIES, ...SHIMANE_CITIES, ...CHUGOKU_PENDING], 107],
-    ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...KAGAWA_CITIES, ...TOKUSHIMA_CITIES, ...SHIKOKU_PENDING], 95],
+    ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...KAGAWA_CITIES, ...TOKUSHIMA_CITIES, ...EHIME_CITIES, ...SHIKOKU_PENDING], 95],
     ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...MIYAZAKI_CITIES, ...OKINAWA_CITIES, ...NAGASAKI_CITIES, ...KYUSHU_PENDING], 274],
     ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING], 179],
   ];
@@ -834,6 +834,69 @@ describe("島根県の、市が扱う市（登録した市）", () => {
     expect(city("浜田市").contact).toMatchObject({ phone: "0855-25-9632", email: "kenchiku@city.hamada.lg.jp" });
     expect(city("江津市").contact).toMatchObject({ phone: "0855-52-7490", fax: "0855-52-1379" });
     expect(city("雲南市").contact).toMatchObject({ phone: "0854-40-1065", fax: "0854-40-1069", email: "kenchiku@city.unnan.shimane.jp" });
+  });
+});
+
+describe("愛媛県の、市が扱う市（登録した市）", () => {
+  const city = (name: string) => EHIME_CITIES.find((x) => x.name === name)!;
+
+  it("今治・宇和島・新居浜・西条を登録。松山市だけ調査中に残る", () => {
+    const codes: Record<string, string> = { 今治市: "38202", 宇和島市: "38203", 新居浜市: "38205", 西条市: "38206" };
+    expect(EHIME_CITIES.map((m) => m.name)).toEqual(Object.keys(codes));
+    for (const [name, code] of Object.entries(codes)) {
+      expect(city(name).codes, name).toEqual([code]);
+      expect(findMunicipality(code)?.name, name).toBe(name);
+      expect(city(name).note, name).toContain(`${name}の一部は都市計画区域の外`);
+    }
+    expect(SHIKOKU_PENDING.filter((x) => x.pref === "愛媛県").map((x) => x.name)).toEqual(["松山市"]);
+    expect(findMunicipality("38201")?.coverage).toBe("unknown");
+  });
+
+  it("新居浜市：指定道路図は全種別（指定道路のほかに1号・2号・3号も）。市の決まりに合わせてトップページから。電話・FAX・メールでは答えない", () => {
+    const m = city("新居浜市");
+    expect(m.coverage).toBe("full");
+    expect(m.maps.map((l) => l.kind)).toEqual(["road_type"]);
+    // 市は「トップページへのリンクは原則として自由」「新居浜市のサイトであることを明記」と書いている
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://www.city.niihama.lg.jp/");
+    expect(m.maps[0].label).toContain("新居浜市のサイトのトップページから進む");
+    expect(m.maps[0].tip).toContain("「組織でさがす」→ 建設部の「建築指導課」→「建築基準法の道路（指定道路図）について」");
+    expect(m.maps[0].tip).toContain("自分で同意して進む");
+    expect(m.maps[0].tip).toContain("平成26年4月1日現在");
+    // 市の注意：接道の判断・不動産取引のための資料には使えない
+    expect(m.maps[0].tip).toContain("敷地が道路に2m以上接するかを判断する資料");
+    expect(m.maps[0].tip).toContain("不動産取引のための資料には使えない");
+    expect(m.contact).toMatchObject({ phone: "0897-65-1273", fax: "0897-65-1276", noPhoneInquiry: true });
+  });
+
+  it("今治市・西条市：道路種別の地図は見つからず none。市道の図への入口と、建築の窓口", () => {
+    const imabari = city("今治市");
+    expect(imabari.coverage).toBe("none");
+    expect(imabari.maps.map((l) => l.kind)).toEqual(["public_road"]);
+    expect(imabari.maps[0].url).toBe("https://www.sonicweb-asp.jp/imabari/");
+    expect(imabari.maps[0].verified).toBe(false);
+    expect(imabari.contact).toMatchObject({ phone: "0898-36-1566", email: "kenchiku@imabari-city.jp" });
+    expect(imabari.note).toContain("該当地に接する道路の種類については建築課で確認してください");
+
+    const saijo = city("西条市");
+    expect(saijo.coverage).toBe("none");
+    expect(saijo.maps[0].url).toBe("https://www.city.saijo.ehime.jp/soshiki/kensetsudoro/saijo-city-road-info.html");
+    // 市が「建築基準法の道路は、このシステム上では検索できません」と書いている
+    expect(saijo.maps[0].tip).toContain("このシステム上では検索できません");
+    // 建築審査係の番号は、市のページに2つ出ている（課のページ・県の一覧は 1554、「建物を建てるときには」は 1558）
+    expect(saijo.contact).toMatchObject({ phone: "0897-52-1554 0897-52-1558", fax: "0897-52-1260" });
+    expect(saijo.note).toContain("と説明している");
+  });
+
+  it("宇和島市：限定特定行政庁。道路の窓口は建築指導係（代表番号の内線）。県の一覧の直通番号は別の係なので使わない", () => {
+    const m = city("宇和島市");
+    expect(m.coverage).toBe("none");
+    expect(m.maps).toEqual([]);
+    expect(m.contact).toMatchObject({ phone: "0895-24-1111（内線2619）", fax: "0895-25-3130" });
+    // 0895-49-7028 は、市のページでは公共建築係の番号
+    expect(JSON.stringify(m)).not.toContain("0895-49-7028");
+    expect(m.note).toContain("限定特定行政庁");
+    expect(m.note).toContain("南予地方局 建設部 建築指導課（0895-22-5211）");
   });
 });
 
@@ -1422,8 +1485,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: SHIKOKU_PENDING,
       total: 15,
       outside: ["上島町", "伊方町", "松野町"],
-      // 特定行政庁の4市と、限定特定行政庁の宇和島市
-      cities: ["松山市", "今治市", "宇和島市", "新居浜市", "西条市"],
+      // 特定行政庁の今治市・新居浜市・西条市と、限定特定行政庁の宇和島市は登録した。松山市は、市のサイトがこの作業の環境から読めないので調査中のまま
+      cities: ["松山市"],
       offices: { 東予地方局: 1, 四国中央土木事務所: 1, 中予地方局: 5, 八幡浜土木事務所: 4, 南予地方局: 4 },
     },
     {
