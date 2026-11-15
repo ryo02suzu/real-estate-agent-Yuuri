@@ -20,7 +20,7 @@ import { FUKUOKA, FUKUOKA_CITIES } from "./data/fukuoka";
 import { KOCHI } from "./data/kochi";
 import { TOKUSHIMA } from "./data/tokushima";
 import { EHIME } from "./data/ehime";
-import { KAGAWA } from "./data/kagawa";
+import { KAGAWA, KAGAWA_CITIES } from "./data/kagawa";
 import { SHIMANE } from "./data/shimane";
 import { TOTTORI } from "./data/tottori";
 import { YAMAGUCHI } from "./data/yamaguchi";
@@ -485,7 +485,7 @@ describe("全国対応で足した地方（中国・四国・九州沖縄・北�
   // 地方ごとの市町村：調査中の一覧（data/<地方>.ts）と、調べ終えて登録した道県（data/<道県>.ts）を合わせたもの
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
     ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...CHUGOKU_PENDING], 107],
-    ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING], 95],
+    ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...KAGAWA_CITIES, ...SHIKOKU_PENDING], 95],
     ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...KYUSHU_PENDING], 274],
     ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING], 179],
   ];
@@ -671,6 +671,29 @@ describe("大分県の、市が扱う市（登録した市）", () => {
   });
 });
 
+describe("香川県の、市が扱う市（登録した市）", () => {
+  it("高松市：市の地図「たかまっぷ」の道路種別マップ。規約に合わせてトップページを開く。営利目的の利用を禁じていることを書く", () => {
+    const m = KAGAWA_CITIES.find((x) => x.name === "高松市")!;
+    expect(m.codes).toEqual(["37201"]);
+    expect(m.coverage).toBe("full");
+    expect(m.maps).toHaveLength(1);
+    expect(m.maps[0].kind).toBe("road_type");
+    // 利用規約：「たかまっぷ」のトップページはリンクフリー（「たかまっぷ」へのリンクだと明記する）
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://www.city.takamatsu.kagawa.jp/kurashi/takamap/index.html");
+    expect(m.maps[0].label).toContain("たかまっぷ");
+    expect(m.maps[0].tip).toContain("自分で「同意する」を押して進む");
+    // 市のページの色の説明
+    expect(m.maps[0].tip).toContain("緑色の両矢印線＝1項1号");
+    expect(m.maps[0].tip).toContain("茶色の両矢印線＝法外道路");
+    // 規約の禁止事項
+    expect(m.maps[0].tip).toContain("営利目的でサービスを使うこと");
+    expect(m.contact?.phone).toBe("087-839-2488");
+    expect(m.contact?.fax).toBe("087-839-2452");
+    expect(SHIKOKU_PENDING.filter((x) => x.pref === "香川県")).toEqual([]);
+  });
+});
+
 describe("福岡県の、市が扱う市（登録した市）", () => {
   it("北九州市：市の「建築基準法道路種別地図」が物件の位置で開く。判定のくわしいことは電話では答えない", () => {
     const m = FUKUOKA_CITIES.find((x) => x.name === "北九州市")!;
@@ -834,8 +857,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: SHIKOKU_PENDING,
       total: 16,
       outside: ["直島町"],
-      // 特定行政庁は高松市だけ
-      cities: ["高松市"],
+      // 特定行政庁は高松市だけ（登録した。下の「香川県の、市が扱う市」）
+      cities: [],
       offices: { 長尾土木事務所: 3, 中讃土木事務所: 8, 西讃土木事務所: 2, 小豆総合事務所: 2, 建築指導課: 1 },
     },
     {
