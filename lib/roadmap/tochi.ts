@@ -107,7 +107,7 @@ export function tochiCheck(t: Tochi, city: string): string | undefined {
   // 自然公園と保安林は都県（国定公園・国有林の保安林も、まずは都県の担当に聞く）、農用地区域は農業委員会、民有林は市町村の林務、国有林は森林管理署
   const pref = [t.park && "自然公園", t.forest === "保安林" && "保安林"].filter(Boolean);
   const where = [
-    pref.length && `${pref.join("・")}は都県の担当`,
+    pref.length && `${pref.join("・")}は都道府県の担当`,
     t.agri && `農用地区域かは${city}の農業委員会`,
     t.forest === "地域森林計画対象民有林" && `民有林は${city}の林務の担当`,
     t.forest === "国有林" && "国有林は森林管理署",

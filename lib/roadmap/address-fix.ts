@@ -8,7 +8,7 @@
 // その町を探して出す（fixOmittedMunicipality。同じ町名が2つ以上の市区町村にあれば選んでもらう）
 import { MUNI_CODES } from "./muni-codes";
 import { newForm } from "./old-kanji";
-import { CHIWARI, addressNumbers, chiwariDigits, geocodeCandidates, type GeocodeResult } from "./geocode";
+import { CHIWARI, JO, addressNumbers, chiwariDigits, geocodeCandidates, joDigits, type GeocodeResult } from "./geocode";
 
 type Muni = { pref: string; name: string; city: string; ward?: string };
 
@@ -25,10 +25,14 @@ const PREF = /^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/;
 /** 番地の始まり（数字か「一丁目」） */
 const NUM = /[0-9]|[一二三四五六七八九十]+丁目/;
 /**
- * 番地の始まりの位置。「第13地割」の番号は町名の一部（岩手県などの大字の区分け）なので飛ばす。
- * 地割の部分を同じ長さの字に置き換えてから探すので、位置はもとの文字列のまま
+ * 番地の始まりの位置。「第13地割」の番号（岩手県などの大字の区分け）と、北海道の「北1条西」「7条通」の条の番号は町名の一部なので飛ばす。
+ * その部分を同じ長さの字に置き換えてから探すので、位置はもとの文字列のまま
  */
-const numAt = (s: string) => s.replace(CHIWARI, (m) => "地".repeat(m.length)).search(NUM);
+const numAt = (s: string) =>
+  s
+    .replace(CHIWARI, (m) => "地".repeat(m.length))
+    .replace(JO, (m) => "条".repeat(m.length))
+    .search(NUM);
 
 /** 対応している市区町村（政令市は「横浜市西区」と「横浜市」の両方）。長い名前から順に */
 const MUNIS: Muni[] = (() => {
@@ -51,10 +55,10 @@ export { newForm };
 /** 名前を比べるときの形：ヶ・ケ・ヵ・が、竜・龍を同じに（1字ずつの置き換えなので、長さは変わらない） */
 const vary = (s: string) => newForm(s).replace(/[ヶヵケが]/g, "ケ").replace(/竜/g, "龍");
 /**
- * 町名を比べるときの形：vary に加えて「大字」を外し、地割の番号を数字にそろえる（岩手県などの「大字南矢幅第13地割」は、
- * 国土地理院が「大字南矢幅第十三地割」と大字つき・漢数字で返す）。長さが変わるので、比べるときだけに使う
+ * 町名を比べるときの形：vary に加えて「大字」を外し、地割・条の番号を数字にそろえる（岩手県などの「大字南矢幅第13地割」は、
+ * 国土地理院が「大字南矢幅第十三地割」と大字つき・漢数字で返す。北海道の「北1条西」は「北一条西」と返す）。長さが変わるので、比べるときだけに使う
  */
-const townForm = (s: string) => chiwariDigits(vary(s.normalize("NFKC"))).replace(/大字/g, "");
+const townForm = (s: string) => joDigits(chiwariDigits(vary(s.normalize("NFKC")))).replace(/大字/g, "");
 /** 町名の書き方の揺れ（送り仮名の「り」、「ノ」「ヶ」「ッ」など）を除いた形。「南大通」と「南大通り」を同じと見る */
 const loose = (s: string) => townForm(s).replace(/[りリのノケ之ッツ]/g, "");
 
@@ -83,12 +87,19 @@ const otherChiwari = (a: string, b: string) => {
   return !!no(a) && !!no(b) && no(a) !== no(b);
 };
 
+/**
+ * 条・丁目の町名（北海道の「北1条西」「7条通」「宮の森1条」）か。条の番号と向き（東西南北）の1字違いは別の町
+ * （「北1条西」と「北2条西」「北1条東」「南1条西」）なので、書き間違いと見ない。loose の形で見る
+ */
+const hasJo = (s: string) => /\d+条/.test(s);
+
 /** 入れた町名と正式な町名が、書き間違い・書き方違いの範囲で同じか（途中まで入れた「南大」→「南大通り」も同じと見る） */
 export function similarTown(typed: string, official: string): boolean {
   const a = loose(typed);
   const b = loose(official);
   if (a === b) return true;
   if (otherChiwari(a, b)) return false;
+  if (hasJo(a) && hasJo(b)) return false;
   if ([...a].length >= 2 && b.startsWith(a)) return true;
   return editDistance(a, b) <= allowance(typed, official);
 }

@@ -1084,13 +1084,39 @@ describe("lookup", () => {
     await expect(lookup("東京都渋谷区神南1-19-11")).rejects.toBeInstanceOf(GeocoderUnavailable);
   });
 
-  it("未対応の市町村なら unsupported", async () => {
+  it("市町村の一覧に無い所（北方領土の6村）なら unsupported", async () => {
+    stubFetch(
+      [{ geometry: { coordinates: [146.75, 43.87] }, properties: { title: "北海道色丹郡色丹村" } }],
+      { results: { muniCd: "01695", lv01Nm: "" } },
+    );
+    const r = await lookup("北海道色丹郡色丹村");
+    expect(r.status).toBe("unsupported");
+  });
+
+  it("全国対応で足した地方の市町村も対応（広島市は区ごとの区役所 建築課。福岡市は、道路の調べ方が調査中）", async () => {
     stubFetch(
       [{ geometry: { coordinates: [132.4553, 34.3853] }, properties: { title: "広島県広島市中区国泰寺町一丁目" } }],
       { results: { muniCd: "34101", lv01Nm: "国泰寺町一丁目" } },
     );
     const r = await lookup("広島県広島市中区国泰寺町1-6-34");
-    expect(r.status).toBe("unsupported");
+    expect(r.status).toBe("ok");
+    if (r.status === "ok") {
+      expect(r.municipality.name).toBe("広島市");
+      expect(r.municipality.coverage).toBe("none");
+      // 窓口は、物件のある区の区役所 建築課
+      expect(r.contact?.dept).toBe("中区役所 建築課（中区国泰寺町一丁目4-21）");
+      expect(r.contact?.phone).toBe("082-504-2579");
+    }
+    stubFetch(
+      [{ geometry: { coordinates: [130.4017, 33.5902] }, properties: { title: "福岡県福岡市中央区天神一丁目" } }],
+      { results: { muniCd: "40133", lv01Nm: "天神一丁目" } },
+    );
+    const f = await lookup("福岡県福岡市中央区天神1-8-1");
+    expect(f.status).toBe("ok");
+    if (f.status === "ok") {
+      expect(f.municipality.name).toBe("福岡市");
+      expect(f.municipality.coverage).toBe("unknown");
+    }
   });
 
   it("中部の市町村も対応（福井市は道路種別が非公開で、位置指定道路の一覧表と市道の地図）", async () => {
@@ -1131,8 +1157,8 @@ describe("lookup", () => {
     const r = await lookup("本町1-1");
     expect(r.status).toBe("choose");
     if (r.status !== "choose") return;
-    // 関東の候補を先に並べる
-    expect(r.candidates[0].matchedAddress).toContain("横浜市");
+    // 全国に対応したので、どの候補も対応エリア（国土地理院の返した順のまま並べる）
+    expect(r.candidates.map((c) => c.matchedAddress)).toEqual(["北海道七飯町本町一丁目１番", "神奈川県横浜市中区本町一丁目１番"]);
   });
 
   // 総点検で見つけた弱点：区・市を書かない住所が区役所・県庁のあたりになり、そこのデータ（用途地域・ハザードなど）を出していた
@@ -1230,9 +1256,12 @@ describe("lookupPoint（地図で選んだ地点）", () => {
     expect(r.links[0].url).toContain("139.6239");
   });
 
-  it("対応エリアの外や海の上は unsupported", async () => {
+  it("市町村の一覧に無い所（北方領土の6村）や海の上は unsupported", async () => {
+    stubRev({ results: { muniCd: "01695", lv01Nm: "" } });
+    expect((await lookupPoint(43.87, 146.75)).status).toBe("unsupported");
+    // 全国対応で足した地方は対応（広島市）
     stubRev({ results: { muniCd: "34101", lv01Nm: "国泰寺町一丁目" } });
-    expect((await lookupPoint(34.3853, 132.4553)).status).toBe("unsupported");
+    expect((await lookupPoint(34.3853, 132.4553)).status).toBe("ok");
     stubRev({});
     const sea = await lookupPoint(35.3, 139.9);
     expect(sea.status === "unsupported" && sea.matchedAddress).toBe("地図で選んだ地点");
@@ -1244,7 +1273,11 @@ describe("lookupPoint（地図で選んだ地点）", () => {
     expect(muniName("19201")).toBe("山梨県甲府市");
     expect(muniName("22138")).toBe("静岡県浜松市中央区");
     expect(muniName("27127")).toBe("大阪府大阪市北区");
-    expect(muniName("34101")).toBeUndefined();
+    expect(muniName("34101")).toBe("広島県広島市中区");
+    expect(muniName("01101")).toBe("北海道札幌市中央区");
+    expect(muniName("47201")).toBe("沖縄県那覇市");
+    // 北方領土の6村は表に入れていない
+    expect(muniName("01695")).toBeUndefined();
   });
 });
 

@@ -167,7 +167,7 @@ export function houreiAuthority(h: HoureiHit): string {
     const names = h.cityName.split(/[,、]/).map((s) => s.trim()).filter(Boolean);
     return names.find((n) => h.rule?.startsWith(n)) ?? names[0];
   }
-  return PREF_NAMES[h.pref] ?? "都県";
+  return PREF_NAMES[h.pref] ?? "都道府県";
 }
 
 /** 確かめる担当（「砂防」「建築」）。地すべり防止区域は所管（国土交通省・農林水産省・林野庁）で担当が分かれる */

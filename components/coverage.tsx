@@ -42,8 +42,8 @@ export const COVERAGE: Record<Coverage, { short: string; pill: string; long: str
   unknown: {
     short: "調査中",
     pill: "道路図の公開の有無を調べています",
-    long: "この市町村の道路種別がネットで公開されているかは、まだ調べていません。県または市の建築指導課で確認してください。",
-    list: "調査中（道路図の公開の有無を確認中。問い合わせ先は県または市の建築指導課）",
+    long: "この市町村の道路種別がネットで公開されているかは、まだ調べていません。都道府県または市町村の建築指導課で確認してください。",
+    list: "調査中（道路図の公開の有無を確認中。問い合わせ先は都道府県または市町村の建築指導課）",
     badge: "bg-[#eef2f6] text-[#4e5d6e]",
     panel: "bg-[#f5f8fb] text-[#43515f] border-[#dde5ee]",
     dot: "bg-[#8aa0b8]",

@@ -4,8 +4,7 @@
 import type { Municipality } from "../municipalities";
 
 export const KYUSHU_PENDING: Municipality[] = [
-  // 福岡県（残り 4）
-  { pref: "福岡県", name: "北九州市", codes: ["40101", "40103", "40105", "40106", "40107", "40108", "40109"], coverage: "unknown", maps: [] },
+  // 福岡県（残り 3）
   { pref: "福岡県", name: "福岡市", codes: ["40131", "40132", "40133", "40134", "40135", "40136", "40137"], coverage: "unknown", maps: [] },
   { pref: "福岡県", name: "大牟田市", codes: ["40202"], coverage: "unknown", maps: [] },
   { pref: "福岡県", name: "久留米市", codes: ["40203"], coverage: "unknown", maps: [] },
@@ -19,10 +18,7 @@ export const KYUSHU_PENDING: Municipality[] = [
   { pref: "熊本県", name: "熊本市", codes: ["43101", "43102", "43103", "43104", "43105"], coverage: "unknown", maps: [] },
   { pref: "熊本県", name: "八代市", codes: ["43202"], coverage: "unknown", maps: [] },
   { pref: "熊本県", name: "天草市", codes: ["43215"], coverage: "unknown", maps: [] },
-  // 大分県（残り 6）
-  { pref: "大分県", name: "大分市", codes: ["44201"], coverage: "unknown", maps: [] },
-  { pref: "大分県", name: "別府市", codes: ["44202"], coverage: "unknown", maps: [] },
-  { pref: "大分県", name: "中津市", codes: ["44203"], coverage: "unknown", maps: [] },
+  // 大分県（残り 3）
   { pref: "大分県", name: "日田市", codes: ["44204"], coverage: "unknown", maps: [] },
   { pref: "大分県", name: "佐伯市", codes: ["44205"], coverage: "unknown", maps: [] },
   { pref: "大分県", name: "宇佐市", codes: ["44211"], coverage: "unknown", maps: [] },
@@ -31,8 +27,7 @@ export const KYUSHU_PENDING: Municipality[] = [
   { pref: "宮崎県", name: "都城市", codes: ["45202"], coverage: "unknown", maps: [] },
   { pref: "宮崎県", name: "延岡市", codes: ["45203"], coverage: "unknown", maps: [] },
   { pref: "宮崎県", name: "日向市", codes: ["45206"], coverage: "unknown", maps: [] },
-  // 鹿児島県（残り 4）
-  { pref: "鹿児島県", name: "鹿児島市", codes: ["46201"], coverage: "unknown", maps: [] },
+  // 鹿児島県（残り 3）
   { pref: "鹿児島県", name: "鹿屋市", codes: ["46203"], coverage: "unknown", maps: [] },
   { pref: "鹿児島県", name: "薩摩川内市", codes: ["46215"], coverage: "unknown", maps: [] },
   { pref: "鹿児島県", name: "霧島市", codes: ["46218"], coverage: "unknown", maps: [] },

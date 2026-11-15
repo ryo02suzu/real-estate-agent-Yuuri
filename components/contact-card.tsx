@@ -1,5 +1,6 @@
 "use client";
 
+import { deptLabel } from "@/lib/roadmap/dept";
 import { useState } from "react";
 import { ASK, BRING, buildInquiryText } from "@/lib/inquiry";
 import type { Contact } from "@/lib/roadmap";
@@ -13,7 +14,7 @@ export function ContactCard({ contact, city, address }: { contact: Contact; city
   const [noteOpen, setNoteOpen] = useState(false);
   const phones = contact.phone ? parsePhones(contact.phone) : [];
   // 県の出先機関（「千葉県 ○○土木事務所」など）は市町村名を付けない
-  const dept = /^(東京都|\S{2,3}県)\s/.test(contact.dept) ? contact.dept : `${city} ${contact.dept}`;
+  const dept = deptLabel(city, contact.dept);
   return (
     <section className="shadow-soft rounded-2xl border border-white bg-white px-4 py-3 tight:py-2">
       <h3 className="flex items-center gap-2 border-b border-line/70 pb-2 text-[13px] font-semibold text-ink">

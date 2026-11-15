@@ -79,8 +79,17 @@ export function AppHelpSheet({ open, onClose }: { open: boolean; onClose: () => 
 }
 
 const ORDER: Municipality["coverage"][] = ["full", "partial", "none", "outside", "unknown"];
-/** 1都6県の並び（東京・神奈川・埼玉・千葉・茨城・栃木・群馬） */
-const PREF_ORDER: string[] = ["東京都", "神奈川県", "埼玉県", "千葉県", "茨城県", "栃木県", "群馬県", "静岡県", "山梨県", "長野県", "愛知県", "岐阜県", "新潟県", "富山県", "石川県", "福井県"];
+/** 都道府県の並び（対応した順：関東の1都6県・中部・東北・近畿・中国・四国・九州沖縄・北海道） */
+const PREF_ORDER: string[] = [
+  ...["東京都", "神奈川県", "埼玉県", "千葉県", "茨城県", "栃木県", "群馬県"],
+  ...["静岡県", "山梨県", "長野県", "愛知県", "岐阜県", "新潟県", "富山県", "石川県", "福井県"],
+  ...["青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県"],
+  ...["三重県", "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県"],
+  ...["鳥取県", "島根県", "岡山県", "広島県", "山口県"],
+  ...["徳島県", "香川県", "愛媛県", "高知県"],
+  ...["福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"],
+  "北海道",
+];
 const prefRank = (p: string) => (PREF_ORDER.includes(p) ? PREF_ORDER.indexOf(p) : 99);
 
 export function AppCitiesSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -99,7 +108,7 @@ export function AppCitiesSheet({ open, onClose }: { open: boolean; onClose: () =
             className="press rounded-full border px-3 py-1 font-semibold leading-[1.5] transition-colors"
             style={{ fontSize: 12.5, background: p === pref ? NAVY : "#fff", borderColor: p === pref ? NAVY : "#dde5ee", color: p === pref ? "#fff" : TEXT }}
           >
-            {p.replace(/[都県]$/, "")}
+            {p.replace(/[都府県]$/, "")}
           </button>
         ))}
       </div>

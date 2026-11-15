@@ -27,7 +27,7 @@ describe("自然公園地域・農業地域・森林地域", () => {
     const t = await tochiAt(LAT, LNG, "14382", fake([area("自然公園地域", 0.01), area("特別地域"), area("農業地域", 0.01), area("農用地区域")]));
     expect(t).toMatchObject({ park: "特別地域", agri: "農用地区域" });
     expect(tochiLine(t!)).toBe("自然公園の特別地域・農用地区域");
-    expect(tochiCheck(t!, "箱根町")).toBe("自然公園は都県の担当、農用地区域かは箱根町の農業委員会で確認");
+    expect(tochiCheck(t!, "箱根町")).toBe("自然公園は都道府県の担当、農用地区域かは箱根町の農業委員会で確認");
     // 特別地域の外は普通地域、農用地区域の外は農業振興地域（いわゆる白地）
     const away: TochiArea = { kind: "特別地域", pref: "14", polygons: [square(LAT + 0.01, LNG, 0.001)] };
     const outer = await tochiAt(LAT, LNG, "14382", fake([area("自然公園地域"), away, area("農業地域")]));
@@ -40,10 +40,10 @@ describe("自然公園地域・農業地域・森林地域", () => {
     const hoan = await tochiAt(LAT, LNG, "14382", fake([area("地域森林計画対象民有林", 0.01), area("保安林")]));
     expect(hoan?.forest).toBe("保安林");
     expect(tochiLine(hoan!)).toBe("保安林");
-    expect(tochiCheck(hoan!, "箱根町")).toBe("保安林は都県の担当で確認");
+    expect(tochiCheck(hoan!, "箱根町")).toBe("保安林は都道府県の担当で確認");
     const min = await tochiAt(LAT, LNG, "14382", fake([area("地域森林計画対象民有林"), area("自然公園地域")]));
     expect(tochiLine(min!)).toBe("自然公園の普通地域・地域森林計画対象民有林");
-    expect(tochiCheck(min!, "箱根町")).toBe("自然公園は都県の担当、民有林は箱根町の林務の担当で確認");
+    expect(tochiCheck(min!, "箱根町")).toBe("自然公園は都道府県の担当、民有林は箱根町の林務の担当で確認");
     const koku = await tochiAt(LAT, LNG, "14382", fake([area("国有林")]));
     expect(tochiForestText(koku!)).toBe("国有林");
     expect(tochiCheck(koku!, "箱根町")).toBe("国有林は森林管理署で確認");

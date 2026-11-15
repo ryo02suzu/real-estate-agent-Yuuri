@@ -159,7 +159,7 @@ describe("次にやること", () => {
     expect(a.where).toBe("渋谷区の開発許可（都市計画）の担当課");
   });
 
-  it("道路種別がネット非公開の市は、窓口で確かめる前提の案内になる", () => {
+  it("道路種別がネット非公開の市町村は、窓口で確かめる前提の案内になる", () => {
     const none = MUNICIPALITIES.find((x) => x.coverage === "none" && x.contact)!;
     const r = { ...base, municipality: none, links: buildLinks(none, 35.7, 139.98), contact: resolveContact(none, none.codes[0]) };
     const t = triageOf(loaded({ result: r, roads: { status: "none" } }));

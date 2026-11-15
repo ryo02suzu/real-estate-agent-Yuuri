@@ -3,6 +3,7 @@
 
 // 印刷・PDF 保存用の「調査メモ」。画面（地図・パネル・シート）は印刷せず、これだけを A4 に出す（app/globals.css の @media print）。
 // 役所調査に持っていけるよう、地図の URL・色の見方・都市計画・地番・問い合わせ先・窓口で聞くことと、回答を書き込む欄をまとめる
+import { deptLabel } from "@/lib/roadmap/dept";
 import { useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { ASK, BRING } from "@/lib/inquiry";
@@ -135,7 +136,7 @@ function Memo({
   // 市町村の地番参考図の筆（出典は市町村ごと）
   const sanko = p?.sanko ?? (parcels.status === "ok" ? parcels.parcel.sanko : undefined);
   const c = result.contact;
-  const dept = c ? (/^(東京都|\S{2,3}県)\s/.test(c.dept) ? c.dept : `${m.name} ${c.dept}`) : undefined;
+  const dept = c ? deptLabel(m.name, c.dept) : undefined;
   const lines = parcels.status === "ok" ? parcelLines(parcels) : undefined;
   const date = `${at.getFullYear()}年${at.getMonth() + 1}月${at.getDate()}日 ${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
 
@@ -227,7 +228,8 @@ function Memo({
               <dt className="text-[#7a6a55]">近くの地価（参考）</dt>
               <dd>
                 {prices.map((h) => (
-                  <span key={h.no} className="block">
+                  // 地価公示と地価調査で同じ番号の地点がある（例：旭川5-5）ので、種類も入れて区別する
+                  <span key={`${h.kind}|${h.no}`} className="block">
                     {kindText(h.kind)} {h.no}（{h.usage}・{h.bearing}へ{distanceText(h.distance)}）：<b>{priceText(h.price)}</b>（前年比 {changeText(h.change)}・{h.year}年）
                   </span>
                 ))}

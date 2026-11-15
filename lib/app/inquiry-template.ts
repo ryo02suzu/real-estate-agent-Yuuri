@@ -3,6 +3,7 @@
 // 差し込み項目は、照会文を作るときにアプリが持っている値だけ（物件の住所・地番・市区町村・窓口の課・日付・書類の差出人・
 // 聞くこと・回答欄）。無い値は作らない。分からない項目（{{部署}} など）は書いたまま残す。
 // 送るのは利用者のメール・FAX のアプリ（mailto:・tel:・印刷・共有）。MICHILU のサーバーには送らず、自動では送らない
+import { deptLabel } from "../roadmap/dept";
 import type { LookupResult } from "../roadmap";
 import { registryChiban } from "../roadmap/parcel";
 import type { Sender } from "../sender";
@@ -103,7 +104,7 @@ type OkResult = Extract<LookupResult, { status: "ok" }>;
 export function inquiryDeptOf(result: Pick<OkResult, "municipality" | "contact">): string {
   const m = result.municipality;
   if (!result.contact) return `${m.name} 建築指導の担当課`;
-  return /^(東京都|\S{2,3}県)\s/.test(result.contact.dept) ? result.contact.dept : `${m.name} ${result.contact.dept}`;
+  return deptLabel(m.name, result.contact.dept);
 }
 
 /** 物件の画面の値から、照会文の材料を作る（地番は地番で調べた筆か住所の地点の筆。地図で選んだ地点の筆は入れない） */

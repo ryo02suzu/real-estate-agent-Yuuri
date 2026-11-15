@@ -4,6 +4,7 @@
 // 国土地理院の地図の道路の幅の区分）、市町村の道路種別の図がネットでどこまで見られるか、その図を開く大きなボタン（MICHILU の中心の機能）、
 // その地図の開き方（市のページのどこを押すか）と市の注意書き、地図の色と幅員のくわしい話、問い合わせ先、窓口で確かめること。
 // どれも地図のデータの参考で、建築基準法の道路か・接道の条件を満たすかは判断しない（市の図と窓口で確かめる）
+import { deptLabel, prefUnit } from "@/lib/roadmap/dept";
 import { ListChecks, Phone, Route } from "lucide-react";
 import { roadGuide } from "@/lib/app/road-guide";
 import { parsePhones } from "@/lib/phone";
@@ -17,7 +18,7 @@ export const COVER: Record<string, string> = {
   partial: "ネットでは一部の種別だけ",
   none: "ネットには非公開（窓口で）",
   outside: "都市計画区域外（窓口で）",
-  unknown: "公開の有無は調査中（県か市の建築指導課で）",
+  unknown: "公開の有無は調査中（都道府県か市町村の建築指導課で）",
 };
 const COVER_STEPS: { key: string; label: string }[] = [
   { key: "full", label: "全種別" },
@@ -40,7 +41,7 @@ export function RoadTab({ result, data, open, front, pick }: TabProps) {
   const mainTip = mapLink && !mapLink.sheet?.zip ? guide.find((g) => g.url === mapLink.url && g.label === mapLink.label)?.tip : undefined;
   const contact = result.contact;
   const phones = contact?.phone ? parsePhones(contact.phone) : [];
-  const dept = contact ? (/^(東京都|\S{2,3}県)\s/.test(contact.dept) ? contact.dept : `${m.name} ${contact.dept}`) : "";
+  const dept = contact ? deptLabel(m.name, contact.dept) : "";
   // 幅員：市の地図のデータに幅員があればそれを出す。無いときは「記録なし」と書き、同じ向きで土地に接する道路の
   // 国土地理院の地図の幅の区分（地図の描き分けの目安。測った幅員ではない）を添える（「現地で確認」と書いた横に幅が出て食い違って見えないように）
   const gsiWidth = (dir: string) => front?.find((f) => f.direction === dir && f.width)?.width;
@@ -93,7 +94,7 @@ export function RoadTab({ result, data, open, front, pick }: TabProps) {
             <li className="py-[8px] leading-[1.5]" style={{ fontSize: 13, color: G.sub }}>
               {m.name}の道路の種別は、MICHILU では読めません。
               {!offline && mapLink
-                ? `下のボタンから${/県/.test(mapLink.label) ? "県" : m.name}の図を開いて確かめてください。`
+                ? `下のボタンから${prefUnit(mapLink.label, m.pref) ?? m.name}の図を開いて確かめてください。`
                 : m.coverage === "unknown"
                   ? "道路種別の図の公開の有無を調べている途中なので、窓口で確かめてください。"
                   : m.coverage === "outside"
@@ -236,8 +237,12 @@ export function RoadTab({ result, data, open, front, pick }: TabProps) {
       </section>
 
       <GNote>
-        道路の種別・幅員は、{m.name}の地図のデータと国土地理院の地図から読んだ参考です（線の位置は数mずれることがあります）。建築基準法の道路か・接道の条件を満たすかは、この画面では判断しません。
-        {mapLink ? "市の図と窓口で確かめてください。" : "窓口で確かめてください。"}
+        {/* 市町村の地図のデータを読めたときだけ、その市町村の名前を出す（読めない市町村で「〇〇市の地図のデータから読んだ」と書かない） */}
+        {list.length > 0
+          ? `道路の種別・幅員は、${m.name}の地図のデータと国土地理院の地図から読んだ参考です（線の位置は数mずれることがあります）。`
+          : "道路の幅の区分は、国土地理院の地図から読んだ参考です（測った幅員ではありません。線の位置は数mずれることがあります）。"}
+        建築基準法の道路か・接道の条件を満たすかは、この画面では判断しません。
+        {mapLink ? "公式の図と窓口で確かめてください。" : "窓口で確かめてください。"}
       </GNote>
     </div>
   );

@@ -1,4 +1,5 @@
 // 調べた結果を、メモや報告にそのまま貼れる文章にする
+import { deptLabel } from "./roadmap/dept";
 import type { LookupResult } from "./roadmap";
 import { buildingSummary, type BuildingResult } from "./roadmap/building";
 import { BUILDING_CREDIT } from "./roadmap/building-data";
@@ -27,7 +28,7 @@ import { ZONING_CREDIT } from "./roadmap/zoning-data";
 import { triageLines, type Triage } from "./app/triage";
 
 const COVERAGE_SHORT = { full: "ネットで全種別が分かる", partial: "ネットで分かるのは一部", none: "ネット非公開（窓口で確認）", outside: "都市計画区域外（窓口で確認）",
-  unknown: "公開の有無は調査中（県か市の建築指導課で確認）" } as const;
+  unknown: "公開の有無は調査中（都道府県か市町村の建築指導課で確認）" } as const;
 
 /**
  * zoning：地点の都市計画、parcels：謄本・公図用の「所在 地番」の行（物件の筆と隣の筆。reference は住所の地点の筆で参考）、
@@ -81,7 +82,7 @@ export function buildSummary(
   }
   const c = result.contact;
   if (c) {
-    const dept = /^(東京都|\S{2,3}県)\s/.test(c.dept) ? c.dept : `${m.name} ${c.dept}`;
+    const dept = deptLabel(m.name, c.dept);
     lines.push(`・窓口：${dept}${c.phone ? ` ${c.phone}` : ""}${c.noPhoneInquiry ? "（道路種別は電話不可・窓口で確認）" : ""}`);
   }
   if (zoning) {
@@ -177,7 +178,7 @@ export function buildSummary(
   if (zoning?.tochi) lines.push(`※自然公園・農業振興地域・森林の${TOCHI_CREDIT}。縮尺約1/5万の概略の区域。`);
   const hr = zoning?.hourei;
   if (hr) {
-    lines.push(`※砂防指定地などの区域の${HOUREI_CREDIT}。概略の区域で、重要事項説明には指定した都県・市の資料で確認を。`);
+    lines.push(`※砂防指定地などの区域の${HOUREI_CREDIT}。概略の区域で、重要事項説明には指定した都道府県・市の資料で確認を。`);
     // 都県が利用条件で求める特記事項（区域外と書くときも、データの時点などを添える）
     const notes = houreiNotesLine(hr.pref);
     if (notes) lines.push(`※${notes}`);

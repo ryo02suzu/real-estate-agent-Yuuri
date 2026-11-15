@@ -2,6 +2,7 @@
 // 読んだデータ（都市計画・道路・筆・ハザード・建物・国の地点データ）から、取引や建築に効きそうな所（要注意）と、データだけでは
 // 分からず確かめないといけない所（要確認）を拾い、確かめる窓口ごとに「何を・どこで・どうやって」をまとめる。
 // どれも参考で、法令の判断（再建築の可否など）はしない。画面の見た目は持たず（文字と並びだけ）、スマホ・PC・共有の文・印刷から同じものを使う
+import { deptLabel } from "../roadmap/dept";
 import { ASK, BRING } from "../inquiry";
 import type { LookupResult } from "../roadmap";
 import type { BuildingResult } from "../roadmap/building";
@@ -280,11 +281,11 @@ function zoningIssues(result: Ok, z: Zoning, st: ZoningStatus | undefined, morid
       out.push({ id: "hourei-missing", level: "check", topic: "law", title: `${hourei.missing.join("・")}は国のデータに無い`, detail: `${pref}の${hourei.missing.join("・")}は国のデータに入っていないので、区域に入るかは${houreiOfficeAll(hourei.missing, pref)}で確かめます。` });
   }
   if (tochi) {
-    if (tochi.park && tochi.park !== "普通地域") out.push({ id: "park", level: "warn", topic: "law", title: `自然公園の${tochi.park}`, detail: "建物の新築・増築などに許可が要ります（自然公園法）。", confirm: "都県の自然公園の担当で" });
-    else if (tochi.park) out.push({ id: "park-futsu", level: "check", topic: "law", title: "自然公園の普通地域", detail: "一定の規模の工作物の新築などに届出が要ります（自然公園法）。", confirm: "都県の自然公園の担当で" });
+    if (tochi.park && tochi.park !== "普通地域") out.push({ id: "park", level: "warn", topic: "law", title: `自然公園の${tochi.park}`, detail: "建物の新築・増築などに許可が要ります（自然公園法）。", confirm: "都道府県の自然公園の担当で" });
+    else if (tochi.park) out.push({ id: "park-futsu", level: "check", topic: "law", title: "自然公園の普通地域", detail: "一定の規模の工作物の新築などに届出が要ります（自然公園法）。", confirm: "都道府県の自然公園の担当で" });
     if (tochi.agri === "農用地区域") out.push({ id: "agri", level: "warn", topic: "law", title: "農業振興地域の農用地区域", detail: "農地以外にすること（転用）は原則できません（農振法）。住宅を建てるには区域からの除外が要ります。", confirm: `${m.name}の農業委員会で` });
     else if (tochi.agri) out.push({ id: "agri-shinko", level: "check", topic: "law", title: "農業振興地域（農用地区域の外）", detail: "農地なら転用の許可（農地法）が要ります。地目と農用地区域かどうかを確かめます。", confirm: `${m.name}の農業委員会で` });
-    if (tochi.forest === "保安林") out.push({ id: "forest", level: "warn", topic: "law", title: "保安林", detail: "木を切ったり、土地の形を変えるのに許可が要ります（森林法）。", confirm: "都県の森林の担当で" });
+    if (tochi.forest === "保安林") out.push({ id: "forest", level: "warn", topic: "law", title: "保安林", detail: "木を切ったり、土地の形を変えるのに許可が要ります（森林法）。", confirm: "都道府県の森林の担当で" });
     else if (tochi.forest) out.push({ id: "forest-plan", level: "check", topic: "law", title: tochi.forest, detail: "一定の面積の開発や伐採に許可・届出が要ります（森林法）。", confirm: tochi.forest === "国有林" ? "森林管理署で" : `${m.name}の林務の担当で` });
   }
   return out;
@@ -373,10 +374,10 @@ function utilityIssues(result: Ok): Issue[] {
 
 const COVERAGE_ISSUE: Record<Ok["municipality"]["coverage"], Issue | undefined> = {
   full: undefined,
-  partial: { id: "coverage-partial", level: "check", topic: "road", title: "道路種別はネットで一部しか分からない市", detail: "位置指定道路など一部の種別だけが地図で分かります。載っていない道路は窓口で確かめます。", confirm: "建築指導の窓口で" },
-  none: { id: "coverage-none", level: "check", topic: "road", title: "道路種別はネット非公開の市", detail: "前面道路の建築基準法上の種別は、窓口で確かめるしかありません（再建築の可否・セットバックに直結します）。", confirm: "建築指導の窓口で" },
+  partial: { id: "coverage-partial", level: "check", topic: "road", title: "道路種別はネットで一部しか分からない市町村", detail: "位置指定道路など一部の種別だけが地図で分かります。載っていない道路は窓口で確かめます。", confirm: "建築指導の窓口で" },
+  none: { id: "coverage-none", level: "check", topic: "road", title: "道路種別はネット非公開の市町村", detail: "前面道路の建築基準法上の種別は、窓口で確かめるしかありません（再建築の可否・セットバックに直結します）。", confirm: "建築指導の窓口で" },
   outside: { id: "coverage-outside", level: "check", topic: "road", title: "都市計画区域の無い市町村", detail: "接道義務（建築基準法43条）は原則かかりませんが、建築の扱いは市町村で確かめてください。", confirm: "市町村の建築の担当で" },
-  unknown: { id: "coverage-unknown", level: "check", topic: "road", title: "道路種別の公開の有無は調査中の市町村", detail: "この市町村の道路図がネットで見られるかは、まだ調べていません。前面道路の建築基準法上の種別は、県または市の建築指導課で確かめてください。", confirm: "県または市の建築指導課で" },
+  unknown: { id: "coverage-unknown", level: "check", topic: "road", title: "道路種別の公開の有無は調査中の市町村", detail: "この市町村の道路図がネットで見られるかは、まだ調べていません。前面道路の建築基準法上の種別は、都道府県または市町村の建築指導課で確かめてください。", confirm: "都道府県または市町村の建築指導課で" },
 };
 
 /** 次にやること */
@@ -394,14 +395,14 @@ function buildActions(input: TriageInput, issues: Issue[]): Action[] {
     if (has("road-2kou")) what.unshift("2項道路のセットバックの位置・距離（中心線の確定の有無）");
     if (has("road-not-road")) what.unshift("建築基準法の道路に接しているか。接していなければ43条2項の許可（認定）の見込み");
     if (has("road-shitei")) what.unshift("位置指定道路の指定番号・指定図面の写し。私道の所有者と承諾の要否");
-    const deptName = c ? (/^(東京都|\S{2,3}県)\s/.test(c.dept) ? c.dept : `${m.name} ${c.dept}`) : dept(m, "建築指導（道路種別）");
+    const deptName = c ? deptLabel(m.name, c.dept) : dept(m, "建築指導（道路種別）");
     // 窓口の注意（市のデータの備考があればそれを、無ければ電話の可否だけ）
     const phoneNote = c?.note ? `${c.note.replace(/[。．]?$/, "")}。` : c?.noPhoneInquiry ? "電話では答えてもらえません（窓口・FAX・メール）。" : "";
     const how =
       m.coverage === "none"
         ? `ネットでは非公開。${c?.noPhoneInquiry ? "電話では答えてもらえないので、窓口（FAX・メールの可否は要確認）で確かめます。" : "窓口か電話で確かめます。"}${c?.note && !c.noPhoneInquiry ? phoneNote : ""}`
         : m.coverage === "unknown"
-          ? "道路図の公開の有無は調査中です。県または市の建築指導課で種別を確かめます。"
+          ? "道路図の公開の有無は調査中です。都道府県または市町村の建築指導課で種別を確かめます。"
           : m.coverage === "outside"
             ? "都市計画区域の外なので接道義務は原則ありませんが、建築の扱いを市町村で確かめます。"
           : `まず${m.coverage === "full" ? "市の地図で種別を見てから" : "市の地図で分かる種別を見てから"}、重説には窓口で道路台帳・指定道路調書を確かめます。${phoneNote}`;
@@ -505,7 +506,7 @@ function buildActions(input: TriageInput, issues: Issue[]): Action[] {
         id: "tochi",
         priority: has("park") || has("agri") || has("forest") ? 1 : 2,
         title: "自然公園・農地・森林の規制を確かめる",
-        where: check ?? "都県・市の担当",
+        where: check ?? "都道府県・市の担当",
         what: [...(tc.park ? [`自然公園の${tc.park}での建築の許可・届出`] : []), ...(tc.agri ? ["農用地区域かどうか。農地なら転用の許可（農地法）と除外の可否"] : []), ...(tc.forest ? [`${tc.forest}での開発・伐採の許可・届出（林地開発）`] : [])],
       });
     }

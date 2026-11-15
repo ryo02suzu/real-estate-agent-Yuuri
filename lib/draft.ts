@@ -1,5 +1,6 @@
 // 重要事項説明書・販売図面（物件概要）に書き写すための下書き。ミチルで調べた結果を、書類の欄の並びに並べ直す。
 // どれも国・市のデータによる参考で、法令上の判断（再建築の可否など）はしない。分からない欄は「要確認」とし、確かめる先を添える
+import { deptLabel } from "./roadmap/dept";
 import type { LookupResult } from "./roadmap";
 import { buildingSummary, type BuildingResult } from "./roadmap/building";
 import { BUILDING_CREDIT } from "./roadmap/building-data";
@@ -114,7 +115,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   const hr = zoning?.hourei;
   const houreiRow = (kind: HoureiKind): DraftRow => {
     const label = `${HOUREI_LAWS[kind].law}（${kind}）`;
-    if (!hr) return { label, value: CHECK, note: "区域を指定した都県・市で確認", check: true };
+    if (!hr) return { label, value: CHECK, note: "区域を指定した都道府県・市で確認", check: true };
     const pref = PREF_NAMES[hr.pref];
     const office = houreiOffice(kind, kind === "災害危険区域" ? `${pref}・${m.name}` : pref);
     if (hr.missing.includes(kind)) return { label, value: CHECK, note: `${pref}の${kind}は国のデータに無い。${office}で確認`, check: true };
@@ -133,7 +134,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   if (md) {
     other.push({ label: "宅地造成及び特定盛土等規制法", value: `${moridoValue(md)}（国のデータ・参考）`, note: `${moridoDetail(md)}。${moridoCaution(md.authority)}`, check: true });
     if (md.link) other.push({ label: "盛土規制法の確認先", value: md.link.label, note: md.link.url });
-  } else other.push({ label: "宅地造成及び特定盛土等規制法", value: CHECK, note: "区域を指定した都県・市（盛土規制法の担当課）で確認", check: true });
+  } else other.push({ label: "宅地造成及び特定盛土等規制法", value: CHECK, note: "区域を指定した都道府県・市（盛土規制法の担当課）で確認", check: true });
   // 区域外の種類が2つ以上なら1つの欄にまとめる（スマホの1画面に収める。区域内の種類は1つずつ）
   const kinds = ["急傾斜地崩壊危険区域", "地すべり防止区域", "砂防指定地"] as const;
   const outside = hr ? kinds.filter((k) => !hr.missing.includes(k) && !hr.hits.some((h) => h.kind === k)) : [];
@@ -153,7 +154,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     other.push({
       label: "自然公園法・農業振興地域の整備に関する法律・森林法",
       value: CHECK,
-      note: "自然公園・保安林は都県、農用地区域は市町村の農業委員会、地域森林計画の森林は市町村の林務の担当で確認",
+      note: "自然公園・保安林は都道府県、農用地区域は市町村の農業委員会、地域森林計画の森林は市町村の林務の担当で確認",
       check: true,
     });
   else {
@@ -197,7 +198,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   if (map) road.push({ label: "確認先の地図", value: `${map.label}`, note: map.url });
   const c = result.contact;
   if (c) {
-    const dept = /^(東京都|\S{2,3}県)\s/.test(c.dept) ? c.dept : `${m.name} ${c.dept}`;
+    const dept = deptLabel(m.name, c.dept);
     road.push({ label: "窓口", value: `${dept}${c.phone ? ` ${c.phone}` : ""}`, note: c.noPhoneInquiry ? "道路種別は電話では答えてもらえない（窓口で確認）" : undefined });
   }
   sections.push({ title: "敷地と道路との関係（参考）", rows: road });
