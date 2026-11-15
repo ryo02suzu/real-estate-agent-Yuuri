@@ -4,19 +4,11 @@
 import type { Municipality } from "../municipalities";
 
 export const KYUSHU_PENDING: Municipality[] = [
-  // 福岡県（残り 2）
+  // 福岡県（残り 1）
   { pref: "福岡県", name: "福岡市", codes: ["40131", "40132", "40133", "40134", "40135", "40136", "40137"], coverage: "unknown", maps: [] },
-  { pref: "福岡県", name: "大牟田市", codes: ["40202"], coverage: "unknown", maps: [] },
-  // 佐賀県（残り 1）
-  { pref: "佐賀県", name: "佐賀市", codes: ["41201"], coverage: "unknown", maps: [] },
-  // 熊本県（残り 3）
+  // 熊本県（残り 2）
   { pref: "熊本県", name: "熊本市", codes: ["43101", "43102", "43103", "43104", "43105"], coverage: "unknown", maps: [] },
   { pref: "熊本県", name: "八代市", codes: ["43202"], coverage: "unknown", maps: [] },
-  { pref: "熊本県", name: "天草市", codes: ["43215"], coverage: "unknown", maps: [] },
-  // 大分県（残り 3）
-  { pref: "大分県", name: "日田市", codes: ["44204"], coverage: "unknown", maps: [] },
-  { pref: "大分県", name: "佐伯市", codes: ["44205"], coverage: "unknown", maps: [] },
-  { pref: "大分県", name: "宇佐市", codes: ["44211"], coverage: "unknown", maps: [] },
   // 宮崎県（残り 3）
   { pref: "宮崎県", name: "都城市", codes: ["45202"], coverage: "unknown", maps: [] },
   { pref: "宮崎県", name: "延岡市", codes: ["45203"], coverage: "unknown", maps: [] },

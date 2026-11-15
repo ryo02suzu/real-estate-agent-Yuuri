@@ -13,9 +13,9 @@ import { OKINAWA, OKINAWA_CITIES } from "./data/okinawa";
 import { KAGOSHIMA, KAGOSHIMA_CITIES } from "./data/kagoshima";
 import { MIYAZAKI, MIYAZAKI_CITIES } from "./data/miyazaki";
 import { OITA, OITA_CITIES } from "./data/oita";
-import { KUMAMOTO } from "./data/kumamoto";
+import { KUMAMOTO, KUMAMOTO_CITIES } from "./data/kumamoto";
 import { NAGASAKI, NAGASAKI_CITIES } from "./data/nagasaki";
-import { SAGA } from "./data/saga";
+import { SAGA, SAGA_CITIES } from "./data/saga";
 import { FUKUOKA, FUKUOKA_CITIES } from "./data/fukuoka";
 import { KOCHI } from "./data/kochi";
 import { TOKUSHIMA, TOKUSHIMA_CITIES } from "./data/tokushima";
@@ -27,7 +27,7 @@ import { YAMAGUCHI, YAMAGUCHI_CITIES } from "./data/yamaguchi";
 import { OKAYAMA, OKAYAMA_CITIES } from "./data/okayama";
 import { HIROSHIMA, HIROSHIMA_CITIES } from "./data/hiroshima";
 import { MUNI_CODES } from "./muni-codes";
-import { buildLinks, findMunicipality, MUNICIPALITIES, type Municipality } from "./municipalities";
+import { buildLinks, findMunicipality, MUNICIPALITIES, noCityPlanning, type Municipality } from "./municipalities";
 import { ROAD_READ_PERMITTED, roadReadPermission } from "./road-read-permission";
 import { ALL_PREF_NAMES, ALL_REGIONS, AREA_LABEL, AREA_SHORT, PREF_NAME_RE, PREF_NAMES, REGION_ORDER, REGIONS, SUPPORTED_BOUNDS, isOpenRegion, isSupportedPref, regionOfMuni, regionOfPref, type RegionKey } from "./regions";
 
@@ -486,7 +486,7 @@ describe("全国対応で足した地方（中国・四国・九州沖縄・北�
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
     ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...YAMAGUCHI_CITIES, ...TOTTORI_CITIES, ...SHIMANE_CITIES, ...CHUGOKU_PENDING], 107],
     ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...KAGAWA_CITIES, ...TOKUSHIMA_CITIES, ...EHIME_CITIES, ...SHIKOKU_PENDING], 95],
-    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...MIYAZAKI_CITIES, ...OKINAWA_CITIES, ...NAGASAKI_CITIES, ...KYUSHU_PENDING], 274],
+    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...MIYAZAKI_CITIES, ...OKINAWA_CITIES, ...NAGASAKI_CITIES, ...SAGA_CITIES, ...KUMAMOTO_CITIES, ...KYUSHU_PENDING], 274],
     ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING], 179],
   ];
   const table = Object.assign({}, ...Object.values(GSI_CODES as Record<string, Record<string, string>>)) as Record<string, string>;
@@ -944,7 +944,7 @@ describe("大分県の、市が扱う市（登録した市）", () => {
     // 電話を断っているのは、指定道路調書の内容の問い合わせだけ
     expect(m.contact?.noPhoneInquiry).toBeUndefined();
     expect(m.contact?.note).toContain("電話では受け付けていない");
-    expect(KYUSHU_PENDING.filter((x) => x.pref === "大分県").map((x) => x.name)).toEqual(["日田市", "佐伯市", "宇佐市"]);
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "大分県").map((x) => x.name)).toEqual([]);
   });
 
   it("別府市：市のページ「建築基準法の道路種別」（利用上の注意の画面）。同意の先は開かない", () => {
@@ -978,6 +978,60 @@ describe("大分県の、市が扱う市（登録した市）", () => {
     expect(m.maps[0].tip).toContain("不動産取引のための資料");
     expect(m.contact?.phone).toBe("0979-62-9029");
     expect(m.contact?.noPhoneInquiry).toBe(true);
+  });
+
+  it("日田市・佐伯市・宇佐市を登録。大分県の特定行政庁の6市が全部そろった（道路種別の地図は、3市とも市のページに無い）", () => {
+    const codes: Record<string, string> = { 大分市: "44201", 別府市: "44202", 中津市: "44203", 日田市: "44204", 佐伯市: "44205", 宇佐市: "44211" };
+    expect(OITA_CITIES.map((m) => m.name)).toEqual(Object.keys(codes));
+    for (const [name, code] of Object.entries(codes)) {
+      expect(OITA_CITIES.find((x) => x.name === name)!.codes, name).toEqual([code]);
+      expect(findMunicipality(code)?.name, name).toBe(name);
+    }
+    for (const name of ["日田市", "佐伯市", "宇佐市"]) {
+      const m = OITA_CITIES.find((x) => x.name === name)!;
+      expect(m.coverage, name).toBe("none");
+      expect(m.note, name).toContain("特定行政庁");
+      expect(m.note, name).toContain(`${name}の一部は都市計画区域の外`);
+    }
+  });
+
+  it("日田市：建築住宅課 指導審査係。市道の幅員などは「日田市Webマップ」の道路情報マップ。道路網図の利用の決まりを注記に", () => {
+    const m = OITA_CITIES.find((x) => x.name === "日田市")!;
+    expect(m.maps).toHaveLength(1);
+    expect(m.maps[0].kind).toBe("public_road");
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://www2.wagmap.jp/hita/");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("「道路情報マップ」を選び");
+    expect(m.maps[0].tip).toContain("MICHILU は地図の中を開いて確かめていない");
+    // 市のサイトへのリンクは置かない（市の決まりは、原則トップページだけ）
+    expect(m.maps.every((l) => !(l.url ?? "").includes("city.hita.oita.jp"))).toBe(true);
+    expect(m.contact?.dept).toContain("建築住宅課 指導審査係");
+    expect(m.contact?.phone).toBe("0973-22-8226");
+    expect(m.contact?.fax).toBe("0973-22-8247");
+    expect(m.contact?.hours).toBe("平日 8:30〜17:00（市役所の開庁時間）");
+    expect(m.contact?.note).toContain("2項道路協議書");
+    expect(m.note).toContain("閲覧以外の目的で利用することを禁じ");
+  });
+
+  it("佐伯市：道路種別は市のページのお問い合わせフォームから（建築住宅課 建築指導係）", () => {
+    const m = OITA_CITIES.find((x) => x.name === "佐伯市")!;
+    expect(m.maps).toEqual([]);
+    expect(m.contact?.dept).toContain("建築指導係");
+    expect(m.contact?.phone).toBe("0972-22-3574");
+    // 確認申請の窓口（建築審査係）の番号ではない
+    expect(m.contact?.phone).not.toBe("0972-22-4223");
+    expect(m.contact?.note).toContain("お問い合わせフォーム");
+    expect(m.note).toContain("非線引き区域");
+  });
+
+  it("宇佐市：建設水道部 建築住宅課 指導審査室（建築基準法に関すること）", () => {
+    const m = OITA_CITIES.find((x) => x.name === "宇佐市")!;
+    expect(m.maps).toEqual([]);
+    expect(m.contact?.dept).toContain("指導審査室");
+    expect(m.contact?.phone).toBe("0978-27-8182");
+    expect(m.contact?.fax).toBe("0978-27-8230");
+    expect(m.contact?.hours).toBe("平日 8:30〜17:00（市役所の開庁時間）");
   });
 });
 
@@ -1167,7 +1221,7 @@ describe("福岡県の、市が扱う市（登録した市）", () => {
     expect(m.maps[0].tip).toContain("不動産取引など権利・義務が発生するものや建築確認申請の資料には使えない");
     expect(m.contact?.phone).toBe("093-582-2535");
     expect(m.contact?.noPhoneInquiry).toBe(true);
-    expect(KYUSHU_PENDING.filter((x) => x.pref === "福岡県").map((x) => x.name)).toEqual(["福岡市", "大牟田市"]);
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "福岡県").map((x) => x.name)).toEqual(["福岡市"]);
   });
 
   it("久留米市：市の公式ホームページの「指定道路図」（くるめMAP と、地区ごとの PDF）。道路種別の電話での問い合わせは断っている", () => {
@@ -1184,6 +1238,65 @@ describe("福岡県の、市が扱う市（登録した市）", () => {
     expect(m.contact?.phone).toBe("0942-30-9089");
     expect(m.contact?.fax).toBe("0942-30-9743");
     expect(m.contact?.noPhoneInquiry).toBe(true);
+  });
+
+  it("大牟田市：道路種別の地図は無い（建築住宅課 指導担当へ。電話のときは地図を FAX かメールで）。市道かどうかは「おおむた地図ナビ」", () => {
+    const m = FUKUOKA_CITIES.find((x) => x.name === "大牟田市")!;
+    expect(m.codes).toEqual(["40202"]);
+    expect(findMunicipality("40202")?.name).toBe("大牟田市");
+    expect(m.coverage).toBe("none");
+    expect(m.maps).toHaveLength(1);
+    expect(m.maps[0].kind).toBe("public_road");
+    expect(m.maps[0].build).toBeNull();
+    // 市の「よくある質問」のリンク（http）と同じ地図の、https の入口
+    expect(m.maps[0].url).toBe("https://www2.wagmap.jp/omuta/Portal");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("MICHILU は地図の中を開いて確かめていない");
+    expect(m.contact?.dept).toContain("建築住宅課 指導担当");
+    expect(m.contact?.phone).toBe("0944-41-2797");
+    expect(m.contact?.fax).toBe("0944-41-2795");
+    // 電話は断っていない（場所の地図を FAX かメールで送るようお願いしている）
+    expect(m.contact?.noPhoneInquiry).toBeUndefined();
+    expect(m.contact?.note).toContain("相談場所の地図を FAX かメールで送る");
+    expect(m.contact?.note).toContain("道路調査依頼書");
+    // 全域が都市計画区域（区域外ではない）
+    expect(m.note).toContain("全域が都市計画区域（");
+    expect(noCityPlanning(m)).toBe(false);
+  });
+});
+
+describe("佐賀県の、市が扱う市（登録した市）", () => {
+  it("佐賀市：道路種別の地図は無い。建築指導課 指導係（道路位置指定など建築基準法の道路に関すること）", () => {
+    expect(SAGA_CITIES.map((m) => m.name)).toEqual(["佐賀市"]);
+    const m = SAGA_CITIES[0];
+    expect(m.codes).toEqual(["41201"]);
+    expect(findMunicipality("41201")?.name).toBe("佐賀市");
+    expect(m.coverage).toBe("none");
+    expect(m.maps).toEqual([]);
+    expect(m.contact?.dept).toBe("都市戦略部 建築指導課 指導係（栄町1番1号 本庁6階）");
+    expect(m.contact?.phone).toBe("0952-40-7170");
+    expect(m.contact?.fax).toBe("0952-40-7392");
+    expect(m.contact?.note).toContain("協定道路制度");
+    expect(m.note).toContain("佐賀市の一部は都市計画区域の外");
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "佐賀県")).toEqual([]);
+  });
+});
+
+describe("熊本県の、市が扱う市（登録した市）", () => {
+  it("天草市：道路種別の地図は無い。建築住宅課へ（道路判定事前協議書・位置指定道路の一覧）。熊本市・八代市は調査中に残る", () => {
+    expect(KUMAMOTO_CITIES.map((m) => m.name)).toEqual(["天草市"]);
+    const m = KUMAMOTO_CITIES[0];
+    expect(m.codes).toEqual(["43215"]);
+    expect(findMunicipality("43215")?.name).toBe("天草市");
+    expect(m.coverage).toBe("none");
+    expect(m.maps).toEqual([]);
+    expect(m.contact?.phone).toBe("0969-32-6797");
+    expect(m.contact?.fax).toBe("0969-24-4266");
+    expect(m.contact?.hours).toBe("平日 8:30〜17:15（市役所の業務時間）");
+    expect(m.contact?.note).toContain("道路判定事前協議書");
+    expect(m.contact?.note).toContain("平成24年度以降に市が指定したもの");
+    expect(m.note).toContain("天草市の一部は都市計画区域の外");
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "熊本県").map((x) => x.name)).toEqual(["熊本市", "八代市"]);
   });
 });
 
@@ -1518,8 +1631,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       total: 56,
       // 都市計画区域も準都市計画区域も無い村だけ（準都市計画区域のある うきは市・大木町・香春町・糸田町・大任町・福智町・上毛町 は区域外にしない）
       outside: ["東峰村", "赤村"],
-      // 市が扱う4市のうち、まだ調べている途中の市（北九州市・久留米市は登録した）
-      cities: ["福岡市", "大牟田市"],
+      // 市が扱う4市のうち、まだ調べている途中の市（北九州市・久留米市・大牟田市は登録した）
+      cities: ["福岡市"],
       offices: { 福岡県土整備事務所: 9, 那珂県土整備事務所: 5, 朝倉県土整備事務所: 3, 久留米県土整備事務所: 3, 南筑後県土整備事務所: 4, 八女県土整備事務所: 3, 飯塚県土整備事務所: 3, 直方県土整備事務所: 4, 田川県土整備事務所: 8, 北九州県土整備事務所: 7, 京築県土整備事務所: 7 },
     },    {
       pref: "佐賀県",
@@ -1528,7 +1641,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       total: 19,
       // 江北町は準都市計画区域があるので区域外にしない
       outside: ["玄海町", "大町町", "太良町"],
-      cities: ["佐賀市"],
+      // 市が扱う佐賀市は登録した（下の「佐賀県の、市が扱う市」）
+      cities: [],
       offices: { 佐賀土木事務所: 2, 東部土木事務所: 6, 唐津土木事務所: 2, 伊万里土木事務所: 2, 杵藤土木事務所: 7 },
     },    {
       pref: "長崎県",
@@ -1546,7 +1660,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       total: 42,
       // 都市計画区域の無い25市町村のうち、準都市計画区域のある玉東町・西原村は区域外にしない
       outside: ["上天草市", "美里町", "南関町", "和水町", "南小国町", "小国町", "産山村", "高森町", "南阿蘇村", "甲佐町", "山都町", "氷川町", "津奈木町", "錦町", "多良木町", "湯前町", "水上村", "相良村", "五木村", "山江村", "球磨村", "あさぎり町", "苓北町"],
-      cities: ["熊本市", "八代市", "天草市"],
+      // 市が扱う3市のうち、まだ調べている途中の市（天草市は登録した。下の「熊本県の、市が扱う市」）
+      cities: ["熊本市", "八代市"],
       offices: { 県央広域本部: 10, 県北広域本部: 18, 県南広域本部: 14 },
     },    {
       pref: "大分県",
@@ -1554,8 +1669,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: KYUSHU_PENDING,
       total: 12,
       outside: ["姫島村", "九重町"],
-      // 特定行政庁の6市のうち、まだ調べている途中の市（大分市・別府市・中津市は登録した。下の「大分県の、市が扱う市」）
-      cities: ["日田市", "佐伯市", "宇佐市"],
+      // 特定行政庁の6市は、全部登録した（下の「大分県の、市が扱う市」）
+      cities: [],
       offices: { 別府土木事務所: 4, 大分土木事務所: 1, 臼杵土木事務所: 2, 豊後大野土木事務所: 2, 日田土木事務所: 2, 中津土木事務所: 1 },
     },    {
       pref: "宮崎県",
