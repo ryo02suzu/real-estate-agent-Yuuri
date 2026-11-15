@@ -7,6 +7,7 @@ import { CHUGOKU_PENDING } from "./data/chugoku";
 import { SHIKOKU_PENDING } from "./data/shikoku";
 import { KYUSHU_PENDING } from "./data/kyushu";
 import { HOKKAIDO_PENDING } from "./data/hokkaido";
+import { HOKKAIDO } from "./data/hokkaido-pref";
 import { OKINAWA } from "./data/okinawa";
 import { KAGOSHIMA } from "./data/kagoshima";
 import { MIYAZAKI } from "./data/miyazaki";
@@ -467,7 +468,7 @@ describe("準備中の地方（中国・四国・九州沖縄・北海道）", (
     ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...CHUGOKU_PENDING], 107],
     ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING], 95],
     ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...KYUSHU_PENDING], 274],
-    ["hokkaido", HOKKAIDO_PENDING, 179],
+    ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_PENDING], 179],
   ];
   const table = Object.assign({}, ...Object.values(GSI_CODES as Record<string, Record<string, string>>)) as Record<string, string>;
 
@@ -720,6 +721,17 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       // 特定行政庁の5市
       cities: ["那覇市", "宜野湾市", "浦添市", "沖縄市", "うるま市"],
       offices: { 北部土木事務所: 12, 中部土木事務所: 6, 南部土木事務所: 13, 宮古土木事務所: 2, 八重山土木事務所: 3 },
+    },
+    {
+      pref: "北海道",
+      list: HOKKAIDO,
+      pending: HOKKAIDO_PENDING,
+      total: 140,
+      // 都市計画区域の無い80町村から、準都市計画区域のあるニセコ町を除いた79
+      outside: ["上砂川町", "由仁町", "月形町", "浦臼町", "妹背牛町", "秩父別町", "雨竜町", "北竜町", "沼田町", "新篠津村", "島牧村", "寿都町", "黒松内町", "蘭越町", "真狩村", "留寿都村", "喜茂別町", "京極町", "泊村", "神恵内村", "積丹町", "仁木町", "赤井川村", "豊浦町", "平取町", "新冠町", "様似町", "えりも町", "松前町", "知内町", "鹿部町", "上ノ国町", "厚沢部町", "乙部町", "奥尻町", "当麻町", "比布町", "愛別町", "東川町", "中富良野町", "南富良野町", "占冠村", "和寒町", "剣淵町", "音威子府村", "中川町", "幌加内町", "小平町", "苫前町", "初山別村", "遠別町", "天塩町", "猿払村", "中頓別町", "豊富町", "礼文町", "利尻町", "利尻富士町", "幌延町", "津別町", "清里町", "小清水町", "訓子府町", "置戸町", "佐呂間町", "湧別町", "西興部村", "士幌町", "上士幌町", "鹿追町", "中札内村", "更別村", "豊頃町", "陸別町", "浜中町", "鶴居村", "別海町", "標津町", "羅臼町"],
+      // 特定行政庁の10市と、限定特定行政庁の29市町
+      cities: ["札幌市", "函館市", "小樽市", "旭川市", "室蘭市", "釧路市", "帯広市", "北見市", "岩見沢市", "網走市", "留萌市", "苫小牧市", "稚内市", "江別市", "紋別市", "士別市", "名寄市", "三笠市", "根室市", "千歳市", "砂川市", "深川市", "富良野市", "登別市", "恵庭市", "伊達市", "北広島市", "石狩市", "当別町", "森町", "長沼町", "東神楽町", "美幌町", "遠軽町", "白老町", "音更町", "芽室町", "幕別町", "中標津町"],
+      offices: { 空知総合振興局: 19, 石狩振興局: 1, 後志総合振興局: 19, 胆振総合振興局: 6, 日高振興局: 7, 渡島総合振興局: 9, 檜山振興局: 7, 上川総合振興局: 18, 留萌振興局: 7, 宗谷総合振興局: 9, オホーツク総合振興局: 13, 十勝総合振興局: 15, 釧路総合振興局: 7, 根室振興局: 3 },
     },
   ];
 
