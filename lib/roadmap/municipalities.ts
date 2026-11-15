@@ -13,6 +13,7 @@ import { CHUGOKU_PENDING } from "./data/chugoku";
 import { SHIKOKU_PENDING } from "./data/shikoku";
 import { KYUSHU_PENDING } from "./data/kyushu";
 import { HOKKAIDO_PENDING } from "./data/hokkaido";
+import { HOKKAIDO } from "./data/hokkaido-pref";
 import { OKINAWA } from "./data/okinawa";
 import { KAGOSHIMA } from "./data/kagoshima";
 import { MIYAZAKI } from "./data/miyazaki";
@@ -172,7 +173,7 @@ const ADDED: [RegionKey, Municipality[]][] = [
   ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...CHUGOKU_PENDING]],
   ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING]],
   ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...KYUSHU_PENDING]],
-  ["hokkaido", HOKKAIDO_PENDING],
+  ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_PENDING]],
 ];
 
 /** 対応している市区町村（アプリが使う。準備中の地方の市町村は入っていない） */
