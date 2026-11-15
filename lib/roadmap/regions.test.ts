@@ -1076,7 +1076,41 @@ describe("宮崎県の、市が扱う市（登録した市）", () => {
     // 来庁も遠慮するよう求めているので、「電話では答えない（窓口へ）」の印は付けず、注意書きに書く
     expect(m.contact?.noPhoneInquiry).toBeUndefined();
     expect(m.contact?.note).toContain("できるだけ遠慮するよう市が求めている");
-    expect(KYUSHU_PENDING.filter((x) => x.pref === "宮崎県").map((x) => x.name)).toEqual(["都城市", "延岡市", "日向市"]);
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "宮崎県").map((x) => x.name)).toEqual(["日向市"]);
+  });
+
+  it("都城市：指定道路図（1項4号・5号・2項。令和3年3月15日現在）はあるが、市の決まりでリンクの前に連絡が要るので、まだリンクを置かない", () => {
+    const m = MIYAZAKI_CITIES.find((x) => x.name === "都城市")!;
+    expect(m.codes).toEqual(["45202"]);
+    expect(findMunicipality("45202")?.name).toBe("都城市");
+    // 指定道路だけの図がネットにある
+    expect(m.coverage).toBe("partial");
+    // 連絡が済むまで、市のページへのリンクは置かない（ページの名前を書く）
+    expect(m.maps).toEqual([]);
+    expect(m.note).toContain("「都城市指定道路図(令和3年3月15日現在)を紹介します」");
+    expect(m.note).toContain("リンクする前に市への連絡が要る");
+    expect(m.note).toContain("不動産取引のための資料");
+    expect(m.contact?.dept).toContain("建築対策課 審査担当");
+    expect(m.contact?.phone).toBe("0986-23-2584");
+    expect(m.contact?.fax).toBe("0986-23-2154");
+    expect(m.contact?.hours).toBe("平日 8:45〜16:30（市役所の窓口受付時間）");
+    expect(m.note).toContain("都城市の一部は都市計画区域の外");
+  });
+
+  it("延岡市：道路種別の地図は無い。建築指導課 宅地審査係（建築基準法に規定する道路に関すること）", () => {
+    const m = MIYAZAKI_CITIES.find((x) => x.name === "延岡市")!;
+    expect(m.codes).toEqual(["45203"]);
+    expect(findMunicipality("45203")?.name).toBe("延岡市");
+    expect(m.coverage).toBe("none");
+    expect(m.maps).toEqual([]);
+    expect(m.contact?.dept).toContain("宅地審査係");
+    expect(m.contact?.phone).toBe("0982-22-8540");
+    // 建築審査係（確認申請）の番号ではない
+    expect(m.contact?.phone).not.toBe("0982-22-7034");
+    expect(m.contact?.fax).toBe("0982-31-3186");
+    expect(m.contact?.hours).toBe("平日 8:30〜17:15（市役所の開庁時間）");
+    expect(m.contact?.note).toContain("30日前までに相談");
+    expect(m.note).toContain("延岡市の一部は都市計画区域の外");
   });
 });
 
@@ -1678,8 +1712,9 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: KYUSHU_PENDING,
       total: 22,
       outside: ["西米良村", "木城町", "諸塚村", "椎葉村", "美郷町", "日之影町", "五ヶ瀬町"],
-      // 市が扱う4市のうち、まだ調べている途中の市（宮崎市は登録した。下の「宮崎県の、市が扱う市」）
-      cities: ["都城市", "延岡市", "日向市"],
+      // 市が扱う4市のうち、まだ調べている途中の市（宮崎市・都城市・延岡市は登録した。下の「宮崎県の、市が扱う市」。
+      // 日向市は、市のホームページがシステム障害で臨時のページになっていて、確かめられなかった）
+      cities: ["日向市"],
       // 問い合わせ先は本務の事務所（国富町・綾町＝宮崎、西都市・西米良村＝高鍋、串間市＝日南）
       offices: { 宮崎土木事務所: 2, 高鍋土木事務所: 7, 日南土木事務所: 2, 都城土木事務所: 1, 小林土木事務所: 3, 日向土木事務所: 4, 西臼杵支庁: 3 },
     },    {
