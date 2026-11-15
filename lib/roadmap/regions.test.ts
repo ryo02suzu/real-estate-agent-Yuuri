@@ -840,16 +840,34 @@ describe("島根県の、市が扱う市（登録した市）", () => {
 describe("愛媛県の、市が扱う市（登録した市）", () => {
   const city = (name: string) => EHIME_CITIES.find((x) => x.name === name)!;
 
-  it("今治・宇和島・新居浜・西条を登録。松山市だけ調査中に残る", () => {
-    const codes: Record<string, string> = { 今治市: "38202", 宇和島市: "38203", 新居浜市: "38205", 西条市: "38206" };
+  it("松山・今治・宇和島・新居浜・西条を登録。愛媛県（と四国）の調査中は無くなった", () => {
+    const codes: Record<string, string> = { 松山市: "38201", 今治市: "38202", 宇和島市: "38203", 新居浜市: "38205", 西条市: "38206" };
     expect(EHIME_CITIES.map((m) => m.name)).toEqual(Object.keys(codes));
     for (const [name, code] of Object.entries(codes)) {
       expect(city(name).codes, name).toEqual([code]);
       expect(findMunicipality(code)?.name, name).toBe(name);
       expect(city(name).note, name).toContain(`${name}の一部は都市計画区域の外`);
     }
-    expect(SHIKOKU_PENDING.filter((x) => x.pref === "愛媛県").map((x) => x.name)).toEqual(["松山市"]);
-    expect(findMunicipality("38201")?.coverage).toBe("unknown");
+    expect(SHIKOKU_PENDING).toEqual([]);
+    expect(MUNICIPALITIES.filter((m) => ["徳島県", "香川県", "愛媛県", "高知県"].includes(m.pref) && m.coverage === "unknown")).toEqual([]);
+  });
+
+  it("松山市：道路種別の地図はネットに無い（建築指導課の閲覧場所・閲覧用のパソコン）。電話では受けない。市道は「e～よ まちナビ」の市のページから", () => {
+    const m = city("松山市");
+    expect(m.coverage).toBe("none");
+    expect(m.maps.map((l) => l.kind)).toEqual(["public_road"]);
+    // 市のサイトの決まり：リンクは原則自由で承諾は要らない → 市道の図の案内のページを直接開く（地図のサイトの利用条件の同意は、使う人がする）
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://www.city.matsuyama.ehime.jp/kurashi/kurashi/doro/sido/matuyamasidourosenzu.html");
+    expect(m.maps[0].tip).toContain("自分で同意する");
+    expect(m.maps[0].tip).toContain("建築基準法の道路の種別が載っているかは確かめられていない");
+    expect(m.contact).toMatchObject({ phone: "089-948-6510 089-948-6526", email: "kenchikus.otoiawase@city.matsuyama.ehime.jp", noPhoneInquiry: true });
+    // FAX でも受けるが、番号は市のページに無い（推測の番号を入れない）
+    expect(m.contact?.fax).toBeUndefined();
+    expect(m.contact?.note).toContain("FAX の番号は、市のページに見つからなかった");
+    expect(m.contact?.note).toContain("建築基準法第42条による道路調査依頼書");
+    expect(m.note).toContain("閲覧用のパソコン");
+    expect(findMunicipality("38201")?.name).toBe("松山市");
   });
 
   it("新居浜市：指定道路図は全種別（指定道路のほかに1号・2号・3号も）。市の決まりに合わせてトップページから。電話・FAX・メールでは答えない", () => {
@@ -1887,8 +1905,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: SHIKOKU_PENDING,
       total: 15,
       outside: ["上島町", "伊方町", "松野町"],
-      // 特定行政庁の今治市・新居浜市・西条市と、限定特定行政庁の宇和島市は登録した。松山市は、市のサイトがこの作業の環境から読めないので調査中のまま
-      cities: ["松山市"],
+      // 特定行政庁の4市（松山・今治・新居浜・西条）と、限定特定行政庁の宇和島市は、全部登録した（上の「愛媛県の、市が扱う市」）
+      cities: [],
       offices: { 東予地方局: 1, 四国中央土木事務所: 1, 中予地方局: 5, 八幡浜土木事務所: 4, 南予地方局: 4 },
     },
     {
