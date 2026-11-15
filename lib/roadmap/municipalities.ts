@@ -20,16 +20,16 @@ import { KAGOSHIMA, KAGOSHIMA_CITIES } from "./data/kagoshima";
 import { MIYAZAKI, MIYAZAKI_CITIES } from "./data/miyazaki";
 import { OITA, OITA_CITIES } from "./data/oita";
 import { KUMAMOTO } from "./data/kumamoto";
-import { NAGASAKI } from "./data/nagasaki";
+import { NAGASAKI, NAGASAKI_CITIES } from "./data/nagasaki";
 import { SAGA } from "./data/saga";
 import { FUKUOKA, FUKUOKA_CITIES } from "./data/fukuoka";
 import { KOCHI } from "./data/kochi";
-import { TOKUSHIMA } from "./data/tokushima";
+import { TOKUSHIMA, TOKUSHIMA_CITIES } from "./data/tokushima";
 import { EHIME } from "./data/ehime";
 import { KAGAWA, KAGAWA_CITIES } from "./data/kagawa";
 import { SHIMANE } from "./data/shimane";
 import { TOTTORI } from "./data/tottori";
-import { YAMAGUCHI } from "./data/yamaguchi";
+import { YAMAGUCHI, YAMAGUCHI_CITIES } from "./data/yamaguchi";
 import { OKAYAMA, OKAYAMA_CITIES } from "./data/okayama";
 import { HIROSHIMA, HIROSHIMA_CITIES } from "./data/hiroshima";
 import { HYOGO, HYOGO_CITIES } from "./data/hyogo";
@@ -171,9 +171,9 @@ const BASE: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GU
  * 2026-11-15 に4地方とも公開した。regions.json で preparing（準備中）にした地方は、対応エリア（MUNICIPALITIES）に入れない
  */
 const ADDED: [RegionKey, Municipality[]][] = [
-  ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...CHUGOKU_PENDING]],
-  ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...KAGAWA_CITIES, ...SHIKOKU_PENDING]],
-  ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...MIYAZAKI_CITIES, ...OKINAWA_CITIES, ...KYUSHU_PENDING]],
+  ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...YAMAGUCHI_CITIES, ...CHUGOKU_PENDING]],
+  ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...KAGAWA_CITIES, ...TOKUSHIMA_CITIES, ...SHIKOKU_PENDING]],
+  ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...MIYAZAKI_CITIES, ...OKINAWA_CITIES, ...NAGASAKI_CITIES, ...KYUSHU_PENDING]],
   ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING]],
 ];
 
