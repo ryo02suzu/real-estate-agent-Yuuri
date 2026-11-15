@@ -6,7 +6,7 @@
 // 直しきれずに別の町に当たったときも、そのことを返す（黙って別の町を出さない）。住所は国土地理院の API にだけ送る。
 // 都道府県のあとに市区町村を書かずに町名から入れた住所（「東京都渋谷2-6-12」「東京都丸の内1-9-1」）も、同じ都道府県の中の
 // その町を探して出す（fixOmittedMunicipality。同じ町名が2つ以上の市区町村にあれば選んでもらう）
-import GSI_CODES from "./data/gsi-muni-codes.json";
+import { MUNI_CODES } from "./muni-codes";
 import { newForm } from "./old-kanji";
 import { CHIWARI, addressNumbers, chiwariDigits, geocodeCandidates, type GeocodeResult } from "./geocode";
 
@@ -34,7 +34,7 @@ const numAt = (s: string) => s.replace(CHIWARI, (m) => "地".repeat(m.length)).s
 const MUNIS: Muni[] = (() => {
   const out: Muni[] = [];
   const cities = new Set<string>();
-  for (const [pref, codes] of Object.entries(GSI_CODES as Record<string, Record<string, string>>)) {
+  for (const [pref, codes] of Object.entries(MUNI_CODES)) {
     for (const raw of Object.values(codes)) {
       const [city, ward] = raw.trim().split(/\s+/);
       out.push(ward ? { pref, name: city + ward, city, ward } : { pref, name: city, city });

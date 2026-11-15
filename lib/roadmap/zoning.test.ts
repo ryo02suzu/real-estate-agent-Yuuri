@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { findMunicipality, noCityPlanning } from "./municipalities";
 import type { LngLat, Polygon } from "./parcel";
 import STATUS from "./data/zoning-status.json";
+import { ALL_PREF_NAMES, PREF_NAMES } from "./regions";
 import {
   noneLabel,
   ratioLabel,
@@ -171,9 +172,11 @@ describe("市区町村のデータの有無", () => {
     expect(statusFor(["11201"], all)?.city).toBe("川越市");
     expect(statusFor(["99999"], all)).toBeUndefined();
   });
-  it("対応エリア（関東1都6県・中部9県・東北6県・近畿2府5県）の市区町村の大半が載っている", () => {
+  it("対応エリアの市区町村の大半が載っていて、どれも regions.json の都道府県（準備中の地方も、データは作る）", () => {
     expect(Object.keys(all).length).toBeGreaterThan(280);
-    expect(Object.keys(all).every((k) => /^(0[2-9]|1[0-9]|2[0-9]|30)\d{3}$/.test(k))).toBe(true);
+    expect(Object.keys(all).every((k) => /^\d{5}$/.test(k) && k.slice(0, 2) in ALL_PREF_NAMES)).toBe(true);
+    // 対応している都道府県の分は、今までどおり入っている
+    for (const pref of Object.keys(PREF_NAMES)) expect(Object.keys(all).some((k) => k.startsWith(pref)), pref).toBe(true);
   });
 });
 

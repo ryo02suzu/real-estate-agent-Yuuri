@@ -72,7 +72,8 @@ const nodeFetcher: TileFetcher = async (url) => {
   return { width: info.width, height: info.height, data };
 };
 
-const zoningSrc = zoningTileSource(fileSource(ZONING_SRC.url));
+// 都市計画のタイルは、R2 に置いてあれば URL から、アプリの中にあればファイルから読む
+const zoningSrc = zoningTileSource(/^https?:/.test(ZONING_SRC.url) ? ZONING_SRC.url : fileSource(ZONING_SRC.url));
 const schoolSrc = schoolTileSource(fileSource(SCHOOL_SRC.url));
 const landSrc = landPriceTileSource(fileSource(LAND_SRC.url));
 const houreiSrc = houreiTileSource(fileSource(HOUREI_SRC.url));

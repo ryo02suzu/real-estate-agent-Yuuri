@@ -9,6 +9,10 @@ import { TOKYO } from "./data/tokyo";
 import { CHUBU_PENDING } from "./data/chubu";
 import { TOHOKU_PENDING } from "./data/tohoku";
 import { KINKI_PENDING } from "./data/kinki";
+import { CHUGOKU_PENDING } from "./data/chugoku";
+import { SHIKOKU_PENDING } from "./data/shikoku";
+import { KYUSHU_PENDING } from "./data/kyushu";
+import { HOKKAIDO_PENDING } from "./data/hokkaido";
 import { HYOGO, HYOGO_CITIES } from "./data/hyogo";
 import { KYOTO, KYOTO_CITIES } from "./data/kyoto";
 import { MIE, MIE_CITIES } from "./data/mie";
@@ -32,6 +36,7 @@ import { ISHIKAWA } from "./data/ishikawa";
 import { NIIGATA } from "./data/niigata";
 import { TOYAMA } from "./data/toyama";
 import { legendFor, type LegendEntry } from "./legends";
+import { isOpenRegion } from "./regions";
 import type { RoadRead } from "./road-read";
 import { roadReadPermission } from "./road-read-permission";
 import { findSheet, type SheetHit, type SheetIndex } from "./sheets";
@@ -101,7 +106,25 @@ export type Prefecture =
   | "大阪府"
   | "兵庫県"
   | "奈良県"
-  | "和歌山県";
+  | "和歌山県"
+  | "鳥取県"
+  | "島根県"
+  | "岡山県"
+  | "広島県"
+  | "山口県"
+  | "徳島県"
+  | "香川県"
+  | "愛媛県"
+  | "高知県"
+  | "福岡県"
+  | "佐賀県"
+  | "長崎県"
+  | "熊本県"
+  | "大分県"
+  | "宮崎県"
+  | "鹿児島県"
+  | "沖縄県"
+  | "北海道";
 
 export type Municipality = {
   pref: Prefecture;
@@ -121,7 +144,13 @@ export type Municipality = {
   note?: string;
 };
 
-export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI, ...SHIZUOKA, ...YAMANASHI, ...NAGANO, ...AICHI, ...GIFU, ...NIIGATA, ...TOYAMA, ...ISHIKAWA, ...FUKUI, ...CHUBU_PENDING, ...AOMORI, ...IWATE, ...MIYAGI, ...AKITA, ...YAMAGATA, ...FUKUSHIMA, ...TOHOKU_PENDING, ...MIE, ...MIE_CITIES, ...SHIGA, ...SHIGA_CITIES, ...KYOTO, ...KYOTO_CITIES, ...OSAKA, ...OSAKA_CITIES, ...HYOGO, ...HYOGO_CITIES, ...NARA, ...NARA_CITIES, ...WAKAYAMA, ...WAKAYAMA_CITIES, ...KINKI_PENDING];
+export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI, ...SHIZUOKA, ...YAMANASHI, ...NAGANO, ...AICHI, ...GIFU, ...NIIGATA, ...TOYAMA, ...ISHIKAWA, ...FUKUI, ...CHUBU_PENDING, ...AOMORI, ...IWATE, ...MIYAGI, ...AKITA, ...YAMAGATA, ...FUKUSHIMA, ...TOHOKU_PENDING, ...MIE, ...MIE_CITIES, ...SHIGA, ...SHIGA_CITIES, ...KYOTO, ...KYOTO_CITIES, ...OSAKA, ...OSAKA_CITIES, ...HYOGO, ...HYOGO_CITIES, ...NARA, ...NARA_CITIES, ...WAKAYAMA, ...WAKAYAMA_CITIES, ...KINKI_PENDING,
+  // 準備中の地方（regions.json の preparing）の市町村は、国のデータを作って確かめ終えるまで入れない（対応エリアの外のまま）
+  ...(isOpenRegion("chugoku") ? CHUGOKU_PENDING : []),
+  ...(isOpenRegion("shikoku") ? SHIKOKU_PENDING : []),
+  ...(isOpenRegion("kyushu") ? KYUSHU_PENDING : []),
+  ...(isOpenRegion("hokkaido") ? HOKKAIDO_PENDING : []),
+];
 
 /**
  * 市区町村に都市計画区域が無い（全域が都市計画区域外）と分かっているか。coverage が outside か、注記にそう書いてある町村

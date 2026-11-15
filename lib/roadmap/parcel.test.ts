@@ -1,3 +1,4 @@
+import { ALL_PREF_NAMES } from "./regions";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import KOZU_SOURCE from "./data/kozu-source.json";
@@ -972,9 +973,9 @@ describe("隣の筆", () => {
 });
 
 describe("公図から推定した筆のデータの置き場所（data/kozu-source.json）", () => {
-  it("置き場所は空（まだ作っていない）か R2 の PMTiles。データのある市区町村は、対応している都府県（02〜30）の5桁のコード", () => {
+  it("置き場所は空（まだ作っていない）か R2 の PMTiles。データのある市区町村は、regions.json の都道府県（準備中の地方も、データは作る）の5桁のコード", () => {
     expect(KOZU_SOURCE.url === "" || /^https:\/\/.+\.pmtiles$/.test(KOZU_SOURCE.url)).toBe(true);
-    for (const c of KOZU_SOURCE.codes) expect(c).toMatch(/^(0[2-9]|[12]\d|30)\d{3}$/);
+    for (const c of KOZU_SOURCE.codes) expect(/^\d{5}$/.test(c) && c.slice(0, 2) in ALL_PREF_NAMES, c).toBe(true);
     expect(new Set(KOZU_SOURCE.codes).size).toBe(KOZU_SOURCE.codes.length);
     if (KOZU_SOURCE.url) {
       expect(KOZU_SOURCE.edition).toMatch(/^\d{4}年\d{1,2}月公開版$/);
@@ -1335,11 +1336,11 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(s.chiban!.every((l) => /^(20(1[1-9]|2[0-2])(-\d)?|161[0-5])$/.test(l))).toBe(true);
     }
   });
-  it("どれも対応エリア（関東1都6県・中部9県・東北6県・近畿2府5県）の5桁の市区町村コード・地図名・町・筆の数・理由がある。同じ決まりは1回だけ（町・地番で絞るときも）", () => {
+  it("どれも regions.json の都道府県（準備中の地方も、データは作る）の5桁の市区町村コード・地図名・町・筆の数・理由がある。同じ決まりは1回だけ（町・地番で絞るときも）", () => {
     expect(data.sheets.length).toBeGreaterThan(0);
     const keys = new Set<string>();
     for (const s of data.sheets) {
-      expect(s.code).toMatch(/^(0[2-9]|1\d|2\d|30)\d{3}$/);
+      expect(/^\d{5}$/.test(s.code) && s.code.slice(0, 2) in ALL_PREF_NAMES, s.code).toBe(true);
       expect(s.sheet.trim()).not.toBe("");
       expect(s.town.trim()).not.toBe("");
       expect(s.parcels).toBeGreaterThan(0);

@@ -1,3 +1,4 @@
+import { ALL_PREF_NAMES, PREF_NAMES } from "./regions";
 import { open, stat } from "node:fs/promises";
 import type { Source } from "pmtiles";
 import { describe, expect, it } from "vitest";
@@ -187,11 +188,12 @@ describe("アプリに入っている地価のタイル", () => {
     expect((await stat(PATH)).size).toBeGreaterThan(1_000_000);
     const points = SRC.points as Record<string, number>;
     for (const k of ["L01", "L02"]) for (const p of ["08", "09", "10", "11", "12", "13", "14"]) expect(points[`${k}-${p}`]).toBeGreaterThan(200);
-    // 入っている都道府県は 関東1都6県・中部9県・東北6県・近畿2府5県（02〜30）だけで、どれも地点がある
+    // 入っている都道府県は regions.json の都道府県（準備中の地方も、データは作る）だけで、どれも地点がある。対応している都道府県は全部入っている
     for (const [key, n] of Object.entries(points)) {
-      expect(key, key).toMatch(/^L0[12]-(0[2-9]|1[0-9]|2[0-9]|30)$/);
+      expect(/^L0[12]-\d{2}$/.test(key) && key.slice(4) in ALL_PREF_NAMES, key).toBe(true);
       expect(n, key).toBeGreaterThan(0);
     }
+    for (const k of ["L01", "L02"]) for (const p of Object.keys(PREF_NAMES)) expect(points[`${k}-${p}`], `${k}-${p}`).toBeGreaterThan(0);
   });
 
   it("千代田区三番町：近くに地価公示の標準地があり、価格・前年比・駅・用途地域が読める", async () => {
@@ -233,7 +235,7 @@ describe("アプリに入っている地価のタイル", () => {
     for (const h of [ote!, maru!]) expect(stationText(h)).not.toMatch(/約[01]m/);
   });
 
-  it("横浜市・千葉市・さいたま市でも見つかり、対応エリアの外（広島市）は空", async () => {
+  it("横浜市・千葉市・さいたま市でも見つかり、データの無い所（地方を足す前の県・海の上）は空", async () => {
     // 地価調査の基準地番号は、県の中で重ならない地名（千葉市中央区は「中央(県)」）
     for (const [lat, lng, city] of [
       [35.4437, 139.638, "横浜市"],
@@ -252,6 +254,15 @@ describe("アプリに入っている地価のタイル", () => {
     } else {
       expect(shizuoka).toEqual([]);
     }
-    expect(await nearestLandPrices(34.3853, 132.4553, src)).toEqual([]); // 広島市（中国地方はまだ）
+    // 広島市（中国地方）も同じ：中国地方込みで作り直したデータなら見つかり、その前のデータなら空（準備中の地方も、データは先に作る）
+    const hiroshima = await nearestLandPrices(34.3853, 132.4553, src);
+    if ((SRC.points as Record<string, number>)["L01-34"]) {
+      expect(hiroshima.length).toBeGreaterThan(0);
+      expect(hiroshima[0].address).toContain("広島市");
+    } else {
+      expect(hiroshima).toEqual([]);
+    }
+    // 陸から遠い海の上（八丈島の東の太平洋）は、どのデータでも空
+    expect(await nearestLandPrices(33.0, 143.5, src)).toEqual([]);
   });
 });

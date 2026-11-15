@@ -1,6 +1,6 @@
-import GSI_CODES from "./data/gsi-muni-codes.json";
 import { correctAddress, describeMatch, placeNotFound, type AddressFix, type AddressMiss } from "./address-fix";
 import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, matchedNumbers, needsChoice, numbersAgree, reverseGeocode, subAreaDropped, withoutNumbers, type GeocodeResult } from "./geocode";
+import { MUNI_CODES } from "./muni-codes";
 import { buildLinks, findMunicipality, resolveContact, type Contact, type Municipality, type ResolvedLink } from "./municipalities";
 import { kuikiAllows, kuikiHasSub, kuikiSubLabel, normalizeChiban, parcelAt, searchParcel, splitChiban, splitLotHead, townFromAddress, townKey, type Parcel, type ParcelSource } from "./parcel";
 import { addressSub, elsewhereLabel, sameTownName, typedChome, type AddressSub, type Elsewhere } from "./parcel-sub";
@@ -269,13 +269,13 @@ export function registryStyle(input: string): boolean {
 
 /** 逆ジオコーダの市区町村コード → 「さいたま市見沼区」「瑞穂町」（都県なし）。対応エリアの外は undefined */
 export function muniCity(muniCd: string): string | undefined {
-  for (const codes of Object.values(GSI_CODES as Record<string, Record<string, string>>)) if (codes[muniCd]) return codes[muniCd].replace(/\s/g, "");
+  for (const codes of Object.values(MUNI_CODES)) if (codes[muniCd]) return codes[muniCd].replace(/\s/g, "");
   return undefined;
 }
 
 /** 逆ジオコーダの市区町村コード → 「埼玉県さいたま市西区」。対応エリアの外は undefined */
 export function muniName(muniCd: string): string | undefined {
-  for (const [pref, codes] of Object.entries(GSI_CODES as Record<string, Record<string, string>>)) {
+  for (const [pref, codes] of Object.entries(MUNI_CODES)) {
     if (codes[muniCd]) return `${pref}${codes[muniCd].replace(/\s/g, "")}`;
   }
   return undefined;

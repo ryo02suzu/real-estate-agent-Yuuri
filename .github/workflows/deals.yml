@@ -37,7 +37,8 @@ env:
 jobs:
   deals:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # 全国（47都道府県）の分を作ると時間がかかるので長めにしてある
+    timeout-minutes: 180
     env:
       REINFOLIB_API_KEY: ${{ secrets.REINFOLIB_API_KEY }}
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}

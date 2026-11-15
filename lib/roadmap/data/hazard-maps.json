@@ -1,6 +1,794 @@
 {
- "updated": "2026-11-09",
+ "updated": "2026-11-15",
  "maps": {
+  "01100": {
+   "flood": "https://www.city.sapporo.jp/kikikanri/higoro/fuusui/ssh_map.html",
+   "naisui": "https://www.city.sapporo.jp/kikikanri/higoro/fuusui/ssh_map.html",
+   "tsunami": "https://www.city.sapporo.jp/kikikanri/tsunamimap.html",
+   "dosha": "https://www.city.sapporo.jp/kikikanri/higoro/fuusui/dosha_keikai.html"
+  },
+  "01202": {
+   "flood": "https://www.city.hakodate.hokkaido.jp/docs/2014022400531/",
+   "takashio": "https://www.city.hakodate.hokkaido.jp/docs/2026022700054/",
+   "tsunami": "https://www.city.hakodate.hokkaido.jp/docs/2016033000090/",
+   "dosha": "https://www.city.hakodate.hokkaido.jp/docs/2014022400524/"
+  },
+  "01203": {
+   "flood": "https://www.city.otaru.lg.jp/docs/2020101000813/",
+   "tsunami": "https://www.city.otaru.lg.jp/docs/2020101000813/",
+   "dosha": "https://www.city.otaru.lg.jp/docs/2020101000813/"
+  },
+  "01204": {
+   "flood": "https://www.city.asahikawa.hokkaido.jp/kurashi/320/kouzui/index.html",
+   "dosha": "https://www.city.asahikawa.hokkaido.jp/kurashi/320/dosya/index.html"
+  },
+  "01205": {
+   "flood": "https://www.city.muroran.lg.jp/prevention/?content=2392",
+   "naisui": "https://www.city.muroran.lg.jp/prevention/?content=6202",
+   "takashio": "https://www.city.muroran.lg.jp/news/detail.html?content=1560",
+   "tsunami": "https://www.city.muroran.lg.jp/prevention/?content=2392",
+   "dosha": "https://www.city.muroran.lg.jp/prevention/?content=2392"
+  },
+  "01206": {
+   "flood": "https://www.city.kushiro.lg.jp/kurashi/bousai/1003697/index.html",
+   "takashio": "https://www.city.kushiro.lg.jp/kurashi/bousai/1003697/index.html",
+   "tsunami": "https://www.city.kushiro.lg.jp/kurashi/bousai/1003697/index.html",
+   "dosha": "https://www.city.kushiro.lg.jp/kurashi/bousai/1003697/index.html"
+  },
+  "01207": {
+   "flood": "https://www.city.obihiro.hokkaido.jp/kurashi/bousai/1007329/1014474/index.html",
+   "naisui": "https://www.city.obihiro.hokkaido.jp/kurashi/bousai/1007329/1002255.html",
+   "dosha": "https://www.city.obihiro.hokkaido.jp/kurashi/bousai/1007329/1002259.html"
+  },
+  "01208": {
+   "flood": "https://www.city.kitami.lg.jp/administration/disaster/detail.php?content=5137",
+   "tsunami": "https://www.city.kitami.lg.jp/administration/disaster/detail.php?content=2003",
+   "dosha": "https://www.city.kitami.lg.jp/administration/disaster/detail.php?content=4658"
+  },
+  "01209": {
+   "flood": "https://www.city.yubari.lg.jp/soshiki/19/1783.html",
+   "dosha": "https://www.city.yubari.lg.jp/soshiki/19/1783.html"
+  },
+  "01210": {
+   "flood": "https://www.city.iwamizawa.hokkaido.jp/soshiki/bosaitaisakushitsu/anshin_anzen/1/1/2671.html",
+   "naisui": "https://www.city.iwamizawa.hokkaido.jp/soshiki/bosaitaisakushitsu/anshin_anzen/1/1/2671.html",
+   "dosha": "https://www.city.iwamizawa.hokkaido.jp/soshiki/bosaitaisakushitsu/anshin_anzen/1/2/1/2414.html"
+  },
+  "01211": {
+   "flood": "https://www.city.abashiri.hokkaido.jp/site/bousai/1044.html",
+   "tsunami": "https://www.city.abashiri.hokkaido.jp/site/bousai/1045.html",
+   "dosha": "https://www.city.abashiri.hokkaido.jp/site/bousai/1044.html"
+  },
+  "01212": {
+   "flood": "https://www.e-rumoi.jp/soumu/sou_00016.html",
+   "naisui": "https://www.e-rumoi.jp/suidou/page26_00082.html",
+   "tsunami": "https://www.e-rumoi.jp/soumu/sou_00016.html",
+   "dosha": "https://www.e-rumoi.jp/soumu/sou_00016.html"
+  },
+  "01213": {
+   "flood": "https://www.city.tomakomai.hokkaido.jp/kurashi/bosai/jishin/handbook.html",
+   "tsunami": "https://www.city.tomakomai.hokkaido.jp/kurashi/bosai/jishin/handbook.html",
+   "dosha": "https://www.city.tomakomai.hokkaido.jp/kurashi/bosai/jishin/handbook.html"
+  },
+  "01214": {
+   "flood": "https://www.city.wakkanai.hokkaido.jp/kurashi/bosaibohankotsuanzen/bosai/sonaeru/hazardmap/kouzuimap.html",
+   "tsunami": "https://www.city.wakkanai.hokkaido.jp/kurashi/bosaibohankotsuanzen/bosai/sonaeru/hazardmap/gaidomap.html",
+   "dosha": "https://www.city.wakkanai.hokkaido.jp/kurashi/bosaibohankotsuanzen/bosai/sonaeru/dosha/dosyasaigai.html"
+  },
+  "01215": {
+   "flood": "https://www.city.bibai.hokkaido.jp/soshiki/4/189.html",
+   "dosha": "https://www.city.bibai.hokkaido.jp/soshiki/4/189.html"
+  },
+  "01216": {
+   "flood": "https://www.city.ashibetsu.hokkaido.jp/docs/4712.html",
+   "dosha": "https://www.city.ashibetsu.hokkaido.jp/docs/4712.html"
+  },
+  "01217": {
+   "flood": "https://www.city.ebetsu.hokkaido.jp/site/bousai/272.html",
+   "dosha": "https://www.city.ebetsu.hokkaido.jp/site/bousai/272.html"
+  },
+  "01218": {
+   "flood": "https://www.city.akabira.hokkaido.jp/docs/4273.html",
+   "dosha": "https://www.city.akabira.hokkaido.jp/docs/4273.html"
+  },
+  "01219": {
+   "flood": "https://mombetsu.jp/prevention/?content=956",
+   "tsunami": "https://mombetsu.jp/prevention/?content=956",
+   "dosha": "https://mombetsu.jp/prevention/?content=96"
+  },
+  "01220": {
+   "flood": "https://www.city.shibetsu.lg.jp/gyoseisaito/kurashi_tetsuzuki/anzen_anshin/5/taisakuyakikennna/2260.html",
+   "dosha": "https://www.city.shibetsu.lg.jp/gyoseisaito/kurashi_tetsuzuki/anzen_anshin/5/taisakuyakikennna/2260.html"
+  },
+  "01221": {
+   "flood": "http://www.city.nayoro.lg.jp/section/bousai/prkeql000000aql5.html",
+   "dosha": "http://www.city.nayoro.lg.jp/section/bousai/prkeql000000aql5.html"
+  },
+  "01222": {
+   "flood": "https://www.city.mikasa.hokkaido.jp/hotnews/detail/00001717.html",
+   "dosha": "https://www.city.mikasa.hokkaido.jp/hotnews/detail/00003336.html"
+  },
+  "01223": {
+   "flood": "https://www.city.nemuro.hokkaido.jp/lifeinfo/kakuka/soumubu/kikikanri/kiki_SONAE/10244.html",
+   "takashio": "https://www.city.nemuro.hokkaido.jp/lifeinfo/kakuka/soumubu/kikikanri/kiki_SONAE/10244.html",
+   "tsunami": "https://www.city.nemuro.hokkaido.jp/lifeinfo/kakuka/soumubu/kikikanri/kiki_SONAE/10244.html",
+   "dosha": "https://www.city.nemuro.hokkaido.jp/lifeinfo/kakuka/soumubu/kikikanri/kiki_SONAE/10244.html"
+  },
+  "01224": {
+   "flood": "https://www.city.chitose.lg.jp/c50/1002703/1002706/1004864.html",
+   "dosha": "https://www.city.chitose.lg.jp/c50/1002703/1002706/1004864.html"
+  },
+  "01225": {
+   "flood": "https://www.city.takikawa.lg.jp/site/bousai/1110.html",
+   "naisui": "https://www.city.takikawa.lg.jp/site/bousai/1110.html",
+   "dosha": "https://www.city.takikawa.lg.jp/site/bousai/1110.html"
+  },
+  "01226": {
+   "flood": "https://www.city.sunagawa.hokkaido.jp/shisei/bousai_bouka/hazard-map.html",
+   "dosha": "https://www.city.sunagawa.hokkaido.jp/shisei/bousai_bouka/hazard-map.html"
+  },
+  "01227": {
+   "flood": "https://www.city.utashinai.hokkaido.jp/hotnews/detail/00003232.html",
+   "dosha": "https://www.city.utashinai.hokkaido.jp/hotnews/detail/00003232.html"
+  },
+  "01228": {
+   "flood": "https://www.city.fukagawa.lg.jp/cms/section/soumu/uo2pli000000ck2a.html",
+   "dosha": "https://www.city.fukagawa.lg.jp/cms/section/soumu/uo2pli000000ck2a.html"
+  },
+  "01229": {
+   "flood": "https://www.city.furano.hokkaido.jp/life/docs/2015022200206.html",
+   "naisui": "https://www.city.furano.hokkaido.jp/life/docs/2015022200206.html",
+   "dosha": "https://www.city.furano.hokkaido.jp/life/docs/2015022200077.html"
+  },
+  "01230": {
+   "flood": "https://www.city.noboribetsu.lg.jp/docs/2022021800047/",
+   "tsunami": "https://www.city.noboribetsu.lg.jp/docs/2022021800047/",
+   "dosha": "https://www.city.noboribetsu.lg.jp/docs/2022021800047/"
+  },
+  "01231": {
+   "flood": "https://www.city.eniwa.hokkaido.jp/kurashi/kyukyu_bosai/bosai_saigai/saigainisonaete/4879.html",
+   "dosha": "https://www.city.eniwa.hokkaido.jp/kurashi/kyukyu_bosai/bosai_saigai/saigainisonaete/4879.html"
+  },
+  "01233": {
+   "flood": "https://www.city.date.hokkaido.jp/hotnews/detail/00000635.html",
+   "tsunami": "https://www.city.date.hokkaido.jp/hotnews/detail/00000351.html",
+   "dosha": "https://www.city.date.hokkaido.jp/hotnews/detail/00002253.html"
+  },
+  "01234": {
+   "flood": "https://www.city.kitahiroshima.hokkaido.jp/hotnews/detail/00150372.html",
+   "dosha": "https://www.city.kitahiroshima.hokkaido.jp/hotnews/detail/00011503.html"
+  },
+  "01235": {
+   "flood": "https://www.city.ishikari.hokkaido.jp/soshiki/kiki/33393.html",
+   "tsunami": "https://www.city.ishikari.hokkaido.jp/soshiki/kiki/33393.html",
+   "dosha": "https://www.city.ishikari.hokkaido.jp/soshiki/kiki/33393.html"
+  },
+  "01236": {
+   "flood": "https://www.city.hokuto.hokkaido.jp/docs/6513.html",
+   "tsunami": "https://www.city.hokuto.hokkaido.jp/docs/6513.html",
+   "dosha": "https://www.city.hokuto.hokkaido.jp/docs/1232.html"
+  },
+  "01303": {
+   "flood": "https://www.town.tobetsu.hokkaido.jp/soshiki/kiki/2292.html",
+   "dosha": "https://www.town.tobetsu.hokkaido.jp/soshiki/kiki/2292.html"
+  },
+  "01304": {
+   "flood": "https://www.vill.shinshinotsu.hokkaido.jp/hotnews/detail/00000553.html"
+  },
+  "01331": {
+   "flood": "https://www.town.matsumae.hokkaido.jp/hotnews/detail/00000192.html",
+   "tsunami": "https://www.town.matsumae.hokkaido.jp/hotnews/detail/00000192.html",
+   "dosha": "https://www.town.matsumae.hokkaido.jp/hotnews/detail/00000192.html"
+  },
+  "01332": {
+   "flood": "https://www.town.fukushima.hokkaido.jp/bosai/bousaimap/",
+   "tsunami": "https://www.town.fukushima.hokkaido.jp/bosai/bousaimap/",
+   "dosha": "https://www.town.fukushima.hokkaido.jp/bosai/bousaimap/"
+  },
+  "01333": {
+   "flood": "https://www.town.shiriuchi.hokkaido.jp/kurashi/bosai/bousaimap.html",
+   "tsunami": "https://www.town.shiriuchi.hokkaido.jp/kurashi/bosai/bousaimap.html",
+   "dosha": "https://www.town.shiriuchi.hokkaido.jp/kurashi/bosai/bousaimap.html"
+  },
+  "01334": {
+   "flood": "https://www.town.kikonai.hokkaido.jp/bosai/bosaimap.html",
+   "tsunami": "https://www.town.kikonai.hokkaido.jp/bosai/bosaimap.html",
+   "dosha": "https://www.town.kikonai.hokkaido.jp/bosai/doshasaigaikikenkashozu.html"
+  },
+  "01337": {
+   "flood": "https://www.town.nanae.hokkaido.jp/hotnews/detail/00009274.html",
+   "dosha": "https://www.town.nanae.hokkaido.jp/hotnews/detail/00009274.html"
+  },
+  "01343": {
+   "tsunami": "https://www.town.shikabe.lg.jp/kurashi_tetsuzuki/anzen_anshin/bosai/2/1140.html",
+   "dosha": "https://www.town.shikabe.lg.jp/kurashi_tetsuzuki/anzen_anshin/bosai/2/986.html"
+  },
+  "01345": {
+   "tsunami": "https://www.town.hokkaido-mori.lg.jp/bunya/tsunami/",
+   "dosha": "https://www.town.hokkaido-mori.lg.jp/docs/2020031600060/"
+  },
+  "01346": {
+   "flood": "https://www.town.yakumo.lg.jp/soshiki/kikitaisaku/hazadomap2022.html",
+   "tsunami": "https://www.town.yakumo.lg.jp/soshiki/kikitaisaku/hazadomap2022.html",
+   "dosha": "https://www.town.yakumo.lg.jp/soshiki/kikitaisaku/hazadomap2022.html"
+  },
+  "01347": {
+   "flood": "https://www.town.oshamambe.lg.jp/life/6/23/91/",
+   "tsunami": "https://www.town.oshamambe.lg.jp/life/6/23/91/",
+   "dosha": "https://www.town.oshamambe.lg.jp/life/6/23/91/"
+  },
+  "01361": {
+   "flood": "https://www.hokkaido-esashi.jp/modules/lifeinfo/content0985.html",
+   "tsunami": "https://www.hokkaido-esashi.jp/modules/lifeinfo/content0985.html",
+   "dosha": "https://www.hokkaido-esashi.jp/modules/lifeinfo/content0985.html"
+  },
+  "01362": {
+   "flood": "https://www.town.kaminokuni.lg.jp/hotnews/detail/00002266.html",
+   "tsunami": "https://www.town.kaminokuni.lg.jp/hotnews/detail/00002266.html",
+   "dosha": "https://www.town.kaminokuni.lg.jp/hotnews/detail/00002266.html"
+  },
+  "01363": {
+   "flood": "https://www.town.assabu.lg.jp/page/9399.html",
+   "tsunami": "https://www.town.assabu.lg.jp/page/9399.html",
+   "dosha": "https://www.town.assabu.lg.jp/page/9399.html"
+  },
+  "01364": {
+   "flood": "https://www.town.otobe.lg.jp/section/soumu/e0taal0000000jho.html",
+   "takashio": "https://www.town.otobe.lg.jp/section/soumu/e0taal0000000jho.html",
+   "tsunami": "https://www.town.otobe.lg.jp/section/soumu/e0taal0000000jho.html",
+   "dosha": "https://www.town.otobe.lg.jp/section/soumu/e0taal0000000jho.html"
+  },
+  "01367": {
+   "flood": "https://www.town.okushiri.lg.jp/hotnews/detail/00003705.html",
+   "tsunami": "https://www.town.okushiri.lg.jp/hotnews/detail/00003705.html",
+   "dosha": "https://www.town.okushiri.lg.jp/hotnews/detail/00003705.html"
+  },
+  "01370": {
+   "flood": "https://www.town.imakane.lg.jp/gyousei/kurashi/syoubou/2710_1.html",
+   "dosha": "https://www.town.imakane.lg.jp/gyousei/kurashi/syoubou/post_43.html"
+  },
+  "01371": {
+   "flood": "https://www.town.setana.lg.jp/kurashi/bousai/post_138.html",
+   "tsunami": "https://www.town.setana.lg.jp/kurashi/bousai/post_136.html",
+   "dosha": "https://www.town.setana.lg.jp/kurashi/bousai/post_622.html"
+  },
+  "01391": {
+   "flood": "https://www.vill.shimamaki.lg.jp/category/detail.php?category=prevention&content=21",
+   "tsunami": "https://www.vill.shimamaki.lg.jp/category/detail.php?category=prevention&content=21",
+   "dosha": "https://www.vill.shimamaki.lg.jp/category/detail.php?category=prevention&content=21"
+  },
+  "01392": {
+   "flood": "http://www.town.suttu.lg.jp/disaster/detail.php?id=83",
+   "tsunami": "http://www.town.suttu.lg.jp/disaster/detail.php?id=83",
+   "dosha": "http://www.town.suttu.lg.jp/disaster/detail.php?id=35"
+  },
+  "01393": {
+   "flood": "http://www.kuromatsunai.com/townlife/bousai/file001/#1"
+  },
+  "01394": {
+   "flood": "https://www.town.rankoshi.hokkaido.jp/administration/detail.html?content=651",
+   "tsunami": "https://www.town.rankoshi.hokkaido.jp/administration/detail.html?content=651",
+   "dosha": "https://www.town.rankoshi.hokkaido.jp/administration/detail.html?content=651"
+  },
+  "01395": {
+   "flood": "https://www.town.niseko.lg.jp/kurashi/bosai_anzen/bosai/bousaigaidomappu/",
+   "dosha": "https://www.town.niseko.lg.jp/kurashi/bosai_anzen/bosai/bousaigaidomappu/"
+  },
+  "01396": {
+   "flood": "https://www.vill.makkari.lg.jp/makkari_map/hinanbasho/",
+   "dosha": "https://www.vill.makkari.lg.jp/makkari_map/hinanbasho/"
+  },
+  "01397": {
+   "flood": "https://www.vill.rusutsu.lg.jp/hotnews/detail/00000269.html",
+   "dosha": "https://www.vill.rusutsu.lg.jp/hotnews/detail/00000269.html"
+  },
+  "01398": {
+   "flood": "https://www.town.kimobetsu.hokkaido.jp/life/detail.php?content=104",
+   "dosha": "https://www.town.kimobetsu.hokkaido.jp/life/detail.php?content=104"
+  },
+  "01399": {
+   "flood": "https://www.town-kyogoku.jp/kurashi/bosai-saigai/haza/"
+  },
+  "01400": {
+   "flood": "https://www.town.kutchan.hokkaido.jp/news/living_infomation/3467/",
+   "dosha": "https://www.town.kutchan.hokkaido.jp/news/living_infomation/3467/"
+  },
+  "01401": {
+   "flood": "https://www.town.kyowa.hokkaido.jp/assets/files/disaster_prevention_guidebook.pdf",
+   "tsunami": "https://www.town.kyowa.hokkaido.jp/assets/files/disaster_prevention_guidebook.pdf",
+   "dosha": "https://www.town.kyowa.hokkaido.jp/assets/files/disaster_prevention_guidebook.pdf"
+  },
+  "01402": {
+   "flood": "https://www.town.iwanai.hokkaido.jp/%e6%9a%ae%e3%82%89%e3%81%97%e3%82%ac%e3%82%a4%e3%83%89/%e9%98%b2%e7%81%bd/%e7%81%bd%e5%ae%b3%e3%81%ae%e5%82%99%e3%81%88/%e5%b2%a9%e5%86%85%e7%94%ba%e9%98%b2%e7%81%bd%e3%83%9e%e3%83%83%e3%83%97%e3%81%ab%e3%81%a4%e3%81%84%e3%81%a6/",
+   "tsunami": "https://www.town.iwanai.hokkaido.jp/%e6%9a%ae%e3%82%89%e3%81%97%e3%82%ac%e3%82%a4%e3%83%89/%e9%98%b2%e7%81%bd/%e7%81%bd%e5%ae%b3%e3%81%ae%e5%82%99%e3%81%88/%e5%b2%a9%e5%86%85%e7%94%ba%e9%98%b2%e7%81%bd%e3%83%9e%e3%83%83%e3%83%97%e3%81%ab%e3%81%a4%e3%81%84%e3%81%a6/",
+   "dosha": "https://www.town.iwanai.hokkaido.jp/%e6%9a%ae%e3%82%89%e3%81%97%e3%82%ac%e3%82%a4%e3%83%89/%e9%98%b2%e7%81%bd/%e7%81%bd%e5%ae%b3%e3%81%ae%e5%82%99%e3%81%88/%e5%b2%a9%e5%86%85%e7%94%ba%e9%98%b2%e7%81%bd%e3%83%9e%e3%83%83%e3%83%97%e3%81%ab%e3%81%a4%e3%81%84%e3%81%a6/"
+  },
+  "01403": {
+   "tsunami": "https://www.vill.tomari.hokkaido.jp/kurashi/anzenbosai/",
+   "dosha": "https://www.vill.tomari.hokkaido.jp/kurashi/anzenbosai/"
+  },
+  "01404": {
+   "flood": "https://www.vill.kamoenai.hokkaido.jp/hotnews/detail/00000511.html",
+   "takashio": "https://www.vill.kamoenai.hokkaido.jp/hotnews/detail/00000511.html",
+   "tsunami": "https://www.vill.kamoenai.hokkaido.jp/hotnews/detail/00000511.html",
+   "dosha": "https://www.vill.kamoenai.hokkaido.jp/hotnews/detail/00000511.html"
+  },
+  "01405": {
+   "flood": "https://www.town.shakotan.lg.jp/contents/content0640.html",
+   "tsunami": "https://www.town.shakotan.lg.jp/contents/content0640.html",
+   "dosha": "https://www.town.shakotan.lg.jp/contents/content0640.html"
+  },
+  "01406": {
+   "flood": "https://www.town.furubira.lg.jp/life/detail.php?id=20",
+   "tsunami": "https://www.town.furubira.lg.jp/life/detail.php?id=20",
+   "dosha": "https://www.town.furubira.lg.jp/life/detail.php?id=20"
+  },
+  "01407": {
+   "flood": "https://www.town.niki.hokkaido.jp/section/somuka/irv9760000000gin.html",
+   "dosha": "https://www.town.niki.hokkaido.jp/section/somuka/irv9760000000gin.html"
+  },
+  "01408": {
+   "flood": "https://www.town.yoichi.hokkaido.jp/kurashi/kurashinojouhou/bousai/2018-0410-1723-1.html",
+   "tsunami": "https://www.town.yoichi.hokkaido.jp/kurashi/kurashinojouhou/bousai/2018-0410-1723-1.html",
+   "dosha": "https://www.town.yoichi.hokkaido.jp/kurashi/kurashinojouhou/bousai/2018-0410-1723-1.html"
+  },
+  "01409": {
+   "flood": "https://www.akaigawa.com/kurashi/cat83/post_142.html",
+   "dosha": "https://www.akaigawa.com/kurashi/cat83/post_142.html"
+  },
+  "01423": {
+   "flood": "https://www.town.nanporo.hokkaido.jp/emergency-management/"
+  },
+  "01424": {
+   "flood": "https://www.town.naie.hokkaido.jp/bousai_info/hazardmap/",
+   "dosha": "https://www.town.naie.hokkaido.jp/bousai_info/hazardmap/"
+  },
+  "01425": {
+   "flood": "https://town.kamisunagawa.hokkaido.jp/kurashi_tetsuzuki/bosai/1312.html",
+   "dosha": "https://town.kamisunagawa.hokkaido.jp/kurashi_tetsuzuki/bosai/1312.html"
+  },
+  "01427": {
+   "flood": "https://www.town.yuni.lg.jp/chosei/bosai",
+   "dosha": "https://www.town.yuni.lg.jp/chosei/bosai"
+  },
+  "01428": {
+   "flood": "https://www.maoi-net.jp/kyukyu_bosai/bosai/map/",
+   "dosha": "https://www.maoi-net.jp/kyukyu_bosai/bosai/map/"
+  },
+  "01429": {
+   "flood": "https://www.town.kuriyama.hokkaido.jp/soshiki/28/1065.html",
+   "dosha": "https://www.town.kuriyama.hokkaido.jp/soshiki/28/1065.html"
+  },
+  "01430": {
+   "flood": "https://www.town.tsukigata.hokkaido.jp/page/1569.html",
+   "dosha": "https://www.town.tsukigata.hokkaido.jp/page/1571.html"
+  },
+  "01431": {
+   "flood": "https://www.town.urausu.hokkaido.jp/kurashi/kurashi/bousai/bousai_handbook.html",
+   "naisui": "https://www.town.urausu.hokkaido.jp/kurashi/kurashi/bousai/shinsui-soutei.html",
+   "dosha": "https://www.town.urausu.hokkaido.jp/kurashi/kurashi/bousai/bousai_handbook.html"
+  },
+  "01432": {
+   "flood": "https://www.town.shintotsukawa.lg.jp/hotnews/detail/00002916.html"
+  },
+  "01433": {
+   "flood": "https://www.town.moseushi.hokkaido.jp/bousai_bouhan/bousai/hazado_map.html"
+  },
+  "01434": {
+   "flood": "https://www.town.chippubetsu.hokkaido.jp/category/detail.html?category=life&content=24"
+  },
+  "01436": {
+   "flood": "https://www.town.uryu.hokkaido.jp/docs/bousai-map.html",
+   "dosha": "https://www.town.uryu.hokkaido.jp/docs/bousai-map.html"
+  },
+  "01437": {
+   "flood": "https://www.town.hokuryu.hokkaido.jp/bosai/hazardmap/",
+   "dosha": "https://www.town.hokuryu.hokkaido.jp/bosai/hazardmap/"
+  },
+  "01438": {
+   "flood": "https://www.town.numata.hokkaido.jp/section/soumu/ujj7s30000001q7o.html",
+   "dosha": "https://www.town.numata.hokkaido.jp/section/soumu/ujj7s30000001q7o.html"
+  },
+  "01452": {
+   "flood": "https://www.town.takasu.hokkaido.jp/page/1263.html",
+   "dosha": "https://www.town.takasu.hokkaido.jp/page/1263.html"
+  },
+  "01453": {
+   "flood": "https://www.town.higashikagura.lg.jp/docs/13891.html",
+   "dosha": "https://www.town.higashikagura.lg.jp/docs/13891.html"
+  },
+  "01454": {
+   "flood": "https://www.town.tohma.hokkaido.jp/living/12/01/1346"
+  },
+  "01455": {
+   "flood": "https://www.town.pippu.hokkaido.jp/cms/section/soumu/i9kb6d0000006oag.html"
+  },
+  "01456": {
+   "flood": "https://www.town.aibetsu.hokkaido.jp/01/07/01/663",
+   "dosha": "https://www.town.aibetsu.hokkaido.jp/01/07/01/663"
+  },
+  "01457": {
+   "flood": "https://www.town.hokkaido-kamikawa.lg.jp/section/chiikimiryoku/chs81200000009ay.html",
+   "dosha": "https://www.town.hokkaido-kamikawa.lg.jp/section/chiikimiryoku/chs81200000009ay.html"
+  },
+  "01458": {
+   "flood": "https://higashikawa-town.jp/portal/kurashi/panel/68",
+   "dosha": "https://higashikawa-town.jp/portal/kurashi/panel/68"
+  },
+  "01459": {
+   "flood": "https://town.biei.hokkaido.jp/emergency/bosaigaido.html",
+   "dosha": "https://town.biei.hokkaido.jp/emergency/bosaigaido.html"
+  },
+  "01460": {
+   "flood": "https://www.town.kamifurano.hokkaido.jp/index.php?id=73",
+   "dosha": "https://www.town.kamifurano.hokkaido.jp/index.php?id=1517"
+  },
+  "01461": {
+   "flood": "https://www.town.nakafurano.lg.jp/",
+   "dosha": "https://www.town.nakafurano.lg.jp/"
+  },
+  "01462": {
+   "flood": "https://www.town.minamifurano.hokkaido.jp/kurashi-info/%e9%98%b2%e7%81%bd%e6%83%85%e5%a0%b1/%e6%b4%aa%e6%b0%b4%e3%83%8f%e3%82%b6%e3%83%bc%e3%83%89%e3%83%9e%e3%83%83%e3%83%97%ef%bc%88%e5%8d%97%e5%af%8c%e8%89%af%e9%87%8e%e7%94%ba%e3%80%80%e9%98%b2%e7%81%bd%e3%81%ae%e5%bf%83%e5%be%97%ef%bc%89/",
+   "dosha": "https://www.town.minamifurano.hokkaido.jp/kurashi-info/%e9%98%b2%e7%81%bd%e6%83%85%e5%a0%b1/%e6%b4%aa%e6%b0%b4%e3%83%8f%e3%82%b6%e3%83%bc%e3%83%89%e3%83%9e%e3%83%83%e3%83%97%ef%bc%88%e5%8d%97%e5%af%8c%e8%89%af%e9%87%8e%e7%94%ba%e3%80%80%e9%98%b2%e7%81%bd%e3%81%ae%e5%bf%83%e5%be%97%ef%bc%89/"
+  },
+  "01463": {
+   "flood": "https://www.vill.shimukappu.lg.jp/shimukappu/section/soumu/nmudtq000004kzft.html",
+   "dosha": "https://www.vill.shimukappu.lg.jp/shimukappu/section/soumu/nmudtq000004kzft.html"
+  },
+  "01464": {
+   "flood": "https://www.town.wassamu.hokkaido.jp/affairs/community-safety/disaster-prevention/",
+   "dosha": "https://www.town.wassamu.hokkaido.jp/affairs/community-safety/disaster-prevention/"
+  },
+  "01465": {
+   "flood": "https://www.town.kembuchi.hokkaido.jp/kurashi/%e6%b6%88%e9%98%b2%e3%83%bb%e9%98%b2%e7%81%bd/%e7%81%bd%e5%ae%b3%e3%81%8c%e8%b5%b7%e3%81%8d%e3%81%9f%e3%82%89/"
+  },
+  "01468": {
+   "flood": "https://www.town.shimokawa.hokkaido.jp/section/.assets/【web用データ】A3冊子_水害危険度マップ.pdf"
+  },
+  "01469": {
+   "flood": "http://www.town.bifuka.hokkaido.jp/cms/section/soumu/qlmcaj0000005h19.html"
+  },
+  "01470": {
+   "flood": "https://www.vill.otoineppu.hokkaido.jp/bousai/index.html",
+   "dosha": "https://www.vill.otoineppu.hokkaido.jp/bousai/index.html"
+  },
+  "01471": {
+   "flood": "https://town.nakagawa.hokkaido.jp/section/kikakuzaisei/b02d3l0000000oyw.html",
+   "dosha": "https://town.nakagawa.hokkaido.jp/section/kikakuzaisei/b02d3l0000000oyw.html"
+  },
+  "01472": {
+   "flood": "https://www.town.horokanai.hokkaido.jp/kurasu/bosai-kyukyu/hazard-map",
+   "dosha": "https://www.town.horokanai.hokkaido.jp/kurasu/bosai-kyukyu/hazard-map"
+  },
+  "01481": {
+   "flood": "https://www.town.mashike.hokkaido.jp/bosai/disaster-defense/index.html",
+   "tsunami": "https://www.town.mashike.hokkaido.jp/menu/bousai/hazardmap/index.html",
+   "dosha": "https://www.town.mashike.hokkaido.jp/bosai/disaster-defense/index.html"
+  },
+  "01482": {
+   "tsunami": "https://www.town.obira.hokkaido.jp/hotnews/detail/00002544.html",
+   "dosha": "https://www.town.obira.hokkaido.jp/hotnews/detail/00002557.html"
+  },
+  "01483": {
+   "flood": "http://www.town.tomamae.lg.jp/section/somu/lg6iib00000000cj.html",
+   "tsunami": "http://www.town.tomamae.lg.jp/section/somu/lg6iib00000000cj.html",
+   "dosha": "http://www.town.tomamae.lg.jp/section/somu/lg6iib00000000cj.html"
+  },
+  "01484": {
+   "flood": "https://www.town.haboro.lg.jp//kurashi/bousai-bouhan/bousai_map/hazardmap/",
+   "tsunami": "https://www.town.haboro.lg.jp//kurashi/bousai-bouhan/bousai_map/hazardmap/",
+   "dosha": "https://www.town.haboro.lg.jp//kurashi/bousai-bouhan/bousai_map/hazardmap/"
+  },
+  "01485": {
+   "flood": "https://www.vill.shosanbetsu.lg.jp/kurashi/bousaianzen/hazardmap.html",
+   "tsunami": "https://www.vill.shosanbetsu.lg.jp/kurashi/bousaianzen/hazardmap.html",
+   "dosha": "https://www.vill.shosanbetsu.lg.jp/kurashi/bousaianzen/hazardmap.html"
+  },
+  "01486": {
+   "tsunami": "https://www.town.embetsu.hokkaido.jp/docs/3435.html?cat=/site/c8010/guide/",
+   "dosha": "https://www.town.embetsu.hokkaido.jp/docs/page2020052900026.html"
+  },
+  "01487": {
+   "flood": "https://www.teshiotown.hokkaido.jp/?page_id=17345",
+   "tsunami": "https://www.teshiotown.hokkaido.jp/?page_id=17345",
+   "dosha": "https://www.teshiotown.hokkaido.jp/?page_id=17345"
+  },
+  "01511": {
+   "flood": "https://www.vill.sarufutsu.hokkaido.jp/hotnews/detail/00003938.html",
+   "tsunami": "https://www.vill.sarufutsu.hokkaido.jp/hotnews/detail/00003938.html",
+   "dosha": "https://www.vill.sarufutsu.hokkaido.jp/hotnews/detail/00003938.html"
+  },
+  "01512": {
+   "flood": "http://www.town.hamatonbetsu.hokkaido.jp/disaster/detail.php?content=632",
+   "tsunami": "http://www.town.hamatonbetsu.hokkaido.jp/disaster/detail.php?content=632",
+   "dosha": "http://www.town.hamatonbetsu.hokkaido.jp/disaster/detail.php?content=632"
+  },
+  "01513": {
+   "flood": "https://www.town.nakatombetsu.hokkaido.jp/bunya/4713/",
+   "dosha": "https://www.town.nakatombetsu.hokkaido.jp/bunya/4713/"
+  },
+  "01514": {
+   "flood": "https://www.esashi.jp/disaster/hazardmap.html",
+   "tsunami": "https://www.esashi.jp/disaster/hazardmap.html",
+   "dosha": "https://www.esashi.jp/disaster/hazardmap.html"
+  },
+  "01516": {
+   "flood": "https://www.town.toyotomi.hokkaido.jp/section/soumuka/a7cug60000000neb.html",
+   "naisui": "https://www.town.toyotomi.hokkaido.jp/section/soumuka/a7cug60000000neb.html",
+   "tsunami": "https://www.town.toyotomi.hokkaido.jp/section/soumuka/a7cug60000000neb.html",
+   "dosha": "https://www.town.toyotomi.hokkaido.jp/section/soumuka/a7cug60000000neb.html"
+  },
+  "01517": {
+   "tsunami": "https://www.town.rebun.hokkaido.jp/hotnews/detail/00003004.html"
+  },
+  "01518": {
+   "tsunami": "https://rishiri-town.jp/%e9%98%b2%e7%81%bd%e3%83%bb%e5%a4%a9%e6%b0%97/%e3%83%8f%e3%82%b6%e3%83%bc%e3%83%89%e3%83%9e%e3%83%83%e3%83%97/",
+   "dosha": "https://rishiri-town.jp/%e9%98%b2%e7%81%bd%e3%83%bb%e5%a4%a9%e6%b0%97/%e3%83%8f%e3%82%b6%e3%83%bc%e3%83%89%e3%83%9e%e3%83%83%e3%83%97/"
+  },
+  "01519": {
+   "tsunami": "https://www.town.rishirifuji.hokkaido.jp/rishirifuji/1176.htm",
+   "dosha": "https://www.town.rishirifuji.hokkaido.jp/hazardmap/"
+  },
+  "01520": {
+   "flood": "https://www.town.horonobe.lg.jp/www4/section/soumu/le009f00000002k9.html",
+   "tsunami": "https://www.town.horonobe.lg.jp/www4/section/soumu/le009f00000002k9.html",
+   "dosha": "https://www.town.horonobe.lg.jp/www4/section/soumu/le009f00000002k9.html"
+  },
+  "01543": {
+   "flood": "http://bousai.town.bihoro.hokkaido.jp/hazardmap/",
+   "dosha": "http://bousai.town.bihoro.hokkaido.jp/hazardmap/"
+  },
+  "01544": {
+   "flood": "https://www.town.tsubetsu.hokkaido.jp/kurashi_tetsuzuki/bosai_anzenanshin/6/1369.html",
+   "dosha": "https://www.town.tsubetsu.hokkaido.jp/kurashi_tetsuzuki/bosai_anzenanshin/6/1369.html"
+  },
+  "01545": {
+   "flood": "https://www.town.shari.hokkaido.jp/soshikikarasagasu/seisakusuisin/bousai/947.html",
+   "tsunami": "https://www.town.shari.hokkaido.jp/soshikikarasagasu/seisakusuisin/bousai/947.html"
+  },
+  "01546": {
+   "flood": "https://www.town.kiyosato.hokkaido.jp/life/?content=595",
+   "dosha": "https://www.town.kiyosato.hokkaido.jp/life/?content=595"
+  },
+  "01547": {
+   "flood": "https://www.town.koshimizu.hokkaido.jp/hotnews/detail/00005586.html",
+   "tsunami": "https://www.town.koshimizu.hokkaido.jp/hotnews/detail/00005586.html",
+   "dosha": "https://www.town.koshimizu.hokkaido.jp/hotnews/detail/00005586.html"
+  },
+  "01549": {
+   "flood": "https://www.town.kunneppu.hokkaido.jp/life/somu/bousai_kikikanri/bousaigaidomap.html",
+   "dosha": "https://www.town.kunneppu.hokkaido.jp/life/somu/bousai_kikikanri/bousaigaidomap.html"
+  },
+  "01550": {
+   "flood": "https://www.town.oketo.hokkaido.jp/kurashi/koutsu_bousai/hazard_map/",
+   "dosha": "https://www.town.oketo.hokkaido.jp/kurashi/koutsu_bousai/dosyasaigai/"
+  },
+  "01552": {
+   "flood": "https://www.town.saroma.hokkaido.jp/emergency/hazardmap.html",
+   "tsunami": "https://www.town.saroma.hokkaido.jp/emergency/hazardmap.html",
+   "dosha": "https://www.town.saroma.hokkaido.jp/emergency/hazardmap.html"
+  },
+  "01555": {
+   "flood": "https://engaru.jp/life/page.php?id=377",
+   "dosha": "https://engaru.jp/life/page.php?id=377"
+  },
+  "01559": {
+   "flood": "https://www.town.yubetsu.lg.jp/administration/life/detail.html?content=184",
+   "tsunami": "https://www.town.yubetsu.lg.jp/administration/life/detail.html?content=191",
+   "dosha": "https://www.town.yubetsu.lg.jp/administration/life/detail.html?content=184"
+  },
+  "01560": {
+   "dosha": "https://www.town.takinoue.hokkaido.jp/kurashi/kinkyu/20150602.html"
+  },
+  "01561": {
+   "flood": "https://www.town.okoppe.lg.jp/cms/section/soumu/opbvt100000009a4.html",
+   "tsunami": "https://www.town.okoppe.lg.jp/cms/section/soumu/opbvt100000009a4.html",
+   "dosha": "https://www.town.okoppe.lg.jp/cms/section/soumu/opbvt100000009a4.html"
+  },
+  "01562": {
+   "flood": "https://www.vill.nishiokoppe.lg.jp/section/kikaku/hhlo2b00000059e0.html?cat2=oucsq30000002b2h&cat3=gyousei02s0",
+   "dosha": "https://www.vill.nishiokoppe.lg.jp/section/kikaku/hhlo2b00000059e0.html?cat2=oucsq30000002b2h&cat3=gyousei02s0"
+  },
+  "01563": {
+   "flood": "https://www.town.oumu.hokkaido.jp/kurashi_tetsuzuki/anshin_anzen/bosai/1/2585.html",
+   "tsunami": "https://www.town.oumu.hokkaido.jp/kurashi_tetsuzuki/anshin_anzen/bosai/1/2585.html",
+   "dosha": "https://www.town.oumu.hokkaido.jp/kurashi_tetsuzuki/anshin_anzen/bosai/1/2585.html"
+  },
+  "01564": {
+   "flood": "https://www.town.ozora.hokkaido.jp/izatoiutoki/2957.html",
+   "tsunami": "https://www.town.ozora.hokkaido.jp/izatoiutoki/2957.html",
+   "dosha": "https://www.town.ozora.hokkaido.jp/izatoiutoki/2957.html"
+  },
+  "01571": {
+   "tsunami": "https://www.town.toyoura.hokkaido.jp/hotnews/detail/00001467.html",
+   "dosha": "https://www.town.toyoura.hokkaido.jp/hotnews/detail/00001929.html"
+  },
+  "01575": {
+   "flood": "https://www.town.sobetsu.lg.jp/anzen/bosai.html",
+   "dosha": "https://www.town.sobetsu.lg.jp/anzen/bosai.html"
+  },
+  "01578": {
+   "flood": "https://www.town.shiraoi.hokkaido.jp/docs/page2022021800023.html",
+   "tsunami": "https://www.town.shiraoi.hokkaido.jp/docs/page2022021800023.html",
+   "dosha": "https://www.town.shiraoi.hokkaido.jp/docs/page2022021800023.html"
+  },
+  "01581": {
+   "flood": "https://www.town.atsuma.lg.jp/office/disaster-prevention/",
+   "tsunami": "https://www.town.atsuma.lg.jp/office/disaster-prevention/",
+   "dosha": "https://www.town.atsuma.lg.jp/office/disaster-prevention/"
+  },
+  "01584": {
+   "tsunami": "http://www.town.toyako.hokkaido.jp/bousai_info/tsunami_hazard_map/",
+   "dosha": "http://www.town.toyako.hokkaido.jp/bousai_info/sediment_disaster_map/"
+  },
+  "01585": {
+   "flood": "https://www.town.abira.lg.jp/kurashi/bosai",
+   "dosha": "https://www.town.abira.lg.jp/kurashi/bosai"
+  },
+  "01586": {
+   "flood": "http://www.town.mukawa.lg.jp/2729.htm",
+   "tsunami": "http://www.town.mukawa.lg.jp/2729.htm",
+   "dosha": "http://www.town.mukawa.lg.jp/3192.htm"
+  },
+  "01601": {
+   "flood": "https://www.town.hidaka.hokkaido.jp/prevention/?category=62",
+   "tsunami": "https://www.town.hidaka.hokkaido.jp/prevention/?category=62",
+   "dosha": "https://www.town.hidaka.hokkaido.jp/prevention/?category=62"
+  },
+  "01602": {
+   "flood": "https://www.town.biratori.hokkaido.jp/soshikikarasagasu/machizukurika/bosaigakari/1/1/1/317.html",
+   "dosha": "https://www.town.biratori.hokkaido.jp/soshikikarasagasu/machizukurika/bosaigakari/1/1/1/317.html"
+  },
+  "01604": {
+   "flood": "https://www.niikappu.jp/kurashi/bosai/bosai/kozui.html",
+   "tsunami": "https://www.niikappu.jp/kurashi/bosai/bosai/tunami-map.html",
+   "dosha": "https://www.niikappu.jp/kurashi/bosai/bosai/kozui.html"
+  },
+  "01607": {
+   "flood": "https://www.town.urakawa.hokkaido.jp/gyosei/prevention/?content=239",
+   "naisui": "https://www.town.urakawa.hokkaido.jp/gyosei/prevention/?content=239",
+   "tsunami": "https://www.town.urakawa.hokkaido.jp/gyosei/prevention/?content=245",
+   "dosha": "https://www.town.urakawa.hokkaido.jp/gyosei/prevention/?content=222"
+  },
+  "01608": {
+   "flood": "http://www.samani.jp/bousai/",
+   "tsunami": "http://www.samani.jp/bousai/",
+   "dosha": "http://www.samani.jp/bousai/"
+  },
+  "01609": {
+   "tsunami": "https://www.town.erimo.lg.jp/section/kikaku/u9c3nn00000004rq.html#s0",
+   "dosha": "https://www.town.erimo.lg.jp/section/kikaku/u9c3nn00000004rq.html#s0"
+  },
+  "01610": {
+   "flood": "https://www.shinhidaka-hokkaido.jp/hotnews/detail/00000054.html",
+   "tsunami": "https://www.shinhidaka-hokkaido.jp/hotnews/detail/00000054.html",
+   "dosha": "https://www.shinhidaka-hokkaido.jp/hotnews/detail/00000054.html#a2_0"
+  },
+  "01631": {
+   "flood": "https://www.town.otofuke.hokkaido.jp/bosai/hinanjo/flood-hazard-map.html",
+   "dosha": "https://www.town.otofuke.hokkaido.jp/bosai/hinanjo/flood-hazard-map.html"
+  },
+  "01632": {
+   "flood": "https://www.shihoro.jp/life/detail.php?content=62",
+   "dosha": "https://www.shihoro.jp/life/detail.php?content=62"
+  },
+  "01633": {
+   "flood": "https://www.kamishihoro.jp/page/00000323",
+   "dosha": "https://www.kamishihoro.jp/page/00000323"
+  },
+  "01634": {
+   "flood": "https://www.town.shikaoi.lg.jp/kurashi/bosai/hazardbook/",
+   "dosha": "https://www.town.shikaoi.lg.jp/kurashi/bosai/hazardbook/"
+  },
+  "01635": {
+   "flood": "https://www.shintoku-town.jp/bousaiwebmap-shintoku/flow_02.html",
+   "dosha": "https://www.shintoku-town.jp/bousaiwebmap-shintoku/flow_02.html"
+  },
+  "01636": {
+   "flood": "https://www.town.shimizu.hokkaido.jp/disaster/details/post_7.html",
+   "dosha": "https://www.town.shimizu.hokkaido.jp/disaster/details/post_7.html"
+  },
+  "01637": {
+   "flood": "https://www.memuro.net/administration/soshiki/soumu/bousai/",
+   "dosha": "https://www.memuro.net/administration/soshiki/soumu/bousai/2023-0929-1416-map.html"
+  },
+  "01638": {
+   "flood": "https://www.vill.nakasatsunai.hokkaido.jp/output/contents/file/release/52/7850/2021_bosaimap.pdf"
+  },
+  "01639": {
+   "flood": "https://www.sarabetsu.jp/bosai/bousaimappu/"
+  },
+  "01641": {
+   "flood": "https://www.town.taiki.hokkaido.jp/soshiki/somuka/4/2/3/888.html",
+   "tsunami": "https://www.town.taiki.hokkaido.jp/soshiki/somuka/4/2/3/888.html"
+  },
+  "01642": {
+   "flood": "https://www.town.hiroo.lg.jp/kurashi/anshin/bousai/kozui/",
+   "tsunami": "https://www.town.hiroo.lg.jp/kurashi/anshin/bousai/bousaimappu/",
+   "dosha": "https://www.town.hiroo.lg.jp/kurashi/anshin/bousai/dosyasaigamap/"
+  },
+  "01643": {
+   "flood": "https://www.town.makubetsu.lg.jp/bousai/bosai/bousainosiori_hazardmap.html",
+   "tsunami": "https://www.town.makubetsu.lg.jp/bousai/bosai/bousainosiori_hazardmap.html",
+   "dosha": "https://www.town.makubetsu.lg.jp/bousai/bosai/bousainosiori_hazardmap.html"
+  },
+  "01644": {
+   "flood": "https://www.town.hokkaido-ikeda.lg.jp/bosai-bohan/bosai/izatoiutoki/5365.html",
+   "dosha": "https://www.town.hokkaido-ikeda.lg.jp/bosai-bohan/bosai/izatoiutoki/5365.html"
+  },
+  "01645": {
+   "flood": "https://www.toyokoro.jp/hazardmap/",
+   "tsunami": "https://www.toyokoro.jp/hazardmap/",
+   "dosha": "https://www.toyokoro.jp/hazardmap/"
+  },
+  "01646": {
+   "flood": "https://www.town.honbetsu.hokkaido.jp/web/disaster/details/post_3.html",
+   "dosha": "https://www.town.honbetsu.hokkaido.jp/web/disaster/details/post_3.html"
+  },
+  "01647": {
+   "flood": "https://www.town.ashoro.hokkaido.jp/kurashi/bousai/bousai_map/page_254.html",
+   "dosha": "https://www.town.ashoro.hokkaido.jp/kurashi/bousai/bousai_map/page_254.html"
+  },
+  "01648": {
+   "flood": "https://www.rikubetsu.jp/kurashi/bousai_saigai/",
+   "naisui": "https://www.rikubetsu.jp/kurashi/bousai_saigai/",
+   "dosha": "https://www.rikubetsu.jp/kurashi/bousai_saigai/"
+  },
+  "01649": {
+   "flood": "https://www.urahoro.jp/prevention/?content=483",
+   "tsunami": "https://www.urahoro.jp/prevention/?content=483",
+   "dosha": "https://www.urahoro.jp/prevention/?content=483"
+  },
+  "01661": {
+   "flood": "http://www.town.kushiro.lg.jp/disaster/keikaku/hazard.html",
+   "naisui": "http://www.town.kushiro.lg.jp/disaster/keikaku/hazard.html",
+   "tsunami": "http://www.town.kushiro.lg.jp/disaster/keikaku/hazard.html",
+   "dosha": "http://www.town.kushiro.lg.jp/disaster/keikaku/hazard.html"
+  },
+  "01662": {
+   "flood": "https://www.akkeshi-town.jp/bousai/bousaitaisaku_05/",
+   "tsunami": "https://www.akkeshi-town.jp/bousai/bousaitaisaku_05/",
+   "dosha": "https://www.akkeshi-town.jp/bousai/bousaitaisaku_05/"
+  },
+  "01663": {
+   "tsunami": "https://www.townhamanaka.jp/kurashi_kankyou/bousai/bousai_map.html"
+  },
+  "01664": {
+   "flood": "https://town.shibecha.hokkaido.jp/gyousei/bousai_chuui/bousai/index.html"
+  },
+  "01665": {
+   "flood": "https://www.town.teshikaga.hokkaido.jp/kurashi/soshikiichiran/somuka/10/2/3470.html",
+   "dosha": "https://www.town.teshikaga.hokkaido.jp/kurashi/soshikiichiran/somuka/10/2/3470.html"
+  },
+  "01667": {
+   "flood": "https://www.vill.tsurui.lg.jp/bosai_kyukyu/1059.html",
+   "dosha": "https://www.vill.tsurui.lg.jp/bosai_kyukyu/1059.html"
+  },
+  "01668": {
+   "flood": "https://www.town.shiranuka.lg.jp/section/nfml630000001evw.html",
+   "tsunami": "https://www.town.shiranuka.lg.jp/section/nfml630000001f5s.html",
+   "dosha": "https://www.town.shiranuka.lg.jp/section/h8v21a0000001y2l.html"
+  },
+  "01691": {
+   "flood": "https://betsukai.jp/anzen/bosai/betsukai_hazardmap/",
+   "naisui": "https://betsukai.jp/kurashi/water/gesuidou/gesui_osirase/naisuihaza-domappu/",
+   "tsunami": "https://betsukai.jp/anzen/bosai/betsukai_hazardmap/",
+   "dosha": "https://betsukai.jp/anzen/bosai/betsukai_hazardmap/"
+  },
+  "01692": {
+   "flood": "https://www.nakashibetsu.jp/kurashi/bohanbosai/HM/",
+   "dosha": "https://www.nakashibetsu.jp/kurashi/bohanbosai/HM/"
+  },
+  "01693": {
+   "flood": "https://shibetsutown-bousai.jp/",
+   "tsunami": "https://shibetsutown-bousai.jp/",
+   "dosha": "https://shibetsutown-bousai.jp/hazardmap/map.html?lay=saigai_06"
+  },
+  "01694": {
+   "flood": "https://www.rausu-town.jp/pages/view/288",
+   "tsunami": "https://www.rausu-town.jp/pages/view/288",
+   "dosha": "https://www.rausu-town.jp/pages/view/288"
+  },
   "02201": {
    "flood": "https://www.city.aomori.aomori.jp/anzen_kinkyu/bousai_shoubou/1002527/1002537/1002538.html",
    "naisui": "https://www.city.aomori.aomori.jp/suido/gesuidou/1001921.html",
@@ -4909,6 +5697,2259 @@
    "flood": "https://www.town.kushimoto.wakayama.jp/bousai/",
    "tsunami": "https://www.town.kushimoto.wakayama.jp/bousai/tsunami/",
    "dosha": "https://www.town.kushimoto.wakayama.jp/bousai/dosyasaigai-map.html"
+  },
+  "31201": {
+   "flood": "https://www.city.tottori.lg.jp/page/2319.html",
+   "tsunami": "https://www.city.tottori.lg.jp/page/2319.html",
+   "dosha": "https://www.city.tottori.lg.jp/page/2319.html"
+  },
+  "31202": {
+   "flood": "https://www.city.yonago.lg.jp/6585.htm",
+   "tsunami": "https://www.city.yonago.lg.jp/6585.htm",
+   "dosha": "https://www.city.yonago.lg.jp/6585.htm"
+  },
+  "31203": {
+   "flood": "https://www.city.kurayoshi.lg.jp/1672.htm",
+   "naisui": "https://www.city.kurayoshi.lg.jp/3384.htm",
+   "dosha": "https://www.city.kurayoshi.lg.jp/1672.htm"
+  },
+  "31204": {
+   "flood": "https://www.city.sakaiminato.lg.jp/index.php?view=120119",
+   "naisui": "https://www.city.sakaiminato.lg.jp/index.php?view=10703",
+   "tsunami": "https://www.city.sakaiminato.lg.jp/index.php?view=120119"
+  },
+  "31302": {
+   "flood": "https://www.iwami.gr.jp/dd.aspx?menuid=2601",
+   "tsunami": "https://www.iwami.gr.jp/dd.aspx?menuid=2600",
+   "dosha": "https://www.iwami.gr.jp/dd.aspx?menuid=2601"
+  },
+  "31325": {
+   "flood": "https://www.town.wakasa.tottori.jp/section/hazardmap/map.html?lay=saigai_02",
+   "naisui": "https://www.town.wakasa.tottori.jp/section/hazardmap/map.html?lay=saigai_02",
+   "dosha": "https://www.town.wakasa.tottori.jp/section/hazardmap/map.html?lay=saigai_02"
+  },
+  "31328": {
+   "flood": "https://www1.town.chizu.tottori.jp/chizu/soumu/bousai/1/",
+   "dosha": "https://www1.town.chizu.tottori.jp/chizu/soumu/bousai/1/"
+  },
+  "31329": {
+   "flood": "https://www.town.yazu.tottori.jp/bousai/",
+   "dosha": "https://www.town.yazu.tottori.jp/bousai/"
+  },
+  "31364": {
+   "flood": "https://www.town.misasa.tottori.jp/315/319/963/29311.html",
+   "dosha": "https://www.town.misasa.tottori.jp/315/319/963/29311.html"
+  },
+  "31370": {
+   "flood": "https://www.yurihama.jp/soshiki/2/15995.html",
+   "tsunami": "https://www.yurihama.jp/soshiki/2/15995.html",
+   "dosha": "https://www.yurihama.jp/soshiki/2/15995.html"
+  },
+  "31371": {
+   "flood": "https://www.town.kotoura.tottori.jp/docs/2021021200062/",
+   "tsunami": "https://www.town.kotoura.tottori.jp/docs/2021021200062/",
+   "dosha": "https://www.town.kotoura.tottori.jp/docs/2021021200062/"
+  },
+  "31372": {
+   "flood": "https://www.e-hokuei.net/soshiki/2/1115.html",
+   "tsunami": "https://www.e-hokuei.net/soshiki/2/1115.html",
+   "dosha": "https://www.e-hokuei.net/soshiki/2/1115.html"
+  },
+  "31384": {
+   "flood": "https://www.hiezu.jp/list/soumu/y121/u509/e970/w613/",
+   "tsunami": "https://www.hiezu.jp/list/soumu/y121/u509/e970/z228/"
+  },
+  "31386": {
+   "flood": "https://www.daisen.jp/1/10/1/119/",
+   "tsunami": "https://www.daisen.jp/1/10/1/119/",
+   "dosha": "https://www.daisen.jp/1/10/1/119/"
+  },
+  "31389": {
+   "flood": "https://www.town.nanbu.tottori.jp/admin/4/2/v112/",
+   "dosha": "https://www.town.nanbu.tottori.jp/admin/4/2/v112/"
+  },
+  "31390": {
+   "flood": "https://www.houki-town.jp/new1/10/3/p943/v876/",
+   "dosha": "https://www.houki-town.jp/new1/10/3/p943/v876/"
+  },
+  "31401": {
+   "flood": "https://www.town.nichinan.lg.jp/soshikikarasagasu/somuka/anzen_anshin/1/0409/index.html",
+   "dosha": "https://www.town.nichinan.lg.jp/soshikikarasagasu/somuka/anzen_anshin/1/0409/index.html"
+  },
+  "31402": {
+   "flood": "https://www.town.hino.tottori.jp/2575.htm",
+   "dosha": "https://www.town.hino.tottori.jp/2575.htm"
+  },
+  "31403": {
+   "flood": "https://www.town-kofu.jp/2/1/2/7/6/",
+   "dosha": "https://www.town-kofu.jp/2/1/2/7/6/"
+  },
+  "32201": {
+   "flood": "https://www.city.matsue.lg.jp/kurashi_tetsuzuki/anzen_anshin/9/hazard_Map/index.html",
+   "tsunami": "https://www.city.matsue.lg.jp/kurashi_tetsuzuki/anzen_anshin/9/hazard_Map/index.html",
+   "dosha": "https://www.city.matsue.lg.jp/kurashi_tetsuzuki/anzen_anshin/9/hazard_Map/index.html"
+  },
+  "32202": {
+   "flood": "https://www.city.hamada.shimane.jp/www/contents/1739343890601/index.html",
+   "tsunami": "https://www.city.hamada.shimane.jp/www/contents/1739343890601/index.html",
+   "dosha": "https://www.city.hamada.shimane.jp/www/contents/1739343890601/index.html"
+  },
+  "32203": {
+   "flood": "https://www.city.izumo.shimane.jp/www/contents/1366858934184/index.html",
+   "tsunami": "https://www.city.izumo.shimane.jp/www/contents/1366858934184/index.html",
+   "dosha": "https://www.city.izumo.shimane.jp/www/contents/1366858934184/index.html"
+  },
+  "32204": {
+   "flood": "https://www.city.masuda.lg.jp/kurashi_tetsuzuki/bosai/saigainisonaeru/4/3389.html",
+   "naisui": "https://www.city.masuda.lg.jp/kurashi_tetsuzuki/bosai/saigainisonaeru/4/3389.html",
+   "tsunami": "https://www.city.masuda.lg.jp/kurashi_tetsuzuki/bosai/saigainisonaeru/4/3389.html",
+   "dosha": "https://www.city.masuda.lg.jp/kurashi_tetsuzuki/bosai/saigainisonaeru/4/3389.html"
+  },
+  "32205": {
+   "flood": "https://www.city.oda.lg.jp/disaster_prevention/1268/12858",
+   "tsunami": "https://www.city.oda.lg.jp/disaster_prevention/1268/12858",
+   "dosha": "https://www.city.oda.lg.jp/disaster_prevention/1268/12858"
+  },
+  "32206": {
+   "flood": "https://www.city.yasugi.shimane.jp/kurashi/anzen/bousai/newbousaimap.html",
+   "tsunami": "https://www.city.yasugi.shimane.jp/shisei/tokei/koukaigatagis/yasugikoukaigis.html",
+   "dosha": "https://www.city.yasugi.shimane.jp/kurashi/anzen/bousai/newbousaimap.html"
+  },
+  "32207": {
+   "flood": "https://www.city.gotsu.lg.jp/soshiki/4/2664.html",
+   "tsunami": "https://www.city.gotsu.lg.jp/soshiki/4/2664.html",
+   "dosha": "https://www.city.gotsu.lg.jp/soshiki/4/2664.html"
+  },
+  "32209": {
+   "flood": "https://www.city.unnan.shimane.jp/unnan/kurashi/bousai/bousaijouhou/prevent01.html",
+   "dosha": "https://www.city.unnan.shimane.jp/unnan/kurashi/bousai/bousaijouhou/prevent01.html"
+  },
+  "32343": {
+   "dosha": "https://www.town.okuizumo.shimane.jp/www/contents/1599022088192/index.html"
+  },
+  "32386": {
+   "dosha": "https://www.iinan.jp/soshiki/5/2336.html"
+  },
+  "32441": {
+   "flood": "https://www.town.shimane-kawamoto.lg.jp/bousai/5000/155",
+   "dosha": "https://www.town.shimane-kawamoto.lg.jp/bousai/5000/155"
+  },
+  "32448": {
+   "flood": "https://www.town.misato.shimane.jp/hazardmap/",
+   "dosha": "https://www.town.misato.shimane.jp/hazardmap/"
+  },
+  "32449": {
+   "flood": "https://www.town.ohnan.lg.jp/www/contents/1001000000258/index.html",
+   "dosha": "https://www.town.ohnan.lg.jp/www/contents/1001000000258/index.html"
+  },
+  "32501": {
+   "flood": "https://www.town.tsuwano.lg.jp/www/contents/1717474148345/index.html",
+   "dosha": "https://www.town.tsuwano.lg.jp/www/contents/1717474148345/index.html"
+  },
+  "32505": {
+   "flood": "https://www.town.yoshika.lg.jp/bousai/bousai/hazardmap.html",
+   "dosha": "https://www.town.yoshika.lg.jp/bousai/bousai/hazardmap.html"
+  },
+  "32525": {
+   "tsunami": "https://www.town.ama.shimane.jp/kurashi-tetsuduki/kurashi/bousai-anzen/",
+   "dosha": "https://www.town.ama.shimane.jp/kurashi-tetsuduki/kurashi/bousai-anzen/"
+  },
+  "32526": {
+   "tsunami": "https://www.town.nishinoshima.shimane.jp/bunya/b_anshin-joho/b_bosai/822",
+   "dosha": "https://www.town.nishinoshima.shimane.jp/bunya/b_anshin-joho/b_bosai/822"
+  },
+  "32527": {
+   "takashio": "http://www.vill.chibu.lg.jp/gyosei/life/needs/needs07/27",
+   "tsunami": "http://www.vill.chibu.lg.jp/gyosei/life/needs/needs07/27",
+   "dosha": "http://www.vill.chibu.lg.jp/gyosei/life/needs/needs07/27"
+  },
+  "32528": {
+   "flood": "https://www.town.okinoshima.shimane.jp/www/contents/1707355339197/index.html",
+   "tsunami": "https://www.town.okinoshima.shimane.jp/www/contents/1707355339197/index.html",
+   "dosha": "https://www.town.okinoshima.shimane.jp/www/contents/1707355339197/index.html"
+  },
+  "33100": {
+   "flood": "https://www.city.okayama.jp/0000012077.html",
+   "naisui": "https://www.city.okayama.jp/kurashi/0000017176.html",
+   "takashio": "https://www.city.okayama.jp/kurashi/0000048463.html",
+   "tsunami": "https://www.city.okayama.jp/0000012072.html",
+   "dosha": "https://www.city.okayama.jp/0000012077.html"
+  },
+  "33202": {
+   "flood": "https://www.city.kurashiki.okayama.jp/anzen/disaster/1002627/1002683/1002684.html",
+   "naisui": "https://www.city.kurashiki.okayama.jp/kurashi/suidou/1003847/1003855/1003986/1003988.html",
+   "takashio": "https://www.city.kurashiki.okayama.jp/anzen/disaster/1002627/1002683/1002685.html",
+   "tsunami": "https://www.city.kurashiki.okayama.jp/anzen/disaster/1002627/1002683/1002686.html",
+   "dosha": "https://www.city.kurashiki.okayama.jp/anzen/disaster/1002627/1002683/1002684.html"
+  },
+  "33203": {
+   "flood": "https://www.city.tsuyama.lg.jp/article?articleId=65b39766319ffe392a806ac8",
+   "dosha": "https://www.city.tsuyama.lg.jp/article?articleId=65b39766319ffe392a806ac8"
+  },
+  "33204": {
+   "flood": "https://www.city.tamano.lg.jp/site/bousai/1499.html",
+   "naisui": "https://www.city.tamano.lg.jp/site/bousai/1388.html",
+   "takashio": "https://www.city.tamano.lg.jp/site/bousai/1499.html",
+   "tsunami": "https://www.city.tamano.lg.jp/site/bousai/1499.html",
+   "dosha": "https://www.city.tamano.lg.jp/site/bousai/1499.html"
+  },
+  "33205": {
+   "flood": "https://www.city.kasaoka.okayama.jp/soshiki/10/33421.html",
+   "tsunami": "https://www.city.kasaoka.okayama.jp/soshiki/10/33421.html",
+   "dosha": "https://www.city.kasaoka.okayama.jp/soshiki/10/33421.html"
+  },
+  "33207": {
+   "flood": "https://www.city.ibara.okayama.jp/soshiki/4/1986.html",
+   "naisui": "https://www.city.ibara.okayama.jp/soshiki/4/1986.html",
+   "dosha": "https://www.city.ibara.okayama.jp/soshiki/4/1986.html"
+  },
+  "33208": {
+   "flood": "https://www.city.soja.okayama.jp/kikikanri/kurashi/bousai/bousaitaisaku/kouzuidosyasaigai_map_h2409.html",
+   "dosha": "https://www.city.soja.okayama.jp/kikikanri/kurashi/bousai/bousai-info.html"
+  },
+  "33209": {
+   "flood": "https://www.city.takahashi.lg.jp/soshiki/102/bousaimappu.html",
+   "dosha": "https://www.city.takahashi.lg.jp/soshiki/102/bousaimappu.html"
+  },
+  "33210": {
+   "flood": "https://www.city.niimi.okayama.jp/kurashi/kurashi_detail/index/101.html",
+   "dosha": "https://www.city.niimi.okayama.jp/kurashi/kurashi_detail/index/101.html"
+  },
+  "33211": {
+   "flood": "https://www.city.bizen.okayama.jp/soshiki/4/4318.html",
+   "tsunami": "https://www.city.bizen.okayama.jp/soshiki/4/4320.html",
+   "dosha": "https://www.city.bizen.okayama.jp/soshiki/4/4318.html"
+  },
+  "33212": {
+   "flood": "https://www.city.setouchi.lg.jp/soshiki/3/3870.html",
+   "naisui": "https://www.city.setouchi.lg.jp/soshiki/35/3412.html",
+   "takashio": "https://www.city.setouchi.lg.jp/soshiki/3/3870.html",
+   "tsunami": "https://www.city.setouchi.lg.jp/soshiki/3/3870.html",
+   "dosha": "https://www.city.setouchi.lg.jp/soshiki/3/3870.html"
+  },
+  "33213": {
+   "flood": "https://www.city.akaiwa.lg.jp/kurashi/bosai/hazard/4812.html",
+   "dosha": "https://www.city.akaiwa.lg.jp/kurashi/bosai/hazard/4812.html"
+  },
+  "33214": {
+   "flood": "https://www.city.maniwa.lg.jp/soshiki/2/41431.html",
+   "dosha": "https://www.city.maniwa.lg.jp/soshiki/2/41431.html"
+  },
+  "33215": {
+   "flood": "https://www.city.mimasaka.lg.jp/soshiki/soumu/kikikanri/1462153723350.html",
+   "dosha": "https://www.city.mimasaka.lg.jp/soshiki/soumu/kikikanri/1462153723350.html"
+  },
+  "33216": {
+   "flood": "https://www.city.asakuchi.lg.jp/page/1022.html",
+   "tsunami": "https://www.city.asakuchi.lg.jp/page/1022.html",
+   "dosha": "https://www.city.asakuchi.lg.jp/page/1022.html"
+  },
+  "33346": {
+   "flood": "https://www.town.wake.lg.jp/kurashi/anzen_anshin/bosai/1/1139.html",
+   "dosha": "https://www.town.wake.lg.jp/kurashi/anzen_anshin/bosai/1/1139.html"
+  },
+  "33423": {
+   "flood": "https://www.town.hayashima.lg.jp/soshiki/somu/gyomu/anzen_anshin/bosai/1918.html",
+   "naisui": "https://www.town.hayashima.lg.jp/soshiki/jogesuido/gyomu/anzen_anshin/bosai/map/1171.html",
+   "dosha": "https://www.town.hayashima.lg.jp/soshiki/somu/gyomu/anzen_anshin/bosai/1918.html"
+  },
+  "33445": {
+   "flood": "https://www.town.satosho.okayama.jp/soshiki/2/5117.html",
+   "tsunami": "https://www.town.satosho.okayama.jp/soshiki/2/5117.html",
+   "dosha": "https://www.town.satosho.okayama.jp/soshiki/2/5117.html"
+  },
+  "33461": {
+   "flood": "http://www.town.yakage.okayama.jp/life/bosai/bousai.html",
+   "dosha": "http://www.town.yakage.okayama.jp/life/bosai/bousai.html"
+  },
+  "33586": {
+   "dosha": "http://www.vill.shinjo.okayama.jp/index.php?id=27"
+  },
+  "33606": {
+   "flood": "https://www.town.kagamino.lg.jp/soshiki/31/6465.html",
+   "dosha": "https://www.town.kagamino.lg.jp/soshiki/31/6465.html"
+  },
+  "33622": {
+   "flood": "https://www.town.shoo.lg.jp/soshiki/1/1117.html",
+   "naisui": "https://www.town.shoo.lg.jp/soshiki/1/1117.html",
+   "dosha": "https://www.town.shoo.lg.jp/soshiki/1/1117.html"
+  },
+  "33623": {
+   "flood": "https://www.town.nagi.okayama.jp/gyousei/kurashi/bousai_shoubou/bousai/hazard_map.html",
+   "dosha": "https://www.town.nagi.okayama.jp/gyousei/kurashi/bousai_shoubou/bousai/hazard_map.html"
+  },
+  "33643": {
+   "dosha": "https://www.vill.nishiawakura.okayama.jp/wp/防災情報/"
+  },
+  "33663": {
+   "dosha": "https://www.town.kumenan.lg.jp/living/bousai_bouhan/bousai/hazardmap.html"
+  },
+  "33666": {
+   "flood": "https://www.town.misaki.okayama.jp/soshiki/jouhou/28.html",
+   "naisui": "https://www.town.misaki.okayama.jp/soshiki/jouhou/28.html",
+   "dosha": "https://www.town.misaki.okayama.jp/soshiki/jouhou/28.html"
+  },
+  "33681": {
+   "flood": "https://www.town.kibichuo.lg.jp/soshiki/2/188.html",
+   "dosha": "https://www1.g-reiki.net/town.kibichuo-hazardmap/index.html"
+  },
+  "34100": {
+   "flood": "https://www.city.hiroshima.lg.jp/saigaiinfo/saigai/1021035/1003240.html",
+   "naisui": "https://www.city.hiroshima.lg.jp/living/suido-gesuido/1005966/1026319/1026321/1003118.html",
+   "takashio": "https://www.city.hiroshima.lg.jp/saigaiinfo/saigai/1021035/1013331.html",
+   "tsunami": "https://www.city.hiroshima.lg.jp/saigaiinfo/saigai/1021035/1003243.html",
+   "dosha": "https://www.city.hiroshima.lg.jp/saigaiinfo/saigai/1021035/1003244.html"
+  },
+  "34202": {
+   "flood": "https://www.city.kure.lg.jp/bosai/hazardmap/flow_02.html",
+   "takashio": "https://www.city.kure.lg.jp/bosai/hazardmap/flow_03.html",
+   "tsunami": "https://www.city.kure.lg.jp/bosai/hazardmap/agree.html?lay=saigai-04",
+   "dosha": "https://www.city.kure.lg.jp/bosai/hazardmap/agree.html?lay=saigai-01"
+  },
+  "34203": {
+   "flood": "https://www.city.takehara.lg.jp/soshikikarasagasu/kikikanrika/gyomuannai/4_1/1/2083.html",
+   "naisui": "https://www.city.takehara.lg.jp/soshikikarasagasu/kikikanrika/gyomuannai/4_1/1/2083.html",
+   "takashio": "https://www.city.takehara.lg.jp/kurashi_tetsuzuki/bosai/1/3893.html",
+   "tsunami": "https://www.city.takehara.lg.jp/kurashi_tetsuzuki/bosai/1/3893.html",
+   "dosha": "https://www.city.takehara.lg.jp/soshikikarasagasu/kikikanrika/gyomuannai/4_1/1/2083.html"
+  },
+  "34204": {
+   "flood": "https://www.city.mihara.hiroshima.jp/soshiki/19/124995.html",
+   "takashio": "https://www.city.mihara.hiroshima.jp/soshiki/19/124995.html",
+   "tsunami": "https://www.city.mihara.hiroshima.jp/soshiki/19/tunamihazad.html",
+   "dosha": "https://www.city.mihara.hiroshima.jp/soshiki/19/dosyasaigaitokubetu.html"
+  },
+  "34205": {
+   "flood": "https://www.city.onomichi.hiroshima.jp/site/bosai/73411.html",
+   "takashio": "https://www.city.onomichi.hiroshima.jp/site/bosai/73411.html",
+   "tsunami": "https://www.city.onomichi.hiroshima.jp/site/bosai/73411.html",
+   "dosha": "https://www.city.onomichi.hiroshima.jp/site/bosai/73411.html"
+  },
+  "34207": {
+   "flood": "https://www.city.fukuyama.hiroshima.jp/soshiki/kikikanri/289611.html",
+   "tsunami": "https://www.city.fukuyama.hiroshima.jp/site/bosai/10792.html",
+   "dosha": "https://www.city.fukuyama.hiroshima.jp/soshiki/kikikanri/289611.html"
+  },
+  "34208": {
+   "flood": "https://www.city.fuchu.hiroshima.jp/kurashi/anzen/shobou/3427.html",
+   "dosha": "https://www.city.fuchu.hiroshima.jp/kurashi/anzen/shobou/1764.html"
+  },
+  "34209": {
+   "flood": "https://www.city.miyoshi.hiroshima.jp/hazardmap/flow_01.html",
+   "naisui": "https://www.city.miyoshi.hiroshima.jp/hazardmap/flow_01.html",
+   "dosha": "https://www.city.miyoshi.hiroshima.jp/hazardmap/flow_01.html"
+  },
+  "34210": {
+   "flood": "https://www.city.shobara.hiroshima.jp/main/life/cat10/cat2/cat6/post_372.html",
+   "dosha": "https://www.city.shobara.hiroshima.jp/main/life/cat10/cat2/cat6/post_372.html"
+  },
+  "34211": {
+   "flood": "https://www.city.otake.hiroshima.jp/soshiki/somu/kikikanri/gyoumukiki/5/hinansyo_bousaimap/1577319031549.html",
+   "naisui": "https://www.city.otake.hiroshima.jp/soshiki/suido/jogesuido/riyou/bousai/5298.html",
+   "takashio": "https://www.city.otake.hiroshima.jp/soshiki/somu/kikikanri/gyoumukiki/5/hinansyo_bousaimap/1577319031549.html",
+   "tsunami": "https://www.city.otake.hiroshima.jp/soshiki/somu/kikikanri/gyoumukiki/5/hinansyo_bousaimap/1577319031549.html",
+   "dosha": "https://www.city.otake.hiroshima.jp/soshiki/somu/kikikanri/gyoumukiki/5/hinansyo_bousaimap/1577319031549.html"
+  },
+  "34212": {
+   "flood": "https://www.city.higashihiroshima.lg.jp/bosai/10/3541.html",
+   "takashio": "https://www.city.higashihiroshima.lg.jp/bosai/10/3541.html",
+   "tsunami": "https://www.city.higashihiroshima.lg.jp/bosai/10/3541.html",
+   "dosha": "https://www.city.higashihiroshima.lg.jp/bosai/10/3541.html"
+  },
+  "34213": {
+   "flood": "https://www.city.hatsukaichi.hiroshima.jp/soshiki/3/10185.html",
+   "takashio": "https://www.city.hatsukaichi.hiroshima.jp/soshiki/3/10185.html",
+   "tsunami": "https://www.city.hatsukaichi.hiroshima.jp/soshiki/3/10185.html",
+   "dosha": "https://www.city.hatsukaichi.hiroshima.jp/soshiki/3/10181.html"
+  },
+  "34214": {
+   "flood": "https://www.akitakata.jp/ja/shisei/section/anzen/hm/",
+   "dosha": "https://www.akitakata.jp/ja/shisei/section/anzen/hm/"
+  },
+  "34215": {
+   "flood": "https://www.city.etajima.hiroshima.jp/cms/hazardmap/flow_02.html",
+   "takashio": "https://www.city.etajima.hiroshima.jp/cms/hazardmap/flow_04.html",
+   "tsunami": "https://www.city.etajima.hiroshima.jp/cms/hazardmap/flow_04.html",
+   "dosha": "https://www.city.etajima.hiroshima.jp/cms/hazardmap/flow_02.html"
+  },
+  "34302": {
+   "flood": "https://www.town.fuchu.hiroshima.jp/site/kikikannrika/19259.html",
+   "takashio": "https://www.town.fuchu.hiroshima.jp/site/kikikannrika/19259.html",
+   "tsunami": "https://www.town.fuchu.hiroshima.jp/site/kikikannrika/19259.html",
+   "dosha": "https://www.town.fuchu.hiroshima.jp/site/kikikannrika/19259.html"
+  },
+  "34304": {
+   "flood": "https://www.town.kaita.lg.jp/soshiki/8/118615.html",
+   "naisui": "https://www.town.kaita.lg.jp/soshiki/8/118615.html",
+   "takashio": "https://www.town.kaita.lg.jp/soshiki/8/118615.html",
+   "tsunami": "https://www.town.kaita.lg.jp/soshiki/8/118615.html",
+   "dosha": "https://www.town.kaita.lg.jp/soshiki/8/118615.html"
+  },
+  "34307": {
+   "flood": "https://www.town.kumano.hiroshima.jp/www/contents/1516093107751/index.html",
+   "dosha": "https://www.town.kumano.hiroshima.jp/www/contents/1516093107751/index.html"
+  },
+  "34309": {
+   "takashio": "https://www.town.saka.lg.jp/2015/08/07/tunamitakasiomap/",
+   "tsunami": "https://www.town.saka.lg.jp/2015/08/07/tunamitakasiomap/",
+   "dosha": "https://www.town.saka.lg.jp/2020/06/01/post_427/"
+  },
+  "34368": {
+   "flood": "https://www.akiota.jp/soshiki/3/1515.html",
+   "dosha": "https://www.akiota.jp/soshiki/3/1515.html"
+  },
+  "34369": {
+   "flood": "https://www.town.kitahiroshima.lg.jp/site/bousai/19156.html",
+   "dosha": "https://www.town.kitahiroshima.lg.jp/site/bousai/19156.html"
+  },
+  "34431": {
+   "takashio": "https://www.town.osakikamijima.hiroshima.jp/soshiki/somu/1/2/4/877.html",
+   "tsunami": "https://www.town.osakikamijima.hiroshima.jp/soshiki/somu/1/2/4/877.html",
+   "dosha": "https://www.town.osakikamijima.hiroshima.jp/soshiki/somu/1/2/4/877.html"
+  },
+  "34462": {
+   "flood": "https://www.town.sera.hiroshima.jp/soshiki/5/217.html",
+   "dosha": "https://www.town.sera.hiroshima.jp/soshiki/5/217.html"
+  },
+  "34545": {
+   "flood": "https://www.jinsekigun.jp/town/formation/soumu/anshinnanzenn/hazardmap/",
+   "dosha": "https://www.jinsekigun.jp/town/formation/soumu/anshinnanzenn/hazardmap/"
+  },
+  "35201": {
+   "flood": "https://www.city.shimonoseki.lg.jp/site/bosai/4297.html",
+   "naisui": "https://www.city.shimonoseki.lg.jp/site/bosai/4301.html",
+   "takashio": "https://www.city.shimonoseki.lg.jp/site/bosai/99474.html",
+   "tsunami": "https://www.city.shimonoseki.lg.jp/site/bosai/4215.html",
+   "dosha": "https://www.city.shimonoseki.lg.jp/site/bosai/list83-299.html"
+  },
+  "35202": {
+   "flood": "https://www.city.ube.yamaguchi.jp/kurashi/bousai/bousai/1001256/1001258.html",
+   "naisui": "https://www.city.ube.yamaguchi.jp/kurashi/bousai/bousai/1001256/1016615.html",
+   "takashio": "https://www.city.ube.yamaguchi.jp/kurashi/bousai/bousai/1001256/1001259.html",
+   "tsunami": "https://www.city.ube.yamaguchi.jp/kurashi/bousai/bousai/1001256/1001282.html",
+   "dosha": "https://www.city.ube.yamaguchi.jp/kurashi/bousai/bousai/1001256/1001260/index.html"
+  },
+  "35203": {
+   "flood": "https://www.city.yamaguchi.lg.jp/soshiki/4/83392.html",
+   "naisui": "https://www.city.yamaguchi.lg.jp/soshiki/4/83392.html",
+   "takashio": "https://www.city.yamaguchi.lg.jp/soshiki/4/83392.html",
+   "tsunami": "https://www.city.yamaguchi.lg.jp/soshiki/4/83392.html",
+   "dosha": "https://www.city.yamaguchi.lg.jp/soshiki/4/83392.html"
+  },
+  "35204": {
+   "flood": "https://www.city.hagi.lg.jp/soshiki/7/h21628.html",
+   "naisui": "https://www.city.hagi.lg.jp/soshiki/7/h21628.html",
+   "takashio": "https://www.city.hagi.lg.jp/soshiki/7/h21628.html",
+   "tsunami": "https://www.city.hagi.lg.jp/soshiki/7/h21628.html",
+   "dosha": "https://www.city.hagi.lg.jp/soshiki/7/h21628.html"
+  },
+  "35206": {
+   "flood": "https://www.city.hofu.yamaguchi.jp/soshiki/2/hazardmap.html",
+   "naisui": "https://www.city.hofu.yamaguchi.jp/soshiki/2/hazardmap.html",
+   "takashio": "https://www.city.hofu.yamaguchi.jp/soshiki/2/hazardmap.html",
+   "tsunami": "https://www.city.hofu.yamaguchi.jp/soshiki/2/hazardmap.html",
+   "dosha": "https://www.city.hofu.yamaguchi.jp/soshiki/2/hazardmap.html"
+  },
+  "35207": {
+   "flood": "https://www.city.kudamatsu.lg.jp/soumu/bousai/kdhazardmap.html",
+   "naisui": "https://www.city.kudamatsu.lg.jp/sui-gesui/seikatsu/gesui/bousai/naisuihazardmap.html",
+   "takashio": "https://www.city.kudamatsu.lg.jp/soumu/soumu/soumu/takasio-kasado.html",
+   "tsunami": "https://www.city.kudamatsu.lg.jp/soumu/soumu/soumu/tsunamimap.html",
+   "dosha": "https://www.city.kudamatsu.lg.jp/soumu/bousai/kdhazardmap.html"
+  },
+  "35208": {
+   "flood": "https://www.city.iwakuni.lg.jp/soshiki/9/30231.html",
+   "takashio": "https://www.city.iwakuni.lg.jp/soshiki/9/30231.html",
+   "tsunami": "https://www.city.iwakuni.lg.jp/soshiki/9/30231.html",
+   "dosha": "https://www.city.iwakuni.lg.jp/soshiki/9/30231.html"
+  },
+  "35210": {
+   "flood": "https://www.city.hikari.lg.jp/kurashi_tetsuzuki/bosai_shobo/12804.html",
+   "takashio": "https://www.city.hikari.lg.jp/kurashi_tetsuzuki/bosai_shobo/12804.html",
+   "tsunami": "https://www.city.hikari.lg.jp/kurashi_tetsuzuki/bosai_shobo/12804.html",
+   "dosha": "https://www.city.hikari.lg.jp/kurashi_tetsuzuki/bosai_shobo/12804.html"
+  },
+  "35211": {
+   "flood": "https://www.city.nagato.yamaguchi.jp/soshiki/4/1076.html",
+   "takashio": "https://www.city.nagato.yamaguchi.jp/soshiki/4/18251.html",
+   "tsunami": "https://www.city.nagato.yamaguchi.jp/soshiki/4/13793.html",
+   "dosha": "https://www.city.nagato.yamaguchi.jp/soshiki/4/21213.html"
+  },
+  "35212": {
+   "flood": "https://www.city-yanai.jp/soshiki/11/hazardmap.html",
+   "naisui": "https://www.city-yanai.jp/soshiki/11/hazardmap.html",
+   "takashio": "https://www.city-yanai.jp/soshiki/16/takashiohazardmap.html",
+   "tsunami": "https://www.city-yanai.jp/site/bousai/tsunamihazardmap.html",
+   "dosha": "https://www.city-yanai.jp/soshiki/11/dosyasaigaihazardmap.html"
+  },
+  "35213": {
+   "flood": "https://www2.city.mine.lg.jp/izatoiutokini/hazardmap/7960.html",
+   "dosha": "https://www2.city.mine.lg.jp/kurashi_tetsuzuki/anshin/saigai/hazardmap/3566.html"
+  },
+  "35215": {
+   "flood": "https://www.city.shunan.lg.jp/soshiki/9/4178.html",
+   "naisui": "https://www.city.shunan.lg.jp/site/ws-top/128739.html",
+   "takashio": "https://www.city.shunan.lg.jp/soshiki/9/4178.html",
+   "tsunami": "https://www.city.shunan.lg.jp/soshiki/9/4178.html",
+   "dosha": "https://www.city.shunan.lg.jp/soshiki/9/4178.html"
+  },
+  "35216": {
+   "flood": "https://www.city.sanyo-onoda.lg.jp/site/bosai/kouzui-hazardmap.html",
+   "takashio": "https://www.city.sanyo-onoda.lg.jp/site/bosai/takashio-hazardmap.html",
+   "tsunami": "https://www.city.sanyo-onoda.lg.jp/site/bosai/tsunami-hazardmap.html",
+   "dosha": "https://www.city.sanyo-onoda.lg.jp/site/bosai/dosha-hazardmap.html"
+  },
+  "35305": {
+   "flood": "https://www.town.suo-oshima.lg.jp/soshiki/3/1080.html",
+   "takashio": "https://www.town.suo-oshima.lg.jp/soshiki/3/1080.html",
+   "tsunami": "https://www.town.suo-oshima.lg.jp/soshiki/3/1080.html",
+   "dosha": "https://www.town.suo-oshima.lg.jp/soshiki/3/1080.html"
+  },
+  "35321": {
+   "flood": "https://www.town.waki.lg.jp/site/bousai/410.html",
+   "takashio": "https://www.town.waki.lg.jp/site/bousai/413.html",
+   "tsunami": "https://www.town.waki.lg.jp/site/bousai/413.html",
+   "dosha": "https://www.town.waki.lg.jp/site/bousai/412.html"
+  },
+  "35341": {
+   "takashio": "https://www.town.kaminoseki.lg.jp/%E9%98%B2%E7%81%BD%E3%83%8F%E3%82%B6%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html",
+   "tsunami": "https://www.town.kaminoseki.lg.jp/%E9%98%B2%E7%81%BD%E3%83%8F%E3%82%B6%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html",
+   "dosha": "https://www.town.kaminoseki.lg.jp/%e9%98%b2%e7%81%bd%e3%83%8f%e3%82%b6%e3%83%bc%e3%83%89%e3%83%9e%e3%83%83%e3%83%97.html"
+  },
+  "35343": {
+   "flood": "https://www.town.tabuse.lg.jp/www/contents/1622694847317/index.html",
+   "takashio": "https://www.town.tabuse.lg.jp/www/contents/1430978304929/index.html",
+   "tsunami": "https://www.town.tabuse.lg.jp/www/contents/1430978304929/index.html",
+   "dosha": "https://www.town.tabuse.lg.jp/www/contents/1517797646570/index.html"
+  },
+  "35344": {
+   "flood": "https://www.town.hirao.lg.jp/kurashi/bousai/map/1616468507148.html",
+   "naisui": "https://www.town.hirao.lg.jp/kurashi/bousai/map/3015.html",
+   "takashio": "https://www.town.hirao.lg.jp/kurashi/bousai/map/1462497307170.html",
+   "tsunami": "https://www.town.hirao.lg.jp/kurashi/bousai/map/1462494047085.html",
+   "dosha": "https://www.town.hirao.lg.jp/kurashi/bousai/map/1531271716099.html"
+  },
+  "35502": {
+   "takashio": "https://www.town.abu.lg.jp/guide/?id=bousai",
+   "tsunami": "https://www.town.abu.lg.jp/guide/?id=bousai",
+   "dosha": "https://www.town.abu.lg.jp/guide/bousaimap/"
+  },
+  "36201": {
+   "flood": "https://www.city.tokushima.tokushima.jp/anzen/shoubo_bousai/disaster_prevention/bousai_map/kohzuitakashio.html",
+   "takashio": "https://www.city.tokushima.tokushima.jp/anzen/shoubo_bousai/disaster_prevention/bousai_map/kohzuitakashio.html",
+   "tsunami": "https://www.city.tokushima.tokushima.jp/anzen/shoubo_bousai/disaster_prevention/bousai_map/jishin.html",
+   "dosha": "https://www.city.tokushima.tokushima.jp/anzen/shoubo_bousai/disaster_prevention/bousai_map/hazard_map/index.html"
+  },
+  "36202": {
+   "flood": "https://www.city.naruto.lg.jp/docs/2024042500944/",
+   "takashio": "https://www.city.naruto.lg.jp/docs/2024042500951/",
+   "tsunami": "https://www.city.naruto.lg.jp/docs/2025070400084/",
+   "dosha": "https://www.city.naruto.lg.jp/docs/2024042500944/"
+  },
+  "36203": {
+   "flood": "https://www.city.komatsushima.lg.jp/docs/kozuidoshahazardmap.html",
+   "takashio": "https://www.city.komatsushima.lg.jp/docs/3060959.html",
+   "tsunami": "https://www.city.komatsushima.lg.jp/docs/2789308.html",
+   "dosha": "https://www.city.komatsushima.lg.jp/docs/kozuidoshahazardmap.html"
+  },
+  "36204": {
+   "flood": "https://www.city.anan.tokushima.jp/docs/2021092900076/",
+   "takashio": "https://www.city.anan.tokushima.jp/docs/2022122000049/",
+   "tsunami": "https://www.city.anan.tokushima.jp/docs/2017121100098/",
+   "dosha": "https://www.city.anan.tokushima.jp/docs/2020121600048/"
+  },
+  "36205": {
+   "flood": "https://www.city.yoshinogawa.lg.jp/docs/2010101200993/",
+   "naisui": "https://www.city.yoshinogawa.lg.jp/docs/2010101200993/",
+   "dosha": "https://www.city.yoshinogawa.lg.jp/docs/2010101200993/"
+  },
+  "36206": {
+   "flood": "https://www.city.awa.lg.jp/docs/2013062700014/",
+   "dosha": "https://www.city.awa.lg.jp/docs/2013062700014/"
+  },
+  "36207": {
+   "flood": "https://www.city.mima.lg.jp/gyosei/docs/4210.html",
+   "naisui": "https://www.city.mima.lg.jp/gyosei/docs/4210.html",
+   "dosha": "https://www.city.mima.lg.jp/gyosei/docs/4210.html"
+  },
+  "36208": {
+   "flood": "https://www.miyoshi.i-tokushima.jp/docs/4476.html",
+   "dosha": "https://www.miyoshi.i-tokushima.jp/docs/4476.html"
+  },
+  "36301": {
+   "flood": "https://www.town.katsuura.lg.jp/docs/2021033100015/",
+   "dosha": "https://www.town.katsuura.lg.jp/docs/2021033100015/"
+  },
+  "36302": {
+   "dosha": "http://www.kamikatsu.jp/docs/2020060500010/"
+  },
+  "36321": {
+   "dosha": "https://www.vill.sanagochi.lg.jp/docs/2023041700027/"
+  },
+  "36341": {
+   "flood": "https://www.town.ishii.lg.jp/docs/2021010800020/",
+   "dosha": "https://www.town.ishii.lg.jp/docs/2021010800020/"
+  },
+  "36342": {
+   "dosha": "https://www.town.kamiyama.lg.jp/office/soumukikikanri/kikikanri/disaster-prevention-map.html"
+  },
+  "36368": {
+   "flood": "https://gis.chklab.com/chkmap/naka/",
+   "dosha": "https://gis.chklab.com/ChkMap/naka/"
+  },
+  "36383": {
+   "takashio": "https://www.town.tokushima-mugi.lg.jp/docs/2021033100022/",
+   "tsunami": "https://www.town.tokushima-mugi.lg.jp/docs/2012031400016/",
+   "dosha": "https://www.town.tokushima-mugi.lg.jp/docs/2020120900019/"
+  },
+  "36387": {
+   "flood": "https://www.town.minami.lg.jp/docs/482.html",
+   "naisui": "https://www.town.minami.lg.jp/docs/4375549.html",
+   "takashio": "https://www.town.minami.lg.jp/docs/2664585.html",
+   "tsunami": "https://www.town.minami.lg.jp/minami-map/",
+   "dosha": "https://www.town.minami.lg.jp/docs/dosyamap.html"
+  },
+  "36388": {
+   "flood": "https://www.town.kaiyo.lg.jp/docs/2020052000030/",
+   "tsunami": "https://www.town.kaiyo.lg.jp/docs/2020052000030/",
+   "dosha": "https://www.town.kaiyo.lg.jp/docs/2020052000030/"
+  },
+  "36401": {
+   "flood": "https://www.town.matsushige.tokushima.jp/docs/2026032900024/",
+   "takashio": "https://www.town.matsushige.tokushima.jp/docs/2026032900024/",
+   "tsunami": "https://www.town.matsushige.tokushima.jp/docs/2026032900024/"
+  },
+  "36402": {
+   "flood": "https://www.town.kitajima.lg.jp/docs/2727204.html",
+   "takashio": "https://www.town.kitajima.lg.jp/docs/2727204.html",
+   "tsunami": "https://www.town.kitajima.lg.jp/docs/2727204.html"
+  },
+  "36403": {
+   "flood": "https://www.town.aizumi.lg.jp/docs/2022042300021/",
+   "takashio": "https://www.town.aizumi.lg.jp/docs/2022042300021/",
+   "tsunami": "https://www.town.aizumi.lg.jp/docs/2022042300021/"
+  },
+  "36404": {
+   "flood": "http://www.town.itano.tokushima.jp/docs/2018080300024/",
+   "dosha": "http://www.town.itano.tokushima.jp/docs/2017032800056/"
+  },
+  "36405": {
+   "flood": "https://www.townkamiita.jp/docs/2018110100013/",
+   "dosha": "https://www.townkamiita.jp/docs/2018110100013/"
+  },
+  "36468": {
+   "flood": "https://www.town.tokushima-tsurugi.lg.jp/docs/2219535.html",
+   "dosha": "https://www.town.tokushima-tsurugi.lg.jp/docs/2219535.html"
+  },
+  "36489": {
+   "flood": "https://www.town.higashimiyoshi.lg.jp/docs/486.html",
+   "naisui": "https://www.town.higashimiyoshi.lg.jp/docs/486.html",
+   "dosha": "https://www.town.higashimiyoshi.lg.jp/docs/486.html"
+  },
+  "37201": {
+   "flood": "https://www.city.takamatsu.kagawa.jp/kurashi/kurashi/shobo/bosai_map/takamatsu_map/index.html",
+   "naisui": "https://www.city.takamatsu.kagawa.jp/kurashi/kurashi/shobo/bosai_map/takamatsu_map/index.html",
+   "takashio": "https://www.city.takamatsu.kagawa.jp/kurashi/kurashi/shobo/bosai_map/takamatsu_map/index.html",
+   "tsunami": "https://www.city.takamatsu.kagawa.jp/kurashi/kurashi/shobo/bosai_map/takamatsu_map/index.html",
+   "dosha": "https://www.city.takamatsu.kagawa.jp/kurashi/kurashi/shobo/bosai_map/takamatsu_map/index.html"
+  },
+  "37202": {
+   "flood": "https://www.city.marugame.lg.jp/site/bousaiinfo/2424.html",
+   "naisui": "https://www.city.marugame.lg.jp/site/bousaiinfo/6670.html",
+   "takashio": "https://www.city.marugame.lg.jp/site/bousaiinfo/21762.html",
+   "tsunami": "https://www.city.marugame.lg.jp/site/bousaiinfo/2424.html",
+   "dosha": "https://www.city.marugame.lg.jp/site/bousaiinfo/2424.html"
+  },
+  "37203": {
+   "flood": "https://www.city.sakaide.lg.jp/site/bousai/kouzuimap.html",
+   "tsunami": "https://www.city.sakaide.lg.jp/site/bousai/tunamimap.html",
+   "dosha": "https://www.city.sakaide.lg.jp/site/bousai/dosyasaigai.html"
+  },
+  "37204": {
+   "flood": "https://www.city.zentsuji.kagawa.jp/site/portal/bousai-hazardtotal.html",
+   "dosha": "https://www.city.zentsuji.kagawa.jp/site/portal/bousai-hazardtotal.html"
+  },
+  "37205": {
+   "flood": "https://www.city.kanonji.kagawa.jp/soshiki/4/41750.html",
+   "takashio": "https://www.city.kanonji.kagawa.jp/soshiki/4/41750.html",
+   "tsunami": "https://www.city.kanonji.kagawa.jp/soshiki/4/41750.html",
+   "dosha": "https://www.city.kanonji.kagawa.jp/soshiki/4/41750.html"
+  },
+  "37206": {
+   "flood": "https://www.city.sanuki.lg.jp/soshiki/kikikanri/gyomu/2/4/1/1463.html",
+   "naisui": "https://www.city.sanuki.kagawa.jp/life/safety/usui",
+   "takashio": "https://www.city.sanuki.lg.jp/soshiki/kikikanri/gyomu/2/4/1/541.html",
+   "tsunami": "https://www.city.sanuki.lg.jp/soshiki/kikikanri/gyomu/2/4/1/6145.html",
+   "dosha": "https://www.city.sanuki.lg.jp/soshiki/kikikanri/gyomu/2/4/1/1462.html"
+  },
+  "37207": {
+   "flood": "https://www.higashikagawa.jp/kurashinojoho/anzen_anshin/bosai/1/1919.html",
+   "takashio": "https://www.higashikagawa.jp/kurashinojoho/anzen_anshin/bosai/1/3905.html",
+   "tsunami": "https://www.higashikagawa.jp/kurashinojoho/anzen_anshin/bosai/1/1928.html",
+   "dosha": "https://www.higashikagawa.jp/kurashinojoho/anzen_anshin/bosai/1/index.html"
+  },
+  "37208": {
+   "flood": "https://www.city.mitoyo.lg.jp/kurashi/bosai/8163.html",
+   "takashio": "https://www.city.mitoyo.lg.jp/kurashi/bosai/11901.html",
+   "tsunami": "https://www.city.mitoyo.lg.jp/kakuka/soumu/kiki/3/bousai2020/index.html",
+   "dosha": "https://www.city.mitoyo.lg.jp/kakuka/soumu/kiki/3/bousai2020/index.html"
+  },
+  "37322": {
+   "flood": "https://www.town.tonosho.kagawa.jp/gyosei/soshiki/somu/bousaisyoubou/bousai/2213.html",
+   "takashio": "https://www.town.tonosho.kagawa.jp/gyosei/soshiki/somu/bousaisyoubou/bousai/2213.html",
+   "tsunami": "https://www.town.tonosho.kagawa.jp/gyosei/soshiki/somu/bousaisyoubou/bousai/2213.html",
+   "dosha": "https://www.town.tonosho.kagawa.jp/gyosei/soshiki/somu/bousaisyoubou/bousai/2213.html"
+  },
+  "37324": {
+   "takashio": "https://www.earth-planning-kagawa.com/tiriintizu5/entrance/takashioentrance.html",
+   "tsunami": "http://www.earth-planning-kagawa.com/tiriintizu4/entrance/tunamientrance.html",
+   "dosha": "http://www.earth-planning-kagawa.com/tiriintizu3/entrance/dosyasaigaientrance.html"
+  },
+  "37341": {
+   "flood": "https://www.town.miki.lg.jp/life/dtl.php?hdnKey=1312",
+   "dosha": "https://www.town.miki.lg.jp/life/dtl.php?hdnKey=1312"
+  },
+  "37364": {
+   "takashio": "https://www.town.naoshima.lg.jp/torikumi/kyukyu/hazardmap.html",
+   "tsunami": "https://www.town.naoshima.lg.jp/torikumi/kyukyu/hazardmap.html",
+   "dosha": "https://www.town.naoshima.lg.jp/torikumi/kyukyu/hazardmap.html"
+  },
+  "37386": {
+   "flood": "https://www.town.utazu.lg.jp/kurashi/bousaibouhan/bosai/hazadomap/",
+   "naisui": "https://www.town.utazu.lg.jp/kurashi/bousaibouhan/bosai/hazadomap/",
+   "takashio": "https://www.town.utazu.lg.jp/kurashi/bousaibouhan/bosai/hazadomap/",
+   "tsunami": "https://www.town.utazu.lg.jp/kurashi/bousaibouhan/bosai/hazadomap/",
+   "dosha": "https://www.town.utazu.lg.jp/kurashi/bousaibouhan/bosai/hazadomap/"
+  },
+  "37387": {
+   "flood": "https://www.town.ayagawa.lg.jp/docs/2020032600014/",
+   "dosha": "https://www.town.ayagawa.lg.jp/docs/2020032600014/"
+  },
+  "37403": {
+   "flood": "https://www.town.kotohira.kagawa.jp/site/bousai/6354.html",
+   "dosha": "https://www.town.kotohira.kagawa.jp/site/bousai/6354.html"
+  },
+  "37404": {
+   "flood": "https://www.town.tadotsu.kagawa.jp/soshikikarasagasu/somuka/bosai/3/931.html",
+   "tsunami": "https://www.town.tadotsu.kagawa.jp/soshikikarasagasu/somuka/bosai/3/931.html",
+   "dosha": "https://www.town.tadotsu.kagawa.jp/soshikikarasagasu/somuka/bosai/3/931.html"
+  },
+  "37406": {
+   "flood": "https://www.town.manno.lg.jp/site/bosai/1577.html",
+   "dosha": "https://www.town.manno.lg.jp/site/bosai/1577.html"
+  },
+  "38201": {
+   "flood": "https://www.city.matsuyama.ehime.jp/kurashi/bosai/bousai/keihatu/20-kozui_hazard_map.html",
+   "naisui": "https://www.city.matsuyama.ehime.jp/kurashi/kurashi/josuido/keikaku/keikakuyatorikumi/naisuimap.html",
+   "takashio": "https://www.city.matsuyama.ehime.jp/kurashi/bosai/bousai/keihatu/takashio_map.html",
+   "tsunami": "https://www.city.matsuyama.ehime.jp/kurashi/bosai/bousai/keihatu/bousaimap.html",
+   "dosha": "https://www.city.matsuyama.ehime.jp/kurashi/bosai/bousai/keihatu/bousaimap.html"
+  },
+  "38202": {
+   "flood": "https://www.city.imabari.ehime.jp/bousai/bousaimap.html",
+   "naisui": "https://www.city.imabari.ehime.jp/bousai/bousaimap.html",
+   "takashio": "https://www.city.imabari.ehime.jp/bousai/bousaimap.html",
+   "tsunami": "https://www.city.imabari.ehime.jp/bousai/bousaimap.html",
+   "dosha": "https://www.city.imabari.ehime.jp/bousai/bousaimap.html"
+  },
+  "38203": {
+   "flood": "https://www.city.uwajima.ehime.jp/soshiki/5/sukagawa.html",
+   "naisui": "https://www.city.uwajima.ehime.jp/soshiki/54/toshi1.html",
+   "takashio": "https://www.city.uwajima.ehime.jp/soshiki/5/bousai-map.html",
+   "tsunami": "https://www.city.uwajima.ehime.jp/soshiki/5/bousai-map.html",
+   "dosha": "https://www.city.uwajima.ehime.jp/soshiki/5/bousai-map.html"
+  },
+  "38204": {
+   "flood": "https://www.city.yawatahama.ehime.jp/doc/bousaijouhou/",
+   "naisui": "https://www.city.yawatahama.ehime.jp/doc/2026012300011/",
+   "takashio": "https://www.city.yawatahama.ehime.jp/doc/2022041800102/",
+   "tsunami": "https://www.city.yawatahama.ehime.jp/doc/2020072800016/",
+   "dosha": "https://www.city.yawatahama.ehime.jp/doc/2022060200020/"
+  },
+  "38205": {
+   "flood": "https://www.city.niihama.lg.jp/site/bousai/boumap.html",
+   "takashio": "https://www.city.niihama.lg.jp/site/bousai/boumap.html",
+   "tsunami": "https://www.city.niihama.lg.jp/site/bousai/boumap.html",
+   "dosha": "https://www.city.niihama.lg.jp/site/bousai/boumap.html"
+  },
+  "38206": {
+   "flood": "https://www.city.saijo.ehime.jp/soshiki/kikikanri/kouzuihm.html",
+   "takashio": "https://www.city.saijo.ehime.jp/soshiki/kikikanri/takashiohm.html",
+   "tsunami": "https://www.city.saijo.ehime.jp/soshiki/kikikanri/bousaimap.html",
+   "dosha": "https://www.city.saijo.ehime.jp/soshiki/kikikanri/doshahm.html"
+  },
+  "38207": {
+   "flood": "https://www.city.ozu.ehime.jp/soshiki/kikikanri/43505.html",
+   "naisui": "https://www.city.ozu.ehime.jp/soshiki/suidou/59384.html",
+   "takashio": "https://www.city.ozu.ehime.jp/soshiki/kikikanri/43505.html",
+   "tsunami": "https://www.city.ozu.ehime.jp/soshiki/kikikanri/43505.html",
+   "dosha": "https://www.city.ozu.ehime.jp/soshiki/kikikanri/43505.html"
+  },
+  "38210": {
+   "flood": "https://www.city.iyo.lg.jp/bousai/kasennbousaimappu.html",
+   "naisui": "https://www.city.iyo.lg.jp/bousai/kurashi/map/20170427_01.html",
+   "takashio": "https://www.city.iyo.lg.jp/bousai/takasiobousaimappu.html",
+   "tsunami": "https://www.city.iyo.lg.jp/bousai/kurashi/map/index.html",
+   "dosha": "https://www.city.iyo.lg.jp/bousai/kurashi/map/index.html"
+  },
+  "38213": {
+   "flood": "https://www.city.shikokuchuo.ehime.jp/soshiki/6/13014.html",
+   "tsunami": "https://www.city.shikokuchuo.ehime.jp/soshiki/6/4083.html",
+   "dosha": "https://www.city.shikokuchuo.ehime.jp/soshiki/6/13018.html"
+  },
+  "38214": {
+   "flood": "https://www.city.seiyo.ehime.jp/kurashi/bousai/bousaimappu/2625.html",
+   "takashio": "https://www.city.seiyo.ehime.jp/kurashi/bousai/bousaimappu/2625.html",
+   "tsunami": "https://www.city.seiyo.ehime.jp/kurashi/bousai/bousaimappu/2625.html",
+   "dosha": "https://www.city.seiyo.ehime.jp/kurashi/bousai/bousaimappu/2625.html"
+  },
+  "38215": {
+   "flood": "https://www.city.toon.ehime.jp/soshiki/5/27358.html",
+   "dosha": "https://www.city.toon.ehime.jp/soshiki/5/27358.html"
+  },
+  "38356": {
+   "takashio": "https://www.town.kamijima.lg.jp/soshiki/15/4082.html",
+   "tsunami": "https://www.town.kamijima.lg.jp/soshiki/15/4082.html",
+   "dosha": "https://www.town.kamijima.lg.jp/soshiki/15/4082.html"
+  },
+  "38386": {
+   "flood": "https://www.kumakogen.jp/site/bousai/12857.html",
+   "dosha": "https://www.kumakogen.jp/site/bousai/12857.html"
+  },
+  "38401": {
+   "flood": "https://www.town.masaki.ehime.jp/site/bousai/24835.html",
+   "naisui": "https://www.town.masaki.ehime.jp/site/bousai/list111-217.html",
+   "takashio": "https://www.town.masaki.ehime.jp/site/bousai/24797.html",
+   "tsunami": "https://www.town.masaki.ehime.jp/site/bousai/24836.html"
+  },
+  "38402": {
+   "flood": "https://www.town.tobe.ehime.jp/kurashi_tetsuzuki/bosai_kyukyu/7/1902.html",
+   "dosha": "https://www.town.tobe.ehime.jp/kurashi_tetsuzuki/bosai_kyukyu/7/1902.html"
+  },
+  "38422": {
+   "flood": "https://www.town.uchiko.ehime.jp/site/bousai/kikikanrikouzuimap.html",
+   "dosha": "https://www.town.uchiko.ehime.jp/site/bousai/kikikanribousaimapkaitei.html"
+  },
+  "38442": {
+   "tsunami": "https://www.town.ikata.ehime.jp/soshiki/1/4229.html",
+   "dosha": "https://www.town.ikata.ehime.jp/site/bousai/11860.html"
+  },
+  "38484": {
+   "flood": "https://www.town.matsuno.ehime.jp/soshiki/2/1272.html",
+   "dosha": "https://www.town.matsuno.ehime.jp/soshiki/2/1272.html"
+  },
+  "38488": {
+   "flood": "https://www.town.kihoku.ehime.jp/soshiki/bousai/8367.html",
+   "dosha": "https://www.town.kihoku.ehime.jp/soshiki/bousai/8367.html"
+  },
+  "38506": {
+   "flood": "https://www.town.ainan.ehime.jp/kurashi/tetsuduki/anshin/bosai/souzu-river_Hazardmap.html",
+   "takashio": "https://www.town.ainan.ehime.jp/kurashi/tetsuduki/anshin/bosai/webhazardmap.html",
+   "tsunami": "https://www.town.ainan.ehime.jp/kurashi/tetsuduki/anshin/bosai/sougoubousaimap.html",
+   "dosha": "https://www.town.ainan.ehime.jp/kurashi/tetsuduki/anshin/bosai/sougoubousaimap.html"
+  },
+  "39201": {
+   "flood": "https://www.city.kochi.kochi.jp/site/bousai/hazardmap.html",
+   "tsunami": "https://www.city.kochi.kochi.jp/site/bousai/jisintsunami-hazardmap.html",
+   "dosha": "https://www.city.kochi.kochi.jp/soshiki/135/doshasaigaihazardmap2609.html"
+  },
+  "39202": {
+   "flood": "https://www.city.muroto.kochi.jp/pages/page3507.php",
+   "tsunami": "https://www.city.muroto.kochi.jp/bousaimap/",
+   "dosha": "https://www.city.muroto.kochi.jp/pages/page3507.php"
+  },
+  "39203": {
+   "flood": "https://www.city.aki.kochi.jp/life/dtl.php?hdnKey=8755",
+   "naisui": "https://www.city.aki.kochi.jp/life/dtl.php?hdnKey=8755",
+   "tsunami": "https://www.city.aki.kochi.jp/life/dtl.php?hdnKey=8755",
+   "dosha": "https://www.city.aki.kochi.jp/life/dtl.php?hdnKey=8755"
+  },
+  "39204": {
+   "flood": "https://www.city.nankoku.lg.jp/life/life_dtl.php?hdnKey=1588",
+   "tsunami": "https://www.city.nankoku.lg.jp/life/life_dtl.php?hdnKey=2170",
+   "dosha": "https://www.city.nankoku.lg.jp/life/life_dtl.php?hdnKey=1587"
+  },
+  "39205": {
+   "flood": "https://www.city.tosa.lg.jp/bousai/map_index.php",
+   "tsunami": "https://www.city.tosa.lg.jp/bousai/map_index.php",
+   "dosha": "https://www.city.tosa.lg.jp/bousai/map_index.php"
+  },
+  "39206": {
+   "tsunami": "https://www.city.susaki.lg.jp/life/detail.php?hdnKey=4269",
+   "dosha": "https://www.city.susaki.lg.jp/life/detail.php?hdnKey=407"
+  },
+  "39208": {
+   "flood": "https://www.city.sukumo.kochi.jp/docs-30/26347.html",
+   "tsunami": "https://www.city.sukumo.kochi.jp/docs-30/p01090312.html",
+   "dosha": "https://www.city.sukumo.kochi.jp/docs-30/26347.html"
+  },
+  "39209": {
+   "tsunami": "https://www.city.tosashimizu.kochi.jp/kurashi/section/kikikanri/007.html",
+   "dosha": "https://www.city.tosashimizu.kochi.jp/kurashi/section/kikikanri/015.html"
+  },
+  "39210": {
+   "flood": "https://www.city.shimanto.lg.jp/soshiki/2/1053.html",
+   "naisui": "https://www.city.shimanto.lg.jp/soshiki/14/24563.html",
+   "tsunami": "https://www.city.shimanto.lg.jp/soshiki/2/1053.html",
+   "dosha": "https://www.city.shimanto.lg.jp/soshiki/2/1053.html"
+  },
+  "39211": {
+   "flood": "https://www.city.kochi-konan.lg.jp/soshikikarasagasu/bosaitaisakuka/bousai_anzen/2/1/2562.html",
+   "tsunami": "https://www.city.kochi-konan.lg.jp/soshikikarasagasu/bosaitaisakuka/bousai_anzen/2/1/2563.html",
+   "dosha": "https://www.city.kochi-konan.lg.jp/soshikikarasagasu/bosaitaisakuka/bousai_anzen/2/1/2562.html"
+  },
+  "39212": {
+   "flood": "https://www.city.kami.lg.jp/soshiki/10/hazardmap.html",
+   "dosha": "https://www.city.kami.lg.jp/soshiki/10/hazardmap.html"
+  },
+  "39301": {
+   "tsunami": "http://www.town.toyo.kochi.jp/contents/info0006.php",
+   "dosha": "http://www.town.toyo.kochi.jp/contents/info0296.php"
+  },
+  "39302": {
+   "tsunami": "https://www.town.nahari.kochi.jp/life/dtl.php?hdnKey=1129",
+   "dosha": "https://www.town.nahari.kochi.jp/life/dtl.php?hdnKey=1129"
+  },
+  "39303": {
+   "tsunami": "https://tanocho.jp/bosai",
+   "dosha": "https://tanocho.jp/bosai"
+  },
+  "39304": {
+   "flood": "https://www.town.yasuda.kochi.jp/life/dtl.php?hdnKey=1014",
+   "tsunami": "https://www.town.yasuda.kochi.jp/life/dtl.php?hdnKey=1014",
+   "dosha": "https://www.town.yasuda.kochi.jp/life/dtl.php?hdnKey=1014"
+  },
+  "39305": {
+   "dosha": "https://www.kitagawamura.jp/life/dtl.php?hdnKey=1359"
+  },
+  "39307": {
+   "tsunami": "https://www.vill.geisei.kochi.jp/pages/m000407.php",
+   "dosha": "https://www.vill.geisei.kochi.jp/pages/m000409.php"
+  },
+  "39341": {
+   "dosha": "https://www.town.motoyama.kochi.jp/kurashi_tetsuzuki/anzen_anshin/bosai/503.html"
+  },
+  "39344": {
+   "dosha": "https://www.town.otoyo.kochi.jp/life/detail.php?hdnKey=900"
+  },
+  "39363": {
+   "dosha": "http://www.town.tosa.kochi.jp/publics/index/51/&anchor_link=page51_1976#page51_1976"
+  },
+  "39386": {
+   "flood": "https://www.town.ino.kochi.jp/bousai/bousai2/shoubou_map/",
+   "dosha": "https://www.town.ino.kochi.jp/bousai/bousai2/shoubou_map/"
+  },
+  "39387": {
+   "dosha": "https://www.town.niyodogawa.lg.jp/life/life_dtl.php?hdnKey=925"
+  },
+  "39401": {
+   "tsunami": "https://www.town.nakatosa.lg.jp/life/detail.php?hdnKey=114",
+   "dosha": "https://www.town.nakatosa.lg.jp/life/detail.php?hdnKey=111"
+  },
+  "39402": {
+   "flood": "https://www.town.sakawa.lg.jp/life/dtl.php?hdnKey=1343",
+   "dosha": "https://www.town.sakawa.lg.jp/life/dtl.php?hdnKey=1343"
+  },
+  "39403": {
+   "flood": "http://www.town.ochi.kochi.jp/kikikanri/87",
+   "dosha": "http://www.town.ochi.kochi.jp/kikikanri/87"
+  },
+  "39405": {
+   "dosha": "http://www.town.yusuhara.kochi.jp/town/kakuka/soumu/entry-1496.html"
+  },
+  "39410": {
+   "flood": "https://www.vill.hidaka.kochi.jp/kurashi/child_category_free_page.cgi?SITE_ID=1&CATEGORY_ID=7&CATEGORY_ID2=5&CATEGORY_ID3=2&CATEGORY_ID4=3&FREE_PAGE_ID=659",
+   "naisui": "https://www.vill.hidaka.kochi.jp/kurashi/child_category_free_page.cgi?SITE_ID=1&CATEGORY_ID=7&CATEGORY_ID2=5&CATEGORY_ID3=2&CATEGORY_ID4=2&FREE_PAGE_ID=217",
+   "dosha": "https://www.vill.hidaka.kochi.jp/kurashi/child_category_free_page.cgi?SITE_ID=1&CATEGORY_ID=7&CATEGORY_ID2=5&CATEGORY_ID3=2&CATEGORY_ID4=3&FREE_PAGE_ID=659"
+  },
+  "39411": {
+   "dosha": "https://town.kochi-tsuno.lg.jp/kurashi/bousai"
+  },
+  "39412": {
+   "naisui": "https://www.town.shimanto.lg.jp/life/detail.php?hdnKey=12274",
+   "tsunami": "https://www.town.shimanto.lg.jp/life/detail.php?hdnKey=1630&hdnSKBN=A",
+   "dosha": "https://www.town.shimanto.lg.jp/life/detail.php?hdnKey=4486"
+  },
+  "39424": {
+   "tsunami": "https://www.town.otsuki.kochi.jp/life/dtl.php?hdnKey=1008"
+  },
+  "39427": {
+   "dosha": "http://www.vill.mihara.kochi.jp/kurasi/info/20190627_hazardmap.html"
+  },
+  "39428": {
+   "tsunami": "https://www.town.kuroshio.lg.jp/pb/cont/bousa-kankei/501"
+  },
+  "40100": {
+   "flood": "https://www.city.kitakyushu.lg.jp/contents/13801096.html",
+   "naisui": "https://www.city.kitakyushu.lg.jp/suidou/s01101096.html",
+   "takashio": "https://www.city.kitakyushu.lg.jp/contents/13801096.html",
+   "tsunami": "https://www.city.kitakyushu.lg.jp/contents/13801096.html",
+   "dosha": "https://www.city.kitakyushu.lg.jp/contents/13801096.html"
+  },
+  "40130": {
+   "flood": "https://www.city.fukuoka.lg.jp/shimin/b_suishin/bousai/kouzuihaza-domap.html",
+   "naisui": "https://www.city.fukuoka.lg.jp/shimin/b_suishin/bousai/naisuihazardmap.html",
+   "takashio": "https://www.city.fukuoka.lg.jp/shimin/b_suishin/bousai/takashiohazardmap.html",
+   "tsunami": "https://www.city.fukuoka.lg.jp/shimin/b_suishin/bousai/tsunamihazardmap.html",
+   "dosha": "https://www.city.fukuoka.lg.jp/shimin/b_suishin/bousai/doshasaigaihazardmap.html"
+  },
+  "40202": {
+   "flood": "https://www.city.omuta.lg.jp/kiji00314214/index.html",
+   "naisui": "https://www.city.omuta.lg.jp/kiji00314214/index.html",
+   "takashio": "https://www.city.omuta.lg.jp/kiji00314214/index.html",
+   "tsunami": "https://www.city.omuta.lg.jp/kiji00314214/index.html",
+   "dosha": "https://www.city.omuta.lg.jp/kiji00314214/index.html"
+  },
+  "40203": {
+   "flood": "https://www.city.kurume.fukuoka.jp/1050kurashi/2040bousaianzen/3003shiru/2023-0908-1305-86.html",
+   "naisui": "https://www.city.kurume.fukuoka.jp/1050kurashi/2040bousaianzen/3003shiru/2023-0908-1305-86.html",
+   "takashio": "https://www.city.kurume.fukuoka.jp/1050kurashi/2040bousaianzen/3003shiru/2023-0908-1305-86.html",
+   "dosha": "https://www.city.kurume.fukuoka.jp/1050kurashi/2040bousaianzen/3003shiru/2023-0908-1305-86.html"
+  },
+  "40204": {
+   "flood": "https://www.city.nogata.fukuoka.jp/kurashi/_1206/_1691/_16173.html",
+   "takashio": "https://www.city.nogata.fukuoka.jp/kurashi/_1206/_1691/_16173.html",
+   "dosha": "https://www.city.nogata.fukuoka.jp/kurashi/_1206/_1691/_16173.html"
+  },
+  "40205": {
+   "flood": "https://www.city.iizuka.lg.jp/shobobosaianzen/bosai/bosai/yobo/map.html",
+   "dosha": "https://www.city.iizuka.lg.jp/shobobosaianzen/bosai/bosai/yobo/map.html"
+  },
+  "40206": {
+   "flood": "https://www.joho.tagawa.fukuoka.jp/bousai/kiji0032734/index.html",
+   "dosha": "https://www.joho.tagawa.fukuoka.jp/bousai/kiji0032734/index.html"
+  },
+  "40207": {
+   "flood": "https://www.city.yanagawa.fukuoka.jp/bosai/bosai/bosai__6389.html",
+   "naisui": "https://www.city.yanagawa.fukuoka.jp/kurashi/jogesuido/gesui/gesui_20170331.html",
+   "tsunami": "https://www.city.yanagawa.fukuoka.jp/bosai/bosai/tunami_map.html"
+  },
+  "40210": {
+   "flood": "https://www.city.yame.fukuoka.jp/kurashi/16/4/1457320372559.html",
+   "dosha": "https://www.city.yame.fukuoka.jp/kurashi/16/4/1457320372559.html"
+  },
+  "40211": {
+   "flood": "https://www.city.chikugo.lg.jp/bosai/_3879/_8408.html",
+   "takashio": "https://www.city.chikugo.lg.jp/bosai/_3879/_8408.html"
+  },
+  "40212": {
+   "flood": "https://www.city.okawa.lg.jp/s013/020/030/070/20150205235257.html",
+   "takashio": "https://www.city.okawa.lg.jp/s013/020/030/070/20150205235257.html",
+   "tsunami": "https://www.city.okawa.lg.jp/s013/020/030/070/20150205235257.html"
+  },
+  "40213": {
+   "flood": "https://www.city.yukuhashi.fukuoka.jp/site/bosai/2098.html",
+   "takashio": "https://www.city.yukuhashi.fukuoka.jp/site/bosai/2098.html",
+   "tsunami": "https://www.city.yukuhashi.fukuoka.jp/site/bosai/2098.html",
+   "dosha": "https://www.city.yukuhashi.fukuoka.jp/site/bosai/2098.html"
+  },
+  "40214": {
+   "flood": "https://www.city.buzen.lg.jp/bousai/bousaimap.html",
+   "takashio": "https://www.city.buzen.lg.jp/bousai/bousaimap.html",
+   "tsunami": "https://www.city.buzen.lg.jp/bousai/bousaimap.html",
+   "dosha": "https://www.city.buzen.lg.jp/bousai/bousaimap.html"
+  },
+  "40215": {
+   "flood": "https://www.city.nakama.lg.jp/site/bousai/1103.html",
+   "takashio": "https://www.city.nakama.lg.jp/site/bousai/1103.html",
+   "dosha": "https://www.city.nakama.lg.jp/site/bousai/1103.html"
+  },
+  "40216": {
+   "flood": "https://www.city.ogori.fukuoka.jp/197/702/739",
+   "dosha": "https://www.city.ogori.fukuoka.jp/197/702/739"
+  },
+  "40217": {
+   "flood": "https://www.city.chikushino.fukuoka.jp/soshiki/7/1666.html",
+   "naisui": "https://www.city.chikushino.fukuoka.jp/soshiki/7/1666.html",
+   "dosha": "https://www.city.chikushino.fukuoka.jp/soshiki/7/1666.html"
+  },
+  "40218": {
+   "flood": "https://www.city.kasuga.fukuoka.jp/kurashi/anzen/bousai/1001398/1015766.html",
+   "naisui": "https://www.city.kasuga.fukuoka.jp/kurashi/anzen/bousai/1001398/1015766.html",
+   "dosha": "https://www.city.kasuga.fukuoka.jp/kurashi/anzen/bousai/1001398/1015766.html"
+  },
+  "40219": {
+   "flood": "https://www.city.onojo.fukuoka.jp/s058/030/010/020/010/9021.html",
+   "naisui": "https://www.city.onojo.fukuoka.jp/s058/030/010/020/010/9021.html",
+   "dosha": "https://www.city.onojo.fukuoka.jp/s058/030/010/020/010/9021.html"
+  },
+  "40220": {
+   "flood": "https://www.city.munakata.lg.jp/bousai/kiji0032204/index.html",
+   "naisui": "https://www.city.munakata.lg.jp/bousai/kiji0032204/index.html",
+   "takashio": "https://www.city.munakata.lg.jp/bousai/kiji0032204/index.html",
+   "tsunami": "https://www.city.munakata.lg.jp/bousai/kiji0032204/index.html",
+   "dosha": "https://www.city.munakata.lg.jp/bousai/kiji0032204/index.html"
+  },
+  "40221": {
+   "flood": "https://www.city.dazaifu.lg.jp/soshiki/5/1979.html",
+   "dosha": "https://www.city.dazaifu.lg.jp/soshiki/5/1979.html"
+  },
+  "40223": {
+   "flood": "https://www.city.koga.fukuoka.jp/cityhall/work/somu/saigai/014.php",
+   "naisui": "https://www.city.koga.fukuoka.jp/cityhall/work/somu/saigai/014.php",
+   "takashio": "https://www.city.koga.fukuoka.jp/cityhall/work/somu/saigai/014.php",
+   "tsunami": "https://www.city.koga.fukuoka.jp/cityhall/work/somu/saigai/014.php",
+   "dosha": "https://www.city.koga.fukuoka.jp/cityhall/work/somu/saigai/014.php"
+  },
+  "40224": {
+   "flood": "https://www.city.fukutsu.lg.jp/kurashi/anshin/fukutsu_bosai/index.html",
+   "naisui": "https://www.city.fukutsu.lg.jp/soshiki/gesui/shisetsu/1_1/17516.html",
+   "takashio": "https://www.city.fukutsu.lg.jp/kurashi/anshin/fukutsu_bosai/index.html",
+   "tsunami": "https://www.city.fukutsu.lg.jp/kurashi/anshin/fukutsu_bosai/index.html",
+   "dosha": "https://www.city.fukutsu.lg.jp/kurashi/anshin/fukutsu_bosai/index.html"
+  },
+  "40225": {
+   "flood": "https://www.city.ukiha.fukuoka.jp/kiji003115/index.html",
+   "dosha": "https://www.city.ukiha.fukuoka.jp/kiji003115/index.html"
+  },
+  "40226": {
+   "flood": "https://www.city.miyawaka.lg.jp/bousai/kiji003445150/index.html",
+   "dosha": "https://www.city.miyawaka.lg.jp/bousai/kiji003445150/index.html"
+  },
+  "40227": {
+   "flood": "https://www.city.kama.lg.jp/soshiki/4/3378.html#a2",
+   "dosha": "https://www.city.kama.lg.jp/soshiki/4/3378.html#a2"
+  },
+  "40228": {
+   "flood": "https://www.city.asakura.lg.jp/soshiki/5/1094.html",
+   "dosha": "https://www.city.asakura.lg.jp/soshiki/5/1094.html"
+  },
+  "40229": {
+   "flood": "https://www.city.miyama.lg.jp/s005/anzen/110/010/20200109104000.html",
+   "takashio": "https://www.city.miyama.lg.jp/s005/anzen/110/030/takasio.html",
+   "tsunami": "https://www.city.miyama.lg.jp/s005/anzen/110/020/20200109103000.html",
+   "dosha": "https://www.city.miyama.lg.jp/s005/anzen/110/010/20200109104000.html"
+  },
+  "40230": {
+   "flood": "https://www.city.itoshima.lg.jp/s004/010/010/010/010/010/haza-do.html",
+   "takashio": "https://www.city.itoshima.lg.jp/s004/010/010/010/010/010/haza-do.html",
+   "tsunami": "https://www.city.itoshima.lg.jp/s004/010/010/010/010/010/haza-do.html",
+   "dosha": "https://www.city.itoshima.lg.jp/s004/010/010/010/010/010/haza-do.html"
+  },
+  "40231": {
+   "flood": "https://www.city.nakagawa.lg.jp/site/hazard-map/",
+   "naisui": "https://www.city.nakagawa.lg.jp/site/hazard-map/",
+   "dosha": "https://www.city.nakagawa.lg.jp/site/hazard-map/"
+  },
+  "40341": {
+   "flood": "https://www.town.umi.lg.jp/soshiki/59/dosyasaigaihaza-domappu.html",
+   "dosha": "https://www.town.umi.lg.jp/soshiki/59/dosyasaigaihaza-domappu.html"
+  },
+  "40342": {
+   "flood": "https://www.town.sasaguri.fukuoka.jp/soshiki/somu/3/1112.html",
+   "dosha": "https://www.town.sasaguri.fukuoka.jp/soshiki/somu/3/1112.html"
+  },
+  "40343": {
+   "flood": "https://www.town.shime.lg.jp/site/bousai-bouhan/bousaihazardmap.html",
+   "takashio": "https://www.town.shime.lg.jp/site/bousai-bouhan/bousaihazardmap.html",
+   "dosha": "https://www.town.shime.lg.jp/site/bousai-bouhan/bousaihazardmap.html"
+  },
+  "40344": {
+   "flood": "https://sue.trims-cloud.net/sue_bosai/hazard_map/html/map/",
+   "dosha": "https://sue.trims-cloud.net/sue_bosai/hazard_map/html/map/"
+  },
+  "40345": {
+   "flood": "https://www.town.shingu.fukuoka.jp/soshiki/chiiki_kyodo/1/3/1/872.html",
+   "takashio": "https://www.town.shingu.fukuoka.jp/soshiki/chiiki_kyodo/1/3/1/872.html",
+   "tsunami": "https://www.town.shingu.fukuoka.jp/soshiki/chiiki_kyodo/1/3/1/872.html",
+   "dosha": "https://www.town.shingu.fukuoka.jp/soshiki/chiiki_kyodo/1/3/1/872.html"
+  },
+  "40348": {
+   "flood": "https://www.town.hisayama.fukuoka.jp/gyosei/kurashi/anzen_anshin/bosai/2062.html",
+   "dosha": "https://www.town.hisayama.fukuoka.jp/gyosei/kurashi/anzen_anshin/bosai/2062.html"
+  },
+  "40349": {
+   "flood": "https://www.town.kasuya.fukuoka.jp/s048/020/010/010/20191222180646.html",
+   "takashio": "https://www.town.kasuya.fukuoka.jp/s048/020/010/010/20191222180646.html",
+   "dosha": "https://www.town.kasuya.fukuoka.jp/s048/020/010/010/20191222180646.html"
+  },
+  "40381": {
+   "flood": "https://www.town.ashiya.lg.jp/site/bousai/2509.html",
+   "takashio": "https://www.town.ashiya.lg.jp/site/bousai/2509.html",
+   "tsunami": "https://www.town.ashiya.lg.jp/site/bousai/2509.html",
+   "dosha": "https://www.town.ashiya.lg.jp/site/bousai/2509.html"
+  },
+  "40382": {
+   "flood": "https://www.town.mizumaki.lg.jp/s026/kurashi/100/020/010/20200109144000.html",
+   "naisui": "https://www.town.mizumaki.lg.jp/s026/kurashi/100/020/020/20200109143000.html",
+   "takashio": "https://www.town.mizumaki.lg.jp/s026/kurashi/100/020/010/20200109144000.html",
+   "dosha": "https://www.town.mizumaki.lg.jp/s026/kurashi/100/020/010/20200109144000.html"
+  },
+  "40383": {
+   "flood": "https://www.town.okagaki.lg.jp/s019/010/011/020/030/201502050092.html",
+   "takashio": "https://www.town.okagaki.lg.jp/s019/010/011/020/030/201502050092.html",
+   "tsunami": "https://www.town.okagaki.lg.jp/s019/010/011/020/030/201502050092.html",
+   "dosha": "https://www.town.okagaki.lg.jp/s019/010/011/020/030/201502050092.html"
+  },
+  "40384": {
+   "flood": "https://www.town.onga.lg.jp/soshiki/4/12426.html",
+   "takashio": "https://www.town.onga.lg.jp/soshiki/4/12426.html",
+   "tsunami": "https://www.town.onga.lg.jp/soshiki/4/12426.html",
+   "dosha": "https://www.town.onga.lg.jp/soshiki/4/12426.html"
+  },
+  "40401": {
+   "flood": "https://town.kotake.lg.jp/hpkiji/pub/detail.aspx?c_id=3&id=699&class_set_id=2&class_id=1",
+   "dosha": "https://town.kotake.lg.jp/hpkiji/pub/detail.aspx?c_id=3&id=699&class_set_id=2&class_id=1"
+  },
+  "40402": {
+   "flood": "https://www.town.kurate.lg.jp/bousai/hazado_map.html",
+   "takashio": "https://www.town.kurate.lg.jp/bousai/hazado_map.html",
+   "dosha": "https://www.town.kurate.lg.jp/bousai/hazado_map.html"
+  },
+  "40421": {
+   "flood": "https://www.town.keisen.fukuoka.jp/kurashi/benri/hazard.php",
+   "dosha": "https://www.town.keisen.fukuoka.jp/kurashi/benri/hazard.php"
+  },
+  "40447": {
+   "flood": "https://www.town.chikuzen.fukuoka.jp/S008/060/20180220132606.html",
+   "naisui": "https://www.town.chikuzen.fukuoka.jp/S053/010/20180220160234.html",
+   "dosha": "https://www.town.chikuzen.fukuoka.jp/S008/060/20180220132606.html"
+  },
+  "40448": {
+   "dosha": "https://vill.toho-info.com/10000/11100/post-272.html"
+  },
+  "40503": {
+   "flood": "https://www.town.tachiarai.fukuoka.jp/bousai/kiji0031017/index.html",
+   "takashio": "https://www.town.tachiarai.fukuoka.jp/bousai/kiji0031017/index.html"
+  },
+  "40522": {
+   "flood": "https://www.town.ooki.lg.jp/kurashi/14/5187.html",
+   "takashio": "https://www.town.ooki.lg.jp/kurashi/14/5187.html"
+  },
+  "40544": {
+   "flood": "https://www.town.hirokawa.fukuoka.jp/kurashi_tetsuzuki/anzen_anshin/2/hazadomap/1560.html",
+   "dosha": "https://www.town.hirokawa.fukuoka.jp/kurashi_tetsuzuki/anzen_anshin/2/hazadomap/1560.html"
+  },
+  "40601": {
+   "flood": "https://www.town.kawara.fukuoka.jp/s001/040/010/020/20171112211530.html",
+   "dosha": "https://www.town.kawara.fukuoka.jp/s001/040/010/020/20171112211530.html"
+  },
+  "40604": {
+   "flood": "https://www.town.itoda.lg.jp/residents/living/public_safety/page_01131.html",
+   "dosha": "https://www.town.itoda.lg.jp/residents/living/public_safety/page_01131.html"
+  },
+  "40605": {
+   "flood": "https://www.town-kawasaki.com/kurashi/11256",
+   "dosha": "https://www.town-kawasaki.com/kurashi/11256"
+  },
+  "40608": {
+   "flood": "http://www.town.oto.fukuoka.jp/bosai/hazardmap/index.html",
+   "dosha": "http://www.town.oto.fukuoka.jp/bosai/hazardmap/index.html"
+  },
+  "40609": {
+   "flood": "https://www.akamura.net/hazardmap/index.html",
+   "dosha": "https://www.akamura.net/hazardmap/index.html"
+  },
+  "40610": {
+   "flood": "https://www.town.fukuchi.lg.jp/soshiki/kanzai/bousaikanri/hazardmap/193.html",
+   "dosha": "https://www.town.fukuchi.lg.jp/soshiki/kanzai/bousaikanri/hazardmap/193.html"
+  },
+  "40621": {
+   "flood": "https://www.town.kanda.lg.jp/page/1047.html",
+   "naisui": "https://www.town.kanda.lg.jp/page/1047.html",
+   "takashio": "https://www.town.kanda.lg.jp/page/1047.html",
+   "tsunami": "https://www.town.kanda.lg.jp/page/1047.html",
+   "dosha": "https://www.town.kanda.lg.jp/page/1047.html"
+  },
+  "40625": {
+   "flood": "https://www.town.miyako.lg.jp/soumu3/bousaimap01.html",
+   "takashio": "https://www.town.miyako.lg.jp/soumu3/bousaimap01.html",
+   "dosha": "https://www.town.miyako.lg.jp/soumu3/bousaimap01.html"
+  },
+  "40642": {
+   "flood": "https://www.town.yoshitomi.lg.jp/gyosei/n162/r393/",
+   "takashio": "https://www.town.yoshitomi.lg.jp/gyosei/n162/r393/",
+   "tsunami": "https://www.town.yoshitomi.lg.jp/gyosei/n162/r393/",
+   "dosha": "https://www.town.yoshitomi.lg.jp/gyosei/n162/r393/"
+  },
+  "40646": {
+   "flood": "https://www.town.koge.lg.jp/moshimo/2/2517.html",
+   "dosha": "https://www.town.koge.lg.jp/moshimo/2/2517.html"
+  },
+  "40647": {
+   "flood": "https://www.town.chikujo.fukuoka.jp/li/010/030/060/index.html",
+   "takashio": "https://www.town.chikujo.fukuoka.jp/li/010/030/060/index.html",
+   "tsunami": "https://www.town.chikujo.fukuoka.jp/li/010/030/060/index.html",
+   "dosha": "https://www.town.chikujo.fukuoka.jp/li/010/030/060/index.html"
+  },
+  "41201": {
+   "flood": "https://www.city.saga.lg.jp/main/382.html",
+   "naisui": "https://www.city.saga.lg.jp/main/382.html",
+   "takashio": "https://www.city.saga.lg.jp/main/382.html",
+   "tsunami": "https://www.city.saga.lg.jp/main/382.html",
+   "dosha": "https://www.city.saga.lg.jp/main/382.html"
+  },
+  "41202": {
+   "flood": "https://www.city.karatsu.lg.jp/page/3967.html",
+   "naisui": "https://www.city.karatsu.lg.jp/page/2065.html",
+   "takashio": "https://www.city.karatsu.lg.jp/page/3967.html",
+   "tsunami": "https://www.city.karatsu.lg.jp/page/3967.html",
+   "dosha": "https://www.city.karatsu.lg.jp/page/3967.html"
+  },
+  "41203": {
+   "flood": "https://www.city.tosu.lg.jp/site/saigai-bousai/2926.html",
+   "dosha": "https://www.city.tosu.lg.jp/site/saigai-bousai/2926.html"
+  },
+  "41204": {
+   "flood": "https://www.city.taku.lg.jp/soshiki/17/9044.html",
+   "dosha": "https://www.city.taku.lg.jp/soshiki/17/9044.html"
+  },
+  "41205": {
+   "flood": "https://www.city.imari.lg.jp/22077.htm",
+   "takashio": "https://www.city.imari.lg.jp/22077.htm",
+   "tsunami": "https://www.city.imari.lg.jp/22077.htm",
+   "dosha": "https://www.city.imari.lg.jp/22077.htm"
+  },
+  "41206": {
+   "flood": "https://www.city.takeo.lg.jp/hazardmap/",
+   "takashio": "https://www.sonicweb-asp.jp/takeo/",
+   "dosha": "https://www.city.takeo.lg.jp/hazardmap/"
+  },
+  "41207": {
+   "flood": "https://www.city.saga-kashima.lg.jp/main/23641.html",
+   "naisui": "https://www.city.saga-kashima.lg.jp/main/26306.html",
+   "takashio": "https://www.city.saga-kashima.lg.jp/main/23641.html",
+   "tsunami": "https://www.city.saga-kashima.lg.jp/main/23641.html",
+   "dosha": "https://www.city.saga-kashima.lg.jp/main/23641.html"
+  },
+  "41208": {
+   "flood": "https://www.city.ogi.lg.jp/main/33353.html",
+   "takashio": "https://www.city.ogi.lg.jp/main/33353.html",
+   "tsunami": "https://www.city.ogi.lg.jp/main/33353.html",
+   "dosha": "https://www.city.ogi.lg.jp/main/33353.html"
+  },
+  "41209": {
+   "flood": "https://www.city.ureshino.lg.jp/hazardMap/flow_01.html",
+   "tsunami": "https://www.city.ureshino.lg.jp/hazardMap/flow_02.html",
+   "dosha": "https://www.city.ureshino.lg.jp/hazardMap/flow_01.html"
+  },
+  "41210": {
+   "flood": "https://www.city.kanzaki.saga.jp/main.php/7653.html",
+   "dosha": "https://www.city.kanzaki.saga.jp/main.php/7653.html"
+  },
+  "41327": {
+   "flood": "https://www.town.yoshinogari.lg.jp/lifeinfo/kurashi_tetsuzuki/anzen_anshin/1/693.html",
+   "takashio": "https://www.town.yoshinogari.lg.jp/lifeinfo/soshiki/somu/1/1/1/5110.html",
+   "dosha": "https://www.town.yoshinogari.lg.jp/lifeinfo/kurashi_tetsuzuki/anzen_anshin/1/693.html"
+  },
+  "41341": {
+   "flood": "https://www.town.kiyama.lg.jp/kiji0035782/index.html",
+   "dosha": "https://www.town.kiyama.lg.jp/kiji0035782/index.html"
+  },
+  "41345": {
+   "flood": "https://www.town.kamimine.lg.jp/bousai/kiji003349/index.html",
+   "takashio": "https://www.town.kamimine.lg.jp/bousai/kiji003799/index.html",
+   "dosha": "https://www.town.kamimine.lg.jp/bousai/kiji003930/index.html"
+  },
+  "41346": {
+   "flood": "https://www.town.miyaki.lg.jp/kurashi/bohan/_6412/_1282.html",
+   "takashio": "https://www.town.miyaki.lg.jp/kurashi/bohan/_6412/_5668.html",
+   "dosha": "https://www.town.miyaki.lg.jp/kurashi/bohan/_6412/_1282.html"
+  },
+  "41387": {
+   "flood": "https://www.town.genkai.lg.jp/site/bousai-portal/62678.html",
+   "takashio": "https://www.town.genkai.lg.jp/site/bousai-portal/62678.html",
+   "tsunami": "https://www.town.genkai.lg.jp/site/bousai-portal/62678.html",
+   "dosha": "https://www.town.genkai.lg.jp/site/bousai-portal/62678.html"
+  },
+  "41401": {
+   "flood": "https://www.town.arita.lg.jp/safety/",
+   "dosha": "https://www.town.arita.lg.jp/safety/"
+  },
+  "41423": {
+   "flood": "https://www2.wagmap.jp/omachi/Portal",
+   "takashio": "https://www2.wagmap.jp/omachi/Portal",
+   "dosha": "https://www2.wagmap.jp/omachi/Portal"
+  },
+  "41424": {
+   "flood": "https://www.town.kouhoku.saga.jp/bousai/kiji003767/index.html",
+   "dosha": "https://www.town.kouhoku.saga.jp/bousai/kiji003767/index.html"
+  },
+  "41425": {
+   "flood": "https://www.town.shiroishi.lg.jp/jyuumin/bousai/_2905.html",
+   "takashio": "https://www.town.shiroishi.lg.jp/jyuumin/bousai/_2905.html",
+   "tsunami": "https://www.town.shiroishi.lg.jp/jyuumin/bousai/_2905.html",
+   "dosha": "https://www.town.shiroishi.lg.jp/jyuumin/bousai/_2905.html"
+  },
+  "41441": {
+   "takashio": "https://www.town.tara.lg.jp/hazardMap/index.html",
+   "tsunami": "https://www.town.tara.lg.jp/hazardMap/index.html"
+  },
+  "42201": {
+   "flood": "https://www.city.nagasaki.lg.jp/bousai/210004/211000/p004103.html",
+   "takashio": "https://www.city.nagasaki.lg.jp/page/87569.html",
+   "tsunami": "https://www.city.nagasaki.lg.jp/page/6188.html",
+   "dosha": "https://www.city.nagasaki.lg.jp/bousai/210004/211000/p025535.html"
+  },
+  "42202": {
+   "flood": "https://www.city.sasebo.lg.jp/doboku/kasenk/kozui.html",
+   "tsunami": "https://sasebo-bousai.my.site.com/K_PUB_VF_KakudaiMap",
+   "dosha": "https://www.city.sasebo.lg.jp/doboku/kasenk/dosha.html"
+  },
+  "42203": {
+   "flood": "https://www.city.shimabara.lg.jp/page2962.html",
+   "tsunami": "https://www.city.shimabara.lg.jp/page2962.html",
+   "dosha": "https://www.city.shimabara.lg.jp/page2962.html"
+  },
+  "42204": {
+   "flood": "https://www.city.isahaya.nagasaki.jp/soshiki/3/1153.html",
+   "dosha": "https://www.city.isahaya.nagasaki.jp/soshiki/58/1562.html"
+  },
+  "42205": {
+   "flood": "https://www.city.omura.nagasaki.jp/bousai/kurashi/anzen/bosai/hazardmap/bousaimap.html",
+   "tsunami": "https://www.city.omura.nagasaki.jp/bousai/kurashi/anzen/bosai/hazardmap/bousaimap.html",
+   "dosha": "https://www.city.omura.nagasaki.jp/bousai/kurashi/anzen/bosai/hazardmap/bousaimap.html"
+  },
+  "42207": {
+   "tsunami": "http://www.bousai.city.hirado.nagasaki.jp/approach/hazardmap.html",
+   "dosha": "http://www.bousai.city.hirado.nagasaki.jp/approach/hazardmap.html"
+  },
+  "42208": {
+   "flood": "https://www.city-matsuura.jp/top/kurashi_tetsuzuki/bosaijoho/1846.html",
+   "dosha": "https://www.city-matsuura.jp/top/kurashi_tetsuzuki/bosaijoho/4582.html"
+  },
+  "42209": {
+   "flood": "https://www.city.tsushima.nagasaki.jp/gyousei/mokuteki/12/4188.html",
+   "tsunami": "https://www.city.tsushima.nagasaki.jp/gyousei/mokuteki/12/4188.html",
+   "dosha": "https://www.city.tsushima.nagasaki.jp/gyousei/mokuteki/12/4188.html"
+  },
+  "42210": {
+   "flood": "https://www.city.iki.nagasaki.jp/soshiki/kiki_kanrika/bosai/saigai_sonae/14040.html",
+   "takashio": "https://www.city.iki.nagasaki.jp/soshiki/kiki_kanrika/bosai/saigai_sonae/14040.html",
+   "tsunami": "https://www.city.iki.nagasaki.jp/soshiki/kiki_kanrika/bosai/saigai_sonae/14040.html",
+   "dosha": "https://www.city.iki.nagasaki.jp/soshiki/kiki_kanrika/bosai/saigai_sonae/14040.html"
+  },
+  "42211": {
+   "flood": "https://www.city.goto.nagasaki.jp/s003/010/020/030/20210625161616.html",
+   "tsunami": "https://www.city.goto.nagasaki.jp/li/kurashi/150/030/010/index.html",
+   "dosha": "https://www.city.goto.nagasaki.jp/li/kurashi/150/030/010/index.html"
+  },
+  "42212": {
+   "tsunami": "https://www.city.saikai.nagasaki.jp/moshimo/bousai/8781.html",
+   "dosha": "https://www.city.saikai.nagasaki.jp/moshimo/bousai/8781.html"
+  },
+  "42213": {
+   "flood": "https://www.city.unzen.nagasaki.jp/bousai/kiji003978/index.html",
+   "takashio": "https://www.city.unzen.nagasaki.jp/bousai/kiji003978/index.html",
+   "tsunami": "https://www.city.unzen.nagasaki.jp/bousai/kiji003978/index.html",
+   "dosha": "https://www.city.unzen.nagasaki.jp/bousai/kiji003978/index.html"
+  },
+  "42214": {
+   "flood": "https://www.city.minamishimabara.lg.jp/hazardmap/map.html?lay=saigai_03",
+   "naisui": "https://www.city.minamishimabara.lg.jp/kiji003286/index.html",
+   "tsunami": "https://www.city.minamishimabara.lg.jp/hazardmap/map.html?lay=saigai_02",
+   "dosha": "https://www.city.minamishimabara.lg.jp/kiji0031626/index.html"
+  },
+  "42307": {
+   "flood": "https://webtown.nagayo.jp/bousai/kiji003377/index.html",
+   "tsunami": "https://webtown.nagayo.jp/bousai/kiji003377/index.html",
+   "dosha": "https://webtown.nagayo.jp/bousai/kiji003377/index.html"
+  },
+  "42308": {
+   "flood": "https://www.town.togitsu.nagasaki.jp/anzen_anshin/bosai/5560.html",
+   "naisui": "https://www.town.togitsu.nagasaki.jp/anzen_anshin/bosai/2676.html",
+   "dosha": "https://www.town.togitsu.nagasaki.jp/anzen_anshin/bosai/2676.html"
+  },
+  "42321": {
+   "flood": "https://www.town.higashisonogi.lg.jp/kurashi_tetsuzuki/bosai/2/524.html",
+   "dosha": "https://www.town.higashisonogi.lg.jp/kurashi_tetsuzuki/bosai/2/444.html"
+  },
+  "42322": {
+   "flood": "https://www.kawatana.jp/cat01/c1-09/post_454/index.html",
+   "dosha": "https://www.kawatana.jp/cat01/c1-09/post_454/index.html"
+  },
+  "42323": {
+   "flood": "https://www.town.hasami.lg.jp/kiji0031011/index.html",
+   "dosha": "https://www.town.hasami.lg.jp/kiji0031701/index.html"
+  },
+  "42383": {
+   "tsunami": "http://ojika.net/administration/bousai/",
+   "dosha": "http://ojika.net/administration/bousai/"
+  },
+  "42391": {
+   "flood": "https://www.sazacho-nagasaki.jp/bousai/kiji0034142/index.html",
+   "naisui": "https://www.sazacho-nagasaki.jp/bousai/kiji0032544/index.html",
+   "tsunami": "https://www.sazacho-nagasaki.jp/bousai/kiji0032544/index.html",
+   "dosha": "https://www.sazacho-nagasaki.jp/bousai/kiji0034142/index.html"
+  },
+  "42411": {
+   "flood": "https://official.shinkamigoto.net/goto_kurashi_full.php?eid=05024&r=1&wcid=i00001x3",
+   "dosha": "https://official.shinkamigoto.net/goto_kurashi_full.php?eid=01367&r=1&wcid=i00001x3"
+  },
+  "43100": {
+   "flood": "https://www.city.kumamoto.jp/bousai/kiji00327014/index.html",
+   "naisui": "https://www.city.kumamoto.jp/kiji0039306/index.html",
+   "takashio": "https://www.city.kumamoto.jp/bousai/kiji00327014/index.html",
+   "tsunami": "https://www.city.kumamoto.jp/bousai/kiji00327014/index.html",
+   "dosha": "https://www.city.kumamoto.jp/bousai/kiji00327014/index.html"
+  },
+  "43202": {
+   "flood": "https://www.city.yatsushiro.lg.jp/bousai/hazardmap/flow_01.html",
+   "naisui": "https://www.city.yatsushiro.lg.jp/kiji00315720/index.html",
+   "takashio": "https://www.city.yatsushiro.lg.jp/bousai/hazardmap/flow_01.html",
+   "tsunami": "https://www.city.yatsushiro.lg.jp/bousai/hazardmap/flow_01.html",
+   "dosha": "https://www.city.yatsushiro.lg.jp/bousai/hazardmap/flow_01.html"
+  },
+  "43203": {
+   "flood": "https://www.city.hitoyoshi.lg.jp/kurashi/bosai_bohan/bosai/37321",
+   "dosha": "https://www.city.hitoyoshi.lg.jp/kurashi/bosai_bohan/bosai/37321"
+  },
+  "43204": {
+   "flood": "https://www.city.arao.lg.jp/bosai-bohan/bosai/hazard-map/page3044.html",
+   "takashio": "https://www.city.arao.lg.jp/bosai-bohan/bosai/hazard-map/page3044.html",
+   "tsunami": "https://www.city.arao.lg.jp/bosai-bohan/bosai/hazard-map/page3044.html",
+   "dosha": "https://www.city.arao.lg.jp/bosai-bohan/bosai/hazard-map/page3044.html"
+  },
+  "43205": {
+   "flood": "https://www.city.minamata.lg.jp/bousai/kiji0033328/index.html",
+   "naisui": "https://www.city.minamata.lg.jp/bousai/kiji0031397/index.html",
+   "takashio": "https://www.city.minamata.lg.jp/bousai/kiji0033328/index.html",
+   "dosha": "https://www.city.minamata.lg.jp/bousai/kiji0033328/index.html"
+  },
+  "43206": {
+   "flood": "https://www.city.tamana.lg.jp/q/aview/102/16409.html",
+   "takashio": "https://www.city.tamana.lg.jp/q/aview/102/16409.html",
+   "tsunami": "https://www.city.tamana.lg.jp/q/aview/102/16409.html",
+   "dosha": "https://www.city.tamana.lg.jp/q/aview/102/16409.html"
+  },
+  "43208": {
+   "flood": "https://www.city.yamaga.kumamoto.jp/bousai/kiji003167/index.html",
+   "dosha": "https://www.city.yamaga.kumamoto.jp/bousai/kiji003167/index.html"
+  },
+  "43210": {
+   "flood": "https://www.city.kikuchi.lg.jp/article/view/1339/3210.html",
+   "dosha": "https://www.city.kikuchi.lg.jp/article/view/1339/3210.html"
+  },
+  "43211": {
+   "flood": "https://www.city.uto.lg.jp/article/view/1017/5569.html",
+   "takashio": "https://www.city.uto.lg.jp/article/view/1017/5569.html",
+   "tsunami": "https://www.city.uto.lg.jp/article/view/1017/5569.html",
+   "dosha": "https://www.city.uto.lg.jp/article/view/1017/5569.html"
+  },
+  "43212": {
+   "flood": "https://www.city.kamiamakusa.kumamoto.jp/q/aview/290/6882/.html",
+   "takashio": "https://www.city.kamiamakusa.kumamoto.jp/q/aview/290/6882/.html",
+   "tsunami": "https://www.city.kamiamakusa.kumamoto.jp/q/aview/290/6882/.html",
+   "dosha": "https://www.city.kamiamakusa.kumamoto.jp/q/aview/290/6882.html"
+  },
+  "43213": {
+   "flood": "https://www.city.uki.kumamoto.jp/2026596",
+   "naisui": "https://www.city.uki.kumamoto.jp/kurashi/bosaiinfo/bosai/2026763",
+   "takashio": "https://www.city.uki.kumamoto.jp/2026596",
+   "tsunami": "https://www.city.uki.kumamoto.jp/2026596",
+   "dosha": "https://www.city.uki.kumamoto.jp/2026596"
+  },
+  "43214": {
+   "flood": "https://www.city.aso.kumamoto.jp/disaster/disaster_prevention_map/disaster_prevention_map_2020/",
+   "dosha": "https://www.city.aso.kumamoto.jp/disaster/disaster_prevention_map/disaster_prevention_map_2020/"
+  },
+  "43215": {
+   "flood": "https://www.city.amakusa.kumamoto.jp/bousai/kiji0038924/index.html",
+   "naisui": "https://www.city.amakusa.kumamoto.jp/bousai/kiji0031786/index.html",
+   "takashio": "https://www.city.amakusa.kumamoto.jp/bousai/kiji0038924/index.html",
+   "tsunami": "https://www.city.amakusa.kumamoto.jp/bousai/kiji0038924/index.html",
+   "dosha": "https://www.city.amakusa.kumamoto.jp/bousai/kiji0038924/index.html"
+  },
+  "43216": {
+   "flood": "https://www.city.koshi.lg.jp/hazardmap/",
+   "naisui": "https://www.city.koshi.lg.jp/hazardmap/",
+   "dosha": "https://www.city.koshi.lg.jp/hazardmap/"
+  },
+  "43348": {
+   "flood": "https://www.town.kumamoto-misato.lg.jp/kurashi_tetsuzuki/anzen_anshin/3/16.html",
+   "dosha": "https://www.town.kumamoto-misato.lg.jp/kurashi_tetsuzuki/anzen_anshin/3/16.html"
+  },
+  "43364": {
+   "flood": "https://www.town.gyokuto.kumamoto.jp/bousai/list00302.html",
+   "dosha": "https://www.town.gyokuto.kumamoto.jp/bousai/list00302.html"
+  },
+  "43367": {
+   "flood": "https://www.town.nankan.lg.jp/bosai/bosaijoho/hazardmap/",
+   "dosha": "https://www.town.nankan.lg.jp/bosai/bosaijoho/hazardmap/"
+  },
+  "43368": {
+   "flood": "https://img.japandx.co.jp/nagasutown/switch/hzmap/index.html",
+   "naisui": "https://www.town.nagasu.lg.jp/soshiki/gesuidou/oshirase/174806037424268/",
+   "takashio": "https://img.japandx.co.jp/nagasutown/switch/hzmap/index.html",
+   "tsunami": "https://img.japandx.co.jp/nagasutown/switch/hzmap/index.html",
+   "dosha": "https://img.japandx.co.jp/nagasutown/switch/hzmap/index.html"
+  },
+  "43369": {
+   "flood": "https://www.town.nagomi.lg.jp/hpkiji/pub/detail.aspx?c_id=3&id=320&class_set_id=1&class_id=544",
+   "dosha": "https://www.town.nagomi.lg.jp/hpkiji/pub/detail.aspx?c_id=3&id=320&class_set_id=1&class_id=544"
+  },
+  "43403": {
+   "flood": "https://www.town.ozu.kumamoto.jp/site/bousai/2556.html",
+   "dosha": "https://www.town.ozu.kumamoto.jp/site/bousai/2556.html"
+  },
+  "43404": {
+   "flood": "https://www.town.kikuyo.lg.jp/bousai/kiji0033321/index.html",
+   "dosha": "https://www.town.kikuyo.lg.jp/bousai/kiji0033321/index.html"
+  },
+  "43423": {
+   "flood": "https://www.town.minamioguni.lg.jp/living/safety/bousai.html",
+   "dosha": "https://www.town.minamioguni.lg.jp/living/safety/bousai.html"
+  },
+  "43424": {
+   "flood": "https://www.town.kumamoto-oguni.lg.jp/q/aview/113/701.html",
+   "dosha": "https://www.town.kumamoto-oguni.lg.jp/q/aview/113/701.html"
+  },
+  "43425": {
+   "dosha": "https://www.ubuyama-v.jp/kurashinojoho/bosai/bousaitaisaku/1160.html"
+  },
+  "43428": {
+   "dosha": "https://www.town.kumamoto-takamori.lg.jp/hazardmap/"
+  },
+  "43432": {
+   "flood": "https://www.vill.nishihara.kumamoto.jp/bousai/kiji003215/index.html",
+   "dosha": "https://www.vill.nishihara.kumamoto.jp/bousai/kiji003215/index.html"
+  },
+  "43433": {
+   "flood": "https://www.vill.minamiaso.lg.jp/bousai/kiji00328/index.html",
+   "dosha": "https://www.vill.minamiaso.lg.jp/bousai/kiji00328/index.html"
+  },
+  "43441": {
+   "flood": "https://www.town.mifune.kumamoto.jp/page8161.html?type=top",
+   "dosha": "https://www.town.mifune.kumamoto.jp/page8161.html?type=top"
+  },
+  "43442": {
+   "flood": "https://www.town.kumamoto-kashima.lg.jp/q/aview/111/223.html",
+   "dosha": "https://www.town.kumamoto-kashima.lg.jp/q/aview/111/223.html"
+  },
+  "43443": {
+   "flood": "https://www.town.mashiki.lg.jp/bousai/kiji0035963/index.html",
+   "dosha": "https://www.town.mashiki.lg.jp/bousai/kiji0035963/index.html"
+  },
+  "43444": {
+   "flood": "https://www.town.kosa.lg.jp/q/aview/109/256.html",
+   "dosha": "https://www.town.kosa.lg.jp/q/aview/109/256.html"
+  },
+  "43447": {
+   "flood": "https://www.town.kumamoto-yamato.lg.jp/bousai/kiji0035128/index.html",
+   "dosha": "https://www.town.kumamoto-yamato.lg.jp/bousai/kiji0035128/index.html"
+  },
+  "43468": {
+   "flood": "https://www.town.hikawa.kumamoto.jp/bousai/kiji0034809/index.html",
+   "takashio": "https://www.town.hikawa.kumamoto.jp/bousai/kiji0034809/index.html",
+   "tsunami": "https://www.town.hikawa.kumamoto.jp/bousai/kiji0034809/index.html",
+   "dosha": "https://www.town.hikawa.kumamoto.jp/bousai/kiji0034809/index.html"
+  },
+  "43482": {
+   "flood": "https://www.town.ashikita.lg.jp/bosai_site/bosaimap",
+   "takashio": "https://www.town.ashikita.lg.jp/bosai_site/bosaimap",
+   "tsunami": "https://www.town.ashikita.lg.jp/bosai_site/bosaimap",
+   "dosha": "https://www.town.ashikita.lg.jp/bosai_site/bosaimap"
+  },
+  "43484": {
+   "flood": "https://www.town.tsunagi.lg.jp/page3204.html",
+   "takashio": "https://www.town.tsunagi.lg.jp/page3204.html",
+   "tsunami": "https://www.town.tsunagi.lg.jp/page3204.html",
+   "dosha": "https://www.town.tsunagi.lg.jp/page3204.html"
+  },
+  "43501": {
+   "flood": "https://www.town.kumamoto-nishiki.lg.jp/bousai/list00303.html",
+   "dosha": "https://www.town.kumamoto-nishiki.lg.jp/bousai/list00303.html"
+  },
+  "43505": {
+   "flood": "https://www.town.taragi.lg.jp/section/hazardmap/index.html",
+   "dosha": "https://www.town.taragi.lg.jp/section/hazardmap/index.html"
+  },
+  "43506": {
+   "flood": "https://www.town.yunomae.lg.jp/bousai/list00704.html",
+   "dosha": "https://www.town.yunomae.lg.jp/bousai/list00704.html"
+  },
+  "43507": {
+   "flood": "https://www.vill.mizukami.lg.jp/q/aview/1106/2327.html",
+   "dosha": "https://www.vill.mizukami.lg.jp/q/aview/1106/2327.html"
+  },
+  "43510": {
+   "flood": "https://www.vill.sagara.lg.jp/q/aview/802/173.html",
+   "dosha": "https://www.vill.sagara.lg.jp/q/aview/802/173.html"
+  },
+  "43511": {
+   "dosha": "https://www.vill.itsuki.lg.jp/bousai/kiji0031042/index.html"
+  },
+  "43512": {
+   "flood": "https://www.vill.yamae.lg.jp/kiji003538/index.html",
+   "dosha": "https://www.vill.yamae.lg.jp/kiji003537/index.html"
+  },
+  "43514": {
+   "flood": "https://www.town.asagiri.lg.jp/q/aview/109/15831.html",
+   "dosha": "https://www.town.asagiri.lg.jp/q/aview/109/15831.html"
+  },
+  "43531": {
+   "flood": "https://reihoku-kumamoto.jp/kiji003681/index.html",
+   "takashio": "https://reihoku-kumamoto.jp/kiji003681/index.html",
+   "tsunami": "https://reihoku-kumamoto.jp/kiji003681/index.html",
+   "dosha": "https://reihoku-kumamoto.jp/kiji003681/index.html"
+  },
+  "44201": {
+   "flood": "https://www.city.oita.oita.jp/o165/kurashi/anshinanzen/1214958872500.html",
+   "takashio": "https://www.city.oita.oita.jp/o165/kurashi/anshinanzen/takashiomap.html",
+   "tsunami": "https://www.city.oita.oita.jp/o009/kurashi/anshinanzen/1367470455977.html",
+   "dosha": "https://www.city.oita.oita.jp/o165/kurashi/anshinanzen/1278396550131.html"
+  },
+  "44202": {
+   "flood": "https://www.city.beppu.oita.jp/bousai_syoubou/bousaijyouhou/bousai_map/detail5.html",
+   "takashio": "https://www.city.beppu.oita.jp/bousai_syoubou/bousaijyouhou/bousai_map/takasio.html",
+   "tsunami": "https://www.city.beppu.oita.jp/bousai_syoubou/bousaijyouhou/bousai_map/tsunami.html",
+   "dosha": "https://www.city.beppu.oita.jp/bousai_syoubou/bousaijyouhou/bousai_map/detail3.html"
+  },
+  "44203": {
+   "flood": "https://nakatsu-bosai.jp/bousaimap/%e4%b8%ad%e6%b4%a5%e5%b8%82%e9%98%b2%e7%81%bd%e3%83%9e%e3%83%83%e3%83%97web%e7%89%88/",
+   "naisui": "https://www.city-nakatsu.jp/doc/2019042400035/",
+   "takashio": "https://nakatsu-bosai.jp/bousaimap/%e4%b8%ad%e6%b4%a5%e5%b8%82%e9%98%b2%e7%81%bd%e3%83%9e%e3%83%83%e3%83%97web%e7%89%88/",
+   "tsunami": "https://nakatsu-bosai.jp/bousaimap/%e4%b8%ad%e6%b4%a5%e5%b8%82%e9%98%b2%e7%81%bd%e3%83%9e%e3%83%83%e3%83%97web%e7%89%88/",
+   "dosha": "https://www.city-nakatsu.jp/doc/2015020200543/"
+  },
+  "44204": {
+   "flood": "https://www.city.hita.oita.jp/soshiki/somubu/kikikanrishitu/kikikanri/anshin/bosai/Preparing_for_disaster/3317.html",
+   "dosha": "https://www.city.hita.oita.jp/soshiki/somubu/kikikanrishitu/kikikanri/anshin/bosai/Preparing_for_disaster/9748.html"
+  },
+  "44205": {
+   "flood": "https://www.city.saiki.oita.jp/bousai/list00718.html",
+   "takashio": "https://www.city.saiki.oita.jp/bousai/list05381.html",
+   "tsunami": "https://www.city.saiki.oita.jp/bousai/list00717.html",
+   "dosha": "https://www.city.saiki.oita.jp/bousai/list00719.html"
+  },
+  "44206": {
+   "flood": "https://www.city.usuki.oita.jp/hazardmap/",
+   "naisui": "https://www.city.usuki.oita.jp/docs/2021071600010/",
+   "takashio": "https://www.city.usuki.oita.jp/hazardmap/",
+   "tsunami": "https://www.city.usuki.oita.jp/hazardmap/",
+   "dosha": "https://www.city.usuki.oita.jp/hazardmap/"
+  },
+  "44207": {
+   "flood": "https://www.city.tsukumi.oita.jp/soshiki/7/197.html",
+   "naisui": "https://www.city.tsukumi.oita.jp/soshiki/18/19257.html",
+   "takashio": "https://www.city.tsukumi.oita.jp/soshiki/32/21375.html",
+   "tsunami": "https://www.city.tsukumi.oita.jp/soshiki/32/201.html",
+   "dosha": "https://www.city.tsukumi.oita.jp/soshiki/32/17511.html"
+  },
+  "44208": {
+   "flood": "https://www.city.taketa.oita.jp/kurashi_tetsuzuki/bosai_kyukyu/1151.html",
+   "dosha": "https://www.city.taketa.oita.jp/kurashi_tetsuzuki/bosai_kyukyu/1151.html"
+  },
+  "44209": {
+   "flood": "https://www.city.bungotakada.oita.jp/site/bousai/list32.html",
+   "takashio": "https://www.city.bungotakada.oita.jp/site/bousai/list32.html",
+   "tsunami": "https://www.city.bungotakada.oita.jp/site/bousai/list32.html",
+   "dosha": "https://www.city.bungotakada.oita.jp/site/bousai/list32.html"
+  },
+  "44210": {
+   "flood": "https://gis.chklab.com/hazardkitsuki/",
+   "naisui": "https://gis.chklab.com/hazardkitsuki/",
+   "takashio": "https://gis.chklab.com/hazardkitsuki/",
+   "tsunami": "https://gis.chklab.com/hazardkitsuki/",
+   "dosha": "https://gis.chklab.com/hazardkitsuki/"
+  },
+  "44211": {
+   "flood": "https://www.city.usa.oita.jp/section/hazardmap/index.html",
+   "takashio": "https://www.city.usa.oita.jp/section/hazardmap/index.html",
+   "tsunami": "https://www.city.usa.oita.jp/section/hazardmap/index.html",
+   "dosha": "https://www.city.usa.oita.jp/section/hazardmap/index.html"
+  },
+  "44212": {
+   "flood": "https://www.bungo-ohno.jp/docs/2021042300079/",
+   "dosha": "https://www.bungo-ohno.jp/docs/2021042300079/"
+  },
+  "44213": {
+   "flood": "https://www.city.yufu.oita.jp/kurashi/bousai/bousai_cate1/article_82532",
+   "dosha": "https://www.city.yufu.oita.jp/kurashi/bousai/bousai_cate1/saigainisonaete/doysasaigaihazardmap"
+  },
+  "44214": {
+   "flood": "https://www.city.kunisaki.oita.jp/hazardmap/",
+   "takashio": "https://www.city.kunisaki.oita.jp/hazardmap/",
+   "tsunami": "https://www.city.kunisaki.oita.jp/hazardmap/",
+   "dosha": "https://www.city.kunisaki.oita.jp/hazardmap/"
+  },
+  "44322": {
+   "takashio": "https://www.himeshima.jp/about/himeshimahm/",
+   "tsunami": "https://www.himeshima.jp/hazardmap/",
+   "dosha": "https://www.himeshima.jp/about/himeshimahm/"
+  },
+  "44341": {
+   "takashio": "https://www.town.hiji.lg.jp/kurashi_tetsuzuki/bosai_bohan_shobo_kotsuanzen/bosai/map/452.html",
+   "tsunami": "https://www.town.hiji.lg.jp/kurashi_tetsuzuki/bosai_bohan_shobo_kotsuanzen/bosai/map/452.html",
+   "dosha": "https://www.town.hiji.lg.jp/kurashi_tetsuzuki/bosai_bohan_shobo_kotsuanzen/bosai/map/452.html"
+  },
+  "44461": {
+   "flood": "https://www.town.kokonoe.oita.jp/docs/2017012000025/",
+   "dosha": "https://www.town.kokonoe.oita.jp/docs/2017012000025/"
+  },
+  "44462": {
+   "flood": "https://www.town.kusu.oita.jp/kurashi_tetsuzuki/anzen_anshin/4/2776.html",
+   "dosha": "https://www.town.kusu.oita.jp/kurashi_tetsuzuki/anzen_anshin/4/1487.html"
+  },
+  "45201": {
+   "flood": "https://www.city.miyazaki.miyazaki.jp/life/fire_department/hazard_map/1153.html",
+   "takashio": "https://www.city.miyazaki.miyazaki.jp/life/fire_department/hazard_map/285506.html",
+   "tsunami": "https://www.city.miyazaki.miyazaki.jp/life/fire_department/hazard_map/803.html",
+   "dosha": "https://www.city.miyazaki.miyazaki.jp/life/fire_department/hazard_map/"
+  },
+  "45202": {
+   "flood": "https://www.city.miyakonojo.miyazaki.jp/soshiki/1/3984.html",
+   "naisui": "https://www.city.miyakonojo.miyazaki.jp/site/mizu/3248.html",
+   "dosha": "https://www.city.miyakonojo.miyazaki.jp/soshiki/1/3984.html"
+  },
+  "45203": {
+   "flood": "https://www.city.nobeoka.miyazaki.jp/soshiki/15/3341.html",
+   "naisui": "https://www.city.nobeoka.miyazaki.jp/soshiki/57/1093.html",
+   "tsunami": "https://www.city.nobeoka.miyazaki.jp/soshiki/15/3338.html",
+   "dosha": "https://www.city.nobeoka.miyazaki.jp/soshiki/15/3341.html"
+  },
+  "45204": {
+   "flood": "https://www.city.nichinan.lg.jp/kurashi_tetsuzuki/anzen_anshin/1/2/index.html",
+   "naisui": "https://www.city.nichinan.lg.jp/kurashi_tetsuzuki/jogesuido_jokaso/4/2574.html",
+   "tsunami": "https://www.city.nichinan.lg.jp/kurashi_tetsuzuki/anzen_anshin/1/2/index.html",
+   "dosha": "https://www.city.nichinan.lg.jp/kurashi_tetsuzuki/anzen_anshin/1/2/index.html"
+  },
+  "45205": {
+   "flood": "https://www.city.kobayashi.lg.jp/kurashi_tetsuzuki/anzen_anshin/bosai/1/3217.html",
+   "dosha": "https://www.city.kobayashi.lg.jp/kurashi_tetsuzuki/anzen_anshin/bosai/1/3217.html"
+  },
+  "45206": {
+   "flood": "https://www.hyugacity.jp/display.php?cont=110318085058",
+   "naisui": "https://www.hyugacity.jp/display.php?cont=110318085058",
+   "takashio": "https://www.hyugacity.jp/hazardmap/",
+   "tsunami": "https://www.hyugacity.jp/display.php?cont=180829153428",
+   "dosha": "https://www.hyugacity.jp/display.php?cont=180109160015"
+  },
+  "45207": {
+   "flood": "https://www.city.kushima.lg.jp/main/safety/cat/cat4/cat/",
+   "naisui": "https://www.city.kushima.lg.jp/main/safety/cat/cat4/naisuihm/",
+   "takashio": "https://www.city.kushima.lg.jp/main/safety/cat/cat4/cat3115/",
+   "tsunami": "https://www.city.kushima.lg.jp/main/safety/cat/cat4/cat1/",
+   "dosha": "https://www.city.kushima.lg.jp/main/safety/cat/cat4/cat/"
+  },
+  "45208": {
+   "flood": "https://www.city.saito.lg.jp/kurashi/0111_1703310000000026.html",
+   "naisui": "https://www.city.saito.lg.jp/kurashi/jogesuido/post_1331.html",
+   "dosha": "https://www.city.saito.lg.jp/kurashi/0111_1703310000000026.html"
+  },
+  "45209": {
+   "flood": "https://www.city.ebino.lg.jp/hazadomappu/3000.html",
+   "dosha": "https://www.city.ebino.lg.jp/hazadomappu/3000.html"
+  },
+  "45341": {
+   "flood": "https://www.town.mimata.lg.jp/contents/790.html",
+   "dosha": "https://www.town.mimata.lg.jp/contents/790.html"
+  },
+  "45361": {
+   "dosha": "https://www.town.takaharu.lg.jp/soshiki/7/1156.html"
+  },
+  "45382": {
+   "flood": "http://www.town.kunitomi.miyazaki.jp/main/disaster/other_disaster/page000322.html",
+   "dosha": "http://www.town.kunitomi.miyazaki.jp/main/disaster/other_disaster/page000322.html"
+  },
+  "45383": {
+   "flood": "https://www.town.aya.miyazaki.jp/soshiki/soumuka/1138.html",
+   "dosha": "https://www.town.aya.miyazaki.jp/soshiki/soumuka/1138.html"
+  },
+  "45401": {
+   "flood": "https://www.town.takanabe.lg.jp/soshiki/kikikanri/2/bousai/635.html",
+   "tsunami": "https://www.town.takanabe.lg.jp/soshiki/kikikanri/2/bousai/635.html",
+   "dosha": "https://www.town.takanabe.lg.jp/soshiki/kikikanri/2/bousai/635.html"
+  },
+  "45402": {
+   "flood": "https://www.town.shintomi.lg.jp/kurashi/bosai_bohan_anzen/3/1884.html#h_idx_iw_flex_1_2",
+   "tsunami": "https://www.town.shintomi.lg.jp/kurashi/bosai_bohan_anzen/3/1884.html#h_idx_iw_flex_1_2",
+   "dosha": "https://www.town.shintomi.lg.jp/kurashi/bosai_bohan_anzen/3/1884.html#h_idx_iw_flex_1_2"
+  },
+  "45403": {
+   "flood": "https://www.vill.nishimera.lg.jp/village/%e6%9c%aa%e5%88%86%e9%a1%9e/10004163"
+  },
+  "45404": {
+   "flood": "https://www.town.kijo.lg.jp/section/hazardmap/index.html",
+   "dosha": "https://www.town.kijo.lg.jp/section/hazardmap/index.html"
+  },
+  "45405": {
+   "takashio": "https://www.town.kawaminami.miyazaki.jp/soshiki/1/12012.html",
+   "tsunami": "https://www.town.kawaminami.miyazaki.jp/soshiki/1/12012.html",
+   "dosha": "https://www.town.kawaminami.miyazaki.jp/soshiki/1/12012.html"
+  },
+  "45406": {
+   "takashio": "https://www.town.tsuno.lg.jp/bousai/index.html",
+   "tsunami": "https://www.town.tsuno.lg.jp/bousai/index.html",
+   "dosha": "https://www.town.tsuno.lg.jp/bousai/index.html"
+  },
+  "45421": {
+   "flood": "https://www.town.kadogawa.lg.jp/disaster/disaster_prevention/page001245.html",
+   "takashio": "https://www.town.kadogawa.lg.jp/disaster/disaster_prevention/page001245.html",
+   "tsunami": "https://www.town.kadogawa.lg.jp/disaster/disaster_prevention/page001245.html",
+   "dosha": "https://www.town.kadogawa.lg.jp/disaster/disaster_prevention/page001245.html"
+  },
+  "45429": {
+   "flood": "https://www.vill.morotsuka.miyazaki.jp/soshiki/1001/5/170.html",
+   "dosha": "https://www.vill.morotsuka.miyazaki.jp/soshiki/1001/5/170.html"
+  },
+  "45430": {
+   "dosha": "https://www.vill.shiiba.miyazaki.jp/affair/d_prevention.php"
+  },
+  "45431": {
+   "flood": "https://www.town.miyazaki-misato.lg.jp/bousai/kiji003183/index.html#BaseTable",
+   "dosha": "https://www.town.miyazaki-misato.lg.jp/bousai/kiji003183/index.html"
+  },
+  "45441": {
+   "flood": "https://www.town-takachiho.jp/top/kurashi/anzen/2/865.html",
+   "dosha": "https://www.town-takachiho.jp/top/kurashi/anzen/2/865.html"
+  },
+  "45442": {
+   "flood": "https://www.town.hinokage.lg.jp/docs/2016020200144/",
+   "dosha": "https://www.town.hinokage.lg.jp/docs/2016020200144/"
+  },
+  "45443": {
+   "flood": "https://www.town.gokase.miyazaki.jp/kurashi/bousai/494.html",
+   "dosha": "https://www.town.gokase.miyazaki.jp/kurashi/bousai/494.html"
+  },
+  "46201": {
+   "flood": "https://www.city.kagoshima.lg.jp/kikikanri/kurashi/bosai/bosai/map/bousaimap.html",
+   "naisui": "https://www.city.kagoshima.lg.jp/kikikanri/kurashi/bosai/bosai/map/naisui.html",
+   "takashio": "https://www2.wagmap.jp/kagoshima/Portal",
+   "tsunami": "https://www.city.kagoshima.lg.jp/kikikanri/kurashi/bosai/bosai/map/tsunami.html",
+   "dosha": "https://www.city.kagoshima.lg.jp/kikikanri/kurashi/bosai/bosai/map/bousaimap.html"
+  },
+  "46203": {
+   "flood": "https://www.city.kanoya.lg.jp/syoubou/bousaimap/bousaimap1.html",
+   "tsunami": "https://www.city.kanoya.lg.jp/syoubou/bousaimap/bousaimap1.html",
+   "dosha": "https://www.city.kanoya.lg.jp/syoubou/bousaimap/bousaimap1.html"
+  },
+  "46204": {
+   "flood": "https://www.city.makurazaki.lg.jp/site/bousai/60.html",
+   "naisui": "https://www.city.makurazaki.lg.jp/soshiki/suidou/5378.html",
+   "tsunami": "https://www.city.makurazaki.lg.jp/site/bousai/60.html",
+   "dosha": "https://www.city.makurazaki.lg.jp/site/bousai/60.html"
+  },
+  "46206": {
+   "tsunami": "https://www.city.akune.lg.jp/soshikikarasagasu/somuka/kikikanrigakari/4/3/1213.html",
+   "dosha": "https://www.city.akune.lg.jp/soshikikarasagasu/somuka/kikikanrigakari/4/3/1213.html"
+  },
+  "46208": {
+   "flood": "https://www.city.kagoshima-izumi.lg.jp/page/page_20096.html",
+   "naisui": "https://www.city.kagoshima-izumi.lg.jp/page/page_20096.html",
+   "tsunami": "https://www.city.kagoshima-izumi.lg.jp/page/page_20096.html",
+   "dosha": "https://www.city.kagoshima-izumi.lg.jp/page/page_20096.html"
+  },
+  "46210": {
+   "tsunami": "https://www.city.ibusuki.lg.jp/main/kyosei/bosai/bosaimap/page004526.html",
+   "dosha": "https://www.city.ibusuki.lg.jp/main/kyosei/bosai/bosaimap/page004526.html"
+  },
+  "46213": {
+   "tsunami": "https://www.city.nishinoomote.lg.jp/admin/kurashi/bousai/1261.html",
+   "dosha": "https://www.city.nishinoomote.lg.jp/admin/kurashi/bousai/1261.html"
+  },
+  "46214": {
+   "flood": "https://www.city.tarumizu.lg.jp/kikikanri/kurashi/bosai/bosai/sougou-bousai-map/sougou-bousai-map.html",
+   "tsunami": "https://www.city.tarumizu.lg.jp/kikikanri/kurashi/bosai/bosai/sougou-bousai-map/sougou-bousai-map.html",
+   "dosha": "https://www.city.tarumizu.lg.jp/kikikanri/kurashi/bosai/bosai/sougou-bousai-map/sougou-bousai-map.html"
+  },
+  "46215": {
+   "flood": "https://www.satsumasendai-bousai.jp/index.php/bousaimap/",
+   "tsunami": "https://www.satsumasendai-bousai.jp/index.php/bousaimap/",
+   "dosha": "https://www.satsumasendai-bousai.jp/index.php/bousaimap/"
+  },
+  "46216": {
+   "flood": "https://www.city.hioki.kagoshima.jp/bousai/kurashi/tetsuzuki/anzen/bosai/hazardmap.html",
+   "tsunami": "https://www.city.hioki.kagoshima.jp/bousai/kurashi/tetsuzuki/anzen/bosai/tsunamihazardmap.html",
+   "dosha": "https://www.city.hioki.kagoshima.jp/bousai/kurashi/tetsuzuki/anzen/bosai/hazardmap.html"
+  },
+  "46217": {
+   "dosha": "https://www.city.soo.kagoshima.jp/kurashi/kyukyubousai/bousai/bousai_guidebook_and_map.html"
+  },
+  "46218": {
+   "flood": "https://www.city-kirishima.jp/anshin/hazard_map.html",
+   "tsunami": "https://www.city-kirishima.jp/anshin/hazard_map.html",
+   "dosha": "https://www.city-kirishima.jp/anshin/hazard_map.html"
+  },
+  "46219": {
+   "tsunami": "https://www.city.ichikikushikino.lg.jp/machibou1/bosai/bosai/joho/hazard-map.html",
+   "dosha": "https://www.city.ichikikushikino.lg.jp/machibou1/bosai/bosai/joho/hazard-map.html"
+  },
+  "46220": {
+   "flood": "https://www2.wagmap.jp/minamisatsuma/Portal",
+   "tsunami": "https://www2.wagmap.jp/minamisatsuma/Portal",
+   "dosha": "https://www2.wagmap.jp/minamisatsuma/Portal"
+  },
+  "46221": {
+   "flood": "https://www.sonicweb-asp.jp/shibushi_city/",
+   "takashio": "https://www.sonicweb-asp.jp/shibushi_city/",
+   "tsunami": "https://www.city.shibushi.lg.jp/soshiki/2/1968.html",
+   "dosha": "https://www.city.shibushi.lg.jp/soshiki/2/1968.html"
+  },
+  "46222": {
+   "flood": "https://www.city.amami.lg.jp/hazardmap/",
+   "tsunami": "https://www.city.amami.lg.jp/hazardmap/",
+   "dosha": "https://www.city.amami.lg.jp/hazardmap/"
+  },
+  "46223": {
+   "flood": "https://www.city.minamikyushu.lg.jp/kurashi_tetsuzuki/anzen_anshin/1/4686.html",
+   "tsunami": "https://www.city.minamikyushu.lg.jp/kurashi_tetsuzuki/anzen_anshin/1/4686.html",
+   "dosha": "https://www.city.minamikyushu.lg.jp/kurashi_tetsuzuki/anzen_anshin/1/4686.html"
+  },
+  "46224": {
+   "flood": "https://www.city.isa.kagoshima.jp/life/knowledge/bousai/",
+   "dosha": "https://www.city.isa.kagoshima.jp/life/knowledge/bousai/"
+  },
+  "46225": {
+   "tsunami": "https://www.city.aira.lg.jp/bosai/kurashi/bosai/bosai-map.html",
+   "dosha": "https://www.city.aira.lg.jp/bosai/kurashi/bosai/bosai-map.html"
+  },
+  "46303": {
+   "flood": "http://mishimamura.com/%e4%b8%89%e5%b3%b6%e6%9d%91%e9%98%b2%e7%81%bd%e3%83%9e%e3%83%83%e3%83%97%e3%81%ab%e3%81%a4%e3%81%84%e3%81%a6/",
+   "takashio": "http://mishimamura.com/%e4%b8%89%e5%b3%b6%e6%9d%91%e9%98%b2%e7%81%bd%e3%83%9e%e3%83%83%e3%83%97%e3%81%ab%e3%81%a4%e3%81%84%e3%81%a6/",
+   "tsunami": "http://mishimamura.com/%e4%b8%89%e5%b3%b6%e6%9d%91%e9%98%b2%e7%81%bd%e3%83%9e%e3%83%83%e3%83%97%e3%81%ab%e3%81%a4%e3%81%84%e3%81%a6/",
+   "dosha": "http://mishimamura.com/%e4%b8%89%e5%b3%b6%e6%9d%91%e9%98%b2%e7%81%bd%e3%83%9e%e3%83%83%e3%83%97%e3%81%ab%e3%81%a4%e3%81%84%e3%81%a6/"
+  },
+  "46304": {
+   "tsunami": "http://www.tokara.jp/life/bousai/#001"
+  },
+  "46392": {
+   "flood": "https://www.satsuma-net.jp/bosai/hazard_map/6667.html",
+   "dosha": "https://www.satsuma-net.jp/bosai/hazard_map/6667.html"
+  },
+  "46404": {
+   "tsunami": "https://www.town.nagashima.lg.jp/livelihood/bousaimap/"
+  },
+  "46452": {
+   "flood": "https://www.town.yusui.kagoshima.jp/soshiki/12/291.html",
+   "dosha": "https://www.town.yusui.kagoshima.jp/soshiki/12/291.html"
+  },
+  "46468": {
+   "tsunami": "https://www.town.kagoshima-osaki.lg.jp/so_syouboukotsu/kurashi/bohan/bosai/hazard-map/jishin/hazardmap.html",
+   "dosha": "https://www.town.kagoshima-osaki.lg.jp/so_syouboukotsu/kurashi/bohan/bosai/hazard-map/jishin/hazardmap.html"
+  },
+  "46482": {
+   "flood": "https://www.higashikushira.com/docs/2018020500019/",
+   "tsunami": "https://www.higashikushira.com/docs/2018020500019/",
+   "dosha": "https://www.higashikushira.com/docs/2018020500019/"
+  },
+  "46490": {
+   "tsunami": "https://www.town.kinko.lg.jp/hazardmap/index.html",
+   "dosha": "https://www.town.kinko.lg.jp/hazardmap/index.html"
+  },
+  "46491": {
+   "flood": "https://www.town.minamiosumi.lg.jp/soumu/kurashi/bosai/bosai/saigaitaisaku/bosai-map.html",
+   "tsunami": "https://www.town.minamiosumi.lg.jp/soumu/kurashi/bosai/bosai/saigaitaisaku/bosai-map.html",
+   "dosha": "https://www.town.minamiosumi.lg.jp/soumu/kurashi/bosai/bosai/saigaitaisaku/bosai-map.html"
+  },
+  "46492": {
+   "flood": "https://kimotsuki-town.jp/bosai_anzen_1/bosai/1929.html",
+   "tsunami": "https://kimotsuki-town.jp/bosai_anzen_1/bosai/1929.html",
+   "dosha": "https://kimotsuki-town.jp/bosai_anzen_1/bosai/1929.html"
+  },
+  "46501": {
+   "takashio": "https://town.nakatane.kagoshima.jp/syoubou/kurashi/bosai-bohan/bosai/jishin/jishinbosai-map.html",
+   "tsunami": "https://town.nakatane.kagoshima.jp/syoubou/kurashi/bosai-bohan/bosai/jishin/jishinbosai-map.html",
+   "dosha": "https://town.nakatane.kagoshima.jp/syoubou/kurashi/bosai-bohan/bosai/jishin/jishinbosai-map.html"
+  },
+  "46502": {
+   "tsunami": "http://www.town.minamitane.kagoshima.jp/disaster/1.html",
+   "dosha": "http://www.town.minamitane.kagoshima.jp/disaster/1.html"
+  },
+  "46505": {
+   "tsunami": "https://www.town.yakushima.kagoshima.jp/prevention/area-plan/",
+   "dosha": "https://www.town.yakushima.kagoshima.jp/prevention/disaster/"
+  },
+  "46523": {
+   "tsunami": "https://www.vill.yamato.lg.jp/somu/kurashi/bosai-kyukyu/map2020.html"
+  },
+  "46524": {
+   "tsunami": "https://www.uken.net/bousai/kurashi/bosai/bosaijoho/bousaimap.html",
+   "dosha": "https://www.uken.net/bousai/kurashi/bosai/bosaijoho/bousaimap.html"
+  },
+  "46525": {
+   "tsunami": "https://www.town.setouchi.lg.jp/syouboubousai/cho/kurashi/bohan/bosai/hazado.html",
+   "dosha": "https://www.town.setouchi.lg.jp/syouboubousai/cho/kurashi/bohan/bosai/hazado.html"
+  },
+  "46529": {
+   "tsunami": "https://www.town.kikai.lg.jp/bosai/kurashi/bosai/kikaichohazard-map/hazard-map.html",
+   "dosha": "https://www.town.kikai.lg.jp/bosai/kurashi/bosai/kikaichohazard-map/hazard-map.html"
+  },
+  "46530": {
+   "takashio": "https://www.tokunoshima-town.org/soumuka/kurashi/bosai/bosai/hazard-map/bosaimap.html",
+   "tsunami": "https://www.tokunoshima-town.org/soumuka/kurashi/bosai/bosai/hazard-map/bosaimap.html",
+   "dosha": "https://www.tokunoshima-town.org/soumuka/kurashi/bosai/bosai/hazard-map/bosaimap.html"
+  },
+  "46531": {
+   "takashio": "https://www.town.amagi.lg.jp/docs/440.html",
+   "tsunami": "https://www.town.amagi.lg.jp/docs/445.html",
+   "dosha": "https://www.town.amagi.lg.jp/docs/446.html"
+  },
+  "46534": {
+   "flood": "https://www.town.china.lg.jp/soumu/kurasu/bosai/bosai_map.html",
+   "tsunami": "https://www.town.china.lg.jp/soumu/kurasu/bosai/bosai_map.html",
+   "dosha": "https://www.town.china.lg.jp/soumu/kurasu/bosai/bosai_map.html"
+  },
+  "47201": {
+   "flood": "https://www.sonicweb-asp.jp/naha/",
+   "naisui": "https://www.city.naha.okinawa.jp/water/pax/gesui_kouhou.html",
+   "takashio": "https://www.sonicweb-asp.jp/naha/",
+   "tsunami": "https://www.sonicweb-asp.jp/naha/",
+   "dosha": "https://www.sonicweb-asp.jp/naha/"
+  },
+  "47205": {
+   "takashio": "https://www.city.ginowan.lg.jp/soshiki/somu/4/2/torikumi/2442.html",
+   "tsunami": "https://www.city.ginowan.lg.jp/soshiki/somu/4/2/torikumi/2442.html",
+   "dosha": "https://www.city.ginowan.lg.jp/soshiki/somu/4/2/torikumi/2442.html"
+  },
+  "47207": {
+   "tsunami": "https://www.city.ishigaki.okinawa.jp/kurashi_gyosei/kurashi/anshin_anzen/bosai/2485.html",
+   "dosha": "https://www.city.ishigaki.okinawa.jp/kurashi_gyosei/kurashi/anshin_anzen/bosai/2485.html"
+  },
+  "47208": {
+   "flood": "https://www.city.urasoe.lg.jp/doc/609e79ed3d59ae2434bfe670/",
+   "takashio": "https://www.city.urasoe.lg.jp/doc/609e79ed3d59ae2434bfe670/",
+   "tsunami": "https://www.city.urasoe.lg.jp/doc/609e79ed3d59ae2434bfe670/",
+   "dosha": "https://www.city.urasoe.lg.jp/doc/609e79ed3d59ae2434bfe670/"
+  },
+  "47209": {
+   "takashio": "https://www.city.nago.okinawa.jp/kurashi/2018071900592/",
+   "tsunami": "https://www.city.nago.okinawa.jp/kurashi/2018071900592/",
+   "dosha": "https://www.city.nago.okinawa.jp/kurashi/2018071900592/"
+  },
+  "47210": {
+   "naisui": "https://www.city.itoman.lg.jp/site/bousai-itoman/2925.html",
+   "tsunami": "https://www.city.itoman.lg.jp/site/bousai-itoman/2195.html",
+   "dosha": "https://www.city.itoman.lg.jp/site/bousai-itoman/2195.html"
+  },
+  "47211": {
+   "flood": "https://www.city.okinawa.okinawa.jp/k002-001/anshin/bousai/bousai/hinan/506.html",
+   "takashio": "https://www.city.okinawa.okinawa.jp/k002-001/anshin/bousai/bousai/hinan/506.html",
+   "tsunami": "https://www.city.okinawa.okinawa.jp/k002-001/anshin/bousai/bousai/hinan/506.html",
+   "dosha": "https://www.city.okinawa.okinawa.jp/k002-001/anshin/bousai/bousai/hinan/506.html"
+  },
+  "47212": {
+   "flood": "https://www.city.tomigusuku.lg.jp/kurashi_tetsuzuki/anshin_anzen/1/1/index.html",
+   "takashio": "https://www.city.tomigusuku.lg.jp/kurashi_tetsuzuki/anshin_anzen/1/1/index.html",
+   "tsunami": "https://www.city.tomigusuku.lg.jp/kurashi_tetsuzuki/anshin_anzen/1/1/index.html",
+   "dosha": "https://www.city.tomigusuku.lg.jp/kurashi_tetsuzuki/anshin_anzen/1/1/index.html"
+  },
+  "47213": {
+   "flood": "https://www.city.uruma.lg.jp/1002005000/contents/1596.html",
+   "naisui": "https://www.city.uruma.lg.jp/6001004000/contents/28926.html",
+   "tsunami": "https://www.city.uruma.lg.jp/1002005000/contents/1596.html",
+   "dosha": "https://www.city.uruma.lg.jp/1002005000/contents/1596.html"
+  },
+  "47214": {
+   "takashio": "https://www.city.miyakojima.lg.jp/kurashi/bousai/bousaijyouhou/bousaimap.html",
+   "tsunami": "https://www.city.miyakojima.lg.jp/kurashi/bousai/bousaijyouhou/bousaimap.html",
+   "dosha": "https://www.city.miyakojima.lg.jp/kurashi/bousai/bousaijyouhou/bousaimap.html"
+  },
+  "47215": {
+   "takashio": "https://www.bousai-nanjo.jp/material",
+   "tsunami": "https://www.bousai-nanjo.jp/material",
+   "dosha": "https://www.bousai-nanjo.jp/material"
+  },
+  "47301": {
+   "takashio": "http://www.vill.kunigami.okinawa.jp/bousai/",
+   "tsunami": "http://www.vill.kunigami.okinawa.jp/bousai/",
+   "dosha": "http://www.vill.kunigami.okinawa.jp/bousai/"
+  },
+  "47302": {
+   "takashio": "https://www.vill.ogimi.okinawa.jp/kurashi/anzen_anshin/bosai/526.html",
+   "tsunami": "https://www.vill.ogimi.okinawa.jp/kurashi/anzen_anshin/bosai/526.html",
+   "dosha": "https://www.vill.ogimi.okinawa.jp/kurashi/anzen_anshin/bosai/526.html"
+  },
+  "47303": {
+   "takashio": "https://www.vill.higashi.okinawa.jp/kurashi_tetsuzuki/anzen_anshin/562.html",
+   "tsunami": "https://www.vill.higashi.okinawa.jp/kurashi_tetsuzuki/anzen_anshin/562.html",
+   "dosha": "https://www.vill.higashi.okinawa.jp/kurashi_tetsuzuki/anzen_anshin/562.html"
+  },
+  "47306": {
+   "takashio": "https://www.nakijin.jp/pagtop/kakuka/somuka/4/5/611.html",
+   "tsunami": "https://www.nakijin.jp/pagtop/kakuka/somuka/4/5/611.html",
+   "dosha": "https://www.nakijin.jp/pagtop/kakuka/somuka/4/5/611.html"
+  },
+  "47308": {
+   "tsunami": "https://www.town.motobu.okinawa.jp/doc/2023103000034/",
+   "dosha": "https://www.town.motobu.okinawa.jp/doc/2023103000034/"
+  },
+  "47311": {
+   "takashio": "https://www.vill.onna.okinawa.jp/living/disaster/webbousaimap/",
+   "tsunami": "https://www.vill.onna.okinawa.jp/living/disaster/webbousaimap/",
+   "dosha": "https://www.vill.onna.okinawa.jp/living/disaster/webbousaimap/"
+  },
+  "47313": {
+   "flood": "https://www.vill.ginoza.okinawa.jp/section/hazardmap/",
+   "takashio": "https://www.vill.ginoza.okinawa.jp/soshiki/1001/2/15.html",
+   "tsunami": "https://www.vill.ginoza.okinawa.jp/soshiki/1001/2/15.html",
+   "dosha": "https://www.vill.ginoza.okinawa.jp/section/hazardmap/"
+  },
+  "47314": {
+   "takashio": "https://www.town.kin.okinawa.jp/soshiki/somuka/gyomuannai/1/2/1/642.html",
+   "tsunami": "https://www.town.kin.okinawa.jp/soshiki/somuka/gyomuannai/1/2/1/642.html",
+   "dosha": "https://www.town.kin.okinawa.jp/soshiki/somuka/gyomuannai/1/2/1/642.html"
+  },
+  "47324": {
+   "tsunami": "https://www.vill.yomitan.okinawa.jp/kurashi/anzen_anshin/bosai/map/5169.html",
+   "dosha": "https://www.vill.yomitan.okinawa.jp/kurashi/anzen_anshin/bosai/map/2369.html"
+  },
+  "47325": {
+   "takashio": "https://www.town.kadena.okinawa.jp/life/kur97.html",
+   "tsunami": "https://www.town.kadena.okinawa.jp/life/kur97.html",
+   "dosha": "https://www.town.kadena.okinawa.jp/life/kur97.html"
+  },
+  "47326": {
+   "flood": "https://www.chatan.jp/hazardmap/",
+   "naisui": "https://www.chatan.jp/hazardmap/",
+   "takashio": "https://www.chatan.jp/seikatsuguide/anshin_anzen/taisaku/bousai_map.html",
+   "tsunami": "https://www.chatan.jp/seikatsuguide/anshin_anzen/taisaku/bousai_map.html",
+   "dosha": "https://www.chatan.jp/seikatsuguide/anshin_anzen/taisaku/bousai_map.html"
+  },
+  "47327": {
+   "naisui": "https://www.vill.kitanakagusuku.lg.jp/sonsei/bousai/661.html",
+   "tsunami": "https://www.vill.kitanakagusuku.lg.jp/sonsei/bousai/661.html",
+   "dosha": "https://www.vill.kitanakagusuku.lg.jp/sonsei/bousai/661.html"
+  },
+  "47328": {
+   "takashio": "https://www.vill.nakagusuku.okinawa.jp/menuIndex.jsp?id=53415&menuid=11674&funcid=28",
+   "tsunami": "https://www.vill.nakagusuku.okinawa.jp/menuIndex.jsp?id=53415&menuid=11674&funcid=28",
+   "dosha": "https://www.vill.nakagusuku.okinawa.jp/menuIndex.jsp?id=53415&menuid=11674&funcid=28"
+  },
+  "47329": {
+   "flood": "https://www.town.nishihara.okinawa.jp/link/bousai.html",
+   "tsunami": "https://www.town.nishihara.okinawa.jp/link/bousai.html",
+   "dosha": "https://www.town.nishihara.okinawa.jp/link/bousai.html"
+  },
+  "47348": {
+   "takashio": "https://www.town.yonabaru.okinawa.jp/soshiki/8/132.html",
+   "tsunami": "https://www.town.yonabaru.okinawa.jp/soshiki/8/132.html",
+   "dosha": "https://www.town.yonabaru.okinawa.jp/soshiki/8/132.html"
+  },
+  "47350": {
+   "flood": "https://www.town.haebaru.lg.jp/soshiki/4/3230.html",
+   "dosha": "https://www.town.haebaru.lg.jp/soshiki/4/3230.html"
+  },
+  "47353": {
+   "tsunami": "https://www.vill.tokashiki.okinawa.jp/soshiki/somu/6/8/285.html",
+   "dosha": "https://www.vill.tokashiki.okinawa.jp/soshiki/somu/6/8/285.html"
+  },
+  "47354": {
+   "tsunami": "https://www.vill.zamami.okinawa.jp/disaster/m/2024/05/post-3.php",
+   "dosha": "https://www.vill.zamami.okinawa.jp/disaster/m/2024/05/post-3.php"
+  },
+  "47356": {
+   "takashio": "http://www.vill.tonaki.okinawa.jp/UserFiles/File/img/bousaimap2020.pdf",
+   "tsunami": "http://www.vill.tonaki.okinawa.jp/UserFiles/File/img/bousaimap2020.pdf"
+  },
+  "47359": {
+   "tsunami": "https://www.vill.iheya.okinawa.jp/soshiki/2/1068.html"
+  },
+  "47361": {
+   "takashio": "https://www.town.kumejima.okinawa.jp/docs/2023031000021/",
+   "tsunami": "https://www.town.kumejima.okinawa.jp/docs/2023031000021/",
+   "dosha": "https://www.town.kumejima.okinawa.jp/docs/2023031000021/"
+  },
+  "47362": {
+   "flood": "https://www.town.yaese.lg.jp/docs/2014042500044/",
+   "takashio": "https://www.town.yaese.lg.jp/docs/2014042500044/",
+   "tsunami": "https://www.town.yaese.lg.jp/docs/2014042500044/",
+   "dosha": "https://www.town.yaese.lg.jp/docs/2014042500044/"
+  },
+  "47381": {
+   "takashio": "https://www.town.taketomi.lg.jp/userfiles/files/hazardmap/flow_01.html",
+   "tsunami": "https://www.town.taketomi.lg.jp/bousai/bousaimap/",
+   "dosha": "https://www.town.taketomi.lg.jp/userfiles/files/hazardmap/flow_01.html"
   }
  }
 }
