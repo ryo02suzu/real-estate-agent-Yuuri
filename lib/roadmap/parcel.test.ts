@@ -20,6 +20,8 @@ import {
   neighborList,
   pickedChibanText,
   isLotChiban,
+  lotHead,
+  splitLotHead,
   registryChiban,
   chibanQueryOf,
   parcelAt,
@@ -693,6 +695,81 @@ describe("lookup で地番を探す", () => {
     );
     const same = await lookup("福島県いわき市中央台高久1丁目17番12", { parcels: src, loadIndex: async () => index });
     expect(same.status === "ok" && same.parcel?.chiban).toBe("17-12");
+  });
+
+  it("地番の頭の十二支・「◯号」（伊予市中山町中山「子4-6」「4号30」）を地番として扱い、町が分かってから入力の町名の後ろの字を地番の頭にする", async () => {
+    // 地図データの地番：十二支・「◯号」の付いた地番も地番（前は「道」などと同じ地番の無い形として扱っていた）
+    expect(isLotChiban("子4-6")).toBe(true);
+    expect(isLotChiban("寅4")).toBe(true);
+    expect(isLotChiban("4号30")).toBe(true);
+    expect(isLotChiban("道-5")).toBe(false);
+    expect(splitLotHead("4号30")).toEqual(["4号", "30"]);
+    expect(splitLotHead("子4-6")).toEqual(["子", "4-6"]);
+    expect(splitLotHead("123-4")).toEqual(["", "123-4"]);
+    // 入力を読むときは、町名の終わりの字（王子・金子）を地番の頭として取り出さない
+    expect(splitChiban("東京都北区王子5番")).toMatchObject({ body: "東京都北区王子", chiban: "5" });
+    expect(splitChiban("愛媛県伊予市中山町中山子4番6")).toMatchObject({ body: "愛媛県伊予市中山町中山子", chiban: "4-6" });
+    // 町が「中山町中山」と分かってから、すぐ後ろの子・4号を地番の頭にする
+    expect(lotHead("愛媛県伊予市中山町中山子", "中山町中山", "4-6", null)).toEqual({ town: "中山町中山", chiban: "子4-6", body: "愛媛県伊予市中山町中山" });
+    expect(lotHead("愛媛県伊予市中山町中山4号", "中山町中山", "30", null)).toEqual({ town: "中山町中山", chiban: "4号30", body: "愛媛県伊予市中山町中山" });
+    expect(lotHead("東京都北区王子", "王子", "5", null)).toBeNull();
+    expect(lotHead("愛媛県伊予市中山町中山字東", "中山町中山", "4-6", null)).toBeNull();
+    // 町名にロまで入って返る所：索引にその町が無く、ロを外した町があれば、外した町で探す（ある町なら直さない）
+    const ota = { k: { "大田市_大田町大田___": [] } };
+    expect(lotHead("島根県大田市大田町大田", "大田町大田ロ", "ロ818-4", ota)).toEqual({ town: "大田町大田", chiban: "ロ818-4", body: "島根県大田市大田町大田" });
+    expect(lotHead("島根県大田市大田町大田", "大田町大田ロ", "ロ818-4", { k: { "大田市_大田町大田ロ___": [] } })).toBeNull();
+    expect(lotHead("島根県大田市大田町大田", "大田町大田ロ", "ロ818-4", null)).toBeNull();
+  });
+
+  it("「中山町中山子4番6」：頭の無い同じ番号の筆（4-6）ではなく「子4-6」を当て、「町名を直した」とは言わない", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          url.includes("AddressSearch")
+            ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "愛媛県伊予市中山町中山" } }]
+            : { results: { muniCd: "38210", lv01Nm: "中山町中山" } },
+      })),
+    );
+    const K = "伊予市_中山町中山___";
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: K, chiban: "4-6" }], [`${SX + 1},${SY}`]: [{ kuiki: K, chiban: "子4-6" }] });
+    const index = { v: 1, k: { [K]: [[SX, SY, 4, 4], [SX + 1, SY, 4, 4]] } } as unknown as Awaited<ReturnType<typeof loadParcelIndex>>;
+    const r = await lookup("愛媛県伊予市中山町中山子4番6", { parcels: src, loadIndex: async () => index });
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.parcel?.chiban).toBe("子4-6");
+    const [w, , e] = tileBounds(SX + 1, SY);
+    expect(r.lng).toBeGreaterThan(w);
+    expect(r.lng).toBeLessThan(e);
+    expect(r.fix).toBeUndefined();
+    // 子を書かなければ、今までどおり頭の無い 4-6
+    const plain = await lookup("愛媛県伊予市中山町中山4番6", { parcels: src, loadIndex: async () => index });
+    expect(plain.status === "ok" && plain.parcel?.chiban).toBe("4-6");
+  });
+
+  it("「大田町大田ロ818番4」：国土地理院が町名を「大田町大田ロ」と返しても、地番区域「大田町大田」の「ﾛ818-4」を当てる（前は「地図データが無い」と出ていた）", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          url.includes("AddressSearch")
+            ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "島根県大田市大田町大田ロ" } }]
+            : { results: { muniCd: "32205", lv01Nm: "大田町大田" } },
+      })),
+    );
+    const K = "大田市_大田町大田___";
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: K, chiban: "ｲ818-4" }], [`${SX + 1},${SY}`]: [{ kuiki: K, chiban: "ﾛ818-4" }] });
+    const index = { v: 1, k: { [K]: [[SX, SY, 818, 818], [SX + 1, SY, 818, 818]] } } as unknown as Awaited<ReturnType<typeof loadParcelIndex>>;
+    const r = await lookup("島根県大田市大田町大田ロ818番4", { parcels: src, loadIndex: async () => index });
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.parcel?.chiban).toBe("ロ818-4");
+    expect(r.parcelMiss).toBeUndefined();
+    const [w, , e] = tileBounds(SX + 1, SY);
+    expect(r.lng).toBeGreaterThan(w);
+    expect(r.lng).toBeLessThan(e);
   });
 
   it("地割の住所で、国土地理院の住所に地割が無くても、地番の地図で同じ地割の筆を見つけたら「町名が見つからない」とは言わない", async () => {

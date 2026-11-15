@@ -2,7 +2,7 @@ import { correctAddress, describeMatch, placeNotFound, type AddressFix, type Add
 import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, matchedNumbers, needsChoice, numbersAgree, reverseGeocode, subAreaDropped, withoutNumbers, type GeocodeResult } from "./geocode";
 import { MUNI_CODES } from "./muni-codes";
 import { buildLinks, findMunicipality, resolveContact, type Contact, type Municipality, type ResolvedLink } from "./municipalities";
-import { kuikiAllows, kuikiHasSub, kuikiSubLabel, normalizeChiban, parcelAt, searchParcel, splitChiban, splitLotHead, townFromAddress, townKey, type Parcel, type ParcelSource } from "./parcel";
+import { kuikiAllows, kuikiHasSub, kuikiSubLabel, lotHead, normalizeChiban, parcelAt, searchParcel, splitChiban, splitLotHead, townFromAddress, townKey, type Parcel, type ParcelSource } from "./parcel";
 import { addressSub, elsewhereLabel, sameTownName, typedChome, type AddressSub, type Elsewhere } from "./parcel-sub";
 import { loadParcelIndex, type ParcelIndex } from "./parcel-index";
 import { pmtilesParcelSource } from "./parcel-tiles";
@@ -145,15 +145,23 @@ export async function lookup(
   const asRegistry = !!chiban && jukyo && (registryStyle(address) || (!/号$/.test(geo.matchedAddress.normalize("NFKC")) && chiban.chiban.includes("-")));
   if (chiban && (chiban.explicit || !jukyo || asRegistry)) {
     const city = muniCity(rev.muniCd) ?? municipality.name;
-    const town = townFromAddress(geo.matchedAddress, city);
+    let town = townFromAddress(geo.matchedAddress, city);
+    // 探す地番と、町より細かい区分を読む入力（地番の頭の字と町名の境目を、町が分かってから決め直すことがある）
+    let lot = chiban.chiban;
+    let body = chiban.body;
     try {
       // 地番の索引（市区町村コードごと。あれば番号の入ったタイルを先に開く。無ければ null で今までの探し方）
       const index = town ? await loadIndex(rev.muniCd) : null;
+      // 「大田町大田ロ818番4」（町名にロまで入って返る）・「中山町中山子4番6」（地番の頭の子が町名の側に残る）を、筆の地番区域と地番の形に直す
+      const head = town ? lotHead(body, town, lot, index) : null;
+      if (head) ({ town, chiban: lot, body } = head);
+      // 町名の後ろの字（子・4号）を地番の頭にしたときは、町名は合っていたので「町名を直した」とは言わない
+      if (head && notes.fix && notes.fix.from === `${town}${lot.slice(0, lot.length - chiban.chiban.length)}`) delete notes.fix;
       // 入れた住所に、見つかった町より細かい区分（丁目・地割・小字）があれば、筆の地番区域と照らし合わせる（同じ地番の別の土地を当てない）
-      const sub = town ? addressSub(chiban.body, town, city) : null;
+      const sub = town ? addressSub(body, town, city) : null;
       // 町の名前のすぐ後ろに書かれた丁目（「上麻生1丁目5番3」）。丁目は地番区域の一部なので、丁目の無い地番区域・別の丁目の同じ地番は当てない
-      const chome = town ? typedChome(chiban.body, town, city) : null;
-      const r = town ? await searchParcel({ city, town, chiban: chiban.chiban, sub, chome }, geo, parcels, { index }) : ({ status: "no_map" } as const);
+      const chome = town ? typedChome(body, town, city) : null;
+      const r = town ? await searchParcel({ city, town, chiban: lot, sub, chome }, geo, parcels, { index }) : ({ status: "no_map" } as const);
       // 見つけた筆が入れた町から遠く離れた別の町にあれば（図面ごと置き間違えた地図データのおそれ）、物件の場所としては出さない
       let away: ReturnType<typeof awayFrom> = null;
       if (r.status === "found") {
@@ -179,17 +187,17 @@ export async function lookup(
           contact: resolveContact(m, prev.muniCd),
         };
       }
-      if (away) parcelMiss = { chiban: chiban.chiban, reason: "not_found", similar: [], away };
+      if (away) parcelMiss = { chiban: lot, reason: "not_found", similar: [], away };
       // 国土地理院が番地まで見つけた住所で、ついでに筆を探しただけなら、見つからなくても何も言わない
       else if (r.status !== "found" && (chiban.explicit || approximate))
         parcelMiss = {
-          chiban: chiban.chiban,
+          chiban: lot,
           reason: r.status,
           similar: r.status === "not_found" ? r.similar : [],
-          ...(r.status === "not_found" && r.elsewhere?.length ? { elsewhere: elsewhereOf(r.elsewhere, geo.matchedAddress, chiban.chiban, chome != null) } : {}),
+          ...(r.status === "not_found" && r.elsewhere?.length ? { elsewhere: elsewhereOf(r.elsewhere, geo.matchedAddress, lot, chome != null) } : {}),
         };
     } catch {
-      if (chiban.explicit || approximate) parcelMiss = { chiban: chiban.chiban, reason: "error", similar: [] };
+      if (chiban.explicit || approximate) parcelMiss = { chiban: lot, reason: "error", similar: [] };
     }
   }
   return {

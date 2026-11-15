@@ -91,10 +91,17 @@ export type ParcelSearch =
 const DASH = "[‐‑–—―−ー－-]";
 
 /**
- * 登記の地番の頭に付くことのある文字。茨城・千葉などには「甲35-1」「乙1906」「丙993」「丁1146-2」「番外24-753」「ｲ533」のように
+ * 入力の住所を読むときに、地番の頭として取り出す文字。茨城・千葉などには「甲35-1」「乙1906」「丙993」「丁1146-2」「番外24-753」「ｲ533」のように
  * 甲乙丙丁戊・イロハ・番外の付いた地番がふつうにある（取手市白山３丁目乙987番1 など。地価公示の所在にもそのまま書かれる）
  */
-const LOT_PREFIX = "(?:番外|[甲乙丙丁戊己庚辛壬癸]{1,2}|[ｲﾛﾊﾆﾎﾍﾄﾁﾘﾇﾙｦイロハニホヘトチリヌルヲ]|仮)";
+const LOT_PREFIX_INPUT = "(?:番外|[甲乙丙丁戊己庚辛壬癸]{1,2}|[ｲﾛﾊﾆﾎﾍﾄﾁﾘﾇﾙｦイロハニホヘトチリヌルヲ]|仮)";
+/**
+ * 地番の頭の十二支と「◯号」（愛媛県伊予市中山町中山の「子4-6」「寅4-5」「4号30」など）。登記の地番の一部だが、
+ * 住所の文字では町名の終わりの字（「王子」「金子」など）と見分けられないので、入力を読むときは取り出さず、町が分かってから付ける（lotHead）
+ */
+const LOT_PREFIX_ETO = "(?:[子丑寅卯辰巳午未申酉戌亥]|\\d+号)";
+/** 登記の地番（地図データの地番）の頭に付くことのある文字：入力で取り出す文字と、十二支・「◯号」 */
+const LOT_PREFIX = `(?:番外|[甲乙丙丁戊己庚辛壬癸]{1,2}|[ｲﾛﾊﾆﾎﾍﾄﾁﾘﾇﾙｦイロハニホヘトチリヌルヲ]|${LOT_PREFIX_ETO}|仮)`;
 const LOT_CHIBAN = new RegExp(`^${LOT_PREFIX}?-?\\d`);
 
 /**
@@ -113,7 +120,7 @@ export function splitChiban(input: string): { body: string; chiban: string; expl
   s = s.replace(/[(（]?\s*地番\s*[)）]?\s*[:：]?/g, " ").replace(/\s+/g, " ").trim();
   if (/号$/.test(s)) return null;
   // 地番の頭の甲乙丙・イロハ・番外（「白山3丁目乙987番1」）は地番の一部として取り出す
-  const m = s.match(new RegExp(`^(.*?)(${LOT_PREFIX}?)(\\d+)(?:\\s*(?:番地の?|番の?|の|${DASH})\\s*(\\d+))?\\s*(?:番地?)?$`));
+  const m = s.match(new RegExp(`^(.*?)(${LOT_PREFIX_INPUT}?)(\\d+)(?:\\s*(?:番地の?|番の?|の|${DASH})\\s*(\\d+))?\\s*(?:番地?)?$`));
   if (!m) return null;
   const body = m[1].trim();
   // 前にも番号が続く（「1-2-3」「1丁目2番3」）のは住居表示
@@ -337,10 +344,38 @@ export function townFromAddress(address: string, city: string): string {
 
 const LOT_HEAD = new RegExp(`^(${LOT_PREFIX})-?`);
 
-/** 地番の頭の文字（甲乙丙・イロハ・番外）と、その後ろ（「乙987-1」→ ["乙", "987-1"]） */
+/** 地番の頭の文字（甲乙丙・イロハ・番外・十二支・「◯号」）と、その後ろ（「乙987-1」→ ["乙", "987-1"]、「4号30」→ ["4号", "30"]） */
 export function splitLotHead(chiban: string): [string, string] {
   const m = chiban.match(LOT_HEAD);
   return m ? [m[1], chiban.slice(m[0].length)] : ["", chiban];
+}
+
+/**
+ * 地番の頭の字と町名の境目を、町（国土地理院の住所の町名）が分かってから決め直す。直さなくてよければ null。
+ * ①「大田町大田ロ818番4」：国土地理院が地番の頭の「ロ」まで町名（大田町大田ロ）として返す。筆の地番区域は「大田町大田」で、地番が「ロ818-4」。
+ *   索引にその町の地番区域が無く、頭の字を外した町の地番区域があれば、外した町で探す
+ * ②「中山町中山子4番6」：地番の頭の十二支（子）や「4号」は、入力を読むときは町名の側に残る（町名の終わりの字と見分けられない）。
+ *   町が「中山町中山」と分かり、入力がその町名のすぐ後ろに十二支1字か「◯号」だけを書いていれば、地番の頭にする（頭の無い同じ番号の別の筆を当てない）
+ */
+export function lotHead(
+  body: string,
+  town: string,
+  chiban: string,
+  index: { k: Record<string, unknown> } | null | undefined,
+): { town: string; chiban: string; body: string } | null {
+  const [head] = splitLotHead(chiban);
+  if (head && index && town.endsWith(head)) {
+    const base = town.slice(0, -head.length);
+    const has = (t: string) => Object.keys(index.k).some((k) => townMatches(k, t));
+    if (base && !has(town) && has(base)) return { town: base, chiban, body };
+  }
+  if (!head && town) {
+    const b = body.normalize("NFKC").replace(/\s/g, "");
+    const i = b.lastIndexOf(town);
+    const tail = i >= 0 ? b.slice(i + town.length) : "";
+    if (new RegExp(`^${LOT_PREFIX_ETO}$`).test(tail)) return { town, chiban: `${tail}${chiban}`, body: b.slice(0, i + town.length) };
+  }
+  return null;
 }
 
 /** 地番の番号（枝番の前。頭の文字は外す） */
