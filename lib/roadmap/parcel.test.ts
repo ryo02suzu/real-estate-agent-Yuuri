@@ -1226,17 +1226,30 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
   const data = JSON.parse(readFileSync(new URL("../../scripts/parcel-tiles/misplaced-sheets.json", import.meta.url), "utf8")) as {
     sheets: { code: string; sheet: string; town: string; parcels: number; reason: string; oaza?: string; chome?: string; chiban?: string[]; shift?: { kind: "T1" | "T2" | "数字の誤り" | "照合" | "縮尺"; east: number; north: number; scale?: { k: number; rotate: number; origin: [number, number] } } }[];
   };
-  it("測地系の取り違えで動かす地図（shift）は、地図ごと・向きと量が日本測地系と世界測地系の差（西または東へ約245〜300m・北または南へ、関東・中部・近畿で約325〜370m、東北の X 系で約300〜315m）", () => {
+  it("測地系の取り違えで動かす地図（shift）は、地図ごと・向きと量が日本測地系と世界測地系の差（西または東へ約245〜300m・北または南へ、関東・中部・近畿で約325〜370m、東北の X 系で約300〜315m。九州・中国・四国・北海道・沖縄はその地方の量）", () => {
+    // 地方ごとの東西・南北の量（m。T1 の向きで、東は負・北は正）。国土地理院の換算の簡易式で各地の値を出し、平面直角座標で計算した量との差（約10m）を見込んだ幅
+    //   北海道：函館 約296・289、根室 約328・279、稚内 約299・247。中国・四国：下関 約221・363、鳥取 約249・351、宇和島 約233・375、徳島 約249・368。
+    //   九州：福岡県大任町 約221・374（決まりの量）、鹿児島 約214・390、奄美 約198・426。沖縄：那覇 約177・449、石垣 約141・464
+    const range = (code: string): { e: [number, number]; n: [number, number] } => {
+      const p = Number(code.slice(0, 2));
+      if (p === 1) return { e: [280, 340], n: [235, 305] };
+      if (p >= 31 && p <= 39) return { e: [205, 265], n: [330, 395] };
+      if (p >= 40 && p <= 46) return { e: [185, 245], n: [345, 445] };
+      if (p === 47) return { e: [125, 195], n: [420, 490] };
+      return { e: [240, 320], n: [290, 400] };
+    };
     for (const s of data.sheets.filter((x) => x.shift && (x.shift.kind === "T1" || x.shift.kind === "T2"))) {
       const { kind, east, north } = s.shift!;
       expect(["T1", "T2"]).toContain(kind);
       // T1：日本測地系の数字→世界測地系（北西へ動かす。今は南東へずれている）。T2：その逆（南東へ動かす）。
       // 差は場所で変わる（国土地理院の TKY2JGD.par：福井県の西で東西 約256m、新潟県の北で南北 約326m、銚子で東西 約301m、館山で南北 約371m。
       // 兵庫県（平面直角座標の V 系）は東西 約245〜248m。東北（青森〜山形の X 系）は北へ短く、花巻市で南北 約310m）
-      expect(east).toBeGreaterThanOrEqual(kind === "T1" ? -320 : 240);
-      expect(east).toBeLessThanOrEqual(kind === "T1" ? -240 : 320);
-      expect(north).toBeGreaterThanOrEqual(kind === "T1" ? 290 : -400);
-      expect(north).toBeLessThanOrEqual(kind === "T1" ? 400 : -290);
+      const { e, n } = range(s.code);
+      const sign = kind === "T1" ? 1 : -1;
+      expect(-sign * east, `${s.code} ${s.sheet}`).toBeGreaterThanOrEqual(e[0]);
+      expect(-sign * east, `${s.code} ${s.sheet}`).toBeLessThanOrEqual(e[1]);
+      expect(sign * north, `${s.code} ${s.sheet}`).toBeGreaterThanOrEqual(n[0]);
+      expect(sign * north, `${s.code} ${s.sheet}`).toBeLessThanOrEqual(n[1]);
       // 理由の向き（「地図全体が南東へ…ずれている」）が動かす向きの逆になっている
       expect(s.reason).not.toMatch(kind === "T1" ? /地図全体が北西へ/ : /地図全体が南東へ/);
       expect(s.reason).not.toMatch(kind === "T1" ? /北西へ約\d+mずれている/ : /南東へ約\d+mずれている/);
@@ -1254,11 +1267,23 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
   });
   it("動かす量は、平面直角座標の数字の取り違えとして計算した値（同じ座標系の中ではほぼ同じ量で、T1 と T2 は向きが逆）", () => {
     // 平面直角座標の系：関東（茨城〜神奈川）IX、新潟・山梨・長野・静岡 VIII、富山・石川・岐阜・愛知 VII、福井と近畿（兵庫を除く）VI、兵庫 V。
+    // 鳥取・岡山 V、島根・広島・山口 III、四国 IV、長崎 I、福岡・佐賀・熊本・大分・宮崎 II。県の中で系が分かれる北海道（XI〜XIII）・鹿児島（II と島の I）・
+    // 沖縄（XV〜XVII）は、市町村ごとに分けて比べる。
     // 緯度経度の変換量（TKY2JGD.par）をそのまま使うと場所ごとに 3〜12m 違い、最初の関東の決まりは同じ系の中で最大 11.9m ばらついていた。
     // 数字の取り違えとして計算すると、同じ系の中では原点からの距離の分しか変わらない（2026-11-08 の作り直しで最大 2.7m）
     const zone = (code: string) => {
       const p = Number(code.slice(0, 2));
-      return p <= 6 ? "X" : p <= 14 ? "IX" : [15, 19, 20, 22].includes(p) ? "VIII" : [18, 24, 25, 26, 27, 29, 30].includes(p) ? "VI" : p === 28 ? "V" : "VII";
+      if ([1, 46, 47].includes(p)) return `市町村 ${code}`;
+      if (p <= 6) return "X";
+      if (p <= 14) return "IX";
+      if ([15, 19, 20, 22].includes(p)) return "VIII";
+      if ([18, 24, 25, 26, 27, 29, 30].includes(p)) return "VI";
+      if ([28, 31, 33].includes(p)) return "V";
+      if ([32, 34, 35].includes(p)) return "III";
+      if (p >= 36 && p <= 39) return "IV";
+      if (p === 42) return "I";
+      if ([40, 41, 43, 44, 45].includes(p)) return "II";
+      return "VII";
     };
     const groups = new Map<string, [number, number][]>();
     // 計算した量に残りを足した地図は、ここでは比べない（会津若松市北会津町水季の里の1枚だけ。計算した量から約9m。理由に書いてある）
@@ -1574,6 +1599,57 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     for (const [code, sheet] of [["28209", "豊岡市日高町日置字姫路"], ["28224", "南あわじ市平成１６年度５００地籍図Ａ"], ["28224", "南あわじ市福良乙１６"], ["28226", "淡路市昭和５６年度５００土地改良Ａ"], ["28229", "28229_2010_0"]]) {
       expect(data.sheets.some((x) => x.code === code && x.sheet === sheet), `${code} ${sheet}`).toBe(false);
     }
+  });
+  it("2026-11-15：新しい地方の地価の地点で見つけた福岡県大任町の2枚（大字大行事 1,592筆・今任原 39筆）を、計算どおりの量で動かす（写真に重ねて確かめた）", () => {
+    const want: [string, string, number][] = [
+      ["大任町大字大行事", "大任町 大字大行事（測地系の取り違え・位置を直す）", 1592],
+      ["今任原", "大任町 大字今任原（測地系の取り違え・位置を直す）", 39],
+    ];
+    for (const [sheet, town, parcels] of want) {
+      const s = data.sheets.find((x) => x.code === "40608" && x.sheet === sheet);
+      expect(s, sheet).toBeDefined();
+      expect(s!.town).toBe(town);
+      expect(s!.parcels).toBe(parcels);
+      // 福岡県（II 系）の量：西へ約221m・北へ約374m（約435m）。日本測地系の数字が世界測地系として入っている（T1）
+      expect(s!.shift?.kind).toBe("T1");
+      expect(s!.shift!.east).toBeCloseTo(-221, 0);
+      expect(s!.shift!.north).toBeCloseTo(374.1, 1);
+      expect(Math.hypot(s!.shift!.east, s!.shift!.north)).toBeGreaterThan(430);
+      expect(Math.hypot(s!.shift!.east, s!.shift!.north)).toBeLessThan(440);
+      expect(s!.reason).toMatch(/航空写真/);
+      expect(s!.chiban).toBeUndefined();
+      expect(s!.oaza).toBeUndefined();
+    }
+    // 大字大行事は、地価調査の標準地「大字大行事931番1」が動かした位置に合うことと、今の位置で 342筆が隣の添田町の上にあることが根拠
+    expect(data.sheets.find((x) => x.code === "40608" && x.sheet === "大任町大字大行事")!.reason).toMatch(/931番1.*添田町/);
+    // 同じ町の候補のうち、「大字今任原（数値）２０Ａ０２」「大字今任原（数値）２０Ａ０３」は写真で今の位置が正しいと確かめた。「大字今任原16-1修正後」は造成地で決め手が無い（動かさない）
+    for (const sheet of ["大字今任原（数値）２０Ａ０２", "大字今任原（数値）２０Ａ０３", "大字今任原16-1修正後"]) {
+      expect(data.sheets.some((x) => x.code === "40608" && x.sheet === sheet), sheet).toBe(false);
+    }
+  });
+  it("2026-11-15：高知市 愛宕山南町の図面（530筆）は、世界測地系の数字に変換がかかって北西へ約451mずれている（T2。南東へ動かす）", () => {
+    const s = data.sheets.find((x) => x.code === "39201" && x.sheet === "愛宕山南町（数値）１７Ａ０１");
+    expect(s).toBeDefined();
+    expect(s!.parcels).toBe(530);
+    expect(s!.shift).toEqual({ kind: "T2", east: 241.4, north: -381 });
+    expect(Math.hypot(s!.shift!.east, s!.shift!.north)).toBeCloseTo(451, 0);
+    // 地価の標準地（愛宕山南町212番10）・隣の図面との重なり（100% → 0%）・町の境界・道路縁・写真が根拠
+    expect(s!.reason).toMatch(/212番10/);
+    expect(s!.reason).toMatch(/100%/);
+    expect(s!.reason).toMatch(/529筆が愛宕山南町に入る/);
+    expect(s!.reason).toMatch(/航空写真/);
+    // 重なっていた隣の図面（愛宕山）は、今の位置が正しい（動かさない）
+    expect(data.sheets.some((x) => x.code === "39201" && x.sheet === "愛宕山（数値）２４Ｒ０１")).toBe(false);
+  });
+  it("2026-11-15：札幌市手稲区 金山の図面（523筆）は、北海道の XII 系で北西へ約404mずれている（T2。南東へ動かす）", () => {
+    const s = data.sheets.find((x) => x.code === "01109" && x.sheet === "整附Ｂ（１／５００）数値Ｈ１７");
+    expect(s).toBeDefined();
+    expect(s!.parcels).toBe(523);
+    expect(s!.shift).toEqual({ kind: "T2", east: 309.1, north: -260 });
+    expect(Math.hypot(s!.shift!.east, s!.shift!.north)).toBeCloseTo(404, 0);
+    expect(s!.reason).toMatch(/金山1条4丁目39番25/);
+    expect(s!.reason).toMatch(/2\/523筆.*508\/523筆/);
+    expect(s!.reason).toMatch(/航空写真/);
   });
   it("地価の地点で見つけたずれ（2026-11-13）：渋川市の地図 10109 は地図ごと動かす決まり1つだけ、生駒市北新町の地図はずれた20筆だけを動かす", () => {
     // 渋川市：前は「ほかの地図の筆と重なる部分だけ外す」決まり3つ（531筆）だった。重なりは地図全体のずれのせいで、動かすと重なりは 0.2%
