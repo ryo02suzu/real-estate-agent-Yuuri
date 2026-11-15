@@ -19,7 +19,7 @@ import type { Contact, MapLink, Municipality } from "../municipalities";
 const pref = "北海道" as const;
 
 /** 総合振興局・振興局の建設指導課 建築住宅係（電話は道「道内の特定行政庁」、場所は道の閲覧規程と「定期報告提出先一覧」） */
-const OFFICE = {
+export const HOKKAIDO_OFFICE = {
   sorachi: { dept: "北海道 空知総合振興局 札幌建設管理部 建設行政室 建設指導課 建築住宅係（岩見沢市8条西5丁目）", phone: "0126-20-0067" },
   ishikari: { dept: "北海道 石狩振興局 産業振興部 建設指導課 建築住宅係（札幌市中央区北3条西7丁目 道庁別館）", phone: "011-204-5833" },
   shiribeshi: { dept: "北海道 後志総合振興局 小樽建設管理部 建設行政室 建設指導課 建築住宅係（倶知安町北1条東2丁目）", phone: "0136-23-1373" },
@@ -35,6 +35,7 @@ const OFFICE = {
   kushiro: { dept: "北海道 釧路総合振興局 釧路建設管理部 建設行政室 建設指導課 建築住宅係（釧路市浦見2丁目2番54号）", phone: "0154-43-9192" },
   nemuro: { dept: "北海道 根室振興局 産業振興部 建設指導課 建築住宅係（根室市常盤町3丁目28番地）", phone: "0153-23-6832" },
 } as const;
+const OFFICE = HOKKAIDO_OFFICE;
 type Office = keyof typeof OFFICE;
 
 /** 「空知総合振興局の建設指導課」のような短い呼び名 */
