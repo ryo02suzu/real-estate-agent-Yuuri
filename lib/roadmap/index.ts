@@ -162,7 +162,7 @@ export async function lookup(
       const head = town ? lotHead(body, town, lot, index) : null;
       if (head) ({ town, chiban: lot, body } = head);
       // 町名の後ろの字（子・4号）を地番の頭にしたときは、町名は合っていたので「町名を直した」とは言わない
-      if (head && notes.fix && notes.fix.from === `${town}${lot.slice(0, lot.length - chiban.chiban.length)}`) delete notes.fix;
+      if (head && notes.fix && lot.length >= chiban.chiban.length && notes.fix.from === `${town}${lot.slice(0, lot.length - chiban.chiban.length)}`) delete notes.fix;
       // 入れた住所に、見つかった町より細かい区分（丁目・地割・小字）があれば、筆の地番区域と照らし合わせる（同じ地番の別の土地を当てない）
       const sub = town ? addressSub(body, town, city) : null;
       // 町の名前のすぐ後ろに書かれた丁目（「上麻生1丁目5番3」）。丁目は地番区域の一部なので、丁目の無い地番区域・別の丁目の同じ地番は当てない
