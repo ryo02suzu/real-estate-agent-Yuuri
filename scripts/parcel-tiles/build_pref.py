@@ -375,11 +375,12 @@ class _Neighbors:
 
 
 # 地番の索引（アプリの地番検索が、町の代表点から遠い筆も最初に開くタイルで見つけられるように）。
-# 市区町村コードごとに、地番区域 → [[z16 のタイル x, y, そのタイルの地番の番号（枝番の前）の最小, 最大], …]。
-# 地番の頭の甲乙丙・イロハ・番外・十二支・「◯号」（伊予市中山町中山の「子4-6」「4号30」など）は外して番号だけで数える
-# （lib/roadmap/parcel.ts の isLotChiban・splitLotHead と同じ形）。道・水などの地番の無い筆は入れない
+# 市区町村コードごとに、地番区域 → [[z16 のタイル x, y, そのタイルの地番の番号（枝番の前）の最小, 最大(, 地番の頭)], …]。
+# 地番の頭の甲乙丙・イロハ・番外・十二支・「◯号」（伊予市中山町中山の「子4-6」「4号30」など）は外して番号で数え、頭ごとに別の範囲にする
+# （頭のある地番は5つ目に頭を書く。同じ町に「甲39」「丁39」「子39」「39」が並ぶ所で、探す地番の頭の範囲のタイルだけを開ける。
+# 頭ごとに分けた索引には "h": 1 を付ける。lib/roadmap/parcel.ts の isLotChiban・splitLotHead と同じ形）。道・水などの地番の無い筆は入れない
 INDEX_ZOOM = 16
-LOT_BASE = re.compile(r"^(?:番外|[甲乙丙丁戊己庚辛壬癸]{1,2}|[ｲﾛﾊﾆﾎﾍﾄﾁﾘﾇﾙｦイロハニホヘトチリヌルヲ]|[子丑寅卯辰巳午未申酉戌亥]|\d+号|仮)?-?(\d+)")
+LOT_BASE = re.compile(r"^(番外|[甲乙丙丁戊己庚辛壬癸]{1,2}|[ｲﾛﾊﾆﾎﾍﾄﾁﾘﾇﾙｦイロハニホヘトチリヌルヲ]|[子丑寅卯辰巳午未申酉戌亥]|\d+号|仮)?-?(\d+)")
 
 
 def _tile_xy(lng: float, lat: float, z: int = INDEX_ZOOM) -> tuple[int, int]:
@@ -407,7 +408,7 @@ def add_to_index(index: dict, code: str, kuiki: str, chiban: str, geom: dict) ->
     m = LOT_BASE.match(unicodedata.normalize("NFKC", chiban or ""))
     if not m or not geom or not geom.get("coordinates"):
         return
-    base = int(m.group(1))
+    head, base = m.group(1) or "", int(m.group(2))
     b = _bbox(geom["coordinates"])
     if b is None:
         return
@@ -418,20 +419,26 @@ def add_to_index(index: dict, code: str, kuiki: str, chiban: str, geom: dict) ->
         tiles = [(x0, y0), (x0, y1), (x1, y0), (x1, y1)]
     k = index.setdefault(code, {}).setdefault(kuiki, {})
     for t in tiles:
-        r = k.get(t)
+        r = k.get((t, head))
         if r is None:
-            k[t] = [base, base]
+            k[(t, head)] = [base, base]
         else:
             r[0], r[1] = min(r[0], base), max(r[1], base)
 
 
+def index_entries(tiles: dict) -> list:
+    """1つの地番区域の索引の並び：[x, y, 最小, 最大]（頭の無い地番）と [x, y, 最小, 最大, 頭]（頭のある地番）"""
+    return sorted(([x, y, lo, hi, head] if head else [x, y, lo, hi]) for ((x, y), head), (lo, hi) in tiles.items())
+
+
 def write_index(index: dict, directory: str) -> int:
-    """市区町村コードごとに <directory>/<code>.json を書く。形：{"v":1,"z":16,"k":{地番区域:[[x,y,最小,最大],…]}}"""
+    """市区町村コードごとに <directory>/<code>.json を書く。形：{"v":1,"z":16,"h":1,"k":{地番区域:[[x,y,最小,最大(,頭)],…]}}
+    （"v" は前の形のままにする。前のアプリは5つ目を読まずに、今までどおり番号の範囲でタイルを開ける）"""
     os.makedirs(directory, exist_ok=True)
     for code, by_kuiki in index.items():
-        k = {kuiki: sorted([x, y, lo, hi] for (x, y), (lo, hi) in tiles.items()) for kuiki, tiles in sorted(by_kuiki.items())}
+        k = {kuiki: index_entries(tiles) for kuiki, tiles in sorted(by_kuiki.items())}
         with open(os.path.join(directory, f"{code}.json"), "w", encoding="utf-8") as f:
-            json.dump({"v": 1, "z": INDEX_ZOOM, "code": code, "k": k}, f, ensure_ascii=False, separators=(",", ":"))
+            json.dump({"v": 1, "z": INDEX_ZOOM, "h": 1, "code": code, "k": k}, f, ensure_ascii=False, separators=(",", ":"))
     return len(index)
 
 

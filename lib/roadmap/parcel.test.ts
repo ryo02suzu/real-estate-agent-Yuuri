@@ -765,6 +765,41 @@ describe("lookup で地番を探す", () => {
     expect(plain.status === "ok" && plain.parcel?.chiban).toBe("4-6");
   });
 
+  it("頭ごとに分けた索引（h）では、探す地番の頭（子）の範囲のタイルだけを開け、近い 24 枚より遠い筆も見つける（伊予市中山町中山子39番2）", async () => {
+    // 本物の索引では、中山町中山の地番区域で番号 39 の入るタイルが 114 枚のうち 55 枚（甲39・丁39・39 など）あり、近い 24 枚だけを開けて
+    // 「子39-2」のある遠いタイルに届かず「町まで」になっていた（2026-11-15、地番タイルの作り直しのあとに本物のデータで確かめて見つけた）
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          url.includes("AddressSearch")
+            ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "愛媛県伊予市中山町中山" } }]
+            : { results: { muniCd: "38210", lv01Nm: "中山町中山" } },
+      })),
+    );
+    const K = "伊予市_中山町中山___";
+    // 代表点のまわりの 30 枚には甲39（頭の違う同じ番号）、6 枚東のタイルにだけ子39-2
+    const near: [number, number][] = [];
+    for (let dx = -2; dx <= 3; dx++) for (let dy = -2; dy <= 2; dy++) near.push([SX + dx, SY + dy]);
+    const tiles: Record<string, { kuiki: string; chiban: string }[]> = {};
+    for (const [x, y] of near) tiles[`${x},${y}`] = [{ kuiki: K, chiban: "甲39" }];
+    tiles[`${SX + 6},${SY}`] = [{ kuiki: K, chiban: "子39-2" }];
+    const src = fakeSource(tiles);
+    const entries = [...near.map(([x, y]) => [x, y, 39, 39, "甲"]), [SX + 6, SY, 39, 39, "子"]];
+    const headed = { v: 1, h: 1, k: { [K]: entries } } as unknown as Awaited<ReturnType<typeof loadParcelIndex>>;
+    const r = await lookup("愛媛県伊予市中山町中山子39番2", { parcels: src, loadIndex: async () => headed });
+    expect(r.status === "ok" && r.parcel?.chiban).toBe("子39-2");
+    expect(r.status === "ok" && r.parcelMiss).toBeFalsy();
+    // 頭で分けていない前の形の索引（h なし）は、今までどおり番号だけで選ぶ（近い 24 枚に届かなければ見つからない）
+    const old = { v: 1, k: { [K]: entries.map((e) => e.slice(0, 4)) } } as unknown as Awaited<ReturnType<typeof loadParcelIndex>>;
+    const r2 = await lookup("愛媛県伊予市中山町中山子39番2", { parcels: src, loadIndex: async () => old });
+    expect(r2.status === "ok" && r2.parcel).toBeFalsy();
+    // 甲39 を探せば、甲の範囲のタイル（近いもの）を開ける
+    const r3 = await lookup("愛媛県伊予市中山町中山甲39番", { parcels: src, loadIndex: async () => headed });
+    expect(r3.status === "ok" && r3.parcel?.chiban).toBe("甲39");
+  });
+
   it("「大田町大田ロ818番4」：国土地理院が町名を「大田町大田ロ」と返しても、地番区域「大田町大田」の「ﾛ818-4」を当てる（前は「地図データが無い」と出ていた）", async () => {
     vi.stubGlobal(
       "fetch",

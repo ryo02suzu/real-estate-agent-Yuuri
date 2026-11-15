@@ -6,8 +6,13 @@ import { PARCEL_DATA } from "./parcel-data";
 export type ParcelIndex = {
   v: 1;
   z: number;
-  /** 地番区域 → [x, y, 最小, 最大][] */
-  k: Record<string, [number, number, number, number][]>;
+  /**
+   * 1 なら、地番の頭（甲乙丙・イロハ・十二支・「◯号」など）ごとに範囲が分かれている（頭のある地番の範囲は5つ目に頭。2026-11-15 から）。
+   * 無ければ前の形（頭を外した番号だけの範囲で、頭の違う地番もまとめて数えている）
+   */
+  h?: 1;
+  /** 地番区域 → [x, y, 最小, 最大][]（頭ごとに分けた索引では、頭のある地番の範囲は [x, y, 最小, 最大, 頭]） */
+  k: Record<string, ([number, number, number, number] | [number, number, number, number, string])[]>;
 };
 
 const cache = new Map<string, Promise<ParcelIndex | null>>();
