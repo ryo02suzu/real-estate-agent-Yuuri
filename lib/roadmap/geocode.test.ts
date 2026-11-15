@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { branchUnmatched, addressNumbers, isApproximate, matchedNumbers, numbersAgree, partialMatch, subAreaDropped, withoutNumbers } from "./geocode";
+import { branchUnmatched, addressNumbers, isApproximate, matchedNumbers, numbersAgree, partialMatch, streetSide, subAreaDropped, withoutNumbers } from "./geocode";
 
 describe("住所の一致の深さ", () => {
   it("番地がまったく無い一致は、町の中心（isApproximate）", () => {
@@ -130,5 +130,17 @@ describe("地番の枝番が合っていない一致（branchUnmatched）", () =
     expect(branchUnmatched("東京都千代田区丸の内1-9-1", "東京都千代田区丸の内一丁目９番")).toBe(false);
     expect(branchUnmatched("神奈川県大和市つきみ野4丁目4番8", "神奈川県大和市つきみ野四丁目４番")).toBe(false);
     expect(branchUnmatched("埼玉県熊谷市大字三ケ尻9999番1", "埼玉県熊谷市三ケ尻")).toBe(false);
+  });
+});
+
+describe("通りの北・南に分かれた丁目を、丁目を書かずに書いた住所（streetSide）", () => {
+  it("「本通14北5-35」を「本通14丁目北5-35」にする（国土地理院は「十四丁目南」と「十四丁目北」の両方を返し、南を当てると道の反対側の町になる）", () => {
+    expect(streetSide("北海道札幌市白石区本通14北5-35")).toBe("北海道札幌市白石区本通14丁目北5-35");
+    expect(streetSide("札幌市白石区平和通16北3-15")).toBe("札幌市白石区平和通16丁目北3-15");
+    expect(streetSide("札幌市白石区南郷通7南1-13")).toBe("札幌市白石区南郷通7丁目南1-13");
+  });
+  it("丁目を書いた住所・条の住所・ほかの地方の住所は変えない", () => {
+    for (const a of ["北海道札幌市白石区本通14丁目北5-35", "北海道札幌市中央区南1条西2丁目", "北海道札幌市北区北28条西13-1-13", "札幌市中央区南1西2", "東京都千代田区神田神保町1-2-3", "愛知県名古屋市中区栄3-15-33"])
+      expect(streetSide(a)).toBe(a);
   });
 });
