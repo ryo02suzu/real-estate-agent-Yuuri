@@ -14,6 +14,7 @@ import {
   parcelMark,
   estimatedNote,
   estimatedSentence,
+  kuikiChome,
   kuikiLabel,
   kuikiLabelFrom,
   adjacentParcels,
@@ -841,6 +842,31 @@ describe("lookup で地番を探す", () => {
     expect(r.status === "ok" && r.parcel?.kuiki).toBe(K);
     expect(r.status === "ok" && r.parcel?.chiban).toBe("246");
     expect(r.status === "ok" && r.parcelMiss).toBeFalsy();
+  });
+
+  it("大字・丁目の欄が空で、小字の欄に町の名前が丁目まで入っている地番区域（陸別町「字陸別本通一丁目」）でも、住所の丁目で筆を見つける", async () => {
+    // 北海道足寄郡陸別町字陸別本通1丁目11番3：法務省の地図データの地番区域は「足寄郡陸別町___字陸別本通一丁目_」。
+    // 国土地理院の町は「陸別本通一丁目」。小字の欄の「一丁目」を丁目と数えず、別の区域の筆として「町まで」になっていた（2026-11-15）
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          url.includes("AddressSearch")
+            ? [{ geometry: { coordinates: [START.lng, START.lat] }, properties: { title: "北海道陸別町陸別本通一丁目" } }]
+            : { results: { muniCd: "01648", lv01Nm: "陸別本通一丁目" } },
+      })),
+    );
+    const K = "足寄郡陸別町___字陸別本通一丁目_";
+    const K2 = "足寄郡陸別町___字陸別本通二丁目_";
+    const src = fakeSource({ [`${SX + 1},${SY}`]: [{ kuiki: K, chiban: "11-3" }, { kuiki: K2, chiban: "11-3" }] });
+    const index = { v: 1, k: { [K]: [[SX + 1, SY, 11, 11]], [K2]: [[SX + 1, SY, 11, 11]] } } as unknown as Awaited<ReturnType<typeof loadParcelIndex>>;
+    const r = await lookup("北海道足寄郡陸別町字陸別本通1丁目11番3", { parcels: src, loadIndex: async () => index });
+    expect(r.status === "ok" && r.parcel?.kuiki).toBe(K);
+    expect(r.status === "ok" && r.parcel?.chiban).toBe("11-3");
+    expect(r.status === "ok" && r.parcelMiss).toBeFalsy();
+    // 小字の名前としての丁目（「字五丁目」。町の名前ではない）は、今までどおり丁目に数えない
+    expect(kuikiChome("川口市_青木__字五丁目_")).toBeNull();
   });
 
   it("地割の住所で、国土地理院の住所に地割が無くても、地番の地図で同じ地割の筆を見つけたら「町名が見つからない」とは言わない", async () => {
