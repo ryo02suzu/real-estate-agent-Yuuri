@@ -13,6 +13,7 @@ import { CHUGOKU_PENDING } from "./data/chugoku";
 import { SHIKOKU_PENDING } from "./data/shikoku";
 import { KYUSHU_PENDING } from "./data/kyushu";
 import { HOKKAIDO_PENDING } from "./data/hokkaido";
+import { HOKKAIDO_CITIES } from "./data/hokkaido-cities";
 import { HOKKAIDO } from "./data/hokkaido-pref";
 import { OKINAWA } from "./data/okinawa";
 import { KAGOSHIMA } from "./data/kagoshima";
@@ -152,7 +153,7 @@ export type Municipality = {
   /**
    * ネットで道路種別がどこまで分かるか。
    * outside = 市町村内に都市計画区域が無い（建築基準法の接道義務＝43条は原則かからない）
-   * unknown = 公開の有無をまだ調べていない（登録したばかりの地方。国のデータは出すが、道路図は県か市の建築指導課へ）
+   * unknown = 公開の有無をまだ調べていない（登録したばかりの地方。国のデータは出すが、道路図は都道府県か市町村の建築指導課へ）
    */
   coverage: "full" | "partial" | "none" | "outside" | "unknown";
   maps: MapLink[];
@@ -162,18 +163,18 @@ export type Municipality = {
   note?: string;
 };
 
-/** 対応している地方（関東・中部・東北・近畿）の市区町村 */
+/** はじめから対応している地方（関東・中部・東北・近畿）の市区町村 */
 const BASE: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI, ...SHIZUOKA, ...YAMANASHI, ...NAGANO, ...AICHI, ...GIFU, ...NIIGATA, ...TOYAMA, ...ISHIKAWA, ...FUKUI, ...CHUBU_PENDING, ...AOMORI, ...IWATE, ...MIYAGI, ...AKITA, ...YAMAGATA, ...FUKUSHIMA, ...TOHOKU_PENDING, ...MIE, ...MIE_CITIES, ...SHIGA, ...SHIGA_CITIES, ...KYOTO, ...KYOTO_CITIES, ...OSAKA, ...OSAKA_CITIES, ...HYOGO, ...HYOGO_CITIES, ...NARA, ...NARA_CITIES, ...WAKAYAMA, ...WAKAYAMA_CITIES, ...KINKI_PENDING];
 
 /**
- * 準備中に足した地方（regions.json の preparing）の市町村。調べ終えて登録した道県（data/<道県>.ts）と、調査中の一覧（data/<地方>.ts）。
- * 国のデータを作って確かめ終えるまで、対応エリア（MUNICIPALITIES）には入れない
+ * 全国対応で足した地方（中国・四国・九州沖縄・北海道）の市町村。調べ終えて登録した道県（data/<道県>.ts）と、調査中の一覧（data/<地方>.ts）。
+ * 2026-11-15 に4地方とも公開した。regions.json で preparing（準備中）にした地方は、対応エリア（MUNICIPALITIES）に入れない
  */
 const ADDED: [RegionKey, Municipality[]][] = [
   ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...CHUGOKU_PENDING]],
   ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING]],
   ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...KYUSHU_PENDING]],
-  ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_PENDING]],
+  ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING]],
 ];
 
 /** 対応している市区町村（アプリが使う。準備中の地方の市町村は入っていない） */

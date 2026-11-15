@@ -3,6 +3,7 @@
 // 相場のタブの下半分「取引事例」（すりガラスのシートの中。前の版の「取引」タブ）：実際の取引価格・成約価格（不動産情報ライブラリ。
 // 同じ町、無ければ市区町村全体）と、近くの地価公示・地価調査の地点の価格の事例。下の操作バーの「取引事例へ」でここまで送る（id="pv-deals"）。
 // 一覧なので、件数が多ければスクロールする
+import { PREF_HEAD } from "@/lib/roadmap/dept";
 import { Building, ChevronDown, ChevronRight, House, LandPlot, Trees } from "lucide-react";
 import { useState } from "react";
 import { TSUBO_M2 } from "@/lib/app/area";
@@ -51,7 +52,7 @@ export function DealsSection({ result, data, open }: TabProps) {
 
       <section>
         <GHead title="公的な価格の事例" note="地価公示・地価調査" />
-        <Lead>国（地価公示・1月1日時点）と都県（地価調査・7月1日時点）が毎年出す、決まった地点の標準的な土地の価格です。実際に売買された価格ではありません。</Lead>
+        <Lead>国（地価公示・1月1日時点）と都道府県（地価調査・7月1日時点）が毎年出す、決まった地点の標準的な土地の価格です。実際に売買された価格ではありません。</Lead>
         <div className="no-scrollbar -mx-[14px] flex gap-[6px] overflow-x-auto px-[14px] pb-[2px]">
           <Chip label="すべて" on={kind === "all"} onClick={() => setKind("all")} />
           <Chip label="地価公示" on={kind === "公示"} onClick={() => setKind("公示")} />
@@ -109,7 +110,7 @@ function DealRow({ hit, onClick }: { hit: LandPriceHit; onClick: () => void }) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate font-semibold leading-[1.3]" style={{ fontSize: 14.5, color: G.text }}>
-          {(hit.jukyo || hit.address || "所在不明").replace(/^(東京都|.{2,3}県)/, "")}
+          {(hit.jukyo || hit.address || "所在不明").replace(PREF_HEAD, "")}
         </span>
         <span className="mt-[2px] block truncate leading-[1.3]" style={{ fontSize: 12, color: G.faint }}>
           {hit.usage}・{hit.bearing}へ{distanceText(hit.distance)}・{hit.year}年{hit.station ? `・${stationText(hit, true)}` : ""}

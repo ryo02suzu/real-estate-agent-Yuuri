@@ -2,6 +2,7 @@
 // 「要点」は結論（要注意点）・物件の概要・災害・残りのやることだけ（上司・同僚への一報）。「詳しく」は法令・地価・周辺・地番・
 // 上下水道・確認先のリンク・出典まで（社内の記録・報告書の元）。中身は PC の結果の文面（lib/summary.ts）と同じデータから作るが、
 // 順と書き方を読む人に合わせて並べ直す。法令上の判断（再建築の可否など）はしない
+import { deptLabel } from "../roadmap/dept";
 import type { LookupResult } from "../roadmap";
 import { buildingSummary, type BuildingResult } from "../roadmap/building";
 import { BUILDING_CREDIT } from "../roadmap/building-data";
@@ -62,7 +63,7 @@ export type ReportOptions = {
 };
 
 const COVERAGE_TEXT = { full: "道路種別はネットの地図で分かる", partial: "道路種別はネットで一部だけ分かる", none: "道路種別はネット非公開（窓口で確認）", outside: "都市計画区域外（窓口で確認）",
-  unknown: "道路種別の公開の有無は調査中（県か市の建築指導課で確認）" } as const;
+  unknown: "道路種別の公開の有無は調査中（都道府県か市町村の建築指導課で確認）" } as const;
 
 const md = (t: number) => {
   const d = new Date(t);
@@ -267,7 +268,7 @@ export function buildReport(result: Ok, input: ReportInput, opts: ReportOptions)
     const items: DocItem[] = [{ label: m.name, text: COVERAGE_TEXT[m.coverage] }];
     const c = result.contact;
     if (c) {
-      const dept = /^(東京都|\S{2,3}県)\s/.test(c.dept) ? c.dept : `${m.name} ${c.dept}`;
+      const dept = deptLabel(m.name, c.dept);
       items.push({ label: "窓口", text: `${dept}${c.phone ? ` ${c.phone}` : ""}`, note: c.noPhoneInquiry ? "道路種別は電話では答えてもらえない。窓口で確認" : undefined });
     }
     if (full) for (const l of result.links) items.push({ text: `${l.label}${l.pinpoint ? "" : "（地図の中で住所を検索）"}`, link: { label: l.label, url: l.url } });

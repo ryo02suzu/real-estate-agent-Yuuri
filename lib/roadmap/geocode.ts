@@ -63,10 +63,21 @@ export const CHIWARI = /第?(?:[0-9０-９]+|[一二三四五六七八九十]+)�
 export const chiwariDigits = (s: string) =>
   s.replace(CHIWARI, (m) => m.normalize("NFKC").replace(/[一二三四五六七八九十]+/, (k) => String(kanjiToInt(k))));
 
-/** 入力に番地（数字）があるのに、結果が町・大字までしか一致していない（代表点になっている）。地割の番号は番地に数えない */
+/**
+ * 北海道の「条」（札幌・旭川・帯広・岩見沢などの「北1条西2丁目」「7条通9丁目」）。条の番号は町名の一部で、番地ではない
+ * （町名は「北一条西」「七条通」）。国土地理院は「北一条西二丁目」と漢数字で返すので、比べるときは数字にそろえる（joDigits）。
+ * 京都の「四条通」・奈良の「三条町」・新潟の「三条市」のような、北海道の外の「条」の付く名前も同じ形にそろうだけで、困らない
+ */
+export const JO = /(?:[0-9０-９]+|[一二三四五六七八九十]+)条/g;
+/** 条の番号を数字に（「北二十四条西」→「北24条西」、「北２４条西」→「北24条西」） */
+export const joDigits = (s: string) => s.replace(JO, (m) => m.normalize("NFKC").replace(/[一二三四五六七八九十]+/, (k) => String(kanjiToInt(k))));
+/** 数字で書いた条（「1条」）を外す。番地の数字を数える前に使う（漢数字の条は、もともと番地に数えない） */
+const dropJo = (s: string) => s.replace(/[0-9０-９]+条/g, "条");
+
+/** 入力に番地（数字）があるのに、結果が町・大字までしか一致していない（代表点になっている）。地割・条の番号は番地に数えない */
 export function isApproximate(input: string, matchedAddress: string): boolean {
   const digit = /[0-9０-９]/;
-  return digit.test(input.replace(CHIWARI, "")) && !digit.test(matchedAddress.replace(CHIWARI, ""));
+  return digit.test(dropJo(input.replace(CHIWARI, ""))) && !digit.test(dropJo(matchedAddress.replace(CHIWARI, "")));
 }
 
 /**
@@ -82,9 +93,12 @@ export function subAreaDropped(input: string, matchedAddress: string): boolean {
   return [...areas(input)].some((a) => !got.has(a));
 }
 
-/** 住所の番号（丁目・番地・号）を数の並びにする（「丸の内一丁目9番」→ [1, 9]）。郵便番号は外し、漢数字の丁目・地割も数える */
+/**
+ * 住所の番号（丁目・番地・号）を数の並びにする（「丸の内一丁目9番」→ [1, 9]）。郵便番号は外し、漢数字の丁目・地割も数える。
+ * 北海道の条（「北1条西2丁目1」の「1条」）は町名の一部なので数えない（→ [2, 1]）
+ */
 export function addressNumbers(a: string): number[] {
-  const s = chiwariDigits(a.normalize("NFKC"))
+  const s = dropJo(chiwariDigits(a.normalize("NFKC")))
     .replace(/〒?\s*\d{3}-\d{4}/g, "")
     .replace(/([一二三四五六七八九十]+)丁目/g, (_, k: string) => `${kanjiToInt(k)}丁目`);
   return (s.match(/\d+/g) ?? []).map(Number);
@@ -132,7 +146,7 @@ export const withoutNumbers = (matchedAddress: string) => matchedAddress.replace
 export function numbersAgree(input: string, matchedAddress: string): boolean {
   const got = matchedNumbers(matchedAddress);
   if (!got.length) return true;
-  const text = chiwariDigits(input.normalize("NFKC"))
+  const text = dropJo(chiwariDigits(input.normalize("NFKC")))
     .replace(/〒?\s*\d{3}-\d{4}/g, "")
     .replace(/([一二三四五六七八九十]+)丁目/g, (_, k: string) => `${kanjiToInt(k)}丁目`);
   // 入力の番号（丁目の番号かどうかの印つき）

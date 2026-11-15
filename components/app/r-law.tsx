@@ -3,6 +3,7 @@
 // 「法令」タブ（すりガラスのシートの中。街の模型では用途地域の色を地面に敷く）：用途地域と都市計画（色の帯）、建ぺい率・容積率の大きな数字、
 // 高度地区・防火地域、建築時の注意点（押すと全部）、その他の法令・上下水道の札、問い合わせ先。道路の種別は道路のタブ。
 // どれも目安で、この土地に建てられるかの判断ではない（「役所・建築士で確認」）
+import { deptLabel } from "@/lib/roadmap/dept";
 import { ChevronRight, Phone } from "lucide-react";
 import { buildingNotes } from "@/lib/app/legal";
 import { ratioHint } from "@/lib/app/ratio-hint";
@@ -145,7 +146,7 @@ export function LawTab({ result, data, open }: TabProps) {
         <GCard className="overflow-hidden">
           <GRow
             icon={<Phone size={17} strokeWidth={1.8} absoluteStrokeWidth color="#fff" />}
-            title={/^(東京都|\S{2,3}県)\s/.test(contact.dept) ? contact.dept : `${m.name} ${contact.dept}`}
+            title={deptLabel(m.name, contact.dept)}
             sub={contact.hours ? `受付：${contact.hours}` : "窓口で聞くことのメモを見る"}
             right={
               phones[0] && !contact.noPhoneInquiry ? (

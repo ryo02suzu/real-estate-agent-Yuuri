@@ -268,7 +268,7 @@ function OtherPart({ state: { morido, hourei, tochi, iseki }, city }: { state: E
         {iseki && <IsekiRow iseki={iseki} />}
       </dl>
       <Notes
-        lead="国のデータの概略の区域です。重要事項説明は、区域を指定した都県・市の資料で確かめてください。"
+        lead="国のデータの概略の区域です。重要事項説明は、区域を指定した都道府県・市の資料で確かめてください。"
         source={
           (morido || hourei || tochi) && (
             <a href="https://nlftp.mlit.go.jp/ksj/" target="_blank" rel="noreferrer" className="underline">
@@ -277,7 +277,7 @@ function OtherPart({ state: { morido, hourei, tochi, iseki }, city }: { state: E
           )
         }
       >
-        <p>国のデータの区域は概略の位置で、法的図書ではありません。重要事項説明には、区域を指定した都県・市の資料で確かめてください。</p>
+        <p>国のデータの区域は概略の位置で、法的図書ではありません。重要事項説明には、区域を指定した都道府県・市の資料で確かめてください。</p>
         {(morido || hourei || tochi) && (
           <p>
             {/* 国土数値情報のデータは1つの文にまとめる（「国土数値情報（○○データ、△△データ）」） */}

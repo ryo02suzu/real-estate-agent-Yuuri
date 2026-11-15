@@ -267,7 +267,7 @@ describe("buildSummary の盛土規制法", () => {
     };
     const zoning = { youto: [], youtoNear: [], tokei: true, jyuntoshi: false, koudoti: false, others: [] };
     const text = buildSummary(result, { zoning: { zoning, tochi: { park: "特別地域", agri: "農用地区域", forest: "保安林", year: 2015 } } });
-    expect(text).toContain("・自然公園・農業振興地域・森林：自然公園の特別地域・農用地区域・保安林（2015年度の国のデータ・参考）\n  （自然公園・保安林は都県の担当、農用地区域かは箱根町の農業委員会で確認）");
+    expect(text).toContain("・自然公園・農業振興地域・森林：自然公園の特別地域・農用地区域・保安林（2015年度の国のデータ・参考）\n  （自然公園・保安林は都道府県の担当、農用地区域かは箱根町の農業委員会で確認）");
     expect(text).toContain("※自然公園・農業振興地域・森林の出典：「国土数値情報（自然公園地域データ・農業地域データ・森林地域データ）」");
   });
 

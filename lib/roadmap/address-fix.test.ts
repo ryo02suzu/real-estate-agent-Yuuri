@@ -297,6 +297,46 @@ describe("部品", () => {
     expect(typedParts("岩手県紫波郡矢巾町大字南矢幅第13地割123番地")).toEqual({ pref: "岩手県", place: "矢巾町南矢幅第13地割", num: "123番地" });
     expect(typedParts("矢巾町南矢幅第１３地割１２３")).toEqual({ pref: "", place: "矢巾町南矢幅第13地割", num: "123" });
   });
+  // 北海道の「条・丁目」（札幌・旭川・帯広・岩見沢・網走など）。「北1条西2丁目」の「1条」は町名の一部（町名は「北一条西」）。
+  // 国土地理院は「北一条西二丁目」と漢数字で返す（下の住所は、2026-11-15 に国土地理院の住所検索が実際に返した形）
+  it("北海道の条・丁目：条の番号は番地ではなく町名に入れる", () => {
+    expect(typedParts("北海道札幌市中央区北1条西2丁目1-1")).toEqual({ pref: "北海道", place: "札幌市中央区北1条西", num: "2丁目1-1" });
+    expect(typedParts("北海道旭川市7条通9丁目48")).toEqual({ pref: "北海道", place: "旭川市7条通", num: "9丁目48" });
+    expect(typedParts("北海道岩見沢市8条西5丁目")).toEqual({ pref: "北海道", place: "岩見沢市8条西", num: "5丁目" });
+    expect(typedParts("北海道札幌市中央区宮の森1条10丁目1")).toEqual({ pref: "北海道", place: "札幌市中央区宮の森1条", num: "10丁目1" });
+    expect(typedParts("札幌市北区北２４条西６丁目１−１")).toEqual({ pref: "", place: "札幌市北区北24条西", num: "6丁目1−1" });
+  });
+  it("北海道の条・丁目：国土地理院の漢数字の町名（「北一条西」）と同じと見る。違う条・違う向きは別の町", () => {
+    expect(describeMatch("北海道札幌市中央区北1条西2丁目", "北海道札幌市中央区北一条西二丁目")).toBeNull();
+    expect(describeMatch("北海道札幌市中央区北1条西2丁目1-1", "北海道札幌市中央区北一条西二丁目１番地")).toBeNull();
+    expect(describeMatch("札幌市北区北24条西6丁目1-1", "北海道札幌市北区北二十四条西六丁目１番１号")).toBeNull();
+    expect(describeMatch("北海道札幌市中央区宮の森1条10丁目1", "北海道札幌市中央区宮の森一条十丁目１番")).toBeNull();
+    expect(describeMatch("北海道旭川市7条通9丁目48", "北海道旭川市七条通九丁目")).toBeNull();
+    expect(describeMatch("北海道帯広市西5条南7丁目1", "北海道帯広市西五条南七丁目１番地")).toBeNull();
+    expect(describeMatch("北海道岩見沢市8条西5丁目", "北海道岩見沢市八条西五丁目")).toBeNull();
+    expect(describeMatch("北海道虻田郡倶知安町北1条東3丁目3", "北海道倶知安町北一条東三丁目３番地")).toBeNull();
+    expect(describeMatch("北海道上川郡東神楽町南1条西1丁目3-2", "北海道東神楽町南一条西一丁目３番")).toBeNull();
+    expect(describeMatch("北海道士別市東6条4丁目1", "北海道士別市東六条四丁目１番地")).toBeNull();
+    // 漢数字で入れても同じ
+    expect(describeMatch("北海道札幌市中央区北一条西二丁目", "北海道札幌市中央区北一条西二丁目")).toBeNull();
+    // 違う条・違う向きに当たったら言う（1字違いでも別の町。書き間違いとして直したとは言わない）
+    expect(describeMatch("北海道札幌市中央区北1条西2丁目", "北海道札幌市中央区北二条西二丁目")).toEqual({ miss: { typed: "北1条西", found: "北二条西", kind: "town" } });
+    expect(describeMatch("北海道札幌市中央区北1条西2丁目", "北海道札幌市中央区北一条東二丁目")).toEqual({ miss: { typed: "北1条西", found: "北一条東", kind: "town" } });
+    expect(similarTown("北1条西", "北一条西")).toBe(true);
+    expect(similarTown("北1条西", "北一条東")).toBe(false);
+    expect(similarTown("北1条西", "北二条西")).toBe(false);
+    expect(similarTown("北1条西", "南一条西")).toBe(false);
+    expect(similarTown("北21条西", "北二十一条西")).toBe(true);
+    // 条の無い町名は今までどおり（1字違いは書き間違い）
+    expect(similarTown("南大道り", "南大通り")).toBe(true);
+  });
+  it("条の字のある、北海道の外の町名（京都の四条通・奈良の三条町・新潟の三条市）は今までどおり", () => {
+    expect(typedParts("新潟県三条市旭町2-3-1")).toEqual({ pref: "新潟県", place: "三条市旭町", num: "2-3-1" });
+    expect(describeMatch("新潟県三条市旭町2-3-1", "新潟県三条市旭町二丁目３番１号")).toBeNull();
+    expect(describeMatch("奈良県奈良市三条町606", "奈良県奈良市三条町６０６番地")).toBeNull();
+    // 数字で書いても、漢数字の町名と同じと見る
+    expect(describeMatch("奈良県奈良市3条町606", "奈良県奈良市三条町６０６番地")).toBeNull();
+  });
   it("郵便番号と郡を外して分ける", () => {
     expect(typedParts("〒190-1201 西多摩郡瑞穂町箱根ケ崎2335")).toEqual({ pref: "", place: "瑞穂町箱根ケ崎", num: "2335" });
     expect(typedParts("栃木県 宇都宮市 南大通り 1丁目2-3 ○○ビル")).toEqual({ pref: "栃木県", place: "宇都宮市南大通り", num: "1丁目2-3 ○○ビル" });

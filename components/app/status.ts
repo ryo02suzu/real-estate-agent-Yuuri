@@ -59,7 +59,7 @@ export function topicStatuses(result: Ok, data: PropertyData, records: PropertyR
       const r = roads.roads[0];
       push("road", { status: "auto", chip: "取得済み", value: `${r.direction}側・${roadShort(r.label)}${r.width ? `・幅員 約${r.width}` : ""}（市の地図データ）`, hint: "幅員・接道は現地と窓口で確認" });
     } else if (link && !offline) push("road", { status: "official", chip: "公式図を確認", value: `道路種別：未確認（${m.name}の公式道路図で）`, hint });
-    else push("road", { status: "unconfirmed", chip: "未確認", value: offline ? "道路種別：未確認（ネット非公開の市）" : "道路種別：未確認", hint });
+    else push("road", { status: "unconfirmed", chip: "未確認", value: offline ? "道路種別：未確認（ネット非公開の市町村）" : "道路種別：未確認", hint });
   }
   // 都市計画
   {

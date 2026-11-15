@@ -7,6 +7,7 @@ import { CHUGOKU_PENDING } from "./data/chugoku";
 import { SHIKOKU_PENDING } from "./data/shikoku";
 import { KYUSHU_PENDING } from "./data/kyushu";
 import { HOKKAIDO_PENDING } from "./data/hokkaido";
+import { HOKKAIDO_CITIES } from "./data/hokkaido-cities";
 import { HOKKAIDO } from "./data/hokkaido-pref";
 import { OKINAWA } from "./data/okinawa";
 import { KAGOSHIMA } from "./data/kagoshima";
@@ -28,21 +29,30 @@ import { HIROSHIMA } from "./data/hiroshima";
 import { MUNI_CODES } from "./muni-codes";
 import { buildLinks, findMunicipality, MUNICIPALITIES, type Municipality } from "./municipalities";
 import { ROAD_READ_PERMITTED, roadReadPermission } from "./road-read-permission";
-import { ALL_PREF_NAMES, ALL_REGIONS, AREA_LABEL, PREF_NAME_RE, PREF_NAMES, REGION_ORDER, REGIONS, SUPPORTED_BOUNDS, isOpenRegion, isSupportedPref, regionOfMuni, regionOfPref, type RegionKey } from "./regions";
+import { ALL_PREF_NAMES, ALL_REGIONS, AREA_LABEL, AREA_SHORT, PREF_NAME_RE, PREF_NAMES, REGION_ORDER, REGIONS, SUPPORTED_BOUNDS, isOpenRegion, isSupportedPref, regionOfMuni, regionOfPref, type RegionKey } from "./regions";
 
 describe("対応している地方と都道府県", () => {
-  it("関東1都6県・中部9県・東北6県・近畿2府5県", () => {
-    expect(REGION_ORDER).toEqual(["kanto", "chubu", "tohoku", "kinki"]);
+  it("全国の8地方・47都道府県（関東1都6県・中部9県・東北6県・近畿2府5県・中国5県・四国4県・九州沖縄8県・北海道）", () => {
+    expect(REGION_ORDER).toEqual(["kanto", "chubu", "tohoku", "kinki", "chugoku", "shikoku", "kyushu", "hokkaido"]);
     expect(Object.keys(REGIONS.kanto.prefs)).toHaveLength(7);
     expect(Object.keys(REGIONS.chubu.prefs)).toHaveLength(9);
     expect(Object.keys(REGIONS.tohoku.prefs)).toHaveLength(6);
     expect(Object.keys(REGIONS.kinki.prefs)).toHaveLength(7);
-    expect(Object.keys(PREF_NAMES)).toHaveLength(29);
+    expect(Object.keys(REGIONS.chugoku.prefs)).toHaveLength(5);
+    expect(Object.keys(REGIONS.shikoku.prefs)).toHaveLength(4);
+    expect(Object.keys(REGIONS.kyushu.prefs)).toHaveLength(8);
+    expect(Object.keys(REGIONS.hokkaido.prefs)).toHaveLength(1);
+    expect(Object.keys(PREF_NAMES)).toHaveLength(47);
     expect(PREF_NAMES["22"]).toBe("静岡県");
     expect(PREF_NAMES["04"]).toBe("宮城県");
     expect(PREF_NAMES["27"]).toBe("大阪府");
-    // 都・府・県は名前の最後の字で数える（関東は東京都を含むので「1都6県」、近畿は京都府・大阪府を含むので「2府5県」）
-    expect(AREA_LABEL).toBe("関東1都6県・中部9県・東北6県・近畿2府5県");
+    expect(PREF_NAMES["01"]).toBe("北海道");
+    expect(PREF_NAMES["34"]).toBe("広島県");
+    expect(PREF_NAMES["47"]).toBe("沖縄県");
+    // 全部の都道府県に対応したので、対応エリアの言い方は「全国47都道府県」「全国」
+    // （一部の地方だけのときは「関東1都6県・中部9県…」のように、都・府・県を名前の最後の字で数えて並べる）
+    expect(AREA_LABEL).toBe("全国47都道府県");
+    expect(AREA_SHORT).toBe("全国");
   });
 
   it("コードから地方を引く", () => {
@@ -50,9 +60,14 @@ describe("対応している地方と都道府県", () => {
     expect(regionOfMuni("22101")).toBe("chubu");
     expect(regionOfMuni("04101")).toBe("tohoku");
     expect(regionOfMuni("27127")).toBe("kinki");
-    expect(regionOfMuni("34101")).toBeUndefined(); // 広島市（中国地方はまだ）
+    expect(regionOfMuni("34101")).toBe("chugoku");
+    expect(regionOfMuni("39201")).toBe("shikoku");
+    expect(regionOfMuni("47201")).toBe("kyushu");
+    expect(regionOfMuni("01101")).toBe("hokkaido");
+    expect(regionOfMuni("99101")).toBeUndefined(); // 都道府県に無い番号
     expect(isSupportedPref("23101")).toBe(true);
-    expect(isSupportedPref("01100")).toBe(false);
+    expect(isSupportedPref("01100")).toBe(true);
+    expect(isSupportedPref("99101")).toBe(false);
   });
 
   it("住所の先頭が対応エリアか", () => {
@@ -60,7 +75,11 @@ describe("対応している地方と都道府県", () => {
     expect(PREF_NAME_RE.test("東京都千代田区")).toBe(true);
     expect(PREF_NAME_RE.test("宮城県仙台市青葉区")).toBe(true);
     expect(PREF_NAME_RE.test("大阪府大阪市")).toBe(true);
-    expect(PREF_NAME_RE.test("広島県広島市")).toBe(false);
+    expect(PREF_NAME_RE.test("広島県広島市")).toBe(true);
+    expect(PREF_NAME_RE.test("北海道札幌市中央区")).toBe(true);
+    expect(PREF_NAME_RE.test("沖縄県那覇市")).toBe(true);
+    // 都道府県から始まらない住所は当たらない
+    expect(PREF_NAME_RE.test("広島市中区")).toBe(false);
   });
 
   it("範囲は関東・中部・東北・近畿を含む", () => {
@@ -460,15 +479,15 @@ describe("市の道路種別のデータをアプリの中に表示するのは�
   });
 });
 
-// 全国へ広げる土台（docs/features.md の 129）。残りの4地方は「準備中」（regions.json の preparing）で足し、国のデータを作って確かめ終えた地方から
-// preparing を外して対応エリアに入れる。準備中のあいだは、アプリからは今までどおり対応エリアの外
-describe("準備中の地方（中国・四国・九州沖縄・北海道）", () => {
+// 全国へ広げる土台（docs/features.md の 129）。残りの4地方は「準備中」（regions.json の preparing）で足し、国のデータを作って確かめ終えた
+// 2026-11-15 に preparing を外して対応エリアに入れた（docs/features.md の 136）。準備中の地方を作る仕組み（preparing）は残してある
+describe("全国対応で足した地方（中国・四国・九州沖縄・北海道）", () => {
   // 地方ごとの市町村：調査中の一覧（data/<地方>.ts）と、調べ終えて登録した道県（data/<道県>.ts）を合わせたもの
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
     ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...CHUGOKU_PENDING], 107],
     ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING], 95],
     ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...KYUSHU_PENDING], 274],
-    ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_PENDING], 179],
+    ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING], 179],
   ];
   const table = Object.assign({}, ...Object.values(GSI_CODES as Record<string, Record<string, string>>)) as Record<string, string>;
 
@@ -514,6 +533,8 @@ describe("準備中の地方（中国・四国・九州沖縄・北海道）", (
   });
 
   it("準備中の地方は、アプリの対応エリアに入れない（市町村の一覧・コード表・地方の一覧とも）。準備を終えた地方は全部入る", () => {
+    // 4地方とも公開した（準備中の地方はもう無い）
+    expect(Object.values(ALL_REGIONS).filter((r) => r.preparing)).toEqual([]);
     for (const [key, list] of NEW) {
       const open = isOpenRegion(key);
       expect(open).toBe(!ALL_REGIONS[key].preparing);
@@ -529,6 +550,26 @@ describe("準備中の地方（中国・四国・九州沖縄・北海道）", (
     // 対応している都道府県のコード表は、今までどおり全部使う
     for (const name of Object.values(PREF_NAMES)) expect(MUNI_CODES[name], name).toBeDefined();
     expect(Object.keys(MUNI_CODES)).toHaveLength(Object.keys(PREF_NAMES).length);
+  });
+});
+
+describe("北海道の、市が扱う市（登録した市）", () => {
+  it("札幌市：地図情報サービスの「道路」で全種別。市の決まりに合わせて、市のトップページから進む。電話では答えない", () => {
+    const m = HOKKAIDO_CITIES.find((x) => x.name === "札幌市")!;
+    expect(m.codes).toHaveLength(10);
+    expect(m.coverage).toBe("full");
+    expect(m.maps[0].kind).toBe("road_type");
+    // 市は、トップページ以外へリンクするときは担当課へ問い合わせるよう求めている（「リンク・著作権・免責事項」）
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://www.city.sapporo.jp/");
+    expect(m.maps[0].label).toContain("札幌市公式ホームページのトップページから進む");
+    expect(m.maps[0].tip).toContain("自分で同意して進む");
+    expect(m.maps[0].tip).toContain("建築基準法の道路（最新情報）");
+    expect(m.contact?.phone).toBe("011-211-2864");
+    expect(m.contact?.noPhoneInquiry).toBe(true);
+    // 登録した市は、調査中の一覧から外してある
+    expect(HOKKAIDO_PENDING.map((x) => x.name)).not.toContain("札幌市");
+    expect(HOKKAIDO_PENDING).toHaveLength(38);
   });
 });
 
@@ -729,8 +770,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       total: 140,
       // 都市計画区域の無い80町村から、準都市計画区域のあるニセコ町を除いた79
       outside: ["上砂川町", "由仁町", "月形町", "浦臼町", "妹背牛町", "秩父別町", "雨竜町", "北竜町", "沼田町", "新篠津村", "島牧村", "寿都町", "黒松内町", "蘭越町", "真狩村", "留寿都村", "喜茂別町", "京極町", "泊村", "神恵内村", "積丹町", "仁木町", "赤井川村", "豊浦町", "平取町", "新冠町", "様似町", "えりも町", "松前町", "知内町", "鹿部町", "上ノ国町", "厚沢部町", "乙部町", "奥尻町", "当麻町", "比布町", "愛別町", "東川町", "中富良野町", "南富良野町", "占冠村", "和寒町", "剣淵町", "音威子府村", "中川町", "幌加内町", "小平町", "苫前町", "初山別村", "遠別町", "天塩町", "猿払村", "中頓別町", "豊富町", "礼文町", "利尻町", "利尻富士町", "幌延町", "津別町", "清里町", "小清水町", "訓子府町", "置戸町", "佐呂間町", "湧別町", "西興部村", "士幌町", "上士幌町", "鹿追町", "中札内村", "更別村", "豊頃町", "陸別町", "浜中町", "鶴居村", "別海町", "標津町", "羅臼町"],
-      // 特定行政庁の10市と、限定特定行政庁の29市町
-      cities: ["札幌市", "函館市", "小樽市", "旭川市", "室蘭市", "釧路市", "帯広市", "北見市", "岩見沢市", "網走市", "留萌市", "苫小牧市", "稚内市", "江別市", "紋別市", "士別市", "名寄市", "三笠市", "根室市", "千歳市", "砂川市", "深川市", "富良野市", "登別市", "恵庭市", "伊達市", "北広島市", "石狩市", "当別町", "森町", "長沼町", "東神楽町", "美幌町", "遠軽町", "白老町", "音更町", "芽室町", "幕別町", "中標津町"],
+      // 特定行政庁の10市と、限定特定行政庁の29市町のうち、まだ調べている38市町（札幌市は登録した。data/hokkaido-cities.ts）
+      cities: ["函館市", "小樽市", "旭川市", "室蘭市", "釧路市", "帯広市", "北見市", "岩見沢市", "網走市", "留萌市", "苫小牧市", "稚内市", "江別市", "紋別市", "士別市", "名寄市", "三笠市", "根室市", "千歳市", "砂川市", "深川市", "富良野市", "登別市", "恵庭市", "伊達市", "北広島市", "石狩市", "当別町", "森町", "長沼町", "東神楽町", "美幌町", "遠軽町", "白老町", "音更町", "芽室町", "幕別町", "中標津町"],
       offices: { 空知総合振興局: 19, 石狩振興局: 1, 後志総合振興局: 19, 胆振総合振興局: 6, 日高振興局: 7, 渡島総合振興局: 9, 檜山振興局: 7, 上川総合振興局: 18, 留萌振興局: 7, 宗谷総合振興局: 9, オホーツク総合振興局: 13, 十勝総合振興局: 15, 釧路総合振興局: 7, 根室振興局: 3 },
     },
   ];

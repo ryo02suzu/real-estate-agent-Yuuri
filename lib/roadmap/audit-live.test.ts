@@ -23,7 +23,7 @@ import { parcelAt } from "./parcel";
 import { pmtilesParcelSource } from "./parcel-tiles";
 import { schoolGaps, schoolsAt } from "./school";
 import { schoolTileSource } from "./school-tiles";
-import { tochiAt, tochiLine } from "./tochi";
+import { tochiAt, tochiLine, tochiUrlFor, type TochiSource } from "./tochi";
 import { tochiTileSource } from "./tochi-tiles";
 import { zoningTileSource } from "./zoning-tiles";
 import { nearbyStations, nearestStations, type Station } from "./walk";
@@ -78,7 +78,14 @@ const schoolSrc = schoolTileSource(fileSource(SCHOOL_SRC.url));
 const landSrc = landPriceTileSource(fileSource(LAND_SRC.url));
 const houreiSrc = houreiTileSource(fileSource(HOUREI_SRC.url));
 const moridoSrc = moridoTileSource(fileSource(MORIDO_SRC.url));
-const tochiSrc = tochiTileSource(fileSource(TOCHI_SRC.url));
+// 自然公園などのタイルは地方ごとのファイル（アプリと同じく、市区町村の地方のファイルを読む。前は関東のファイルだけを読んでいて、ほかの地方が全部「外」と出ていた）
+const tochiSrcs = new Map<string, TochiSource>();
+const tochiSrcFor = (muni: string): TochiSource | undefined => {
+  const url = tochiUrlFor(muni);
+  if (!url) return undefined;
+  if (!tochiSrcs.has(url)) tochiSrcs.set(url, tochiTileSource(fileSource(url)));
+  return tochiSrcs.get(url);
+};
 const STATIONS = (JSON.parse(readFileSync(`public${STATION_SRC.url}`, "utf-8")) as { stations: Station[] }).stations;
 
 type Row = {
@@ -200,7 +207,8 @@ async function auditOne(m: Municipality): Promise<Row> {
     row.facts["砂防指定地など"] = hr.hits.length ? hr.hits.map((h) => h.kind).join("・") : "区域外";
     if (hr.missing.length) row.notes.push(`砂防指定地など：県のデータに無い種類：${hr.missing.join("・")}`);
   }
-  const tc = await safe(() => tochiAt(lat, lng, muni, tochiSrc));
+  const tochiSrc = tochiSrcFor(muni);
+  const tc = await safe(() => (tochiSrc ? tochiAt(lat, lng, muni, tochiSrc) : Promise.resolve(null)));
   row.facts["自然公園など"] = tc instanceof Error ? "読み込めず" : tc ? tochiLine(tc) : "データなし";
   if (tc instanceof Error) row.flags.push(`自然公園など：読み込めず（${tc.message}）`);
 

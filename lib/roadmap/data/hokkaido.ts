@@ -4,8 +4,7 @@
 import type { Municipality } from "../municipalities";
 
 export const HOKKAIDO_PENDING: Municipality[] = [
-  // 北海道（残り 39）
-  { pref: "北海道", name: "札幌市", codes: ["01101", "01102", "01103", "01104", "01105", "01106", "01107", "01108", "01109", "01110"], coverage: "unknown", maps: [] },
+  // 北海道（残り 38）
   { pref: "北海道", name: "函館市", codes: ["01202"], coverage: "unknown", maps: [] },
   { pref: "北海道", name: "小樽市", codes: ["01203"], coverage: "unknown", maps: [] },
   { pref: "北海道", name: "旭川市", codes: ["01204"], coverage: "unknown", maps: [] },
