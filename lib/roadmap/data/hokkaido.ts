@@ -4,18 +4,11 @@
 import type { Municipality } from "../municipalities";
 
 export const HOKKAIDO_PENDING: Municipality[] = [
-  // 北海道（残り 36）
-  { pref: "北海道", name: "小樽市", codes: ["01203"], coverage: "unknown", maps: [] },
-  { pref: "北海道", name: "室蘭市", codes: ["01205"], coverage: "unknown", maps: [] },
-  { pref: "北海道", name: "釧路市", codes: ["01206"], coverage: "unknown", maps: [] },
-  { pref: "北海道", name: "帯広市", codes: ["01207"], coverage: "unknown", maps: [] },
-  { pref: "北海道", name: "北見市", codes: ["01208"], coverage: "unknown", maps: [] },
+  // 北海道（残り 29）
   { pref: "北海道", name: "岩見沢市", codes: ["01210"], coverage: "unknown", maps: [] },
   { pref: "北海道", name: "網走市", codes: ["01211"], coverage: "unknown", maps: [] },
   { pref: "北海道", name: "留萌市", codes: ["01212"], coverage: "unknown", maps: [] },
-  { pref: "北海道", name: "苫小牧市", codes: ["01213"], coverage: "unknown", maps: [] },
   { pref: "北海道", name: "稚内市", codes: ["01214"], coverage: "unknown", maps: [] },
-  { pref: "北海道", name: "江別市", codes: ["01217"], coverage: "unknown", maps: [] },
   { pref: "北海道", name: "紋別市", codes: ["01219"], coverage: "unknown", maps: [] },
   { pref: "北海道", name: "士別市", codes: ["01220"], coverage: "unknown", maps: [] },
   { pref: "北海道", name: "名寄市", codes: ["01221"], coverage: "unknown", maps: [] },
