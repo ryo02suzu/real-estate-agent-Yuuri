@@ -6,13 +6,4 @@
 import type { Municipality } from "../municipalities";
 
 export const CHUGOKU_PENDING: Municipality[] = [
-  // 島根県（残り 8）
-  { pref: "島根県", name: "松江市", codes: ["32201"], coverage: "unknown", maps: [] },
-  { pref: "島根県", name: "浜田市", codes: ["32202"], coverage: "unknown", maps: [] },
-  { pref: "島根県", name: "出雲市", codes: ["32203"], coverage: "unknown", maps: [] },
-  { pref: "島根県", name: "益田市", codes: ["32204"], coverage: "unknown", maps: [] },
-  { pref: "島根県", name: "大田市", codes: ["32205"], coverage: "unknown", maps: [] },
-  { pref: "島根県", name: "安来市", codes: ["32206"], coverage: "unknown", maps: [] },
-  { pref: "島根県", name: "江津市", codes: ["32207"], coverage: "unknown", maps: [] },
-  { pref: "島根県", name: "雲南市", codes: ["32209"], coverage: "unknown", maps: [] },
 ];

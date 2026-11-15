@@ -21,7 +21,7 @@ import { KOCHI } from "./data/kochi";
 import { TOKUSHIMA, TOKUSHIMA_CITIES } from "./data/tokushima";
 import { EHIME } from "./data/ehime";
 import { KAGAWA, KAGAWA_CITIES } from "./data/kagawa";
-import { SHIMANE } from "./data/shimane";
+import { SHIMANE, SHIMANE_CITIES } from "./data/shimane";
 import { TOTTORI, TOTTORI_CITIES } from "./data/tottori";
 import { YAMAGUCHI, YAMAGUCHI_CITIES } from "./data/yamaguchi";
 import { OKAYAMA, OKAYAMA_CITIES } from "./data/okayama";
@@ -484,7 +484,7 @@ describe("市の道路種別のデータをアプリの中に表示するのは�
 describe("全国対応で足した地方（中国・四国・九州沖縄・北海道）", () => {
   // 地方ごとの市町村：調査中の一覧（data/<地方>.ts）と、調べ終えて登録した道県（data/<道県>.ts）を合わせたもの
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
-    ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...YAMAGUCHI_CITIES, ...TOTTORI_CITIES, ...CHUGOKU_PENDING], 107],
+    ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...YAMAGUCHI_CITIES, ...TOTTORI_CITIES, ...SHIMANE_CITIES, ...CHUGOKU_PENDING], 107],
     ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...KAGAWA_CITIES, ...TOKUSHIMA_CITIES, ...SHIKOKU_PENDING], 95],
     ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...MIYAZAKI_CITIES, ...OKINAWA_CITIES, ...NAGASAKI_CITIES, ...KYUSHU_PENDING], 274],
     ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING], 179],
@@ -739,6 +739,101 @@ describe("鳥取県の、市が扱う市（登録した市）", () => {
     expect(m.note).toContain("境港市は全域が都市計画区域");
     // 「全域が都市計画区域外」と読まれる書き方にしない（区域の外の町村の印に使う言い回し）
     expect(m.note).not.toContain("都市計画区域外");
+  });
+});
+
+describe("島根県の、市が扱う市（登録した市）", () => {
+  const city = (name: string) => SHIMANE_CITIES.find((x) => x.name === name)!;
+  const PREF_SYSTEM = "https://web-gis.pref.shimane.lg.jp/shimane/Agreement?IsPost=False&MapId=29&RequestPage=%2fshimane%2fPositionSelect%3fmid%3d29";
+
+  it("8市を登録したので、調査中の一覧に島根県は残っていない（中国地方の調査中は 0）", () => {
+    const codes: Record<string, string> = { 松江市: "32201", 浜田市: "32202", 出雲市: "32203", 益田市: "32204", 大田市: "32205", 安来市: "32206", 江津市: "32207", 雲南市: "32209" };
+    expect(SHIMANE_CITIES.map((m) => m.name)).toEqual(Object.keys(codes));
+    for (const [name, code] of Object.entries(codes)) {
+      expect(city(name).codes, name).toEqual([code]);
+      expect(findMunicipality(code)?.name, name).toBe(name);
+      // 8市とも、都市計画区域は市の一部（国の都市別一覧）
+      expect(city(name).note, name).toContain(`${name}の一部は都市計画区域の外`);
+      // 電話を断ると書いている市は無い
+      expect(city(name).contact?.noPhoneInquiry, name).toBeUndefined();
+    }
+    expect(CHUGOKU_PENDING.filter((x) => x.pref === "島根県")).toEqual([]);
+    expect(CHUGOKU_PENDING).toEqual([]);
+  });
+
+  it("限定特定行政庁の6市：市が扱わない建築物の県の窓口（県土整備事務所）を、市ごとに正しく書く", () => {
+    const office: Record<string, string> = {
+      浜田市: "浜田県土整備事務所 建築部（0855-29-5668）",
+      江津市: "浜田県土整備事務所 建築部（0855-29-5668）",
+      益田市: "益田県土整備事務所 建築部（0856-31-9660）",
+      大田市: "県央県土整備事務所 建築部（0855-72-9608）",
+      安来市: "松江県土整備事務所 建築部（0852-32-5757）",
+      雲南市: "雲南県土整備事務所 建築部（0854-42-9590）",
+    };
+    for (const [name, text] of Object.entries(office)) {
+      expect(city(name).note, name).toContain("限定特定行政庁");
+      expect(city(name).note, name).toContain(text);
+    }
+    // 特定行政庁の2市には、県の窓口を書かない
+    for (const name of ["松江市", "出雲市"]) {
+      expect(city(name).note, name).toContain("特定行政庁");
+      expect(city(name).note, name).not.toContain("限定特定行政庁");
+      expect(city(name).note, name).not.toContain("県土整備事務所");
+    }
+  });
+
+  it("島根県の地図システムを開く5市：同意の画面を開き、中は確かめていないと書く。国の一覧の「公開済」「一部公開」をそのまま書く", () => {
+    const status: Record<string, string> = { 浜田市: "一部公開", 大田市: "一部公開", 江津市: "公開済", 雲南市: "公開済" };
+    for (const name of ["松江市", ...Object.keys(status)]) {
+      const m = city(name);
+      expect(m.coverage, name).toBe("partial");
+      expect(m.maps[0].kind, name).toBe("designated_only");
+      expect(m.maps[0].build, name).toBeNull();
+      expect(m.maps[0].url, name).toBe(PREF_SYSTEM);
+      expect(m.maps[0].label, name).toContain(`${name}の指定道路`);
+      // 県のサイトの決まり：島根県のホームページへのリンクだと書く
+      expect(m.maps[0].label, name).toContain("島根県の地図システムへのリンク");
+      expect(m.maps[0].tip, name).toContain("MICHILU は同意の先を開いていない");
+    }
+    for (const [name, st] of Object.entries(status)) {
+      expect(city(name).maps[0].tip, name).toContain(`${name}の指定道路図は「${st}」`);
+      expect(city(name).maps[0].tip, name).toContain("MICHILU では確かめられていない");
+    }
+    // 松江市は、市のページが「4号・5号・2項に限ります」と書いている
+    expect(city("松江市").maps[0].tip).toContain("4号・5号（位置指定道路）・2項道路に限られる");
+    expect(city("松江市").contact).toMatchObject({ phone: "0852-55-5347", fax: "0852-55-5552", email: "ke-shidou@city.matsue.lg.jp" });
+  });
+
+  it("地図の無い3市（出雲・益田・安来）は none。出雲市は市道の路線図だけ", () => {
+    for (const name of ["出雲市", "益田市", "安来市"]) expect(city(name).coverage, name).toBe("none");
+    expect(city("益田市").maps).toEqual([]);
+    expect(city("安来市").maps).toEqual([]);
+    const izumo = city("出雲市");
+    expect(izumo.maps.map((l) => l.kind)).toEqual(["public_road"]);
+    expect(izumo.maps[0].url).toBe("https://gis4.city.izumo.shimane.jp/alandis/menu_gis/");
+    expect(izumo.maps[0].tip).toContain("「道路・交通・安全・防災」→「市道認定路線図」");
+    expect(izumo.maps[0].tip).toContain("種別を示す地図ではない");
+    // 市の今の組織の一覧にある課の名前（地図の案内に残っている古い課の名前は使わない）
+    expect(izumo.maps[0].tip).toContain("道路河川管理課（0853-21-6564）");
+    expect(izumo.contact).toMatchObject({ phone: "0853-21-6150", fax: "0853-21-6594", email: "kenchiku@city.izumo.shimane.jp" });
+    expect(city("益田市").contact).toMatchObject({ phone: "0856-31-0668", fax: "0856-31-0005" });
+    expect(city("安来市").contact).toMatchObject({ phone: "0854-23-3325", fax: "0854-23-3381", email: "kenchiku@city.yasugi.shimane.jp" });
+    expect(city("安来市").contact!.note).toContain("43条2項2号の許可は、どの建築物も島根県の扱い");
+  });
+
+  it("大田市：窓口へ行く前に電話。市道の図は閲覧のほかには使えないと市が書いている。浜田・江津・雲南の窓口", () => {
+    const oda = city("大田市");
+    expect(oda.maps.map((l) => l.kind)).toEqual(["designated_only", "public_road"]);
+    expect(oda.maps[1].url).toBe("https://www.city.oda.lg.jp/ohda_city/city_organization/22/2379/9861");
+    // 市のサイトの決まり：大田市のホームページへのリンクだと書く
+    expect(oda.maps[1].label).toContain("大田市のホームページへのリンク");
+    expect(oda.maps[1].tip).toContain("閲覧以外の目的で利用することはできません");
+    expect(oda.contact!.phone).toBe("0854-83-8105");
+    expect(oda.contact!.fax).toBeUndefined();
+    expect(oda.contact!.note).toContain("窓口へ行く前に、電話で連絡する");
+    expect(city("浜田市").contact).toMatchObject({ phone: "0855-25-9632", email: "kenchiku@city.hamada.lg.jp" });
+    expect(city("江津市").contact).toMatchObject({ phone: "0855-52-7490", fax: "0855-52-1379" });
+    expect(city("雲南市").contact).toMatchObject({ phone: "0854-40-1065", fax: "0854-40-1069", email: "kenchiku@city.unnan.shimane.jp" });
   });
 });
 
@@ -1307,8 +1402,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: CHUGOKU_PENDING,
       total: 11,
       outside: ["飯南町", "美郷町", "邑南町", "海士町", "西ノ島町", "知夫村"],
-      // 特定行政庁の松江市・出雲市と、限定特定行政庁の6市
-      cities: ["松江市", "浜田市", "出雲市", "益田市", "大田市", "安来市", "江津市", "雲南市"],
+      // 特定行政庁の松江市・出雲市と、限定特定行政庁の6市は、全部登録した（上の「島根県の、市が扱う市」）
+      cities: [],
       offices: { 雲南県土整備事務所: 2, 県央県土整備事務所: 3, 益田県土整備事務所: 2, 隠岐支庁: 4 },
     },
     {
