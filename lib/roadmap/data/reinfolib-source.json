@@ -1,28 +1,28 @@
 {
  "appraisal": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261109",
-  "asOf": "20261109",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261115",
+  "asOf": "20261115",
   "year": 2026,
-  "count": 19419,
+  "count": 25565,
   "zoom": 13
  },
  "fac": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261109",
-  "asOf": "20261109",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261115",
+  "asOf": "20261115",
   "counts": {
-   "1": 5105,
-   "2": 78344,
-   "3": 52618,
-   "4": 6347,
-   "5": 4943
+   "1": 8269,
+   "2": 104183,
+   "3": 68860,
+   "4": 8837,
+   "5": 6985
   },
   "medicalYear": 2020,
   "kinderYear": 2023
  },
  "liq": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261109",
-  "asOf": "20261109",
-  "count": 3292034,
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261115",
+  "asOf": "20261115",
+  "count": 6022874,
   "levels": {
    "1": "非常に液状化しやすい",
    "2": "液状化しやすい",
@@ -63,8 +63,8 @@
   }
  },
  "pop": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261109",
-  "asOf": "20261109",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261115",
+  "asOf": "20261115",
   "years": [
    2020,
    2025,
@@ -75,40 +75,41 @@
    2050
   ],
   "reach": 2,
-  "count": 735433
+  "count": 1162630
  },
  "ridership": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261109",
-  "asOf": "20261109",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261115",
+  "asOf": "20261115",
   "year": 2024,
-  "count": 6041
+  "count": 8565
  },
  "rireki": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261109",
-  "asOf": "20261109",
-  "count": 26394,
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261115",
+  "asOf": "20261115",
+  "count": 51577,
   "kinds": {
-   "11": 15791,
-   "12": 130,
-   "13": 1823,
-   "21": 3427,
-   "22": 24,
+   "11": 24054,
+   "12": 542,
+   "13": 2692,
+   "14": 86,
+   "21": 17534,
+   "22": 102,
    "23": 125,
-   "24": 18,
-   "33": 642,
-   "34": 4026,
+   "24": 882,
+   "33": 1017,
+   "34": 4126,
    "37": 341,
-   "38": 47
+   "38": 76
   }
  },
  "zousei": {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261109",
-  "asOf": "20261109",
-  "count": 36498,
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/reinfolib/20261115",
+  "asOf": "20261115",
+  "count": 53346,
   "kinds": {
-   "区分していない": 822,
-   "谷埋め型": 33280,
-   "腹付け型": 2396
+   "谷埋め型": 48092,
+   "腹付け型": 4351,
+   "区分していない": 903
   }
  }
 }
