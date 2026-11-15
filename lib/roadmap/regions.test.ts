@@ -7,6 +7,9 @@ import { CHUGOKU_PENDING } from "./data/chugoku";
 import { SHIKOKU_PENDING } from "./data/shikoku";
 import { KYUSHU_PENDING } from "./data/kyushu";
 import { HOKKAIDO_PENDING } from "./data/hokkaido";
+import { NAGASAKI } from "./data/nagasaki";
+import { SAGA } from "./data/saga";
+import { FUKUOKA } from "./data/fukuoka";
 import { KOCHI } from "./data/kochi";
 import { TOKUSHIMA } from "./data/tokushima";
 import { EHIME } from "./data/ehime";
@@ -458,7 +461,7 @@ describe("準備中の地方（中国・四国・九州沖縄・北海道）", (
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
     ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...CHUGOKU_PENDING], 107],
     ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING], 95],
-    ["kyushu", KYUSHU_PENDING, 274],
+    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KYUSHU_PENDING], 274],
     ["hokkaido", HOKKAIDO_PENDING, 179],
   ];
   const table = Object.assign({}, ...Object.values(GSI_CODES as Record<string, Record<string, string>>)) as Record<string, string>;
@@ -639,6 +642,34 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       // 高知県は道路の種別を市町村の担当課で確かめる決まりなので、問い合わせ先は市町村の課。県の受け持ちは注に書いている
       officeIn: "note",
       offices: { "県の受け持ち：建築指導課": 27, "県の受け持ち：幡多土木事務所": 6 },
+    },
+    {
+      pref: "福岡県",
+      list: FUKUOKA,
+      pending: KYUSHU_PENDING,
+      total: 56,
+      // 都市計画区域も準都市計画区域も無い村だけ（準都市計画区域のある うきは市・大木町・香春町・糸田町・大任町・福智町・上毛町 は区域外にしない）
+      outside: ["東峰村", "赤村"],
+      cities: ["北九州市", "福岡市", "大牟田市", "久留米市"],
+      offices: { 福岡県土整備事務所: 9, 那珂県土整備事務所: 5, 朝倉県土整備事務所: 3, 久留米県土整備事務所: 3, 南筑後県土整備事務所: 4, 八女県土整備事務所: 3, 飯塚県土整備事務所: 3, 直方県土整備事務所: 4, 田川県土整備事務所: 8, 北九州県土整備事務所: 7, 京築県土整備事務所: 7 },
+    },    {
+      pref: "佐賀県",
+      list: SAGA,
+      pending: KYUSHU_PENDING,
+      total: 19,
+      // 江北町は準都市計画区域があるので区域外にしない
+      outside: ["玄海町", "大町町", "太良町"],
+      cities: ["佐賀市"],
+      offices: { 佐賀土木事務所: 2, 東部土木事務所: 6, 唐津土木事務所: 2, 伊万里土木事務所: 2, 杵藤土木事務所: 7 },
+    },    {
+      pref: "長崎県",
+      list: NAGASAKI,
+      pending: KYUSHU_PENDING,
+      total: 18,
+      outside: ["小値賀町"],
+      // 特定行政庁の長崎市・佐世保市と、限定特定行政庁の大村市（同じ限定特定行政庁の五島市は、県のページに受け持ちの分かれ方があるので登録済み）
+      cities: ["長崎市", "佐世保市", "大村市"],
+      offices: { 長崎振興局: 2, 県央振興局: 1, 島原振興局: 3, 県北振興局: 8, "五島振興局 建設部": 1, 上五島支所: 1, 壱岐振興局: 1, 対馬振興局: 1 },
     },
   ];
 
