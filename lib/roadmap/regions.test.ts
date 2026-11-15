@@ -12,7 +12,7 @@ import { HOKKAIDO } from "./data/hokkaido-pref";
 import { OKINAWA } from "./data/okinawa";
 import { KAGOSHIMA, KAGOSHIMA_CITIES } from "./data/kagoshima";
 import { MIYAZAKI } from "./data/miyazaki";
-import { OITA } from "./data/oita";
+import { OITA, OITA_CITIES } from "./data/oita";
 import { KUMAMOTO } from "./data/kumamoto";
 import { NAGASAKI } from "./data/nagasaki";
 import { SAGA } from "./data/saga";
@@ -486,7 +486,7 @@ describe("全国対応で足した地方（中国・四国・九州沖縄・北�
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
     ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...CHUGOKU_PENDING], 107],
     ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING], 95],
-    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...KYUSHU_PENDING], 274],
+    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...KYUSHU_PENDING], 274],
     ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING], 179],
   ];
   const table = Object.assign({}, ...Object.values(GSI_CODES as Record<string, Record<string, string>>)) as Record<string, string>;
@@ -612,6 +612,29 @@ describe("鹿児島県の、市が扱う市（登録した市）", () => {
     expect(m.contact?.note).toContain("できる限り来庁");
     expect(m.contact?.note).toContain("099-216-1516");
     expect(KYUSHU_PENDING.filter((x) => x.pref === "鹿児島県").map((x) => x.name)).toEqual(["鹿屋市", "薩摩川内市", "霧島市"]);
+  });
+});
+
+describe("大分県の、市が扱う市（登録した市）", () => {
+  it("大分市：市の地図（おおいたマップ地図情報）の「道路情報他」の指定道路図。指定道路調書の内容の問い合わせは来庁して", () => {
+    const m = OITA_CITIES.find((x) => x.name === "大分市")!;
+    expect(m.codes).toEqual(["44201"]);
+    expect(m.coverage).toBe("full");
+    expect(m.maps[0].kind).toBe("road_type");
+    // 市のページと同じ入口のリンク（地図の中は開いて確かめていない）
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://www2.wagmap.jp/oitacity/Portal");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("「道路情報他」の地図を選び");
+    // 指定道路（1項2号〜5号・2項など）のほかは、参考の表示
+    expect(m.maps[0].tip).toContain("そのほかの道路は、おおよその位置と種別を参考として表示");
+    expect(m.maps[0].tip).toContain("整理番号（判定番号）");
+    expect(m.contact?.phone).toBe("097-537-5635");
+    expect(m.contact?.fax).toBe("097-534-6201");
+    // 電話を断っているのは、指定道路調書の内容の問い合わせだけ
+    expect(m.contact?.noPhoneInquiry).toBeUndefined();
+    expect(m.contact?.note).toContain("電話では受け付けていない");
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "大分県").map((x) => x.name)).toEqual(["別府市", "中津市", "日田市", "佐伯市", "宇佐市"]);
   });
 });
 
@@ -835,8 +858,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: KYUSHU_PENDING,
       total: 12,
       outside: ["姫島村", "九重町"],
-      // 特定行政庁の6市
-      cities: ["大分市", "別府市", "中津市", "日田市", "佐伯市", "宇佐市"],
+      // 特定行政庁の6市のうち、まだ調べている途中の市（大分市は登録した。下の「大分市」）
+      cities: ["別府市", "中津市", "日田市", "佐伯市", "宇佐市"],
       offices: { 別府土木事務所: 4, 大分土木事務所: 1, 臼杵土木事務所: 2, 豊後大野土木事務所: 2, 日田土木事務所: 2, 中津土木事務所: 1 },
     },    {
       pref: "宮崎県",
