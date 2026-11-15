@@ -17,7 +17,7 @@ import { KUMAMOTO, KUMAMOTO_CITIES } from "./data/kumamoto";
 import { NAGASAKI, NAGASAKI_CITIES } from "./data/nagasaki";
 import { SAGA, SAGA_CITIES } from "./data/saga";
 import { FUKUOKA, FUKUOKA_CITIES } from "./data/fukuoka";
-import { KOCHI } from "./data/kochi";
+import { KOCHI, KOCHI_CITIES } from "./data/kochi";
 import { TOKUSHIMA, TOKUSHIMA_CITIES } from "./data/tokushima";
 import { EHIME, EHIME_CITIES } from "./data/ehime";
 import { KAGAWA, KAGAWA_CITIES } from "./data/kagawa";
@@ -485,7 +485,7 @@ describe("全国対応で足した地方（中国・四国・九州沖縄・北�
   // 地方ごとの市町村：調査中の一覧（data/<地方>.ts）と、調べ終えて登録した道県（data/<道県>.ts）を合わせたもの
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
     ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...YAMAGUCHI_CITIES, ...TOTTORI_CITIES, ...SHIMANE_CITIES, ...CHUGOKU_PENDING], 107],
-    ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...KAGAWA_CITIES, ...TOKUSHIMA_CITIES, ...EHIME_CITIES, ...SHIKOKU_PENDING], 95],
+    ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...KAGAWA_CITIES, ...TOKUSHIMA_CITIES, ...EHIME_CITIES, ...KOCHI_CITIES, ...SHIKOKU_PENDING], 95],
     ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...MIYAZAKI_CITIES, ...OKINAWA_CITIES, ...NAGASAKI_CITIES, ...SAGA_CITIES, ...KUMAMOTO_CITIES, ...KYUSHU_PENDING], 274],
     ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING], 179],
   ];
@@ -1444,8 +1444,8 @@ describe("佐賀県の、市が扱う市（登録した市）", () => {
 });
 
 describe("熊本県の、市が扱う市（登録した市）", () => {
-  it("天草市：道路種別の地図は無い。建築住宅課へ（道路判定事前協議書・位置指定道路の一覧）。熊本市・八代市は調査中に残る", () => {
-    expect(KUMAMOTO_CITIES.map((m) => m.name)).toEqual(["天草市"]);
+  it("天草市：道路種別の地図は無い。建築住宅課へ（道路判定事前協議書・位置指定道路の一覧）", () => {
+    expect(KUMAMOTO_CITIES.map((m) => m.name)).toEqual(["天草市", "熊本市"]);
     const m = KUMAMOTO_CITIES[0];
     expect(m.codes).toEqual(["43215"]);
     expect(findMunicipality("43215")?.name).toBe("天草市");
@@ -1457,7 +1457,54 @@ describe("熊本県の、市が扱う市（登録した市）", () => {
     expect(m.contact?.note).toContain("道路判定事前協議書");
     expect(m.contact?.note).toContain("平成24年度以降に市が指定したもの");
     expect(m.note).toContain("天草市の一部は都市計画区域の外");
-    expect(KYUSHU_PENDING.filter((x) => x.pref === "熊本県").map((x) => x.name)).toEqual(["熊本市", "八代市"]);
+  });
+
+  it("熊本市：市の地図情報サービスに、市が道路判定をした道と位置指定道路（一部）。電話・FAX・メールでは道路を調べない。八代市だけ調査中に残る", () => {
+    const m = KUMAMOTO_CITIES[1];
+    expect(m.name).toBe("熊本市");
+    // 政令市は区のコード（市そのもののコード 43100 は使わない）
+    expect(m.codes).toEqual(["43101", "43102", "43103", "43104", "43105"]);
+    for (const c of m.codes) expect(findMunicipality(c)?.name, c).toBe("熊本市");
+    expect(m.coverage).toBe("partial");
+    expect(m.maps).toHaveLength(1);
+    const map = m.maps[0];
+    expect(map).toMatchObject({ kind: "road_type", build: null, url: "https://www.sonicweb-asp.jp/kumamoto/", verified: false });
+    expect(map.tip).toContain("表示テーマ「建築基準法（道路判定、建築協定）」");
+    expect(map.tip).toContain("MICHILU は地図の中を開いて確かめていない");
+    expect(map.tip).toContain("市が道路判定をした道と、指定済みの位置指定道路だけ");
+    expect(m.contact).toMatchObject({ phone: "096-328-2513", noPhoneInquiry: true });
+    // 道路調査は電話・FAX・メールでは受けないので、FAX とメールの宛先は入れない（メールは障害で届かない時期もある）
+    expect(m.contact?.fax).toBeUndefined();
+    expect(m.contact?.email).toBeUndefined();
+    expect(m.contact?.note).toContain("電話・FAX・メールなどでは受けていない");
+    expect(m.contact?.note).toContain("道等の判定申込書");
+    expect(m.contact?.note).toContain("1か月ほど");
+    expect(m.note).toContain("熊本市の一部は都市計画区域の外");
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "熊本県").map((x) => x.name)).toEqual(["八代市"]);
+  });
+});
+
+describe("高知県の、市が扱う市（登録した市）", () => {
+  it("高知市：市のページの指定道路図（全種別）。市の決まりに合わせてトップページから進む。営利目的に使えないことを道順に書く", () => {
+    expect(KOCHI_CITIES.map((m) => m.name)).toEqual(["高知市"]);
+    const m = KOCHI_CITIES[0];
+    expect(m.codes).toEqual(["39201"]);
+    expect(findMunicipality("39201")?.name).toBe("高知市");
+    expect(m.coverage).toBe("full");
+    expect(m.maps).toHaveLength(1);
+    const map = m.maps[0];
+    // リンクはトップページへ、という市の決まり
+    expect(map).toMatchObject({ kind: "road_type", build: null, url: "https://www.city.kochi.kochi.jp/", verified: true });
+    expect(map.tip).toContain("「組織でさがす」→ 都市建設部の「建築指導課」→「建築基準法上の道路種別の閲覧について」");
+    expect(map.tip).toContain("2026年4月1日現在");
+    expect(map.tip).toContain("営利目的で使えない");
+    expect(map.tip).toContain("不動産取引のための資料としては使えない");
+    expect(m.contact).toMatchObject({ phone: "088-823-9470", fax: "088-823-9454", email: "kc-171300@city.kochi.lg.jp", hours: "平日 9:00〜16:30（市役所の開庁時間）" });
+    // 電話は断っていない（窓口が基本。遠方などは FAX・メールで照会できる）
+    expect(m.contact?.noPhoneInquiry).toBeUndefined();
+    expect(m.contact?.note).toContain("道路判断申込書");
+    expect(m.note).toContain("高知市の一部は都市計画区域の外");
+    expect(SHIKOKU_PENDING.filter((x) => x.pref === "高知県")).toEqual([]);
   });
 });
 
@@ -1860,8 +1907,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: SHIKOKU_PENDING,
       total: 33,
       outside: ["奈半利町", "田野町", "安田町", "北川村", "馬路村", "芸西村", "大豊町", "大川村", "仁淀川町", "梼原町", "日高村", "津野町", "大月町", "三原村"],
-      // 特定行政庁は高知市だけ
-      cities: ["高知市"],
+      // 特定行政庁は高知市だけで、登録した（下の「高知県の、市が扱う市」）
+      cities: [],
       // 高知県は道路の種別を市町村の担当課で確かめる決まりなので、問い合わせ先は市町村の課。県の受け持ちは注に書いている
       officeIn: "note",
       offices: { "県の受け持ち：建築指導課": 27, "県の受け持ち：幡多土木事務所": 6 },
@@ -1902,8 +1949,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       total: 42,
       // 都市計画区域の無い25市町村のうち、準都市計画区域のある玉東町・西原村は区域外にしない
       outside: ["上天草市", "美里町", "南関町", "和水町", "南小国町", "小国町", "産山村", "高森町", "南阿蘇村", "甲佐町", "山都町", "氷川町", "津奈木町", "錦町", "多良木町", "湯前町", "水上村", "相良村", "五木村", "山江村", "球磨村", "あさぎり町", "苓北町"],
-      // 市が扱う3市のうち、まだ調べている途中の市（天草市は登録した。下の「熊本県の、市が扱う市」）
-      cities: ["熊本市", "八代市"],
+      // 市が扱う3市のうち、まだ調べている途中の市（天草市・熊本市は登録した。下の「熊本県の、市が扱う市」）
+      cities: ["八代市"],
       offices: { 県央広域本部: 10, 県北広域本部: 18, 県南広域本部: 14 },
     },    {
       pref: "大分県",
