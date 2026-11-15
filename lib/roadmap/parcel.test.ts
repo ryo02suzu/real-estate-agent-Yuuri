@@ -1797,6 +1797,16 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     // 山林の図面（豊田市怒田沢町）は地形図で確かめた
     expect(data.sheets.find((x) => x.code === "23211" && x.sheet === "怒田沢町Ｂ")!.reason).toMatch(/地形図/);
   });
+  it("2026-11-15：浜松市中央区 呉松町の図面（286筆）は、南東へ約453mずれている（T1。北西へ動かす）。今の位置ではほかの図面と全部重なる", () => {
+    const all = data.sheets.filter((x) => x.code === "22138" && x.sheet === "H22080422133001");
+    expect(all).toHaveLength(1);
+    const s = all[0];
+    expect(s.parcels).toBe(286);
+    expect(s.shift).toEqual({ kind: "T1", east: -284.8, north: 352.7 });
+    expect(Math.hypot(s.shift!.east, s.shift!.north)).toBeCloseTo(453, 0);
+    expect(s.reason).toMatch(/100\.0%.*0\.1%/);
+    expect(s.reason).toMatch(/航空写真/);
+  });
   it("2026-11-15：旭川市 永山町１４〜１６丁目の図面（234筆）は、北海道の XII 系で北西へ約404mずれている（T2。南東へ動かす）", () => {
     const s = data.sheets.find((x) => x.code === "01204" && x.sheet === "旭川市永山東（１０００）・図郭有１７条");
     expect(s).toBeDefined();
