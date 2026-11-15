@@ -13,6 +13,11 @@ import { CHUGOKU_PENDING } from "./data/chugoku";
 import { SHIKOKU_PENDING } from "./data/shikoku";
 import { KYUSHU_PENDING } from "./data/kyushu";
 import { HOKKAIDO_PENDING } from "./data/hokkaido";
+import { SHIMANE } from "./data/shimane";
+import { TOTTORI } from "./data/tottori";
+import { YAMAGUCHI } from "./data/yamaguchi";
+import { OKAYAMA } from "./data/okayama";
+import { HIROSHIMA } from "./data/hiroshima";
 import { HYOGO, HYOGO_CITIES } from "./data/hyogo";
 import { KYOTO, KYOTO_CITIES } from "./data/kyoto";
 import { MIE, MIE_CITIES } from "./data/mie";
@@ -36,7 +41,7 @@ import { ISHIKAWA } from "./data/ishikawa";
 import { NIIGATA } from "./data/niigata";
 import { TOYAMA } from "./data/toyama";
 import { legendFor, type LegendEntry } from "./legends";
-import { isOpenRegion } from "./regions";
+import { isOpenRegion, type RegionKey } from "./regions";
 import type { RoadRead } from "./road-read";
 import { roadReadPermission } from "./road-read-permission";
 import { findSheet, type SheetHit, type SheetIndex } from "./sheets";
@@ -144,13 +149,25 @@ export type Municipality = {
   note?: string;
 };
 
-export const MUNICIPALITIES: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI, ...SHIZUOKA, ...YAMANASHI, ...NAGANO, ...AICHI, ...GIFU, ...NIIGATA, ...TOYAMA, ...ISHIKAWA, ...FUKUI, ...CHUBU_PENDING, ...AOMORI, ...IWATE, ...MIYAGI, ...AKITA, ...YAMAGATA, ...FUKUSHIMA, ...TOHOKU_PENDING, ...MIE, ...MIE_CITIES, ...SHIGA, ...SHIGA_CITIES, ...KYOTO, ...KYOTO_CITIES, ...OSAKA, ...OSAKA_CITIES, ...HYOGO, ...HYOGO_CITIES, ...NARA, ...NARA_CITIES, ...WAKAYAMA, ...WAKAYAMA_CITIES, ...KINKI_PENDING,
-  // 準備中の地方（regions.json の preparing）の市町村は、国のデータを作って確かめ終えるまで入れない（対応エリアの外のまま）
-  ...(isOpenRegion("chugoku") ? CHUGOKU_PENDING : []),
-  ...(isOpenRegion("shikoku") ? SHIKOKU_PENDING : []),
-  ...(isOpenRegion("kyushu") ? KYUSHU_PENDING : []),
-  ...(isOpenRegion("hokkaido") ? HOKKAIDO_PENDING : []),
+/** 対応している地方（関東・中部・東北・近畿）の市区町村 */
+const BASE: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GUNMA, ...TOCHIGI, ...IBARAKI, ...SHIZUOKA, ...YAMANASHI, ...NAGANO, ...AICHI, ...GIFU, ...NIIGATA, ...TOYAMA, ...ISHIKAWA, ...FUKUI, ...CHUBU_PENDING, ...AOMORI, ...IWATE, ...MIYAGI, ...AKITA, ...YAMAGATA, ...FUKUSHIMA, ...TOHOKU_PENDING, ...MIE, ...MIE_CITIES, ...SHIGA, ...SHIGA_CITIES, ...KYOTO, ...KYOTO_CITIES, ...OSAKA, ...OSAKA_CITIES, ...HYOGO, ...HYOGO_CITIES, ...NARA, ...NARA_CITIES, ...WAKAYAMA, ...WAKAYAMA_CITIES, ...KINKI_PENDING];
+
+/**
+ * 準備中に足した地方（regions.json の preparing）の市町村。調べ終えて登録した道県（data/<道県>.ts）と、調査中の一覧（data/<地方>.ts）。
+ * 国のデータを作って確かめ終えるまで、対応エリア（MUNICIPALITIES）には入れない
+ */
+const ADDED: [RegionKey, Municipality[]][] = [
+  ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...CHUGOKU_PENDING]],
+  ["shikoku", SHIKOKU_PENDING],
+  ["kyushu", KYUSHU_PENDING],
+  ["hokkaido", HOKKAIDO_PENDING],
 ];
+
+/** 対応している市区町村（アプリが使う。準備中の地方の市町村は入っていない） */
+export const MUNICIPALITIES: Municipality[] = [...BASE, ...ADDED.filter(([k]) => isOpenRegion(k)).flatMap(([, list]) => list)];
+
+/** 準備中の地方も入れた全部の市区町村（登録したデータの形を確かめるテスト・点検の道具用。アプリは使わない） */
+export const ALL_MUNICIPALITIES: Municipality[] = [...BASE, ...ADDED.flatMap(([, list]) => list)];
 
 /**
  * 市区町村に都市計画区域が無い（全域が都市計画区域外）と分かっているか。coverage が outside か、注記にそう書いてある町村
