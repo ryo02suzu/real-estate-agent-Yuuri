@@ -921,7 +921,65 @@ describe("鹿児島県の、市が扱う市（登録した市）", () => {
     expect(m.contact?.noPhoneInquiry).toBeUndefined();
     expect(m.contact?.note).toContain("できる限り来庁");
     expect(m.contact?.note).toContain("099-216-1516");
-    expect(KYUSHU_PENDING.filter((x) => x.pref === "鹿児島県").map((x) => x.name)).toEqual(["鹿屋市", "薩摩川内市", "霧島市"]);
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "鹿児島県").map((x) => x.name)).toEqual([]);
+  });
+
+  it("限定特定行政庁の3市（鹿屋・薩摩川内・霧島）を登録。市が扱わない建築物の県の窓口も書く", () => {
+    const codes: Record<string, string> = { 鹿児島市: "46201", 鹿屋市: "46203", 薩摩川内市: "46215", 霧島市: "46218" };
+    expect(KAGOSHIMA_CITIES.map((m) => m.name)).toEqual(Object.keys(codes));
+    for (const [name, code] of Object.entries(codes)) {
+      expect(KAGOSHIMA_CITIES.find((x) => x.name === name)!.codes, name).toEqual([code]);
+      expect(findMunicipality(code)?.name, name).toBe(name);
+    }
+    const office: Record<string, string> = { 鹿屋市: "大隅地域振興局", 薩摩川内市: "北薩地域振興局", 霧島市: "姶良・伊佐地域振興局" };
+    for (const [name, o] of Object.entries(office)) {
+      const m = KAGOSHIMA_CITIES.find((x) => x.name === name)!;
+      expect(m.note, name).toContain("限定特定行政庁");
+      expect(m.contact?.note, name).toContain(o);
+      expect(m.note, name).toContain(`${name}の一部は都市計画区域の外`);
+    }
+  });
+
+  it("鹿屋市：「まっぷdeかのや」の道路情報マップ（どの種別まで載るかは確かめられていないので「一部」）。道路相談票はメールで", () => {
+    const m = KAGOSHIMA_CITIES.find((x) => x.name === "鹿屋市")!;
+    expect(m.coverage).toBe("partial");
+    expect(m.maps[0].kind).toBe("road_type");
+    expect(m.maps[0].build).toBeNull();
+    expect(m.maps[0].url).toBe("https://www2.wagmap.jp/kanoya/Portal");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("どの種別まで載っているかも確かめられていない");
+    expect(m.contact?.phone).toBe("0994-31-1161");
+    expect(m.contact?.fax).toBe("0994-41-2936");
+    expect(m.contact?.email).toBe("kentiku@city.kanoya.lg.jp");
+    expect(m.contact?.note).toContain("道路相談票");
+  });
+
+  it("薩摩川内市：道路種別の地図はネットに無い（指定道路図は建築住宅課の閲覧所で）。道路のことは建物の大きさにかかわらず市", () => {
+    const m = KAGOSHIMA_CITIES.find((x) => x.name === "薩摩川内市")!;
+    expect(m.coverage).toBe("none");
+    expect(m.maps).toEqual([]);
+    expect(m.contact?.dept).toContain("建築指導グループ");
+    expect(m.contact?.phone).toBe("0996-23-5111（代表）");
+    expect(m.contact?.fax).toBe("0996-23-8389");
+    expect(m.contact?.note).toContain("建物の大きさにかかわらず市が受け持つ");
+    expect(m.contact?.note).toContain("閲覧所");
+  });
+
+  it("霧島市：市の地図情報システムの指定道路図（1項1号・2号・3号・5号・2項・法外道路）。問い合わせは原則メール・FAX・電子申請", () => {
+    const m = KAGOSHIMA_CITIES.find((x) => x.name === "霧島市")!;
+    expect(m.coverage).toBe("full");
+    expect(m.maps[0].kind).toBe("road_type");
+    expect(m.maps[0].build).toBeNull();
+    // 市のページのリンク（http）と同じ地図の、https の入口
+    expect(m.maps[0].url).toBe("https://www.sonicweb-asp.jp/kirishima/");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("1項1号・2号・3号・5号（位置指定道路）・2項と法外道路");
+    expect(m.contact?.phone).toBe("0995-64-0954");
+    expect(m.contact?.fax).toBe("0995-46-0566");
+    expect(m.contact?.email).toBe("shido@city-kirishima.jp");
+    // 電話は軽微なものなら受けるので、「電話では答えない」の印は付けない
+    expect(m.contact?.noPhoneInquiry).toBeUndefined();
+    expect(m.contact?.note).toContain("軽微なものを除いて原則");
   });
 });
 
@@ -1723,8 +1781,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: KYUSHU_PENDING,
       total: 39,
       outside: ["三島村", "十島村", "長島町", "東串良町", "大和村", "宇検村", "伊仙町", "与論町"],
-      // 限定特定行政庁の鹿屋市・薩摩川内市・霧島市（特定行政庁の鹿児島市は登録した。下の「鹿児島市」）
-      cities: ["鹿屋市", "薩摩川内市", "霧島市"],
+      // 市が扱う4市（特定行政庁の鹿児島市と、限定特定行政庁の鹿屋市・薩摩川内市・霧島市）は、全部登録した（下の「鹿児島県の、市が扱う市」）
+      cities: [],
       offices: { 鹿児島地域振興局: 4, 南薩地域振興局: 4, 北薩地域振興局: 4, "姶良・伊佐地域振興局 建設部 土木建築課 建築係": 2, 伊佐市駐在: 1, 大隅地域振興局: 8, "熊毛支庁 建設部": 3, 屋久島事務所: 1, "大島支庁 建設部": 9, 徳之島事務所: 3 },
     },    {
       pref: "沖縄県",
