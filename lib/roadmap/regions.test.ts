@@ -7,6 +7,11 @@ import { CHUGOKU_PENDING } from "./data/chugoku";
 import { SHIKOKU_PENDING } from "./data/shikoku";
 import { KYUSHU_PENDING } from "./data/kyushu";
 import { HOKKAIDO_PENDING } from "./data/hokkaido";
+import { OKINAWA } from "./data/okinawa";
+import { KAGOSHIMA } from "./data/kagoshima";
+import { MIYAZAKI } from "./data/miyazaki";
+import { OITA } from "./data/oita";
+import { KUMAMOTO } from "./data/kumamoto";
 import { NAGASAKI } from "./data/nagasaki";
 import { SAGA } from "./data/saga";
 import { FUKUOKA } from "./data/fukuoka";
@@ -461,7 +466,7 @@ describe("準備中の地方（中国・四国・九州沖縄・北海道）", (
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
     ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...CHUGOKU_PENDING], 107],
     ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING], 95],
-    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KYUSHU_PENDING], 274],
+    ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...KYUSHU_PENDING], 274],
     ["hokkaido", HOKKAIDO_PENDING, 179],
   ];
   const table = Object.assign({}, ...Object.values(GSI_CODES as Record<string, Record<string, string>>)) as Record<string, string>;
@@ -670,6 +675,51 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       // 特定行政庁の長崎市・佐世保市と、限定特定行政庁の大村市（同じ限定特定行政庁の五島市は、県のページに受け持ちの分かれ方があるので登録済み）
       cities: ["長崎市", "佐世保市", "大村市"],
       offices: { 長崎振興局: 2, 県央振興局: 1, 島原振興局: 3, 県北振興局: 8, "五島振興局 建設部": 1, 上五島支所: 1, 壱岐振興局: 1, 対馬振興局: 1 },
+    },    {
+      pref: "熊本県",
+      list: KUMAMOTO,
+      pending: KYUSHU_PENDING,
+      total: 42,
+      // 都市計画区域の無い25市町村のうち、準都市計画区域のある玉東町・西原村は区域外にしない
+      outside: ["上天草市", "美里町", "南関町", "和水町", "南小国町", "小国町", "産山村", "高森町", "南阿蘇村", "甲佐町", "山都町", "氷川町", "津奈木町", "錦町", "多良木町", "湯前町", "水上村", "相良村", "五木村", "山江村", "球磨村", "あさぎり町", "苓北町"],
+      cities: ["熊本市", "八代市", "天草市"],
+      offices: { 県央広域本部: 10, 県北広域本部: 18, 県南広域本部: 14 },
+    },    {
+      pref: "大分県",
+      list: OITA,
+      pending: KYUSHU_PENDING,
+      total: 12,
+      outside: ["姫島村", "九重町"],
+      // 特定行政庁の6市
+      cities: ["大分市", "別府市", "中津市", "日田市", "佐伯市", "宇佐市"],
+      offices: { 別府土木事務所: 4, 大分土木事務所: 1, 臼杵土木事務所: 2, 豊後大野土木事務所: 2, 日田土木事務所: 2, 中津土木事務所: 1 },
+    },    {
+      pref: "宮崎県",
+      list: MIYAZAKI,
+      pending: KYUSHU_PENDING,
+      total: 22,
+      outside: ["西米良村", "木城町", "諸塚村", "椎葉村", "美郷町", "日之影町", "五ヶ瀬町"],
+      cities: ["宮崎市", "都城市", "延岡市", "日向市"],
+      // 問い合わせ先は本務の事務所（国富町・綾町＝宮崎、西都市・西米良村＝高鍋、串間市＝日南）
+      offices: { 宮崎土木事務所: 2, 高鍋土木事務所: 7, 日南土木事務所: 2, 都城土木事務所: 1, 小林土木事務所: 3, 日向土木事務所: 4, 西臼杵支庁: 3 },
+    },    {
+      pref: "鹿児島県",
+      list: KAGOSHIMA,
+      pending: KYUSHU_PENDING,
+      total: 39,
+      outside: ["三島村", "十島村", "長島町", "東串良町", "大和村", "宇検村", "伊仙町", "与論町"],
+      // 特定行政庁の鹿児島市と、限定特定行政庁の鹿屋市・薩摩川内市・霧島市
+      cities: ["鹿児島市", "鹿屋市", "薩摩川内市", "霧島市"],
+      offices: { 鹿児島地域振興局: 4, 南薩地域振興局: 4, 北薩地域振興局: 4, "姶良・伊佐地域振興局 建設部 土木建築課 建築係": 2, 伊佐市駐在: 1, 大隅地域振興局: 8, "熊毛支庁 建設部": 3, 屋久島事務所: 1, "大島支庁 建設部": 9, 徳之島事務所: 3 },
+    },    {
+      pref: "沖縄県",
+      list: OKINAWA,
+      pending: KYUSHU_PENDING,
+      total: 36,
+      outside: ["国頭村", "大宜味村", "東村", "今帰仁村", "恩納村", "宜野座村", "金武町", "伊江村", "伊平屋村", "伊是名村", "久米島町", "渡嘉敷村", "座間味村", "粟国村", "渡名喜村", "南大東村", "北大東村", "多良間村", "竹富町", "与那国町"],
+      // 特定行政庁の5市
+      cities: ["那覇市", "宜野湾市", "浦添市", "沖縄市", "うるま市"],
+      offices: { 北部土木事務所: 12, 中部土木事務所: 6, 南部土木事務所: 13, 宮古土木事務所: 2, 八重山土木事務所: 3 },
     },
   ];
 
