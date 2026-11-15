@@ -22,7 +22,7 @@ import { TOKUSHIMA, TOKUSHIMA_CITIES } from "./data/tokushima";
 import { EHIME } from "./data/ehime";
 import { KAGAWA, KAGAWA_CITIES } from "./data/kagawa";
 import { SHIMANE } from "./data/shimane";
-import { TOTTORI } from "./data/tottori";
+import { TOTTORI, TOTTORI_CITIES } from "./data/tottori";
 import { YAMAGUCHI, YAMAGUCHI_CITIES } from "./data/yamaguchi";
 import { OKAYAMA, OKAYAMA_CITIES } from "./data/okayama";
 import { HIROSHIMA, HIROSHIMA_CITIES } from "./data/hiroshima";
@@ -484,7 +484,7 @@ describe("市の道路種別のデータをアプリの中に表示するのは�
 describe("全国対応で足した地方（中国・四国・九州沖縄・北海道）", () => {
   // 地方ごとの市町村：調査中の一覧（data/<地方>.ts）と、調べ終えて登録した道県（data/<道県>.ts）を合わせたもの
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
-    ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...YAMAGUCHI_CITIES, ...CHUGOKU_PENDING], 107],
+    ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...HIROSHIMA_CITIES, ...OKAYAMA_CITIES, ...YAMAGUCHI_CITIES, ...TOTTORI_CITIES, ...CHUGOKU_PENDING], 107],
     ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...KAGAWA_CITIES, ...TOKUSHIMA_CITIES, ...SHIKOKU_PENDING], 95],
     ["kyushu", [...FUKUOKA, ...SAGA, ...NAGASAKI, ...KUMAMOTO, ...OITA, ...MIYAZAKI, ...KAGOSHIMA, ...OKINAWA, ...FUKUOKA_CITIES, ...KAGOSHIMA_CITIES, ...OITA_CITIES, ...MIYAZAKI_CITIES, ...OKINAWA_CITIES, ...NAGASAKI_CITIES, ...KYUSHU_PENDING], 274],
     ["hokkaido", [...HOKKAIDO, ...HOKKAIDO_CITIES, ...HOKKAIDO_PENDING], 179],
@@ -662,6 +662,83 @@ describe("岡山県の、市が扱う市（登録した市）", () => {
     // 市の説明の引用（MICHILU の判断ではない）
     expect(m.note).toContain("と説明している");
     expect(m.note).toContain("大佐・神郷・哲多町・哲西町は、全域が都市計画区域の外");
+  });
+});
+
+describe("鳥取県の、市が扱う市（登録した市）", () => {
+  const city = (name: string) => TOTTORI_CITIES.find((x) => x.name === name)!;
+
+  it("鳥取・米子・倉吉・境港の4市を登録したので、調査中の一覧に鳥取県は残っていない", () => {
+    expect(TOTTORI_CITIES.map((m) => m.name)).toEqual(["鳥取市", "米子市", "倉吉市", "境港市"]);
+    expect(CHUGOKU_PENDING.filter((x) => x.pref === "鳥取県")).toEqual([]);
+    const codes: Record<string, string> = { 鳥取市: "31201", 米子市: "31202", 倉吉市: "31203", 境港市: "31204" };
+    for (const [name, code] of Object.entries(codes)) {
+      expect(city(name).codes, name).toEqual([code]);
+      expect(findMunicipality(code)?.name, name).toBe(name);
+    }
+    // 同意の画面の先を MICHILU で開いて確かめていない市は、そう書く
+    for (const name of ["米子市", "倉吉市"]) {
+      expect(city(name).coverage, name).toBe("partial");
+      expect(city(name).maps[0].build, name).toBeNull();
+      expect(city(name).maps[0].tip, name).toContain("どの種別まで載っているかも確かめられていない");
+      expect(city(name).maps[0].tip, name).toContain("自分で同意して進");
+    }
+  });
+
+  it("鳥取市：物件の場所で、市の指定道路図（7つのレイヤ）を表示した状態で開く。道路の疑問は電話では答えない", () => {
+    const m = city("鳥取市");
+    expect(m.coverage).toBe("full");
+    expect(m.maps.map((l) => l.kind)).toEqual(["road_type"]);
+    const [link] = buildLinks(m, 35.501, 134.233);
+    // とっとりジオマップが自分でアドレスに書き出す形（center=経度/緯度・zoom・baseMap・layers・marker）。その場所が中心に開くことを画面で確かめた
+    expect(link.url).toBe("https://city-tottori.tottori-geomap.jp/#/?center=134.233000%2F35.501000&zoom=17&baseMap=gsi&layers=3VfuA2koPS79lOIopD1cz&marker=on");
+    expect(link.pinpoint).toBe(true);
+    expect(link.verified).toBe(true);
+    // 規約の画面は、利用者が自分で読んで同意する。レイヤが出ないときの選び方も書く
+    expect(link.tip).toContain("自分で同意して進む");
+    expect(link.tip).toContain("「都市計画・建築」→「指定道路図」");
+    // 市が、窓口に問い合わせるよう求めている場合（幅員4m未満の1号〜5号・1.8m未満の2項・未判定道路など）
+    expect(link.tip).toContain("幅員が4m未満");
+    expect(link.tip).toContain("未判定道路");
+    expect(link.tip).toContain("権利や義務にかかわる資料にはできない");
+    expect(m.contact).toMatchObject({ phone: "0857-30-8361", fax: "0857-20-3956", noPhoneInquiry: true });
+    expect(m.contact!.note).toContain("電話では答えない");
+    // 市役所の窓口の時間は、市のページで確かめられなかったので入れていない
+    expect(m.contact!.hours).toBeUndefined();
+  });
+
+  it("米子市：市の地図の「指定道路」（注意事項に同意して進む）。電話での問い合わせには応じていない", () => {
+    const m = city("米子市");
+    expect(m.maps[0].url).toBe("https://webgis.alandis.jp/yonago31/conf/conf.html");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("道路種別を確かめる目的のほかには使えない");
+    expect(m.contact).toMatchObject({ phone: "0859-23-5236", fax: "0859-23-5394", email: "kenchikusoudan@city.yonago.lg.jp", noPhoneInquiry: true });
+    // 糀町庁舎の開庁時間（市が 9:00〜17:00 に変えた）
+    expect(m.contact!.hours).toContain("9:00〜17:00");
+  });
+
+  it("倉吉市：市のウェブサイトの「倉吉市指定道路の検索」。市の注意（営利などの目的には使えない）をそのまま道順に入れる", () => {
+    const m = city("倉吉市");
+    expect(m.maps[0].url).toBe("https://www.city.kurayoshi.lg.jp/s_road/");
+    // 市のサイトの決まり：倉吉市のウェブサイトへのリンクだと分かるように書く
+    expect(m.maps[0].label).toContain("倉吉市のウェブサイト");
+    expect(m.maps[0].tip).toContain("本図を営利などの特定の目的で利用することはできません");
+    expect(m.maps[0].tip).toContain("閲覧する目的のほかには使えない");
+    expect(m.contact).toMatchObject({ phone: "0858-22-8175", fax: "0858-22-8140", email: "kenchikujutaku@city.kurayoshi.lg.jp" });
+    expect(m.contact?.noPhoneInquiry).toBeUndefined();
+  });
+
+  it("境港市：限定特定行政庁。道路種別の地図は見つからず、市の窓口と、市が扱わない建築物の県の窓口を出す。全域が都市計画区域", () => {
+    const m = city("境港市");
+    expect(m.coverage).toBe("none");
+    expect(m.maps).toEqual([]);
+    expect(m.contact).toMatchObject({ phone: "0859-47-1062", fax: "0859-47-1086" });
+    expect(m.contact!.note).toContain("西部総合事務所 環境建築局 建築住宅課（0859-31-9753）");
+    // 開庁時間の短縮の試行（2026年8月3日〜12月28日）も入れる
+    expect(m.contact!.hours).toContain("9:00〜16:30");
+    expect(m.note).toContain("境港市は全域が都市計画区域");
+    // 「全域が都市計画区域外」と読まれる書き方にしない（区域の外の町村の印に使う言い回し）
+    expect(m.note).not.toContain("都市計画区域外");
   });
 });
 
@@ -1220,8 +1297,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       pending: CHUGOKU_PENDING,
       total: 15,
       outside: ["大山町", "南部町", "伯耆町", "日南町", "日野町", "江府町"],
-      // 鳥取市・米子市・倉吉市と、限定特定行政庁の境港市
-      cities: ["鳥取市", "米子市", "倉吉市", "境港市"],
+      // 鳥取市・米子市・倉吉市と、限定特定行政庁の境港市は、全部登録した（上の「鳥取県の、市が扱う市」）
+      cities: [],
       offices: { 東部建築住宅事務所: 4, 中部総合事務所: 4, 西部総合事務所: 7 },
     },
     {

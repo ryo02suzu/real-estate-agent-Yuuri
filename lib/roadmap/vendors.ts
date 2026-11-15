@@ -101,6 +101,18 @@ export const arcgisWebApp =
     `https://${host}/apps/webappviewer/index.html?id=${appId}&center=${lng.toFixed(6)},${lat.toFixed(6)},4326&scale=${scale}`;
 
 /**
+ * とっとりジオマップ（鳥取県と県内市町村の統合型GIS。<自治体>.tottori-geomap.jp）。
+ * …/#/?center=経度%2F緯度&zoom=&baseMap=gsi&layers=<レイヤの短いIDをつなげたもの>&marker=on。画面が自分でアドレスに書き出す形と同じ。
+ * その場所が中心に開き、layers のレイヤが表示されることを、パソコンとスマホの画面で確かめた（鳥取市の指定道路図）。
+ * 最初に利用規約の画面が出て、利用者が自分で読んで同意して進む。layers のIDは、サイトのメニューの設定（公開されているページの中）にある。
+ * IDが変わったときは、地図は場所で開くが、レイヤは利用者が自分で選ぶことになる（道順にも書く）
+ */
+export const tottoriGeomap =
+  (site: string, layers: string, zoom = 17): Build =>
+  (lat, lng) =>
+    `https://${site}.tottori-geomap.jp/#/?center=${lng.toFixed(6)}%2F${lat.toFixed(6)}&zoom=${zoom}&baseMap=gsi&layers=${layers}&marker=on`;
+
+/**
  * ArcGIS の Map Viewer（<ポータル>/apps/mapviewer/index.html?webmap=）。center=経度,緯度 と scale で開き、marker で物件にピンを立てる。
  * 自治体の Experience Builder アプリが URL の位置指定を受け付けないとき、同じ公開 Web マップをこちらで開く（千代田区）
  */

@@ -6,11 +6,6 @@
 import type { Municipality } from "../municipalities";
 
 export const CHUGOKU_PENDING: Municipality[] = [
-  // 鳥取県（残り 4）
-  { pref: "鳥取県", name: "鳥取市", codes: ["31201"], coverage: "unknown", maps: [] },
-  { pref: "鳥取県", name: "米子市", codes: ["31202"], coverage: "unknown", maps: [] },
-  { pref: "鳥取県", name: "倉吉市", codes: ["31203"], coverage: "unknown", maps: [] },
-  { pref: "鳥取県", name: "境港市", codes: ["31204"], coverage: "unknown", maps: [] },
   // 島根県（残り 8）
   { pref: "島根県", name: "松江市", codes: ["32201"], coverage: "unknown", maps: [] },
   { pref: "島根県", name: "浜田市", codes: ["32202"], coverage: "unknown", maps: [] },
