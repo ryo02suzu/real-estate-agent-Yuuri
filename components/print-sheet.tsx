@@ -228,7 +228,8 @@ function Memo({
               <dt className="text-[#7a6a55]">近くの地価（参考）</dt>
               <dd>
                 {prices.map((h) => (
-                  <span key={h.no} className="block">
+                  // 地価公示と地価調査で同じ番号の地点がある（例：旭川5-5）ので、種類も入れて区別する
+                  <span key={`${h.kind}|${h.no}`} className="block">
                     {kindText(h.kind)} {h.no}（{h.usage}・{h.bearing}へ{distanceText(h.distance)}）：<b>{priceText(h.price)}</b>（前年比 {changeText(h.change)}・{h.year}年）
                   </span>
                 ))}
