@@ -7,13 +7,17 @@ import { CHUGOKU_PENDING } from "./data/chugoku";
 import { SHIKOKU_PENDING } from "./data/shikoku";
 import { KYUSHU_PENDING } from "./data/kyushu";
 import { HOKKAIDO_PENDING } from "./data/hokkaido";
+import { KOCHI } from "./data/kochi";
+import { TOKUSHIMA } from "./data/tokushima";
+import { EHIME } from "./data/ehime";
+import { KAGAWA } from "./data/kagawa";
 import { SHIMANE } from "./data/shimane";
 import { TOTTORI } from "./data/tottori";
 import { YAMAGUCHI } from "./data/yamaguchi";
 import { OKAYAMA } from "./data/okayama";
 import { HIROSHIMA } from "./data/hiroshima";
 import { MUNI_CODES } from "./muni-codes";
-import { buildLinks, findMunicipality, MUNICIPALITIES } from "./municipalities";
+import { buildLinks, findMunicipality, MUNICIPALITIES, type Municipality } from "./municipalities";
 import { ROAD_READ_PERMITTED, roadReadPermission } from "./road-read-permission";
 import { ALL_PREF_NAMES, ALL_REGIONS, AREA_LABEL, PREF_NAME_RE, PREF_NAMES, REGION_ORDER, REGIONS, SUPPORTED_BOUNDS, isOpenRegion, isSupportedPref, regionOfMuni, regionOfPref, type RegionKey } from "./regions";
 
@@ -453,7 +457,7 @@ describe("準備中の地方（中国・四国・九州沖縄・北海道）", (
   // 地方ごとの市町村：調査中の一覧（data/<地方>.ts）と、調べ終えて登録した道県（data/<道県>.ts）を合わせたもの
   const NEW: [RegionKey, typeof CHUGOKU_PENDING, number][] = [
     ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...CHUGOKU_PENDING], 107],
-    ["shikoku", SHIKOKU_PENDING, 95],
+    ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING], 95],
     ["kyushu", KYUSHU_PENDING, 274],
     ["hokkaido", HOKKAIDO_PENDING, 179],
   ];
@@ -552,7 +556,9 @@ describe("広島県（県が扱う15市町を登録。市が扱う8市は調査�
 // 全国対応で足した県のうち、決まった形（県の事務所が受け持つ市町村・都市計画区域の無い市町村・市が扱う市は調査中）で登録した県。
 // 県ごとの出典は docs/<県>-research.md
 describe("中国・四国・九州沖縄・北海道で登録した県（県が扱う市町村）", () => {
-  const CASES = [
+  /** offices は「窓口の名前に入っている言葉 → 市町村の数」。officeIn が note のときは、注に入っている言葉で数える */
+  type Case = { pref: string; list: Municipality[]; pending: Municipality[]; total: number; outside: string[]; cities: string[]; offices: Record<string, number>; officeIn?: "note" };
+  const CASES: Case[] = [
     {
       pref: "岡山県",
       list: OKAYAMA,
@@ -592,9 +598,51 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       cities: ["松江市", "浜田市", "出雲市", "益田市", "大田市", "安来市", "江津市", "雲南市"],
       offices: { 雲南県土整備事務所: 2, 県央県土整備事務所: 3, 益田県土整備事務所: 2, 隠岐支庁: 4 },
     },
+    {
+      pref: "香川県",
+      list: KAGAWA,
+      pending: SHIKOKU_PENDING,
+      total: 16,
+      outside: ["直島町"],
+      // 特定行政庁は高松市だけ
+      cities: ["高松市"],
+      offices: { 長尾土木事務所: 3, 中讃土木事務所: 8, 西讃土木事務所: 2, 小豆総合事務所: 2, 建築指導課: 1 },
+    },
+    {
+      pref: "愛媛県",
+      list: EHIME,
+      pending: SHIKOKU_PENDING,
+      total: 15,
+      outside: ["上島町", "伊方町", "松野町"],
+      // 特定行政庁の4市と、限定特定行政庁の宇和島市
+      cities: ["松山市", "今治市", "宇和島市", "新居浜市", "西条市"],
+      offices: { 東予地方局: 1, 四国中央土木事務所: 1, 中予地方局: 5, 八幡浜土木事務所: 4, 南予地方局: 4 },
+    },
+    {
+      pref: "徳島県",
+      list: TOKUSHIMA,
+      pending: SHIKOKU_PENDING,
+      total: 23,
+      outside: ["阿波市", "勝浦町", "上勝町", "佐那河内村", "神山町", "那賀町", "海陽町", "板野町", "上板町", "東みよし町"],
+      // 特定行政庁は徳島市だけ
+      cities: ["徳島市"],
+      offices: { 徳島県土整備事務所: 10, 吉野川県土整備事務所: 4, 阿南県土整備事務所: 5, 美馬県土整備事務所: 2, 三好県土整備事務所: 2 },
+    },
+    {
+      pref: "高知県",
+      list: KOCHI,
+      pending: SHIKOKU_PENDING,
+      total: 33,
+      outside: ["奈半利町", "田野町", "安田町", "北川村", "馬路村", "芸西村", "大豊町", "大川村", "仁淀川町", "梼原町", "日高村", "津野町", "大月町", "三原村"],
+      // 特定行政庁は高知市だけ
+      cities: ["高知市"],
+      // 高知県は道路の種別を市町村の担当課で確かめる決まりなので、問い合わせ先は市町村の課。県の受け持ちは注に書いている
+      officeIn: "note",
+      offices: { "県の受け持ち：建築指導課": 27, "県の受け持ち：幡多土木事務所": 6 },
+    },
   ];
 
-  it.each(CASES)("$pref：県が扱う市町村の数・受け持ちの事務所・都市計画区域の無い市町村・調査中の市", ({ pref, list, pending, total, outside, cities, offices }) => {
+  it.each(CASES)("$pref：県が扱う市町村の数・受け持ちの事務所・都市計画区域の無い市町村・調査中の市", ({ pref, list, pending, total, outside, cities, offices, officeIn }) => {
     expect(list).toHaveLength(total);
     for (const m of list) {
       expect(m.pref).toBe(pref);
@@ -604,7 +652,7 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
     expect(list.filter((m) => m.coverage === "outside").map((m) => m.name).sort()).toEqual([...outside].sort());
     // 都市計画区域の無い市町村は地図を出さず、注に「全域が都市計画区域外」と書く
     for (const m of list.filter((x) => x.coverage === "outside")) expect([m.maps.length, /全域が都市計画区域外/.test(m.note ?? "")], m.name).toEqual([0, true]);
-    for (const [word, n] of Object.entries(offices)) expect(list.filter((m) => m.contact!.dept.includes(word)), word).toHaveLength(n);
+    for (const [word, n] of Object.entries(offices)) expect(list.filter((m) => (officeIn === "note" ? m.note! : m.contact!.dept).includes(word)), word).toHaveLength(n);
     expect(Object.values(offices).reduce((a, b) => a + b, 0)).toBe(total);
     // 市が扱う市は、まだ調査中の一覧にある
     expect(pending.filter((m) => m.pref === pref).map((m) => m.name)).toEqual(cities);

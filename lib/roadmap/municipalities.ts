@@ -13,6 +13,10 @@ import { CHUGOKU_PENDING } from "./data/chugoku";
 import { SHIKOKU_PENDING } from "./data/shikoku";
 import { KYUSHU_PENDING } from "./data/kyushu";
 import { HOKKAIDO_PENDING } from "./data/hokkaido";
+import { KOCHI } from "./data/kochi";
+import { TOKUSHIMA } from "./data/tokushima";
+import { EHIME } from "./data/ehime";
+import { KAGAWA } from "./data/kagawa";
 import { SHIMANE } from "./data/shimane";
 import { TOTTORI } from "./data/tottori";
 import { YAMAGUCHI } from "./data/yamaguchi";
@@ -158,7 +162,7 @@ const BASE: Municipality[] = [...SAITAMA, ...CHIBA, ...KANAGAWA, ...TOKYO, ...GU
  */
 const ADDED: [RegionKey, Municipality[]][] = [
   ["chugoku", [...HIROSHIMA, ...OKAYAMA, ...YAMAGUCHI, ...TOTTORI, ...SHIMANE, ...CHUGOKU_PENDING]],
-  ["shikoku", SHIKOKU_PENDING],
+  ["shikoku", [...KAGAWA, ...EHIME, ...TOKUSHIMA, ...KOCHI, ...SHIKOKU_PENDING]],
   ["kyushu", KYUSHU_PENDING],
   ["hokkaido", HOKKAIDO_PENDING],
 ];
