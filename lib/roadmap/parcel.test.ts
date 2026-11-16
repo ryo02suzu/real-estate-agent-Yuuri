@@ -1678,8 +1678,8 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     // 神戸市北区若葉台（1枚の本体を縮尺ごと直す。大字・丁目ごとに6つ）、11-14 に拾い直した津市（みのりヶ丘・あのつ台三丁目・五丁目）と松阪市（清生町・垣鼻町・田原町）の4枚、
     // 11-15 に全部の図面の点検（v4）で見つけた神戸市西区岩岡町古郷・加古川市志方町畑の2枚と、加西市中山町・丹波篠山市今田町本荘の2枚、
     // 同じ点検の続きで見つけた亀岡市（ヒエ田野町・宮前町宮川・本梅町井手）の3枚と京田辺市（普賢寺の水取・打田の工区）の2枚、
-    // 11-16 に「保留」から航空写真で確かめて足した京丹後市 大宮町五十河の1枚と、同じ点検の続きで見つけた滋賀県（長浜市・近江八幡市・甲賀市）の4枚
-    expect(kinki).toHaveLength(45);
+    // 11-16 に「保留」から航空写真で確かめて足した京丹後市 大宮町五十河の1枚と、同じ点検の続きで見つけた滋賀県（長浜市・近江八幡市・甲賀市・米原市）の5枚
+    expect(kinki).toHaveLength(46);
     const sanda = kinki.filter((s) => s.code === "28219");
     expect(sanda.map((s) => s.sheet).sort()).toEqual(["あかしあ台１～５丁目", "すずかけ台１～４丁目", "ゆりのき台１～６丁目（修正後）", "北摂三田ニュータウン南地区"].sort());
     expect(sanda.reduce((a, s) => a + s.parcels, 0)).toBe(11320);
@@ -1940,6 +1940,24 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
       expect(s.oaza, sheet).toBeUndefined();
       // 動かした先では、ほかの地図の筆と重なるのは15%以下
       expect(Number(s.reason.match(/動かした先では ([\d.]+)%/)?.[1]), sheet).toBeLessThanOrEqual(15);
+      expect(s.reason, sheet).toMatch(/2026-11-16.*航空写真/);
+    }
+  });
+  it("2026-11-16：同じ点検の続きで見つけた米原市 伊吹町（364筆）と倉吉市 関金町関金宿（52筆）は、北西へ約424〜434mずれている（T2。南東へ動かす）", () => {
+    const want: [string, string, number, number, number][] = [
+      ["25214", "平成１３年度伊吹町５００", 364, 259.5, -348],
+      ["31203", "H20270131203451", 52, 248.4, -343.7],
+    ];
+    for (const [code, sheet, parcels, east, north] of want) {
+      const all = data.sheets.filter((x) => x.code === code && x.sheet === sheet);
+      expect(all, sheet).toHaveLength(1);
+      const s = all[0];
+      expect(s.parcels, sheet).toBe(parcels);
+      expect(s.shift, sheet).toEqual({ kind: "T2", east, north });
+      expect(s.chiban, sheet).toBeUndefined();
+      expect(s.oaza, sheet).toBeUndefined();
+      // 今の位置ではほかの地図の筆と重なり（18.4%・79.9%）、動かした先ではほとんど重ならない
+      expect(s.reason, sheet).toMatch(/重なるのは面積の (18\.4|79\.9)%、動かした先では 0\.[01]%/);
       expect(s.reason, sheet).toMatch(/2026-11-16.*航空写真/);
     }
   });
