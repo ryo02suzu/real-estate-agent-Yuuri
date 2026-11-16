@@ -1153,6 +1153,16 @@ def read_muni(src: dict, root: str) -> dict:
     }
 
 
+def poly_parts(g) -> list:
+    """図形の面（Polygon）を全部取り出す。make_valid が返す GeometryCollection の中の MultiPolygon などの入れ子も開き、
+    線・点・空の面は除く（書き出すときに残るのは面だけなので、線で離れた面がつながって見えないように）"""
+    if g is None or g.is_empty:
+        return []
+    if g.geom_type == "Polygon":
+        return [g]
+    return [p for x in getattr(g, "geoms", []) for p in poly_parts(x)]
+
+
 def merge(geoms: list):
     """同じ筆の形をまとめる。形が壊れていてまとめられなければ、1mm の格子にそろえて直してからまとめ、それでもだめなら並べるだけにする"""
     try:
@@ -1542,7 +1552,7 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         by_base[(appended.get(gk[0], gk[0]),) + gk[1:]].append(gk)
     for gks in by_base.values():
         idx_all = [i for gk in gks for i in groups[gk]]
-        gs = [p for i in idx_all for p in getattr(muni["geom"][i], "geoms", [muni["geom"][i]])]
+        gs = [p for i in idx_all for p in poly_parts(muni["geom"][i])]
         if len(gs) < 2:
             continue
         parent = list(range(len(gs)))
