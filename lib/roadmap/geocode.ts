@@ -1,5 +1,6 @@
 // 国土地理院の無料API（APIキー不要・保存制限なし）で住所→座標→市区町村コードを引く。
 // 住所をサーバーに送らないよう、ブラウザから直接呼ぶ想定。
+import { KYOTO_SAME_NAME } from "./data/kyoto-same-name";
 import { PREF_NAME_RE } from "./regions";
 import { kanjiToInt, normalizeChiban, splitChiban, splitLotHead } from "./parcel";
 
@@ -75,6 +76,109 @@ export const chiwariDigits = (s: string) =>
  */
 export function streetSide(address: string): string {
   return address.replace(/(通)([0-9０-９]+)([北南])(?=[0-9０-９])/g, "$1$2丁目$3");
+}
+
+/** 京都市の通り名の住所の向き（「上る」「下る」「西入」「東入」） */
+const KYOTO_DIR = "(?:上る|上ル|上がる|下る|下ル|下がる|西入る|西入ル|西入|東入る|東入ル|東入)";
+const KYOTO_STREET = new RegExp(
+  `^(.*京都市(?:北|上京|左京|中京|東山|下京|南|右京|伏見|山科|西京)区)(.*${KYOTO_DIR})(?:[0-9０-９一二三四五六七八九十]+丁目)?(?:[東西南北]側)?(.+)$`,
+);
+
+/** 京都市の通り名の住所の、区まで（「京都府京都市中京区」）・区の名前・通り名と向き（「河原町通二条下る」）・町名から後ろ（「下丸屋町400」） */
+function kyotoParts(address: string): { head: string; ward: string; street: string; rest: string } | null {
+  const m = address.match(KYOTO_STREET);
+  if (!m || !m[2].includes("通") || !/^[^0-9０-９]*町/.test(m[3])) return null;
+  return { head: m[1], ward: m[1].replace(/^.*京都市/, ""), street: m[2], rest: m[3] };
+}
+
+/** 京都市の同じ区の同じ名前の町（KYOTO_SAME_NAME）で、町名から後ろ（「下丸屋町400」）の町の名前。同じ名前の町でなければ null */
+function sameNameBase(ward: string, rest: string): string | null {
+  const same = KYOTO_SAME_NAME[ward];
+  if (!same) return null;
+  // 長い名前から（「中之町」と「上中之町」のように、短い名前が長い名前の一部のことがある）
+  return Object.keys(same)
+    .sort((a, b) => b.length - a.length)
+    .find((b) => rest.startsWith(b)) ?? null;
+}
+
+/** 通り名と向き（「河原町通二条下る」）に、地番区域の括弧の中の通り名（「河原町通二条」。「二条通河原町」と逆に書いたものも）があるか */
+function streetHas(street: string, name: string): boolean {
+  const br = name.match(/（(.+)）$/)?.[1];
+  if (!br) return false;
+  const s = street.normalize("NFKC");
+  const b = br.normalize("NFKC");
+  if (s.includes(b)) return true;
+  const m = b.match(/^(.+?)通(.+)$/);
+  return !!m && s.includes(`${m[2]}通${m[1]}`);
+}
+
+/** 京都市の区まで（「京都府京都市中京区」）と、その後ろ */
+const KYOTO_WARD = /^(.*京都市(?:北|上京|左京|中京|東山|下京|南|右京|伏見|山科|西京)区)(.+)$/;
+
+/**
+ * 京都市の同じ区の同じ名前の町（KYOTO_SAME_NAME）の住所の分け方：区まで・通り名と向き（無ければ空）・町の名前（「下丸屋町」）・
+ * 町名に付けた括弧の中（「下丸屋町（河原町通二条）400」の「河原町通二条」。無ければ null）・その後ろ（「400」）。同じ名前の町でなければ null
+ */
+function kyotoSameName(address: string): { head: string; ward: string; street: string; base: string; bracket: string | null; after: string } | null {
+  const p = kyotoParts(address);
+  const head = p ? p.head : address.match(KYOTO_WARD)?.[1];
+  if (!head) return null;
+  const ward = head.replace(/^.*京都市/, "");
+  const rest = p ? p.rest : address.slice(head.length);
+  const base = sameNameBase(ward, rest);
+  if (!base) return null;
+  const tail = rest.slice(base.length);
+  const br = tail.match(/^[（(](.+?)[）)](.*)$/);
+  return { head, ward, street: p ? p.street : "", base, bracket: br ? br[1] : null, after: br ? br[2] : tail };
+}
+
+/** 京都市の同じ区の同じ名前の町で、通り名から決めた町（地番区域の町名「下丸屋町（河原町通二条）」と、その町の位置） */
+export type KyotoTown = { base: string; town: string; lat: number; lng: number };
+
+/**
+ * 京都市の同じ区に同じ名前の町がある（中京区の「下丸屋町」は小川通竹屋町と河原町通二条の2つ）住所で、どちらの町かを決める。
+ * 町名に括弧で通り名を付けた住所（「下丸屋町（河原町通二条）400」。候補から選んだ住所）はその町。通り名の住所は、地番区域の括弧の中の
+ * 通り名（「河原町通二条」）が住所の通り名にある町が1つだけならその町。位置が分からない・決められなければ null
+ */
+export function kyotoTown(address: string): KyotoTown | null {
+  const s = kyotoSameName(address);
+  if (!s) return null;
+  const rows = KYOTO_SAME_NAME[s.ward][s.base];
+  const hit =
+    s.bracket != null
+      ? rows.filter(([name]) => name.normalize("NFKC") === `${s.base}(${s.bracket})`.normalize("NFKC"))
+      : rows.filter(([name]) => streetHas(s.street, name));
+  if (hit.length !== 1) return null;
+  const [town, lat, lng] = hit[0];
+  return lat == null || lng == null ? null : { base: s.base, town, lat, lng };
+}
+
+/**
+ * 京都市の同じ区に同じ名前の町がある住所で、どちらの町か決められないとき（通り名が無い・括弧の中の通り名が住所の通り名に無い）の候補。
+ * 町名を地番区域の名前（「下丸屋町（河原町通二条）」）にした住所と、その町の位置（選ぶと、その町で探す）。国土地理院は同じ名前の町を
+ * 1つの点にしか当てないので、選んでもらう。括弧の付かない町がある名前（下京区の「上之町」）・位置の分からない町がある名前は候補にできない（null）
+ */
+export function kyotoChoices(address: string): GeocodeResult[] | null {
+  const s = kyotoSameName(address);
+  if (!s || kyotoTown(address)) return null;
+  const rows = KYOTO_SAME_NAME[s.ward][s.base];
+  if (rows.some(([name, lat, lng]) => !name.includes("（") || lat == null || lng == null)) return null;
+  return rows.map(([name, lat, lng]) => ({ lat: lat!, lng: lng!, matchedAddress: `${s.head}${name}${s.after}` }));
+}
+
+/**
+ * 京都市の通り名の住所（「上京区下長者町通七本松西入鳳瑞町233番10」）から、通り名と向き（上る・下る・西入・東入）を外して、
+ * 町名から始まる形（「上京区鳳瑞町233番10」）にする。国土地理院の住所検索は、通り名の住所を通り名の一部に似た別の町
+ * （「下之町」「松原中之町」など）に当てることがある（町名だけにすると、その町の番地に当たる）。向きの後ろの「2丁目」
+ * （四条通寺町東入2丁目）と「西側」も外す。通り名（「◯◯通」）の無い住所・向きの後ろに町名の無い住所はそのまま。
+ * 同じ区に同じ名前の町がある住所は、町を決められる（kyotoTown）ときだけ、通り名・町名の括弧を外す（国土地理院は同じ名前の町を
+ * 1つの点にしか当てない。決められなければ、そのまま）
+ */
+export function kyotoStreet(address: string): string {
+  const s = kyotoSameName(address);
+  if (s) return kyotoTown(address) ? s.head + s.base + s.after : address;
+  const p = kyotoParts(address);
+  return p ? p.head + p.rest : address;
 }
 
 export const JO = /(?:[0-9０-９]+|[一二三四五六七八九十]+)条/g;
@@ -186,7 +290,8 @@ export type ReverseResult = {
 
 export async function reverseGeocode(lat: number, lng: number): Promise<ReverseResult | null> {
   const url = `https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${lat}&lon=${lng}`;
-  const res = await fetch(url);
+  // 応答しないとき（障害・混雑。2026-11-16 は数十分のあいだ 502〜504 と時間切れ）に待ち続けないよう、10秒で打ち切る
+  const res = await fetch(url, typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? { signal: AbortSignal.timeout(10_000) } : undefined);
   if (!res.ok) throw new Error(`市区町村の判定に失敗しました (${res.status})`);
   const body: { results?: { muniCd: string; lv01Nm: string } } = await res.json();
   if (!body.results) return null;

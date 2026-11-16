@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import GSI_CODES from "./data/gsi-muni-codes.json";
-import { GeocoderUnavailable, MUNICIPALITIES, buildLinks, findMunicipality, lookup, lookupPoint, muniName, resolveContact } from "./index";
+import { GeocoderUnavailable, MUNICIPALITIES, buildLinks, findMunicipality, lookup, lookupPoint, muniFromAddress, muniName, resolveContact } from "./index";
 import { ALL_MUNICIPALITIES } from "./municipalities";
 
 // 熊谷市役所（宮町二丁目47）の国土地理院の座標
@@ -1237,6 +1237,42 @@ describe("lookup", () => {
   it("API がエラーなら例外を投げる", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 503 })));
     await expect(lookup("埼玉県熊谷市")).rejects.toThrow("503");
+  });
+
+  it("逆ジオコーダだけが応答しない（障害）ときは、住所検索で見つかった住所の市区町村・町名で続ける", async () => {
+    // 2026-11-16 は、国土地理院の逆ジオコーダが数十分のあいだ 502〜504・時間切れで、住所検索が全部「市区町村の判定に失敗しました」になっていた
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url.includes("AddressSearch")
+          ? { ok: true, json: async () => [{ geometry: { coordinates: [140.8705, 38.2617] }, properties: { title: "宮城県仙台市青葉区一番町二丁目" } }] }
+          : { ok: false, status: 504 },
+      ),
+    );
+    const r = await lookup("宮城県仙台市青葉区一番町2丁目");
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.municipality.name).toBe(findMunicipality("04101")!.name);
+    expect(r.town).toBe("一番町二丁目");
+    // 住所から市区町村が読めなければ、今までどおり例外
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url.includes("AddressSearch")
+          ? { ok: true, json: async () => [{ geometry: { coordinates: [139.38, 36.18] }, properties: { title: "埼玉県" } }] }
+          : { ok: false, status: 504 },
+      ),
+    );
+    await expect(lookup("埼玉県")).rejects.toThrow("504");
+  });
+
+  it("住所の市区町村コードと町名（逆ジオコーダの代わり）：政令市は区まで・郡の名前は外す・名前に郡の字がある市はそのまま", () => {
+    expect(muniFromAddress("宮城県仙台市青葉区一番町二丁目")).toEqual({ muniCd: "04101", town: "一番町二丁目" });
+    expect(muniFromAddress("埼玉県比企郡小川町大字大塚５５番地")).toEqual({ muniCd: "11343", town: "大塚" });
+    expect(muniFromAddress("福島県郡山市朝日一丁目")?.muniCd).toBe("07203");
+    expect(muniFromAddress("東京都千代田区")).toEqual({ muniCd: "13101", town: "" });
+    expect(muniFromAddress("埼玉県")).toBeNull();
+    expect(muniFromAddress("どこか")).toBeNull();
   });
 });
 

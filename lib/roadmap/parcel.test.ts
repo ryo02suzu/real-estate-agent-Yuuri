@@ -659,6 +659,40 @@ describe("lookup で地番を探す", () => {
     expect(r.links[0].url).toContain(r.lng.toFixed(6));
   });
 
+  it("京都市の同じ区の同じ名前の町（中京区の下丸屋町は2つ）：通り名から決めた町の位置と地番区域で探し、もう1つの町の同じ地番を当てない", async () => {
+    // 国土地理院は「中京区下丸屋町」を小川通竹屋町の方の1点にしか当てない（2026-11-16 に確かめた）
+    const gsi = { lat: 35.015533, lng: 135.754222 };
+    const fetch = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.includes("AddressSearch")
+          ? [{ geometry: { coordinates: [gsi.lng, gsi.lat] }, properties: { title: "京都府京都市中京区下丸屋町" } }]
+          : { results: { muniCd: "26104", lv01Nm: "下丸屋町" } },
+    }));
+    vi.stubGlobal("fetch", fetch);
+    const [ox, oy] = tileOf(gsi.lat, gsi.lng);
+    const [kx, ky] = tileOf(35.010296, 135.769704);
+    const src = fakeSource({
+      [`${ox},${oy}`]: [{ kuiki: "京都市中京区_下丸屋町（小川通竹屋町）___", chiban: "400" }],
+      [`${kx},${ky}`]: [{ kuiki: "京都市中京区_下丸屋町（河原町通二条）___", chiban: "400" }],
+    });
+    const r = await lookup("京都府京都市中京区河原町通二条下る下丸屋町400", { parcels: src, loadIndex: async () => null });
+    expect(r.status === "ok" && r.parcel?.kuiki).toBe("京都市中京区_下丸屋町（河原町通二条）___");
+    // 国土地理院には通り名を外した住所で聞く
+    expect(fetch.mock.calls.some(([u]) => String(u).includes(encodeURIComponent("京都府京都市中京区下丸屋町400")))).toBe(true);
+    // 通り名の無い住所は、どちらの町か決められないので、地番区域の町名から選んでもらう（国土地理院には聞かない）
+    const calls = fetch.mock.calls.length;
+    const plain = await lookup("京都府京都市中京区下丸屋町400", { parcels: src, loadIndex: async () => null });
+    expect(plain.status === "choose" && plain.candidates.map((c) => c.matchedAddress)).toEqual([
+      "京都府京都市中京区下丸屋町（小川通竹屋町）400",
+      "京都府京都市中京区下丸屋町（河原町通二条）400",
+    ]);
+    expect(fetch.mock.calls.length).toBe(calls);
+    // 選んだ住所（括弧付きの町名）は、その町の地番区域で探す
+    const picked = await lookup("京都府京都市中京区下丸屋町（小川通竹屋町）400", { parcels: src, loadIndex: async () => null });
+    expect(picked.status === "ok" && picked.parcel?.kuiki).toBe("京都市中京区_下丸屋町（小川通竹屋町）___");
+  });
+
   it("丁目を書いた住所で、同じ地番が丁目の無い地番区域にしか無ければ、当てずに知らせ、丁目を外して探し直せるようにする", async () => {
     vi.stubGlobal(
       "fetch",
@@ -1192,6 +1226,20 @@ describe("地番区域の町の名前の合わせ方（townMatches）", () => {
     expect(townMatches("川口市_青木_２丁目__", townKey("青木二丁目"))).toBe(true);
     expect(townMatches("さいたま市見沼区_大字南中丸___", townKey("大字南中丸"))).toBe(true);
   });
+  it("市町村の地番参考図の小字を足した地番区域（豊田市「深見町」＋「木戸」）は、国土地理院の町名（「深見町木戸」）にも大字だけの町名にも当たる", () => {
+    // 法務省の地番区域は「豊田市_深見町___」（小字なし）で、国土地理院の町名「深見町木戸」に当たらず筆を探していなかった（2026-11-16）
+    expect(townMatches("豊田市_深見町___", townKey("深見町木戸"))).toBe(false);
+    expect(townMatches("豊田市_深見町__木戸_", townKey("深見町木戸"))).toBe(true);
+    expect(townMatches("豊田市_深見町__木戸_", townKey("深見町"))).toBe(true);
+    expect(townMatches("豊田市_深見町__木戸_", townKey("深見町北畑"))).toBe(false);
+  });
+  it("京都市の通り名を括弧で付けた町名（「鍛冶屋町（西洞院通正面）」）は、括弧付きの町名にだけ当たる（括弧なしの「鍛冶屋町」は同じ区のもう1つの町かもしれない）", () => {
+    expect(townMatches("京都市下京区_鍛冶屋町（西洞院通正面）___", townKey("鍛冶屋町（西洞院通正面）"))).toBe(true);
+    expect(townMatches("京都市下京区_鍛冶屋町（西洞院通正面）___", townKey("鍛冶屋町"))).toBe(false);
+    expect(townMatches("京都市下京区_鍛冶屋町（西洞院通正面）___", townKey("鍛冶屋町（堺町通万寿寺）"))).toBe(false);
+    expect(townMatches("京都市上京区_北町（御前通今出川）___", townKey("北町（御前通今出川）"))).toBe(true);
+    expect(townMatches("京都市上京区_北町（御前通今出川）___", townKey("北町"))).toBe(false);
+  });
   it("丁目の書き方だけ違うもの：地番区域が大字だけ（住所の丁目は地番の区域でない）、入力に丁目が無い", () => {
     expect(townMatches("松戸市_古ケ崎___", townKey("古ヶ崎四丁目"))).toBe(true);
     expect(townMatches("松戸市_古ケ崎_４丁目__", townKey("古ヶ崎"))).toBe(true);
@@ -1619,8 +1667,9 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     // 11-12 の14枚と、11-13 に地価の地点で見つけた東員町（2枚）・木津川市（1枚）・生駒市北新町（1枚の一部・大字ごとに2つ）・松阪市飯南町（1枚）・津市あのつ台１丁目（1枚）・
     // 神戸市北区若葉台（1枚の本体を縮尺ごと直す。大字・丁目ごとに6つ）、11-14 に拾い直した津市（みのりヶ丘・あのつ台三丁目・五丁目）と松阪市（清生町・垣鼻町・田原町）の4枚、
     // 11-15 に全部の図面の点検（v4）で見つけた神戸市西区岩岡町古郷・加古川市志方町畑の2枚と、加西市中山町・丹波篠山市今田町本荘の2枚、
-    // 同じ点検の続きで見つけた亀岡市（ヒエ田野町・宮前町宮川・本梅町井手）の3枚と京田辺市（普賢寺の水取・打田の工区）の2枚
-    expect(kinki).toHaveLength(40);
+    // 同じ点検の続きで見つけた亀岡市（ヒエ田野町・宮前町宮川・本梅町井手）の3枚と京田辺市（普賢寺の水取・打田の工区）の2枚、
+    // 11-16 に「保留」から航空写真で確かめて足した京丹後市 大宮町五十河の1枚
+    expect(kinki).toHaveLength(41);
     const sanda = kinki.filter((s) => s.code === "28219");
     expect(sanda.map((s) => s.sheet).sort()).toEqual(["あかしあ台１～５丁目", "すずかけ台１～４丁目", "ゆりのき台１～６丁目（修正後）", "北摂三田ニュータウン南地区"].sort());
     expect(sanda.reduce((a, s) => a + s.parcels, 0)).toBe(11320);
