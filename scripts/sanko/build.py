@@ -264,6 +264,26 @@ SOURCES = [
         "wards": ["43101", "43102", "43103", "43104", "43105"], "ward_field": "ku",
     },
     {
+        # G空間情報センターの 7z。KU は区の番号（1 青葉区〜5 泉区）、ANAME は「坪沼字原前」（大字名＋字＋小字名）
+        "code": "04100", "name": "仙台市", "credit": "仙台市「仙台市地番図（参考図）データ」", "license": "CC BY（版の記載なし）",
+        "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja（G空間情報センターの表示は「クリエイティブ・コモンズ 表示」で版の記載なし）",
+        "fetch": {"kind": "ckan", "api": GSPATIAL, "dataset": "chibanzu", "resource": r"^土地$"},
+        "date": "2026-01-01", "epsg": 6678, "enc": "cp932",
+        "shp": r"(?i)/tochi\.shp$", "chiban": ["DNO"], "key": "AZA", "oname": "ANAME", "split_aza": True,
+        "wards": ["04101", "04102", "04103", "04104", "04105"], "ward_field": "KU",
+        "ward_names": {"1": "青葉区", "2": "宮城野区", "3": "若林区", "4": "太白区", "5": "泉区"},
+    },
+    {
+        # 法務省の地図XMLは、2024年の区の再編のあとも前の区のコード（22131〜22137。天竜区は 22137）と新しい区（22138 中央区・22139 浜名区）に
+        # 分かれているので、全部を合わせて読む。図の区の番号は前の区なので使わない（同じ名前の町は区の別で決めない）
+        "code": "22130", "name": "浜松市", "credit": "浜松市「浜松市地番図」", "license": "CC BY（版の記載なし）",
+        "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja（G空間情報センターの表示は「クリエイティブ・コモンズ 表示」で版の記載なし）",
+        "fetch": {"kind": "ckan", "api": GSPATIAL, "dataset": "hamamatsu_chibanzu", "resource": r"^地番$"},
+        "date": "2026-01-01", "epsg": 2450, "enc": "cp932",
+        "shp": r"(?i)/POL\.shp$", "chiban": ["Chiban"], "key": "Shozai", "oname": "Ooaza",
+        "wards": ["22131", "22132", "22133", "22134", "22135", "22136", "22137", "22138", "22139"],
+    },
+    {
         "code": "40204", "name": "直方市", "credit": "直方市「直方市地番対応図」", "license": CCBY, "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja",
         "fetch": {"kind": "ckan", "api": BODIK, "dataset": "402044_land_lot_correspondence_map", "resource": r"R8\.1\.1時点"},
         "date": "2026-01-01", "epsg": 2444, "enc": "utf-8",
@@ -335,6 +355,8 @@ def download(url: str, path: str) -> None:
                 raise OSError(f"途中で切れました（{got}/{want} バイト）")
             if path.lower().endswith(".zip") and not zipfile.is_zipfile(tmp):
                 raise OSError("zip として読めません")
+            if path.lower().endswith(".7z") and not is_archive(tmp):
+                raise OSError("7z として読めません")
             os.replace(tmp, path)
             return
         except Exception as e:
@@ -497,8 +519,8 @@ def fetch_only(srcs: list[dict], work: str) -> None:
     metas = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else {}
     for s in srcs:
         meta = resolve(s)
-        dl = os.path.join(d, f"{s['code']}-{meta['id']}.zip")
-        if not zipfile.is_zipfile(dl):
+        dl = archive_path(work, s["code"], meta)
+        if not is_archive(dl):
             download(meta["url"], dl)
         metas[s["code"]] = meta
         log(f"{s['code']} {s['name']}: {os.path.basename(dl)}（{meta['file']} {meta['modified']}・{os.path.getsize(dl)} バイト）")
@@ -508,8 +530,52 @@ def fetch_only(srcs: list[dict], work: str) -> None:
     log(f"{path}: {len(metas)} 市町村")
 
 
+def archive_path(work: str, code: str, meta: dict) -> str:
+    """取ったファイルの置き場所（7z で配られているもの（仙台市）は .7z、ほかは .zip）"""
+    ext = ".7z" if str(meta.get("file", "")).lower().endswith(".7z") else ".zip"
+    return os.path.join(work, "src", f"{code}-{meta['id']}{ext}")
+
+
+def is_archive(path: str) -> bool:
+    """読めるファイルか（zip か 7z。7z は頭の6バイトで見る）"""
+    if not os.path.exists(path):
+        return False
+    if path.lower().endswith(".7z"):
+        with open(path, "rb") as f:
+            return f.read(6) == b"7z\xbc\xaf\x27\x1c"
+    return zipfile.is_zipfile(path)
+
+
+def extract_7z(path: str, out: str) -> None:
+    """7z を展開する（py7zr があれば使い、無ければ 7z のコマンド。GitHub Actions の Ubuntu には 7z がある）。
+    展開先の外を指す名前（「..」・絶対パス）があれば展開しない"""
+    try:
+        import py7zr
+    except ImportError:
+        py7zr = None
+    if py7zr is not None:
+        with py7zr.SevenZipFile(path, "r") as z:
+            names = z.getnames()
+            if any(".." in n.replace("\\", "/").split("/") or n.startswith("/") for n in names):
+                raise RuntimeError(f"{path}: 展開先の外を指す名前があります")
+            z.extractall(path=out)
+        return
+    exe = shutil.which("7z") or shutil.which("7za")
+    if not exe:
+        raise RuntimeError("7z を展開できません（py7zr も 7z のコマンドもありません）")
+    listing = subprocess.run([exe, "l", "-slt", path], check=True, capture_output=True, text=True).stdout
+    names = [l[7:] for l in listing.splitlines() if l.startswith("Path = ")][1:]
+    if any(".." in n.replace("\\", "/").split("/") or n.startswith("/") for n in names):
+        raise RuntimeError(f"{path}: 展開先の外を指す名前があります")
+    os.makedirs(out, exist_ok=True)
+    subprocess.run([exe, "x", "-y", f"-o{out}", path], check=True, capture_output=True)
+
+
 def extract(zip_path: str, out: str) -> None:
-    """zip を展開する（中の zip も。Shift_JIS・「#U5730」の名前も読む）"""
+    """zip を展開する（中の zip も。Shift_JIS・「#U5730」の名前も読む）。7z（仙台市）も展開する"""
+    if zip_path.lower().endswith(".7z"):
+        extract_7z(zip_path, out)
+        return
 
     def name_of(i: zipfile.ZipInfo) -> str:
         n = i.filename
@@ -760,7 +826,9 @@ def read_muni(src: dict, root: str) -> dict:
             else:
                 key = str(rec[src["key"]]).strip()
                 ch = norm_chiban([rec[c] for c in src["chiban"]])
-            wardl.append(str(rec[src["ward_field"]]).strip() if src.get("ward_field") else "")
+            # 区の名前（番号で書かれた所は ward_names で名前にする。仙台市の KU「1」→「青葉区」）
+            w = str(rec[src["ward_field"]]).strip() if src.get("ward_field") else ""
+            wardl.append(src.get("ward_names", {}).get(w, w))
             if not ch or not sr.shape.points:
                 chibans.append("")
                 geoms.append(None)
@@ -780,6 +848,10 @@ def read_muni(src: dict, root: str) -> dict:
                 head = next((p for p in prefixes if key.startswith(p)), "")
                 if head:
                     key, nm, koaza = head, head, key[len(head):]
+            # 「坪沼字原前」（大字名＋「字」＋小字名。仙台市）を大字と小字に分ける
+            if src.get("split_aza") and "字" in nm[1:]:
+                j = nm.index("字", 1)
+                nm, koaza = nm[:j], nm[j + 1 :]
             keys.append(key)
             onames.append(nm)
             koazas.append(koaza)
@@ -820,9 +892,9 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
     code = src["code"]
     t0 = time.time()
     meta = resolve(src, known)
-    dl = os.path.join(work, "src", f"{code}-{meta['id']}.zip")
+    dl = archive_path(work, code, meta)
     os.makedirs(os.path.dirname(dl), exist_ok=True)
-    if not zipfile.is_zipfile(dl):
+    if not is_archive(dl):
         download(meta["url"], dl)
     root = os.path.join(work, "src", f"{code}-{meta['id']}")
     if not os.path.isdir(root):
@@ -835,8 +907,17 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
     # 区のある市（熊本市）は、区ごとの法務省の地図XMLを合わせて読む（wards：区の市区町村コード）
     paths, moj_year = [], None
     for c in src.get("wards") or [code]:
-        p, moj_year = moj_zips(c, year, work)
+        try:
+            p, moj_year = moj_zips(c, year, work)
+        except RuntimeError as e:
+            # 地図XMLの無い区（浜松市天竜区）は飛ばす（区のある市で、ほかの区があれば作る）
+            if not src.get("wards"):
+                raise
+            log(f"  ::warning:: {e}（この区は飛ばします）")
+            continue
         paths += p
+    if not paths:
+        raise RuntimeError(f"{code} の地図XMLが見つかりません")
     moj = read_moj(paths)
     recs = moj["recs"]
     if src.get("wards"):
