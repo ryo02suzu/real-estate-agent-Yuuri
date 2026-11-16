@@ -399,7 +399,7 @@ function TochiRow({ tochi, city }: { tochi: Tochi; city: string }) {
   );
 }
 
-/** 埋蔵文化財の行。包蔵地（遺跡）に入るかは教育委員会で確かめるもので、ここでは都県・市の遺跡地図と窓口を出す */
+/** 埋蔵文化財の行。包蔵地（遺跡）に入るかは教育委員会で確かめるもので、ここでは都県・市の遺跡地図（無ければ国の参考の地図）と窓口を出す */
 function IsekiRow({ iseki }: { iseki: Iseki }) {
   const m = iseki.map;
   return (
@@ -407,10 +407,10 @@ function IsekiRow({ iseki }: { iseki: Iseki }) {
       <dt className={LABEL}>埋蔵文化財</dt>
       <dd className="min-w-0 flex-1">
         <span className={`block ${VALUE} text-ink`}>
-          {m ? "遺跡地図で確認" : `${iseki.city}の教育委員会で確認`}
+          {m && !m.ref ? "遺跡地図で確認" : `${iseki.city}の教育委員会で確認`}
           {m && (
             <a href={m.url} target="_blank" rel="noreferrer" title={m.name} className="ml-2 whitespace-nowrap text-[12.5px] text-brand underline">
-              {m.at ? "地図で見る" : "開く"}
+              {m.ref ? "参考の地図" : m.at ? "地図で見る" : "開く"}
             </a>
           )}
         </span>

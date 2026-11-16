@@ -2,7 +2,8 @@
 // 確かめる窓口（市区町村の教育委員会の文化財の担当）を出す。地図のデータそのものは取り込まない（東京都の遺跡地図のように
 // 複製を禁じている地図があり、どの地図も「包蔵地の内容を証明するものではない」としているため）。
 // 埼玉・千葉・茨城・群馬は県の地図が県内全域（埼玉は川越市を除く）を載せている。東京都は都の地図が全域を載せているが
-// 地点で開けないので、地点で開ける区市の地図があればそちらを使う。神奈川・栃木は県の地図が無く、見つかった市町の地図だけ
+// 地点で開けないので、地点で開ける区市の地図があればそちらを使う。神奈川・栃木は県の地図が無く、見つかった市町の地図だけ。
+// 都県・市の地図が無い所（関東の外の道府県と、地図の無い市町）は、国の文化財総覧WebGIS を物件の場所で開く参考の地図として出す
 import type { Municipality, Prefecture } from "./municipalities";
 import { arcgisExperience, geocloud, geocloudMp, machiInfoMap, machiInfoTokyo, nasushiobaraMap, sonicweb, wagmap } from "./vendors";
 
@@ -18,8 +19,11 @@ export type IsekiMap = {
   tip?: string;
 };
 
-/** 地点の確認先。map が無ければ教育委員会で確かめる。note は県の地図に載っていない市などの注意 */
-export type Iseki = { city: string; office: string; map?: { name: string; url: string; at: boolean; tip?: string }; note?: string };
+/**
+ * 地点の確認先。map が無ければ教育委員会で確かめる。note は県の地図に載っていない市などの注意。
+ * map.ref は、都県・市の遺跡地図が無い所で出す国の文化財総覧WebGIS（参考の地図。包蔵地の範囲は自治体の遺跡地図・教育委員会で確かめる）
+ */
+export type Iseki = { city: string; office: string; map?: { name: string; url: string; at: boolean; tip?: string; ref?: boolean }; note?: string };
 
 /** 初めて開くと利用規約のページが出て、同意すると物件の場所の地図に進む地図 */
 const AGREE = "利用規約に同意すると開きます";
@@ -100,6 +104,18 @@ const CITY_MAPS: Record<string, IsekiMap> = {
   栃木県下野市: { name: "しもつけシティーガイド（史跡・遺跡・古墳）", build: sonicweb("shimotsuke", "th_36", 2500) },
 };
 
+/**
+ * 都県・市の遺跡地図が無い所で出す、国の文化財総覧WebGIS（奈良文化財研究所。全国の文化財・遺跡の位置と、自治体から提供された
+ * 遺跡地図の範囲を1つの地図で見られる）。?lat=&lng=&zoom= で物件の場所が中心に開くことを確かめた（2026-11-16。京都市役所のあたり）。
+ * 利用規約は「リンクはフリー」（ほかのページに組み込まない）。開くと利用規約の画面が出て、利用者が自分で同意する。
+ * 地図の下に「位置情報や範囲情報は、現状を正確に反映していない場合がある…必ず文化財所管機関へご照会ください」とあるので、参考として出す
+ */
+const NATIONAL: IsekiMap = {
+  name: "文化財総覧WebGIS（奈良文化財研究所）",
+  build: (lat, lng) => `https://heritagemap.nabunken.go.jp/?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&zoom=16`,
+  tip: "国の参考の地図で、範囲は自治体の遺跡地図と違うことがあります。利用規約に同意すると開きます",
+};
+
 /** 県の地図に載っていない市（県の地図を出さない） */
 const NOT_IN_PREF_MAP: Record<string, string> = {
   埼玉県川越市: "川越市の包蔵地は埼玉県の地図に載っていません",
@@ -114,21 +130,26 @@ export function isekiFor(m: Pick<Municipality, "pref" | "name">, lat: number, ln
   const city = m.name;
   const office = `${city}の教育委員会（文化財の担当）`;
   const note = NOT_IN_PREF_MAP[key];
-  const map = CITY_MAPS[key] ?? (note ? undefined : PREF_MAPS[m.pref]);
-  if (!map) return { city, office, note };
+  const own = CITY_MAPS[key] ?? (note ? undefined : PREF_MAPS[m.pref]);
+  // 都県・市の遺跡地図が無ければ、国の文化財総覧WebGIS を参考の地図として出す
+  const map = own ?? NATIONAL;
   const url = map.build ? map.build(lat, lng) : map.url!;
-  return { city, office, map: { name: map.name, url, at: !!map.build, tip: map.tip }, note };
+  return { city, office, map: { name: map.name, url, at: !!map.build, tip: map.tip, ...(own ? {} : { ref: true }) }, note };
 }
 
 // ---- 画面・共有・下書きの文字 ----
 
 /** 画面の短い補足（「利用条件に同意すると開きます。包蔵地（遺跡）に入るかは行田市の教育委員会で確認」）。地図の名前はリンクの説明に */
 export function isekiNote(i: Iseki): string {
-  const before = i.map ? i.map.tip : i.note;
+  const before = [i.note, i.map?.tip].filter(Boolean).join("。");
   return `${before ? `${before}。` : ""}包蔵地（遺跡）に入るかは${i.city}の教育委員会で確認`;
 }
 
-/** 共有・印刷の1行（「埼玉県 埋蔵文化財包蔵地マップで確認（物件の場所で開く）」） */
+/**
+ * 共有・印刷の1行（「埼玉県 埋蔵文化財包蔵地マップで確認（物件の場所で開く）」）。国の参考の地図のときは窓口が先
+ * （「京都市の教育委員会（文化財の担当）で確認（遺跡の位置は文化財総覧WebGIS（奈良文化財研究所）で下調べ）」）
+ */
 export function isekiLine(i: Iseki): string {
+  if (i.map?.ref) return `${i.office}で確認（遺跡の位置は${i.map.name}で下調べ）`;
   return i.map ? `${i.map.name}で確認${i.map.at ? "（物件の場所で開く）" : ""}` : `${i.office}で確認`;
 }
