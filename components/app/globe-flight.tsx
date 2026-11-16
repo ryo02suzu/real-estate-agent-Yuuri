@@ -8,13 +8,14 @@
 // 全国最新写真・標高（山の立体と陰影）・道路（夜は街灯の光の筋）。雲は MICHILU で作った模様（components/app/flight-clouds.ts）。
 // 読むのは地図の絵だけで、住所はどこにも送らない（降りる場所は、調べ終わった結果の座標）。
 // 流れ：地球が現れる（絵がそろうまで最大 1 秒待ち、そろったらふわっと出す）→ 日本へ回る（1.6 秒。この間に描く速さを数え、遅い端末は
-// 軽い版にする：山の立体・雲・山の陰影なし。#fx=lite／#fx=full で決められる）→ 調べている間は日本の上空でゆっくり近づく
+// 軽い版にする：山の立体・雲・山の陰影なし。#fx=lite／#fx=full で決められる）→ 調べている間は、入れた住所の都道府県の上空へ向かう
+// （components/app/flight-wait.ts。読めなければ日本の上空のまま）
 // → 場所が分かったら、雲を抜けて山並みの上へ斜めに降りる（2.1 秒。富士山が近い所では富士山の方を向く）
 // → 真上から見る向きに起きながら土地へ降りる（1.7 秒。物件の画面の模型の最初の見え方に、位置・大きさ・向きをそろえる。
 // components/app/flight-handoff.ts）→ 写真がそろうのを最大 0.9 秒待つ → 印が光る（0.8 秒）→ ふわっと消えるのと同時に、
 // 模型が建物を立ち上げる。見つからない・候補から選ぶ・調べられなかったときは、すぐ消える。
 // 画面に触れる・スキップボタン・Esc で飛ばす。途中で動きを減らす設定にしたときも止める。
-// 14 秒たっても場所が分からないときも消える（結果の画面がそのまま出る）
+// 20 秒たっても場所が分からないときも消える（結果の画面がそのまま出る）
 import "maplibre-gl/dist/maplibre-gl.css";
 import { addProtocol, getVersion, Map as MapLibreMap, setWorkerUrl } from "maplibre-gl";
 import { LoaderCircle } from "lucide-react";
@@ -22,6 +23,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { cloudPainter, type CloudPainter } from "./flight-clouds";
 import { bearingTo, centerFor, distanceKm, landingFrame, zoomForMpp, type LandingFrame } from "./flight-handoff";
 import { DEM_PROTOCOL, flightMood, flightStyle, GSI_PHOTO, gsiToTerrarium, hazeBackground, LOOKS, terrainExaggeration, type FlightMood } from "./flight-look";
+import { waitViewOf } from "./flight-wait";
 
 // 描画のワーカーは public/maplibre/<版>/ に置いてある（scripts/copy-maplibre-worker.mjs）
 export const MAPLIBRE_VERSION = getVersion();
@@ -35,11 +37,12 @@ const JAPAN: [number, number] = [137.6, 36.0];
 /** 富士山（関東・山梨・静岡の近くに降りるときは、富士山の方を向いて山並みの上を降りる） */
 const FUJI = { lat: 35.3606, lng: 138.7274 };
 /**
- * 動きの長さ（ミリ秒）。descend は日本の上空から山並みの上まで（雲を抜ける）、settle は真上から土地を見るまで（模型の着地の見え方に
- * そろえる）、sharpen は写真がそろうのを待つ長さの上限、ring は印が光る間。模型の見え方が降り始めにまだ無かったとき（模型の周りの
- * 建物・道路を読んでいる）は、印が光ったあと最大 waitModel 待ち、届いたら adjust でそこへ滑らせてから消える
+ * 動きの長さ（ミリ秒）。wait は調べている間に都道府県の上空へ向かう長さ、descend は上空から山並みの上まで（雲を抜ける）、
+ * settle は真上から土地を見るまで（模型の着地の見え方にそろえる）、sharpen は写真がそろうのを待つ長さの上限、ring は印が光る間。
+ * 模型の見え方が降り始めにまだ無かったとき（模型の周りの建物・道路を読んでいる）は、印が光ったあと最大 waitModel 待ち、
+ * 届いたら adjust でそこへ滑らせてから消える。giveUp までに場所が分からなければ消える
  */
-const T = { firstTiles: 1000, turn: 1600, descend: 2100, settle: 1700, sharpen: 900, ring: 800, adjust: 600, waitModel: 1400, fade: 450, giveUp: 14000 };
+const T = { firstTiles: 1000, turn: 1600, wait: 5200, descend: 2100, settle: 1700, sharpen: 900, ring: 800, adjust: 600, waitModel: 1400, fade: 450, giveUp: 20000 };
 
 /**
  * 重さの選び方。#fx=lite／#fx=full で決められる（確かめる用）。決めていなければ、地球が日本へ回る間の描く速さで決める
@@ -290,7 +293,7 @@ export default function GlobeFlight({
     later(4000, () => {
       if (!turned) finish(false);
     });
-    // 場所が分からないまま 14 秒たったら消える
+    // 場所が分からないまま 20 秒たったら消える（地番で探す住所は、筆を探すのに時間がかかることがある）
     later(T.giveUp, () => {
       if (!descending.current) finish(false);
     });
@@ -306,12 +309,15 @@ export default function GlobeFlight({
     };
   }, [finish, later, mood]);
 
-  // 調べている間は、日本の上空でゆっくり近づく
+  // 調べている間は、入れた住所の都道府県の上空へ向かう（components/app/flight-wait.ts）。都道府県が読めなければ日本の上空のまま
+  // （向きだけゆっくり変える）。前は日本の真ん中の1点へ寄り続けたので、調べるのに時間がかかると物件と関係の無い所へ拡大して見えた
   useEffect(() => {
     const m = map.current;
     if (!m || done.current || !overJapan || target !== null || stage !== "space") return;
-    m.easeTo({ zoom: 4.4, bearing: -8, duration: 8000, easing: (t) => t });
-  }, [overJapan, target, stage]);
+    const v = waitViewOf(label);
+    if (v) m.easeTo({ center: v.center, zoom: v.zoom, bearing: -8, duration: T.wait, easing: easeInOut });
+    else m.easeTo({ bearing: -8, duration: 8000, easing: (t) => t });
+  }, [overJapan, target, stage, label]);
 
   // 場所が分かったら降りる（見つからないときは、すぐ消える）。
   // ① 山並みの上へ：斜めに見下ろしながら、雲を抜けて土地の上空へ（富士山が近い所では富士山の方を向く。山は立体）
