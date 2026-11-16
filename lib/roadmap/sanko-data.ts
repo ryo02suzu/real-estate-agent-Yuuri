@@ -56,7 +56,7 @@ export const SANKO_MARK = "（地番参考図）";
 /** 参考図の筆の注意（見出しや注記に添える） */
 export const SANKO_NOTE = "市町村の課税用の参考図で、登記の地番・筆の形と違うことがあります";
 
-/** 市町村の地番参考図の出典（ライセンス：公共データ利用規約第1.0版か CC BY 4.0。どちらも出典と加工した旨を書く） */
+/** 市町村の地番参考図の出典（ライセンス：公共データ利用規約第1.0版か CC BY（4.0・2.1 JP）。どれも出典と加工した旨を書く） */
 export function sankoSource(code: string): string {
   const c = SANKO_CITIES[code];
   return c ? `出典：${c.credit}（${c.license}・${c.date}）を加工して作成` : "出典：市町村の地番参考図（オープンデータ）を加工して作成";
