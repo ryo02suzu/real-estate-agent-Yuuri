@@ -40,9 +40,10 @@ const FUJI = { lat: 35.3606, lng: 138.7274 };
  * 動きの長さ（ミリ秒）。wait は調べている間に都道府県の上空へ向かう長さ、descend は上空から山並みの上まで（雲を抜ける）、
  * settle は真上から土地を見るまで（模型の着地の見え方にそろえる）、sharpen は写真がそろうのを待つ長さの上限、ring は印が光る間。
  * 模型の見え方が降り始めにまだ無かったとき（模型の周りの建物・道路を読んでいる）は、印が光ったあと最大 waitModel 待ち、
- * 届いたら adjust でそこへ滑らせてから消える。giveUp までに場所が分からなければ消える
+ * 届いたら adjust でそこへ滑らせてから消える。giveUp までに場所が分からなければ消える。firstTiles は地球の絵がそろうのを待つ長さの上限
+ * （回線が遅いと、絵の無い地球のまま回ってしまう）、warmOver は降り始める前に山並みの上の写真を待つ長さの上限
  */
-const T = { firstTiles: 1000, turn: 1600, wait: 5200, descend: 2100, settle: 1700, sharpen: 900, ring: 800, adjust: 600, waitModel: 1400, fade: 450, giveUp: 20000 };
+const T = { firstTiles: 2000, turn: 1600, wait: 5200, warmOver: 900, descend: 2100, settle: 1700, sharpen: 900, ring: 800, adjust: 600, waitModel: 1400, fade: 450, giveUp: 20000 };
 
 /**
  * 重さの選び方。#fx=lite／#fx=full で決められる（確かめる用）。決めていなければ、地球が日本へ回る間の描く速さで決める
@@ -130,6 +131,29 @@ function warmPhotos(lat: number, lng: number, zoom: number): void {
   const z = Math.min(18, Math.round(zoom) + 1);
   const p = at(z);
   for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) get(z, Math.floor(p.x) + dx, Math.floor(p.y) + dy);
+}
+
+/**
+ * 山並みの上（降り始めの見え方）の写真を先に読む：土地のまわり 3×3 枚（ズーム 10。1 枚 100KB ほど。降りるときに地図が読むものと同じ）。
+ * 全部届くか失敗したら終わる。写真が届く前に降りると、写真の無い所が遠景用の淡い色だけになり、灰色の画面のまま拡大していくように見えた
+ * （本番を 4G くらいの回線で確かめたとき）
+ */
+function warmOver(lat: number, lng: number): Promise<void> {
+  const r = (lat * Math.PI) / 180;
+  const n = 2 ** 10;
+  const x = Math.floor(((lng + 180) / 360) * n);
+  const y = Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n);
+  const tasks: Promise<unknown>[] = [];
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++) {
+      const url = GSI_PHOTO.replace("{z}", "10").replace("{x}", String(x + dx)).replace("{y}", String(y + dy));
+      tasks.push(
+        fetch(url, { mode: "cors" })
+          .then((res) => res.blob())
+          .catch(() => null),
+      );
+    }
+  return Promise.all(tasks).then(() => undefined);
 }
 
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -337,6 +361,7 @@ export default function GlobeFlight({
     const fuji = distanceKm(target, FUJI);
     const facing = fuji > 6 && fuji < 190 ? bearingTo(target, FUJI) : (first?.bearing ?? 340);
     warmPhotos(target.lat, target.lng, first ? zoomForMpp(first.mpp, target.lat) : FALLBACK.zoom);
+    const over = warmOver(target.lat, target.lng);
     // 山の立体は、山並みが見えてくるところ（ズーム 6）から入れて、山並みの上を過ぎたら外す（真上から降りるときは要らない。
     // 細かい標高が届くまで地図が描けない所が出るのを避ける）
     let terrainOn = false;
@@ -349,55 +374,63 @@ export default function GlobeFlight({
         // 立体にできないときは、平らなまま降りる
       }
     };
-    m.on("move", onMove);
-    m.flyTo({ center: here, zoom: OVER.zoom, pitch: OVER.pitch, bearing: facing, duration: T.descend, curve: 1.5, easing: glide, essential: true });
-    m.once("moveend", () => {
-      m.off("move", onMove);
-      if (done.current) return;
-      if (terrainOn) m.setTerrain(null);
-      /** 降りきったところ（模型の着地の見え方。まだ無いときは真上・北が上・画面の上から 42%） */
-      const endOf = (frame: LandingFrame | null) => {
-        const box = m.getContainer().getBoundingClientRect();
-        const e = frame
-          ? { zoom: zoomForMpp(frame.mpp, target.lat), bearing: frame.bearing, x: frame.x - box.left, y: frame.y - box.top }
-          : { zoom: FALLBACK.zoom, bearing: FALLBACK.bearing, x: box.width / 2, y: box.height * FALLBACK.y };
-        const c = centerFor(target, e.x - box.width / 2, e.y - box.height / 2, e.bearing, e.zoom);
-        return { center: [c.lng, c.lat] as [number, number], zoom: e.zoom, pitch: 0, bearing: e.bearing };
-      };
-      const frame = landingFrame();
-      m.easeTo({ ...endOf(frame), duration: T.settle, easing: easeInOut, essential: true });
+    // 山並みの上の写真が届くまで少し待ってから降りる（最大 T.warmOver。届かなくても降りる。待っている間に飛ばしたら何もしない）
+    let started = false;
+    const go = () => {
+      if (started || done.current) return;
+      started = true;
+      m.on("move", onMove);
+      m.flyTo({ center: here, zoom: OVER.zoom, pitch: OVER.pitch, bearing: facing, duration: T.descend, curve: 1.5, easing: glide, essential: true });
       m.once("moveend", () => {
+        m.off("move", onMove);
         if (done.current) return;
-        // 写真がそろうのを少し待ってから、印を光らせる（印は土地に付いていく）
-        let shown = false;
-        const track = () => {
-          const p = m.project(here);
-          setRing({ x: p.x, y: p.y });
+        if (terrainOn) m.setTerrain(null);
+        /** 降りきったところ（模型の着地の見え方。まだ無いときは真上・北が上・画面の上から 42%） */
+        const endOf = (frame: LandingFrame | null) => {
+          const box = m.getContainer().getBoundingClientRect();
+          const e = frame
+            ? { zoom: zoomForMpp(frame.mpp, target.lat), bearing: frame.bearing, x: frame.x - box.left, y: frame.y - box.top }
+            : { zoom: FALLBACK.zoom, bearing: FALLBACK.bearing, x: box.width / 2, y: box.height * FALLBACK.y };
+          const c = centerFor(target, e.x - box.width / 2, e.y - box.height / 2, e.bearing, e.zoom);
+          return { center: [c.lng, c.lat] as [number, number], zoom: e.zoom, pitch: 0, bearing: e.bearing };
         };
-        const land = () => {
-          if (shown || done.current) return;
-          shown = true;
-          track();
-          m.on("move", track);
-          setStage("land");
-          // 模型の見え方がそろっていれば、印が光ったら消える（模型と重なるので、地図はもう動かさない）。降り始めにまだ無かったときは、
-          // 届くのを少し待ち、届いたらそこへ滑らせてから消える。届かなければ、そのまま消える（模型は自分の着地をする）
-          const t0 = performance.now();
-          const wait = () => {
-            if (done.current) return;
-            const late = frame ? null : landingFrame();
-            if (late) {
-              m.easeTo({ ...endOf(late), duration: T.adjust, easing: easeInOut, essential: true });
-              later(T.adjust + 200, () => finish(true));
-            } else if (!frame && performance.now() - t0 < T.waitModel) later(150, wait);
-            else finish(true);
+        const frame = landingFrame();
+        m.easeTo({ ...endOf(frame), duration: T.settle, easing: easeInOut, essential: true });
+        m.once("moveend", () => {
+          if (done.current) return;
+          // 写真がそろうのを少し待ってから、印を光らせる（印は土地に付いていく）
+          let shown = false;
+          const track = () => {
+            const p = m.project(here);
+            setRing({ x: p.x, y: p.y });
           };
-          later(T.ring, wait);
-        };
-        m.once("idle", land);
-        later(T.sharpen, land);
+          const land = () => {
+            if (shown || done.current) return;
+            shown = true;
+            track();
+            m.on("move", track);
+            setStage("land");
+            // 模型の見え方がそろっていれば、印が光ったら消える（模型と重なるので、地図はもう動かさない）。降り始めにまだ無かったときは、
+            // 届くのを少し待ち、届いたらそこへ滑らせてから消える。届かなければ、そのまま消える（模型は自分の着地をする）
+            const t0 = performance.now();
+            const wait = () => {
+              if (done.current) return;
+              const late = frame ? null : landingFrame();
+              if (late) {
+                m.easeTo({ ...endOf(late), duration: T.adjust, easing: easeInOut, essential: true });
+                later(T.adjust + 200, () => finish(true));
+              } else if (!frame && performance.now() - t0 < T.waitModel) later(150, wait);
+              else finish(true);
+            };
+            later(T.ring, wait);
+          };
+          m.once("idle", land);
+          later(T.sharpen, land);
+        });
       });
-    });
+    };
+    void over.then(go);
+    later(T.warmOver, go);
   }, [target, overJapan, finish, later]);
 
   const known = !!target && target !== "none";

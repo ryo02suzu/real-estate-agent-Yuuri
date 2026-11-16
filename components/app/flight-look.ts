@@ -128,10 +128,12 @@ export function flightStyle(mood: FlightMood, opts: { terrain: boolean }): Style
         source: "earth",
         paint: {
           ...rasterPaint(L.earth),
-          // 宇宙から見る間はそのまま。近づいたら、写真の届かない遠く（地平線の近く）が霞んで見えるよう、明るく淡くする
-          "raster-brightness-min": ["interpolate", ["linear"], ["zoom"], 7, 0, 9, L.far] as unknown as number,
-          "raster-saturation": ["interpolate", ["linear"], ["zoom"], 7, L.earth.saturation, 9, -0.55] as unknown as number,
-          "raster-contrast": ["interpolate", ["linear"], ["zoom"], 7, L.earth.contrast, 9, -0.3] as unknown as number,
+          // 宇宙から見る間はそのまま。近づいたら、写真の届かない遠く（地平線の近く）が霞んで見えるよう、少し明るく淡くする。
+          // 淡くしすぎると、写真がまだ届いていない所が灰色一色になり、降りる途中が灰色の画面のまま拡大していくように見えた
+          // （本番を 4G くらいの回線で確かめたとき）。色が分かる程度にとどめる（地平線の霞は空の色と霞の帯で出す）
+          "raster-brightness-min": ["interpolate", ["linear"], ["zoom"], 8, 0, 10, L.far * 0.6] as unknown as number,
+          "raster-saturation": ["interpolate", ["linear"], ["zoom"], 8, L.earth.saturation, 10, -0.3] as unknown as number,
+          "raster-contrast": ["interpolate", ["linear"], ["zoom"], 8, L.earth.contrast, 10, -0.15] as unknown as number,
           "raster-fade-duration": 250,
         },
       },
