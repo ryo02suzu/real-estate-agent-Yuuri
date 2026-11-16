@@ -1225,6 +1225,63 @@ describe("lookup", () => {
     });
   });
 
+  // 2026-11-16 の総点検（地価公示・地価調査の所在 2,400件）：入れた町名が見つからないとき、市の中心や名前のつながらない別の町を物件の場所として
+  // 出し、地球から降りる演出もそこへ寄っていた。小字のあとに区分の字を書いた地番は、区分の兄弟の町に当たっていた
+  describe("別の場所に降りない（町名が見つからない・区分の字）", () => {
+    const noParcels = { parcels: { tile: async () => null }, loadIndex: async () => null };
+    const stubGsi = (table: Record<string, string[]>, rev: unknown) => {
+      const asked: string[] = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          const q = decodeURIComponent(url.split("AddressSearch?q=")[1] ?? "");
+          if (url.includes("AddressSearch")) asked.push(q);
+          return {
+            ok: true,
+            json: async () => (url.includes("AddressSearch") ? (table[q] ?? []).map((title, i) => ({ geometry: { coordinates: [140.0 + i / 100, 36.0] }, properties: { title } })) : rev),
+          };
+        }),
+      );
+      return asked;
+    };
+
+    it("町名が見つからず市の中心にしか当たらなければ「見つからない」（市の中心を物件の場所として出さない）", async () => {
+      stubGsi({ "茨城県つくば市さくらの森15番10": ["茨城県つくば市"] }, { results: { muniCd: "08220", lv01Nm: "研究学園一丁目" } });
+      expect(await lookup("茨城県つくば市さくらの森15番10", noParcels)).toEqual({ status: "not_found", miss: { typed: "さくらの森", found: "つくば市", kind: "city" } });
+    });
+
+    it("名前のつながらない別の町に当たったら、同じ市の町から選んでもらう（町名だけ置き換えた住所）", async () => {
+      stubGsi({ "高知県南国市大ソネ字永道甲1519番13": ["高知県南国市大改野", "高知県南国市大埆"] }, { results: { muniCd: "39204", lv01Nm: "大改野" } });
+      const r = await lookup("高知県南国市大ソネ字永道甲1519番13", noParcels);
+      expect(r).toMatchObject({ status: "choose", near: true, miss: { typed: "大ソネ", found: "大改野", kind: "town" } });
+      if (r.status !== "choose") return;
+      expect(r.candidates.map((c) => c.matchedAddress)).toEqual(["高知県南国市大改野字永道甲1519番13", "高知県南国市大埆字永道甲1519番13"]);
+    });
+
+    it("見つかった町の続き（地割・小字）は、今までどおり町の代表点として出す（町名が見つからないことは知らせる）", async () => {
+      stubGsi({ "岩手県九戸郡軽米町大字上舘第15地割字岩崎60番51": ["岩手県軽米町上舘"] }, { results: { muniCd: "03501", lv01Nm: "上舘" } });
+      const r = await lookup("岩手県九戸郡軽米町大字上舘第15地割字岩崎60番51", noParcels);
+      expect(r).toMatchObject({ status: "ok", approximate: true, miss: { typed: "上舘第15地割", found: "上舘", kind: "town" } });
+    });
+
+    it("「八街字北中道ほ224番12」は区分の町「八街ほ」の224番地（兄弟の「八街い」に当てず、直したとも言わない）", async () => {
+      const asked = stubGsi(
+        {
+          "千葉県八街市八街字北中道ほ224番12": ["千葉県八街市八街い", "千葉県八街市八街に", "千葉県八街市八街ほ"],
+          "千葉県八街市八街ほ224番12": ["千葉県八街市八街ほ２２４番地"],
+        },
+        { results: { muniCd: "12212", lv01Nm: "八街ほ" } },
+      );
+      const r = await lookup("千葉県八街市八街字北中道ほ224番12", noParcels);
+      expect(r.status).toBe("ok");
+      if (r.status !== "ok") return;
+      expect(r.matchedAddress).toBe("千葉県八街市八街ほ２２４番地");
+      expect(r.fix).toBeUndefined();
+      expect(r.miss).toBeUndefined();
+      expect(asked.slice(0, 2)).toEqual(["千葉県八街市八街字北中道ほ224番12", "千葉県八街市八街ほ224番12"]);
+    });
+  });
+
   it("番地を入れたのに町までしか一致しなければ approximate", async () => {
     stubFetch(
       [{ geometry: { coordinates: [139.38, 36.18] }, properties: { title: "埼玉県熊谷市三ケ尻" } }],

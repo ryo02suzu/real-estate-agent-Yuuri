@@ -11,6 +11,7 @@ import { localOf, townTiles, type XZ } from "@/lib/app/town-model";
 import { isLotChiban, PARCEL_ZOOM, registryChiban, type Neighbor, type ParcelPiece } from "@/lib/roadmap/parcel";
 import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
 import { addressOffLot, pickKey, type ParcelInfo } from "../parcel-card";
+import { LOADING, NONE } from "@/lib/app/load-state";
 
 /** 配置図の幅÷高さ（カードの中の横長の図） */
 export const PLAN_ASPECT = 1.75;
@@ -67,8 +68,8 @@ export function useNeighborPlan(lat: number, lng: number, info: ParcelInfo): Nei
     // ok は key で見る
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
-  if (!ok) return { status: info.status === "loading" ? "loading" : "none" };
-  return state?.key === key ? state.plan : { status: "loading" };
+  if (!ok) return info.status === "loading" ? LOADING : NONE;
+  return state?.key === key ? state.plan : LOADING;
 }
 
 async function build(lat: number, lng: number, info: Extract<ParcelInfo, { status: "ok" }>): Promise<NeighborPlan> {

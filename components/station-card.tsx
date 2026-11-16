@@ -13,6 +13,7 @@ import { Notes } from "./notes";
 import { PoiList, type PoiState } from "./poi-card";
 import { Sheet } from "./sheet";
 import { Tabs } from "./tabs";
+import { LOADING } from "@/lib/app/load-state";
 
 export type StationState = { status: "loading" } | { status: "error" } | { status: "ok"; stations: StationWalk[] };
 
@@ -30,7 +31,7 @@ export function useStations(lat: number, lng: number): StationState {
     // key に地点が入っている
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
-  return state?.key === key ? state.value : { status: "loading" };
+  return state?.key === key ? state.value : LOADING;
 }
 
 /** 「徒歩約11分」か、歩いて行ける範囲に無ければ「直線約3.2km」 */

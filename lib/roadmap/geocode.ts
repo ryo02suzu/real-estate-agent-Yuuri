@@ -184,6 +184,60 @@ export function kyotoStreet(address: string): string {
 export const JO = /(?:[0-9０-９]+|[一二三四五六七八九十]+)条/g;
 /** 条の番号を数字に（「北二十四条西」→「北24条西」、「北２４条西」→「北24条西」） */
 export const joDigits = (s: string) => s.replace(JO, (m) => m.normalize("NFKC").replace(/[一二三四五六七八九十]+/, (k) => String(kanjiToInt(k))));
+/**
+ * 北海道の殖民区画の「線」（士幌町「字士幌西2線171番12」・上士幌町「字上士幌東3線」）。線の番号は町名の一部で、番地ではない
+ * （国土地理院の町名は「士幌西二線」）。番地の数字と見分けるため、すぐ後ろに番地の数字が続くときだけ
+ */
+export const SEN = /(?:[0-9０-９]+|[一二三四五六七八九十]+)線(?=[0-9０-９])/g;
+/** 線の番号を数字に（「士幌西二線」→「士幌西2線」）。国土地理院の町名（後ろに番地が無い）にも使うので、後ろは見ない */
+export const senDigits = (s: string) => s.replace(/(?:[0-9０-９]+|[一二三四五六七八九十]+)線/g, (m) => m.normalize("NFKC").replace(/[一二三四五六七八九十]+/, (k) => String(kanjiToInt(k))));
+
+/** 大字を区分けする字（八街市の「八街い」〜「八街ち」のイロハ、高知市の「朝倉甲」〜「朝倉庚」の甲乙丙…） */
+const SUB_AREA_MARK = "[甲乙丙丁戊己庚辛壬癸いろはにほへとちりぬるをイロハニホヘトチリヌルヲ]";
+/** 小字のあとに区分の字を書いた地番の住所（「…八街字北中道ほ224番12」）：前・小字・区分の字・番地 */
+const SUB_AREA_RE = new RegExp(`^(.*[^小])字([^字\\d]+?)(${SUB_AREA_MARK})(\\d.*)$`);
+
+/**
+ * 大字が「い・ろ・は…」「甲・乙・丙…」で分かれた町の地番は、「八街市八街字北中道ほ224番12」「高知市朝倉字田島丙219番1」のように、
+ * 小字のあとに区分の字を書く。国土地理院の町名は「八街ほ」「朝倉丙」（区分の字が町名の終わり）で、小字は持っていないので、
+ * そのまま探すと区分の兄弟（「八街い」「朝倉横町」）を先に返す（2026-11-16 の総点検：4.7〜6.4km・1.0〜1.6km 離れた別の場所）。
+ * 国土地理院の町名の形（「八街市八街ほ224番12」）にした住所と、その町（「…八街ほ」）。当てはまらなければ null
+ */
+export function subAreaForm(address: string): { query: string; town: string } | null {
+  const m = address.normalize("NFKC").replace(/\s+/g, "").match(SUB_AREA_RE);
+  if (!m) return null;
+  const [, head, , mark, rest] = m;
+  // 小字の前に大字（町名）が無い（市区町村のすぐ後ろが字）ときは、区分の町ではない
+  if (/[市区町村郡]$/.test(head)) return null;
+  return { query: `${head}${mark}${rest}`, town: `${head}${mark}` };
+}
+
+/** 比べるための形（郡の名前と「大字」を外し、全角・半角をそろえる。国土地理院の住所に郡は無く、大字は付いたり付かなかったりする） */
+const placeForm = (s: string) =>
+  s
+    .normalize("NFKC")
+    .replace(/\s+/g, "")
+    .replace(/(?:^|(?<=[都道府県]))[^都道府県市区町村]{1,6}?郡(?=.)/, "")
+    .replace(/大字/g, "");
+
+/** 国土地理院の住所（番地を外した町まで）が、区分の町（subAreaForm の town）と同じか。入力が都道府県・市区町村を省いていても、後ろがそろえば同じ */
+export function subAreaMatched(town: string, matchedAddress: string): boolean {
+  const a = placeForm(town);
+  const b = placeForm(withoutNumbers(matchedAddress));
+  return !!a && !!b && (a === b || a.endsWith(b) || b.endsWith(a)) && b.endsWith(a.slice(-2));
+}
+
+/**
+ * 小字のあとに区分の字を書いた地番の住所で、国土地理院が区分の兄弟の町に当てたときは、区分の町の形で探し直す。
+ * 探し直した先頭が区分の町そのもの（「八街ほ２２４番地」「朝倉丙」）なら、その候補を返す。当てはまらない・見つからなければ null
+ */
+export async function subAreaRequery(address: string, candidates: GeocodeResult[], search: (q: string) => Promise<GeocodeResult[]> = geocodeCandidates): Promise<GeocodeResult[] | null> {
+  const f = subAreaForm(address);
+  if (!f) return null;
+  if (candidates[0] && subAreaMatched(f.town, candidates[0].matchedAddress)) return null;
+  const again = await search(f.query).catch(() => []);
+  return again[0] && subAreaMatched(f.town, again[0].matchedAddress) ? again : null;
+}
 /** 数字で書いた条（「1条」）を外す。番地の数字を数える前に使う（漢数字の条は、もともと番地に数えない） */
 const dropJo = (s: string) => s.replace(/[0-9０-９]+条/g, "条");
 

@@ -9,6 +9,7 @@ import { readRoads, ROAD_RADIUS_M, type NearbyRoad, type RoadRead } from "@/lib/
 import { ChevronRightIcon, MapIcon } from "./icons";
 import { Notes } from "./notes";
 import { Sheet } from "./sheet";
+import { LOADING, NONE } from "@/lib/app/load-state";
 
 export type RoadsState = { status: "none" } | { status: "loading" } | { status: "error" } | { status: "ok"; roads: NearbyRoad[]; label: string; /** データの出典（ライセンスが求める書き方） */ credit?: string };
 
@@ -30,8 +31,8 @@ export function useNearbyRoads(links: ResolvedLink[], lat: number, lng: number):
     // key に地点とレイヤが入っている
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
-  if (!read) return { status: "none" };
-  return state?.key === key ? state.value : { status: "loading" };
+  if (!read) return NONE;
+  return state?.key === key ? state.value : LOADING;
 }
 
 /** 「北 約6m」 */

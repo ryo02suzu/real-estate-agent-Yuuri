@@ -12,6 +12,7 @@ import { pmtilesBuildingSource } from "@/lib/roadmap/building-tiles";
 import { BuildingIcon } from "./icons";
 import { Notes } from "./notes";
 import type { ParcelInfo } from "./parcel-card";
+import { LOADING, NONE } from "@/lib/app/load-state";
 
 type Ok = Extract<LookupResult, { status: "ok" }>;
 
@@ -38,8 +39,8 @@ export function useBuilding(result: Ok, parcels: ParcelInfo): BuildingState {
     // key に地点と筆が入っている
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, covered, ready]);
-  if (!covered) return { status: "none" };
-  return state?.key === key ? state.value : { status: "loading" };
+  if (!covered) return NONE;
+  return state?.key === key ? state.value : LOADING;
 }
 
 /** 建物の行（名称・用途・階数・構造・高さ・面積・調査年） */

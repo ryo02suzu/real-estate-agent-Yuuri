@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changedMarks, correctAddress, describeMatch, fixMunicipality, placeNotFound, similarTown, typedParts } from "./address-fix";
+import { changedMarks, correctAddress, describeMatch, fixMunicipality, missChoices, missIsElsewhere, placeNotFound, similarTown, typedParts } from "./address-fix";
 import type { GeocodeResult } from "./geocode";
 
 /** 国土地理院の住所検索の代わり（実際に返った住所の形をまねる）。表に無い住所を引いたら空 */
@@ -344,5 +344,74 @@ describe("部品", () => {
   it("直した字の印", () => {
     expect(changedMarks("南大道り", "南大通り")).toEqual([false, false, true, false]);
     expect(changedMarks("宇都宮南大道り", "宇都宮市南大通り")).toEqual([false, false, false, true, false, false, true, false]);
+  });
+});
+
+/**
+ * 2026-11-16 の総点検（地価公示・地価調査の所在 2,400件）：入れた町名が見つからないとき、別の町や市の中心に降りていた
+ * （南国市「大ソネ」→ 12.7km 先の「大改野」、つくば市「さくらの森」→ 5.1km 先の市の中心）。一方で、同じ町なのに「別の町を出しています」と
+ * 出ていた住所もあった（北海道の「士幌町字士幌西2線」、沖縄の「久米島町字比嘉」）
+ */
+describe("入れた町名が見つからないとき（別の場所を物件の場所として出さない）", () => {
+  it("北海道の「線」の番号・市区町村のすぐ後ろの「字」は町名の一部（別の町とは言わない）", () => {
+    expect(typedParts("北海道河東郡士幌町字士幌西2線171番12")).toEqual({ pref: "北海道", place: "士幌町字士幌西2線", num: "171番12" });
+    expect(describeMatch("北海道河東郡士幌町字士幌西2線171番12", "北海道士幌町士幌西二線")).toBeNull();
+    // 沖縄：字（比嘉）のあとの小字（比嘉）は、見つかった町の続き
+    expect(describeMatch("沖縄県島尻郡久米島町字比嘉比嘉31番", "沖縄県久米島町比嘉")?.miss).toEqual({ typed: "比嘉比嘉", found: "比嘉", kind: "town" });
+    // いの町「字西前田」は、町名「西前田」として比べる（市区町村の名前「いの町」を町名と取り違えない）
+    expect(describeMatch("高知県吾川郡いの町字西前田1186番10", "高知県いの町西町")?.miss).toEqual({ typed: "西前田", found: "西町", kind: "town" });
+  });
+
+  it("小字のあとに区分の字を書いた地番を区分の町に当てたのは、直したのではない（「八街→八街い」と言わない）", () => {
+    expect(describeMatch("千葉県八街市八街字北中道ほ224番12", "千葉県八街市八街ほ２２４番地")).toBeNull();
+    expect(describeMatch("高知県高知市朝倉字田島丙219番1", "高知県高知市朝倉丙")).toBeNull();
+  });
+
+  it("別の場所：市区町村の中心・名前のつながらない別の町・町名の続きが別の町の名前", () => {
+    expect(missIsElsewhere({ typed: "さくらの森", found: "つくば市", kind: "city" })).toBe(true);
+    expect(missIsElsewhere({ typed: "大ソネ", found: "大改野", kind: "town" })).toBe(true);
+    expect(missIsElsewhere({ typed: "西前田", found: "西町", kind: "town" })).toBe(true);
+    expect(missIsElsewhere({ typed: "みなみ大通り", found: "みどり野町", kind: "town" })).toBe(true);
+    expect(missIsElsewhere({ typed: "千住朝日町", found: "千住", kind: "town" })).toBe(true);
+    expect(missIsElsewhere({ typed: "北1条西", found: "北二条西", kind: "town" })).toBe(true);
+  });
+
+  it("同じ町：見つかった町名の続き（小字・地割・区分の字）、字の印の違い、地割の番号違い（地番の地図で確かめる）、読み取れない町名", () => {
+    for (const [typed, found] of [
+      ["上舘第15地割", "上舘"],
+      ["大島町馬場尻", "大島町"],
+      ["貝田ソ", "貝田"],
+      ["郡町弐", "郡町"],
+      ["一場屋舗", "一場"],
+      ["茂福字坪ノ内", "大字茂福"],
+      ["長崎字新町", "大字長崎"],
+      ["字伊佐津小", "伊佐津"],
+      ["植田小字堂ケ島", "大字植田堂ケ島"],
+      ["比嘉比嘉", "比嘉"],
+      ["南矢幅第13地割", "大字南矢幅第十二地割"],
+      ["士幌西", "士幌西二線"],
+      ["", "比嘉"],
+    ]) {
+      expect(missIsElsewhere({ typed, found, kind: "town" }), `${typed} → ${found}`).toBe(false);
+    }
+  });
+
+  it("選んでもらう候補：同じ市区町村の町ごとに、入れた住所の町名だけを置き換える", () => {
+    const c = (title: string): GeocodeResult => ({ lat: 33.6, lng: 133.6, matchedAddress: title });
+    const got = missChoices("高知県南国市大ソネ字永道甲1519番13", { typed: "大ソネ", found: "大改野", kind: "town" }, [
+      c("高知県南国市大改野"),
+      c("高知県南国市大埆"),
+      c("高知県南国市大改野"),
+      c("高知県香南市野市町大谷"),
+      c("高知県南国市"),
+    ]);
+    expect(got.map((x) => x.matchedAddress)).toEqual(["高知県南国市大改野字永道甲1519番13", "高知県南国市大埆字永道甲1519番13"]);
+    // 町名が市区町村の名前と同じ字を含んでも、市区町村の後ろの町名を置き換える
+    expect(missChoices("東京都大島町大島字大島1番", { typed: "大島", found: "元町", kind: "town" }, [c("東京都大島町元町"), c("東京都大島町岡田")]).map((x) => x.matchedAddress)).toEqual([
+      "東京都大島町元町字大島1番",
+      "東京都大島町岡田字大島1番",
+    ]);
+    // 市区町村の中心しか無ければ候補なし（見つからないとして出す）
+    expect(missChoices("茨城県つくば市さくらの森15番10", { typed: "さくらの森", found: "つくば市", kind: "city" }, [c("茨城県つくば市")])).toEqual([]);
   });
 });

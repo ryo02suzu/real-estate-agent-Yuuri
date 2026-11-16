@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { branchUnmatched, addressNumbers, isApproximate, kyotoChoices, kyotoStreet, kyotoTown, matchedNumbers, numbersAgree, partialMatch, streetSide, subAreaDropped, withoutNumbers } from "./geocode";
+import { branchUnmatched, addressNumbers, isApproximate, kyotoChoices, kyotoStreet, kyotoTown, matchedNumbers, numbersAgree, partialMatch, senDigits, streetSide, subAreaDropped, subAreaForm, subAreaMatched, subAreaRequery, withoutNumbers, type GeocodeResult } from "./geocode";
 
 describe("住所の一致の深さ", () => {
   it("番地がまったく無い一致は、町の中心（isApproximate）", () => {
@@ -221,5 +221,62 @@ describe("京都市の通り名の住所（kyotoStreet）", () => {
     // 括弧の付かない町がある名前（下京区の上之町）・位置の分からない町がある名前（中京区の壺屋町）は候補にできない
     expect(kyotoChoices("京都府京都市下京区上之町417番1")).toBeNull();
     expect(kyotoChoices("京都府京都市中京区壺屋町1")).toBeNull();
+  });
+});
+
+/**
+ * 2026-11-16 の総点検：大字が「い・ろ・は…」「甲・乙・丙…」で分かれた町の地番（「八街市八街字北中道ほ224番12」「高知市朝倉字田島丙219番1」）は、
+ * 小字のあとに区分の字を書く。国土地理院は小字を知らないので区分の兄弟（「八街い」「朝倉横町」）を先に返し、4.7〜6.4km・1.0〜1.6km 離れた
+ * 別の場所に降りていた。区分の町の形（「八街ほ224番12」）で探し直す
+ */
+describe("小字のあとに区分の字を書いた地番（subAreaForm・subAreaRequery）", () => {
+  const at = (title: string): GeocodeResult => ({ lat: 35.6, lng: 140.3, matchedAddress: title });
+
+  it("国土地理院の町名の形にする（区分の字が町名の終わり。小字は外す）", () => {
+    expect(subAreaForm("千葉県八街市八街字北中道ほ224番12")).toEqual({ query: "千葉県八街市八街ほ224番12", town: "千葉県八街市八街ほ" });
+    expect(subAreaForm("高知県高知市朝倉字田島丙219番1")).toEqual({ query: "高知県高知市朝倉丙219番1", town: "高知県高知市朝倉丙" });
+    expect(subAreaForm("高知県高知市大津字大石ケ本乙389番19")?.query).toBe("高知県高知市大津乙389番19");
+    // 全角の数字・空白もそろえる
+    expect(subAreaForm("千葉県八街市八街字北中道ほ２２４番１２")?.query).toBe("千葉県八街市八街ほ224番12");
+  });
+
+  it("当てはまらない住所はそのまま（区分の字が無い・小字が無い・市区町村のすぐ後ろが字）", () => {
+    expect(subAreaForm("埼玉県熊谷市大字三ケ尻字東原1234番")).toBeNull();
+    expect(subAreaForm("群馬県桐生市元宿町3-27")).toBeNull();
+    expect(subAreaForm("島根県大田市大田町大田ハ282番")).toBeNull();
+    // 北海道・沖縄の「町＋字」は、字が町名（区分の町ではない）
+    expect(subAreaForm("北海道河東郡士幌町字士幌西ほ171番12")).toBeNull();
+  });
+
+  it("区分の町か：同じ町・都道府県や郡を省いた形は同じ、兄弟の区分は違う", () => {
+    expect(subAreaMatched("千葉県八街市八街ほ", "千葉県八街市八街ほ２２４番地")).toBe(true);
+    expect(subAreaMatched("八街市八街ほ", "千葉県八街市八街ほ")).toBe(true);
+    expect(subAreaMatched("千葉県八街市八街ほ", "千葉県八街市八街い")).toBe(false);
+    expect(subAreaMatched("高知県高知市朝倉丙", "高知県高知市朝倉横町")).toBe(false);
+    expect(subAreaMatched("高知県吾川郡いの町大内甲", "高知県いの町大内甲")).toBe(true);
+  });
+
+  it("兄弟の区分に当たったときだけ探し直し、区分の町が見つかったときだけ使う", async () => {
+    const asked: string[] = [];
+    const search = async (q: string) => {
+      asked.push(q);
+      return q === "千葉県八街市八街ほ224番12" ? [at("千葉県八街市八街ほ２２４番地")] : [at("高知県南国市大改野")];
+    };
+    const first = [at("千葉県八街市八街い"), at("千葉県八街市八街に"), at("千葉県八街市八街ほ")];
+    expect((await subAreaRequery("千葉県八街市八街字北中道ほ224番12", first, search))?.[0].matchedAddress).toBe("千葉県八街市八街ほ２２４番地");
+    expect(asked).toEqual(["千葉県八街市八街ほ224番12"]);
+    // 最初から区分の町に当たっていれば、探し直さない
+    expect(await subAreaRequery("千葉県八街市八街字北中道ほ224番12", [at("千葉県八街市八街ほ２２４番地")], search)).toBeNull();
+    expect(asked).toHaveLength(1);
+    // 区分の町が国土地理院に無ければ、使わない（最初の結果のまま。別の判定で知らせる）
+    expect(await subAreaRequery("高知県南国市大ソネ字永道甲1519番13", [at("高知県南国市大改野")], search)).toBeNull();
+    // 探し直しが通信で失敗しても、最初の結果のまま
+    expect(await subAreaRequery("千葉県八街市八街字北中道ほ224番12", first, async () => Promise.reject(new Error("503")))).toBeNull();
+  });
+
+  it("北海道の線の番号を数字にそろえる（「士幌西二線」→「士幌西2線」）", () => {
+    expect(senDigits("士幌西二線")).toBe("士幌西2線");
+    expect(senDigits("上士幌東３線")).toBe("上士幌東3線");
+    expect(senDigits("新線通り")).toBe("新線通り");
   });
 });

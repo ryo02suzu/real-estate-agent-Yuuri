@@ -15,6 +15,7 @@ import { rirekiAt, type RirekiRecord } from "@/lib/roadmap/rireki";
 import type { StationWalk } from "@/lib/roadmap/walk";
 import { zouseiAt, type Zousei } from "@/lib/roadmap/zousei";
 import { withRetry } from "@/lib/retry";
+import { LOADING, NONE } from "@/lib/app/load-state";
 
 /** 読み込みの状態。none はデータがまだ無い（取り込み前） */
 export type Loaded<T> = { status: "none" } | { status: "loading" } | { status: "error" } | { status: "ok"; value: T };
@@ -35,8 +36,8 @@ function useLoaded<T>(data: NationalKey | NationalKey[], key: string | null, run
     // key に読むものが入っている
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, ready]);
-  if (!ready || key === null) return { status: "none" };
-  return state?.key === key ? state.value : { status: "loading" };
+  if (!ready || key === null) return NONE;
+  return state?.key === key ? state.value : LOADING;
 }
 
 /** 液状化の発生傾向（null はデータの無い所：海・関東の外） */
