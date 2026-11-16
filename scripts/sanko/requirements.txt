@@ -3,3 +3,4 @@ pyshp==3.1.6
 shapely==2.2.0
 pyproj==3.7.2
 numpy==2.4.6
+fiona==1.10.1

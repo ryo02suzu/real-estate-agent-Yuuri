@@ -96,6 +96,7 @@ CCBY = "CC BY 4.0"
 #   only：この列がこの値の筆だけ使う（長岡京市の「長狭物区分」＝地番）。drop_lots：地番の頭の数字がこれに合えば地番ではない（道・水路の番号）
 #   mirror：GitHub Actions から取れないので R2 の写し（sanko/src/）から読む（手元で --fetch-only → ワークフローの import_ref で足す）
 #   names：大字名を別の表から引く（shp か csv。key・name の列。pad はコードの桁をそろえる）
+#   gdb：shapefile でなくファイルジオデータベース（.gdb のフォルダ）の所。layer は筆の面のレイヤ（fiona で読む）
 #   oaza_poly：筆に大字の列が無い所。大字の境の面の shapefile（shp。key・name の列）のうち、筆の中の点を含む面の大字にする
 #   split：1つの列に「大字コード-地番」があるもの
 #   subkey：小字のコードの列（小字ごとに地番が付き、小字の名前が無い市。小字のまとまりごとに法務省の地番区域を決める）
@@ -364,6 +365,15 @@ SOURCES = [
         # 地番で照らし合わせられないもの。約0.5%）の筆は、地番区域が法務省と合わないので入れない
         "drop_unmapped": True,
     },
+    {
+        # G空間情報センターの室蘭市のページ（ファイルジオデータベース）。データセットのライセンスは「CC-BY」（版の記載なし。作成者は室蘭市）。
+        # 筆の面は hude レイヤ（町字のコード・町字名・地番・枝番。枝番の「0」は枝番なし）。座標系は平面直角座標系 XII 系（JGD2000）
+        "code": "01205", "name": "室蘭市", "credit": "室蘭市「室蘭市地番図2024年」", "license": "CC BY（版の記載なし）",
+        "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja（G空間情報センターの表示は「CC-BY」で版の記載なし）",
+        "fetch": {"kind": "ckan", "api": GSPATIAL, "dataset": "muroranchiban2024", "resource": r"(?i)gdb\.zip$"},
+        "date": "2024-01-01", "epsg": 2454, "enc": "utf-8",
+        "gdb": {"layer": "hude"}, "chiban": ["地番", "枝番"], "key": "町字", "oname": "町字名",
+    },
 ]
 # 確かめて外したもの（--check で「入れていない市町村」として知らせない）。
 EXCLUDED = {
@@ -400,6 +410,8 @@ SPLIT_GAP_M = 100.0
 # 同じ名前の町の筆を、離れた区画のまとまりに分けるときの間（m）。京都市の同じ区の同じ名前の町は、ふつう数百 m 以上離れている
 PAREN_GAP_M = 30.0
 CHIBAN_RE = re.compile(r"^\d+(-\d+)*$")
+# 法務省の地図の地番の後ろの印（W・V・X。lib/roadmap/parcel.ts の PIECE_MARK と同じ）
+PIECE_RE = re.compile(r"(?:W\d+|V\d+|X\(\d+/\d+\))$")
 # 西東京市（日本測地系・平面直角座標系 IX 系）→ 世界測地系（JGD2011 の IX 系として扱う）。Tokyo to JGD2000 (1)（EPSG:15483）の3パラメータ
 TOKYO_PIPELINE = (
     "+proj=pipeline +step +inv +proj=tmerc +lat_0=36 +lon_0=139.833333333333 +k=0.9999 +x_0=0 +y_0=0 +ellps=bessel "
@@ -777,14 +789,23 @@ def moj_zips(code: str, year: str | None, work: str) -> tuple[list[str], str]:
     return paths, year
 
 
+def bare_chiban(chiban: str) -> str:
+    """法務省の地図の地番の後ろの印（二重地番「10-1W1」・めがね地番「25V2」・分属管理地番「7X(1/2)」。1つの土地が地図の上で
+    分かれて描かれたもの。登記の地番には付かない）を外した地番。印を外すと地番の形になるものだけ外す
+    （アプリの lib/roadmap/parcel.ts の registryChiban と同じ印）"""
+    bare = PIECE_RE.sub("", chiban)
+    return bare if bare != chiban and CHIBAN_RE.match(bare) else chiban
+
+
 def read_moj(paths: list[str]) -> dict:
-    """地番区域・地番（全ての筆）と、公共座標の筆の形（緯度経度）"""
+    """地番区域・地番（全ての筆。切れ端の印は外す）と、公共座標の筆の形（緯度経度）。pub_piece は公共座標の筆が切れ端か"""
     from mojxml.parse import ParseOptions, parse_raw
     from mojxml.reader import iter_content_xmls
 
     recs = []  # (地番区域の5つ, 地番, 公共座標か)
     pub_geom = []
     pub_idx = []
+    pub_piece = []
     for content in iter_content_xmls(paths):
         arbitrary = "任意座標系".encode() in content[:4000]
         try:
@@ -795,13 +816,15 @@ def read_moj(paths: list[str]) -> dict:
         for f in feats:
             p = f["properties"]
             parts = tuple(str(p.get(k) or "") for k in ("市区町村名", "大字名", "丁目名", "小字名", "予備名"))
-            chiban = str(p.get("地番") or "")
+            raw = str(p.get("地番") or "")
+            chiban = bare_chiban(raw)
             public = p.get("座標系") != "任意座標系"
             recs.append((parts, chiban, public))
             if public and CHIBAN_RE.match(chiban):
                 pub_geom.append(shape(f["geometry"]))
                 pub_idx.append(len(recs) - 1)
-    return {"recs": recs, "pub_geom": pub_geom, "pub_idx": pub_idx}
+                pub_piece.append(chiban != raw)
+    return {"recs": recs, "pub_geom": pub_geom, "pub_idx": pub_idx, "pub_piece": pub_piece}
 
 
 # ---- 市町村のデータ ----
@@ -885,6 +908,32 @@ def reader(path: str, enc: str) -> shapefile.Reader:
     base = path[:-4]
     sib = {os.path.splitext(f)[1].lower(): os.path.join(os.path.dirname(path), f) for f in os.listdir(os.path.dirname(path)) if os.path.splitext(f)[0] == os.path.basename(base)}
     return shapefile.Reader(shp=open(sib[".shp"], "rb"), shx=open(sib[".shx"], "rb") if ".shx" in sib else None, dbf=open(sib[".dbf"], "rb"), encoding=enc, encodingErrors="replace")
+
+
+class GdbShape:
+    """ファイルジオデータベースの図形を、pyshp の図形と同じように扱う（points が空でなく、__geo_interface__ がある）"""
+
+    def __init__(self, geo: dict):
+        self.__geo_interface__ = geo
+        self.points = [geo["coordinates"]]
+
+
+def gdb_rows(root: str, spec: dict, epsg: int) -> tuple[list[str], list]:
+    """ファイルジオデータベース（.gdb のフォルダ。室蘭市）のレイヤの図形と属性（fiona で読む）。座標系が SOURCES の epsg と違えば知らせる"""
+    import fiona
+    from pyproj import CRS
+
+    gdb = os.path.dirname(find(root, r"\.gdb/[^/]+\.gdbtable$"))
+    with fiona.open(gdb, layer=spec["layer"]) as c:
+        if c.crs_wkt and CRS.from_wkt(c.crs_wkt).to_epsg() != epsg:
+            log(f"  ::warning:: {spec['layer']} の座標系は EPSG:{CRS.from_wkt(c.crs_wkt).to_epsg()}、SOURCES は {epsg}")
+        names = list(c.schema["properties"])
+        rows = []
+        for f in c:
+            g = f.geometry
+            shp = GdbShape({"type": g.type, "coordinates": g.coordinates}) if g is not None else None
+            rows.append((shp, [f.properties.get(n) for n in names]))
+    return names, rows
 
 
 def name_table(root: str, spec: dict, enc: str) -> dict[str, str]:
@@ -1006,15 +1055,19 @@ def read_muni(src: dict, root: str) -> dict:
         wardl = [""] * len(geoms)
         subs = [""] * len(geoms)
     else:
-        path = find(root, src["shp"])
-        prj = [f for f in os.listdir(os.path.dirname(path)) if f.lower() == os.path.basename(path)[:-4].lower() + ".prj"]
-        if prj:
-            t = open(os.path.join(os.path.dirname(path), prj[0]), "rb").read().decode("latin1")
-            datum = "JGD2011" if "2011" in t else "JGD2000" if "2000" in t else "Tokyo" if "Tokyo" in t or "Bessel" in t else "?"
-            if datum != datum_of(src["epsg"]):
-                log(f"  ::warning:: .prj は {datum}、SOURCES は {datum_of(src['epsg'])}")
-        r = reader(path, src["enc"])
-        names = [f[0] for f in r.fields[1:]]
+        if src.get("gdb"):
+            names, rows = gdb_rows(root, src["gdb"], src["epsg"])
+        else:
+            path = find(root, src["shp"])
+            prj = [f for f in os.listdir(os.path.dirname(path)) if f.lower() == os.path.basename(path)[:-4].lower() + ".prj"]
+            if prj:
+                t = open(os.path.join(os.path.dirname(path), prj[0]), "rb").read().decode("latin1")
+                datum = "JGD2011" if "2011" in t else "JGD2000" if "2000" in t else "Tokyo" if "Tokyo" in t or "Bessel" in t else "?"
+                if datum != datum_of(src["epsg"]):
+                    log(f"  ::warning:: .prj は {datum}、SOURCES は {datum_of(src['epsg'])}")
+            r = reader(path, src["enc"])
+            names = [f[0] for f in r.fields[1:]]
+            rows = shape_records(r)
         table = name_table(root, src.get("names"), src["enc"])
         pad = (src.get("names") or {}).get("pad", 0)
         # 大字名に小字名がつながった名前（豊田市の町字名「福受町下ノ切」）を、大字の名前の一覧（大字界の shapefile）の一番長く合う頭で、
@@ -1027,7 +1080,7 @@ def read_muni(src: dict, root: str) -> dict:
             prefixes = sorted({str(rec[i_name]).strip() for rec in rn.iterRecords() if str(rec[i_name]).strip()}, key=len, reverse=True)
         geoms, chibans, keys, onames, koazas = [], [], [], [], []
         raw_n = 0
-        for shp, raw in shape_records(r):
+        for shp, raw in rows:
             raw_n += 1
             rec = dict(zip(names, raw))
             if "split" in src:
@@ -1213,7 +1266,9 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
                 votes[muni["key"][i]][(parts[0], parts[1], parts[2])] += 1
                 if muni["sub"][i]:
                     kvotes[(muni["key"][i], muni["sub"][i])][parts] += 1
-                pairs.append((i, j))
+                # 切れ端（筆の一部）は重心が筆と違うので、平行移動の量を測る組には入れない
+                if not moj["pub_piece"][j]:
+                    pairs.append((i, j))
     # 平行移動（同じ地番の筆の重心のずれの中央値）
     shift = (0.0, 0.0)
     resid_before = resid_after = None
