@@ -5,6 +5,7 @@
 import { SANKO_MARK } from "./sanko-data";
 import { subCompatible, subNorm, subParse, type AddressSub } from "./parcel-sub";
 import type { ParcelIndex } from "./parcel-index";
+import { newForm } from "./old-kanji";
 
 /** 筆を探すタイルのズーム（このズームのタイルに全ての筆が入っている） */
 export const PARCEL_ZOOM = 16;
@@ -180,13 +181,29 @@ export function kanjiToInt(k: string): number {
 }
 
 /**
- * 町・大字の名前をそろえる（「大字」「字」を外す、「ヶ」と「ケ」、「二丁目」と「２丁目」）。
+ * 町の名前を照らし合わせるときだけそろえる字体。全国の地番の索引（1,856市区町村）の町名を国勢調査の町丁・字の名前と比べ、
+ * 1字だけ違う組で、同じ字の書き方の違いだったもの（2026-11-16）：澤・沢（25町）、渕・淵（21）、の・之・ノ（21）、桧・檜（19）、
+ * 薮・藪（18）、ッ・ツ（13）、が・ケ（12）、籠・篭（11）、曽・曾（8）、壺・壷（7）、舘・館（6）、瀧・滝（4）など。
+ * 旧字（澤・濱・廣・櫻・冨・峯・﨑・嶋・條・藏・萬・眞）は newForm でそろえる。どちらの書き方もある字なので、照らし合わせの
+ * 両方に同じ直しをかける（画面に出す名前と、国土地理院へ送る住所の直し newForm の表は変えない）
+ */
+const TOWN_VARIANT: Record<string, string> = {
+  渕: "淵", 薮: "藪", 桧: "檜", 篭: "籠", 曾: "曽", 壷: "壺", 舘: "館", 瀧: "滝", 溪: "渓", 狹: "狭", 穗: "穂", 嶽: "岳",
+  剱: "剣", 鍜: "鍛", 竃: "竈", 龍: "竜", 槇: "槙", 斉: "斎", ッ: "ツ", の: "ノ", 之: "ノ", 乃: "ノ", が: "ケ", ガ: "ケ",
+};
+const TOWN_VARIANT_RE = new RegExp(`[${Object.keys(TOWN_VARIANT).join("")}]`, "g");
+
+/**
+ * 町・大字の名前をそろえる（「大字」「字」を外す、「ヶ」と「ケ」、「二丁目」と「２丁目」、旧字・異体字（TOWN_VARIANT））。
+ * 法務省の地図データの町名の誤り（上里町の「昆沙吐」。国土地理院と国勢調査は「毘沙吐」）と、「鍛治」（「鍛冶」の書き違い）もそろえる。
  * 「大字」「字」は名前の途中にあっても外す：法務省の地図の地番区域は、沖縄県では「平良字西里」「玉城字前川」、
  * 合併前の町の名前が付く所では「山内町大字三間坂」（武雄市）のように途中に「字」「大字」が入るが、国土地理院の住所は「平良西里」「山内町三間坂」
  */
 export function townKey(s: string): string {
-  return s
-    .normalize("NFKC")
+  return newForm(s.normalize("NFKC"))
+    .replace(TOWN_VARIANT_RE, (c) => TOWN_VARIANT[c] ?? c)
+    .replace(/昆沙吐/g, "毘沙吐")
+    .replace(/鍛治/g, "鍛冶")
     .replace(/\s/g, "")
     .replace(/[ヶヵケ]/g, "ケ")
     .replace(/大字/g, "")
