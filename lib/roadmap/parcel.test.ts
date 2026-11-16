@@ -1678,8 +1678,8 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     // 神戸市北区若葉台（1枚の本体を縮尺ごと直す。大字・丁目ごとに6つ）、11-14 に拾い直した津市（みのりヶ丘・あのつ台三丁目・五丁目）と松阪市（清生町・垣鼻町・田原町）の4枚、
     // 11-15 に全部の図面の点検（v4）で見つけた神戸市西区岩岡町古郷・加古川市志方町畑の2枚と、加西市中山町・丹波篠山市今田町本荘の2枚、
     // 同じ点検の続きで見つけた亀岡市（ヒエ田野町・宮前町宮川・本梅町井手）の3枚と京田辺市（普賢寺の水取・打田の工区）の2枚、
-    // 11-16 に「保留」から航空写真で確かめて足した京丹後市 大宮町五十河の1枚
-    expect(kinki).toHaveLength(41);
+    // 11-16 に「保留」から航空写真で確かめて足した京丹後市 大宮町五十河の1枚と、同じ点検の続きで見つけた滋賀県（長浜市・近江八幡市・甲賀市）の4枚
+    expect(kinki).toHaveLength(45);
     const sanda = kinki.filter((s) => s.code === "28219");
     expect(sanda.map((s) => s.sheet).sort()).toEqual(["あかしあ台１～５丁目", "すずかけ台１～４丁目", "ゆりのき台１～６丁目（修正後）", "北摂三田ニュータウン南地区"].sort());
     expect(sanda.reduce((a, s) => a + s.parcels, 0)).toBe(11320);
@@ -1921,6 +1921,27 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     }
     // 町名の無い図面は、ほかの図面（ニセコ町・鷹栖町）と同じ書き方
     expect(data.sheets.find((x) => x.code === "01461")!.town).toBe("空知郡中富良野町（町名の無い図面。測地系の取り違え・位置を直す）");
+  });
+  it("2026-11-16：全部の図面の点検（v4）の続きで見つけた滋賀県の4枚（長浜市 木之本町古橋・近江八幡市 上田町・甲賀市 水口町の2枚）は、約434mずれている", () => {
+    const want: [string, string, number, "T1" | "T2", number, number][] = [
+      ["25203", "平成１４年度団体営古橋地区５００", 234, "T2", 259.1, -347.9],
+      ["25204", "近江八幡市平成１８年度１／５００", 592, "T1", -260.4, 347.7],
+      ["25209", "旧水口町平成１４年度１／５００Ａ", 173, "T2", 260.5, -348],
+      ["25209", "旧水口町平成１４年度１／５００Ｃ", 327, "T2", 260.5, -348],
+    ];
+    for (const [code, sheet, parcels, kind, east, north] of want) {
+      const all = data.sheets.filter((x) => x.code === code && x.sheet === sheet);
+      expect(all, sheet).toHaveLength(1);
+      const s = all[0];
+      expect(s.parcels, sheet).toBe(parcels);
+      expect(s.shift, sheet).toEqual({ kind, east, north });
+      expect(Math.hypot(east, north), sheet).toBeCloseTo(434, -1);
+      expect(s.chiban, sheet).toBeUndefined();
+      expect(s.oaza, sheet).toBeUndefined();
+      // 動かした先では、ほかの地図の筆と重なるのは15%以下
+      expect(Number(s.reason.match(/動かした先では ([\d.]+)%/)?.[1]), sheet).toBeLessThanOrEqual(15);
+      expect(s.reason, sheet).toMatch(/2026-11-16.*航空写真/);
+    }
   });
   it("地価の地点で見つけたずれ（2026-11-13）：渋川市の地図 10109 は地図ごと動かす決まり1つだけ、生駒市北新町の地図はずれた20筆だけを動かす", () => {
     // 渋川市：前は「ほかの地図の筆と重なる部分だけ外す」決まり3つ（531筆）だった。重なりは地図全体のずれのせいで、動かすと重なりは 0.2%
