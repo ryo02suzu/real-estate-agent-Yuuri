@@ -5,7 +5,7 @@ import KOZU_SOURCE from "./data/kozu-source.json";
 import { lookup, registryStyle } from "./index";
 import { loadParcelIndex } from "./parcel-index";
 import { mergeParcelSources, withoutCities } from "./parcel-tiles";
-import { sankoCovers } from "./sanko-data";
+import { coversCity, sankoCovers } from "./sanko-data";
 import { addressSub } from "./parcel-sub";
 import {
   chibanLabel,
@@ -1298,6 +1298,16 @@ describe("地番参考図のある市町村", () => {
     expect(sankoCovers("小川町")).toBe(true);
     expect(sankoCovers("松戸市")).toBe(false);
     expect(sankoCovers("横浜市港北区")).toBe(false);
+  });
+  it("区のある市は、地番区域の区の名前まで入った形（「熊本市南区」）でも判定する", () => {
+    const names = new Set(["熊本市", "市川市", "小川町"]);
+    expect(coversCity(names, "熊本市南区")).toBe(true);
+    expect(coversCity(names, "熊本市")).toBe(true);
+    expect(coversCity(names, "比企郡小川町")).toBe(true);
+    // 区の無い市・名前の頭だけが同じ別の市は当てない
+    expect(coversCity(names, "横浜市港北区")).toBe(false);
+    expect(coversCity(names, "市川三郷町")).toBe(false);
+    expect(coversCity(names, "熊本")).toBe(false);
   });
 });
 
