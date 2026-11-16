@@ -20,16 +20,13 @@ describe("調べている間に向かう上空（components/app/flight-wait.ts�
       expect(lng, pref).toBeLessThan(146);
       expect(lat, pref).toBeGreaterThan(24);
       expect(lat, pref).toBeLessThan(46);
-      expect(zoom, pref).toBeGreaterThanOrEqual(5.5);
-      // 遠くの地球の絵（ズーム 8 までの粗い絵）がぼやけない高さまで
-      expect(zoom, pref).toBeLessThanOrEqual(6);
+      // 遠くの地球の絵（ズーム 8 までの粗い絵）がぼやけない高さ
+      expect(zoom, pref).toBe(5.5);
     }
     // 人口の重心：都庁・県庁のある街の近く（群馬県は前橋・高崎のあいだ、東京都は都心、北海道は札幌の近く）
     expect(km(PREF_VIEW["東京都"].slice(0, 2) as [number, number], [139.6917, 35.6895])).toBeLessThan(10);
     expect(km(PREF_VIEW["群馬県"].slice(0, 2) as [number, number], [139.0608, 36.3912])).toBeLessThan(15);
     expect(km(PREF_VIEW["北海道"].slice(0, 2) as [number, number], [141.3469, 43.0642])).toBeLessThan(60);
-    // 広い・離島の多い所は引いた見え方
-    expect(PREF_VIEW["北海道"][2]).toBeLessThan(PREF_VIEW["群馬県"][2]);
   });
 
   it("入れた住所から都道府県を読む（都道府県から・郵便番号つき・地番・市区町村から）", () => {
