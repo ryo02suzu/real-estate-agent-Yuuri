@@ -1892,6 +1892,26 @@ describe("位置がずれた地図の一覧（scripts/parcel-tiles/misplaced-she
     expect(s!.reason).toMatch(/2\/523筆.*508\/523筆/);
     expect(s!.reason).toMatch(/航空写真/);
   });
+  it("2026-11-16：全部の図面の点検（v4）の続きで見つけた北海道の2枚（中富良野町113筆・音更町 宝来131筆）は、北西へ約404〜420mずれている（T2。南東へ動かす）", () => {
+    const want: [string, string, number, number, number][] = [
+      ["01461", "20565_hosei_20130107093426", 113, 305.8, -264.5],
+      ["01631", "10042_hosei_20130107093505", 131, 323.1, -267.7],
+    ];
+    for (const [code, sheet, parcels, east, north] of want) {
+      const all = data.sheets.filter((x) => x.code === code && x.sheet === sheet);
+      expect(all, sheet).toHaveLength(1);
+      const s = all[0];
+      expect(s.parcels, sheet).toBe(parcels);
+      expect(s.shift, sheet).toEqual({ kind: "T2", east, north });
+      expect(s.chiban, sheet).toBeUndefined();
+      expect(s.oaza, sheet).toBeUndefined();
+      // 今の位置ではほかの地図の筆とほとんど重なり（65%・99.8%）、動かした先ではほとんど重ならない
+      expect(s.reason, sheet).toMatch(/重なるのは面積の (65\.3|99\.8)%、動かした先では 0\.[12]%/);
+      expect(s.reason, sheet).toMatch(/2026-11-16.*航空写真/);
+    }
+    // 町名の無い図面は、ほかの図面（ニセコ町・鷹栖町）と同じ書き方
+    expect(data.sheets.find((x) => x.code === "01461")!.town).toBe("空知郡中富良野町（町名の無い図面。測地系の取り違え・位置を直す）");
+  });
   it("地価の地点で見つけたずれ（2026-11-13）：渋川市の地図 10109 は地図ごと動かす決まり1つだけ、生駒市北新町の地図はずれた20筆だけを動かす", () => {
     // 渋川市：前は「ほかの地図の筆と重なる部分だけ外す」決まり3つ（531筆）だった。重なりは地図全体のずれのせいで、動かすと重なりは 0.2%
     const shibukawa = data.sheets.filter((s) => s.code === "10208" && s.sheet === "10109_hosei_20121211082249");

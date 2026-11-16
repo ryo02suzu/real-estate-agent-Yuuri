@@ -88,13 +88,15 @@ CCBY = "CC BY 4.0"
 
 # 市町村ごとの公開ファイルと読み方。
 #   fetch：dataeye（埼玉県・千葉県のオープンデータサイト。dataset はデータセットの番号）か ckan（api・dataset）。
-#          resource はリソース名・ファイル名に合う正規表現（合うものが複数あれば一番新しいもの）
+#          resource はリソース名・ファイル名に合う正規表現（合うものが複数あれば一番新しいもの）。
+#          parts：shapefile の部品（.shp・.dbf・.shx など）が zip でなく別々のリソースの所。合う部品を全部取って1つの zip にまとめる
 #   shp：zip の中の筆のポリゴンの shapefile（パスの正規表現）。epsg：座標系（.prj が無いものも平面直角座標系 IX 系）
 #   chiban：地番の列（複数なら「本番-枝番-小枝番」とつなぐ）。key：大字の列（コードか名前。列の一覧なら「_」でつなぐ：京都市の区＋町名）。
 #   oname：大字名の列。koaza：小字名の列
 #   only：この列がこの値の筆だけ使う（長岡京市の「長狭物区分」＝地番）。drop_lots：地番の頭の数字がこれに合えば地番ではない（道・水路の番号）
 #   mirror：GitHub Actions から取れないので R2 の写し（sanko/src/）から読む（手元で --fetch-only → ワークフローの import_ref で足す）
 #   names：大字名を別の表から引く（shp か csv。key・name の列。pad はコードの桁をそろえる）
+#   oaza_poly：筆に大字の列が無い所。大字の境の面の shapefile（shp。key・name の列）のうち、筆の中の点を含む面の大字にする
 #   split：1つの列に「大字コード-地番」があるもの
 #   subkey：小字のコードの列（小字ごとに地番が付き、小字の名前が無い市。小字のまとまりごとに法務省の地番区域を決める）
 #   date：データの時点（ファイルに書かれたもの。分からなければ公開日）
@@ -329,6 +331,39 @@ SOURCES = [
         "ward_field": "市区町村名",
         "ward_names": {f"京都市{w}": w for w in ("北区", "上京区", "左京区", "中京区", "東山区", "下京区", "南区", "右京区", "伏見区", "山科区", "西京区")},
     },
+    {
+        # 筆のポリゴン（Tochi_Poly）の .shp・.dbf・.shx が別々のリソース（zip でない）。.prj は無い（平面直角座標系 II 系）。
+        # データセットのライセンスは CC BY 2.1 JP。市のオープンデータ利用規約（CC BY 4.0）は「リソースに個別のライセンスが定められているものはそれによります」
+        "code": "40215", "name": "中間市", "credit": "中間市「中間市地番図（令和８年１月１日時点）」", "license": "CC BY 2.1 JP",
+        "terms": "https://creativecommons.org/licenses/by/2.1/jp/legalcode ＋ 中間市オープンデータ利用規約 https://odcs.bodik.jp/402150/tos/",
+        "fetch": {"kind": "ckan", "api": BODIK, "dataset": "402150_tibanzu", "resource": r"(?i)^tochi_poly\.(shp|shx|dbf|prj|cpg)$", "parts": True},
+        "date": "2026-01-01", "epsg": 6670, "enc": "cp932",
+        "shp": r"(?i)tochi_poly\.shp$", "chiban": ["地番"], "key": "大字名", "oname": "大字名",
+    },
+    {
+        # 公開型GIS（ひおきマップ）の地番図。.shp・.dbf・.shx・.prj が別々のリソース。大字のコードは旧町ごと（1xx 東市来町・2xx 伊集院町・
+        # 3xx 日吉町・4xx 吹上町）で、同じ名前の大字が別の旧町にある（神之川・寺脇）のでコードで分ける。本番が「無地番」「道路・公道」「水路」の面は入れない
+        "code": "46216", "name": "日置市", "credit": "日置市「地番図データ」", "license": CCBY,
+        "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja ＋ 日置市オープンデータ利用規約 https://odcs.bodik.jp/462161/tos/",
+        "fetch": {"kind": "ckan", "api": BODIK, "dataset": "462161_chibanzudata", "resource": r"(?i)^chibanzu\.(shp|shx|dbf|prj|cpg)$", "parts": True},
+        "date": "2026-11-09 公開（時点の記載なし）", "epsg": 2444, "enc": "cp932",
+        "shp": r"(?i)chibanzu\.shp$", "chiban": ["本番", "枝番"], "key": "大字コード", "oname": "大字名称", "koaza": "小字名称",
+    },
+    {
+        # G空間情報センターの伊丹市のページ。伊丹市オープンデータ利用規約（同じページの PDF。令和2年9月1日から）は、データのライセンスを
+        # 「CC BY 4.0」か「CC 0」のどちらかとしている。最新の令和８年版（2026-04-30）だけライセンスの表示が「GNU Free Documentation License」で
+        # 規約と合わないので使わず（市に確かめるまで）、CC BY の令和７年版を使う。
+        # 筆の面（筆界線。名前は線だが面）に大字の列が無いので、大字界の面で大字を決める（oaza_poly）
+        "code": "28207", "name": "伊丹市", "credit": "伊丹市「令和７年度（２０２５年度）伊丹市地番参考図（令和７年１月時点）」", "license": CCBY,
+        "terms": "伊丹市オープンデータ利用規約（G空間情報センターの伊丹市のページの PDF。CC BY 4.0。改変した情報を市が作ったように見せることは禁止）",
+        "fetch": {"kind": "ckan", "api": GSPATIAL, "dataset": "chiban_2025", "resource": r"伊丹市地番参考図"},
+        "date": "2025-01-01", "epsg": 2447, "enc": "cp932",
+        "shp": r"/筆界線\.shp$", "chiban": ["所在地地番"],
+        "oaza_poly": {"shp": r"/大字界\.shp$", "key": "大字cd", "name": "大字名"},
+        # 法務省の町に対応しない大字（「口酒井字明見」のように大字名に小字が付き、法務省の地図の地番に W1 などの切れ端の印が付いていて
+        # 地番で照らし合わせられないもの。約0.5%）の筆は、地番区域が法務省と合わないので入れない
+        "drop_unmapped": True,
+    },
 ]
 # 確かめて外したもの（--check で「入れていない市町村」として知らせない）。
 EXCLUDED = {
@@ -350,6 +385,11 @@ EXCLUDED = {
     "ニセコ町": "地番図データ（北海道オープンデータポータル）のページが、自動アクセスの対策（Incapsula）で開けない（回り込まない）",
     "水巻町": "登記地番の点と筆界の線に分かれた形で、点が引出線で筆の外に置かれる所がある。点と筆の対応を誤るおそれがあるので、今は入れない",
     "長与町": "地番の点と筆界の線に分かれた形（地番.zip・筆界.zip）。点と筆の対応を誤るおそれがあるので、今は入れない",
+    # 2026-11-16（2回目）に確かめたもの
+    "東員町": "地番参考図（CC BY 4.0）は地番の文字の点と筆の面が別々で、文字の約4分の1は引出線で筆の外に置かれている。点と筆の対応を誤るおそれがあるので、今は入れない",
+    "川西市": "G空間情報センターの地番参考図は2018年1月1日時点のもので、案内先の市のページが無くなり、市のオープンデータの一覧にも無い（古く、今の公開が確かめられないので入れない）",
+    "静岡市": "G空間情報センターの地番図は2015〜2017年のもの。新しいものは市の地図サイト（しずマップ）で利用条件に同意してから取る所にある（MICHILU は同意の先を開かない）",
+    "日野町": "地籍図は明治の地引絵図などを写した PDF（筆のデータではない）",
 }
 
 KANJI_NUM = {"〇": 0, "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
@@ -538,9 +578,57 @@ def resolve(src: dict, known: dict | None = None) -> dict:
     cand = [r for r in res if pat.search(r["name"]) or pat.search(urllib.parse.unquote(r["file"]))]
     if not cand:
         raise RuntimeError(f"{src['name']}: リソースが見つかりません（{[r['name'] for r in res]}）")
-    best = max(cand, key=lambda r: (r["modified"], r["id"]))
     page = f"{f['base']}/datasets/{f['dataset']}" if f["kind"] == "dataeye" else f"{f['api'].replace('/api/3/action', '')}/dataset/{f['dataset']}"
+    if f.get("parts"):
+        return {**shapefile_parts(src, cand), "title": info.get("title", ""), "org": info.get("org", ""), "page": page}
+    best = max(cand, key=lambda r: (r["modified"], r["id"]))
     return {**best, "title": info.get("title", ""), "org": info.get("org", ""), "page": page}
+
+
+def part_name(r: dict) -> str:
+    """リソースのファイル名（URL の最後。展開先の外を指さないよう、ディレクトリを外す）"""
+    return os.path.basename(urllib.parse.unquote(r["file"]).replace("\\", "/"))
+
+
+def shapefile_parts(src: dict, cand: list[dict]) -> dict:
+    """shapefile の部品（.shp・.dbf・.shx・.prj など）が zip でなく別々のリソースで置かれている所（日置市・中間市）。
+    拡張子ごとに一番新しいものを取り、id・URL は .shp のもの、更新日は部品の一番新しい日、大きさは合計にする（parts に部品の一覧）"""
+    by_ext: dict[str, dict] = {}
+    for r in cand:
+        ext = os.path.splitext(part_name(r))[1].lower()
+        if ext and (ext not in by_ext or (r["modified"], r["id"]) > (by_ext[ext]["modified"], by_ext[ext]["id"])):
+            by_ext[ext] = r
+    missing = {".shp", ".shx", ".dbf"} - set(by_ext)
+    if missing:
+        raise RuntimeError(f"{src['name']}: shapefile の部品が足りません（{sorted(missing)}。ある部品：{sorted(part_name(r) for r in cand)}）")
+    parts = sorted(by_ext.values(), key=part_name)
+    shp = by_ext[".shp"]
+    return {
+        **shp,
+        "file": " ".join(part_name(r) for r in parts),
+        "modified": max(r["modified"] for r in parts),
+        "size": sum(r["size"] for r in parts),
+        "parts": [{"file": part_name(r), "url": r["url"], "size": r["size"]} for r in parts],
+    }
+
+
+def fetch_archive(meta: dict, path: str) -> None:
+    """公開ファイルを path（zip か 7z）に取る。部品が別々のリソースの所（parts）は、部品を取って1つの zip にまとめる"""
+    if not meta.get("parts"):
+        download(meta["url"], path)
+        return
+    tmp = path + ".parts"
+    os.makedirs(tmp, exist_ok=True)
+    for p in meta["parts"]:
+        name = os.path.basename(p["file"])
+        if not name or name in (".", ".."):
+            raise RuntimeError(f"部品の名前が読めません: {p['file']!r}")
+        download(p["url"], os.path.join(tmp, name))
+    with zipfile.ZipFile(path + ".zip-tmp", "w", zipfile.ZIP_DEFLATED) as z:
+        for p in meta["parts"]:
+            z.write(os.path.join(tmp, os.path.basename(p["file"])), os.path.basename(p["file"]))
+    os.replace(path + ".zip-tmp", path)
+    shutil.rmtree(tmp)
 
 
 def known_files(source_path: str | None, work: str) -> dict:
@@ -555,6 +643,7 @@ def known_files(source_path: str | None, work: str) -> dict:
                 known[code] = {
                     "id": rid, "name": "", "file": e["file"], "modified": e["modified"], "size": e["size"],
                     "license": e.get("portal_license", ""), "terms": e.get("terms", ""), "url": e["url"], "page": e["page"],
+                    **({"parts": e["parts"]} if e.get("parts") else {}),
                 }
     imp = os.path.join(work, "src", "import.json")
     if os.path.exists(imp):
@@ -573,7 +662,7 @@ def fetch_only(srcs: list[dict], work: str) -> None:
         meta = resolve(s)
         dl = archive_path(work, s["code"], meta)
         if not is_archive(dl):
-            download(meta["url"], dl)
+            fetch_archive(meta, dl)
         metas[s["code"]] = meta
         log(f"{s['code']} {s['name']}: {os.path.basename(dl)}（{meta['file']} {meta['modified']}・{os.path.getsize(dl)} バイト）")
     with open(path, "w", encoding="utf-8") as f:
@@ -859,6 +948,44 @@ def read_lines_mode(src: dict, root: str) -> tuple[list, list[str], list[str], l
     return geoms, chibans, keys, onames, koazas
 
 
+def oaza_by_polygon(src: dict, root: str, geoms: list, chibans: list[str], keys: list[str], onames: list[str]) -> None:
+    """筆に大字の列が無い所（伊丹市）：大字の境の面（oaza_poly の shapefile。同じ座標系）のうち、筆の中の点を含む面がちょうど1つなら、
+    その大字のコードを鍵、名前を大字名にする（keys・onames を書き換える）。含む面が無い・2つ以上の筆は大字が分からないので、地番を消して入れない"""
+    sp = src["oaza_poly"]
+    r = reader(find(root, sp["shp"]), src["enc"])
+    names = [f[0] for f in r.fields[1:]]
+    ik, iname = names.index(sp["key"]), names.index(sp["name"])
+    polys, codes, name_of = [], [], {}
+    for shp, rec in shape_records(r):
+        if shp is None or not shp.points:
+            continue
+        try:
+            g = shape(shp.__geo_interface__)
+        except Exception:
+            continue
+        polys.append(g if g.is_valid else shapely.make_valid(g))
+        c = str(rec[ik]).strip()
+        codes.append(c)
+        name_of[c] = str(rec[iname]).strip()
+    idx = [i for i, (g, c) in enumerate(zip(geoms, chibans)) if c and g is not None and not g.is_empty]
+    pts = [(geoms[i] if geoms[i].is_valid else shapely.make_valid(geoms[i])).representative_point() for i in idx]
+    hits: dict[int, set] = collections.defaultdict(set)
+    if polys and pts:
+        qi, ti = STRtree(polys).query(np.array(pts, dtype=object), predicate="within")
+        for a, b in zip(qi, ti):
+            hits[int(a)].add(codes[int(b)])
+    lost = 0
+    for j, i in enumerate(idx):
+        h = hits.get(j, set())
+        if len(h) == 1:
+            c = next(iter(h))
+            keys[i], onames[i] = c, name_of[c]
+        else:
+            chibans[i] = ""
+            lost += 1
+    log(f"  大字の面 {len(polys)}（{len(name_of)} 大字）で筆の大字を決めた：{len(idx) - lost} 筆（大字の面に入らない・2つ以上に入る筆 {lost} は入れない）")
+
+
 def shape_records(r):
     """図形と属性を1つずつ。図形が空・壊れたもの（京都市の試作データに、点の無いポリゴンがある。pyshp はそこで止まる）は None"""
     for i in range(len(r)):
@@ -909,7 +1036,10 @@ def read_muni(src: dict, root: str) -> dict:
                     continue
                 key, ch = m.group(1), norm_chiban([m.group(2)])
             else:
-                key = "_".join(str(rec[c]).strip() for c in src["key"]) if isinstance(src["key"], list) else str(rec[src["key"]]).strip()
+                if src.get("oaza_poly"):
+                    key = ""  # 大字の面（oaza_poly）で、あとで決める
+                else:
+                    key = "_".join(str(rec[c]).strip() for c in src["key"]) if isinstance(src["key"], list) else str(rec[src["key"]]).strip()
                 ch = norm_chiban([rec[c] for c in src["chiban"]])
             # 地番の面だけ（長岡京市の「長狭物区分」：道路・水路などの面にも 96666 のような番号が付いている）
             if src.get("only") and str(rec[src["only"]["field"]]).strip() not in src["only"]["values"]:
@@ -950,6 +1080,8 @@ def read_muni(src: dict, root: str) -> dict:
             keys.append(key)
             onames.append(nm)
             koazas.append(koaza)
+        if src.get("oaza_poly"):
+            oaza_by_polygon(src, root, geoms, chibans, keys, onames)
     keep = [i for i, (g, c) in enumerate(zip(geoms, chibans)) if c and g is not None and not g.is_empty]
     geoms = [geoms[i] for i in keep]
     geoms = [g if g.is_valid else shapely.make_valid(g) for g in geoms]
@@ -1011,7 +1143,7 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
     dl = archive_path(work, code, meta)
     os.makedirs(os.path.dirname(dl), exist_ok=True)
     if not is_archive(dl):
-        download(meta["url"], dl)
+        fetch_archive(meta, dl)
     root = os.path.join(work, "src", f"{code}-{meta['id']}")
     if not os.path.isdir(root):
         extract(dl, root + ".tmp")
@@ -1407,6 +1539,7 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         "file": meta["file"],
         "modified": meta["modified"],
         "size": meta["size"],
+        **({"parts": meta["parts"]} if meta.get("parts") else {}),
         "date": src["date"],
         "moj_year": moj_year,
         "parcels_raw": muni["raw"],
@@ -1512,6 +1645,20 @@ def run_one(src: dict, part: str, *opts) -> dict:
         raise RuntimeError(f"{type(e).__name__}: {e}") from None
 
 
+def license_families(lics: list[str]) -> str:
+    """地図の出典に書くライセンスの種類（「PDL1.0／CC BY 4.0／CC BY 2.1 JP」。版の書かれていない CC BY は「CC BY」）"""
+    fam = []
+    if any("公共データ利用規約" in s or "PDL" in s for s in lics):
+        fam.append("PDL1.0")
+    if any("4.0" in s for s in lics):
+        fam.append("CC BY 4.0")
+    if any("2.1" in s for s in lics):
+        fam.append("CC BY 2.1 JP")
+    if any(s.startswith("CC BY") and not re.search(r"\d\.\d", s.split("（")[0]) for s in lics):
+        fam.append("CC BY")
+    return "／".join(fam)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="公開ファイルが新しくなったかだけ調べる（GITHUB_OUTPUT があれば changed= を書く）")
@@ -1579,7 +1726,7 @@ def main() -> None:
     if not results:
         sys.exit("1つも作れませんでした")
     credits = "、".join(results[c]["credit"] for c in results)
-    attribution = f"出典：{credits}（いずれも市町村のオープンデータ。PDL1.0／CC BY 4.0）を MICHILU が加工して作成。課税用の参考図で、登記の地番・筆の形と違うことがある"
+    attribution = f"出典：{credits}（いずれも市町村のオープンデータ。{license_families([results[c]['license'] for c in results])}）を MICHILU が加工して作成。課税用の参考図で、登記の地番・筆の形と違うことがある"
     stamp = datetime.date.today().strftime("%Y%m%d")
     cmd = [
         a.tippecanoe, "-o", a.out, "--force", "-l", "sanko", f"-Z{a.minzoom}", f"-z{a.maxzoom}", "-P",
