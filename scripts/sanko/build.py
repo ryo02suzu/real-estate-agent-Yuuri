@@ -215,6 +215,8 @@ SOURCES = [
         "date": "2026-01-01", "epsg": 6675, "enc": "cp932",
         "shp": r"(?i)/Tochi\.shp$", "chiban": ["地番"], "key": "町字名", "oname": "町字名",
         "split_name": {"shp": r"大字界\.shp$", "field": "AZANAME"},
+        # 法務省の地番区域が大字だけ（「深見町」）の町で、市の図の小字（「木戸」）を地番区域に残す。国土地理院の町名は「深見町木戸」
+        "keep_koaza": True,
     },
     {
         "code": "27203", "name": "豊中市", "credit": "豊中市「地番参考図（地図情報とよなか）」", "license": CCBY, "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja ＋ 豊中市オープンデータ利用規約（CC BY 4.0 に準拠）",
@@ -355,6 +357,8 @@ KANJI_NUM = {"〇": 0, "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 
 CHOME_ONLY = re.compile(r"(?:[0-9]+|[〇一二三四五六七八九十]+)丁目")
 # 同じ地番区域・地番の筆がこれより離れた2か所以上にあれば、違う土地に同じ地番を付けたおそれがあるので入れない（m）
 SPLIT_GAP_M = 100.0
+# 同じ名前の町の筆を、離れた区画のまとまりに分けるときの間（m）。京都市の同じ区の同じ名前の町は、ふつう数百 m 以上離れている
+PAREN_GAP_M = 30.0
 CHIBAN_RE = re.compile(r"^\d+(-\d+)*$")
 # 西東京市（日本測地系・平面直角座標系 IX 系）→ 世界測地系（JGD2011 の IX 系として扱う）。Tokyo to JGD2000 (1)（EPSG:15483）の3パラメータ
 TOKYO_PIPELINE = (
@@ -978,6 +982,26 @@ def merge(geoms: list):
 # ---- 対応づけ ----
 
 
+def near_groups(gs: list, gap: float) -> list[list[int]]:
+    """図形を、gap（m）より離れていないもののつながりに分ける（番号の一覧の一覧。大きい順）"""
+    parent = list(range(len(gs)))
+
+    def root_of(a: int) -> int:
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    if len(gs) > 1:
+        qa, qb = STRtree(gs).query(gs, predicate="dwithin", distance=gap)
+        for a, b in zip(qa, qb):
+            parent[root_of(int(a))] = root_of(int(b))
+    out: dict[int, list[int]] = collections.defaultdict(list)
+    for a in range(len(gs)):
+        out[root_of(a)].append(a)
+    return sorted(out.values(), key=len, reverse=True)
+
+
 def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: bool, drop_unmapped: bool, known: dict, fo) -> dict:
     code = src["code"]
     t0 = time.time()
@@ -1033,8 +1057,11 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         if CHIBAN_RE.match(ch) and parts[0] in cities:
             kuiki_ch[parts].add(ch)
     town_by_name: dict[str, list] = collections.defaultdict(list)
+    # 括弧を除いた名前 → 町（京都市の同じ区の同じ名前の町は、法務省では通り名を括弧で付けて分ける）
+    town_by_base: dict[str, list] = collections.defaultdict(list)
     for t in town_ch:
         town_by_name[norm_town(t[1] + t[2])].append(t)
+        town_by_base[re.sub(r"\(.*?\)", "", norm_town(t[1] + t[2]))].append(t)
     log(f"  {code} 法務省 {moj_year}: 筆 {len(recs)}（公共座標 {len(moj['pub_geom'])}）・町 {len(town_ch)}")
 
     # 1. 公共座標の筆と重ねる（内側の点がその筆に入り、地番が同じ）
@@ -1076,24 +1103,47 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         by_key[k].append(i)
     decide: dict[str, tuple] = {}
     second: dict[str, list] = {}
+    # 同じ区に、法務省では括弧の付いた同じ名前の町が2つ以上ある大字（京都市の「鍛冶屋町（西洞院通正面）」と「鍛冶屋町（堺町通万寿寺）」。
+    # 市町村の図は括弧なしの「鍛冶屋町」）：離れた区画のまとまりごとに、地番の集まりで町を決める（paren_pick：筆の番号 → 町）
+    paren_multi: dict[str, list] = {}
+    paren_pick: dict[int, tuple] = {}
     methods = collections.Counter()
     for k, idx in by_key.items():
         A = {muni["chiban"][i] for i in idx}
+        # 区のある市は、市町村の図に書かれた区の町だけから選ぶ（同じ名前の町がほかの区にある。前は、名前が1つだけ合う別の区の町に当てていた）
+        ward = collections.Counter(muni["ward"][i] for i in idx).most_common(1)[0][0] if muni.get("ward") else ""
+        in_ward = (lambda t: t[0].endswith(ward)) if ward else (lambda t: True)
         cnt = collections.Counter()
         for c in A:
             for t in inv.get(c, ()):
-                cnt[t] += 1
+                if in_ward(t):
+                    cnt[t] += 1
         score = {t: v / len(A) for t, v in cnt.items()}
         ranked = sorted(score, key=lambda t: -score[t])
         # 地番の集まりの重なり（Jaccard）。小さな町の地番（1〜数百）は大きな町にもあるので、含まれる割合だけでは決まらないことがある
         jac = {t: v / (len(A) + len(town_ch[t]) - v) for t, v in cnt.items()}
         jr = sorted(jac, key=lambda t: -jac[t])
         nm = collections.Counter(muni["name"][i] for i in idx).most_common(1)[0][0]
-        named = town_by_name.get(norm_town(nm), []) if nm else []
-        # 区のある市：同じ名前の町がほかの区にもあれば、市町村の図に書かれた区の町にする
-        ward = collections.Counter(muni["ward"][i] for i in idx).most_common(1)[0][0] if muni.get("ward") else ""
-        if ward and len(named) > 1:
-            named = [t for t in named if t[0].endswith(ward)]
+        named = [t for t in town_by_name.get(norm_town(nm), []) if in_ward(t)] if nm else []
+        # 括弧を除くと同じ名前になる、同じ区の町（京都市の「下丸屋町（小川通竹屋町）」「下丸屋町（河原町通二条）」、括弧なしの「上之町」と「上之町（大宮通木津屋橋）」）
+        pn = [t for t in town_by_base.get(norm_town(nm), []) if in_ward(t)] if nm else []
+        if not named and len(pn) == 1:
+            named = pn
+        if len(pn) > 1:
+            # 市町村の図では同じ名前の町の筆が1つの名前にまとまっている。離れた区画のまとまり（PAREN_GAP_M より離れていない筆のつながり）ごとに、
+            # 地番が法務省のどの町の地番の集まりに入っているかで町を決める（京都市は同じ名前の町どうしで地番がほとんど重ならない）。
+            # 決めきれないまとまり（一番合う町が 6 割未満か、二番目が一番の半分より多い）の筆は入れない
+            paren_multi[k] = pn
+            for grp in near_groups([muni["geom"][i] for i in idx], PAREN_GAP_M):
+                lots = [muni["chiban"][idx[a]] for a in grp]
+                sc = sorted(((sum(1 for c in lots if c in town_ch[t2]) / len(lots), t2) for t2 in pn), key=lambda x: -x[0])
+                if sc[0][0] >= 0.6 and sc[1][0] <= sc[0][0] / 2:
+                    for a in grp:
+                        paren_pick[idx[a]] = sc[0][1]
+                    methods["paren"] += len(grp)
+                else:
+                    methods["paren_undecided"] += len(grp)
+            continue
         t_name = named[0] if len(named) == 1 else None
         v = votes.get(k)
         choice = None
@@ -1164,6 +1214,11 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
             key_pick[k] = cands[0]
     if key_pick:
         log(f"  {code} 大字＋小字の名前で地番区域が決まった町 {len(key_pick)}（筆 {sum(len(by_key[k]) for k in key_pick)}）")
+    if paren_multi:
+        log(
+            f"  {code} 同じ区に同じ名前の町がある名前 {len(paren_multi)}：離れた区画のまとまりごとに町を決めた筆 {methods['paren']}"
+            f"・決められず入れない筆 {methods['paren_undecided']}"
+        )
 
     # 小字ごとに地番が付く町（法務省のデータで、同じ地番が別々の小字にある地番が 2% 以上）。小字の分からない筆に、町までの地番区域を付けない
     per_koaza = {t for t, chs in town_ch.items() if sum(1 for cn in chs.values() if len(cn) > 1) >= 0.02 * len(chs)}
@@ -1176,6 +1231,7 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
     groups: dict[tuple, list] = collections.defaultdict(list)
     stats = collections.Counter()
     amb_town: collections.Counter = collections.Counter()  # 小字が決まらない筆の多い町（確かめ用の記録）
+    appended: dict[str, str] = {}  # 市町村の図の小字を足した地番区域 → 足す前（法務省の地番区域）
     amb_ex: dict[str, list] = collections.defaultdict(list)
     for i in range(n):
         if covered[i]:
@@ -1183,6 +1239,12 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
             continue
         k, ch = muni["key"][i], muni["chiban"][i]
         t = decide.get(k)
+        if k in paren_multi:
+            t = paren_pick.get(i)
+            if t is None:
+                # どの町の筆か決められないまとまり（上の paren_multi）なので入れない
+                stats["ambiguous"] += 1
+                continue
         kuiki = None
         K = key_pick.get(k) or sub_pick.get((k, muni["sub"][i]))
         if K is not None:
@@ -1234,6 +1296,27 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
                     else:
                         # 法務省のこの町に無い地番で、小字が分からない（地番は町ごとに付く）：小字を書かずに、町（大字・丁目）までの地番区域にする
                         kuiki = f"{t[0]}_{t[1]}_{t[2]}__"
+                # 法務省の地番区域に小字が無く（「豊田市_深見町___」）、市町村の図の小字（「深見町木戸」の木戸）が法務省のこの町の小字に無い：
+                # 小字を地番区域に残す（keep_koaza の市だけ。法務省のこの町にある小字なら、上で法務省の地番区域に当てている）。国土地理院の町名は
+                # 小字まで付く（「深見町木戸」）ことがあり、大字だけの地番区域では住所の町と照らし合わせられない（小字を残すと、大字でも小字まででも当たる）。
+                # 小字の欄に町の名前ごと入る市（福山市の「加茂町字北山」「坪生町六丁目」）があるので、数字だけ・大字の名前を含む・丁目を含む小字は残さない
+                kp = kuiki.split("_")
+                kz = re.sub(r"\s", "", unicodedata.normalize("NFKC", muni["koaza"][i])).removeprefix("字") if koaza else ""
+                if (
+                    src.get("keep_koaza")
+                    and kz
+                    and not kz_town
+                    and len(kp) == 5
+                    and not kp[2]
+                    and not kp[3]
+                    and not re.fullmatch(r"[0-9\-ー・.]+", kz)
+                    and kp[1] not in kz
+                    and "丁目" not in kz
+                ):
+                    kp[3] = kz
+                    kuiki = "_".join(kp)
+                    appended[kuiki] = "_".join(kp[:3] + ["", kp[4]])
+                    stats["koaza_kept"] += 1
             stats["mapped"] += 1
         else:
             if drop_unmapped or src.get("drop_unmapped"):
@@ -1263,8 +1346,15 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
     # 同じ地番区域・地番の筆が、SPLIT_GAP_M より離れた2か所以上にあるもの（評価分割の切れ端ではなく、違う土地に同じ地番を
     # 付けたおそれ。小字ごとに地番が付く所で小字が分からない・市町村の図の地番の誤りなど）は、どれが正しいか決められないので入れない
     split_dropped, split_examples = 0, []
-    for gk in [gk for gk, idx in groups.items() if len(idx) > 1]:
-        gs = [muni["geom"][i] for i in groups[gk]]
+    # 小字を足した地番区域は、足す前の地番区域（法務省の地番区域。地番はその中で1つ）でまとめて確かめる
+    by_base: dict[tuple, list] = collections.defaultdict(list)
+    for gk in groups:
+        by_base[(appended.get(gk[0], gk[0]),) + gk[1:]].append(gk)
+    for gks in by_base.values():
+        idx_all = [i for gk in gks for i in groups[gk]]
+        if len(idx_all) < 2:
+            continue
+        gs = [muni["geom"][i] for i in idx_all]
         parent = list(range(len(gs)))
 
         def root_of(a: int) -> int:
@@ -1279,8 +1369,9 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         if len({root_of(a) for a in range(len(gs))}) > 1:
             split_dropped += len(gs)
             if len(split_examples) < 5:
-                split_examples.append(f"{gk[0]} {gk[1]}（{len(gs)}筆）")
-            del groups[gk]
+                split_examples.append(f"{gks[0][0]} {gks[0][1]}（{len(gs)}筆）")
+            for gk in gks:
+                del groups[gk]
     if split_dropped:
         log(f"  {code} 同じ地番区域・地番が {SPLIT_GAP_M:.0f}m より離れた2か所以上にある筆 {split_dropped} を入れない（例：{'、'.join(split_examples)}）")
 
@@ -1338,6 +1429,7 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         f"地番区域 {len(out_kuiki)} 種のうち法務省にある {res['kuiki_in_moj']:.1%}・"
         f"地番区域と地番が法務省にある {res['exists']:.1%}・平行移動 {res['shift_m']}m（同じ地番の筆 {len(pairs)}、ずれの中央値 {res['residual_m']}m）・"
         f"入れない筆：小字が決まらない {stats['ambiguous']}・町名なし {stats['dropped_noname']}・離れた同じ地番 {split_dropped}"
+        + (f"・市の図の小字を地番区域に残した筆 {stats['koaza_kept']}" if stats["koaza_kept"] else "")
     )
     return res
 
