@@ -1,10 +1,10 @@
 {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/sanko/sanko-20261116-1022.pmtiles",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/sanko/sanko-20261116-1156.pmtiles",
   "built": "2026-11-16",
-  "file": "sanko-20261116-1022.pmtiles",
-  "bytes": 515233395,
+  "file": "sanko-20261116-1156.pmtiles",
+  "bytes": 593916831,
   "layer": "sanko",
-  "attribution": "出典：市川市「地籍図（地番図）」、越谷市「地番図データ」、川越市「地番図データ」、前橋市「地籍図(地番現況図)」、久喜市「地番現況図（地番図データ）」、深谷市「地番参考図」、秩父市「地番参考図」、小鹿野町「地番参考図データ」、横瀬町「地番参考図データ」、小川町「地番参考図データ」、上里町「地番参考図（地番図データ）」、入間市「地番図情報」、我孫子市「地番参考図」、浦安市「浦安市地図データ（筆－形状）」、西東京市「地番図」、国立市「地番図」、東村山市「地形図（筆界）」、豊田市「地番参考図」、豊中市「地番参考図（地図情報とよなか）」、福山市「福山市地番図データ」、長岡京市「地番参考図」、伊賀市「地番図データ」、大牟田市「地番参考図」、高島市「地番図」、熊本市「熊本市_地番参考図」、浜松市「浜松市地番図」、直方市「直方市地番対応図」（いずれも市町村のオープンデータ。PDL1.0／CC BY 4.0）を MICHILU が加工して作成。課税用の参考図で、登記の地番・筆の形と違うことがある",
+  "attribution": "出典：市川市「地籍図（地番図）」、越谷市「地番図データ」、川越市「地番図データ」、前橋市「地籍図(地番現況図)」、久喜市「地番現況図（地番図データ）」、深谷市「地番参考図」、秩父市「地番参考図」、小鹿野町「地番参考図データ」、横瀬町「地番参考図データ」、小川町「地番参考図データ」、上里町「地番参考図（地番図データ）」、入間市「地番図情報」、我孫子市「地番参考図」、浦安市「浦安市地図データ（筆－形状）」、西東京市「地番図」、国立市「地番図」、東村山市「地形図（筆界）」、豊田市「地番参考図」、豊中市「地番参考図（地図情報とよなか）」、福山市「福山市地番図データ」、長岡京市「地番参考図」、伊賀市「地番図データ」、大牟田市「地番参考図」、高島市「地番図」、熊本市「熊本市_地番参考図」、仙台市「仙台市地番図（参考図）データ」、浜松市「浜松市地番図」、直方市「直方市地番対応図」、京都市「京都市固定資産税（土地）地番図データ」（国土交通省「土地境界データ(地番現況図) 試作データ」で共通の仕様に変換されたもの）（いずれも市町村のオープンデータ。PDL1.0／CC BY 4.0）を MICHILU が加工して作成。課税用の参考図で、登記の地番・筆の形と違うことがある",
   "sources": {
     "12203": {
       "name": "市川市",
@@ -21,16 +21,19 @@
       "date": "2026-04-01（更新日）",
       "moj_year": "2026",
       "parcels_raw": 245240,
-      "parcels_numbered": 240161,
+      "parcels_numbered": 240122,
       "public_overlap_dropped": 8203,
-      "kept": 231958,
-      "features": 231674,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 558,
+      "kept": 231919,
+      "features": 231361,
       "mapped": 1.0,
-      "exists": 0.9937,
+      "exists": 0.9938,
       "kuiki_distinct": 236,
       "kuiki_in_moj": 1.0,
       "methods": {
-        "name": 205726,
+        "name": 205687,
         "spatial": 30451,
         "chiban": 3984
       },
@@ -43,7 +46,7 @@
         0.84,
         0.83
       ],
-      "seconds": 115
+      "seconds": 162
     },
     "11222": {
       "name": "越谷市",
@@ -62,11 +65,14 @@
       "parcels_raw": 272955,
       "parcels_numbered": 267903,
       "public_overlap_dropped": 15703,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 874,
       "kept": 252200,
-      "features": 251714,
+      "features": 251288,
       "mapped": 1.0,
       "exists": 0.9955,
-      "kuiki_distinct": 194,
+      "kuiki_distinct": 193,
       "kuiki_in_moj": 1.0,
       "methods": {
         "name": 237605,
@@ -82,7 +88,7 @@
         0.47,
         0.44
       ],
-      "seconds": 85
+      "seconds": 137
     },
     "11201": {
       "name": "川越市",
@@ -101,11 +107,14 @@
       "parcels_raw": 348837,
       "parcels_numbered": 337994,
       "public_overlap_dropped": 104027,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 3090,
       "kept": 233967,
-      "features": 232218,
+      "features": 230714,
       "mapped": 1.0,
       "exists": 0.9724,
-      "kuiki_distinct": 236,
+      "kuiki_distinct": 235,
       "kuiki_in_moj": 1.0,
       "methods": {
         "spatial": 152508,
@@ -122,7 +131,7 @@
         0.17,
         0.17
       ],
-      "seconds": 152
+      "seconds": 174
     },
     "10201": {
       "name": "前橋市",
@@ -141,8 +150,11 @@
       "parcels_raw": 452497,
       "parcels_numbered": 432673,
       "public_overlap_dropped": 234325,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 1344,
       "kept": 198348,
-      "features": 197655,
+      "features": 196990,
       "mapped": 1.0,
       "exists": 0.9861,
       "kuiki_distinct": 263,
@@ -160,7 +172,7 @@
         0.15,
         0.15
       ],
-      "seconds": 176
+      "seconds": 292
     },
     "11232": {
       "name": "久喜市",
@@ -179,8 +191,11 @@
       "parcels_raw": 239401,
       "parcels_numbered": 233052,
       "public_overlap_dropped": 25016,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 2612,
       "kept": 208036,
-      "features": 206405,
+      "features": 205144,
       "mapped": 1.0,
       "exists": 0.9868,
       "kuiki_distinct": 143,
@@ -199,7 +214,7 @@
         0.53,
         0.53
       ],
-      "seconds": 114
+      "seconds": 135
     },
     "11218": {
       "name": "深谷市",
@@ -218,8 +233,11 @@
       "parcels_raw": 235503,
       "parcels_numbered": 227050,
       "public_overlap_dropped": 62611,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 2117,
       "kept": 164439,
-      "features": 163287,
+      "features": 162239,
       "mapped": 0.9999,
       "exists": 0.985,
       "kuiki_distinct": 127,
@@ -238,7 +256,7 @@
         0.56,
         0.43
       ],
-      "seconds": 125
+      "seconds": 141
     },
     "11207": {
       "name": "秩父市",
@@ -255,17 +273,20 @@
       "date": "2026-01-01",
       "moj_year": "2026",
       "parcels_raw": 231150,
-      "parcels_numbered": 219033,
+      "parcels_numbered": 219027,
       "public_overlap_dropped": 9377,
-      "kept": 209656,
-      "features": 207513,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 3574,
+      "kept": 209650,
+      "features": 205807,
       "mapped": 1.0,
       "exists": 0.9855,
       "kuiki_distinct": 65,
       "kuiki_in_moj": 1.0,
       "methods": {
         "chiban": 163648,
-        "spatial": 55385
+        "spatial": 55379
       },
       "pairs": 9242,
       "shift_m": [
@@ -276,7 +297,7 @@
         0.3,
         0.08
       ],
-      "seconds": 122
+      "seconds": 127
     },
     "11365": {
       "name": "小鹿野町",
@@ -295,8 +316,11 @@
       "parcels_raw": 85361,
       "parcels_numbered": 79862,
       "public_overlap_dropped": 8520,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 1590,
       "kept": 71342,
-      "features": 70450,
+      "features": 69662,
       "mapped": 1.0,
       "exists": 0.9717,
       "kuiki_distinct": 12,
@@ -314,7 +338,7 @@
         0.01,
         0.01
       ],
-      "seconds": 53
+      "seconds": 86
     },
     "11361": {
       "name": "横瀬町",
@@ -333,8 +357,11 @@
       "parcels_raw": 36027,
       "parcels_numbered": 34684,
       "public_overlap_dropped": 1167,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 49,
       "kept": 33517,
-      "features": 33441,
+      "features": 33417,
       "mapped": 1.0,
       "exists": 0.9947,
       "kuiki_distinct": 2,
@@ -352,7 +379,7 @@
         0.0,
         0.0
       ],
-      "seconds": 26
+      "seconds": 33
     },
     "11343": {
       "name": "小川町",
@@ -371,8 +398,11 @@
       "parcels_raw": 73973,
       "parcels_numbered": 65797,
       "public_overlap_dropped": 36856,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 379,
       "kept": 28941,
-      "features": 28748,
+      "features": 28560,
       "mapped": 1.0,
       "exists": 0.9802,
       "kuiki_distinct": 36,
@@ -390,7 +420,7 @@
         0.02,
         0.02
       ],
-      "seconds": 34
+      "seconds": 42
     },
     "11385": {
       "name": "上里町",
@@ -409,8 +439,11 @@
       "parcels_raw": 50000,
       "parcels_numbered": 48350,
       "public_overlap_dropped": 36236,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 397,
       "kept": 12114,
-      "features": 11905,
+      "features": 11707,
       "mapped": 1.0,
       "exists": 0.9577,
       "kuiki_distinct": 17,
@@ -429,7 +462,7 @@
         0.12,
         0.12
       ],
-      "seconds": 39
+      "seconds": 31
     },
     "11225": {
       "name": "入間市",
@@ -448,10 +481,13 @@
       "parcels_raw": 107842,
       "parcels_numbered": 105747,
       "public_overlap_dropped": 79714,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 72,
       "kept": 26033,
-      "features": 25996,
+      "features": 25960,
       "mapped": 1.0,
-      "exists": 0.9443,
+      "exists": 0.9442,
       "kuiki_distinct": 82,
       "kuiki_in_moj": 1.0,
       "methods": {
@@ -468,7 +504,7 @@
         0.34,
         0.2
       ],
-      "seconds": 54
+      "seconds": 75
     },
     "12222": {
       "name": "我孫子市",
@@ -487,8 +523,11 @@
       "parcels_raw": 94440,
       "parcels_numbered": 94024,
       "public_overlap_dropped": 3355,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 317,
       "kept": 90669,
-      "features": 90497,
+      "features": 90342,
       "mapped": 1.0,
       "exists": 0.989,
       "kuiki_distinct": 126,
@@ -506,7 +545,7 @@
         0.5,
         0.11
       ],
-      "seconds": 37
+      "seconds": 53
     },
     "12227": {
       "name": "浦安市",
@@ -525,12 +564,15 @@
       "parcels_raw": 33935,
       "parcels_numbered": 33595,
       "public_overlap_dropped": 9408,
-      "kept": 24187,
-      "features": 24185,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 1,
+      "split_dropped": 3,
+      "kept": 24186,
+      "features": 24183,
       "mapped": 1.0,
       "exists": 0.9936,
-      "kuiki_distinct": 55,
-      "kuiki_in_moj": 0.9818,
+      "kuiki_distinct": 54,
+      "kuiki_in_moj": 1.0,
       "methods": {
         "spatial": 14587,
         "name": 19007,
@@ -545,7 +587,7 @@
         0.0,
         0.0
       ],
-      "seconds": 16
+      "seconds": 17
     },
     "13229": {
       "name": "西東京市",
@@ -564,8 +606,11 @@
       "parcels_raw": 91755,
       "parcels_numbered": 90383,
       "public_overlap_dropped": 164,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 34,
       "kept": 90219,
-      "features": 90197,
+      "features": 90180,
       "mapped": 1.0,
       "exists": 0.9964,
       "kuiki_distinct": 114,
@@ -583,7 +628,7 @@
         1.02,
         0.9
       ],
-      "seconds": 46
+      "seconds": 61
     },
     "13215": {
       "name": "国立市",
@@ -602,8 +647,11 @@
       "parcels_raw": 36431,
       "parcels_numbered": 34184,
       "public_overlap_dropped": 342,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 16,
       "kept": 33842,
-      "features": 33833,
+      "features": 33825,
       "mapped": 1.0,
       "exists": 0.9963,
       "kuiki_distinct": 32,
@@ -621,7 +669,7 @@
         0.25,
         0.25
       ],
-      "seconds": 21
+      "seconds": 29
     },
     "13213": {
       "name": "東村山市",
@@ -640,8 +688,11 @@
       "parcels_raw": 81101,
       "parcels_numbered": 79926,
       "public_overlap_dropped": 125,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 128,
       "kept": 79801,
-      "features": 79734,
+      "features": 79671,
       "mapped": 1.0,
       "exists": 0.9951,
       "kuiki_distinct": 53,
@@ -659,7 +710,7 @@
         0.48,
         0.24
       ],
-      "seconds": 34
+      "seconds": 48
     },
     "23211": {
       "name": "豊田市",
@@ -678,17 +729,19 @@
       "parcels_raw": 913861,
       "parcels_numbered": 878476,
       "public_overlap_dropped": 62952,
-      "kept": 815524,
-      "features": 722662,
-      "mapped": 0.8457,
-      "exists": 0.8228,
-      "kuiki_distinct": 6177,
-      "kuiki_in_moj": 0.9822,
+      "ambiguous_dropped": 3700,
+      "noname_dropped": 0,
+      "split_dropped": 3755,
+      "kept": 811824,
+      "features": 796622,
+      "mapped": 0.9998,
+      "exists": 0.9613,
+      "kuiki_distinct": 6866,
+      "kuiki_in_moj": 0.9994,
       "methods": {
-        "name": 445732,
-        "spatial": 289653,
-        "none": 138016,
-        "chiban": 5075
+        "name": 574620,
+        "spatial": 303723,
+        "none": 133
       },
       "pairs": 61072,
       "shift_m": [
@@ -699,7 +752,7 @@
         0.0,
         0.0
       ],
-      "seconds": 692
+      "seconds": 916
     },
     "27203": {
       "name": "豊中市",
@@ -716,18 +769,21 @@
       "date": "2025-01-01",
       "moj_year": "2026",
       "parcels_raw": 124269,
-      "parcels_numbered": 124269,
-      "public_overlap_dropped": 6179,
-      "kept": 118090,
-      "features": 116565,
-      "mapped": 0.9998,
-      "exists": 0.9807,
-      "kuiki_distinct": 336,
-      "kuiki_in_moj": 0.997,
+      "parcels_numbered": 122706,
+      "public_overlap_dropped": 6159,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 12,
+      "split_dropped": 384,
+      "kept": 116535,
+      "features": 116074,
+      "mapped": 1.0,
+      "exists": 0.9939,
+      "kuiki_distinct": 335,
+      "kuiki_in_moj": 1.0,
       "methods": {
-        "chiban": 106888,
-        "spatial": 17359,
-        "none": 22
+        "chiban": 105560,
+        "spatial": 17134,
+        "none": 12
       },
       "pairs": 5628,
       "shift_m": [
@@ -738,7 +794,7 @@
         0.4,
         0.4
       ],
-      "seconds": 88
+      "seconds": 95
     },
     "34207": {
       "name": "福山市",
@@ -757,11 +813,14 @@
       "parcels_raw": 789640,
       "parcels_numbered": 667843,
       "public_overlap_dropped": 325473,
-      "kept": 342370,
-      "features": 340026,
-      "mapped": 0.9819,
-      "exists": 0.9697,
-      "kuiki_distinct": 453,
+      "ambiguous_dropped": 14,
+      "noname_dropped": 6202,
+      "split_dropped": 1799,
+      "kept": 336154,
+      "features": 333119,
+      "mapped": 1.0,
+      "exists": 0.9876,
+      "kuiki_distinct": 446,
       "kuiki_in_moj": 1.0,
       "methods": {
         "spatial": 352388,
@@ -777,7 +836,7 @@
         0.1,
         0.1
       ],
-      "seconds": 411
+      "seconds": 585
     },
     "26209": {
       "name": "長岡京市",
@@ -794,17 +853,25 @@
       "date": "2026-01-01",
       "moj_year": "2026",
       "parcels_raw": 62813,
-      "parcels_numbered": 62253,
-      "public_overlap_dropped": 5736,
-      "kept": 56517,
-      "features": 38510,
+      "parcels_numbered": 59991,
+      "public_overlap_dropped": 5723,
+      "ambiguous_dropped": 8546,
+      "noname_dropped": 0,
+      "split_dropped": 10,
+      "kept": 45722,
+      "features": 45691,
       "mapped": 1.0,
-      "exists": 0.9546,
-      "kuiki_distinct": 312,
+      "exists": 0.9927,
+      "kuiki_distinct": 237,
       "kuiki_in_moj": 1.0,
       "methods": {
-        "chiban": 44272,
-        "spatial": 17981
+        "chiban": 42692,
+        "spatial": 17299
+      },
+      "sub_methods": {
+        "none": 9020,
+        "chiban": 41359,
+        "spatial": 9612
       },
       "pairs": 5673,
       "shift_m": [
@@ -815,7 +882,7 @@
         0.0,
         0.0
       ],
-      "seconds": 24
+      "seconds": 41
     },
     "24216": {
       "name": "伊賀市",
@@ -834,16 +901,18 @@
       "parcels_raw": 441165,
       "parcels_numbered": 431512,
       "public_overlap_dropped": 105016,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 14202,
       "kept": 326496,
-      "features": 291706,
+      "features": 287817,
       "mapped": 1.0,
       "exists": 0.8764,
       "kuiki_distinct": 228,
       "kuiki_in_moj": 1.0,
       "methods": {
         "spatial": 286195,
-        "name": 144257,
-        "chiban": 1060
+        "name": 145317
       },
       "pairs": 102863,
       "shift_m": [
@@ -854,7 +923,7 @@
         0.18,
         0.18
       ],
-      "seconds": 416
+      "seconds": 595
     },
     "40202": {
       "name": "大牟田市",
@@ -873,12 +942,15 @@
       "parcels_raw": 159147,
       "parcels_numbered": 150410,
       "public_overlap_dropped": 26890,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 1861,
       "kept": 123520,
-      "features": 122325,
+      "features": 121435,
       "mapped": 0.9992,
       "exists": 0.9743,
-      "kuiki_distinct": 198,
-      "kuiki_in_moj": 0.9848,
+      "kuiki_distinct": 199,
+      "kuiki_in_moj": 0.9849,
       "methods": {
         "spatial": 77423,
         "name": 72885,
@@ -893,7 +965,7 @@
         0.38,
         0.38
       ],
-      "seconds": 127
+      "seconds": 136
     },
     "25212": {
       "name": "高島市",
@@ -910,17 +982,20 @@
       "date": "2026-01-01",
       "moj_year": "2026",
       "parcels_raw": 204738,
-      "parcels_numbered": 190158,
+      "parcels_numbered": 190059,
       "public_overlap_dropped": 50466,
-      "kept": 139692,
-      "features": 137865,
-      "mapped": 0.9996,
-      "exists": 0.9769,
-      "kuiki_distinct": 137,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 49,
+      "split_dropped": 1626,
+      "kept": 139544,
+      "features": 137032,
+      "mapped": 1.0,
+      "exists": 0.978,
+      "kuiki_distinct": 136,
       "kuiki_in_moj": 1.0,
       "methods": {
-        "spatial": 171333,
-        "chiban": 18776,
+        "spatial": 171239,
+        "chiban": 18771,
         "none": 49
       },
       "pairs": 49419,
@@ -932,7 +1007,7 @@
         0.29,
         0.29
       ],
-      "seconds": 112
+      "seconds": 166
     },
     "43100": {
       "name": "熊本市",
@@ -951,8 +1026,11 @@
       "parcels_raw": 702120,
       "parcels_numbered": 697396,
       "public_overlap_dropped": 235899,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 4056,
       "kept": 461497,
-      "features": 459099,
+      "features": 457163,
       "mapped": 1.0,
       "exists": 0.9877,
       "kuiki_distinct": 875,
@@ -971,7 +1049,50 @@
         0.53,
         0.33
       ],
-      "seconds": 346
+      "seconds": 587
+    },
+    "04100": {
+      "name": "仙台市",
+      "credit": "仙台市「仙台市地番図（参考図）データ」",
+      "license": "CC BY（版の記載なし）",
+      "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja（G空間情報センターの表示は「クリエイティブ・コモンズ 表示」で版の記載なし）",
+      "portal_license": "クリエイティブ・コモンズ 表示",
+      "page": "https://www.geospatial.jp/ckan/dataset/chibanzu",
+      "id": "90801b2a-52fa-401b-9cd9-66ece7852689",
+      "url": "https://www.geospatial.jp/ckan/dataset/c5e2303a-6b57-4901-a31b-99acd7bac7a3/resource/90801b2a-52fa-401b-9cd9-66ece7852689/download/tochi.7z",
+      "file": "tochi.7z",
+      "modified": "2026-07-13",
+      "size": 41289785,
+      "date": "2026-01-01",
+      "moj_year": "2026",
+      "parcels_raw": 645056,
+      "parcels_numbered": 623886,
+      "public_overlap_dropped": 209375,
+      "ambiguous_dropped": 526,
+      "noname_dropped": 0,
+      "split_dropped": 1062,
+      "kept": 413985,
+      "features": 412602,
+      "mapped": 1.0,
+      "exists": 0.9609,
+      "kuiki_distinct": 2714,
+      "kuiki_in_moj": 0.9996,
+      "methods": {
+        "name": 348763,
+        "spatial": 275108,
+        "none": 4,
+        "name-only": 11
+      },
+      "pairs": 207657,
+      "shift_m": [
+        0.0,
+        0.0
+      ],
+      "residual_m": [
+        0.09,
+        0.09
+      ],
+      "seconds": 477
     },
     "22130": {
       "name": "浜松市",
@@ -990,11 +1111,14 @@
       "parcels_raw": 1353270,
       "parcels_numbered": 1292413,
       "public_overlap_dropped": 621855,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 5091,
       "kept": 670557,
-      "features": 664222,
+      "features": 662106,
       "mapped": 1.0,
       "exists": 0.9828,
-      "kuiki_distinct": 477,
+      "kuiki_distinct": 476,
       "kuiki_in_moj": 1.0,
       "methods": {
         "spatial": 941558,
@@ -1011,7 +1135,7 @@
         0.18,
         0.18
       ],
-      "seconds": 542
+      "seconds": 815
     },
     "40204": {
       "name": "直方市",
@@ -1028,18 +1152,21 @@
       "date": "2026-01-01",
       "moj_year": "2026",
       "parcels_raw": 103865,
-      "parcels_numbered": 100507,
-      "public_overlap_dropped": 9785,
-      "kept": 90722,
-      "features": 90333,
-      "mapped": 0.9997,
-      "exists": 0.9759,
-      "kuiki_distinct": 37,
-      "kuiki_in_moj": 0.9459,
+      "parcels_numbered": 99909,
+      "public_overlap_dropped": 9781,
+      "ambiguous_dropped": 0,
+      "noname_dropped": 0,
+      "split_dropped": 774,
+      "kept": 90128,
+      "features": 89354,
+      "mapped": 0.9999,
+      "exists": 0.9824,
+      "kuiki_distinct": 36,
+      "kuiki_in_moj": 0.9722,
       "methods": {
-        "name": 30576,
-        "spatial": 69906,
-        "none": 25
+        "name": 30420,
+        "spatial": 69478,
+        "none": 11
       },
       "pairs": 9646,
       "shift_m": [
@@ -1050,7 +1177,51 @@
         0.0,
         0.0
       ],
-      "seconds": 72
+      "seconds": 78
+    },
+    "26100": {
+      "name": "京都市",
+      "credit": "京都市「京都市固定資産税（土地）地番図データ」（国土交通省「土地境界データ(地番現況図) 試作データ」で共通の仕様に変換されたもの）",
+      "license": "CC BY 4.0（京都市）・公共データ利用規約第1.0版（国土交通省の変換）",
+      "terms": "京都市固定資産税（土地）地番図データ利用規約（CC BY 4.0）＋ 国土交通省ウェブサイトの利用ルール https://www.mlit.go.jp/link.html（PDL1.0）",
+      "portal_license": "",
+      "page": "https://www.mlit.go.jp/tochi_fudousan_kensetsugyo/tochi_fudousan_kensetsugyo_tk17_000001_00063.html",
+      "id": "26100_Shapefile",
+      "url": "https://www.mlit.go.jp/tochi_fudousan_kensetsugyo/content/26100_Shapefile.zip",
+      "file": "26100_Shapefile.zip",
+      "modified": "2026-01-13",
+      "size": 43528893,
+      "date": "2026-01-13 公開（国土交通省。元のデータの時点は書かれていない）",
+      "moj_year": "2026",
+      "parcels_raw": 718603,
+      "parcels_numbered": 718563,
+      "public_overlap_dropped": 78202,
+      "ambiguous_dropped": 1478,
+      "noname_dropped": 0,
+      "split_dropped": 1548,
+      "kept": 638883,
+      "features": 637335,
+      "mapped": 0.9917,
+      "exists": 0.9693,
+      "kuiki_distinct": 5314,
+      "kuiki_in_moj": 0.9881,
+      "methods": {
+        "none": 320376,
+        "chiban": 107360,
+        "spatial": 120692,
+        "name": 168341,
+        "name-only": 1794
+      },
+      "pairs": 74867,
+      "shift_m": [
+        0.26,
+        0.14
+      ],
+      "residual_m": [
+        0.38,
+        0.29
+      ],
+      "seconds": 462
     }
   }
 }
