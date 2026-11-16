@@ -55,4 +55,20 @@ describe("調べている間に向かう上空（components/app/flight-wait.ts�
     // 地番で探す住所は時間がかかることがあるので、あきらめるまで 20 秒待つ
     expect(src).toMatch(/giveUp: 20000/);
   });
+
+  // 本番を 4G くらいの回線で確かめると、絵の無い地球のまま回り（星だけ）、降りる途中は灰色一色、そのあといきなり住宅地の写真になっていた
+  it("回線が遅くても：地球の絵を 2 秒まで待ち、山並みの上の写真を先に読んで（最大 0.9 秒）から降りる。遠くを淡くしすぎない", () => {
+    const src = readFileSync(join(__dirname, "globe-flight.tsx"), "utf8");
+    expect(src).toMatch(/firstTiles: 2000/);
+    expect(src).toMatch(/warmOver: 900/);
+    expect(src).toMatch(/const over = warmOver\(target\.lat, target\.lng\);/);
+    expect(src).toMatch(/void over\.then\(go\);\s*later\(T\.warmOver, go\);/);
+    // 降り始め（flyTo）は go の中だけ（写真を待たずに降りない）
+    const goBody = src.slice(src.indexOf("const go = () => {"), src.indexOf("void over.then(go);"));
+    expect(goBody).toMatch(/m\.flyTo\(\{ center: here, zoom: OVER\.zoom/);
+    expect(src.split("m.flyTo({ center: here, zoom: OVER.zoom").length).toBe(2);
+    const look = readFileSync(join(__dirname, "flight-look.ts"), "utf8");
+    expect(look).toMatch(/"raster-brightness-min": \["interpolate", \["linear"\], \["zoom"\], 8, 0, 10, L\.far \* 0\.6\]/);
+    expect(look).toMatch(/"raster-saturation": \["interpolate", \["linear"\], \["zoom"\], 8, L\.earth\.saturation, 10, -0\.3\]/);
+  });
 });
