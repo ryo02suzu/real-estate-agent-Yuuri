@@ -481,11 +481,13 @@ export function missChoices(input: string, miss: AddressMiss, candidates: Geocod
   if (!off || miss.kind !== "town") return [];
   const q = input.normalize("NFKC").replace(/\s+/g, "");
   const t = typedParts(q);
+  // 入れた町名の場所：市区町村の名前の後ろから探す（「大島町大島123」の町名の「大島」を、市区町村の名前の中で見つけない）
+  const mi = q.indexOf(off.muni);
+  const at = q.indexOf(miss.typed, mi >= 0 ? mi + off.muni.length : 0);
   const out = new Map<string, GeocodeResult>();
   for (const c of candidates) {
     const o = splitOfficial(c.matchedAddress);
     if (!o || o.pref !== off.pref || o.muni !== off.muni || !o.town) continue;
-    const at = q.lastIndexOf(miss.typed);
     // 町名を置き換えられなければ、市区町村・町名・番地を並べ直す
     const address = at >= 0 ? `${q.slice(0, at)}${o.town}${q.slice(at + miss.typed.length)}` : `${o.pref}${o.muni}${o.town}${t.num}`;
     if (!out.has(o.town)) out.set(o.town, { ...c, matchedAddress: address });
