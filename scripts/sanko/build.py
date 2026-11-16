@@ -72,7 +72,17 @@ CHIBA = "https://opendata.pref.chiba.lg.jp"
 TOKYO = "https://catalog.data.metro.tokyo.lg.jp/api/3/action"
 BODIK = "https://data.bodik.jp/api/3/action"
 GSPATIAL = "https://www.geospatial.jp/ckan/api/3/action"
-MOJ_ORGS = {"08": "moj-08ibaraki", "09": "moj-09tochigi", "10": "moj-10gunma", "11": "moj-11saitama", "12": "moj-12chiba", "13": "moj-13tokyo", "14": "moj-14kanagawa"}
+# G空間情報センターの法務省の組織（都道府県ごと）
+MOJ_ORGS = {
+    "01": "moj-01hokkaido", "02": "moj-02aomori", "03": "moj-03iwate", "04": "moj-04miyagi", "05": "moj-05akita", "06": "moj-06yamagata",
+    "07": "moj-07fukushima", "08": "moj-08ibaraki", "09": "moj-09tochigi", "10": "moj-10gunma", "11": "moj-11saitama", "12": "moj-12chiba",
+    "13": "moj-13tokyo", "14": "moj-14kanagawa", "15": "moj-15niigata", "16": "moj-16toyama", "17": "moj-17ishikawa", "18": "moj-18fukui",
+    "19": "moj-19yamanashi", "20": "moj-20nagano", "21": "moj-21gifu", "22": "moj-22shizuoka", "23": "moj-23aichi", "24": "moj-24mie",
+    "25": "moj-25shiga", "26": "moj-26kyoto", "27": "moj-27osaka", "28": "moj-28hyogo", "29": "moj-29nara", "30": "moj-30wakayama",
+    "31": "moj-31tottori", "32": "moj-32shimane", "33": "moj-33okayama", "34": "moj-34hiroshima", "35": "moj-35yamaguchi", "36": "moj-36tokushima",
+    "37": "moj-37kagawa", "38": "moj-38ehime", "39": "moj-39kochi", "40": "moj-40fukuoka", "41": "moj-41saga", "42": "moj-42nagasaki",
+    "43": "moj-43kumamoto", "44": "moj-44oita", "45": "moj-45miyazaki", "46": "moj-46kagoshima", "47": "moj-47okinawa",
+}
 PDL = "公共データ利用規約第1.0版（PDL1.0）"
 CCBY = "CC BY 4.0"
 
@@ -193,6 +203,72 @@ SOURCES = [
         "date": "2024-01（ファイルの日付）", "epsg": 6677, "enc": "cp932",
         "shp": r"(?i)tochi_poly\.shp$", "chiban": ["TXTCD"], "key": "AZACD",
     },
+    # ---- 関東の外（2026-11-15 に足した。国の地価の地点で、法務省の地図データでは筆まで出ない所が多い市） ----
+    {
+        # 町字名は大字と小字をつないだ名前（「福受町下ノ切」）。大字界の大字名で、大字と小字に分ける
+        "code": "23211", "name": "豊田市", "credit": "豊田市「地番参考図」", "license": CCBY, "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja",
+        "fetch": {"kind": "ckan", "api": BODIK, "dataset": "232114_chibanzu", "resource": r"^地番参考図\.zip$"},
+        "date": "2026-01-01", "epsg": 6675, "enc": "cp932",
+        "shp": r"(?i)/Tochi\.shp$", "chiban": ["地番"], "key": "町字名", "oname": "町字名",
+        "split_name": {"shp": r"大字界\.shp$", "field": "AZANAME"},
+    },
+    {
+        "code": "27203", "name": "豊中市", "credit": "豊中市「地番参考図（地図情報とよなか）」", "license": CCBY, "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja ＋ 豊中市オープンデータ利用規約（CC BY 4.0 に準拠）",
+        "fetch": {"kind": "ckan", "api": BODIK, "dataset": "272035_chibansanko", "resource": r"地番参考図$"},
+        "date": "2025-01-01", "epsg": 6674, "enc": "cp932",
+        "shp": r"(?i)chiban\.shp$", "chiban": ["TIBAN", "EDABAN", "KOBAN"], "key": "CYOU_NO",
+    },
+    {
+        "code": "34207", "name": "福山市", "credit": "福山市「福山市地番図データ」", "license": "CC BY（版の記載なし）",
+        "terms": "https://data.city.fukuyama.hiroshima.jp/terms（福山市オープンデータカタログサイト利用規約。出典と、加工したこと・加工した者を書く）",
+        "fetch": {"kind": "ckan", "api": "https://data.city.fukuyama.hiroshima.jp/api/3/action", "dataset": "digital_numbers_map", "resource": r"地番図データ"},
+        "date": "2026-01-01", "epsg": 6671, "enc": "cp932",
+        "shp": r"筆界_面\.shp$", "chiban": ["TXTCD"], "key": "AZACD", "koaza": "KOAZA_小字",
+    },
+    {
+        # 市のページに直接置かれたファイル（オープンデータのサイトのデータセットは、このページへのリンクだけ）
+        "code": "26209", "name": "長岡京市", "credit": "長岡京市「地番参考図」", "license": CCBY,
+        "terms": "https://www.city.nagaokakyo.lg.jp/cmsfiles/contents/0000012/12991/riyoukiyaku.pdf（長岡京市オープンデータ利用規約。CC BY 4.0）",
+        "fetch": {"kind": "page", "page": "https://www.city.nagaokakyo.lg.jp/0000012991.html", "resource": r"(?i)^R\d+_?(?:tiban|chiban).*shape.*\.zip$"},
+        "date": "2026-01-01", "epsg": 2448, "enc": "cp932",
+        "shp": r"筆面\.shp$", "split": {"field": "所在", "re": r"^(\d+)-\d+:(.+)$"},
+    },
+    {
+        "code": "24216", "name": "伊賀市", "credit": "伊賀市「地番図データ」", "license": CCBY, "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja",
+        "fetch": {"kind": "ckan", "api": BODIK, "dataset": "_chibanzu", "resource": r"地番図データ"},
+        "date": "2026-01-01", "epsg": 6674, "enc": "cp932",
+        "shp": r"(?i)chibanzu\.shp$", "chiban": ["地番"], "key": "大字名", "oname": "大字名", "koaza": "小字名",
+    },
+    {
+        # 年ごとにリソースが増える（同じ日に前の年のものも更新された）ので、時点の名前で選ぶ
+        "code": "40202", "name": "大牟田市", "credit": "大牟田市「地番参考図」", "license": CCBY, "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja",
+        "fetch": {"kind": "ckan", "api": BODIK, "dataset": "402028_26", "resource": r"令和8年1月1日時点"},
+        "date": "2026-01-01", "epsg": 6670, "enc": "cp932",
+        "shp": r"1_筆界）\.shp$", "split": {"field": "KEYCODE", "re": r"^(\d+)-(.+)$"},
+        "names": {"shp": r"5_大字名称）\.shp$", "key": "OOAZACODE", "name": "OOAZANAME"},
+    },
+    {
+        "code": "25212", "name": "高島市", "credit": "高島市「地番図」", "license": CCBY, "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja",
+        "fetch": {"kind": "ckan", "api": BODIK, "dataset": "252123_chibanzu", "resource": r"高島市地番図"},
+        "date": "2026-01-01", "epsg": 2448, "enc": "cp932",
+        "shp": r"(?i)exp-tochi\.shp$", "split": {"field": "MOTOCHIBAN", "re": r"^(\d+)-(.+)$"},
+    },
+    {
+        # 区のある市。区ごとの法務省の地図XMLを合わせて読み、同じ名前の町がほかの区にもあれば、筆の区（ku）の町にする。
+        # 地番区域は「熊本市南区_…」、筆の市区町村コード（m）は市のコード（出典を引くため）
+        "code": "43100", "name": "熊本市", "credit": "熊本市「熊本市_地番参考図」", "license": PDL,
+        "terms": "https://www.digital.go.jp/resources/open_data/public_data_license_v1.0 ＋ 熊本市地番参考図利用規約（データセットのページ。編集・加工したことを書き、熊本市が作ったように見せない）",
+        "fetch": {"kind": "ckan", "api": BODIK, "dataset": "040001_chibansankouzu", "resource": r"^sjis_.*chibansankouzu"},
+        "date": "2025-01-01", "epsg": 2444, "enc": "cp932",
+        "shp": r"(?i)chibansankouzu_kumamotocity\.shp$", "chiban": ["chiban"], "key": "oaza", "oname": "oaza_name",
+        "wards": ["43101", "43102", "43103", "43104", "43105"], "ward_field": "ku",
+    },
+    {
+        "code": "40204", "name": "直方市", "credit": "直方市「直方市地番対応図」", "license": CCBY, "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja",
+        "fetch": {"kind": "ckan", "api": BODIK, "dataset": "402044_land_lot_correspondence_map", "resource": r"R8\.1\.1時点"},
+        "date": "2026-01-01", "epsg": 2444, "enc": "utf-8",
+        "shp": r"直方市地番対応図\d*\.shp$", "chiban": ["地番"], "key": "大字", "oname": "大字",
+    },
 ]
 # 確かめて外したもの（--check で「入れていない市町村」として知らせない）。
 EXCLUDED = {
@@ -200,6 +276,14 @@ EXCLUDED = {
     "習志野市": "地番現況図が PDF しかない（CC BY 2.1 JP）",
     # さがみはら地図情報（https://sagamihara.geocloud.jp/webgis/TermsOfUse/101/termsOfUse.html。2026年10月に確認）
     "相模原市": "さがみはら地図情報の地番参考図は、利用規約が図形の変形・変更・加筆・削除等の編集を禁じている（オープンデータのライセンスではない）",
+    # 2026-11-15 に確かめたもの
+    "名古屋市": "オープンデータのサイト（BODIK）のデータセットは CC BY 4.0 だが、市の地番参考図のページ（https://www.city.nagoya.jp/kurashi/zeikin/1037356/1011931/1011937/1033712.html。2026-06-12 更新）が「地番参考図の変形・変更・加筆・削除等の編集を行うことはできません」「営利目的で利用することはできません」と書いていて、食い違う（市に確かめるまで入れない）",
+    "岡山市": "地番参考図のページは CC BY 4.0 としつつ、「変形、変更、加筆、削除などの編集はできません」と書いていて、食い違う（市に確かめるまで入れない）",
+    "和歌山市": "地番参考図の利用規約が、内容の変形・変更・加筆・削除などの編集（二次的著作物の作成）を禁じている（ライセンスは「その他」）",
+    "堺市": "地番参考図は閲覧システムだけで、掲載内容の無断の複製・転用を禁じている",
+    "岸和田市": "地番参考図のファイルは、市のページで利用条件に同意してから進む所にある（MICHILU は同意の先を開かない）。ライセンスの表示も無い",
+    "福岡市": "字図（地番現況図）は、オープンデータのサイトにファイルが無い（福岡市Webまっぷで見るだけ）",
+    "城陽市": "データセットは CC BY 4.0 だが、すべてに同意してから使うようにと書かれた「城陽市オープンデータ利用規約」の本文が見つからない（読めたら入れる）",
 }
 
 KANJI_NUM = {"〇": 0, "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
@@ -324,10 +408,50 @@ def ckan_resources(api: str, dataset: str) -> tuple[dict, list[dict]]:
     return info, out
 
 
+def page_resources(page: str, pattern: str) -> tuple[dict, list[dict]]:
+    """市町村のページに直接置かれたファイル（オープンデータのサイトに無い所。長岡京市）。ページのリンクのうち pattern に合うものを、
+    ページに載っている順に（新しい年が上）。更新日はファイルの Last-Modified"""
+    t = get(page).decode("utf-8", "replace")
+    out = []
+    for href in dict.fromkeys(re.findall(r'href="([^"]+)"', t)):
+        url = urllib.parse.urljoin(page, html.unescape(href))
+        if not re.search(pattern, urllib.parse.unquote(url.rsplit("/", 1)[-1])):
+            continue
+        modified, size = "", 0
+        try:
+            req = urllib.request.Request(url, headers=UA, method="HEAD")
+            with urllib.request.urlopen(req, timeout=60) as r:
+                lm = r.headers.get("Last-Modified")
+                size = int(r.headers.get("Content-Length") or 0)
+            if lm:
+                from email.utils import parsedate_to_datetime
+
+                modified = parsedate_to_datetime(lm).strftime("%Y-%m-%d")
+        except Exception:
+            pass
+        name = url.rsplit("/", 1)[-1]
+        out.append({"id": re.sub(r"\.zip$", "", name, flags=re.I), "name": name, "file": name, "modified": modified, "size": size, "license": "", "url": url, "order": len(out)})
+    return {"title": "", "org": ""}, out
+
+
 def resolve(src: dict, known: dict | None = None) -> dict:
     """いま公開されているファイル（合うリソースのうち一番新しいもの）。公開サイトに届かないときは、known（前に取ったファイル。
     known_files）にその市町村があれば、それを使う（埼玉県・千葉県のサイトは GitHub Actions から 403。ファイルは R2 の写しを使う）"""
     f = src["fetch"]
+    if f["kind"] == "page":
+        try:
+            info, res = page_resources(f["page"], f["resource"])
+        except Exception as e:
+            k = (known or {}).get(src["code"])
+            if not k:
+                raise
+            log(f"::warning::{src['code']} {src['name']}: 公開ページに届かないので（{type(e).__name__}: {e}）、前に取ったファイル {k['file']} を使います")
+            return k
+        if not res:
+            raise RuntimeError(f"{src['name']}: ページにファイルが見つかりません（{f['page']}）")
+        best = min(res, key=lambda r: r["order"])
+        best = {k: v for k, v in best.items() if k != "order"}
+        return {**best, "title": info.get("title", ""), "org": info.get("org", ""), "page": f["page"]}
     try:
         info, res = dataeye_resources(f["base"], f["dataset"]) if f["kind"] == "dataeye" else ckan_resources(f["api"], f["dataset"])
     except Exception as e:
@@ -510,8 +634,18 @@ def norm_town(s: str) -> str:
     return s.replace("ヶ", "ケ").replace("ヵ", "ケ").replace("が", "ケ")
 
 
+def datum_of(epsg: int) -> str:
+    """座標系の測地系（「JGD2011」「JGD2000」「Tokyo」）"""
+    if epsg == 30169:
+        return "Tokyo"
+    from pyproj import CRS
+
+    name = CRS.from_epsg(epsg).datum.name
+    return "JGD2011" if "2011" in name else "JGD2000" if "2000" in name else "Tokyo" if "Tokyo" in name else name
+
+
 def to_m(epsg: int):
-    """元の座標系 → 平面直角座標系 IX 系（JGD2011）の m"""
+    """元の座標系 → 平面直角座標系 IX 系（JGD2011）の m（関東の外の市町村も、計算はこの系の m で行う。位置は変わらない）"""
     if epsg == 6677:
         return None
     if epsg == 30169:
@@ -588,22 +722,31 @@ def read_lines_mode(src: dict, root: str) -> tuple[list, list[str], list[str], l
 
 def read_muni(src: dict, root: str) -> dict:
     """市町村の筆（元の座標系の形・地番・大字のキー・大字名・小字名）"""
+    wardl: list[str] = []  # 区のある市の、筆の区の名前（「南区」。ward_field）
     if "lines" in src:
         geoms, chibans, keys, onames, koazas = read_lines_mode(src, root)
         raw_n = len(geoms)
+        wardl = [""] * len(geoms)
     else:
         path = find(root, src["shp"])
         prj = [f for f in os.listdir(os.path.dirname(path)) if f.lower() == os.path.basename(path)[:-4].lower() + ".prj"]
         if prj:
             t = open(os.path.join(os.path.dirname(path), prj[0]), "rb").read().decode("latin1")
             datum = "JGD2011" if "2011" in t else "JGD2000" if "2000" in t else "Tokyo" if "Tokyo" in t or "Bessel" in t else "?"
-            want = {6677: "JGD2011", 2451: "JGD2000", 30169: "Tokyo"}[src["epsg"]]
-            if datum != want:
-                log(f"  ::warning:: .prj は {datum}、SOURCES は {want}")
+            if datum != datum_of(src["epsg"]):
+                log(f"  ::warning:: .prj は {datum}、SOURCES は {datum_of(src['epsg'])}")
         r = reader(path, src["enc"])
         names = [f[0] for f in r.fields[1:]]
         table = name_table(root, src.get("names"), src["enc"])
         pad = (src.get("names") or {}).get("pad", 0)
+        # 大字名に小字名がつながった名前（豊田市の町字名「福受町下ノ切」）を、大字の名前の一覧（大字界の shapefile）の一番長く合う頭で、
+        # 大字（鍵・大字名）と小字に分ける
+        prefixes: list[str] = []
+        if src.get("split_name"):
+            sp = src["split_name"]
+            rn = reader(find(root, sp["shp"]), src["enc"])
+            i_name = [f[0] for f in rn.fields[1:]].index(sp["field"])
+            prefixes = sorted({str(rec[i_name]).strip() for rec in rn.iterRecords() if str(rec[i_name]).strip()}, key=len, reverse=True)
         geoms, chibans, keys, onames, koazas = [], [], [], [], []
         raw_n = 0
         for sr in r.iterShapeRecords():
@@ -617,6 +760,7 @@ def read_muni(src: dict, root: str) -> dict:
             else:
                 key = str(rec[src["key"]]).strip()
                 ch = norm_chiban([rec[c] for c in src["chiban"]])
+            wardl.append(str(rec[src["ward_field"]]).strip() if src.get("ward_field") else "")
             if not ch or not sr.shape.points:
                 chibans.append("")
                 geoms.append(None)
@@ -630,10 +774,15 @@ def read_muni(src: dict, root: str) -> dict:
                 g = None
             geoms.append(g)
             chibans.append(ch)
-            keys.append(key)
             nm = str(rec[src["oname"]]).strip() if src.get("oname") else table.get(key.zfill(pad), "")
+            koaza = str(rec[src["koaza"]]).strip() if src.get("koaza") else ""
+            if prefixes:
+                head = next((p for p in prefixes if key.startswith(p)), "")
+                if head:
+                    key, nm, koaza = head, head, key[len(head):]
+            keys.append(key)
             onames.append(nm)
-            koazas.append(str(rec[src["koaza"]]).strip() if src.get("koaza") else "")
+            koazas.append(koaza)
     keep = [i for i, (g, c) in enumerate(zip(geoms, chibans)) if c and g is not None and not g.is_empty]
     geoms = [geoms[i] for i in keep]
     geoms = [g if g.is_valid else shapely.make_valid(g) for g in geoms]
@@ -647,6 +796,7 @@ def read_muni(src: dict, root: str) -> dict:
         "key": [keys[i] for i in keep],
         "name": [onames[i] for i in keep],
         "koaza": [koazas[i] for i in keep],
+        "ward": [wardl[i] for i in keep],
     }
 
 
@@ -682,24 +832,33 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
     n = len(muni["geom"])
     log(f"{code} {src['name']}: 筆 {muni['raw']} → 地番が数字の筆 {n}（{meta['file']} {meta['modified']}）")
 
-    paths, moj_year = moj_zips(code, year, work)
+    # 区のある市（熊本市）は、区ごとの法務省の地図XMLを合わせて読む（wards：区の市区町村コード）
+    paths, moj_year = [], None
+    for c in src.get("wards") or [code]:
+        p, moj_year = moj_zips(c, year, work)
+        paths += p
     moj = read_moj(paths)
     recs = moj["recs"]
-    city = collections.Counter(r[0][0] for r in recs).most_common(1)[0][0]
-    # 法務省の町（大字名・丁目名）ごとの地番 → 地番区域
+    if src.get("wards"):
+        cities = {r[0][0] for r in recs}
+        city = src["name"]
+    else:
+        city = collections.Counter(r[0][0] for r in recs).most_common(1)[0][0]
+        cities = {city}
+    # 法務省の町（市区町村名・大字名・丁目名）ごとの地番 → 地番区域
     town_ch: dict[tuple, dict[str, collections.Counter]] = collections.defaultdict(lambda: collections.defaultdict(collections.Counter))
     town_kuiki: dict[tuple, collections.Counter] = collections.defaultdict(collections.Counter)
     inv: dict[str, set] = collections.defaultdict(set)
     for parts, ch, _pub in recs:
-        if not CHIBAN_RE.match(ch) or parts[0] != city:
+        if not CHIBAN_RE.match(ch) or parts[0] not in cities:
             continue
-        t = (parts[1], parts[2])
+        t = (parts[0], parts[1], parts[2])
         town_ch[t][ch][parts] += 1
         town_kuiki[t][parts] += 1
         inv[ch].add(t)
     town_by_name: dict[str, list] = collections.defaultdict(list)
     for t in town_ch:
-        town_by_name[norm_town(t[0] + t[1])].append(t)
+        town_by_name[norm_town(t[1] + t[2])].append(t)
     log(f"  {code} 法務省 {moj_year}: 筆 {len(recs)}（公共座標 {len(moj['pub_geom'])}）・町 {len(town_ch)}")
 
     # 1. 公共座標の筆と重ねる（内側の点がその筆に入り、地番が同じ）
@@ -713,7 +872,7 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         for i, j in zip(mi, pj):
             parts, ch, _ = recs[moj["pub_idx"][j]]
             if ch == muni["chiban"][i]:
-                votes[muni["key"][i]][(parts[1], parts[2])] += 1
+                votes[muni["key"][i]][(parts[0], parts[1], parts[2])] += 1
                 pairs.append((i, j))
     # 平行移動（同じ地番の筆の重心のずれの中央値）
     shift = (0.0, 0.0)
@@ -752,6 +911,10 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         jr = sorted(jac, key=lambda t: -jac[t])
         nm = collections.Counter(muni["name"][i] for i in idx).most_common(1)[0][0]
         named = town_by_name.get(norm_town(nm), []) if nm else []
+        # 区のある市：同じ名前の町がほかの区にもあれば、市町村の図に書かれた区の町にする
+        ward = collections.Counter(muni["ward"][i] for i in idx).most_common(1)[0][0] if muni.get("ward") else ""
+        if ward and len(named) > 1:
+            named = [t for t in named if t[0].endswith(ward)]
         t_name = named[0] if len(named) == 1 else None
         v = votes.get(k)
         choice = None
@@ -803,13 +966,18 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
                 kuiki = "_".join(pick[0] if pick else cands.most_common(1)[0][0])
             stats["mapped"] += 1
         else:
-            if drop_unmapped:
+            if drop_unmapped or src.get("drop_unmapped"):
                 stats["dropped_unmapped"] += 1
                 continue
             nm = unicodedata.normalize("NFKC", muni["name"][i]).replace(" ", "") if muni["name"][i] else ""
             nm = re.sub(r"(\d+)丁目", lambda m: chr(0xFF10 + int(m.group(1))) + "丁目" if len(m.group(1)) == 1 else m.group(0), nm)
             m = re.match(r"^(.*?)([０-９\d]+丁目)$", nm)
-            kuiki = f"{city}_{m.group(1)}_{m.group(2)}__" if m else f"{city}_{nm}___"
+            # 区のある市は、筆の区の名前を付ける（「熊本市南区」。区が分からなければ入れない）
+            cty = f"{city}{muni['ward'][i]}" if src.get("wards") else city
+            if src.get("wards") and not muni["ward"][i]:
+                stats["dropped_unmapped"] += 1
+                continue
+            kuiki = f"{cty}_{m.group(1)}_{m.group(2)}__" if m else f"{cty}_{nm}___"
         # 法務省の町に対応しない筆は、市町村の大字ごとに分けておく（別の大字の同じ地番をまとめない）
         groups[(kuiki, ch, "" if t else k)].append(i)
         stats["kept"] += 1
@@ -827,7 +995,7 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         written += 1
     kept = stats["kept"]
     # 書き出した地番区域（種類）のうち、法務省のデータにある地番区域の割合
-    moj_kuiki = {"_".join(parts) for parts, _ch, _pub in recs if parts[0] == city}
+    moj_kuiki = {"_".join(parts) for parts, _ch, _pub in recs if parts[0] in cities}
     out_kuiki = {g[0] for g in groups}
     res = {
         "name": src["name"],

@@ -33,11 +33,21 @@ export const SANKO_CITIES: Record<string, SankoCity> = Object.fromEntries(
 /** 参考図のある市町村の名前（「小川町」。推定の筆の位置より参考図を使う） */
 export const SANKO_CITY_NAMES = new Set(Object.values(SANKO_CITIES).map((c) => c.name));
 
-/** 地番区域の市区町村の部分（「市川市」「比企郡小川町」）が、参考図のある市町村か（町村は郡の名前が前に付く） */
-export function sankoCovers(city: string): boolean {
-  if (SANKO_CITY_NAMES.has(city)) return true;
+/**
+ * 地番区域の市区町村の部分（「市川市」「比企郡小川町」「熊本市南区」）が、names（参考図のある市町村の名前）の市町村か
+ * （町村は郡の名前が前に付く。区のある市は、地番区域が区の名前まで入る）
+ */
+export function coversCity(names: ReadonlySet<string>, city: string): boolean {
+  if (names.has(city)) return true;
   const i = city.indexOf("郡");
-  return i > 0 && SANKO_CITY_NAMES.has(city.slice(i + 1));
+  if (i > 0 && names.has(city.slice(i + 1))) return true;
+  const m = city.match(/^(.+?市)(.+区)$/);
+  return !!m && names.has(m[1]);
+}
+
+/** 地番区域の市区町村の部分が、参考図のある市町村か */
+export function sankoCovers(city: string): boolean {
+  return coversCity(SANKO_CITY_NAMES, city);
 }
 
 /** 参考図の筆に添える印 */
