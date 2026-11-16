@@ -132,6 +132,12 @@ export function splitChiban(input: string): { body: string; chiban: string; expl
     body += head;
     head = "";
   }
+  // 丁目を「◯丁」と書く町（堺市「上野芝町3丁647番9」「浜寺船尾町西2丁158番5」。法務省の地番区域も「上野芝町」＋「三丁」）の丁は、
+  // 地番の頭ではなく丁目の終わり
+  if (head === "丁" && /\d$/.test(body)) {
+    body += head;
+    head = "";
+  }
   // 前にも番号が続く（「1-2-3」「1丁目2番3」）のは住居表示
   if (!body || (!(head && kanjiBan) && new RegExp(`(\\d|${DASH}|番)$`).test(body))) return null;
   return { body, chiban: `${head}${m[3]}${m[4] ? `-${m[4]}` : ""}`, explicit };

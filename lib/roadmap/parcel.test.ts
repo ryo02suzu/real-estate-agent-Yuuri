@@ -784,6 +784,12 @@ describe("lookup で地番を探す", () => {
     expect(splitChiban("宮城県仙台市若林区東八番丁197番2")).toMatchObject({ body: "宮城県仙台市若林区東八番丁", chiban: "197-2" });
     // 漢数字の住居表示（「一丁目二番三」）は、今までどおり地番として読まない
     expect(splitChiban("東京都千代田区丸の内一丁目二番3")).toBeNull();
+    // 丁目を「◯丁」と書く町（堺市）：「3丁」は丁目の終わりで、地番は 647-9（前は番号が続く住居表示とみて読まなかった）
+    expect(splitChiban("大阪府堺市西区上野芝町3丁647番9")).toMatchObject({ body: "大阪府堺市西区上野芝町3丁", chiban: "647-9" });
+    expect(splitChiban("大阪府堺市西区浜寺船尾町西2丁158番5")).toMatchObject({ body: "大阪府堺市西区浜寺船尾町西2丁", chiban: "158-5" });
+    // 丁目の後ろの地番の頭の丁（「3丁目丁12」）・住居表示（「1-2-3」）は今までどおり
+    expect(splitChiban("茨城県取手市白山3丁目丁12番")).toMatchObject({ body: "茨城県取手市白山3丁目", chiban: "丁12" });
+    expect(splitChiban("渋谷区神南1-1-1")).toBeNull();
   });
 
   it("「元寺町北ノ丁12番」「十番丁4番」（和歌山市）：町名の終わりの丁を地番の頭にせず、その町の地番 12・4 の筆を当てる（前は筆が出なかった）", async () => {
