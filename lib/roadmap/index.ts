@@ -1,6 +1,7 @@
 import { correctAddress, describeMatch, placeNotFound, type AddressFix, type AddressMiss } from "./address-fix";
-import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, matchedNumbers, needsChoice, numbersAgree, reverseGeocode, streetSide, subAreaDropped, withoutNumbers, type GeocodeResult } from "./geocode";
+import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, kyotoChoices, kyotoStreet, kyotoTown, matchedNumbers, needsChoice, numbersAgree, reverseGeocode, streetSide, subAreaDropped, withoutNumbers, type GeocodeResult, type ReverseResult } from "./geocode";
 import { MUNI_CODES } from "./muni-codes";
+import { PREF_NAME_RE } from "./regions";
 import { buildLinks, findMunicipality, resolveContact, type Contact, type Municipality, type ResolvedLink } from "./municipalities";
 import { indexHasTown, kuikiAllows, kuikiHasSub, kuikiSubLabel, lotHead, normalizeChiban, parcelAt, searchParcel, splitChiban, splitLotHead, townFromAddress, townKey, type Parcel, type ParcelSource } from "./parcel";
 import { addressSub, elsewhereLabel, sameTownName, typedChome, type AddressSub, type Elsewhere } from "./parcel-sub";
@@ -100,7 +101,13 @@ export async function lookup(
   } = {},
 ): Promise<LookupResult> {
   // 「本通14北5-35」（丁目を書かない、通りの北・南に分かれた丁目）を「本通14丁目北5-35」に（南北の取り違えを防ぐ）
-  address = streetSide(address);
+  // 京都市の通り名の住所（「上京区下長者町通七本松西入鳳瑞町233番10」）は、通り名を外して町名から探す（別の町に当たるのを防ぐ）。
+  // 同じ区に同じ名前の町がある住所は、通り名から決めた町（kyoto）の位置と地番区域で探す
+  const kyoto = kyotoTown(streetSide(address));
+  // どちらの町か決められない（通り名が無い・括弧の中の通り名が住所に無い）ときは、地番区域の町名（「下丸屋町（河原町通二条）」）から選んでもらう
+  const kyotoPick = kyotoChoices(streetSide(address));
+  if (kyotoPick) return { status: "choose", candidates: kyotoPick };
+  address = kyotoStreet(streetSide(address));
   const chiban = splitChiban(address);
   // 「地番」の語は外して調べる（国土地理院が番地まで持っていれば、その位置から筆を探せる）
   const query = chiban?.explicit ? `${chiban.body}${chiban.chiban}` : address;
@@ -127,7 +134,10 @@ export async function lookup(
   if (subAreaDropped(address, geo.matchedAddress) && matchedNumbers(geo.matchedAddress).length) geo = await townPoint(geo);
   // 「地番」と明示したのに住居表示の街区（「217番」）に当たったら、地番と取り違えないよう町の代表点から探す
   if (chiban?.explicit && isJukyo(geo.matchedAddress)) geo = (await geocodeCandidates(chiban.body))[0] ?? geo;
-  const rev = await reverseGeocode(geo.lat, geo.lng);
+  // 京都市の同じ区の同じ名前の町（中京区の「下丸屋町」は2つ）：国土地理院はどちらも1つの点に当てるので、その点が通り名から決めた町から
+  // 離れていれば（250m より遠い）、その町の位置から探す
+  if (kyoto && sameNameMatched(geo.matchedAddress, kyoto.base) && distKm(geo, kyoto) > 0.25) geo = { ...geo, lat: kyoto.lat, lng: kyoto.lng };
+  const rev = await reverseOrAddress(geo.lat, geo.lng, geo.matchedAddress);
   const municipality = rev && findMunicipality(rev.muniCd);
   if (!rev || !municipality) {
     return { status: "unsupported", lat: geo.lat, lng: geo.lng, muniCd: rev?.muniCd ?? "", matchedAddress: geo.matchedAddress };
@@ -167,12 +177,14 @@ export async function lookup(
       const sub = town ? addressSub(body, town, city) : null;
       // 町の名前のすぐ後ろに書かれた丁目（「上麻生1丁目5番3」）。丁目は地番区域の一部なので、丁目の無い地番区域・別の丁目の同じ地番は当てない
       const chome = town ? typedChome(body, town, city) : null;
-      const r = town ? await searchParcel({ city, town, chiban: lot, sub, chome }, geo, parcels, { index }) : ({ status: "no_map" } as const);
+      // 京都市の同じ区の同じ名前の町は、通り名から決めた町の地番区域（「下丸屋町（河原町通二条）」）だけで探す（もう1つの町の同じ地番を当てない）
+      const searchTown = kyoto && town && townKey(town) === townKey(kyoto.base) ? kyoto.town : town;
+      const r = town ? await searchParcel({ city, town: searchTown, chiban: lot, sub, chome }, geo, parcels, { index }) : ({ status: "no_map" } as const);
       // 見つけた筆が入れた町から遠く離れた別の町にあれば（図面ごと置き間違えた地図データのおそれ）、物件の場所としては出さない
       let away: ReturnType<typeof awayFrom> = null;
       if (r.status === "found") {
         const { lat, lng } = r.parcel.point;
-        const prev = (await reverseGeocode(lat, lng)) ?? rev;
+        const prev = (await reverseGeocode(lat, lng).catch(() => null)) ?? rev;
         away = awayFrom(r.parcel.point, geo, town, prev.town);
         const m = findMunicipality(prev.muniCd) ?? municipality;
         // 入力の町名で筆が見つかったら、「町名を直した」とは言わない（町名は合っていた）
@@ -222,6 +234,55 @@ export async function lookup(
     links: buildLinks(municipality, geo.lat, geo.lng, rev.town),
     contact: resolveContact(municipality, rev.muniCd),
   };
+}
+
+/**
+ * 住所（国土地理院の住所検索で見つかった「宮城県仙台市青葉区一番町二丁目」「埼玉県比企郡小川町大字大塚」）の市区町村コードと町名。
+ * 対応エリアの外・市区町村が読めなければ null
+ */
+export function muniFromAddress(address: string): ReverseResult | null {
+  const s = address.normalize("NFKC").replace(/\s/g, "");
+  const pref = s.match(PREF_NAME_RE)?.[1];
+  const codes = pref ? MUNI_CODES[pref] : undefined;
+  if (!pref || !codes) return null;
+  const names = Object.entries(codes)
+    .map(([code, name]) => [code, name.replace(/\s/g, "")] as const)
+    .sort((a, b) => b[1].length - a[1].length);
+  let rest = s.slice(pref.length);
+  let hit = names.find(([, n]) => rest.startsWith(n));
+  // 郡の名前（「比企郡」）は市区町村の一覧に無いので外して探す（郡山市のように名前に郡の字がある市は、上でそのまま当たる）
+  const gun = hit ? null : rest.match(/^[^市区町村]+?郡/)?.[0];
+  if (gun) {
+    rest = rest.slice(gun.length);
+    hit = names.find(([, n]) => rest.startsWith(n));
+  }
+  if (!hit) return null;
+  // 町名は逆ジオコーダの町名（「三ケ尻」）に合わせて、頭の「大字」を外す（市の図面の町名との照らし合わせに使う）
+  return { muniCd: hit[0], town: withoutNumbers(rest.slice(hit[1].length)).replace(/^大字/, "") };
+}
+
+/**
+ * 地点の市区町村と町名（国土地理院の逆ジオコーダ）。逆ジオコーダが応答しない（障害・混雑・時間切れ）ときは、住所検索で見つかった住所の
+ * 市区町村と町名にする（住所検索がその市区町村の中で見つけた地点なので、同じ市区町村。逆ジオコーダが止まっても調べられるように）
+ */
+async function reverseOrAddress(lat: number, lng: number, matchedAddress: string): Promise<ReverseResult | null> {
+  try {
+    return await reverseGeocode(lat, lng);
+  } catch (e) {
+    const r = muniFromAddress(matchedAddress);
+    if (r) return r;
+    throw e;
+  }
+}
+
+/** 2点の間の距離（km。近い所の目安） */
+function distKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  return Math.hypot((a.lat - b.lat) * 111.32, (a.lng - b.lng) * 111.32 * Math.cos((a.lat * Math.PI) / 180));
+}
+
+/** 国土地理院の住所（「京都府京都市中京区下丸屋町」）の町が、その名前（「下丸屋町」）か */
+export function sameNameMatched(matchedAddress: string, base: string): boolean {
+  return withoutNumbers(matchedAddress).normalize("NFKC").endsWith(base.normalize("NFKC"));
 }
 
 /**
