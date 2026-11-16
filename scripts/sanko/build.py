@@ -90,9 +90,13 @@ CCBY = "CC BY 4.0"
 #   fetch：dataeye（埼玉県・千葉県のオープンデータサイト。dataset はデータセットの番号）か ckan（api・dataset）。
 #          resource はリソース名・ファイル名に合う正規表現（合うものが複数あれば一番新しいもの）
 #   shp：zip の中の筆のポリゴンの shapefile（パスの正規表現）。epsg：座標系（.prj が無いものも平面直角座標系 IX 系）
-#   chiban：地番の列（複数なら「本番-枝番-小枝番」とつなぐ）。key：大字の列（コードか名前）。oname：大字名の列。koaza：小字名の列
+#   chiban：地番の列（複数なら「本番-枝番-小枝番」とつなぐ）。key：大字の列（コードか名前。列の一覧なら「_」でつなぐ：京都市の区＋町名）。
+#   oname：大字名の列。koaza：小字名の列
+#   only：この列がこの値の筆だけ使う（長岡京市の「長狭物区分」＝地番）。drop_lots：地番の頭の数字がこれに合えば地番ではない（道・水路の番号）
+#   mirror：GitHub Actions から取れないので R2 の写し（sanko/src/）から読む（手元で --fetch-only → ワークフローの import_ref で足す）
 #   names：大字名を別の表から引く（shp か csv。key・name の列。pad はコードの桁をそろえる）
 #   split：1つの列に「大字コード-地番」があるもの
+#   subkey：小字のコードの列（小字ごとに地番が付き、小字の名前が無い市。小字のまとまりごとに法務省の地番区域を決める）
 #   date：データの時点（ファイルに書かれたもの。分からなければ公開日）
 SOURCES = [
     {
@@ -232,6 +236,10 @@ SOURCES = [
         "fetch": {"kind": "page", "page": "https://www.city.nagaokakyo.lg.jp/0000012991.html", "resource": r"(?i)^R\d+_?(?:tiban|chiban).*shape.*\.zip$"},
         "date": "2026-01-01", "epsg": 2448, "enc": "cp932",
         "shp": r"筆面\.shp$", "split": {"field": "所在", "re": r"^(\d+)-\d+:(.+)$"},
+        # 地番は小字ごとに付く（同じ大字の別々の小字に同じ地番がある）。小字の名前は無いので、小字コードで法務省の地番区域を決める
+        "subkey": "小字コード",
+        # 道路・水路などの面にも 96666・93333 のような番号が付いているので、地番の面だけ
+        "only": {"field": "長狭物区分", "values": ["地番"]},
     },
     {
         "code": "24216", "name": "伊賀市", "credit": "伊賀市「地番図データ」", "license": CCBY, "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja",
@@ -252,6 +260,8 @@ SOURCES = [
         "fetch": {"kind": "ckan", "api": BODIK, "dataset": "252123_chibanzu", "resource": r"高島市地番図"},
         "date": "2026-01-01", "epsg": 2448, "enc": "cp932",
         "shp": r"(?i)exp-tochi\.shp$", "split": {"field": "MOTOCHIBAN", "re": r"^(\d+)-(.+)$"},
+        # 8888・9999 は同じ大字に数十の面（細長い形が多い：道・水路など）に付く番号で、地番ではない
+        "drop_lots": r"8888|9999",
     },
     {
         # 区のある市。区ごとの法務省の地図XMLを合わせて読み、同じ名前の町がほかの区にもあれば、筆の区（ku）の町にする。
@@ -265,7 +275,7 @@ SOURCES = [
     },
     {
         # G空間情報センターの 7z。KU は区の番号（1 青葉区〜5 泉区）、ANAME は「坪沼字原前」（大字名＋字＋小字名）
-        "code": "04100", "name": "仙台市", "credit": "仙台市「仙台市地番図（参考図）データ」", "license": "CC BY（版の記載なし）",
+        "code": "04100", "mirror": True, "name": "仙台市", "credit": "仙台市「仙台市地番図（参考図）データ」", "license": "CC BY（版の記載なし）",
         "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja（G空間情報センターの表示は「クリエイティブ・コモンズ 表示」で版の記載なし）",
         "fetch": {"kind": "ckan", "api": GSPATIAL, "dataset": "chibanzu", "resource": r"^土地$"},
         "date": "2026-01-01", "epsg": 6678, "enc": "cp932",
@@ -288,6 +298,24 @@ SOURCES = [
         "fetch": {"kind": "ckan", "api": BODIK, "dataset": "402044_land_lot_correspondence_map", "resource": r"R8\.1\.1時点"},
         "date": "2026-01-01", "epsg": 2444, "enc": "utf-8",
         "shp": r"直方市地番対応図\d*\.shp$", "chiban": ["地番"], "key": "大字", "oname": "大字",
+        # 99999-◯ は道などの面に付く番号で、地番ではない
+        "drop_lots": r"99999",
+    },
+    {
+        # 京都市のサイトのファイルはダウンロードのボタン（フォームの送信）でしか取れないので、国土交通省が同じデータを共通の仕様に
+        # 変換して公開している試作データを使う（国交省のサイトのコンテンツは PDL1.0。この試作データは別のルールの一覧に無い）
+        "code": "26100", "name": "京都市", "mirror": True,
+        "credit": "京都市「京都市固定資産税（土地）地番図データ」（国土交通省「土地境界データ(地番現況図) 試作データ」で共通の仕様に変換されたもの）",
+        "license": "CC BY 4.0（京都市）・公共データ利用規約第1.0版（国土交通省の変換）",
+        "terms": "京都市固定資産税（土地）地番図データ利用規約（CC BY 4.0）＋ 国土交通省ウェブサイトの利用ルール https://www.mlit.go.jp/link.html（PDL1.0）",
+        "fetch": {"kind": "page", "page": "https://www.mlit.go.jp/tochi_fudousan_kensetsugyo/tochi_fudousan_kensetsugyo_tk17_000001_00063.html", "resource": r"^26100_Shapefile\.zip$"},
+        "date": "2026-01-13 公開（国土交通省。元のデータの時点は書かれていない）", "epsg": 6674, "enc": "cp932",
+        "shp": r"26100_京都市_土地境界データ_\d+\.shp$", "chiban": ["地番"],
+        # 同じ町名がいくつもの区にある（亀屋町など）ので、区の名前と町名で分ける
+        "key": ["市区町村名", "大字名"], "oname": "大字名", "koaza": "小字名",
+        "wards": ["26101", "26102", "26103", "26104", "26105", "26106", "26107", "26108", "26109", "26110", "26111"],
+        "ward_field": "市区町村名",
+        "ward_names": {f"京都市{w}": w for w in ("北区", "上京区", "左京区", "中京区", "東山区", "下京区", "南区", "右京区", "伏見区", "山科区", "西京区")},
     },
 ]
 # 確かめて外したもの（--check で「入れていない市町村」として知らせない）。
@@ -307,6 +335,10 @@ EXCLUDED = {
 }
 
 KANJI_NUM = {"〇": 0, "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+# 「６丁目」「十二丁目」だけの名前（大字の名前の後ろに残ったとき、小字ではなく丁目として町の名前に残す）
+CHOME_ONLY = re.compile(r"(?:[0-9]+|[〇一二三四五六七八九十]+)丁目")
+# 同じ地番区域・地番の筆がこれより離れた2か所以上にあれば、違う土地に同じ地番を付けたおそれがあるので入れない（m）
+SPLIT_GAP_M = 100.0
 CHIBAN_RE = re.compile(r"^\d+(-\d+)*$")
 # 西東京市（日本測地系・平面直角座標系 IX 系）→ 世界測地系（JGD2011 の IX 系として扱う）。Tokyo to JGD2000 (1)（EPSG:15483）の3パラメータ
 TOKYO_PIPELINE = (
@@ -530,6 +562,11 @@ def fetch_only(srcs: list[dict], work: str) -> None:
     log(f"{path}: {len(metas)} 市町村")
 
 
+def mirrored(src: dict) -> bool:
+    """GitHub Actions から取れないので、R2 の写し（sanko/src/）から読む市町村（埼玉県・千葉県のサイトと、mirror の付いたもの）"""
+    return src["fetch"]["kind"] == "dataeye" or bool(src.get("mirror"))
+
+
 def archive_path(work: str, code: str, meta: dict) -> str:
     """取ったファイルの置き場所（7z で配られているもの（仙台市）は .7z、ほかは .zip）"""
     ext = ".7z" if str(meta.get("file", "")).lower().endswith(".7z") else ".zip"
@@ -675,12 +712,26 @@ def norm_chiban(parts: list[str]) -> str:
     s = "-".join(out)
     if not CHIBAN_RE.match(s):
         return ""
-    return "-".join(str(int(x)) for x in s.split("-"))
+    nums = [int(x) for x in s.split("-")]
+    # 頭の数字が 0（豊中市の道・水路の面の TIBAN「0」）は地番ではない
+    if nums[0] == 0:
+        return ""
+    return "-".join(str(x) for x in nums)
+
+
+# 地名の旧字体 → 新字体（名前を比べるときだけ。豊田市の図「澤ノ堂」「佛田」と法務省の「沢ノ堂」「仏田」など）
+OLD_KANJI = str.maketrans({
+    "澤": "沢", "濱": "浜", "邊": "辺", "邉": "辺", "嶋": "島", "冨": "富", "廣": "広", "德": "徳", "國": "国", "櫻": "桜", "瀧": "滝",
+    "藏": "蔵", "萬": "万", "澁": "渋", "條": "条", "佛": "仏", "圓": "円", "當": "当", "豐": "豊", "實": "実", "壽": "寿", "惠": "恵",
+    "髙": "高", "﨑": "崎", "嵜": "崎", "舊": "旧", "淺": "浅", "鹽": "塩", "龜": "亀", "黑": "黒", "驛": "駅", "峯": "峰",
+    # 形が同じひらがなとカタカナ（法務省の「べボノ木」と豊田市の図の「ベボノ木」）
+    "へ": "ヘ", "べ": "ベ", "ぺ": "ペ",
+})
 
 
 def norm_town(s: str) -> str:
-    """名前の比べ方（「大字」「字」・空白・丁目の数字の書き方・ケ／ヶの違いを無視）"""
-    s = unicodedata.normalize("NFKC", s or "").replace(" ", "").replace("　", "")
+    """名前の比べ方（「大字」「字」・空白・丁目の数字の書き方・ケ／ヶの違い・地名の旧字体を無視）"""
+    s = unicodedata.normalize("NFKC", s or "").replace(" ", "").replace("　", "").translate(OLD_KANJI)
     s = re.sub(r"^(大字|字)", "", s)
 
     def kan(m):
@@ -786,13 +837,25 @@ def read_lines_mode(src: dict, root: str) -> tuple[list, list[str], list[str], l
     return geoms, chibans, keys, onames, koazas
 
 
+def shape_records(r):
+    """図形と属性を1つずつ。図形が空・壊れたもの（京都市の試作データに、点の無いポリゴンがある。pyshp はそこで止まる）は None"""
+    for i in range(len(r)):
+        try:
+            shp = r.shape(i)
+        except Exception:
+            shp = None
+        yield shp, r.record(i)
+
+
 def read_muni(src: dict, root: str) -> dict:
     """市町村の筆（元の座標系の形・地番・大字のキー・大字名・小字名）"""
     wardl: list[str] = []  # 区のある市の、筆の区の名前（「南区」。ward_field）
+    subs: list[str] = []  # 小字のコード（subkey。小字ごとに地番が付く市の、小字の名前の代わり）
     if "lines" in src:
         geoms, chibans, keys, onames, koazas = read_lines_mode(src, root)
         raw_n = len(geoms)
         wardl = [""] * len(geoms)
+        subs = [""] * len(geoms)
     else:
         path = find(root, src["shp"])
         prj = [f for f in os.listdir(os.path.dirname(path)) if f.lower() == os.path.basename(path)[:-4].lower() + ".prj"]
@@ -815,21 +878,28 @@ def read_muni(src: dict, root: str) -> dict:
             prefixes = sorted({str(rec[i_name]).strip() for rec in rn.iterRecords() if str(rec[i_name]).strip()}, key=len, reverse=True)
         geoms, chibans, keys, onames, koazas = [], [], [], [], []
         raw_n = 0
-        for sr in r.iterShapeRecords():
+        for shp, raw in shape_records(r):
             raw_n += 1
-            rec = dict(zip(names, sr.record))
+            rec = dict(zip(names, raw))
             if "split" in src:
                 m = re.match(src["split"]["re"], str(rec[src["split"]["field"]]))
                 if not m:
                     continue
                 key, ch = m.group(1), norm_chiban([m.group(2)])
             else:
-                key = str(rec[src["key"]]).strip()
+                key = "_".join(str(rec[c]).strip() for c in src["key"]) if isinstance(src["key"], list) else str(rec[src["key"]]).strip()
                 ch = norm_chiban([rec[c] for c in src["chiban"]])
+            # 地番の面だけ（長岡京市の「長狭物区分」：道路・水路などの面にも 96666 のような番号が付いている）
+            if src.get("only") and str(rec[src["only"]["field"]]).strip() not in src["only"]["values"]:
+                ch = ""
+            # 地番ではない決まった番号（高島市の 8888・9999、直方市の 99999-◯：道・水路などの面に付く）
+            if ch and src.get("drop_lots") and re.fullmatch(src["drop_lots"], ch.split("-")[0]):
+                ch = ""
             # 区の名前（番号で書かれた所は ward_names で名前にする。仙台市の KU「1」→「青葉区」）
             w = str(rec[src["ward_field"]]).strip() if src.get("ward_field") else ""
             wardl.append(src.get("ward_names", {}).get(w, w))
-            if not ch or not sr.shape.points:
+            subs.append(str(rec[src["subkey"]]).strip() if src.get("subkey") else "")
+            if not ch or shp is None or not shp.points:
                 chibans.append("")
                 geoms.append(None)
                 keys.append(key)
@@ -837,7 +907,7 @@ def read_muni(src: dict, root: str) -> dict:
                 koazas.append("")
                 continue
             try:
-                g = shape(sr.shape.__geo_interface__)
+                g = shape(shp.__geo_interface__)
             except Exception:
                 g = None
             geoms.append(g)
@@ -846,8 +916,11 @@ def read_muni(src: dict, root: str) -> dict:
             koaza = str(rec[src["koaza"]]).strip() if src.get("koaza") else ""
             if prefixes:
                 head = next((p for p in prefixes if key.startswith(p)), "")
-                if head:
-                    key, nm, koaza = head, head, key[len(head):]
+                rest = key[len(head):] if head else ""
+                # 残りが「６丁目」だけなら小字ではなく丁目なので、町の名前（鍵・大字名）に残す。大字だけにすると、
+                # 丁目ごとに付く地番（新生町１丁目の 1-1 と６丁目の 1-1）がまとまり、ほかの丁目の地番区域が付く
+                if head and not CHOME_ONLY.fullmatch(unicodedata.normalize("NFKC", rest).strip()):
+                    key, nm, koaza = head, head, rest
             # 「坪沼字原前」（大字名＋「字」＋小字名。仙台市）を大字と小字に分ける
             if src.get("split_aza") and "字" in nm[1:]:
                 j = nm.index("字", 1)
@@ -869,6 +942,7 @@ def read_muni(src: dict, root: str) -> dict:
         "name": [onames[i] for i in keep],
         "koaza": [koazas[i] for i in keep],
         "ward": [wardl[i] for i in keep],
+        "sub": [subs[i] for i in keep],
     }
 
 
@@ -937,6 +1011,11 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         town_ch[t][ch][parts] += 1
         town_kuiki[t][parts] += 1
         inv[ch].add(t)
+    # 法務省の地番区域（小字まで）ごとの地番
+    kuiki_ch: dict[tuple, set] = collections.defaultdict(set)
+    for parts, ch, _pub in recs:
+        if CHIBAN_RE.match(ch) and parts[0] in cities:
+            kuiki_ch[parts].add(ch)
     town_by_name: dict[str, list] = collections.defaultdict(list)
     for t in town_ch:
         town_by_name[norm_town(t[1] + t[2])].append(t)
@@ -947,6 +1026,7 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
     pub_m = [shapely.transform(g, lambda xy: np.column_stack(TO_M.transform(xy[:, 0], xy[:, 1]))) for g in moj["pub_geom"]]
     tree = STRtree(pub_m) if pub_m else None
     votes: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
+    kvotes: dict[tuple, collections.Counter] = collections.defaultdict(collections.Counter)  # 小字のコードごと：地番区域（小字まで）
     pairs = []
     if tree is not None:
         mi, pj = tree.query(pts_m, predicate="within")
@@ -954,6 +1034,8 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
             parts, ch, _ = recs[moj["pub_idx"][j]]
             if ch == muni["chiban"][i]:
                 votes[muni["key"][i]][(parts[0], parts[1], parts[2])] += 1
+                if muni["sub"][i]:
+                    kvotes[(muni["key"][i], muni["sub"][i])][parts] += 1
                 pairs.append((i, j))
     # 平行移動（同じ地番の筆の重心のずれの中央値）
     shift = (0.0, 0.0)
@@ -1016,6 +1098,60 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
             decide[k] = choice
             second[k] = [t for t in ranked if t != choice and score[t] >= 0.2][:3]
 
+    # 小字ごとに地番が付く所（長岡京市：同じ大字の別々の小字に同じ地番がある）は、市町村の小字のコード（subkey）ごとに、
+    # 法務省の地番区域（小字まで）を決める：公共座標の筆と同じ地番で重なればその地番区域、無ければ地番の集まりが一番重なる
+    # 地番区域（小字の地番の半分以上が入り、2番目の2倍以上）。決まらない小字の筆は、下の「同じ地番が別々の小字にある」で外れる
+    sub_pick: dict[tuple, tuple] = {}
+    sub_methods = collections.Counter()
+    by_sub: dict[tuple, list[int]] = collections.defaultdict(list)
+    for i, (k, s) in enumerate(zip(muni["key"], muni["sub"])):
+        if s:
+            by_sub[(k, s)].append(i)
+    for (k, s), idx in by_sub.items():
+        t = decide.get(k)
+        if not t:
+            continue
+        v = kvotes.get((k, s))
+        if v and sum(v.values()) >= 3 and v.most_common(1)[0][1] / sum(v.values()) >= 0.6:
+            sub_pick[(k, s)] = v.most_common(1)[0][0]
+            sub_methods["spatial"] += len(idx)
+            continue
+        A = {muni["chiban"][i] for i in idx}
+        sc = sorted(((len(A & kuiki_ch[K]), K) for K in town_kuiki[t]), key=lambda x: -x[0])
+        if sc and sc[0][0] > 0 and sc[0][0] >= 0.5 * len(A) and sc[0][0] >= 2 * (sc[1][0] if len(sc) > 1 else 0):
+            sub_pick[(k, s)] = sc[0][1]
+            sub_methods["chiban"] += len(idx)
+        else:
+            sub_methods["none"] += len(idx)
+    if by_sub:
+        log(f"  {code} 小字のコード {len(by_sub)} のうち地番区域が決まった {len(sub_pick)}（筆：{dict(sub_methods)}）")
+
+    # 町名が、法務省の「大字＋小字」をつないだ形の市（京都市の試作データ「東野中井ノ上町」、法務省は大字「東野」＋小字「中井ノ上町」）は、
+    # つないだ名前で法務省の地番区域（小字まで）を引く（区のある市は同じ区のもの。地番の重なりが3割以上か、地番が3つ未満）
+    full_kuiki: dict[str, list] = collections.defaultdict(list)
+    for K in kuiki_ch:
+        if K[3]:
+            full_kuiki[norm_town(K[1] + K[2] + K[3])].append(K)
+    key_pick: dict[str, tuple] = {}
+    for k, idx in by_key.items():
+        if any(muni["koaza"][i] for i in idx) or any(muni["sub"][i] for i in idx):
+            continue
+        nm = collections.Counter(muni["name"][i] for i in idx).most_common(1)[0][0]
+        cands = full_kuiki.get(norm_town(nm), []) if nm else []
+        ward = collections.Counter(muni["ward"][i] for i in idx).most_common(1)[0][0]
+        if ward:
+            cands = [K for K in cands if K[0].endswith(ward)]
+        if len(cands) != 1:
+            continue
+        A = {muni["chiban"][i] for i in idx}
+        if len(A) < 3 or len(A & kuiki_ch[cands[0]]) >= 0.3 * len(A):
+            key_pick[k] = cands[0]
+    if key_pick:
+        log(f"  {code} 大字＋小字の名前で地番区域が決まった町 {len(key_pick)}（筆 {sum(len(by_key[k]) for k in key_pick)}）")
+
+    # 小字ごとに地番が付く町（法務省のデータで、同じ地番が別々の小字にある地番が 2% 以上）。小字の分からない筆に、町までの地番区域を付けない
+    per_koaza = {t for t, chs in town_ch.items() if sum(1 for cn in chs.values() if len(cn) > 1) >= 0.02 * len(chs)}
+
     # 筆ごとの地番区域
     covered = np.zeros(n, dtype=bool)
     if tree is not None and not keep_public:
@@ -1023,6 +1159,8 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         covered[np.unique(mi)] = True
     groups: dict[tuple, list] = collections.defaultdict(list)
     stats = collections.Counter()
+    amb_town: collections.Counter = collections.Counter()  # 小字が決まらない筆の多い町（確かめ用の記録）
+    amb_ex: dict[str, list] = collections.defaultdict(list)
     for i in range(n):
         if covered[i]:
             stats["public"] += 1
@@ -1030,27 +1168,66 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         k, ch = muni["key"][i], muni["chiban"][i]
         t = decide.get(k)
         kuiki = None
+        K = key_pick.get(k) or sub_pick.get((k, muni["sub"][i]))
+        if K is not None:
+            t = t or (K[0], K[1], K[2])
         if t:
-            if ch not in town_ch[t]:
-                alt = [s for s in second.get(k, []) if ch in town_ch[s]]
-                if len(alt) == 1:
-                    t = alt[0]
-            koaza = norm_town(muni["koaza"][i]) if muni["koaza"][i] else ""
-            if ch in town_ch[t]:
-                cands = town_ch[t][ch]
-                pick = [p for p in cands if koaza and norm_town(p[3]) == koaza]
-                kuiki = "_".join(pick[0] if pick else cands.most_common(1)[0][0])
-                stats["exists"] += 1
+            if K is not None:
+                kuiki = "_".join(K)
+                stats["exists"] += ch in kuiki_ch[K]
             else:
-                cands = town_kuiki[t]
-                pick = [p for p in cands if koaza and norm_town(p[3]) == koaza]
-                kuiki = "_".join(pick[0] if pick else cands.most_common(1)[0][0])
+                if ch not in town_ch[t]:
+                    alt = [s for s in second.get(k, []) if ch in town_ch[s]]
+                    if len(alt) == 1:
+                        t = alt[0]
+                koaza = norm_town(muni["koaza"][i]) if muni["koaza"][i] else ""
+                # 市町村の図の小字が法務省のこの町にある（その小字に、この地番が無くても）
+                kz_town = [p for p in town_kuiki[t] if koaza and norm_town(p[3]) == koaza]
+                if ch in town_ch[t]:
+                    cands = town_ch[t][ch]
+                    pick = [p for p in cands if koaza and norm_town(p[3]) == koaza]
+                    if pick:
+                        kuiki = "_".join(pick[0])
+                    elif kz_town:
+                        # 小字は合うが、法務省ではその小字にこの地番が無い（別の小字にある）：市町村の図の小字を信じる
+                        kuiki = "_".join(kz_town[0])
+                    elif len(cands) == 1:
+                        kuiki = "_".join(next(iter(cands)))
+                    else:
+                        # 法務省のこの町では、別々の小字（地番区域）に同じ地番がある（小字ごとに地番が付く所）。
+                        # 市町村の図に小字が無く、どの小字の筆か決められないので入れない（前は一番多い小字を付けていて、違う土地に同じ地番区域が付いた）
+                        stats["ambiguous"] += 1
+                        amb_town[t[1] + t[2]] += 1
+                        if len(amb_ex[t[1] + t[2]]) < 2:
+                            amb_ex[t[1] + t[2]].append(f"{muni['koaza'][i] or '（小字なし）'} {ch} → {'・'.join(sorted({p[3] or '（なし）' for p in cands}))}")
+                        continue
+                    stats["exists"] += bool(pick) or (not kz_town and len(cands) == 1)
+                else:
+                    cands = town_kuiki[t]
+                    if kz_town:
+                        kuiki = "_".join(kz_town[0])
+                    elif len({p[3:] for p in cands}) <= 1:
+                        kuiki = "_".join(cands.most_common(1)[0][0])
+                    elif t in per_koaza:
+                        # 小字ごとに地番が付く町で、法務省に無い地番・小字が分からない：どの小字の筆か決められないので入れない
+                        stats["ambiguous"] += 1
+                        amb_town[t[1] + t[2]] += 1
+                        if len(amb_ex[t[1] + t[2]]) < 2:
+                            amb_ex[t[1] + t[2]].append(f"{muni['koaza'][i] or '（小字なし）'} {ch} → 法務省のこの町に無い地番")
+                        continue
+                    else:
+                        # 法務省のこの町に無い地番で、小字が分からない（地番は町ごとに付く）：小字を書かずに、町（大字・丁目）までの地番区域にする
+                        kuiki = f"{t[0]}_{t[1]}_{t[2]}__"
             stats["mapped"] += 1
         else:
             if drop_unmapped or src.get("drop_unmapped"):
                 stats["dropped_unmapped"] += 1
                 continue
             nm = unicodedata.normalize("NFKC", muni["name"][i]).replace(" ", "") if muni["name"][i] else ""
+            if not nm:
+                # 町の名前が分からない筆（地番区域が市の名前だけになり、住所の町と照らし合わせられない）は入れない
+                stats["dropped_noname"] += 1
+                continue
             nm = re.sub(r"(\d+)丁目", lambda m: chr(0xFF10 + int(m.group(1))) + "丁目" if len(m.group(1)) == 1 else m.group(0), nm)
             m = re.match(r"^(.*?)([０-９\d]+丁目)$", nm)
             # 区のある市は、筆の区の名前を付ける（「熊本市南区」。区が分からなければ入れない）
@@ -1058,10 +1235,38 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
             if src.get("wards") and not muni["ward"][i]:
                 stats["dropped_unmapped"] += 1
                 continue
-            kuiki = f"{cty}_{m.group(1)}_{m.group(2)}__" if m else f"{cty}_{nm}___"
+            # 小字の名前があれば地番区域に入れる（小字ごとに地番が付く所で、別の小字の同じ地番とまとめない）
+            kz = re.sub(r"\s", "", unicodedata.normalize("NFKC", muni["koaza"][i])) if muni["koaza"][i] else ""
+            kuiki = f"{cty}_{m.group(1)}_{m.group(2)}_{kz}_" if m else f"{cty}_{nm}__{kz}_"
         # 法務省の町に対応しない筆は、市町村の大字ごとに分けておく（別の大字の同じ地番をまとめない）
         groups[(kuiki, ch, "" if t else k)].append(i)
         stats["kept"] += 1
+
+    if amb_town:
+        log(f"  {code} 小字が決まらない筆の多い町：" + "、".join(f"{tn} {c}（{' / '.join(amb_ex[tn])}）" for tn, c in amb_town.most_common(6)))
+    # 同じ地番区域・地番の筆が、SPLIT_GAP_M より離れた2か所以上にあるもの（評価分割の切れ端ではなく、違う土地に同じ地番を
+    # 付けたおそれ。小字ごとに地番が付く所で小字が分からない・市町村の図の地番の誤りなど）は、どれが正しいか決められないので入れない
+    split_dropped, split_examples = 0, []
+    for gk in [gk for gk, idx in groups.items() if len(idx) > 1]:
+        gs = [muni["geom"][i] for i in groups[gk]]
+        parent = list(range(len(gs)))
+
+        def root_of(a: int) -> int:
+            while parent[a] != a:
+                parent[a] = parent[parent[a]]
+                a = parent[a]
+            return a
+
+        qa, qb = STRtree(gs).query(gs, predicate="dwithin", distance=SPLIT_GAP_M)
+        for a, b in zip(qa, qb):
+            parent[root_of(int(a))] = root_of(int(b))
+        if len({root_of(a) for a in range(len(gs))}) > 1:
+            split_dropped += len(gs)
+            if len(split_examples) < 5:
+                split_examples.append(f"{gk[0]} {gk[1]}（{len(gs)}筆）")
+            del groups[gk]
+    if split_dropped:
+        log(f"  {code} 同じ地番区域・地番が {SPLIT_GAP_M:.0f}m より離れた2か所以上にある筆 {split_dropped} を入れない（例：{'、'.join(split_examples)}）")
 
     # 書き出す（同じ地番区域・地番の筆はまとめる：評価分割など）
     written = 0
@@ -1095,6 +1300,10 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         "parcels_raw": muni["raw"],
         "parcels_numbered": n,
         "public_overlap_dropped": stats["public"],
+        # 入れなかった筆：同じ町の別々の小字に同じ地番があり小字が決まらない・町の名前が無い・同じ地番が離れた2か所以上
+        "ambiguous_dropped": stats["ambiguous"],
+        "noname_dropped": stats["dropped_noname"],
+        "split_dropped": split_dropped,
         "kept": kept,
         "features": written,
         "mapped": round(stats["mapped"] / kept, 4) if kept else 0,
@@ -1102,6 +1311,7 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         "kuiki_distinct": len(out_kuiki),
         "kuiki_in_moj": round(len(out_kuiki & moj_kuiki) / len(out_kuiki), 4) if out_kuiki else 0,
         "methods": dict(methods),
+        **({"sub_methods": dict(sub_methods)} if by_sub else {}),
         "pairs": len(pairs),
         "shift_m": [round(shift[0], 2), round(shift[1], 2)],
         "residual_m": [None if resid_before is None else round(resid_before, 2), None if resid_after is None else round(resid_after, 2)],
@@ -1110,7 +1320,8 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
     log(
         f"  {code} → 筆 {kept}（公共座標の所 {stats['public']} を除く）・地番区域が法務省の町に対応 {res['mapped']:.1%}・"
         f"地番区域 {len(out_kuiki)} 種のうち法務省にある {res['kuiki_in_moj']:.1%}・"
-        f"地番区域と地番が法務省にある {res['exists']:.1%}・平行移動 {res['shift_m']}m（同じ地番の筆 {len(pairs)}、ずれの中央値 {res['residual_m']}m）"
+        f"地番区域と地番が法務省にある {res['exists']:.1%}・平行移動 {res['shift_m']}m（同じ地番の筆 {len(pairs)}、ずれの中央値 {res['residual_m']}m）・"
+        f"入れない筆：小字が決まらない {stats['ambiguous']}・町名なし {stats['dropped_noname']}・離れた同じ地番 {split_dropped}"
     )
     return res
 
@@ -1222,7 +1433,7 @@ def main() -> None:
     if a.fetch_only:
         if not a.work:
             sys.exit("--work を指定してください")
-        fetch_only([s for s in SOURCES if (s["code"] in a.only if a.only else s["fetch"]["kind"] == "dataeye")], a.work)
+        fetch_only([s for s in SOURCES if (s["code"] in a.only if a.only else mirrored(s))], a.work)
         return
     if not a.out:
         sys.exit("--out を指定してください")
@@ -1245,9 +1456,9 @@ def main() -> None:
                 log(f"::warning::{s['code']} {s['name']}: {e}")
     results = {s["code"]: done[s["code"]] for s in srcs if s["code"] in done}
     if a.mirror_list:
-        portal = {s["code"] for s in SOURCES if s["fetch"]["kind"] == "dataeye"}
+        portal = {s["code"] for s in SOURCES if mirrored(s)}
         with open(a.mirror_list, "w", encoding="utf-8") as f:
-            f.writelines(f"{c}-{r['id']}.zip\n" for c, r in results.items() if c in portal)
+            f.writelines(f"{os.path.basename(archive_path(work, c, r))}\n" for c, r in results.items() if c in portal)
     with open(seq, "w", encoding="utf-8") as fo:
         for c in results:
             with open(os.path.join(parts_dir, f"{c}.geojsonl"), encoding="utf-8") as fi:
