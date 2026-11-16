@@ -9,6 +9,8 @@
 # （12市町）は R2 の写し（sanko/src/）から読む。写しは、別の所（手元など）で build.py --fetch-only で取ったファイルを
 # ブランチの sanko-src/ に置き、Run workflow の import_ref にそのブランチを入れて足す（作れたら R2 に置く。ブランチは消してよい）。
 # 新しいファイルが出たかも GitHub Actions からは分からないので、同じ所で確かめる。
+# G空間情報センターの仙台市の 7z と、国土交通省のページの京都市の zip も、GitHub Actions からは取れないことがある（2026年11月。
+# 仙台市は 7z でない中身が返る）ので、同じように写しから読む（build.py の SOURCES の mirror）。
 #
 # 必要な設定は地番の地図データ（parcel-tiles.yml）と同じ。無ければ何もしないで終わる:
 #   Secrets:   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
@@ -23,7 +25,7 @@ on:
         type: boolean
         default: false
       import_ref:
-        description: 埼玉県・千葉県のサイトのファイルを置いたブランチ（sanko-src/ に zip と import.json。build.py --fetch-only で作る）
+        description: GitHub Actions から取れない市町村のファイルを置いたブランチ（sanko-src/ に zip・7z と import.json。build.py --fetch-only で作る）
         type: string
         default: ""
   schedule:
@@ -105,7 +107,7 @@ jobs:
           git clone --depth 1 --branch "$TIPPECANOE_VERSION" https://github.com/felt/tippecanoe.git /tmp/tippecanoe
           make -C /tmp/tippecanoe -j"$(nproc)"
           mkdir -p ~/tippecanoe-bin && cp /tmp/tippecanoe/tippecanoe /tmp/tippecanoe/tile-join ~/tippecanoe-bin/
-      - name: 埼玉県・千葉県のサイトのファイルの写しを R2 から読む
+      - name: 取れないサイトのファイルの写しを R2 から読む
         if: steps.c.outputs.changed == 'true'
         run: |
           mkdir -p work/sanko/src
@@ -119,7 +121,8 @@ jobs:
           git fetch --depth 1 origin "$IMPORT_REF"
           mkdir -p work/import
           git archive FETCH_HEAD sanko-src | tar -x -C work/import
-          cp work/import/sanko-src/*.zip work/import/sanko-src/import.json work/sanko/src/
+          # zip と 7z（仙台市）と import.json
+          find work/import/sanko-src -maxdepth 1 -type f \( -name '*.zip' -o -name '*.7z' -o -name import.json \) -exec cp {} work/sanko/src/ \;
           ls -la work/sanko/src
       - name: タイルを作る
         if: steps.c.outputs.changed == 'true'
@@ -144,7 +147,7 @@ jobs:
           if count(new) < 0.9 * count(old):
               sys.exit("::error::筆が前の回の9割より少ないので置き換えません")
           PY
-      - name: 埼玉県・千葉県のサイトのファイルの写しを R2 に置く
+      - name: 取れないサイトのファイルの写しを R2 に置く
         if: steps.c.outputs.changed == 'true'
         run: |
           # 使ったファイルで R2 に無いものを置き、同じ市町村の前のファイルを消す（次の回もこの写しから作る）
