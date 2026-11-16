@@ -603,6 +603,21 @@ describe("地点の筆", () => {
     for (const [raw, bare] of [["10-1W1", "10-1"], ["25V2", "25"], ["7X(1/2)", "7"], ["12-3", "12-3"]]) expect(registryChiban(raw)).toBe(bare);
   });
 
+  it("参考図を作る仕組みは、離れた同じ地番を筆の面ごとに確かめ、地番が町に無い筆をほかの町に付け替えず、同じデータから毎回同じ参考図を作る", () => {
+    const py = readFileSync(new URL("../../scripts/sanko/build.py", import.meta.url), "utf8");
+    // 1つの筆の図形が離れた2か所以上の面でできているもの（伊丹市 昆陽南３丁目 20-1 など）も、離れた同じ地番として入れない
+    // make_valid が返す入れ子の図形（GeometryCollection の中の MultiPolygon）も面まで開き、線・点は除く（線で離れた面がつながって見えないように）
+    expect(py).toMatch(/gs = \[p for i in idx_all for p in poly_parts\(muni\["geom"\]\[i\]\)\]/);
+    expect(py).toMatch(/def poly_parts\(g\)[\s\S]{0,400}if g\.geom_type == "Polygon":\n\s+return \[g\]\n\s+return \[p for x in getattr\(g, "geoms", \[\]\) for p in poly_parts\(x\)\]/);
+    expect(py).toMatch(/split_dropped \+= len\(idx_all\)/);
+    // 前は、地番が法務省のその町に無い筆を、地番の集まりがよく合うほかの町に付け替えていた（逆ジオコーダで調べると、ほとんどが元の町の筆だった）
+    expect(py).not.toMatch(/second\[k\]|second\.get\(/);
+    expect(py).not.toMatch(/alt = \[s for s in/);
+    // 同じ割合の町の並びは名前の順（Python の集合の順は作るたびに変わる）
+    expect(py).toContain("ranked = sorted(score, key=lambda t: (-score[t], t))");
+    expect(py).toContain("jr = sorted(jac, key=lambda t: (-jac[t], t))");
+  });
+
   it("住所の地点が道路の上だったときの、地番で探し直す文字（町に丁目があれば、すぐ後ろの番号を丁目に）", () => {
     expect(chibanQueryOf("千葉県松戸市古ヶ崎4-3556-1", true)).toBe("地番 千葉県松戸市古ヶ崎4丁目3556-1");
     expect(chibanQueryOf("千葉県松戸市古ヶ崎4-3556", true)).toBe("地番 千葉県松戸市古ヶ崎4丁目3556");

@@ -1153,6 +1153,16 @@ def read_muni(src: dict, root: str) -> dict:
     }
 
 
+def poly_parts(g) -> list:
+    """図形の面（Polygon）を全部取り出す。make_valid が返す GeometryCollection の中の MultiPolygon などの入れ子も開き、
+    線・点・空の面は除く（書き出すときに残るのは面だけなので、線で離れた面がつながって見えないように）"""
+    if g is None or g.is_empty:
+        return []
+    if g.geom_type == "Polygon":
+        return [g]
+    return [p for x in getattr(g, "geoms", []) for p in poly_parts(x)]
+
+
 def merge(geoms: list):
     """同じ筆の形をまとめる。形が壊れていてまとめられなければ、1mm の格子にそろえて直してからまとめ、それでもだめなら並べるだけにする"""
     try:
@@ -1291,7 +1301,6 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
     for i, k in enumerate(muni["key"]):
         by_key[k].append(i)
     decide: dict[str, tuple] = {}
-    second: dict[str, list] = {}
     # 同じ区に、法務省では括弧の付いた同じ名前の町が2つ以上ある大字（京都市の「鍛冶屋町（西洞院通正面）」と「鍛冶屋町（堺町通万寿寺）」。
     # 市町村の図は括弧なしの「鍛冶屋町」）：離れた区画のまとまりごとに、地番の集まりで町を決める（paren_pick：筆の番号 → 町）
     paren_multi: dict[str, list] = {}
@@ -1308,10 +1317,11 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
                 if in_ward(t):
                     cnt[t] += 1
         score = {t: v / len(A) for t, v in cnt.items()}
-        ranked = sorted(score, key=lambda t: -score[t])
+        # 同じ割合の町は町の名前の順に並べる（A は集合で、Python の集合の順は作るたびに変わる。同じデータから毎回同じ参考図を作る）
+        ranked = sorted(score, key=lambda t: (-score[t], t))
         # 地番の集まりの重なり（Jaccard）。小さな町の地番（1〜数百）は大きな町にもあるので、含まれる割合だけでは決まらないことがある
         jac = {t: v / (len(A) + len(town_ch[t]) - v) for t, v in cnt.items()}
-        jr = sorted(jac, key=lambda t: -jac[t])
+        jr = sorted(jac, key=lambda t: (-jac[t], t))
         nm = collections.Counter(muni["name"][i] for i in idx).most_common(1)[0][0]
         named = [t for t in town_by_name.get(norm_town(nm), []) if in_ward(t)] if nm else []
         # 括弧を除くと同じ名前になる、同じ区の町（京都市の「下丸屋町（小川通竹屋町）」「下丸屋町（河原町通二条）」、括弧なしの「上之町」と「上之町（大宮通木津屋橋）」）
@@ -1350,11 +1360,8 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
             how = "none"
         methods[how] += len(idx)
         if choice:
+            # 地番がこの町に無い筆も、ほかの町には付け替えない（下の「筆ごとの地番区域」）
             decide[k] = choice
-            # 市町村の図の町名が法務省の町名（丁目まで）とそのまま合って決めた町（name）は、地番がその町に無くても、ほかの町には付け替えない。
-            # 京都市で「西五辻東町」の筆の地番 38-11 が法務省の西五辻東町に無く、約1km 離れた下清蔵口町の 38-11 に付け替わって、同じ地番が
-            # 離れた2か所になっていた（両方とも入らなくなっていた）。丁目ごとに地番が付く町（豊田市の五ケ丘６丁目と７丁目）でも同じ
-            second[k] = [] if how in ("name", "name-only") else [t for t in ranked if t != choice and score[t] >= 0.2][:3]
 
     # 小字ごとに地番が付く所（長岡京市：同じ大字の別々の小字に同じ地番がある）は、市町村の小字のコード（subkey）ごとに、
     # 法務省の地番区域（小字まで）を決める：公共座標の筆と同じ地番で重なればその地番区域、無ければ地番の集まりが一番重なる
@@ -1446,10 +1453,10 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
                 kuiki = "_".join(K)
                 stats["exists"] += ch in kuiki_ch[K]
             else:
-                if ch not in town_ch[t]:
-                    alt = [s for s in second.get(k, []) if ch in town_ch[s]]
-                    if len(alt) == 1:
-                        t = alt[0]
+                # 地番が法務省のこの町に無い筆も、この町のまま（前は、地番の集まりがよく合うほかの町（上位3つ）のうち、その地番が
+                # 1つの町にだけあればその町に付け替えていた。国土地理院の逆ジオコーダで筆の場所の町を調べると、付け替えた筆は
+                # 伊丹市 22・豊中市 124・直方市 192・豊田市 85・京都市 105、高島市・加古川市・福山市の抜き出し各 150（合わせて 978）のうち、
+                # 付け替えた先の町にあったのは2つだけで、ほとんどが元の町にあった。法務省の地図データに無い地番は、その町の地番の抜けで、ほかの町の筆ではない）
                 koaza = norm_town(muni["koaza"][i]) if muni["koaza"][i] else ""
                 # 市町村の図の小字が法務省のこの町にある（その小字に、この地番が無くても）
                 kz_town = [p for p in town_kuiki[t] if koaza and norm_town(p[3]) == koaza]
@@ -1536,7 +1543,8 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
     if amb_town:
         log(f"  {code} 小字が決まらない筆の多い町：" + "、".join(f"{tn} {c}（{' / '.join(amb_ex[tn])}）" for tn, c in amb_town.most_common(6)))
     # 同じ地番区域・地番の筆が、SPLIT_GAP_M より離れた2か所以上にあるもの（評価分割の切れ端ではなく、違う土地に同じ地番を
-    # 付けたおそれ。小字ごとに地番が付く所で小字が分からない・市町村の図の地番の誤りなど）は、どれが正しいか決められないので入れない
+    # 付けたおそれ。小字ごとに地番が付く所で小字が分からない・市町村の図の地番の誤りなど）は、どれが正しいか決められないので入れない。
+    # 1つの筆の図形が離れた2か所以上の面でできているもの（伊丹市の昆陽南３丁目 20-1 の 11m² と 約270m 先の 3m² など）も同じに扱う
     split_dropped, split_examples = 0, []
     # 小字を足した地番区域は、足す前の地番区域（法務省の地番区域。地番はその中で1つ）でまとめて確かめる
     by_base: dict[tuple, list] = collections.defaultdict(list)
@@ -1544,9 +1552,9 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         by_base[(appended.get(gk[0], gk[0]),) + gk[1:]].append(gk)
     for gks in by_base.values():
         idx_all = [i for gk in gks for i in groups[gk]]
-        if len(idx_all) < 2:
+        gs = [p for i in idx_all for p in poly_parts(muni["geom"][i])]
+        if len(gs) < 2:
             continue
-        gs = [muni["geom"][i] for i in idx_all]
         parent = list(range(len(gs)))
 
         def root_of(a: int) -> int:
@@ -1559,9 +1567,9 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         for a, b in zip(qa, qb):
             parent[root_of(int(a))] = root_of(int(b))
         if len({root_of(a) for a in range(len(gs))}) > 1:
-            split_dropped += len(gs)
+            split_dropped += len(idx_all)
             if len(split_examples) < 5:
-                split_examples.append(f"{gks[0][0]} {gks[0][1]}（{len(gs)}筆）")
+                split_examples.append(f"{gks[0][0]} {gks[0][1]}（{len(idx_all)}筆）")
             for gk in gks:
                 del groups[gk]
     if split_dropped:
