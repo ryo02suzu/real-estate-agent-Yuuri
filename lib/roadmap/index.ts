@@ -1,5 +1,5 @@
-import { correctAddress, describeMatch, placeNotFound, type AddressFix, type AddressMiss } from "./address-fix";
-import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, kyotoChoices, kyotoStreet, kyotoTown, matchedNumbers, needsChoice, numbersAgree, reverseGeocode, streetSide, subAreaDropped, withoutNumbers, type GeocodeResult, type ReverseResult } from "./geocode";
+import { correctAddress, describeMatch, missChoices, missIsElsewhere, placeNotFound, type AddressFix, type AddressMiss } from "./address-fix";
+import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, kyotoChoices, kyotoStreet, kyotoTown, matchedNumbers, needsChoice, numbersAgree, reverseGeocode, streetSide, subAreaDropped, subAreaRequery, withoutNumbers, type GeocodeResult, type ReverseResult } from "./geocode";
 import { MUNI_CODES } from "./muni-codes";
 import { PREF_NAME_RE } from "./regions";
 import { buildLinks, findMunicipality, resolveContact, type Contact, type Municipality, type ResolvedLink } from "./municipalities";
@@ -14,7 +14,11 @@ export { toWebMercator } from "./vendors";
 export { changedMarks, type AddressFix, type AddressMiss } from "./address-fix";
 
 export type LookupResult =
-  | { status: "not_found" } // 住所が見つからない
+  | {
+      status: "not_found";
+      /** 入れた町名が見つからず、市区町村の中心にしか当たらなかった（その中心を物件の場所として出さない） */
+      miss?: AddressMiss;
+    } // 住所が見つからない
   | {
       status: "choose";
       candidates: GeocodeResult[];
@@ -22,6 +26,8 @@ export type LookupResult =
       near?: true;
       /** 市区町村を書かずに町名から入れた住所で、同じ町名が2つ以上の市区町村にあった（「東京都新宿3-1-1」は新宿区と葛飾区） */
       omitted?: true;
+      /** 入れた町名が見つからず、名前のつながらない別の町に当たった（その町を物件の場所として出さず、同じ市区町村の町から選んでもらう） */
+      miss?: AddressMiss;
     } // 同名の場所が複数（都道府県から入れ直すか、候補から選ぶ）
   | { status: "unsupported"; lat: number; lng: number; muniCd: string; matchedAddress: string } // 未対応の市町村
   | {
@@ -112,6 +118,10 @@ export async function lookup(
   // 「地番」の語は外して調べる（国土地理院が番地まで持っていれば、その位置から筆を探せる）
   const query = chiban?.explicit ? `${chiban.body}${chiban.chiban}` : address;
   let candidates = await geocodeCandidates(query);
+  // 小字のあとに大字の区分の字を書いた地番（「八街市八街字北中道ほ224番12」）は、国土地理院の区分の町（「八街ほ」）の形で探し直す
+  // （区分の兄弟の町「八街い」に当てない）
+  const subArea = await subAreaRequery(query, candidates);
+  if (subArea) candidates = subArea;
   // 書き間違い（市の抜け・町名の誤字・旧字・区の違い・合併前の市の名前）で町・市の中心や別の場所に当たったら、正式な名前で探し直す
   const fixed = exact ? null : await correctAddress(query, candidates);
   if (fixed && "choices" in fixed) return { status: "choose", candidates: fixed.choices.slice(0, 15), ...(fixed.omitted ? { omitted: true as const } : { near: true as const }) };
@@ -149,6 +159,12 @@ export async function lookup(
     ...(said?.fix && !exact ? { fix: { input: address, ...(fixed ? { query: fixed.query } : {}), ...said.fix } } : {}),
     ...(said?.miss ? { miss: said.miss } : {}),
   };
+  // 入れた町名が見つからず、市区町村の中心や名前のつながらない別の町に当たったときは、そこを物件の場所として出さない
+  // （地球から降りる演出がその場所へ寄り、別の場所の用途地域・ハザード・地番を出してしまう）。別の町なら、同じ市区町村の町から選んでもらう
+  if (said?.miss && missIsElsewhere(said.miss)) {
+    const choices = missChoices(address, said.miss, candidates);
+    return choices.length ? { status: "choose", candidates: choices, near: true, miss: said.miss } : { status: "not_found", miss: said.miss };
+  }
   let parcelMiss: Extract<LookupResult, { status: "ok" }>["parcelMiss"];
   // 住居表示（「1番」「1番1号」）まで一致した住所は、ふつうは地番ではないので探さない。町・大字まで、または「354番地」までの一致なら、
   // 地番の筆を探して位置（枝番まで）と筆の形を出す。ただし入力が登記の書き方（「14番1」「150番地」。号が無い）か、

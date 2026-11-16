@@ -47,6 +47,9 @@ function Empty({ icon, title, body, children }: { icon: ReactNode; title: string
 }
 
 const DISCLAIMER = "地図・データは参考情報です。MICHILUは判定をしません。重要事項説明などの最終確認は、必ず役所の窓口・公的な資料で行ってください。";
+/** 入れた町名が見つからなかったとき（市区町村の中心や別の町を、物件の場所として出さない） */
+const MISS_BODY = "国土地理院の住所のデータに、この町名がありませんでした（新しい町名や字の名前は、まだ入っていないことがあります）。町名を確かめて入れ直すか、地図で物件の場所を選んでください。";
+const MISS_NOTE = "候補は、国土地理院が返した同じ市区町村の町です。入れた町と同じ場所とは限りません。";
 
 /** 住所が見つからない・候補が複数・未対応の市区町村 */
 export function NotOkPage({ query, result, onPick, onMap, onBack, backLabel, banner }: { query: string; result: Exclude<LookupResult, { status: "ok" }>; onPick: (address: string) => void; onMap: () => void; onBack: () => void; backLabel?: string; banner?: ReactNode }) {
@@ -56,7 +59,11 @@ export function NotOkPage({ query, result, onPick, onMap, onBack, backLabel, ban
         <Top title="住所が見つかりませんでした" sub={`「${query}」`} onBack={onBack} backLabel={backLabel} />
         {banner}
         <div className="px-[16px] pt-[8px]">
-          <Empty icon={<TriangleAlert size={30} strokeWidth={1.6} absoluteStrokeWidth color="#c99700" />} title="入れ方を変えると見つかることがあります" body="都道府県・市区町村から入力してください。建物名や部屋番号は外すと見つかりやすくなります。地番は「松戸市古ヶ崎四丁目3556-1」のように、町名のあとに地番を続けます。">
+          <Empty
+            icon={<TriangleAlert size={30} strokeWidth={1.6} absoluteStrokeWidth color="#c99700" />}
+            title={result.miss ? `町名「${result.miss.typed}」が見つかりませんでした` : "入れ方を変えると見つかることがあります"}
+            body={result.miss ? MISS_BODY : "都道府県・市区町村から入力してください。建物名や部屋番号は外すと見つかりやすくなります。地番は「松戸市古ヶ崎四丁目3556-1」のように、町名のあとに地番を続けます。"}
+          >
             <Primary onClick={onMap} icon={<MapIcon size={18} strokeWidth={1.8} absoluteStrokeWidth />}>
               地図で場所を選ぶ
             </Primary>
@@ -69,13 +76,15 @@ export function NotOkPage({ query, result, onPick, onMap, onBack, backLabel, ban
     return (
       <>
         <Top
-          title={result.near ? "近い名前の町が複数あります" : "当てはまる場所が複数あります"}
+          title={result.miss ? `町名「${result.miss.typed}」が見つかりませんでした` : result.near ? "近い名前の町が複数あります" : "当てはまる場所が複数あります"}
           sub={
-            result.near
-              ? `「${query}」の町名を直して探します。物件の場所を選んでください`
-              : result.omitted
-                ? "市区町村が書かれていないので、同じ町名の場所を探しました。物件の場所を選んでください"
-                : "物件の場所を選んでください"
+            result.miss
+              ? "同じ市区町村の町で探すときは、下から選んでください。違うときは町名を確かめて入れ直すか、地図で場所を選んでください"
+              : result.near
+                ? `「${query}」の町名を直して探します。物件の場所を選んでください`
+                : result.omitted
+                  ? "市区町村が書かれていないので、同じ町名の場所を探しました。物件の場所を選んでください"
+                  : "物件の場所を選んでください"
           }
           onBack={onBack}
           backLabel={backLabel}
@@ -97,8 +106,15 @@ export function NotOkPage({ query, result, onPick, onMap, onBack, backLabel, ban
               </li>
             ))}
           </ul>
+          {result.miss && (
+            <div className="mt-[12px]">
+              <Primary onClick={onMap} icon={<MapIcon size={18} strokeWidth={1.8} absoluteStrokeWidth />}>
+                地図で場所を選ぶ
+              </Primary>
+            </div>
+          )}
           <Note className="mt-[10px]">
-            {result.omitted ? "無ければ、市区町村から入れ直すと一度で見つかります。" : "無ければ、都道府県から入れ直すと一度で見つかります。"}
+            {result.miss ? MISS_NOTE : result.omitted ? "無ければ、市区町村から入れ直すと一度で見つかります。" : "無ければ、都道府県から入れ直すと一度で見つかります。"}
             {DISCLAIMER}
           </Note>
         </div>

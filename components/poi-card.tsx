@@ -9,6 +9,7 @@ import { nearbyPois, nearestOf, POI_CREDIT, POI_DATA, POI_NOTE, POI_ORDER, POI_S
 import { pmtilesPoiSource } from "@/lib/roadmap/poi-tiles";
 import { ShopIcon } from "./icons";
 import { Notes } from "./notes";
+import { LOADING } from "@/lib/app/load-state";
 
 export type PoiState = { status: "loading" } | { status: "error" } | { status: "ok"; pois: PoiWalk[] };
 
@@ -35,7 +36,7 @@ export function usePois(lat: number, lng: number): PoiState {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   if (!POI_DATA.url) return NONE;
-  return state?.key === key ? state.value : { status: "loading" };
+  return state?.key === key ? state.value : LOADING;
 }
 
 /** 施設の一覧（種類・名前・徒歩の目安）と注意・出典。シートで入りきらなければ詰める（components/sheet.tsx の useDense） */

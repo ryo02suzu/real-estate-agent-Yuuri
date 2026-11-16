@@ -71,20 +71,22 @@ export function ResultView({
   /** PC（地図の左のパネル）用の配置 */
   desktop?: boolean;
 }) {
-  if (result.status === "not_found") return <NotFound query={query} />;
+  if (result.status === "not_found") return <NotFound query={query} result={result} />;
   if (result.status === "choose") return <Choose query={query} result={result} onPick={onPick} />;
   if (result.status === "unsupported") return <Unsupported result={result} onFix={onFix} />;
   return desktop ? <DesktopFound query={query} result={result} onPick={onPick} /> : <Found result={result} onFix={onFix} onExpand={onExpand} onPick={onPick} />;
 }
 
-function NotFound({ query }: { query: string }) {
+function NotFound({ query, result }: { query: string; result: Extract<LookupResult, { status: "not_found" }> }) {
   return (
     <div className={`${CARD} p-6 text-center`}>
       <SearchIcon className="mx-auto h-9 w-9 text-muted" />
-      <p className="mt-3 font-bold text-ink">住所が見つかりませんでした</p>
+      <p className="mt-3 font-bold text-ink">{result.miss ? `町名「${result.miss.typed}」が見つかりませんでした` : "住所が見つかりませんでした"}</p>
       <p className="mt-1 break-all text-sm text-muted">「{query}」</p>
       <p className="mt-3 text-xs leading-relaxed text-muted">
-        都道府県・市区町村から入力してください。建物名や部屋番号は外すと見つかりやすくなります。
+        {result.miss
+          ? "国土地理院の住所のデータに、この町名がありませんでした（新しい町名や字の名前は、まだ入っていないことがあります）。町名を確かめて入れ直すか、地図をクリックして「ここで調べる」で物件の場所を選んでください。"
+          : "都道府県・市区町村から入力してください。建物名や部屋番号は外すと見つかりやすくなります。"}
       </p>
     </div>
   );
@@ -103,12 +105,14 @@ function Choose({
   return (
     <section className={`${CARD} p-4`}>
       <p className="text-[14px] font-semibold text-ink">
-        「{query}」に当てはまる場所が複数あります
+        {result.miss ? `町名「${result.miss.typed}」が見つかりませんでした` : `「${query}」に当てはまる場所が複数あります`}
       </p>
       <p className="mt-1 text-[11px] text-muted">
-        {result.omitted
-          ? "市区町村が書かれていないので、同じ町名の場所を探しました。物件の場所を選んでください。無ければ市区町村から入れ直すと一度で見つかります。"
-          : "物件の場所を選んでください。無ければ都道府県から入れ直すと一度で見つかります。"}
+        {result.miss
+          ? "同じ市区町村の町で探すときは、下から選んでください（入れた町と同じ場所とは限りません）。違うときは町名を確かめて入れ直すか、地図をクリックして「ここで調べる」で選んでください。"
+          : result.omitted
+            ? "市区町村が書かれていないので、同じ町名の場所を探しました。物件の場所を選んでください。無ければ市区町村から入れ直すと一度で見つかります。"
+            : "物件の場所を選んでください。無ければ都道府県から入れ直すと一度で見つかります。"}
       </p>
       <ul className="mt-3 divide-y divide-line/70">
         {result.candidates.slice(0, 7).map((c) => (

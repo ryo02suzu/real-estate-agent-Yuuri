@@ -9,7 +9,7 @@
 import { Box, Compass, LocateFixed, Map as MapIcon, Maximize2, Minimize2, Minus, Plus, RotateCcw, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { addCompare, clearCompare, loadCompare, removeCompare, type CompareItem } from "@/lib/app/compare";
-import { loadPrefs, savePrefs, todOfSun, ZOOM_DIST, type DeskPrefs, type DeskTod, type GoogleFail } from "@/lib/app/desk";
+import { loadPrefs, samePlaces, savePrefs, todOfSun, ZOOM_DIST, type DeskPrefs, type DeskTod, type GoogleFail } from "@/lib/app/desk";
 import { placeParts } from "@/lib/app/scene";
 import { BASE, solar } from "@/lib/app/sun";
 import { favoriteKey, toggleFavoriteChecked, type FavoriteItem } from "@/lib/favorites";
@@ -161,6 +161,8 @@ export function DesktopShell({
   // 物件から届くもの（左の列の札・地図の駅と学校・いま出している 3D・案内図を開いているか）
   const [info, setInfo] = useState<{ lot?: string; town: string } | null>(null);
   const [places, setPlaces] = useState<MapPlace[]>([]);
+  // 同じ札の並びが届いたときは前のまま（新しい配列で描き直しを起こさない。描き直しのたびに届くと更新が止まらなくなる）
+  const onPlaces = useCallback((next: MapPlace[]) => setPlaces((cur) => (samePlaces(cur, next) ? cur : next)), []);
   const [engine, setEngine] = useState<{ e: Engine; note?: string } | null>(null);
   const [gsiPane, setGsiPane] = useState(false);
   const told = useRef(false);
@@ -565,7 +567,7 @@ export function DesktopShell({
             onLiteral={onLiteral}
             onMap={toMap}
             onFix={onFix}
-            onPlaces={setPlaces}
+            onPlaces={onPlaces}
             onEngine={onEngine}
             onInfo={setInfo}
             onGsiPane={setGsiPane}

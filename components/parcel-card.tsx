@@ -21,8 +21,12 @@ import { Sheet } from "./sheet";
 import { Tabs } from "./tabs";
 import { useCopy } from "./use-copy";
 import type { NeighborPlan } from "./app/neighbor-plan";
+import { LOADING } from "@/lib/app/load-state";
 
 type Ok = Extract<LookupResult, { status: "ok" }>;
+
+/** 町の代表点（番地まで分からない住所）なので筆を探さない（描くたびに同じ値を返す。lib/app/load-state.ts） */
+const TOWN_CENTER = { status: "none", approximate: true } as const;
 
 /** どうやって決めた筆か：地番で探した・地図で選んだ地点・住所の地点（参考） */
 export type ParcelKind = "chiban" | "picked" | "address";
@@ -60,8 +64,8 @@ export function useParcelInfo(result: Ok): ParcelInfo {
     // key に地点と筆が入っている
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, townCenter]);
-  if (townCenter) return { status: "none", approximate: true };
-  return state?.key === key ? state.value : { status: "loading" };
+  if (townCenter) return TOWN_CENTER;
+  return state?.key === key ? state.value : LOADING;
 }
 
 /**

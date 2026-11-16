@@ -150,3 +150,13 @@ export function googleFailText(f: GoogleFail): string {
       return "Google の 3D を読み込めなかったため、街の模型を出しています";
   }
 }
+
+/** 地図の札（駅・学校・施設）の並びが同じか（札の名前・説明・種類・位置まで。PC の地図へ渡すとき、同じなら前の並びのままにする） */
+export function samePlaces<P extends { key: string; name: string; sub?: string; kind: string; lng: number; lat: number }>(a: readonly P[], b: readonly P[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  return a.every((p, i) => {
+    const q = b[i];
+    return p.key === q.key && p.name === q.name && p.sub === q.sub && p.kind === q.kind && p.lng === q.lng && p.lat === q.lat;
+  });
+}

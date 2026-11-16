@@ -30,6 +30,7 @@ import { Fact } from "./fact";
 import { AlertIcon, ChevronRightIcon, ExternalIcon, HazardIcon, MapIcon } from "./icons";
 import { Notes } from "./notes";
 import { Sheet } from "./sheet";
+import { LOADING } from "@/lib/app/load-state";
 
 export type HazardState =
   | { status: "loading" }
@@ -85,7 +86,7 @@ export function useHazard(lat: number, lng: number, municipality: Municipality):
     // key に lat・lng・codes が入っている
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
-  return state?.key === key ? state.value : { status: "loading" };
+  return state?.key === key ? state.value : LOADING;
 }
 
 /**

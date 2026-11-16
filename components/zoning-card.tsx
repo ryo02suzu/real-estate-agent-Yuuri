@@ -25,6 +25,7 @@ import { AlertIcon, ChevronRightIcon, ZoningIcon } from "./icons";
 import { Fact } from "./fact";
 import { Notes } from "./notes";
 import { Sheet } from "./sheet";
+import { LOADING } from "@/lib/app/load-state";
 
 /**
  * morido：盛土規制法の区域、hourei：砂防指定地・急傾斜地崩壊危険区域などの区域、tochi：自然公園・農業振興地域（読めなければ無し）、
@@ -70,7 +71,7 @@ export function useZoning(lat: number, lng: number, municipality: Municipality):
     // key に lat・lng・codes が入っている
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
-  return state?.key === key ? state.value : { status: "loading" };
+  return state?.key === key ? state.value : LOADING;
 }
 
 /** 注意の色にする印 */

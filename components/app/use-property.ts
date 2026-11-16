@@ -25,6 +25,7 @@ import { useStations } from "../station-card";
 import { useZoning } from "../zoning-card";
 import { useLiquefaction, useRireki, useZousei } from "./use-national";
 import { useTriage } from "./use-triage";
+import { LOADING, NONE } from "@/lib/app/load-state";
 
 export type Ok = Extract<LookupResult, { status: "ok" }>;
 
@@ -43,6 +44,9 @@ export type AroundState =
       /** 歩いて行ける範囲（約1.2km）の施設すべて（近い順） */
       all: (Poi & { straight: number })[];
     };
+
+/** 施設のデータが無いとき（描くたびに同じ値を返す。lib/app/load-state.ts） */
+const NO_POI_DATA: AroundState = { status: "ok", nearest: [], all: [] };
 
 /** 周辺環境の画面の施設（最寄り・飲食店の数・地図の印） */
 export function useAround(lat: number, lng: number): AroundState {
@@ -67,8 +71,8 @@ export function useAround(lat: number, lng: number): AroundState {
     // key に地点が入っている
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
-  if (!POI_DATA.url) return { status: "ok", nearest: [], all: [] };
-  return state?.key === key ? state.value : { status: "loading" };
+  if (!POI_DATA.url) return NO_POI_DATA;
+  return state?.key === key ? state.value : LOADING;
 }
 
 export type EvacWalk = EvacSite & { walk?: { meters: number; minutes: number } };
@@ -102,7 +106,7 @@ export function useEvacuation(lat: number, lng: number): EvacState {
     // key に地点が入っている
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
-  return state?.key === key ? state.value : { status: "loading" };
+  return state?.key === key ? state.value : LOADING;
 }
 
 export type DealsState =
@@ -140,8 +144,8 @@ export function useDeals(result: Ok): DealsState {
     // key に市区町村と町が入っている
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
-  if (!code) return { status: "none" };
-  return state?.key === key ? state.value : { status: "loading" };
+  if (!code) return NONE;
+  return state?.key === key ? state.value : LOADING;
 }
 
 /** 1つの物件で読むデータすべて */
@@ -164,8 +168,9 @@ export function useProperty(result: Ok) {
   const zousei = useZousei(lat, lng);
   const rireki = useRireki(lat, lng);
   // 共有の文面・下書き・調査メモには、今までどおり生活環境の種類だけ（飲食店は入れない）
-  const pois: PoiState = around.status === "ok" ? { status: "ok", pois: around.nearest.filter((p) => POI_ORDER.includes(p.kind)) } : around;
-  const landPrice5 = landPrice.status === "ok" ? { ...landPrice, hits: landPrice.hits.slice(0, 5) } : landPrice;
+  // （読み込みの状態が変わったときだけ作り直す。描くたびに新しい値にしない。lib/app/load-state.ts）
+  const pois: PoiState = useMemo(() => (around.status === "ok" ? { status: "ok", pois: around.nearest.filter((p) => POI_ORDER.includes(p.kind)) } : around), [around]);
+  const landPrice5 = useMemo(() => (landPrice.status === "ok" ? { ...landPrice, hits: landPrice.hits.slice(0, 5) } : landPrice), [landPrice]);
   // 都市計画のデータに建ぺい率・容積率が無い市で、画面に（参考）として出す近くの同じ用途地域の地点の値（要注意点の文にも入れる）
   const ratioRef = useMemo(() => {
     const y = zoning.status === "ok" ? zoning.zoning.youto[0] : undefined;

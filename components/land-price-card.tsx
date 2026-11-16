@@ -25,6 +25,7 @@ import { Fact } from "./fact";
 import { ChevronRightIcon, ExternalIcon, LandPriceIcon, MapIcon } from "./icons";
 import { Notes } from "./notes";
 import { Sheet } from "./sheet";
+import { LOADING } from "@/lib/app/load-state";
 
 /** シート・カードに最初に出す地点の数（残りは「ほかの地点」で開く） */
 const SHOWN = 3;
@@ -49,7 +50,7 @@ export function useLandPrices(lat: number, lng: number, count = 5): LandPriceSta
     // key に地点が入っている
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
-  return state?.key === key ? state.value : { status: "loading" };
+  return state?.key === key ? state.value : LOADING;
 }
 
 /** 前年比の色（上がった・下がった。上がったのは良い悪いではないので、強い色にはしない） */

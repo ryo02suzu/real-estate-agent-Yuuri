@@ -13,6 +13,7 @@ import { Fact } from "./fact";
 import { ChevronRightIcon, SchoolIcon } from "./icons";
 import { Notes } from "./notes";
 import { Sheet } from "./sheet";
+import { LOADING } from "@/lib/app/load-state";
 
 /** none：データの無い市区町村（国のデータに入っていないか、利用条件で入れていない） */
 export type SchoolState = { status: "loading" } | { status: "none" } | { status: "error" } | { status: "ok"; schools: Schools };
@@ -39,7 +40,7 @@ export function useSchools(lat: number, lng: number): SchoolState {
     // key に地点が入っている
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
-  return state?.key === key ? state.value : { status: "loading" };
+  return state?.key === key ? state.value : LOADING;
 }
 
 function Row({ label, s, missing }: { label: string; s?: SchoolHit; missing?: string }) {
