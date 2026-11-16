@@ -593,6 +593,16 @@ describe("地点の筆", () => {
     expect(chibanLabel("123X(3/4)")).toBe("地番 123");
   });
 
+  it("参考図を作る仕組み（scripts/sanko/build.py）も、法務省の地番の印（W・V・X）をアプリと同じ形で外して照らし合わせる", () => {
+    const py = readFileSync(new URL("../../scripts/sanko/build.py", import.meta.url), "utf8");
+    // アプリの印（PIECE_MARK）と同じ正規表現（Python では / をエスケープしない）
+    expect(py).toContain('PIECE_RE = re.compile(r"(?:W\\d+|V\\d+|X\\(\\d+/\\d+\\))$")');
+    // 町の決め方・公共座標の重なりに使う地番は印を外したもの。平行移動を測る組には、筆の一部の切れ端を入れない
+    expect(py).toMatch(/chiban = bare_chiban\(raw\)/);
+    expect(py).toMatch(/if not moj\["pub_piece"\]\[j\]:\n\s+pairs\.append\(\(i, j\)\)/);
+    for (const [raw, bare] of [["10-1W1", "10-1"], ["25V2", "25"], ["7X(1/2)", "7"], ["12-3", "12-3"]]) expect(registryChiban(raw)).toBe(bare);
+  });
+
   it("住所の地点が道路の上だったときの、地番で探し直す文字（町に丁目があれば、すぐ後ろの番号を丁目に）", () => {
     expect(chibanQueryOf("千葉県松戸市古ヶ崎4-3556-1", true)).toBe("地番 千葉県松戸市古ヶ崎4丁目3556-1");
     expect(chibanQueryOf("千葉県松戸市古ヶ崎4-3556", true)).toBe("地番 千葉県松戸市古ヶ崎4丁目3556");
