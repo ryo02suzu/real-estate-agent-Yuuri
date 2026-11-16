@@ -555,7 +555,11 @@ function buildActions(input: TriageInput, issues: Issue[]): Action[] {
       title: "埋蔵文化財包蔵地かを確かめる",
       where: ik.office,
       what: ["周知の埋蔵文化財包蔵地（遺跡）に入るか。入るなら着工前の届出（文化財保護法93条）と試掘の可能性", ...(ik.note ? [ik.note] : [])],
-      how: ik.map ? "遺跡地図はネットで下調べ。包蔵地かどうかの回答は教育委員会で。" : "教育委員会（文化財の担当）に住所・地番で照会。",
+      how: ik.map?.ref
+        ? "国の参考の地図（文化財総覧WebGIS）で遺跡の位置を下調べ。包蔵地かどうかは教育委員会（文化財の担当）に住所・地番で照会。"
+        : ik.map
+          ? "遺跡地図はネットで下調べ。包蔵地かどうかの回答は教育委員会で。"
+          : "教育委員会（文化財の担当）に住所・地番で照会。",
       links: ik.map ? [{ label: ik.map.name, url: ik.map.url }] : undefined,
     });
   }

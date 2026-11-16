@@ -181,7 +181,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   // 文化財保護法：周知の埋蔵文化財包蔵地（遺跡）に入るかは教育委員会で確かめる。遺跡地図は概要を示すもので、証明にはならない
   const ik = isekiFor(m, result.lat, result.lng);
   other.push({ label: "文化財保護法（埋蔵文化財包蔵地）", value: CHECK, note: `包蔵地（遺跡）に入るかは${ik.office}で確認${ik.note ? `。${ik.note}` : ""}`, check: true });
-  if (ik.map) other.push({ label: "遺跡地図", value: `${ik.map.name}${ik.map.at ? "（物件の場所で開く）" : ""}`, note: ik.map.url });
+  if (ik.map) other.push({ label: ik.map.ref ? "遺跡の位置（参考）" : "遺跡地図", value: `${ik.map.name}${ik.map.at ? "（物件の場所で開く）" : ""}`, note: ik.map.url });
   sections.push({ title: "その他の法令に基づく制限（参考）", rows: other });
 
   // 敷地と道路との関係

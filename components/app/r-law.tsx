@@ -61,7 +61,7 @@ export function LawTab({ result, data, open }: TabProps) {
         tab: 1,
       });
     if (zoning.tochi) others.push({ label: "自然公園・農振・森林", value: tochiLine(zoning.tochi), warn: !!(zoning.tochi.park || zoning.tochi.agri || zoning.tochi.forest), tab: 1 });
-    if (zoning.iseki) others.push({ label: "埋蔵文化財", value: zoning.iseki.map ? "遺跡地図で確認" : "教育委員会で確認", tab: 1 });
+    if (zoning.iseki) others.push({ label: "埋蔵文化財", value: zoning.iseki.map && !zoning.iseki.map.ref ? "遺跡地図で確認" : "教育委員会で確認", tab: 1 });
     others.push({ label: "上下水道・ガス", value: zoning.suido?.length ? "台帳の地図" : "担当で確認", tab: 2 });
   }
   const contact = result.contact;

@@ -188,7 +188,7 @@ export function buildReport(result: Ok, input: ReportInput, opts: ReportOptions)
       if (full || inArea) items.push({ label: "自然公園・農振・森林", text: `${tochiLine(zoning.tochi)}（${zoning.tochi.year}年度の国のデータ）`, tone: inArea ? "warn" : undefined, note: check ?? undefined });
     }
     const iseki = isekiFor(m, result.lat, result.lng);
-    if (full) items.push({ label: "埋蔵文化財", text: isekiLine(iseki), tone: "check", link: iseki.map ? { label: "埋蔵文化財の地図", url: iseki.map.url } : undefined });
+    if (full) items.push({ label: "埋蔵文化財", text: isekiLine(iseki), tone: "check", link: iseki.map ? { label: iseki.map.ref ? "遺跡の位置（参考の地図）" : "埋蔵文化財の地図", url: iseki.map.url } : undefined });
     if (items.length) sections.push({ title: "法令上の制限（参考）", items });
   }
 
