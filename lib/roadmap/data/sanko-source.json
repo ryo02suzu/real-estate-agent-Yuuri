@@ -1,8 +1,8 @@
 {
-  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/sanko/sanko-20261116-1427.pmtiles",
+  "url": "https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev/sanko/sanko-20261116-1616.pmtiles",
   "built": "2026-11-16",
-  "file": "sanko-20261116-1427.pmtiles",
-  "bytes": 604978698,
+  "file": "sanko-20261116-1616.pmtiles",
+  "bytes": 607778859,
   "layer": "sanko",
   "attribution": "出典：市川市「地籍図（地番図）」、越谷市「地番図データ」、川越市「地番図データ」、前橋市「地籍図(地番現況図)」、久喜市「地番現況図（地番図データ）」、深谷市「地番参考図」、秩父市「地番参考図」、小鹿野町「地番参考図データ」、横瀬町「地番参考図データ」、小川町「地番参考図データ」、上里町「地番参考図（地番図データ）」、入間市「地番図情報」、我孫子市「地番参考図」、浦安市「浦安市地図データ（筆－形状）」、西東京市「地番図」、国立市「地番図」、東村山市「地形図（筆界）」、豊田市「地番参考図」、豊中市「地番参考図（地図情報とよなか）」、福山市「福山市地番図データ」、長岡京市「地番参考図」、伊賀市「地番図データ」、大牟田市「地番参考図」、高島市「地番図」、熊本市「熊本市_地番参考図」、仙台市「仙台市地番図（参考図）データ」、浜松市「浜松市地番図」、直方市「直方市地番対応図」、加古川市「加古川市地番参考図（土地家屋図）データ」、京都市「京都市固定資産税（土地）地番図データ」（国土交通省「土地境界データ(地番現況図) 試作データ」で共通の仕様に変換されたもの）（いずれも市町村のオープンデータ。PDL1.0／CC BY 4.0）を MICHILU が加工して作成。課税用の参考図で、登記の地番・筆の形と違うことがある",
   "sources": {
@@ -25,11 +25,11 @@
       "public_overlap_dropped": 8203,
       "ambiguous_dropped": 0,
       "noname_dropped": 0,
-      "split_dropped": 560,
+      "split_dropped": 48,
       "kept": 231919,
-      "features": 231359,
+      "features": 231871,
       "mapped": 1.0,
-      "exists": 0.9938,
+      "exists": 0.9927,
       "kuiki_distinct": 236,
       "kuiki_in_moj": 1.0,
       "methods": {
@@ -46,7 +46,7 @@
         0.84,
         0.83
       ],
-      "seconds": 69
+      "seconds": 143
     },
     "11222": {
       "name": "越谷市",
@@ -67,12 +67,12 @@
       "public_overlap_dropped": 15703,
       "ambiguous_dropped": 0,
       "noname_dropped": 0,
-      "split_dropped": 718,
+      "split_dropped": 69,
       "kept": 252200,
-      "features": 251444,
+      "features": 252083,
       "mapped": 1.0,
-      "exists": 0.9952,
-      "kuiki_distinct": 195,
+      "exists": 0.9939,
+      "kuiki_distinct": 192,
       "kuiki_in_moj": 1.0,
       "methods": {
         "name": 236172,
@@ -89,7 +89,7 @@
         0.47,
         0.44
       ],
-      "seconds": 91
+      "seconds": 141
     },
     "11201": {
       "name": "川越市",
@@ -110,12 +110,12 @@
       "public_overlap_dropped": 104027,
       "ambiguous_dropped": 40,
       "noname_dropped": 0,
-      "split_dropped": 2977,
+      "split_dropped": 1782,
       "kept": 233927,
-      "features": 230786,
+      "features": 231960,
       "mapped": 1.0,
-      "exists": 0.9722,
-      "kuiki_distinct": 235,
+      "exists": 0.9689,
+      "kuiki_distinct": 234,
       "kuiki_in_moj": 1.0,
       "methods": {
         "paren": 33536,
@@ -133,7 +133,7 @@
         0.17,
         0.17
       ],
-      "seconds": 118
+      "seconds": 143
     },
     "10201": {
       "name": "前橋市",
@@ -154,9 +154,9 @@
       "public_overlap_dropped": 234325,
       "ambiguous_dropped": 0,
       "noname_dropped": 0,
-      "split_dropped": 1340,
+      "split_dropped": 1342,
       "kept": 198348,
-      "features": 196994,
+      "features": 196992,
       "mapped": 1.0,
       "exists": 0.9861,
       "kuiki_distinct": 263,
@@ -174,7 +174,7 @@
         0.15,
         0.15
       ],
-      "seconds": 211
+      "seconds": 241
     },
     "11232": {
       "name": "久喜市",
@@ -195,11 +195,11 @@
       "public_overlap_dropped": 25016,
       "ambiguous_dropped": 8,
       "noname_dropped": 0,
-      "split_dropped": 2215,
+      "split_dropped": 1327,
       "kept": 208028,
-      "features": 205518,
+      "features": 206393,
       "mapped": 1.0,
-      "exists": 0.9858,
+      "exists": 0.9835,
       "kuiki_distinct": 143,
       "kuiki_in_moj": 1.0,
       "methods": {
@@ -217,7 +217,7 @@
         0.53,
         0.53
       ],
-      "seconds": 79
+      "seconds": 111
     },
     "11218": {
       "name": "深谷市",
@@ -238,11 +238,11 @@
       "public_overlap_dropped": 62611,
       "ambiguous_dropped": 0,
       "noname_dropped": 0,
-      "split_dropped": 1766,
+      "split_dropped": 872,
       "kept": 164439,
-      "features": 162590,
+      "features": 163481,
       "mapped": 0.9999,
-      "exists": 0.9839,
+      "exists": 0.9808,
       "kuiki_distinct": 128,
       "kuiki_in_moj": 0.9922,
       "methods": {
@@ -260,7 +260,7 @@
         0.56,
         0.43
       ],
-      "seconds": 83
+      "seconds": 108
     },
     "11207": {
       "name": "秩父市",
@@ -301,7 +301,7 @@
         0.3,
         0.08
       ],
-      "seconds": 89
+      "seconds": 144
     },
     "11365": {
       "name": "小鹿野町",
@@ -342,7 +342,7 @@
         0.01,
         0.01
       ],
-      "seconds": 53
+      "seconds": 78
     },
     "11361": {
       "name": "横瀬町",
@@ -383,7 +383,7 @@
         0.0,
         0.0
       ],
-      "seconds": 16
+      "seconds": 31
     },
     "11343": {
       "name": "小川町",
@@ -404,11 +404,11 @@
       "public_overlap_dropped": 36856,
       "ambiguous_dropped": 0,
       "noname_dropped": 0,
-      "split_dropped": 379,
+      "split_dropped": 339,
       "kept": 28941,
-      "features": 28560,
+      "features": 28600,
       "mapped": 1.0,
-      "exists": 0.9802,
+      "exists": 0.9787,
       "kuiki_distinct": 36,
       "kuiki_in_moj": 1.0,
       "methods": {
@@ -424,7 +424,7 @@
         0.02,
         0.02
       ],
-      "seconds": 33
+      "seconds": 48
     },
     "11385": {
       "name": "上里町",
@@ -466,7 +466,7 @@
         0.12,
         0.12
       ],
-      "seconds": 17
+      "seconds": 27
     },
     "11225": {
       "name": "入間市",
@@ -487,12 +487,12 @@
       "public_overlap_dropped": 79714,
       "ambiguous_dropped": 0,
       "noname_dropped": 0,
-      "split_dropped": 68,
+      "split_dropped": 58,
       "kept": 26033,
-      "features": 25964,
+      "features": 25974,
       "mapped": 1.0,
-      "exists": 0.9428,
-      "kuiki_distinct": 82,
+      "exists": 0.9425,
+      "kuiki_distinct": 81,
       "kuiki_in_moj": 1.0,
       "methods": {
         "spatial": 77810,
@@ -509,7 +509,7 @@
         0.34,
         0.2
       ],
-      "seconds": 53
+      "seconds": 67
     },
     "12222": {
       "name": "我孫子市",
@@ -530,12 +530,12 @@
       "public_overlap_dropped": 3355,
       "ambiguous_dropped": 0,
       "noname_dropped": 0,
-      "split_dropped": 314,
+      "split_dropped": 8,
       "kept": 90669,
-      "features": 90345,
+      "features": 90652,
       "mapped": 1.0,
-      "exists": 0.989,
-      "kuiki_distinct": 127,
+      "exists": 0.9872,
+      "kuiki_distinct": 126,
       "kuiki_in_moj": 1.0,
       "methods": {
         "name": 79857,
@@ -550,7 +550,7 @@
         0.5,
         0.11
       ],
-      "seconds": 32
+      "seconds": 40
     },
     "12227": {
       "name": "浦安市",
@@ -575,8 +575,8 @@
       "kept": 24186,
       "features": 24183,
       "mapped": 1.0,
-      "exists": 0.9936,
-      "kuiki_distinct": 54,
+      "exists": 0.9933,
+      "kuiki_distinct": 52,
       "kuiki_in_moj": 1.0,
       "methods": {
         "spatial": 14587,
@@ -592,7 +592,7 @@
         0.0,
         0.0
       ],
-      "seconds": 14
+      "seconds": 16
     },
     "13229": {
       "name": "西東京市",
@@ -613,11 +613,11 @@
       "public_overlap_dropped": 164,
       "ambiguous_dropped": 0,
       "noname_dropped": 0,
-      "split_dropped": 34,
+      "split_dropped": 2,
       "kept": 90219,
-      "features": 90180,
+      "features": 90212,
       "mapped": 1.0,
-      "exists": 0.9964,
+      "exists": 0.9963,
       "kuiki_distinct": 114,
       "kuiki_in_moj": 1.0,
       "methods": {
@@ -633,7 +633,7 @@
         1.02,
         0.9
       ],
-      "seconds": 38
+      "seconds": 53
     },
     "13215": {
       "name": "国立市",
@@ -654,11 +654,11 @@
       "public_overlap_dropped": 342,
       "ambiguous_dropped": 0,
       "noname_dropped": 0,
-      "split_dropped": 16,
+      "split_dropped": 0,
       "kept": 33842,
-      "features": 33825,
+      "features": 33841,
       "mapped": 1.0,
-      "exists": 0.9963,
+      "exists": 0.9961,
       "kuiki_distinct": 32,
       "kuiki_in_moj": 1.0,
       "methods": {
@@ -674,7 +674,7 @@
         0.25,
         0.25
       ],
-      "seconds": 17
+      "seconds": 23
     },
     "13213": {
       "name": "東村山市",
@@ -715,7 +715,7 @@
         0.48,
         0.24
       ],
-      "seconds": 27
+      "seconds": 40
     },
     "23211": {
       "name": "豊田市",
@@ -734,14 +734,14 @@
       "parcels_raw": 913861,
       "parcels_numbered": 878476,
       "public_overlap_dropped": 62952,
-      "ambiguous_dropped": 3704,
+      "ambiguous_dropped": 3611,
       "noname_dropped": 0,
-      "split_dropped": 3750,
-      "kept": 811820,
-      "features": 796623,
+      "split_dropped": 1301,
+      "kept": 811913,
+      "features": 798657,
       "mapped": 0.9998,
-      "exists": 0.9613,
-      "kuiki_distinct": 8339,
+      "exists": 0.9593,
+      "kuiki_distinct": 8331,
       "kuiki_in_moj": 0.812,
       "methods": {
         "name": 574620,
@@ -757,7 +757,7 @@
         0.0,
         0.0
       ],
-      "seconds": 591
+      "seconds": 795
     },
     "27203": {
       "name": "豊中市",
@@ -778,12 +778,12 @@
       "public_overlap_dropped": 6159,
       "ambiguous_dropped": 0,
       "noname_dropped": 12,
-      "split_dropped": 360,
+      "split_dropped": 371,
       "kept": 116535,
-      "features": 116098,
+      "features": 116088,
       "mapped": 1.0,
       "exists": 0.9938,
-      "kuiki_distinct": 336,
+      "kuiki_distinct": 335,
       "kuiki_in_moj": 1.0,
       "methods": {
         "chiban": 105560,
@@ -799,7 +799,7 @@
         0.4,
         0.4
       ],
-      "seconds": 44
+      "seconds": 62
     },
     "34207": {
       "name": "福山市",
@@ -820,11 +820,11 @@
       "public_overlap_dropped": 325473,
       "ambiguous_dropped": 14,
       "noname_dropped": 6202,
-      "split_dropped": 1801,
+      "split_dropped": 1814,
       "kept": 336154,
-      "features": 333114,
+      "features": 333105,
       "mapped": 1.0,
-      "exists": 0.9875,
+      "exists": 0.9876,
       "kuiki_distinct": 446,
       "kuiki_in_moj": 1.0,
       "methods": {
@@ -841,7 +841,7 @@
         0.1,
         0.1
       ],
-      "seconds": 304
+      "seconds": 498
     },
     "26209": {
       "name": "長岡京市",
@@ -887,7 +887,7 @@
         0.0,
         0.0
       ],
-      "seconds": 24
+      "seconds": 42
     },
     "24216": {
       "name": "伊賀市",
@@ -908,11 +908,11 @@
       "public_overlap_dropped": 105016,
       "ambiguous_dropped": 0,
       "noname_dropped": 0,
-      "split_dropped": 14193,
+      "split_dropped": 7897,
       "kept": 326496,
-      "features": 287826,
+      "features": 291080,
       "mapped": 1.0,
-      "exists": 0.8764,
+      "exists": 0.8553,
       "kuiki_distinct": 228,
       "kuiki_in_moj": 1.0,
       "methods": {
@@ -928,7 +928,7 @@
         0.18,
         0.18
       ],
-      "seconds": 385
+      "seconds": 515
     },
     "40202": {
       "name": "大牟田市",
@@ -949,13 +949,13 @@
       "public_overlap_dropped": 26890,
       "ambiguous_dropped": 0,
       "noname_dropped": 0,
-      "split_dropped": 1869,
+      "split_dropped": 1172,
       "kept": 123520,
-      "features": 121427,
+      "features": 122097,
       "mapped": 0.9992,
-      "exists": 0.9743,
-      "kuiki_distinct": 199,
-      "kuiki_in_moj": 0.9849,
+      "exists": 0.9712,
+      "kuiki_distinct": 198,
+      "kuiki_in_moj": 0.9848,
       "methods": {
         "spatial": 77423,
         "name": 72885,
@@ -970,7 +970,7 @@
         0.38,
         0.38
       ],
-      "seconds": 111
+      "seconds": 158
     },
     "25212": {
       "name": "高島市",
@@ -991,9 +991,9 @@
       "public_overlap_dropped": 50466,
       "ambiguous_dropped": 0,
       "noname_dropped": 49,
-      "split_dropped": 1627,
+      "split_dropped": 1677,
       "kept": 139544,
-      "features": 137032,
+      "features": 136984,
       "mapped": 1.0,
       "exists": 0.978,
       "kuiki_distinct": 136,
@@ -1012,7 +1012,7 @@
         0.29,
         0.29
       ],
-      "seconds": 126
+      "seconds": 183
     },
     "43100": {
       "name": "熊本市",
@@ -1033,17 +1033,17 @@
       "public_overlap_dropped": 235899,
       "ambiguous_dropped": 0,
       "noname_dropped": 0,
-      "split_dropped": 3325,
+      "split_dropped": 1330,
       "kept": 461497,
-      "features": 457870,
+      "features": 459790,
       "mapped": 1.0,
-      "exists": 0.9872,
-      "kuiki_distinct": 878,
+      "exists": 0.9847,
+      "kuiki_distinct": 877,
       "kuiki_in_moj": 1.0,
       "methods": {
         "spatial": 346879,
-        "name": 348163,
-        "chiban": 2354
+        "name": 349219,
+        "chiban": 1298
       },
       "pairs": 224591,
       "shift_m": [
@@ -1054,7 +1054,7 @@
         0.53,
         0.33
       ],
-      "seconds": 528
+      "seconds": 413
     },
     "04100": {
       "name": "仙台市",
@@ -1073,14 +1073,14 @@
       "parcels_raw": 645056,
       "parcels_numbered": 623886,
       "public_overlap_dropped": 209375,
-      "ambiguous_dropped": 562,
+      "ambiguous_dropped": 334,
       "noname_dropped": 0,
-      "split_dropped": 1268,
-      "kept": 413949,
-      "features": 412355,
+      "split_dropped": 479,
+      "kept": 414177,
+      "features": 413372,
       "mapped": 1.0,
-      "exists": 0.9612,
-      "kuiki_distinct": 2730,
+      "exists": 0.9593,
+      "kuiki_distinct": 2706,
       "kuiki_in_moj": 0.9996,
       "methods": {
         "name": 348763,
@@ -1097,7 +1097,7 @@
         0.09,
         0.09
       ],
-      "seconds": 230
+      "seconds": 443
     },
     "22130": {
       "name": "浜松市",
@@ -1118,12 +1118,12 @@
       "public_overlap_dropped": 621855,
       "ambiguous_dropped": 0,
       "noname_dropped": 0,
-      "split_dropped": 5100,
+      "split_dropped": 2745,
       "kept": 670557,
-      "features": 662102,
+      "features": 663925,
       "mapped": 1.0,
-      "exists": 0.9828,
-      "kuiki_distinct": 476,
+      "exists": 0.9793,
+      "kuiki_distinct": 473,
       "kuiki_in_moj": 1.0,
       "methods": {
         "spatial": 941558,
@@ -1140,7 +1140,7 @@
         0.18,
         0.18
       ],
-      "seconds": 501
+      "seconds": 741
     },
     "40204": {
       "name": "直方市",
@@ -1161,11 +1161,11 @@
       "public_overlap_dropped": 9781,
       "ambiguous_dropped": 0,
       "noname_dropped": 0,
-      "split_dropped": 766,
+      "split_dropped": 512,
       "kept": 90128,
-      "features": 89362,
+      "features": 89616,
       "mapped": 0.9999,
-      "exists": 0.9823,
+      "exists": 0.9809,
       "kuiki_distinct": 36,
       "kuiki_in_moj": 0.9722,
       "methods": {
@@ -1182,7 +1182,7 @@
         0.0,
         0.0
       ],
-      "seconds": 84
+      "seconds": 64
     },
     "28210": {
       "name": "加古川市",
@@ -1203,12 +1203,12 @@
       "public_overlap_dropped": 143977,
       "ambiguous_dropped": 0,
       "noname_dropped": 0,
-      "split_dropped": 3798,
+      "split_dropped": 3684,
       "kept": 112180,
-      "features": 107749,
+      "features": 107863,
       "mapped": 1.0,
-      "exists": 0.9421,
-      "kuiki_distinct": 152,
+      "exists": 0.9414,
+      "kuiki_distinct": 150,
       "kuiki_in_moj": 1.0,
       "methods": {
         "spatial": 229584,
@@ -1223,7 +1223,7 @@
         0.03,
         0.03
       ],
-      "seconds": 110
+      "seconds": 180
     },
     "26100": {
       "name": "京都市",
@@ -1242,21 +1242,21 @@
       "parcels_raw": 718603,
       "parcels_numbered": 718563,
       "public_overlap_dropped": 78202,
-      "ambiguous_dropped": 1502,
+      "ambiguous_dropped": 6,
       "noname_dropped": 0,
-      "split_dropped": 1181,
-      "kept": 638859,
-      "features": 637674,
-      "mapped": 0.9958,
-      "exists": 0.9807,
-      "kuiki_distinct": 5462,
-      "kuiki_in_moj": 0.9927,
+      "split_dropped": 196,
+      "kept": 640355,
+      "features": 640159,
+      "mapped": 0.998,
+      "exists": 0.9819,
+      "kuiki_distinct": 5456,
+      "kuiki_in_moj": 0.9958,
       "methods": {
         "none": 254118,
-        "chiban": 167436,
-        "spatial": 116366,
-        "name": 168341,
-        "paren": 12266,
+        "chiban": 165983,
+        "spatial": 116236,
+        "name": 169794,
+        "paren": 12396,
         "name-only": 36
       },
       "pairs": 74867,
@@ -1268,7 +1268,7 @@
         0.38,
         0.29
       ],
-      "seconds": 273
+      "seconds": 417
     }
   }
 }
