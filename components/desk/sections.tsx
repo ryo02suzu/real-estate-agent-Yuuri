@@ -16,7 +16,7 @@ import { LIQ_CREDIT } from "@/lib/roadmap/liquefaction";
 import { chibanzuFor } from "@/lib/roadmap/chibanzu";
 import { rirekiLine } from "@/lib/roadmap/rireki";
 import { roadShort } from "@/lib/roadmap/road-read";
-import { youtoShort } from "@/lib/roadmap/zoning";
+import { noYoutoSummary, youtoShort } from "@/lib/roadmap/zoning";
 import { zouseiText } from "@/lib/roadmap/zousei";
 import { BuildingCard } from "../building-card";
 import { ContactCard } from "../contact-card";
@@ -88,7 +88,7 @@ export function sectionSummary(k: SectionKey, c: Pick<SectionCtx, "result" | "da
     case "law": {
       if (data.zoning.status !== "ok") return data.zoning.status === "loading" ? "確認中…" : "読み込めず";
       const y = data.zoning.zoning.youto[0];
-      if (!y) return data.zoning.zoning.senbiki ?? "用途地域の指定なし";
+      if (!y) return noYoutoSummary(data.zoning.zoning, data.zoning.st);
       return `${youtoShort(y.name)}${y.bcr && y.far ? ` ${y.bcr}/${y.far}` : ""}`;
     }
     case "hazard": {

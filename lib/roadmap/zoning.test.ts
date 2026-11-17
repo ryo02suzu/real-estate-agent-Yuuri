@@ -5,6 +5,7 @@ import STATUS from "./data/zoning-status.json";
 import { ALL_PREF_NAMES, PREF_NAMES } from "./regions";
 import {
   noneLabel,
+  noYoutoSummary,
   ratioLabel,
   statusFor,
   youtoShort,
@@ -192,6 +193,30 @@ describe("データの無い種類を「指定なし」と言わない（スマ�
     expect(noneLabel(statusFor(["12225"], all), "bouka")).toBe("データなし");
     // 市のデータが一覧に無ければ「データなし」
     expect(noneLabel(undefined, "bouka")).toBe("データなし");
+  });
+
+  it("国の一覧で「〇」でも、留意事項で非公開の種類は「データなし」（横浜市は区域・区域区分・用途地域のみ公開）", () => {
+    // 横浜市（区のコードから市のデータを引く）。防火・高度地区・地区計画のデータは配られていない
+    const yokohama = statusFor(["14118"], all);
+    expect(yokohama?.note).toContain("のみ公開");
+    for (const l of ["bouka", "koudoti", "chikukei", "douro", "fuuchichiku"] as const) expect(noneLabel(yokohama, l), l).toBe("データなし");
+    // 公開されている用途地域・区域は今までどおり
+    expect(noneLabel(yokohama, "youto")).toBe("指定なし");
+    expect(zoningArea({ ...base, tokei: false } as Zoning, yokohama)).toBe("都市計画区域外");
+    // 川崎市は公開されているので「指定なし」と言える
+    expect(noneLabel(statusFor(["14131"], all), "koudoti")).toBe("指定なし");
+  });
+
+  it("都市計画区域・用途地域が非公開の市（延岡市）は「都市計画区域外」「用途地域の指定なし」と言わない", () => {
+    const nobeoka = statusFor(["45203"], all);
+    expect(nobeoka?.note).toContain("非公開");
+    const none = { ...base, tokei: false } as Zoning;
+    expect(zoningArea(none, nobeoka)).toBe("データなし");
+    expect(noYoutoSummary(none, nobeoka)).toBe("データなし");
+    // データのある市で都市計画区域の外なら、今までどおり
+    expect(noYoutoSummary(none, statusFor(["13101"], all))).toBe("用途地域の指定なし");
+    expect(noYoutoSummary({ ...base, senbiki: "市街化調整区域" } as Zoning, nobeoka)).toBe("市街化調整区域");
+    expect(noYoutoSummary(base, statusFor(["13101"], all))).toBe("用途地域の指定なし");
   });
 
   it("「都市計画区域外」は、都市計画区域のデータがあるか、市区町村に都市計画区域が無いと分かっているときだけ", () => {

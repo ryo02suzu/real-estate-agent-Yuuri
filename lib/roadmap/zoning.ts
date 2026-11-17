@@ -201,6 +201,16 @@ export function zoningArea(z: Zoning, st: ZoningStatus | undefined, outside = fa
   return (st && flag("tokei") === 1) || outside ? "都市計画区域外" : "データなし";
 }
 
+/**
+ * 用途地域が無い地点の短い一言（PC の「法令」の見出しの横）。区域区分があればそれ。
+ * その市の用途地域・都市計画区域のデータが国の GIS に無い（非公開の）ときは「指定なし」と言わず「データなし」
+ */
+export function noYoutoSummary(z: Zoning, st: ZoningStatus | undefined): string {
+  if (z.senbiki) return z.senbiki;
+  if (z.tokei || z.jyuntoshi) return noneLabel(st, "youto") === "データなし" ? "データなし" : "用途地域の指定なし";
+  return zoningArea(z, st) === "データなし" ? "データなし" : "用途地域の指定なし";
+}
+
 /** 画面に出す行（区域・用途地域・建ぺい率と容積率・防火・高度地区・地区計画・そのほか・都市計画道路・用途地域の境目） */
 export function zoningRows(z: Zoning, st: ZoningStatus | undefined): ZoningRow[] {
   const none = (l: ZoningLayer) => noneLabel(st, l);
