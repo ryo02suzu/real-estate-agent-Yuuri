@@ -242,7 +242,7 @@ describe("小字のあとに区分の字を書いた地番（subAreaForm・subAr
 
   it("当てはまらない住所はそのまま（区分の字が無い・小字が無い・市区町村のすぐ後ろが字）", () => {
     expect(subAreaForm("埼玉県熊谷市大字三ケ尻字東原1234番")).toBeNull();
-    expect(subAreaForm("群馬県桐生市元宿町3-27")).toBeNull();
+    expect(subAreaForm("群馬県桐生市織姫町1-1")).toBeNull();
     expect(subAreaForm("島根県大田市大田町大田ハ282番")).toBeNull();
     // 北海道・沖縄の「町＋字」は、字が町名（区分の町ではない）
     expect(subAreaForm("北海道河東郡士幌町字士幌西ほ171番12")).toBeNull();

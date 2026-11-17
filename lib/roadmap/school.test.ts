@@ -285,7 +285,7 @@ describe("アプリに入っている学区のタイル", () => {
   });
 
   it("桐生市は小学校区が国のデータに無い（市が公開していない）ので、中学校区だけ。「学区なし」ではなく、わけを返す", async () => {
-    const r = await schoolsAt(36.413, 139.327, src);
+    const r = await schoolsAt(36.4053, 139.3306, src);
     expect(r?.elementary).toBeUndefined();
     expect(r?.junior?.name).toBe("中央中学校");
     expect(schoolGaps("10203", r)).toEqual([{ key: "es", label: "小学校区", why: "absent" }]);

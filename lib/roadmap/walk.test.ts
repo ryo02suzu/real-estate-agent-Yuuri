@@ -119,8 +119,8 @@ describe("アプリに入っている駅のデータ", () => {
     expect(isCableOnly(STATIONS.find((s) => s.n === "御岳山")!)).toBe(true);
   });
 
-  it("桐生市元宿町のあたりは、西桐生より桐生が近い（ホームの端ではなく、駅舎・駅の位置まで測る）", () => {
-    const near = nearbyStations(36.413, 139.327, STATIONS);
+  it("桐生市役所のあたりは、西桐生より桐生が近い（ホームの端ではなく、駅舎・駅の位置まで測る）", () => {
+    const near = nearbyStations(36.4053, 139.3306, STATIONS);
     expect(near[0].station.n).toBe("桐生");
     expect(near.findIndex((n) => n.station.n === "西桐生")).toBeGreaterThan(0);
   });

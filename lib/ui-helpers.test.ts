@@ -71,7 +71,7 @@ describe("buildSummary", () => {
 
   it("学区のデータが無いときは「データなし（わけ）・教育委員会で確認」を書く（学区が無いとは書かない）", () => {
     const kiryu = findMunicipality("10203")!;
-    const ok = { status: "ok" as const, lat: 36.413, lng: 139.327, matchedAddress: "群馬県桐生市元宿町", town: "元宿町", approximate: false, municipality: kiryu, links: buildLinks(kiryu, 36.413, 139.327) };
+    const ok = { status: "ok" as const, lat: 36.4053, lng: 139.3306, matchedAddress: "群馬県桐生市織姫町", town: "織姫町", approximate: false, municipality: kiryu, links: buildLinks(kiryu, 36.4053, 139.3306) };
     const junior = { kind: "中学校" as const, name: "中央中学校", owner: "桐生市", city: "10203" };
     const text = buildSummary(ok, { schools: { junior } });
     expect(text).toContain("・中学校：中央中学校（桐生市）");
