@@ -90,6 +90,45 @@ LIST_COLUMNS = {
 }
 
 
+# 一覧の「留意事項」に出てくる都市計画の名前 → レイヤ（「〇」でも配っているデータに入っていない種類を見つける）
+NOTE_NAMES = {
+    "都市計画区域": ["tokei"],
+    "区域区分": ["senbiki"],
+    "用途地域": ["youto"],
+    "特別用途地区": ["tkbt"],
+    "高度地区": ["koudoti"],
+    "高度利用地区": ["koudori"],
+    "防火": ["bouka"],
+    "土地区画整理事業": ["tochiku"],
+    "地区計画": ["chikukei"],
+    "都市計画道路": ["douro"],
+    "都市計画公園": ["kouen"],
+    "立地適正化計画": ["ritteki"],
+    "特定用途制限地域": ["tokuteiyouto"],
+    "風致地区": ["fuuchichiku"],
+    "特別緑地保全地区": ["tokuryoku"],
+}
+
+
+def unpublished_layers(note: str) -> set:
+    """
+    留意事項から、一覧では「〇」でも公開していない（配っているデータに入っていない）レイヤを読む。
+    「一部非公開：都市計画区域、区域区分、用途地域のみ公開」（横浜市）→ 書いてある3つの外は全部。
+    「非公開（都市計画区域  区域区分  用途地域）」（延岡市）・「一部非公開（都市計画道路・都市計画公園…については、公開しない）」→ 書いてあるもの
+    """
+    note = note or ""
+    if "非公開" not in note:
+        return set()
+    named = lambda text: {l for name, ls in NOTE_NAMES.items() if name in text for l in ls}
+    m = re.search(r"非公開\s*[：:]\s*(.+?)のみ公開", note)
+    if m:
+        return set(LIST_COLUMNS.values()) - named(m.group(1))
+    m = re.search(r"非公開\s*[（(](.+?)[)）]", note)
+    if m:
+        return named(m.group(1))
+    return set()
+
+
 def log(*a):
     print(*a, flush=True)
 
@@ -240,9 +279,14 @@ def status(list_path: str) -> dict:
             flags[layer] = {"〇": 1, "×": 0, "－": -1, "-": -1}.get(v, 0)
         # データの時点。日付のほか「平成29年3月」「㉝道路：R6.3.5」のような書き方もあるので、文字のまま出す。無ければ作成日
         when = when_text(r[when_i]) or when_text(r[made_i])
+        note = str(r[note_i]).strip() if note_i is not None and r[note_i] else ""
+        # 一覧では「〇」でも、留意事項で非公開とされた種類はデータが無い（「指定なし」と言えない）ので 0 にする
+        for layer in unpublished_layers(note):
+            if flags.get(layer) == 1:
+                flags[layer] = 0
         entry = {"city": r[city_i], "asOf": when, "layers": flags}
-        if note_i is not None and r[note_i]:
-            entry["note"] = str(r[note_i]).strip()
+        if note:
+            entry["note"] = note
         out[code[:5]] = entry
     return dict(sorted(out.items()))
 
