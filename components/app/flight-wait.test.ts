@@ -30,13 +30,13 @@ describe("調べている間に向かう上空（components/app/flight-wait.ts�
   });
 
   it("入れた住所から都道府県を読む（都道府県から・郵便番号つき・地番・市区町村から）", () => {
-    expect(prefOfLabel("群馬県桐生市元宿町3-27")).toBe("群馬県");
-    expect(prefOfLabel("〒376-0045 群馬県桐生市元宿町3-27")).toBe("群馬県");
+    expect(prefOfLabel("群馬県桐生市織姫町1-1")).toBe("群馬県");
+    expect(prefOfLabel("〒371-8570 群馬県前橋市大手町1-1-1")).toBe("群馬県");
     expect(prefOfLabel("地番 千葉県八街市八街ほ224-12")).toBe("千葉県");
     expect(prefOfLabel("神奈川県横浜市西区みなとみらい2-2-1")).toBe("神奈川県");
     expect(prefOfLabel("京都府京都市中京区河原町通二条下る下丸屋町400")).toBe("京都府");
     // 都道府県を書かなくても、市区町村の名前が1つの都道府県にだけあれば
-    expect(prefOfLabel("桐生市元宿町3-27")).toBe("群馬県");
+    expect(prefOfLabel("桐生市織姫町1-1")).toBe("群馬県");
     expect(prefOfLabel("吾川郡いの町字西前田1186番10")).toBe("高知県");
   });
 
@@ -45,7 +45,7 @@ describe("調べている間に向かう上空（components/app/flight-wait.ts�
     expect(prefOfLabel("本町1-1")).toBeNull();
     expect(prefOfLabel("")).toBeNull();
     expect(waitViewOf("本町1-1")).toBeNull();
-    expect(waitViewOf("群馬県桐生市元宿町3-27")).toEqual({ center: [PREF_VIEW["群馬県"][0], PREF_VIEW["群馬県"][1]], zoom: PREF_VIEW["群馬県"][2] });
+    expect(waitViewOf("群馬県桐生市織姫町1-1")).toEqual({ center: [PREF_VIEW["群馬県"][0], PREF_VIEW["群馬県"][1]], zoom: PREF_VIEW["群馬県"][2] });
   });
 
   it("演出は、調べている間にこの上空へ向かい、日本の真ん中の1点へ寄り続けない", () => {

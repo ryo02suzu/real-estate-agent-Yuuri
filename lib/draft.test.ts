@@ -137,7 +137,7 @@ describe("重説・物件概要の下書き", () => {
   it("学区のデータが無い学校区は、教育委員会で確かめる行を【要確認】で入れる", () => {
     const kiryu = findMunicipality("10203")!;
     const junior = { kind: "中学校" as const, name: "中央中学校", owner: "桐生市", city: "10203" };
-    const text = draftText(buildDraft({ ...base, municipality: kiryu, links: buildLinks(kiryu, 36.413, 139.327) }, { schools: { junior } }));
+    const text = draftText(buildDraft({ ...base, municipality: kiryu, links: buildLinks(kiryu, 36.4053, 139.3306) }, { schools: { junior } }));
     expect(text).toContain("中学校区：中央中学校（桐生市）");
     expect(text).toContain("小学校区：桐生市の教育委員会で確認（データなし（国のデータに無い市））【要確認】");
     expect(draftText(buildDraft(base, {}))).not.toContain("小学校区");
