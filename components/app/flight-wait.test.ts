@@ -32,6 +32,9 @@ describe("調べている間に向かう上空（components/app/flight-wait.ts�
   it("入れた住所から都道府県を読む（都道府県から・郵便番号つき・地番・市区町村から）", () => {
     expect(prefOfLabel("群馬県桐生市織姫町1-1")).toBe("群馬県");
     expect(prefOfLabel("〒371-8570 群馬県前橋市大手町1-1-1")).toBe("群馬県");
+    // Google マップのコピー・見出し付き
+    expect(prefOfLabel("日本、〒163-8001 東京都新宿区西新宿２丁目８−１")).toBe("東京都");
+    expect(prefOfLabel("住所：群馬県桐生市織姫町1-1")).toBe("群馬県");
     expect(prefOfLabel("地番 千葉県八街市八街ほ224-12")).toBe("千葉県");
     expect(prefOfLabel("神奈川県横浜市西区みなとみらい2-2-1")).toBe("神奈川県");
     expect(prefOfLabel("京都府京都市中京区河原町通二条下る下丸屋町400")).toBe("京都府");

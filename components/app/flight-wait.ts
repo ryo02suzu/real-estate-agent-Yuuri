@@ -5,6 +5,7 @@
 // スマホの画面（縦長）に入る大きさ。ただし 5.5 より近づかない（遠くの地球の絵（NASA GIBS）はズーム 8 までの粗い絵で、スマホの細かい画面では
 // 6 より近いとぼやけ始め、7 より近いと淡くなって、かえって何の場所か分からなくなる。写真（国土地理院）に切り替わるのは場所が分かって降り始めてから）。
 // 出典：総務省統計局「令和2年国勢調査 小地域（町丁・字等別）境界データ」（e-Stat）の代表点・人口を加工して作成
+import { pastedAddress } from "@/lib/roadmap/geocode";
 import { MUNI_CODES } from "@/lib/roadmap/muni-codes";
 
 /** 都道府県ごとの [経度, 緯度, ズーム]（調べている間に向かう上空） */
@@ -65,7 +66,8 @@ const PREF = /^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/;
  * （「桐生市織姫町1-1」→ 群馬県。「府中市…」のように2つ以上の都道府県にある名前・読めない住所は null）
  */
 export function prefOfLabel(label: string): string | null {
-  const s = label
+  // 住所の検索と同じく、貼り付けた住所の「日本、」・郵便番号・「住所：」などを外して読む
+  const s = pastedAddress(label)
     .normalize("NFKC")
     .replace(/^〒?\s*\d{3}-?\d{4}\s*/, "")
     .replace(/^地番\s*/, "")
