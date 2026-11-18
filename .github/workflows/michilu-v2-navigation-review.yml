@@ -1,0 +1,121 @@
+name: MICHILU v2 search and navigation review
+on:
+  push:
+    branches: [qa/michilu-ui-v2-review]
+    paths: [.github/workflows/michilu-v2-navigation-review.yml, scripts/qa/michilu-v2-navigation-review.py]
+permissions:
+  contents: read
+concurrency:
+  # Preserve before/after evidence when two distinct QA revisions are compared.
+  group: michilu-v2-navigation-review-${{ github.sha }}
+  cancel-in-progress: true
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      REVIEW_URL: http://127.0.0.1:3000
+      PREVIEW_URL: ""
+      REVIEW_SHA: e5fe66dffdd3c1150352fbc16470a69004e4455c
+      REVIEW_PHASE: approved-v2-e5fe66d-search-navigation
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+          path: qa-tools
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ env.REVIEW_SHA }}
+          path: app-source
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app-source/package-lock.json
+      - name: Build the exact review commit
+        working-directory: app-source
+        run: |
+          test "$(git rev-parse HEAD)" = "$REVIEW_SHA"
+          npm ci
+          npm run lint
+          npm run typecheck
+          npm test
+          npm run build
+      - name: Serve the static build on the runner
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          Path("/tmp/michilu-range-server.py").write_text("""
+          import http.server, os, re
+          class RangeHandler(http.server.SimpleHTTPRequestHandler):
+              def send_head(self):
+                  self.request_range = None
+                  raw = self.headers.get('Range')
+                  path = self.translate_path(self.path)
+                  if not raw or not os.path.isfile(path):
+                      return super().send_head()
+                  match = re.fullmatch(r'bytes=(\\d+)-(\\d*)', raw)
+                  size = os.path.getsize(path)
+                  if not match:
+                      self.send_error(416)
+                      return None
+                  start = int(match[1])
+                  end = min(int(match[2]) if match[2] else size - 1, size - 1)
+                  if start > end or start >= size:
+                      self.send_response(416)
+                      self.send_header('Content-Range', f'bytes */{size}')
+                      self.end_headers()
+                      return None
+                  stream = open(path, 'rb')
+                  stream.seek(start)
+                  self.request_range = (start, end)
+                  self.send_response(206)
+                  self.send_header('Content-Type', self.guess_type(path))
+                  self.send_header('Accept-Ranges', 'bytes')
+                  self.send_header('Content-Range', f'bytes {start}-{end}/{size}')
+                  self.send_header('Content-Length', str(end - start + 1))
+                  self.end_headers()
+                  return stream
+              def copyfile(self, source, outputfile):
+                  if self.request_range is None:
+                      return super().copyfile(source, outputfile)
+                  remaining = self.request_range[1] - self.request_range[0] + 1
+                  while remaining:
+                      chunk = source.read(min(remaining, 65536))
+                      if not chunk:
+                          break
+                      outputfile.write(chunk)
+                      remaining -= len(chunk)
+          os.chdir('app-source/out')
+          http.server.ThreadingHTTPServer(('127.0.0.1', 3000), RangeHandler).serve_forever()
+          """.lstrip())
+          PY
+          python3 /tmp/michilu-range-server.py > "$RUNNER_TEMP/michilu-static-server.log" 2>&1 &
+          python3 - <<'PY'
+          import time, urllib.request
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen("http://127.0.0.1:3000", timeout=2) as response:
+                      assert response.status == 200
+                  break
+              except Exception:
+                  if attempt == 29:
+                      raise
+                  time.sleep(1)
+          PY
+      - name: Install isolated browser tools
+        run: |
+          python3 -m venv "$RUNNER_TEMP/michilu-browser"
+          "$RUNNER_TEMP/michilu-browser/bin/pip" install playwright==1.62.0 Pillow==13.0.0
+          "$RUNNER_TEMP/michilu-browser/bin/playwright" install --with-deps chromium webkit
+      - name: Exercise the built app (not Vercel Preview)
+        run: '"$RUNNER_TEMP/michilu-browser/bin/python" qa-tools/scripts/qa/michilu-v2-navigation-review.py'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: michilu-v2-navigation-e5fe66d-${{ github.run_id }}
+          path: ui-review/
+          retention-days: 14
+
