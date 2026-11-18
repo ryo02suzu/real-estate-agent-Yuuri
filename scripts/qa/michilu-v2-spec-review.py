@@ -26,7 +26,7 @@ def response_event(response, record):
     if url.hostname == "cyberjapandata.gsi.go.jp" and re.match(r"/xyz/(pale|std)/", url.path):
         record["basemap_responses"].append(info)
 
-def map_image_stats(png):
+def map_image_stats(png, background_rgb=(230, 242, 242)):
     # A positive WebGL canvas can still contain only the fallback background.
     # Inspect an actual screenshot of the unobscured map, excluding all app panels.
     image = Image.open(BytesIO(png)).convert("RGB")
@@ -35,7 +35,7 @@ def map_image_stats(png):
     total = image.width * image.height
     # JapanMap's #e6f2f2 fallback is distinct from the GSI raster sea. Requiring
     # coverage also rejects partially loaded maps, which a color-count check misses.
-    background = sum(max(abs(v - c) for v, c in zip(pixel, (230, 242, 242))) <= 4 for pixel in pixels)
+    background = sum(max(abs(v - c) for v, c in zip(pixel, background_rgb)) <= 4 for pixel in pixels)
     return {"significant_colors": sum(count / total > 0.0005 for count in colors.values()),
             "dominant_ratio": max(colors.values()) / total,
             "unrendered_background_ratio": background / total}
@@ -43,17 +43,34 @@ def map_image_stats(png):
 async def wait_for_map_pixels(page, name, record):
     started = asyncio.get_running_loop().time()
     ready_frames = 0
+    desktop = page.viewport_size["width"] >= 1024
+    # Actual background layers: JapanMap #e6f2f2; gsiStyle #eef1ee.
+    background_rgb = (238, 241, 238) if desktop else (230, 242, 242)
+    if desktop:
+        canvas = page.locator("canvas.maplibregl-canvas").first
+        await canvas.wait_for(state="visible", timeout=20000)
+        record["canvas_geometry"] = await canvas.bounding_box()
+        assert record["canvas_geometry"]["width"] > 200 and record["canvas_geometry"]["height"] > 150, "Desktop MapLibre canvas is empty or collapsed"
     while True:
-        panel = await page.locator(".mui-panel").bounding_box()
         viewport = page.viewport_size
-        side = await page.locator('[data-side="1"]').count() > 0
-        left = panel["x"] + panel["width"] + 16 if side else 16
-        top = 24 if side else 86
-        bottom = viewport["height"] - 36 if side else panel["y"] - 16
+        if desktop:
+            # The inspected 1024/1440 layouts have a left information panel,
+            # top-right tools (ending at y=296), and bottom map controls.
+            # Include the rightmost tiles, where old captures were incomplete.
+            left = viewport["width"] * 0.62
+            top = max(320, viewport["height"] * 0.4)
+            bottom = viewport["height"] - 170
+        else:
+            panel = await page.locator(".mui-panel").bounding_box()
+            side = await page.locator('[data-side="1"]').count() > 0
+            left = panel["x"] + panel["width"] + 16 if side else 16
+            top = 24 if side else 86
+            bottom = viewport["height"] - 36 if side else panel["y"] - 16
         clip = {"x":left,"y":top,"width":viewport["width"] - left - 16,"height":bottom - top}
         assert clip["width"] >= 40 and clip["height"] >= 40, "No unobscured home map region"
         png = await page.screenshot(clip=clip)
-        stats = map_image_stats(png)
+        stats = map_image_stats(png, background_rgb)
+        stats["background_rgb"] = background_rgb
         stats["successful_basemap_responses"] = sum(r["status"] == 200 for r in record["basemap_responses"])
         stats["wait_ms"] = round((asyncio.get_running_loop().time() - started) * 1000)
         stats["clip"] = clip
@@ -181,8 +198,7 @@ async def run():
                     assert "MICHILU" in await page.title(), "Expected the MICHILU app title"
                     await page.evaluate("document.fonts.ready")
                     await page.wait_for_timeout(1800)
-                    if width < 1024:
-                        await wait_for_map_pixels(page,name,record)
+                    await wait_for_map_pixels(page,name,record)
                     await snapshot(page,name+"-home",record)
                     if width < 1024:
                         record["home_targets"] = await home_target_checks(page)

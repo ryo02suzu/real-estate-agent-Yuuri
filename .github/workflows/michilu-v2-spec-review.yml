@@ -17,7 +17,7 @@ jobs:
       REVIEW_URL: http://127.0.0.1:3000
       PREVIEW_URL: ""
       REVIEW_SHA: e5fe66dffdd3c1150352fbc16470a69004e4455c
-      REVIEW_PHASE: approved-v2-e5fe66d-home-targets
+      REVIEW_PHASE: approved-v2-e5fe66d-pc-map-render
     steps:
       - uses: actions/checkout@v4
         with:
