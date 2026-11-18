@@ -549,10 +549,10 @@ export function MobileShell({
               <div className="space-y-3">
                 <HistoryChips items={history.slice(0, 3)} onSelect={onPickHistory} onShowAll={onShowHistory} />
                 <div className="flex gap-2 text-[13px]">
-                  <button type="button" onClick={onOpenHelp} className="mui-press mui-hit rounded-full bg-[var(--mui-primary-soft)] px-3 py-1.5 font-semibold text-[var(--mui-primary-ink)]">
+                  <button type="button" onClick={onOpenHelp} className="mui-press mui-hit mui-home-action rounded-full bg-[var(--mui-primary-soft)] px-3 py-1.5 font-semibold text-[var(--mui-primary-ink)]">
                     使い方
                   </button>
-                  <button type="button" onClick={onOpenCities} className="mui-press mui-hit rounded-full bg-[var(--mui-primary-soft)] px-3 py-1.5 font-semibold text-[var(--mui-primary-ink)]">
+                  <button type="button" onClick={onOpenCities} className="mui-press mui-hit mui-home-action rounded-full bg-[var(--mui-primary-soft)] px-3 py-1.5 font-semibold text-[var(--mui-primary-ink)]">
                     対応エリア
                   </button>
                 </div>

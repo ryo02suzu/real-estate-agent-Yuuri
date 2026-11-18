@@ -433,6 +433,14 @@ body {
     height: max(100%, var(--mui-hit));
     transform: translateY(-50%);
   }
+  /* ホームの操作は実寸も44pxにする。検索欄とスクロール領域の境界で、透明な拡張面が隠れたり隣の操作に重ならないようにする。 */
+  body[data-mui] .mui-home-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--mui-hit);
+    min-height: var(--mui-hit);
+  }
   /* 候補の住所の行は、行の高さそのものを 44px 以上に（隣の行と押せる範囲が重ならないように） */
   body[data-mui] .mui-cand {
     min-height: var(--mui-hit);

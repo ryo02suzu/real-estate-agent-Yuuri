@@ -114,13 +114,13 @@ export function SearchCard({
           </span>
           <span className="flex shrink-0 gap-1.5">
             {onMap && (
-              <button type="button" onClick={onMap} className={`flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 font-bold text-brand ${teal ? "mui-hit" : ""}`}>
+              <button type="button" onClick={onMap} className={`flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 font-bold text-brand ${teal ? "mui-hit mui-home-action" : ""}`}>
                 <MapIcon className="h-3.5 w-3.5" />
                 地図で選ぶ
               </button>
             )}
             {!value && (
-              <button type="button" onClick={paste} className={`flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 font-bold text-brand ${teal ? "mui-hit" : ""}`}>
+              <button type="button" onClick={paste} className={`flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 font-bold text-brand ${teal ? "mui-hit mui-home-action" : ""}`}>
                 <PasteIcon className="h-3.5 w-3.5" />
                 貼り付け
               </button>
