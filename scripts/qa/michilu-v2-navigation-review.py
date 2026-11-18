@@ -301,6 +301,9 @@ async def exercise(page, record, mobile, gate):
         assert at_home["saved"] == before["saved"], "Browser Back cancellation changed history"
         await page.go_forward()
         entry["restored"] = await result(page, A, mobile)
+        # Observe the full 1300ms camera move plus the 300ms panel adjustment.
+        await page.wait_for_timeout(2000)
+        entry["capture_delay_after_result_ms"] = 2000
         await capture(page, name + "-forward-restored", entry)
     await check(page, record, "browser-back-inflight-and-forward", back_forward)
 
@@ -317,6 +320,9 @@ async def exercise(page, record, mobile, gate):
         assert final["saved"].count(A) == 1, "Duplicate search-history entry"
         assert final["canvases"] and all(c["width"] > 0 and c["height"] > 0 for c in final["canvases"])
         entry["state"] = final
+        # Observe the full 1300ms camera move plus the 300ms panel adjustment.
+        await page.wait_for_timeout(2000)
+        entry["capture_delay_after_result_ms"] = 2000
         await capture(page, name + "-same-address", entry)
     await check(page, record, "same-address-research", same_address)
 
@@ -371,3 +377,4 @@ if __name__ == "__main__":
     asyncio.run(main())
     if any(c["status"] != "passed" for c in REPORT["checks"]):
         raise SystemExit("Navigation QA failed; inspect navigation-report.json and screenshots")
+
