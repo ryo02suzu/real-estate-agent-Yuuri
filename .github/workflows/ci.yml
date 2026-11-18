@@ -18,6 +18,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Claude のモデル検査のテスト（モデル呼び出しなし）
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
