@@ -129,6 +129,31 @@ async def snapshot(page, name, record):
       inputs:[...document.querySelectorAll('input')].filter(e=>e.getBoundingClientRect().width).map(e=>({name:e.getAttribute('aria-label')||e.id,fontSize:getComputedStyle(e).fontSize,box:e.getBoundingClientRect().toJSON()})),
       controls:[...document.querySelectorAll('button,a')].filter(e=>e.getBoundingClientRect().width).map(e=>({text:e.getAttribute('aria-label')||e.innerText,box:e.getBoundingClientRect().toJSON()}))
     })""")
+
+async def home_target_checks(page):
+    checks = []
+    for label in ["地図で選ぶ", "貼り付け", "使い方", "対応エリア"]:
+        target = page.get_by_role("button", name=label, exact=True)
+        await target.scroll_into_view_if_needed()
+        check = await target.evaluate("""(el) => {
+          const r = el.getBoundingClientRect();
+          const w = Math.max(44, r.width), h = Math.max(44, r.height);
+          const area = {x:r.x + (r.width-w)/2, y:r.y + (r.height-h)/2, width:w, height:h};
+          const points = [];
+          for (const fx of [0, 0.5, 1]) for (const fy of [0, 0.5, 1]) {
+            const x = area.x + 1 + (area.width-2)*fx;
+            const y = area.y + 1 + (area.height-2)*fy;
+            const hit = document.elementFromPoint(x, y);
+            points.push({x,y,hit:!!hit && (hit === el || el.contains(hit)),
+              blocker:hit && hit !== el && !el.contains(hit) ? {tag:hit.tagName, class:hit.className} : null});
+          }
+          return {label:el.textContent.trim(),box:r.toJSON(),area,points,
+            passed:points.every(p => p.hit)};
+        }""")
+        checks.append(check)
+    await page.locator(".mui-list-in").evaluate("e => e.scrollTop = 0")
+    return checks
+
 async def run():
     async with async_playwright() as pw:
         for engine in ["chromium", "webkit"]:
@@ -159,6 +184,8 @@ async def run():
                     if width < 1024:
                         await wait_for_map_pixels(page,name,record)
                     await snapshot(page,name+"-home",record)
+                    if width < 1024:
+                        record["home_targets"] = await home_target_checks(page)
                     # Failure gate: blank MapLibre canvases passed the old screenshot-only QA.
                     # This checks the app's real layout; never apply an artificial CSS override.
                     if width < 1024 and urlparse(page.url).netloc == urlparse(report["url"]).netloc:
@@ -216,6 +243,7 @@ async def run():
                             await snapshot(page,name+"-text-200pct-simulation",record["font_simulation"])
                             assert not record["font_simulation"]["layout"]["horizontalOverflow"], "Horizontal overflow in font simulation"
                         assert all(d["status"] == "passed" for d in record["details"]), "One or more detail round trips failed"
+                        assert all(t["passed"] for t in record["home_targets"]), "Home actions do not own their full 44px tap area"
                 except Exception as e:
                     record["status"]="blocked"
                     record["error"]=str(e)[:1200]
@@ -224,7 +252,7 @@ async def run():
                 await ctx.close()
                 (out/"report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
             await browser.close()
-    print(json.dumps({"phase":report["phase"],"sha":report["sha"],"checks":[{"name":r["name"],"status":r["status"],"error":r.get("error"),"http_errors":r["http_errors"],"details":[{k:v for k,v in d.items() if k in ["name","status","error","scroll_before","scroll_after"]} for d in r.get("details",[])]} for r in report["checks"]]},ensure_ascii=False))
+    print(json.dumps({"phase":report["phase"],"sha":report["sha"],"checks":[{"name":r["name"],"status":r["status"],"error":r.get("error"),"http_errors":r["http_errors"],"home_targets":[{"label":t["label"],"passed":t["passed"],"misses":sum(not p["hit"] for p in t["points"])} for t in r.get("home_targets",[])],"details":[{k:v for k,v in d.items() if k in ["name","status","error","scroll_before","scroll_after"]} for d in r.get("details",[])]} for r in report["checks"]]},ensure_ascii=False))
 asyncio.run(run())
 if any(r.get('status') == 'blocked' for r in report['checks']):
     raise SystemExit('Browser review contains blocked cases; see report.json')
