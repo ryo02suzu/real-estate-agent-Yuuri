@@ -1,5 +1,52 @@
 import { describe, expect, it } from "vitest";
-import { branchUnmatched, addressNumbers, isApproximate, kyotoChoices, kyotoStreet, kyotoTown, matchedNumbers, numbersAgree, partialMatch, senDigits, streetSide, subAreaDropped, subAreaForm, subAreaMatched, subAreaRequery, withoutNumbers, type GeocodeResult } from "./geocode";
+import { branchUnmatched, addressNumbers, isApproximate, kyotoChoices, kyotoStreet, kyotoTown, matchedNumbers, numbersAgree, partialMatch, pastedAddress, senDigits, streetSide, subAreaDropped, subAreaForm, subAreaMatched, subAreaRequery, withoutNumbers, type GeocodeResult } from "./geocode";
+
+describe("貼り付けた住所の飾りを外す（pastedAddress）", () => {
+  it("郵便番号（〒付き・〒なし・ハイフンなし・全角）を外す", () => {
+    expect(pastedAddress("〒163-8001 東京都新宿区西新宿2-8-1")).toBe("東京都新宿区西新宿2-8-1");
+    expect(pastedAddress("〒 163-8001　東京都新宿区西新宿2-8-1")).toBe("東京都新宿区西新宿2-8-1");
+    expect(pastedAddress("163-8001 東京都新宿区西新宿2-8-1")).toBe("東京都新宿区西新宿2-8-1");
+    expect(pastedAddress("163-8001東京都新宿区西新宿2-8-1")).toBe("東京都新宿区西新宿2-8-1");
+    expect(pastedAddress("〒1638001 東京都新宿区西新宿2-8-1")).toBe("東京都新宿区西新宿2-8-1");
+    expect(pastedAddress("〒１６３－８００１ 東京都新宿区西新宿２－８－１")).toBe("東京都新宿区西新宿２－８－１");
+    // 後ろに付いた郵便番号
+    expect(pastedAddress("東京都新宿区西新宿2-8-1 〒163-8001")).toBe("東京都新宿区西新宿2-8-1");
+  });
+
+  it("Google マップのコピー（日本、〒…）を外す", () => {
+    expect(pastedAddress("日本、〒163-8001 東京都新宿区西新宿２丁目８−１")).toBe("東京都新宿区西新宿２丁目８−１");
+    expect(pastedAddress("日本 東京都新宿区西新宿2-8-1")).toBe("東京都新宿区西新宿2-8-1");
+  });
+
+  it("見出し（住所：・所在地・物件所在地）を外す", () => {
+    expect(pastedAddress("住所：東京都新宿区西新宿2-8-1")).toBe("東京都新宿区西新宿2-8-1");
+    expect(pastedAddress("住所: 東京都新宿区西新宿2-8-1")).toBe("東京都新宿区西新宿2-8-1");
+    expect(pastedAddress("所在地 東京都新宿区西新宿2-8-1")).toBe("東京都新宿区西新宿2-8-1");
+    expect(pastedAddress("物件所在地：埼玉県熊谷市下奈良354")).toBe("埼玉県熊谷市下奈良354");
+    expect(pastedAddress("所在：埼玉県熊谷市下奈良354")).toBe("埼玉県熊谷市下奈良354");
+    expect(pastedAddress("所在 埼玉県熊谷市下奈良354")).toBe("埼玉県熊谷市下奈良354");
+    // 「所在地番」は見出しの区切りが無いので外さない
+    expect(pastedAddress("所在地番 埼玉県熊谷市下奈良354")).toBe("所在地番 埼玉県熊谷市下奈良354");
+  });
+
+  it("改行・空白はひとつの空白にまとめる", () => {
+    expect(pastedAddress("東京都新宿区\n西新宿2-8-1")).toBe("東京都新宿区 西新宿2-8-1");
+    expect(pastedAddress("  東京都新宿区西新宿2-8-1　")).toBe("東京都新宿区西新宿2-8-1");
+  });
+
+  it("地名・地番・建物名はそのまま（日本橋・日本平・地番の語・番地の数字）", () => {
+    expect(pastedAddress("日本橋1-1-1")).toBe("日本橋1-1-1");
+    expect(pastedAddress("東京都中央区日本橋1-1-1")).toBe("東京都中央区日本橋1-1-1");
+    expect(pastedAddress("静岡県静岡市清水区日本平")).toBe("静岡県静岡市清水区日本平");
+    expect(pastedAddress("地番 埼玉県熊谷市下奈良354")).toBe("地番 埼玉県熊谷市下奈良354");
+    expect(pastedAddress("埼玉県熊谷市下奈良391番地3")).toBe("埼玉県熊谷市下奈良391番地3");
+    expect(pastedAddress("東京都新宿区西新宿2-8-1 グランドビル5階")).toBe("東京都新宿区西新宿2-8-1 グランドビル5階");
+    // 先頭でない「〒」の無い 3桁-4桁 は地番などのことがあるので外さない
+    expect(pastedAddress("千葉県八街市八街ほ224-1234")).toBe("千葉県八街市八街ほ224-1234");
+    // 「住所」で始まる地名は無いが、見出しの区切り（：・空白）が無ければ外さない
+    expect(pastedAddress("所在東京都新宿区西新宿2-8-1")).toBe("所在東京都新宿区西新宿2-8-1");
+  });
+});
 
 describe("住所の一致の深さ", () => {
   it("番地がまったく無い一致は、町の中心（isApproximate）", () => {

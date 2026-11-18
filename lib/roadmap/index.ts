@@ -1,5 +1,5 @@
 import { correctAddress, describeMatch, missChoices, missIsElsewhere, placeNotFound, type AddressFix, type AddressMiss } from "./address-fix";
-import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, kyotoChoices, kyotoStreet, kyotoTown, matchedNumbers, needsChoice, numbersAgree, reverseGeocode, streetSide, subAreaDropped, subAreaRequery, withoutNumbers, type GeocodeResult, type ReverseResult } from "./geocode";
+import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, kyotoChoices, kyotoStreet, kyotoTown, matchedNumbers, needsChoice, numbersAgree, pastedAddress, reverseGeocode, streetSide, subAreaDropped, subAreaRequery, withoutNumbers, type GeocodeResult, type ReverseResult } from "./geocode";
 import { MUNI_CODES } from "./muni-codes";
 import { PREF_NAME_RE } from "./regions";
 import { buildLinks, findMunicipality, resolveContact, type Contact, type Municipality, type ResolvedLink } from "./municipalities";
@@ -106,6 +106,8 @@ export async function lookup(
     loadIndex?: (code: string) => Promise<ParcelIndex | null>;
   } = {},
 ): Promise<LookupResult> {
+  // 貼り付けた住所の郵便番号・「日本、」・「住所：」などを外す（付いたままだと国土地理院が何も返さない）
+  address = pastedAddress(address);
   // 「本通14北5-35」（丁目を書かない、通りの北・南に分かれた丁目）を「本通14丁目北5-35」に（南北の取り違えを防ぐ）
   // 京都市の通り名の住所（「上京区下長者町通七本松西入鳳瑞町233番10」）は、通り名を外して町名から探す（別の町に当たるのを防ぐ）。
   // 同じ区に同じ名前の町がある住所は、通り名から決めた町（kyoto）の位置と地番区域で探す
