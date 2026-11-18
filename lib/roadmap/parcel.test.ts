@@ -35,6 +35,7 @@ import {
   townFromAddress,
   townKey,
   townMatches,
+  indexHasTownless,
   type ParcelFeature,
   type ParcelSource,
   type Polygon,
@@ -352,6 +353,54 @@ describe("筆の探索", () => {
     // 町の地番区域が番号の区分で分かれていなければ、今までどおり（比べられないので当てる）
     const plain = await searchParcel({ city: "越前市", town: "横市町", chiban: "1-4", sub }, START, fakeSource({ [`${SX},${SY}`]: [{ kuiki: "越前市_横市町___", chiban: "1-4" }] }), { maxTiles: 12 });
     expect(plain.status === "found" && plain.parcel.kuiki).toBe("越前市_横市町___");
+  });
+
+  // 2026-11-18 の全国の点検（地価公示・地価調査の所在 376件）で、その地点に筆があるのに見つからなかったもの
+  it("国土地理院の地割・条・線の漢数字（第十一地割・北一条西）でも、地番区域（第１１地割・北１条西）に当たる", () => {
+    // townMatches には townKey でそろえた町を渡す（searchParcel・indexHasTown と同じ）
+    expect(townMatches("紫波郡矢巾町_大字南矢幅_第１１地割__", townKey("大字南矢幅第十一地割"))).toBe(true);
+    expect(townMatches("八幡平市_大更_第２１地割__", townKey("大更第二十一地割"))).toBe(true);
+    // 別の地割には当てない
+    expect(townMatches("紫波郡矢巾町_大字南矢幅_第１２地割__", townKey("大字南矢幅第十一地割"))).toBe(false);
+    expect(townMatches("札幌市中央区_北１条西_２丁目__", townKey("北一条西二丁目"))).toBe(true);
+    expect(townMatches("札幌市中央区_北２条西_２丁目__", townKey("北一条西二丁目"))).toBe(false);
+    expect(townKey("東三線")).toBe(townKey("東３線"));
+  });
+
+  it("町村全体が1つの地番区域（大字の無い地番区域）の地番は、町の名前が無くても、その市区町村の地番区域で探す（奈半利町乙3884）", async () => {
+    const N = "安芸郡奈半利町____";
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: N, chiban: "乙3884" }] });
+    const r = await searchParcel({ city: "奈半利町", town: "", chiban: "乙3884" }, START, src);
+    expect(r.status === "found" && [r.parcel.kuiki, r.parcel.chiban]).toEqual([N, "乙3884"]);
+    // 隣の町村の大字の無い地番区域の同じ地番には当てない
+    const other = fakeSource({ [`${SX},${SY}`]: [{ kuiki: "安芸郡田野町____", chiban: "乙3884" }] });
+    expect((await searchParcel({ city: "奈半利町", town: "", chiban: "乙3884" }, START, other)).status).not.toBe("found");
+    // 大字のある地番区域は、町の名前が無ければ当てない（今までどおり）
+    const named = fakeSource({ [`${SX},${SY}`]: [{ kuiki: "安芸郡奈半利町_甲___", chiban: "乙3884" }] });
+    expect((await searchParcel({ city: "奈半利町", town: "", chiban: "乙3884" }, START, named)).status).not.toBe("found");
+    expect(indexHasTownless({ k: { [N]: [] } }, "奈半利町")).toBe(true);
+    expect(indexHasTownless({ k: { "安芸郡奈半利町_甲___": [] } }, "奈半利町")).toBe(false);
+    expect(indexHasTownless({ k: { [N]: [] } }, "田野町")).toBe(false);
+  });
+
+  it("索引で番号の入るタイルが多い広い大字では、近い 24 枚に無くても、番号の幅の狭いタイルから開いて見つける（小海町大字小海4045番1）", async () => {
+    const O = "南佐久郡小海町_大字小海___";
+    const tiles: Record<string, { kuiki: string; chiban: string }[]> = {};
+    const entries: [number, number, number, number][] = [];
+    // 代表点のまわりの 30 枚は、番号の幅が広く（1〜9999）、探す番号の筆は無い
+    for (let i = 0; i < 30; i++) {
+      const [x, y] = [SX + (i % 6) - 2, SY + Math.floor(i / 6) - 2];
+      tiles[`${x},${y}`] = [{ kuiki: O, chiban: String(100 + i) }];
+      entries.push([x, y, 1, 9999]);
+    }
+    // 筆は 12 枚先の、番号の幅の狭いタイル
+    tiles[`${SX + 12},${SY}`] = [{ kuiki: O, chiban: "4045-1" }];
+    entries.push([SX + 12, SY, 4000, 4100]);
+    const src = fakeSource(tiles);
+    const r = await searchParcel({ city: "小海町", town: "小海", chiban: "4045-1" }, START, src, { index: { k: { [O]: entries } } });
+    expect(r.status === "found" && [r.parcel.chiban, r.parcel.pieces[0].tile]).toEqual(["4045-1", [SX + 12, SY]]);
+    // 開いたタイルは、近い 24 枚と、幅の狭い順の残り（見つかったところで止める）
+    expect(src.reads.length).toBeLessThanOrEqual(24 + 8 + 9);
   });
 
   it("地番区域に小字が書かれていなければ、入力に小字があっても当てる（比べられない）", async () => {
@@ -689,6 +738,52 @@ describe("地点の筆", () => {
 describe("lookup で地番を探す", () => {
   afterEach(() => vi.unstubAllGlobals());
 
+  /** 国土地理院の住所検索（どの問い合わせにも titles を返す）と逆ジオコーダ（rev）の代わり */
+  const stubTitles = (titles: string[], rev: { muniCd: string; lv01Nm: string }) =>
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          url.includes("AddressSearch")
+            ? titles.map((title, i) => ({ geometry: { coordinates: [START.lng + i / 100, START.lat] }, properties: { title } }))
+            : { results: rev },
+      })),
+    );
+
+  // 2026-11-18 の全国の点検で、その地点に筆があるのに見つからなかったもの
+  it("国土地理院が小字まで町名にしても（北勢町阿下喜中川原）、入力に書いた町（北勢町阿下喜）の地番区域で探す", async () => {
+    stubTitles(["三重県いなべ市北勢町阿下喜中川原"], { muniCd: "24214", lv01Nm: "北勢町阿下喜" });
+    const K2 = "いなべ市_北勢町阿下喜___";
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: K2, chiban: "3346" }] });
+    const r = await lookup("三重県いなべ市北勢町阿下喜字中川原3346番", { parcels: src, loadIndex: async () => ({ v: 1, z: 16, k: { [K2]: [[SX, SY, 3000, 3500]] } }) });
+    expect(r.status === "ok" && [r.parcel?.kuiki, r.parcel?.chiban, r.matchedAddress]).toEqual([K2, "3346", "三重県いなべ市北勢町阿下喜"]);
+  });
+
+  it("国土地理院の住所が町村まで（高知県安芸郡奈半利町）でも、町村全体が1つの地番区域なら、その地番区域で探す", async () => {
+    stubTitles(["高知県安芸郡奈半利町"], { muniCd: "39302", lv01Nm: "乙" });
+    const N = "安芸郡奈半利町____";
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: N, chiban: "乙3884" }] });
+    const r = await lookup("高知県安芸郡奈半利町字広岡乙3884番", { parcels: src, loadIndex: async () => ({ v: 1, z: 16, h: 1, k: { [N]: [[SX, SY, 3800, 3900, "乙"]] } }) });
+    expect(r.status === "ok" && [r.parcel?.kuiki, r.parcel?.chiban]).toEqual([N, "乙3884"]);
+    // 索引に大字の無い地番区域が無ければ、今までどおり（地図データが無い）
+    const none = await lookup("高知県安芸郡奈半利町字広岡乙3884番", { parcels: src, loadIndex: async () => ({ v: 1, z: 16, k: { "安芸郡奈半利町_甲___": [[SX, SY, 1, 99]] } }) });
+    expect(none.status === "ok" && [none.parcel, none.parcelMiss?.reason]).toEqual([undefined, "no_map"]);
+  });
+
+  it("入力に書いた町を書き間違いとして別の町に直しても（田野町 → 田野町あけぼの）、入力の町の地番区域にその地番があれば、その筆を出す", async () => {
+    stubTitles(["宮崎県宮崎市田野町あけぼの", "宮崎県宮崎市田野町乙", "宮崎県宮崎市田野町甲"], { muniCd: "45201", lv01Nm: "田野町あけぼの一丁目" });
+    const T = "宮崎市_田野町___";
+    const src = fakeSource({ [`${SX},${SY}`]: [{ kuiki: T, chiban: "甲1646-3" }], [`${SX + 1},${SY}`]: [{ kuiki: "宮崎市_田野町あけぼの_１丁目__", chiban: "12" }] });
+    const index = { v: 1 as const, z: 16, h: 1 as const, k: { [T]: [[SX, SY, 1600, 1700, "甲"]] as [number, number, number, number, string][], "宮崎市_田野町あけぼの_１丁目__": [[SX + 1, SY, 1, 99]] as [number, number, number, number][] } };
+    const r = await lookup("宮崎県宮崎市田野町字大手原甲1646番3", { parcels: src, loadIndex: async () => index });
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect([r.parcel?.kuiki, r.parcel?.chiban, r.matchedAddress]).toEqual([T, "甲1646-3", "宮崎県宮崎市田野町"]);
+    // 町は合っていたので「町名を直した」とは言わない
+    expect(r.fix).toBeUndefined();
+  });
+
   it("番地まで見つからない住所は、地番の筆を探してその場所を使う", async () => {
     const town = { lat: START.lat, lng: START.lng };
     vi.stubGlobal(
@@ -966,10 +1061,11 @@ describe("lookup で地番を探す", () => {
     const r = await lookup("愛媛県伊予市中山町中山子39番2", { parcels: src, loadIndex: async () => headed });
     expect(r.status === "ok" && r.parcel?.chiban).toBe("子39-2");
     expect(r.status === "ok" && r.parcelMiss).toBeFalsy();
-    // 頭で分けていない前の形の索引（h なし）は、今までどおり番号だけで選ぶ（近い 24 枚に届かなければ見つからない）
+    // 頭で分けていない前の形の索引（h なし）は、番号だけで選ぶ。近い 24 枚に無ければ、残りのタイルも番号の幅の狭い順に開くので見つかる
+    // （2026-11-18 から。前は近い 24 枚に届かなければ見つからなかった）
     const old = { v: 1, k: { [K]: entries.map((e) => e.slice(0, 4)) } } as unknown as Awaited<ReturnType<typeof loadParcelIndex>>;
     const r2 = await lookup("愛媛県伊予市中山町中山子39番2", { parcels: src, loadIndex: async () => old });
-    expect(r2.status === "ok" && r2.parcel).toBeFalsy();
+    expect(r2.status === "ok" && r2.parcel?.chiban).toBe("子39-2");
     // 甲39 を探せば、甲の範囲のタイル（近いもの）を開ける
     const r3 = await lookup("愛媛県伊予市中山町中山甲39番", { parcels: src, loadIndex: async () => headed });
     expect(r3.status === "ok" && r3.parcel?.chiban).toBe("甲39");

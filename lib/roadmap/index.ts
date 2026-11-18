@@ -3,13 +3,13 @@ import { geocodeCandidates, geocoderAlive, GeocoderUnavailable, isApproximate, k
 import { MUNI_CODES } from "./muni-codes";
 import { PREF_NAME_RE } from "./regions";
 import { buildLinks, findMunicipality, resolveContact, type Contact, type Municipality, type ResolvedLink } from "./municipalities";
-import { indexHasTown, kuikiAllows, kuikiHasSub, kuikiSubLabel, lotHead, normalizeChiban, parcelAt, searchParcel, splitChiban, splitLotHead, townFromAddress, townKey, type Parcel, type ParcelSource } from "./parcel";
+import { indexHasTown, indexHasTownless, kuikiAllows, kuikiHasSub, kuikiSubLabel, lotHead, normalizeChiban, parcelAt, searchParcel, splitChiban, splitLotHead, townFromAddress, townKey, type Parcel, type ParcelSource } from "./parcel";
 import { addressSub, elsewhereLabel, sameTownName, typedChome, type AddressSub, type Elsewhere } from "./parcel-sub";
 import { loadParcelIndex, type ParcelIndex } from "./parcel-index";
 import { pmtilesParcelSource } from "./parcel-tiles";
 
 export * from "./municipalities";
-export { geocode, geocodeCandidates, GeocoderUnavailable, isApproximate, needsChoice, reverseGeocode, type GeocodeResult } from "./geocode";
+export { geocode, geocodeCandidates, GeocoderUnavailable, isApproximate, needsChoice, pastedAddress, reverseGeocode, type GeocodeResult } from "./geocode";
 export { toWebMercator } from "./vendors";
 export { changedMarks, type AddressFix, type AddressMiss } from "./address-fix";
 
@@ -181,7 +181,8 @@ export async function lookup(
     let body = chiban.body;
     try {
       // 地番の索引（市区町村コードごと。あれば番号の入ったタイルを先に開く。無ければ null で今までの探し方）
-      const index = town ? await loadIndex(rev.muniCd) : null;
+      // （町の名前が無い住所でも読む：町村全体が1つの地番区域の所。indexHasTownless）
+      const index = await loadIndex(rev.muniCd);
       // 国土地理院に無い町名を、似た名前の別の町に直していても（「朝倉字田島丙219番1」の朝倉 → 朝倉横町・「洲之内字森長甲289番」の洲之内 → 洲之内乙）、
       // 地番の地図に入力の町名の地番区域（高知市「朝倉」・西条市「洲之内」）があれば、入力の町名で探す（筆の地番は「丙219-1」「甲289」）
       const typedTown = !!town && notes.fix?.to === town && !!notes.fix.from && !indexHasTown(index, town) && indexHasTown(index, notes.fix.from);
@@ -192,12 +193,41 @@ export async function lookup(
       // 町名の後ろの字（子・4号）を地番の頭にしたときは、町名は合っていたので「町名を直した」とは言わない
       if (head && notes.fix && lot.length >= chiban.chiban.length && notes.fix.from === `${town}${lot.slice(0, lot.length - chiban.chiban.length)}`) delete notes.fix;
       // 入れた住所に、見つかった町より細かい区分（丁目・地割・小字）があれば、筆の地番区域と照らし合わせる（同じ地番の別の土地を当てない）
-      const sub = town ? addressSub(body, town, city) : null;
+      let sub = town ? addressSub(body, town, city) : null;
       // 町の名前のすぐ後ろに書かれた丁目（「上麻生1丁目5番3」）。丁目は地番区域の一部なので、丁目の無い地番区域・別の丁目の同じ地番は当てない
-      const chome = town ? typedChome(body, town, city) : null;
+      let chome = town ? typedChome(body, town, city) : null;
       // 京都市の同じ区の同じ名前の町は、通り名から決めた町の地番区域（「下丸屋町（河原町通二条）」）だけで探す（もう1つの町の同じ地番を当てない）
       const searchTown = kyoto && town && townKey(town) === townKey(kyoto.base) ? kyoto.town : town;
-      const r = town ? await searchParcel({ city, town: searchTown, chiban: lot, sub, chome }, geo, parcels, { index }) : ({ status: "no_map" } as const);
+      // 国土地理院の住所が町村まで（「高知県安芸郡奈半利町」）でも、町村全体が1つの地番区域なら、その地番区域で探す
+      const townless = !town && indexHasTownless(index, city);
+      let r: Awaited<ReturnType<typeof searchParcel>> =
+        town || townless ? await searchParcel({ city, town: searchTown, chiban: lot, sub, chome }, geo, parcels, { index }) : { status: "no_map" };
+      // 国土地理院の町で見つからなければ、入力に書いた町（小字の前まで）でも探す。国土地理院が小字まで町名にした所（「北勢町阿下喜字中川原」→
+      // 「北勢町阿下喜中川原」。地番区域は「北勢町阿下喜」）や、入れた町を書き間違いとして別の町に直した所（「田野町」→「田野町あけぼの」）。
+      // 地番の筆と同じ番号がその町の地番区域にあるときだけ当たる（2026-11-18 の全国の点検で、その地点に筆があるのに見つからなかった）
+      let altTown: string | null = null;
+      if (r.status !== "found" && index) {
+        for (const alt of typedTowns(chiban.body, city, notes.fix?.from)) {
+          if (townKey(alt) === townKey(town) || !indexHasTown(index, alt)) continue;
+          let t = alt;
+          let altLot = chiban.chiban;
+          let altBody = chiban.body;
+          const h = lotHead(altBody, t, altLot, index);
+          if (h) ({ town: t, chiban: altLot, body: altBody } = h);
+          const altSub = addressSub(altBody, t, city);
+          const altChome = typedChome(altBody, t, city);
+          const r2 = await searchParcel({ city, town: t, chiban: altLot, sub: altSub, chome: altChome }, geo, parcels, { index });
+          if (r2.status !== "found") continue;
+          r = r2;
+          town = t;
+          lot = altLot;
+          body = altBody;
+          sub = altSub;
+          chome = altChome;
+          altTown = t;
+          break;
+        }
+      }
       // 見つけた筆が入れた町から遠く離れた別の町にあれば（図面ごと置き間違えた地図データのおそれ）、物件の場所としては出さない
       let away: ReturnType<typeof awayFrom> = null;
       if (r.status === "found") {
@@ -208,11 +238,13 @@ export async function lookup(
         // 入力の町名で筆が見つかったら、「町名を直した」とは言わない（町名は合っていた）
         const foundNotes = { ...notes };
         if (typedTown) delete foundNotes.fix;
+        // 入力に書いた町で筆が見つかったら、その町は合っていたので「町名を直した」とは言わない
+        if (altTown && notes.fix?.from && townKey(notes.fix.from) === townKey(altTown)) delete foundNotes.fix;
         if (!away) return {
           status: "ok",
           lat,
           lng,
-          matchedAddress: geo.matchedAddress.replace(/[0-9０-９][0-9０-９番地号の\-－]*$/, ""),
+          matchedAddress: altTown ? withTown(geo.matchedAddress, city, altTown) : geo.matchedAddress.replace(/[0-9０-９][0-9０-９番地号の\-－]*$/, ""),
           town: prev.town,
           approximate: false,
           ...withoutVerifiedMiss(foundNotes, sub, r.parcel.kuiki, town),
@@ -252,6 +284,22 @@ export async function lookup(
     links: buildLinks(municipality, geo.lat, geo.lng, rev.town),
     contact: resolveContact(municipality, rev.muniCd),
   };
+}
+
+/**
+ * 入力に書いた町（小字の前まで。「北勢町阿下喜字中川原」→「北勢町阿下喜」、「大字小海字小坂下」→「大字小海」）と、書き間違いとして
+ * 直す前の町（「田野町」）。地番を国土地理院の町で探して見つからないときに、この町でも探す
+ */
+export function typedTowns(body: string, city: string, fixFrom?: string): string[] {
+  const typed = townFromAddress(body, city).replace(/(?<!大)字.*$/, "");
+  return [...new Set([typed, fixFrom ?? ""].filter(Boolean))];
+}
+
+/** 国土地理院の住所（「宮崎県宮崎市田野町あけぼの」）の町を、筆を見つけた町（「田野町」）に置き換える。市区町村が読めなければ番地を外すだけ */
+export function withTown(matched: string, city: string, town: string): string {
+  const bare = withoutNumbers(matched);
+  const i = city ? bare.indexOf(city) : -1;
+  return i >= 0 ? `${bare.slice(0, i + city.length)}${town}` : bare;
 }
 
 /**

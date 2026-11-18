@@ -209,7 +209,24 @@ export function townKey(s: string): string {
     .replace(/大字/g, "")
     .replace(/^字/, "")
     .replace(/(?<=\D)字(?=\D)/g, "")
-    .replace(/([一二三四五六七八九十]+)丁目/g, (_, k: string) => `${kanjiToInt(k)}丁目`);
+    .replace(/([一二三四五六七八九十]+)丁目/g, (_, k: string) => `${kanjiToInt(k)}丁目`)
+    // 地割・条・線の番号も数字に（国土地理院は番地まで当てると「大字南矢幅第十一地割８番地」「北一条西」と漢数字で返し、
+    // 法務省の地番区域は「第１１地割」「北１条西」。そろえないと、地割の町の地番が「地図データが無い」になっていた）
+    .replace(/([一二三四五六七八九十]+)(?=地割|条|線)/g, (k: string) => String(kanjiToInt(k)));
+}
+
+/**
+ * 大字・丁目・小字の欄がどれも空の地番区域（町村全体が1つの地番区域。高知県奈半利町「安芸郡奈半利町____」の「乙3884」）。
+ * 国土地理院の住所も町村まで（「高知県安芸郡奈半利町」）で、町の名前で照らし合わせられない
+ */
+export function townlessKuiki(kuiki: string): boolean {
+  const [, oaza = "", chome = "", koaza = ""] = kuiki.split("_");
+  return !oaza && !chome && !koaza;
+}
+
+/** 索引に、その市区町村の、大字の無い地番区域（townlessKuiki）があるか */
+export function indexHasTownless(index: { k: Record<string, unknown> } | null | undefined, city: string): boolean {
+  return !!index && !!city && Object.keys(index.k).some((k) => townlessKuiki(k) && cityMatches(kuikiParts(k).city, city));
 }
 
 const cityKey = (s: string) => s.normalize("NFKC").replace(/\s/g, "").replace(/[ヶヵケ]/g, "ケ");
@@ -512,6 +529,8 @@ export async function searchParcel(
 ): Promise<ParcelSearch> {
   const [sx, sy] = tileOf(start.lat, start.lng);
   const town = townKey(q.town);
+  // 町の名前が無い（国土地理院の住所が町村まで）ときは、その市区町村の大字の無い地番区域（townlessKuiki）を町とする
+  const inTown = (kuiki: string) => (town ? townMatches(kuiki, town) : townlessKuiki(kuiki) && cityMatches(kuikiParts(kuiki).city, q.city));
   const want = normalizeChiban(q.chiban);
   const wantBase = baseNumber(want);
   const [wantHead, wantRest] = splitLotHead(want);
@@ -584,7 +603,7 @@ export async function searchParcel(
     tiles.forEach(([x, y], i) => {
       seen.add(`${x},${y}`);
       for (const f of got[i] ?? []) {
-        if (!townMatches(f.kuiki, town)) continue;
+        if (!inTown(f.kuiki)) continue;
         townSeen = true;
         // 地図データの「51-3W2」（同じ地番の土地の分かれた区画）も「51-3」として探す
         const c = registryChiban(normalizeChiban(f.chiban));
@@ -641,6 +660,8 @@ export async function searchParcel(
     if (!Number.isNaN(num)) {
       const tiles = indexTiles;
       const key = new Set<string>();
+      // タイルごとの、探す番号の入る範囲の幅のいちばん狭いもの（狭いほど、その番号の筆がある見込みが高い）
+      const width = new Map<string, number>();
       // 頭ごとに分けた索引（index.h）なら、探す地番の頭（「子39-2」の子）と同じ頭の範囲のタイルだけを開ける。同じ町に「甲39」「丁39」「子39」「39」が
       // 並ぶ所（伊予市中山町中山は番号 39 の入るタイルが 55 枚）で、近い 24 枚に入らない遠いタイルの筆も見つけるため。
       // 小字の欄にイロハがある地番区域（かほく市「白尾」＋「ハ」）の筆は頭が無いので、小字が探す頭と同じ地番区域は頭の無い範囲を使う
@@ -648,10 +669,12 @@ export async function searchParcel(
         !index.h || entryHead === wantHead || (!!wantHead && !entryHead && kuikiParts(kuiki).koaza.normalize("NFKC") === wantHead);
       const collect = (byHead: boolean) => {
         for (const [kuiki, entries] of Object.entries(index.k)) {
-          if (!townMatches(kuiki, town)) continue;
+          if (!inTown(kuiki)) continue;
           for (const [x, y, lo, hi, entryHead = ""] of entries) {
             const k = `${x},${y}`;
-            if (lo <= num && num <= hi && !key.has(k) && (!byHead || headOk(kuiki, entryHead))) {
+            if (lo <= num && num <= hi && (!byHead || headOk(kuiki, entryHead))) {
+              width.set(k, Math.min(width.get(k) ?? Number.POSITIVE_INFINITY, hi - lo));
+              if (key.has(k)) continue;
               key.add(k);
               tiles.push([x, y]);
             }
@@ -663,6 +686,14 @@ export async function searchParcel(
       if (!tiles.length) collect(false);
       tiles.sort((a, b) => (a[0] - sx) ** 2 + (a[1] - sy) ** 2 - ((b[0] - sx) ** 2 + (b[1] - sy) ** 2));
       for (let i = 0; i < Math.min(tiles.length, 24) && !hits.size; i += 8) await visit(tiles.slice(i, Math.min(i + 8, 24)));
+      // 近い 24 枚に無ければ、残りのタイルを、番号の幅の狭い順（探す番号の筆がある見込みの高い順）に、合わせて 64 枚まで開く。
+      // 広い大字で、探す番号の入るタイルが多い所（小海町大字小海は 4045 の入るタイルが 40 枚あり、筆は町の代表点から 2.6km 先で、
+      // 近い 24 枚に入らず「見つからない」になっていた。2026-11-18 の全国の点検）
+      if (!hits.size && tiles.length > 24) {
+        const w = ([x, y]: [number, number]) => width.get(`${x},${y}`) ?? Number.POSITIVE_INFINITY;
+        const rest = tiles.slice(24).sort((a, b) => w(a) - w(b)).slice(0, 40);
+        for (let i = 0; i < rest.length && !hits.size; i += 8) await visit(rest.slice(i, i + 8));
+      }
     }
   }
 

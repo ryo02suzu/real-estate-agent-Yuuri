@@ -7,7 +7,7 @@ import { MobileApp } from "@/components/app/mobile-app";
 import { loadFavorites, type FavoriteItem } from "@/lib/favorites";
 import { addHistory, clearHistory, loadHistory, removeHistory, restoreHistory, type HistoryItem } from "@/lib/history";
 import { propertyIdOf } from "@/lib/property-id";
-import { GeocoderUnavailable, lookup, lookupPoint, type AddressFix, type LookupResult } from "@/lib/roadmap";
+import { GeocoderUnavailable, lookup, lookupPoint, pastedAddress, type AddressFix, type LookupResult } from "@/lib/roadmap";
 import { buildHash, pageUrl, readUrlState } from "@/lib/app/url";
 import { AREA_SHORT } from "@/lib/roadmap/regions";
 
@@ -83,7 +83,8 @@ export default function Home() {
 
   const search = useCallback(
     (address: string, push: boolean) => {
-      const q = address.trim();
+      // 貼り付けた住所の郵便番号・「日本、」・「住所：」などを外す（検索欄・履歴・URL にもこの形で残す）
+      const q = pastedAddress(address);
       if (!q) return;
       setInput(q);
       return run({ q }, push);
