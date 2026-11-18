@@ -273,8 +273,9 @@ export default function JapanMap({ point, focus, bottomInset, leftInset = 0, red
 /**
  * 範囲に合わせて動かす。fitBounds の余白は、地図がすでに持っている余白（easeTo の padding で付く）に足されるので、
  * 欲しい余白と今の余白の差で渡す（そのまま渡すと二重になり、余白が画面より大きいと何もせず警告だけ出して止まる）
+ * 減速カーブを省略したときも関数を渡す。easing: undefined は MapLibre の既定値を上書きし、ホームへの移動を止める。
  */
-function fitWith(m: MapLibreMap, bounds: [[number, number], [number, number]], want: Padding, duration: number, easing?: (t: number) => number) {
+function fitWith(m: MapLibreMap, bounds: [[number, number], [number, number]], want: Padding, duration: number, easing: (t: number) => number = easeOut) {
   const cur = m.getPadding();
   m.fitBounds(bounds, {
     padding: { top: want.top - (cur.top ?? 0), bottom: want.bottom - (cur.bottom ?? 0), left: want.left - (cur.left ?? 0), right: want.right - (cur.right ?? 0) },
