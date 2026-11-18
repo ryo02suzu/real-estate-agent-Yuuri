@@ -6,8 +6,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: michilu-v2-spec-review
-  # A newer QA revision supersedes the older diagnostic run on this branch.
+  # Preserve before/after evidence when two distinct QA revisions are compared.
+  group: michilu-v2-spec-review-${{ github.sha }}
   cancel-in-progress: true
 jobs:
   browser:
@@ -16,8 +16,8 @@ jobs:
     env:
       REVIEW_URL: http://127.0.0.1:3000
       PREVIEW_URL: ""
-      REVIEW_SHA: 6d5ab10f9d700df122553e6bac8665f30000ae32
-      REVIEW_PHASE: approved-v2-6d5ab10-map-render-details
+      REVIEW_SHA: e5fe66dffdd3c1150352fbc16470a69004e4455c
+      REVIEW_PHASE: approved-v2-e5fe66d-home-targets
     steps:
       - uses: actions/checkout@v4
         with:
@@ -115,7 +115,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: michilu-v2-6d5ab10-${{ github.run_id }}
+          name: michilu-v2-e5fe66d-${{ github.run_id }}
           path: ui-review/
           retention-days: 14
 
