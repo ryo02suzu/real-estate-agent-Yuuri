@@ -424,6 +424,7 @@ export function MobileShell({
         <section
           ref={panel}
           aria-label={hasResult ? "調査結果" : "住所を調べる"}
+          data-home={hasResult ? undefined : "1"}
           style={
             side
               ? // 横向き：左の列。結果は列の高さいっぱい（中をスクロール）、ホームは内容の高さ（列の高さまで）。キーボードの分は下を上げる。

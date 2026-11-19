@@ -317,6 +317,66 @@ body {
  * PC（1024px 以上）は対象外。印刷も対象外
  */
 @media screen and (max-width: 1023.98px) {
+  /* ホームは文字拡大・低い横向きでも、入力から補助操作まで同じ面でスクロールする。 */
+  body[data-mui] .mui-panel[data-home="1"] {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  body[data-mui] .mui-panel[data-home="1"] > .mui-list-in {
+    flex: none;
+    overflow: visible;
+  }
+  /* 案内を細い縦列へ押しつぶさず、必要な幅がなければ操作を次の行へ。 */
+  body[data-mui] .mui-search-hints {
+    flex-wrap: wrap;
+  }
+  body[data-mui] .mui-search-hints > span:first-child {
+    flex: 1 1 10em;
+  }
+  body[data-mui] .mui-search-hints > span:last-child,
+  body[data-mui] .mui-scope .mui-place-head > span {
+    max-width: 100%;
+    flex-shrink: 1;
+    flex-wrap: wrap;
+  }
+  body[data-mui] .mui-scope .mui-coverage-pill {
+    min-width: 0;
+    max-width: 100%;
+    flex-shrink: 1;
+  }
+  /* 札の中も折り返す。親だけをwrapにしても子のnowrap・shrink-0がはみ出していた。 */
+  body[data-mui] .mui-scope .mui-rows button span.flex-wrap > span,
+  body[data-mui] .mui-scope .mui-rows button span.overflow-hidden.whitespace-nowrap > span {
+    min-width: 0;
+    max-width: 100%;
+    flex-shrink: 1;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  /* 詳細のラベル幅はemで拡大する。値の幅が足りなければ次の段に送って読む。 */
+  body[data-mui] .mui-detail dl > div {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  body[data-mui] .mui-detail dl > div > dt {
+    max-width: 100%;
+  }
+  body[data-mui] .mui-detail dl > div > dd {
+    flex-basis: 10em;
+    min-width: min(100%, 10em);
+  }
+  body[data-mui] .mui-detail dd a.whitespace-nowrap {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  body[data-mui] .mui-detail [role="tablist"] {
+    flex-wrap: wrap;
+  }
+  body[data-mui] .mui-detail [role="tab"] {
+    flex-shrink: 0;
+    max-width: 100%;
+  }
+
   body[data-mui] .bg-gold,
   body[data-mui] .bg-brand {
     background: var(--mui-primary) !important;
