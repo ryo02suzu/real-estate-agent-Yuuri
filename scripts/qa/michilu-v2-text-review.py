@@ -74,6 +74,14 @@ async def capture(page, name):
           clientHeight: e.clientHeight, scrollHeight: e.scrollHeight, scrollTop: e.scrollTop,
           horizontal_overflow: e.scrollWidth > e.clientWidth + 2
         })),
+      overflow_elements: [...document.querySelectorAll('.mui-panel *')]
+        .filter(e => {
+          const container = e.closest('.mui-list-in,[data-testid="panel-detail"],.mui-panel');
+          if (!container) return false;
+          const r = e.getBoundingClientRect(), c = container.getBoundingClientRect();
+          return r.width > 0 && r.height > 0 && (r.right > c.right + 2 || r.left < c.left - 2);
+        }).slice(0,40).map(e => ({tag:e.tagName,class:e.className,
+          text:e.textContent.slice(0,120),box:e.getBoundingClientRect().toJSON()})),
       clipped_text: [...document.querySelectorAll('button,a,h1,h2,h3,p,span')]
         .filter(e => e.getBoundingClientRect().height > 0 && e.scrollWidth > e.clientWidth + 2
           && ['hidden','clip'].includes(getComputedStyle(e).overflowX))
@@ -156,7 +164,11 @@ async def run():
                     await page.evaluate("document.fonts.ready")
                     record["home_fonts"] = await enlarge_text(page)
                     record["home"] = await capture(page, name + "-home")
-                    assert_layout(record["home"])
+                    record["layout_failures"] = []
+                    try:
+                        assert_layout(record["home"])
+                    except AssertionError as error:
+                        record["layout_failures"].append("home: " + str(error))
                     await page.locator("#address").fill("東京都新宿区西新宿2丁目8番1号")
                     await page.get_by_role("button", name="検索", exact=True).first.click(timeout=5000)
                     record["stage"] = "result"
@@ -165,10 +177,14 @@ async def run():
                     record["result_url"] = page.url
                     record["result_fonts"] = await enlarge_text(page)
                     record["result"] = await capture(page, name + "-result")
-                    assert_layout(record["result"])
+                    try:
+                        assert_layout(record["result"])
+                    except AssertionError as error:
+                        record["layout_failures"].append("result: " + str(error))
                     for key, label in DETAILS:
                         await detail_check(page, name, record, key, label)
                     assert all(d["status"] == "passed" for d in record["details"]), "Some enlarged detail round trips failed"
+                    assert not record["layout_failures"], record["layout_failures"]
                     assert not record["page_errors"], "Uncaught JavaScript errors"
                     record["status"] = "passed"
                 except Exception as error:
