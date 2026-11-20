@@ -47,8 +47,9 @@ def load(name: str) -> tuple[np.ndarray, dict]:
     return np.load(os.path.join(WORK, f"{name}.npy")), meta
 
 
-def grid_object(name: str, X, Y, Z, elev, face_mask, mat) -> bpy.types.Object:
-    """格子の点（行は北→南、列は西→東）から、面が上を向いた地面のメッシュを作る。face_mask で使う面を選ぶ"""
+def grid_object(name: str, X, Y, Z, elev, face_mask, mat, uv=None) -> bpy.types.Object:
+    """格子の点（行は北→南、列は西→東）から、面が上を向いた地面のメッシュを作る。face_mask で使う面を選ぶ。
+    uv（行×列×2）を渡すと、画像を貼る座標も付ける"""
     H, W = X.shape
     co = np.stack([X, Y, Z], -1).reshape(-1, 3)
     ii, jj = np.meshgrid(np.arange(H - 1), np.arange(W - 1), indexing="ij")
@@ -78,6 +79,10 @@ def grid_object(name: str, X, Y, Z, elev, face_mask, mat) -> bpy.types.Object:
         me.polygons.foreach_set("use_smooth", np.ones(nf, dtype=bool))
     a = me.attributes.new("elev", "FLOAT", "POINT")
     a.data.foreach_set("value", el)
+    if uv is not None:
+        uvs = np.asarray(uv, dtype=np.float32).reshape(-1, 2)[used]
+        layer = me.uv_layers.new(name="UVMap")
+        layer.data.foreach_set("uv", uvs[quads.ravel()].ravel())
     me.materials.append(mat)
     ob = bpy.data.objects.new(name, me)
     bpy.context.scene.collection.objects.link(ob)
