@@ -2448,6 +2448,7 @@ function PropertyView({
           onPick={onPick}
           onPickPoint={onPickPoint}
           onFix={onFix}
+          onHowto={() => setParcelsDoc(true)}
         />
         <div
           key={tab}
@@ -2696,6 +2697,7 @@ function PlaceNote({
   onPick,
   onPickPoint,
   onFix,
+  onHowto,
 }: {
   query: string;
   result: Ok;
@@ -2703,6 +2705,8 @@ function PlaceNote({
   onPick: (address: string) => void;
   onPickPoint: (lat: number, lng: number) => void;
   onFix: () => void;
+  /** 地番の確かめ方（「謄本・公図用の地番」の書類を開く。地番が確定しないときの公式の手段を並べている） */
+  onHowto: () => void;
 }) {
   const { approximate, picked, parcel, parcelMiss } = result;
   let text: ReactNode = null;
@@ -2855,9 +2859,18 @@ function PlaceNote({
     text = "地図で選んだ地点です（番地は分からないので町名まで）。";
   }
   if (!text) return null;
+  // 地番が見つからない・地番の地図データが無いときは、帯の下に「地番の確かめ方」（帯は開け閉めのボタンなので、その中には入れない）
+  const howto = !!parcelMiss && !parcelMiss.away && parcelMiss.reason !== "error";
   return (
-    <PlaceBanner warn={warn} short={short} onFix={onFix} open={!!parcelMiss || !!result.parcelUnsure}>
-      {text}
-    </PlaceBanner>
+    <>
+      <PlaceBanner warn={warn} short={short} onFix={onFix} open={!!parcelMiss || !!result.parcelUnsure}>
+        {text}
+      </PlaceBanner>
+      {howto && (
+        <div className="mx-[14px] mt-[6px] flex justify-end">
+          <MiniButton onClick={onHowto}>地番の確かめ方</MiniButton>
+        </div>
+      )}
+    </>
   );
 }

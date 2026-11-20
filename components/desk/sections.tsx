@@ -19,6 +19,7 @@ import { roadShort } from "@/lib/roadmap/road-read";
 import { noYoutoSummary, youtoShort } from "@/lib/roadmap/zoning";
 import { zouseiText } from "@/lib/roadmap/zousei";
 import { BuildingCard } from "../building-card";
+import { ChibanHowto, chibanHowtoLead } from "../chiban-howto";
 import { ContactCard } from "../contact-card";
 import { COVERAGE, CoveragePill } from "../coverage";
 import { HazardCard, HazardLine } from "../hazard-card";
@@ -421,11 +422,14 @@ function Parcel({ ctx }: { ctx: SectionCtx }) {
         <div className="paper">
           <ParcelDetail info={p} chibanzu={chibanzu} pick={pick} />
         </div>
-      ) : (
+      ) : p.status === "none" && !p.approximate && !chibanzu ? null : (
+        // 筆が無く、町の中心でも市の地番図も無いときは ParcelCard が何も描かないので、空の枠を出さない
         <div className="paper p-0">
           <ParcelCard info={p} chibanzu={chibanzu} />
         </div>
       )}
+      {/* 地番が確定しない（地図データに筆が無い・読めなかった・住所の地点の筆は参考）ときは、空で終わらせず公式の確かめ方を出す */}
+      {chibanHowtoLead(p) && <ChibanHowto chibanzu={chibanzu} lead={chibanHowtoLead(p)!} />}
       <div className="paper mt-2 p-0">
         <BuildingCard state={data.building} />
       </div>

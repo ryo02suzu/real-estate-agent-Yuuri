@@ -8,6 +8,8 @@ import { SANKO_NOTE } from "../roadmap/sanko-data";
 import type { ParcelListInput } from "../parcel-list";
 import { half, jaDate, type Doc, type DocItem } from "./doc";
 import { formalChiban } from "./inquiry-letter";
+import { chibanHowtoLines } from "./chiban-howto";
+import { chibanzuFor } from "../roadmap/chibanzu";
 
 type Ok = Extract<LookupResult, { status: "ok" }>;
 
@@ -17,7 +19,10 @@ export function parcelDoc(result: Ok, parcels: ParcelListInput | undefined, date
     return {
       title: "謄本・公図用の地番",
       head,
-      sections: [{ title: "地番", items: [{ text: "この場所の筆は、地図データの中に見つかりませんでした。市町村の地番図（参考図）か法務局の窓口で、地番を確かめてください。", tone: "check" }] }],
+      sections: [
+        { title: "地番", items: [{ text: "この場所の筆は、地図データの中に見つかりませんでした。次の方法で地番を確かめてください。", tone: "check" }] },
+        { title: "地番の確かめ方", items: chibanHowtoLines(chibanzuFor(result.municipality, result.lat, result.lng)).map((text) => ({ text })) },
+      ],
     };
   const own: DocItem[] = [];
   const note = parcels.offLot
@@ -35,6 +40,9 @@ export function parcelDoc(result: Ok, parcels: ParcelListInput | undefined, date
     if (parcels.offLot) sections.push({ title: "隣の筆", items: [{ text: `省略（この筆に接する筆は${parcels.neighbors.length}筆）。公図で物件の筆を確かめてから、隣地を調べてください。` }] });
     else sections.push({ title: `隣の筆（境界が接している筆・${parcels.neighbors.length}筆）`, items: parcels.neighbors.map((n) => ({ box: "todo" as const, text: half(n) })) });
   }
+  // 住所の地点にある筆（参考）しか分からないときは、地番の確かめ方も添える（住居表示の住所と地番は別のもの）
+  if (parcels.reference || parcels.offLot)
+    sections.push({ title: "地番の確かめ方", items: chibanHowtoLines(chibanzuFor(result.municipality, result.lat, result.lng)).map((text) => ({ text })) });
   sections.push({
     title: "請求するもの（目安）",
     items: [
