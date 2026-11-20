@@ -11,6 +11,7 @@ import { SANKO_NOTE } from "./roadmap/sanko-data";
 import { distanceText, kindText, priceText, type LandPriceHit } from "./roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
 import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark, type Estimated } from "./roadmap/parcel";
+import { placeSuffix } from "./roadmap/geocode";
 import type { NearbyRoad } from "./roadmap/road-read";
 import { schoolCredit, schoolGaps, schoolGapShort, schoolLine, type Schools } from "./roadmap/school";
 import { POI_NOTE, poiCredit, poiWalkText, type PoiWalk } from "./roadmap/poi";
@@ -59,9 +60,16 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     {
       label: "所在（住所）",
       // 住所の数字は半角にそろえる（国土地理院の住所は「１９番１１号」のように全角。地番は半角）
-      value: `${result.matchedAddress.normalize("NFKC")}${found ? "" : " 付近"}`,
-      note: result.picked ? "地図で選んだ地点" : result.approximate ? "番地まで見つからず、町の中心の位置" : undefined,
-      check: result.approximate,
+      // 「付近」とは書かない（町の中心・地図で選んだ地点のときは、下の注記にそう書く。地番が分からないことは「所在（地番）」の行に書く）
+      value: result.matchedAddress.normalize("NFKC"),
+      note: result.picked
+        ? "地図で選んだ地点"
+        : result.approximate
+          ? "番地まで見つからず、町の中心の位置"
+          : !found && placeSuffix(result) === "（町の中心）"
+            ? "番地の無い住所なので、町の中心の位置"
+            : undefined,
+      check: result.approximate || (!found && !result.picked && placeSuffix(result) === "（町の中心）"),
     },
   ];
   if (found)

@@ -15,6 +15,7 @@ import { asOfText, changeText, distanceText, kindText, priceText, type LandPrice
 import { LAND_PRICE_CREDIT } from "../roadmap/land-price-data";
 import { MORIDO_CREDIT, moridoLine, type Morido } from "../roadmap/morido";
 import { chibanLabel, estimatedNote, kuikiLabel, parcelMark, type Estimated } from "../roadmap/parcel";
+import { placeSuffix } from "../roadmap/geocode";
 import { PARCEL_CREDIT } from "../roadmap/parcel-data";
 import { POI_SOURCES, poiLine, type PoiWalk } from "../roadmap/poi";
 import type { NearbyRoad } from "../roadmap/road-read";
@@ -74,8 +75,8 @@ const md = (t: number) => {
 function propertyLine(result: Ok): string {
   const p = result.parcel;
   const found = p && !result.picked ? p : undefined;
-  const lot = found ? `${chibanLabel(found.chibanRaw)}${parcelMark(found)}` : result.picked ? "（地図で選んだ地点）" : "付近";
-  return `物件：${half(result.matchedAddress)} ${lot}`.trim();
+  // 地番の筆が無いときは「付近」とは書かず、町の中心・地図で選んだ地点のときだけそう添える（placeSuffix）
+  return found ? `物件：${half(result.matchedAddress)} ${chibanLabel(found.chibanRaw)}${parcelMark(found)}` : `物件：${half(result.matchedAddress)}${placeSuffix(result)}`;
 }
 
 /** 確認先の短い言い方（「法務局の公図で」）を、注の文にする（「法務局の公図で確認」） */

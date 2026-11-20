@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { branchUnmatched, addressNumbers, isApproximate, kyotoChoices, kyotoStreet, kyotoTown, matchedNumbers, numbersAgree, partialMatch, pastedAddress, senDigits, streetSide, subAreaDropped, subAreaForm, subAreaMatched, subAreaRequery, withoutNumbers, type GeocodeResult } from "./geocode";
+import { branchUnmatched, addressNumbers, isApproximate, kyotoChoices, kyotoStreet, kyotoTown, matchedNumbers, numbersAgree, partialMatch, pastedAddress, placeSuffix, senDigits, streetSide, subAreaDropped, subAreaForm, subAreaMatched, subAreaRequery, withoutNumbers, type GeocodeResult } from "./geocode";
 
 describe("貼り付けた住所の飾りを外す（pastedAddress）", () => {
   it("郵便番号（〒付き・〒なし・ハイフンなし・全角）を外す", () => {
@@ -325,5 +325,23 @@ describe("小字のあとに区分の字を書いた地番（subAreaForm・subAr
     expect(senDigits("士幌西二線")).toBe("士幌西2線");
     expect(senDigits("上士幌東３線")).toBe("上士幌東3線");
     expect(senDigits("新線通り")).toBe("新線通り");
+  });
+});
+
+describe("placeSuffix（地番の筆を出さないときに住所の後ろに添える言葉）", () => {
+  const r = (matchedAddress: string, more: { approximate?: boolean; picked?: true; parcel?: unknown } = {}) => ({ approximate: false, matchedAddress, ...more });
+  it("住所が号・番地まで見つかっていれば何も付けない（「付近」と書かない）", () => {
+    expect(placeSuffix(r("東京都渋谷区神南一丁目１９番１１号"))).toBe("");
+    expect(placeSuffix(r("東京都渋谷区神南一丁目１９番"))).toBe("");
+    expect(placeSuffix(r("千葉県松戸市松戸３番地"))).toBe("");
+  });
+  it("番地まで見つからなかったとき・番地の無い住所（町の代表点）は「町の中心」", () => {
+    expect(placeSuffix(r("東京都千代田区三番町", { approximate: true }))).toBe("（町の中心）");
+    expect(placeSuffix(r("埼玉県熊谷市宮町二丁目"))).toBe("（町の中心）");
+    expect(placeSuffix(r("岩手県二戸市上舘第１５地割"))).toBe("（町の中心）");
+  });
+  it("地図で選んだ地点はそう書き、地番で探した筆が見つかったときは何も付けない（場所はその筆）", () => {
+    expect(placeSuffix(r("埼玉県熊谷市宮町二丁目", { picked: true }))).toBe("（地図で選んだ地点）");
+    expect(placeSuffix(r("埼玉県熊谷市宮町二丁目", { parcel: {} }))).toBe("");
   });
 });

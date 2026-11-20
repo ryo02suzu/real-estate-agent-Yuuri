@@ -165,7 +165,7 @@ describe("重説・物件概要の下書き", () => {
 
   it("データの無い欄は「要確認」と確かめる先", () => {
     const text = draftText(buildDraft({ ...base, approximate: true }));
-    expect(text).toContain("所在（住所）：東京都千代田区三番町 付近（番地まで見つからず、町の中心の位置）【要確認】");
+    expect(text).toContain("所在（住所）：東京都千代田区三番町（番地まで見つからず、町の中心の位置）【要確認】");
     expect(text).toContain("所在（地番）：要確認（登記・公図で確認）");
     expect(text).toContain("用途地域など：要確認");
     expect(text).toContain("宅地造成及び特定盛土等規制法：要確認（区域を指定した都道府県・市（盛土規制法の担当課）で確認）");
@@ -216,7 +216,8 @@ describe("住所の地点の筆", () => {
 
   it("住所の全角の数字は半角にそろえる（地番と同じ幅で並ぶ）", () => {
     const text = draftText(buildDraft({ ...base, matchedAddress: "東京都渋谷区神南一丁目１９番１１号" }, {}));
-    expect(text).toContain("所在（住所）：東京都渋谷区神南一丁目19番11号 付近");
+    expect(text).toContain("所在（住所）：東京都渋谷区神南一丁目19番11号\n");
+    expect(text).not.toContain("付近");
     expect(text).not.toContain("１９番");
   });
 });

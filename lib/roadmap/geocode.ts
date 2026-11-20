@@ -317,6 +317,18 @@ export function matchedNumbers(matchedAddress: string): number[] {
   return (tail?.match(/\d+/g) ?? []).map(Number);
 }
 
+/**
+ * 地番の筆を出さないときに、住所の後ろに添える言葉。
+ * 住所が番地・号まで見つかっていれば何も付けない（「付近」とは書かない。住所の場所はネットの地図と同じくらい分かっていて、
+ * 分からないのは地番だけ。地番のことは地番の欄に書く）。地図で選んだ地点と、町の中心の点（番地まで見つからなかった・
+ * 番地を書かずに町名で調べた）のときだけ、そう書く。地番で探した筆が見つかったときは、場所はその筆なので何も付けない
+ */
+export function placeSuffix(r: { approximate: boolean; picked?: true; parcel?: unknown; matchedAddress: string }): string {
+  if (r.picked) return "（地図で選んだ地点）";
+  if (r.parcel) return "";
+  return r.approximate || matchedNumbers(r.matchedAddress).length === 0 ? "（町の中心）" : "";
+}
+
 /** 見つかった住所から終わりの番地・号を外した、町までの部分（「千葉県松戸市松戸３番地」→「千葉県松戸市松戸」） */
 export const withoutNumbers = (matchedAddress: string) => matchedAddress.replace(/[0-9０-９][0-9０-９番地号の\-－]*$/, "");
 

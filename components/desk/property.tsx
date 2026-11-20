@@ -21,7 +21,7 @@ import type { HistoryItem } from "@/lib/history";
 import type { MapPlace } from "../live-map";
 import { propertyIdOf } from "@/lib/property-id";
 import { loadRecords, RECORDS_EVENT, type PropertyRecords, type RecordTopic } from "@/lib/records";
-import { branchUnmatched, partialMatch } from "@/lib/roadmap/geocode";
+import { branchUnmatched, partialMatch, placeSuffix } from "@/lib/roadmap/geocode";
 import type { AddressFix } from "@/lib/roadmap";
 import { distanceText } from "@/lib/roadmap/land-price";
 import { chibanLabel, chibanQueryOf, estimatedSentence, isLotChiban, kuikiLabel, registryChiban, type Neighbor } from "@/lib/roadmap/parcel";
@@ -347,7 +347,7 @@ export function DeskProperty(props: Props) {
               </h2>
             </>
           ) : (
-            <h2 className="addr">{result.picked ? `${where} 付近（地図で選んだ地点）` : `${where}${result.approximate ? "（町の中心）" : " 付近"}`}</h2>
+            <h2 className="addr">{`${where}${placeSuffix(result)}`}</h2>
           )}
           <span className="acts">
             <button type="button" className="btn ghost icon" onClick={copyAddress} aria-label="住所と地番をコピー" title="住所と地番をコピー（地図の住所検索に貼る）">

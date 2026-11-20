@@ -62,7 +62,8 @@ describe("buildSummary", () => {
       links: buildLinks(m, 36.147129, 139.38858),
       contact: resolveContact(m, "11202"),
     });
-    expect(text).toContain("埼玉県熊谷市宮町二丁目 付近");
+    // 番地の無い住所（町の代表点）は「付近」ではなく「町の中心」と書く
+    expect(text).toContain("埼玉県熊谷市宮町二丁目（町の中心）");
     expect(text).toContain("埼玉県熊谷市：ネットで分かるのは一部");
     expect(text).toContain("https://www2.wagmap.jp/kumagaya/Map?mid=170");
     expect(text).toContain("窓口：熊谷市 建築審査課 0493-39-4809");
@@ -373,7 +374,8 @@ describe("buildSummary の地番", () => {
     const neighbors = Array.from({ length: 40 }, (_, i) => `渋谷区神南１丁目 ${i + 1}`);
     const off = buildSummary(result, { parcels: { target: "渋谷区神南１丁目 100", neighbors, reference: true, offLot: true } });
     // 住所の全角の数字は半角にそろえる
-    expect(off).toContain("【MICHILU の調査結果】東京都渋谷区神南一丁目19番11号 付近");
+    // 住所が号まで見つかっていれば「付近」は付けない（地番は下の「謄本・公図用の地番」に分けて書く）
+    expect(off).toContain("【MICHILU の調査結果】東京都渋谷区神南一丁目19番11号\n");
     expect(off).toContain("【謄本・公図用の地番（住所の地点の筆・参考。道路など物件の外の土地の可能性）】\n・物件：渋谷区神南１丁目 100\n・隣地：省略（この筆に接する筆は40筆。公図で物件の筆を確かめてから）");
     expect(off).not.toContain("神南１丁目 1、");
     const ref = buildSummary(result, { parcels: { target: "渋谷区神南１丁目 100", neighbors: neighbors.slice(0, 3), reference: true } });

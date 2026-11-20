@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import type { LookupResult } from "@/lib/roadmap";
 import { KOZU_CREDIT } from "@/lib/roadmap/kozu-data";
 import { chibanLabel, kuikiLabel, parcelMark, tileBounds, type Parcel } from "@/lib/roadmap/parcel";
+import { placeSuffix } from "@/lib/roadmap/geocode";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
 import { sankoCredit } from "@/lib/roadmap/sanko-data";
 import { TILE, tilesAround, toWorldPixel } from "@/lib/tiles";
@@ -106,7 +107,7 @@ function GuideMapPage({ result, sender }: { result: Ok; sender?: Sender }) {
           <p className="text-[18px] font-bold leading-tight tracking-[0.3em]">案内図</p>
           <p className="mt-1 text-[14px] font-bold leading-snug">
             {result.matchedAddress.normalize("NFKC")}
-            {found ? ` ${chibanLabel(found.chibanRaw)}${parcelMark(found)}` : <span className="text-[12px] font-normal"> 付近</span>}
+            {found ? ` ${chibanLabel(found.chibanRaw)}${parcelMark(found)}` : placeSuffix(result) && <span className="text-[12px] font-normal">{placeSuffix(result)}</span>}
           </p>
           {p && result.picked && (
             <p className="text-[11px]">

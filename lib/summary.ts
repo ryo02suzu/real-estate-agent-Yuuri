@@ -14,6 +14,7 @@ import { KOZU_CREDIT } from "./roadmap/kozu-data";
 import { rosenkaLinks } from "./roadmap/rosenka";
 import { SANKO_NOTE, sankoCredit } from "./roadmap/sanko-data";
 import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark, type Estimated } from "./roadmap/parcel";
+import { placeSuffix } from "./roadmap/geocode";
 import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
 import { CHIBANZU_NOTE, chibanzuFor } from "./roadmap/chibanzu";
@@ -67,7 +68,7 @@ export function buildSummary(
   const m = result.municipality;
   const p = result.parcel;
   // 住所の数字は半角にそろえる（国土地理院の住所は「１９番１１号」のように全角。画面の見出しと地番は半角）
-  const lines = [`【MICHILU の調査結果】${result.matchedAddress.normalize("NFKC")}${p && !result.picked ? ` ${chibanLabel(p.chibanRaw)}${parcelMark(p)}` : " 付近"}`];
+  const lines = [`【MICHILU の調査結果】${result.matchedAddress.normalize("NFKC")}${p && !result.picked ? ` ${chibanLabel(p.chibanRaw)}${parcelMark(p)}` : placeSuffix(result)}`];
   // 地図で選んだ地点・地番で探した筆は、その地点を地理院地図で開けるようにする
   if (result.picked || p) lines.push(`${result.picked ? "地図で選んだ地点" : "筆の位置"}：https://maps.gsi.go.jp/#18/${result.lat.toFixed(6)}/${result.lng.toFixed(6)}/`);
   // 問題になりそうな所と次にやることを、結果の前に

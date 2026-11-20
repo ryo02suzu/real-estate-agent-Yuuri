@@ -18,6 +18,7 @@ import { POI_SOURCES, poiWalkText } from "@/lib/roadmap/poi";
 import { STATION_CREDIT, stationLine } from "@/lib/roadmap/walk";
 import { KOZU_CREDIT } from "@/lib/roadmap/kozu-data";
 import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark } from "@/lib/roadmap/parcel";
+import { placeSuffix } from "@/lib/roadmap/geocode";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
 import { SANKO_NOTE, sankoCredit } from "@/lib/roadmap/sanko-data";
 import { HOUREI_CREDIT, houreiLine, houreiNote } from "@/lib/roadmap/hourei";
@@ -147,7 +148,7 @@ function Memo({
           <p className="text-[10px] tracking-[0.1em] text-[#7a6a55]">道路種別・都市計画・災害リスクの調査メモ</p>
           <h1 className="text-[17px] font-bold leading-snug">
             {result.matchedAddress.normalize("NFKC")}
-            {found ? ` ${chibanLabel(found.chibanRaw)}${parcelMark(found)}` : <span className="text-[13px] font-normal">{result.picked ? "（地図で選んだ地点）" : " 付近"}</span>}
+            {found ? ` ${chibanLabel(found.chibanRaw)}${parcelMark(found)}` : placeSuffix(result) && <span className="text-[13px] font-normal">{placeSuffix(result)}</span>}
           </h1>
         </div>
         <p className="shrink-0 text-right text-[10px] leading-[1.5] text-[#7a6a55]">
