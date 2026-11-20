@@ -235,15 +235,21 @@ def build_local() -> dict:
             ca = (LAT[:-1, :-1] + LAT[1:, 1:]) / 2.0
             mask = ~((cl > w + 0.006) & (cl < ee - 0.006) & (ca > s + 0.005) & (ca < nn - 0.005))
         grid_object(name, e, n, u, hh, mask, mat)
-    # 雲海（東の盆地を埋める。海抜 1650m あたり、ゆるく波打つ）
-    gx = np.linspace(5000.0, 160000.0, 260)
-    gy = np.linspace(-100000.0, 100000.0, 300)
+    # 雲海（海抜 1650m あたり、ゆるく波打つ。まわりの低い盆地や谷を埋める）。上高地の谷（飛ぶ所）には置かない
+    gx = np.linspace(-60000.0, 160000.0, 360)
+    gy = np.linspace(-100000.0, 100000.0, 330)
     GY, GX = np.meshgrid(gy[::-1], gx, indexing="ij")
     rng = np.random.default_rng(3)
     bumps = sum(a * np.sin(GX / l + rng.uniform(0, 6.3)) * np.cos(GY / (l * 1.3) + rng.uniform(0, 6.3)) for a, l in ((45.0, 900.0), (25.0, 380.0), (70.0, 4200.0)))
     GZ = 1650.0 + bumps - (GX**2 + GY**2) / (2.0 * 6371008.8)
+    clat = P.P1[0] + np.degrees(GY / 6371008.8)
+    clon = P.P1[1] + np.degrees(GX / (6371008.8 * math.cos(math.radians(P.P1[0]))))
+    fc_lon = (clon[:-1, :-1] + clon[1:, 1:]) / 2.0
+    fc_lat = (clat[:-1, :-1] + clat[1:, 1:]) / 2.0
+    valley = [(137.585, 36.215), (137.66, 36.225), (137.72, 36.26), (137.715, 36.32), (137.64, 36.33), (137.585, 36.28)]
+    keep = ~inside_polygon(fc_lon, fc_lat, valley)
     cloud = principled("cloudsea", (0.82, 0.84, 0.88), 1.0, 0.2)
-    grid_object("cloudsea", GX, GY, GZ, np.zeros_like(GX), None, cloud)
+    grid_object("cloudsea", GX, GY, GZ, np.zeros_like(GX), keep, cloud)
     world_sky(0.6)
     sun_lamp(P.sun_dir("local"), 4.5)
     return dict(japan=None, unit_clip=(1.0, 400000.0))
