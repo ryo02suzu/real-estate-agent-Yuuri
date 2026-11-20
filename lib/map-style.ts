@@ -38,6 +38,15 @@ export const JAPAN_BOUNDS: [[number, number], [number, number]] = [
 export const JAPAN_CENTER: [number, number] = [136.9, 36.2];
 
 const ATTRIBUTION = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">地理院タイル</a>';
+/**
+ * 「写真」の地図の出典。国土地理院の地理院タイル一覧の「写真」は、ズーム 2〜8 が世界衛星モザイク画像、9〜13 が全国ランドサット
+ * モザイク画像、14〜18 が全国最新写真（シームレス）で、2つの衛星画像には、それぞれの備考で次の出所もあわせて書くよう求めている
+ * （2026-11-20 に原文で確かめた）。引いた縮尺で衛星画像が出るので、いつも添える
+ */
+const PHOTO_LANDSAT = "データソース：Landsat8画像（GSI,TSIC,GEO Grid/AIST）, Landsat8画像（courtesy of the U.S. Geological Survey）, 海底地形（GEBCO）";
+const PHOTO_MODIS =
+  "Images on 世界衛星モザイク画像 obtained from site https://lpdaac.usgs.gov/data_access maintained by the NASA Land Processes Distributed Active Archive Center (LP DAAC), USGS/Earth Resources Observation and Science (EROS) Center, Sioux Falls, South Dakota, (Year). Source of image data product.";
+export const PHOTO_ATTRIBUTION = `${ATTRIBUTION}（写真）／${PHOTO_LANDSAT}／${PHOTO_MODIS}`;
 // 登記所備付地図データの利用規約どおり、出典と加工したことを書く
 const PARCEL_ATTRIBUTION = `<a href="https://front.geospatial.jp/moj-chizu-xml-readme/" target="_blank" rel="noreferrer">「登記所備付地図データ」（法務省）</a>を加工して作成（${PARCEL_DATA.edition}）`;
 
@@ -277,7 +286,7 @@ export function gsiStyle(basemap: Basemap = "pale", accent: Accent = GOLD): Styl
         keys.map((k) => [
           k,
           // 地理院タイルは z18 まで。それより拡大したときは z18 のタイルを引き伸ばす
-          { type: "raster", tiles: [BASEMAPS[k].url], tileSize: 256, minzoom: BASEMAPS[k].minzoom, maxzoom: 18, attribution: ATTRIBUTION },
+          { type: "raster", tiles: [BASEMAPS[k].url], tileSize: 256, minzoom: BASEMAPS[k].minzoom, maxzoom: 18, attribution: k === "photo" ? PHOTO_ATTRIBUTION : ATTRIBUTION },
         ]),
       ),
       sheet: { type: "geojson", data: sheetFeatures() },

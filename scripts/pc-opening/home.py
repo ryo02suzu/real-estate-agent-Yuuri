@@ -28,6 +28,7 @@ from animatic import grid_object, principled  # noqa: E402
 WORK = os.environ.get("PC_OPENING_WORK", os.path.join(HERE, "work"))
 JAPAN_BOUNDS = ((128.6, 30.9), (145.9, 45.6))  # lib/map-style.ts と同じ
 MIN_ZOOM = 5.0
+SUFFIX = ""  # 広い版（--extent）は "_w"（home_prep.py --wide の出力）
 EARTH = 40075016.7  # 赤道の長さ（m）
 
 
@@ -56,9 +57,9 @@ def home_view(W: int, H: int) -> tuple[float, float, float]:
 
 
 def build(view_mx: float, view_my: float, zoom: float, exag: float) -> None:
-    with open(os.path.join(WORK, "home_dem.json")) as f:
+    with open(os.path.join(WORK, f"home_dem{SUFFIX}.json")) as f:
         meta = json.load(f)
-    dem = np.load(os.path.join(WORK, "home_dem.npy"))
+    dem = np.load(os.path.join(WORK, f"home_dem{SUFFIX}.npy"))
     S = 4
     h = dem[::S, ::S].astype(np.float64)
     Hf, Wf = dem.shape
@@ -79,7 +80,7 @@ def build(view_mx: float, view_my: float, zoom: float, exag: float) -> None:
     nt = mat.node_tree
     b = nt.nodes["Principled BSDF"]
     tex = nt.nodes.new("ShaderNodeTexImage")
-    tex.image = bpy.data.images.load(os.path.join(WORK, "home_albedo.png"))
+    tex.image = bpy.data.images.load(os.path.join(WORK, f"home_albedo{SUFFIX}.png"))
     tex.interpolation = "Cubic"
     uvn = nt.nodes.new("ShaderNodeUVMap")
     uvn.uv_map = "UVMap"
@@ -141,10 +142,31 @@ def main() -> None:
     ap.add_argument("--spp", type=int, default=24)
     ap.add_argument("--exag", type=float, default=6.0)
     ap.add_argument("--out", default="")
+    # 広い版：データの範囲全部を、ズーム 5 の地図と同じ縮尺で描く（アプリは画像の四隅の経度・緯度で地図に重ねるので、
+    # 画面の大きさによらず重なる）。四隅は出力と同じ名前の .json に書く
+    ap.add_argument("--extent", action="store_true")
     a = ap.parse_args()
-    W, H = (int(v) for v in a.view.split("x"))
-    zoom, vmx, vmy = home_view(W, H)
-    print(f"PC のホームの地図（{W}×{H}）：ズーム {zoom:.3f}、真ん中 {vmx * 360 - 180:.3f}°E", flush=True)
+    global SUFFIX
+    if a.extent:
+        SUFFIX = "_w"
+        with open(os.path.join(WORK, "home_dem_w.json")) as f:
+            meta = json.load(f)
+        dh, dw = np.load(os.path.join(WORK, "home_dem_w.npy"), mmap_mode="r").shape
+        n = 2.0 ** meta["z"]
+        mx0, mx1 = meta["x0"] / n, (meta["x0"] + dw / 256.0) / n
+        my0, my1 = meta["y0"] / n, (meta["y0"] + dh / 256.0) / n
+        zoom = MIN_ZOOM
+        world = 512 * 2**zoom
+        W, H = int(round((mx1 - mx0) * world)), int(round((my1 - my0) * world))
+        vmx, vmy = (mx0 + mx1) / 2, (my0 + my1) / 2
+        lon = lambda x: x * 360 - 180
+        lat = lambda y: math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * y))))
+        corners = [[lon(mx0), lat(my0)], [lon(mx1), lat(my0)], [lon(mx1), lat(my1)], [lon(mx0), lat(my1)]]
+        print(f"広い版：{W}×{H}（ズーム 5 の画素）、四隅 {corners}", flush=True)
+    else:
+        W, H = (int(v) for v in a.view.split("x"))
+        zoom, vmx, vmy = home_view(W, H)
+        print(f"PC のホームの地図（{W}×{H}）：ズーム {zoom:.3f}、真ん中 {vmx * 360 - 180:.3f}°E", flush=True)
     bpy.ops.wm.read_factory_settings(use_empty=True)
     build(vmx, vmy, zoom, a.exag)
     lights()
@@ -172,10 +194,13 @@ def main() -> None:
     sc.view_settings.look = "AgX - Medium High Contrast"
     sc.view_settings.exposure = 0.3
     finish(0.06)
-    out = a.out or os.path.join(WORK, "home", f"home_{W}x{H}.png")
+    out = a.out or os.path.join(WORK, "home", "home_wide.png" if a.extent else f"home_{W}x{H}.png")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     sc.render.filepath = out
     bpy.ops.render.render(write_still=True)
+    if a.extent:
+        with open(os.path.splitext(out)[0] + ".json", "w") as f:
+            json.dump({"coordinates": corners, "zoom": zoom, "size": [W, H]}, f, ensure_ascii=False, indent=1)
     print(out, flush=True)
 
 

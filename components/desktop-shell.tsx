@@ -319,6 +319,7 @@ export function DesktopShell({
             toolsClassName="desk-map-tools"
             skin="desk"
             places={ok ? places : undefined}
+            waitLabel={loading ? input : undefined}
             fallback={
               <div className="absolute inset-0" style={{ paddingLeft: frame.left, paddingRight: frame.right, paddingTop: frame.top, paddingBottom: frame.bottom }}>
                 {point ? <MapPreview lat={point.lat} lng={point.lng} className="h-full" large /> : <MapIllustration className="h-full w-full opacity-70" />}

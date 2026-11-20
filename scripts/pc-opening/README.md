@@ -34,6 +34,8 @@ python3 fetch.py near_photo && python3 photo.py near_photo
 python final.py local --frames 345 --res 1920x1080 --spp 96   # 雲海と朝日の 1 コマ（この作業場所で約 26 分）
 python3 fetch.py lndst modis dem8 && python3 home_prep.py
 python home.py --view 1440x900                                 # 真上から見た日本（約 1.5 分）
+python3 fetch.py dem8w modisw && python3 home_prep.py --wide
+python home.py --extent                                        # PC のホームの背景（広い版。四隅は home_wide.json。約 6 分）
 ```
 
 `animatic.py` は `--res 640x360 --spp 8`（大きさ・1画素あたりの光の数）、`--frames 0-168`、`--every 30`（間引いて試す）を選べる。

@@ -8,6 +8,8 @@
 // 重ねた色の凡例も出す
 import "maplibre-gl/dist/maplibre-gl.css";
 import { addProtocol, getVersion, MapLibreMap, Marker, NavigationControl, Popup, ScaleControl, setWorkerUrl, type GeoJSONSource, type PointLike } from "maplibre-gl";
+import { addDeskCinema, flyToProperty, headToward } from "@/lib/app/desk-cinema";
+import { waitViewOf } from "./app/flight-wait";
 import { Protocol } from "pmtiles";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -245,6 +247,8 @@ export type LiveMapProps = {
   skin?: "desk";
   /** PC：「駅・学校」で出す札（渡したときだけ道具に出る） */
   places?: MapPlace[];
+  /** PC：調べている間の入力（場所が分かる前に、入れた住所の都道府県の上へゆっくり向かう） */
+  waitLabel?: string;
 };
 
 /** 濃さを変えるレイヤとその不透明度の属性（ハザードのタイルはこれに加えて raster-opacity） */
@@ -295,6 +299,7 @@ export default function LiveMap({
   parcelPick,
   me,
   skin,
+  waitLabel,
   places,
 }: LiveMapProps) {
   const container = useRef<HTMLDivElement>(null);
@@ -303,6 +308,11 @@ export default function LiveMap({
   const labelRef = useRef<Marker | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [basemap, setBasemap] = useState<Basemap>("pale");
+  // 地図のイベントや動きの中から、今の背景の地図を見る
+  const basemapRef = useRef(basemap);
+  useEffect(() => {
+    basemapRef.current = basemap;
+  });
   const [locating, setLocating] = useState(false);
   // 地図の「現在地」で取れた位置（青い点を出す。渡された現在地があればそちら）
   const [located, setLocated] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
@@ -389,7 +399,11 @@ export default function LiveMap({
     map.keyboard.disableRotation();
     map.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
     map.addControl(new ScaleControl({ maxWidth: 110 }), "bottom-right");
-    map.on("load", () => setLoaded(true));
+    map.on("load", () => {
+      // PC：ホームの背景（Blender の日本）と、検索の途中の写真・着いた所の輪（lib/app/desk-cinema.ts）
+      if (skin === "desk") addDeskCinema(map, Object.keys(BASEMAPS));
+      setLoaded(true);
+    });
     // スマホの狭い地図では、出典（地理院タイル・PLATEAU・登記所備付地図など）の帯を最初から畳んでおく（ⓘ で開ける）。
     // 開いたままだと地図の下の方を大きく隠す。MapLibre は地図を動かすと畳むが、最初は開いている
     if (compact) map.once("idle", () => map.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show"));
@@ -620,9 +634,20 @@ export default function LiveMap({
       });
       pinRef.current = pin;
     } else pinRef.current.setLngLat([lng, lat]);
-    // ピンを動かして選び直したときは、地図はそのまま。別の場所を調べたときだけ移動する
-    if (map.getZoom() < 15 || !map.getBounds().contains([lng, lat])) map.flyTo({ center: [lng, lat], zoom: 17, duration: 1200 });
-  }, [lat, lng, mode]);
+    // ピンを動かして選び直したときは、地図はそのまま。別の場所を調べたときだけ移動する。PC は遠くから写真を見せながら真上から降りる
+    if (map.getZoom() < 15 || !map.getBounds().contains([lng, lat])) {
+      if (skin === "desk") flyToProperty(map, [lng, lat], { keepPhoto: basemapRef.current === "photo" });
+      else map.flyTo({ center: [lng, lat], zoom: 17, duration: 1200 });
+    }
+  }, [lat, lng, mode, skin]);
+
+  // PC：調べている間は、入れた住所の都道府県の上へゆっくり向かう（場所が分かったら上の flyToProperty で降りる）
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded || skin !== "desk" || !waitLabel || point) return;
+    const view = waitViewOf(waitLabel);
+    if (view) headToward(map, view);
+  }, [waitLabel, loaded, skin, point]);
 
   // 現在地の青い点（脈打つ輪と、誤差の円。誤差の円はズームに合わせて大きさを変える）。指は地図に通す
   const here = me ?? located;
@@ -670,8 +695,11 @@ export default function LiveMap({
   useEffect(() => {
     if (focusKey === lastFocus.current) return;
     lastFocus.current = focusKey;
-    if (lat !== undefined && lng !== undefined) mapRef.current?.flyTo({ center: [lng, lat], zoom: 17, duration: 900 });
-  }, [focusKey, lat, lng]);
+    if (lat === undefined || lng === undefined || !mapRef.current) return;
+    // PC は、遠くから（ホームなど）なら写真を見せながら真上から降りる（近ければ今までどおり短く寄る。lib/app/desk-cinema.ts）
+    if (skin === "desk") flyToProperty(mapRef.current, [lng, lat], { keepPhoto: basemapRef.current === "photo" });
+    else mapRef.current.flyTo({ center: [lng, lat], zoom: 17, duration: 900 });
+  }, [focusKey, lat, lng, skin]);
 
   // 図の範囲の枠と、図の名前の札
   const sheetKey = sheet ? `${sheet.label}|${sheet.bounds.join(",")}` : "";

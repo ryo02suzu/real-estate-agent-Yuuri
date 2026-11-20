@@ -46,6 +46,9 @@ SETS = {
     # 同じ範囲・同じ細かさの標高（海底を含む）。陸と海の境目と、海の深さの色に使う
     "dem8": dict(kind="terrarium", z=8, bbox=(119.5, 30.0, 154.0, 47.2)),
     "modis": dict(kind="modis", z=7, bbox=(119.5, 30.0, 154.0, 47.2)),
+    # PC のホームの背景（広い版）：画面の大きさによらず地図と重なるよう、日本のまわりを広く（ランドサットは日本だけなので上のまま）
+    "dem8w": dict(kind="terrarium", z=8, bbox=(110.0, 18.0, 165.0, 52.0)),
+    "modisw": dict(kind="modis", z=7, bbox=(110.0, 18.0, 165.0, 52.0)),
 }
 URL = {
     "terrarium": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",

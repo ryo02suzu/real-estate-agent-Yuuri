@@ -73,26 +73,46 @@ def smooth_noise(shape, scale: int, seed: int) -> np.ndarray:
 
 
 def main() -> None:
-    with open(os.path.join(WORK, "dem8.json")) as f:
+    import sys
+
+    wide = "--wide" in sys.argv[1:]  # PC のホームの背景（広い版）
+    dem_name, mod_name, suffix = ("dem8w", "modisw", "_w") if wide else ("dem8", "modis", "")
+    with open(os.path.join(WORK, f"{dem_name}.json")) as f:
         meta = json.load(f)
-    h, n = fix_spikes(np.load(os.path.join(WORK, "dem8.npy")))
+    h, n = fix_spikes(np.load(os.path.join(WORK, f"{dem_name}.npy")))
+    if wide:
+        # 広い版はズーム 5 の2倍で描くので、ズーム 7 の細かさ（半分）で十分。メモリも 1/4 にする
+        F = 2
+        H8, W8 = h.shape
+        h = h[: H8 // F * F, : W8 // F * F].reshape(H8 // F, F, W8 // F, F).mean(axis=(1, 3))
+        meta = dict(meta, z=meta["z"] - 1, x0=meta["x0"] / F, y0=meta["y0"] / F)
     H, W = h.shape
-    np.save(os.path.join(WORK, "home_dem.npy"), h.astype(np.float32))
-    with open(os.path.join(WORK, "home_dem.json"), "w") as f:
+    np.save(os.path.join(WORK, f"home_dem{suffix}.npy"), h.astype(np.float32))
+    with open(os.path.join(WORK, f"home_dem{suffix}.json"), "w") as f:
         json.dump(meta, f, ensure_ascii=False, indent=1)
     print(f"標高 {W}×{H}、飛び抜けた値を {n} 画素直した。標高 {h.min():.0f}〜{h.max():.0f}m")
 
     # 陸の色：ランドサット（日本）を、世界衛星モザイク（まわりの国）の上に重ねる
     with open(os.path.join(WORK, "lndst.json")) as f:
         lm = json.load(f)
-    with open(os.path.join(WORK, "modis.json")) as f:
+    with open(os.path.join(WORK, f"{mod_name}.json")) as f:
         mm = json.load(f)
-    assert (lm["z"], lm["x0"], lm["y0"]) == (meta["z"], meta["x0"], meta["y0"]), "ランドサットと標高の格子がずれている"
-    lnd = np.asarray(Image.open(os.path.join(WORK, "lndst.png")).convert("RGBA"), dtype=np.float32) / 255.0
-    mod_im = Image.open(os.path.join(WORK, "modis.png")).convert("RGBA")
-    mod_im = mod_im.resize((mod_im.width * 2, mod_im.height * 2), Image.BILINEAR)  # ズーム 7 → 8
-    ox = (mm["x0"] * 2 - meta["x0"]) * TILE
-    oy = (mm["y0"] * 2 - meta["y0"]) * TILE
+    # ランドサット（日本だけ）を、標高の格子の中の位置に置く（同じ格子なら、そのまま。広い版は半分に縮める）
+    sl = 2.0 ** (meta["z"] - lm["z"])
+    lim = Image.open(os.path.join(WORK, "lndst.png")).convert("RGBA")
+    if sl != 1:
+        lim = lim.resize((int(round(lim.width * sl)), int(round(lim.height * sl))), Image.BILINEAR)
+    lsrc = np.asarray(lim, dtype=np.float32) / 255.0
+    lox, loy = int(round((lm["x0"] * sl - meta["x0"]) * TILE)), int(round((lm["y0"] * sl - meta["y0"]) * TILE))
+    lnd = np.zeros((H, W, 4), dtype=np.float32)
+    lys, lxs = slice(max(0, loy), min(H, loy + lsrc.shape[0])), slice(max(0, lox), min(W, lox + lsrc.shape[1]))
+    lnd[lys, lxs] = lsrc[lys.start - loy : lys.stop - loy, lxs.start - lox : lxs.stop - lox]
+    mod_im = Image.open(os.path.join(WORK, f"{mod_name}.png")).convert("RGBA")
+    sm = 2.0 ** (meta["z"] - mm["z"])  # ズーム 7 → 標高の格子（8 なら2倍、広い版の 7 ならそのまま）
+    if sm != 1:
+        mod_im = mod_im.resize((int(round(mod_im.width * sm)), int(round(mod_im.height * sm))), Image.BILINEAR)
+    ox = int(round((mm["x0"] * sm - meta["x0"]) * TILE))
+    oy = int(round((mm["y0"] * sm - meta["y0"]) * TILE))
     mod = np.zeros((H, W, 4), dtype=np.float32)
     src = np.asarray(mod_im, dtype=np.float32) / 255.0
     ys, xs = slice(max(0, oy), min(H, oy + src.shape[0])), slice(max(0, ox), min(W, ox + src.shape[1]))
@@ -126,8 +146,8 @@ def main() -> None:
     land = np.clip((h + 4.0) / 8.0, 0.0, 1.0)
     rgb = sea * (1 - land[..., None]) + land_rgb * land[..., None]
     out = np.dstack([to_srgb(rgb), land]) * 255.0 + 0.5
-    Image.fromarray(out.astype(np.uint8), mode="RGBA").save(os.path.join(WORK, "home_albedo.png"))
-    with open(os.path.join(WORK, "home_albedo.json"), "w") as f:
+    Image.fromarray(out.astype(np.uint8), mode="RGBA").save(os.path.join(WORK, f"home_albedo{suffix}.png"))
+    with open(os.path.join(WORK, f"home_albedo{suffix}.json"), "w") as f:
         json.dump(meta, f, ensure_ascii=False, indent=1)
     print(f"home_albedo.png {W}×{H}  陸 {land.mean() * 100:.0f}%")
 
