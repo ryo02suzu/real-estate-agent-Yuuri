@@ -40,11 +40,19 @@ SETS = {
     "mid": dict(kind="gsi", z=11, bbox=(136.9, 35.25, 139.1, 37.0)),
     # 上高地のまわりの航空写真（国土地理院 全国最新写真（シームレス）。約 3.9m ごと）。地面の色に使う
     "near_photo": dict(kind="photo", z=15, bbox=(137.55, 36.17, 137.82, 36.37)),
+    # 真上から見た日本（PC のホームの地図と重ねる）の陸の色：日本は国土地理院 全国ランドサットモザイク画像、
+    # まわりの国は国土地理院 世界衛星モザイク画像（海は使わない。海は Blender で描く）
+    "lndst": dict(kind="lndst", z=8, bbox=(119.5, 30.0, 154.0, 47.2)),
+    # 同じ範囲・同じ細かさの標高（海底を含む）。陸と海の境目と、海の深さの色に使う
+    "dem8": dict(kind="terrarium", z=8, bbox=(119.5, 30.0, 154.0, 47.2)),
+    "modis": dict(kind="modis", z=7, bbox=(119.5, 30.0, 154.0, 47.2)),
 }
 URL = {
     "terrarium": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
     "gsi": "https://cyberjapandata.gsi.go.jp/xyz/dem_png/{z}/{x}/{y}.png",
     "photo": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg",
+    "lndst": "https://cyberjapandata.gsi.go.jp/xyz/lndst/{z}/{x}/{y}.png",
+    "modis": "https://cyberjapandata.gsi.go.jp/xyz/modis/{z}/{x}/{y}.png",
 }
 
 
@@ -75,31 +83,37 @@ def get(url: str, path: str) -> bytes | None:
     raise RuntimeError(f"取れなかった: {url}（{err}）")
 
 
-def photo_mosaic(name: str, z: int, bbox: tuple[float, float, float, float]) -> None:
-    """航空写真のタイルをつなぎ合わせて、1枚の JPEG（work/<名前>.jpg）にする"""
+def photo_mosaic(name: str, z: int, bbox: tuple[float, float, float, float], kind: str = "photo") -> None:
+    """写真・衛星画像のタイルをつなぎ合わせて、1枚の画像にする（航空写真は work/<名前>.jpg、衛星画像は透明な所のある
+    work/<名前>.png）"""
     x0, y0, x1, y1 = tile_range(bbox, z)
     nx, ny = x1 - x0 + 1, y1 - y0 + 1
-    out = Image.new("RGB", (nx * TILE, ny * TILE), (60, 70, 60))
+    png = kind != "photo"
+    out = Image.new("RGBA" if png else "RGB", (nx * TILE, ny * TILE), (0, 0, 0, 0) if png else (60, 70, 60))
     missing = 0
+    ext = "png" if png else "jpg"
     for ty in range(ny):
         for tx in range(nx):
             x, y = x0 + tx, y0 + ty
-            data = get(URL["photo"].format(z=z, x=x, y=y), os.path.join(WORK, "tiles", "photo", str(z), str(x), f"{y}.jpg"))
+            data = get(URL[kind].format(z=z, x=x, y=y), os.path.join(WORK, "tiles", kind, str(z), str(x), f"{y}.{ext}"))
             if data is None:
                 missing += 1
                 continue
-            out.paste(Image.open(io.BytesIO(data)).convert("RGB"), (tx * TILE, ty * TILE))
+            out.paste(Image.open(io.BytesIO(data)).convert("RGBA" if png else "RGB"), (tx * TILE, ty * TILE))
         print(f"  {name}: {ty + 1}/{ny} 行", flush=True)
-    out.save(os.path.join(WORK, f"{name}.jpg"), quality=92)
-    meta = dict(kind="photo", z=z, x0=x0, y0=y0, nx=nx, ny=ny, bbox=bbox, source=URL["photo"])
+    if png:
+        out.save(os.path.join(WORK, f"{name}.png"))
+    else:
+        out.save(os.path.join(WORK, f"{name}.jpg"), quality=92)
+    meta = dict(kind=kind, z=z, x0=x0, y0=y0, nx=nx, ny=ny, bbox=bbox, source=URL[kind])
     with open(os.path.join(WORK, f"{name}.json"), "w") as f:
         json.dump(meta, f, ensure_ascii=False, indent=1)
     print(f"{name}: {out.width}×{out.height} 画素、{nx * ny} 枚（無いタイル {missing}）", flush=True)
 
 
 def mosaic(name: str, kind: str, z: int, bbox: tuple[float, float, float, float]) -> None:
-    if kind == "photo":
-        photo_mosaic(name, z, bbox)
+    if kind in ("photo", "lndst", "modis"):
+        photo_mosaic(name, z, bbox, kind)
         return
     x0, y0, x1, y1 = tile_range(bbox, z)
     nx, ny = x1 - x0 + 1, y1 - y0 + 1

@@ -1,7 +1,8 @@
 # PC のオープニング CG（作る道具）
 
 PC 版（横幅 1024px 以上）で、アプリを開いたときに流すオープニング映像を、Blender で作る道具。スマホの画面には使わない。
-いまは **粗い下書き（カメラの動きと長さだけを見る動画）** の段階で、アプリにはまだ組み込んでいない。
+いまは **粗い下書き（カメラの動きと長さだけを見る動画）** と、**本番の色と質感の試し**（雲海と朝日の 1 コマ、
+真上から見た日本＝PC のホームの背景の見本）の段階で、アプリにはまだ組み込んでいない。
 
 ## 流れ（約13.5秒・30コマ/秒）
 
@@ -27,6 +28,12 @@ python3 fetch.py                 # 標高のタイルを取ってきて、work/ 
 python3 path.py                  # カメラの速さ・向きの変わる速さ・地面からの高さを 0.1 秒ごとに出す（確かめる用）
 python animatic.py global        # 列島の場面のコマを描く（python は bpy を入れたもの）。local・top も同じ
 python3 assemble.py animatic --labels --logo ロゴの画像.webp   # 1本の動画に（work/animatic.mp4）
+
+# 本番の色と質感の試し
+python3 fetch.py near_photo && python3 photo.py near_photo
+python final.py local --frames 345 --res 1920x1080 --spp 96   # 雲海と朝日の 1 コマ（この作業場所で約 26 分）
+python3 fetch.py lndst modis dem8 && python3 home_prep.py
+python home.py --view 1440x900                                 # 真上から見た日本（約 1.5 分）
 ```
 
 `animatic.py` は `--res 640x360 --spp 8`（大きさ・1画素あたりの光の数）、`--frames 0-168`、`--every 30`（間引いて試す）を選べる。
@@ -39,6 +46,10 @@ python3 assemble.py animatic --labels --logo ロゴの画像.webp   # 1本の動
 | `path.py` | 時間割とカメラの動き（Blender を使わずに確かめられる） |
 | `animatic.py` | Blender で場面を組み、コマを描く |
 | `assemble.py` | コマを1本の動画にする（雲の中の白さ・仮のロゴ・秒と場面の名前） |
+| `photo.py` | 航空写真の色の偏り（撮った年・季節の違うつぎはぎ）を、約 1.2km より大きな範囲で均す |
+| `final.py` | 本番の色と質感（航空写真の地面・立体の雲海・朝焼けの空・空気のかすみ・太陽のまわりのにじみ）。いまは上高地の場面 |
+| `home_prep.py` | 真上から見た日本の地面の色の地図（陸は衛星画像、海は深さで色を決める。標高の飛び抜けた値を直す） |
+| `home.py` | 真上から見た日本を、PC のホームの地図と同じメルカトル図法・同じ縮尺で描く（地図の最初の見え方を同じ計算で出す） |
 | `work/` | 取ってきたタイル・描いたコマ・動画（Git には入れない） |
 
 ## 使っているデータと出典
@@ -48,13 +59,17 @@ python3 assemble.py animatic --labels --logo ロゴの画像.webp   # 1本の動
 | 国土地理院 標高タイル（基盤地図情報数値標高モデル。`dem_png`＝DEM10B、ズーム 14・11） | 上高地のまわり（約 7.7m ごと）、北アルプス〜富士山（約 60m ごと） | タイル一覧の「■2. 基本測量成果以外で出典の記載のみで利用可能なもの」にあり、出典を書けば申請なしで使える。「国土地理院」または「地理院タイル」と書き、[地理院タイル一覧](https://maps.gsi.go.jp/development/ichiran.html)へのリンクを付ける。加工したことも書く（例：「地理院タイル（標高タイル（基盤地図情報数値標高モデル））を加工して作成」）。国土地理院が作ったように見せない（[利用規約](https://www.gsi.go.jp/kikakuchousei/kikakuchousei40182.html)）。この欄の備考に、ほかの出典の指定は無い（2026-11-20 に原文で確認） |
 | AWS Terrain Tiles（terrarium、ズーム 6） | 日本列島と、まわりの海・海底 | 出典は元のデータごと（[attribution.md](https://github.com/tilezen/joerd/blob/master/docs/attribution.md)）。海は ETOPO1（NOAA。「Not to be used for navigation.」）、陸は SRTM・GMTED2010（USGS）。日本の陸の元のデータが何かは、このページに書かれていない（本番の前に確かめる。陸は国土地理院の標高に置き換える案もある） |
 
-まだ使っていないもの（本番の質感で使う予定。条件は 2026-11-20 に原文で確認）：
+| 国土地理院 全国最新写真（シームレス。`seamlessphoto`、ズーム 15） | 上高地のまわりの地面の色 | 標高タイルと同じ「■2」の欄で、出典を書けば使える（下の備考も） |
+| 国土地理院 全国ランドサットモザイク画像（`lndst`、ズーム 8） | 真上から見た日本の、日本の陸の色 | 「■2」の欄。備考の原文：「本タイル画像を利用する場合は、「国土地理院コンテンツ利用規約」で定める方法での出所明示に加え、以下の出所も合わせて明示してください。」「データソース：Landsat8画像（GSI,TSIC,GEO Grid/AIST）, Landsat8画像（courtesy of the U.S. Geological Survey）, 海底地形（GEBCO）」。画像の無い所は白で塗られている |
+| 国土地理院 世界衛星モザイク画像（`modis`、ズーム 7） | 真上から見た日本の、まわりの国の陸の色 | 「■2」の欄。国土地理院の出所に加え、備考の英文の出所（Images on 世界衛星モザイク画像 obtained from site https://lpdaac.usgs.gov/data_access maintained by the NASA Land Processes Distributed Active Archive Center (LP DAAC), USGS/Earth Resources Observation and Science (EROS) Center, Sioux Falls, South Dakota, (Year). Source of image data product.）を書く |
+| AWS Terrain Tiles（terrarium、ズーム 8。`dem8`） | 真上から見た日本の、陸と海の境目・海の深さの色・山の起伏 | 上の AWS Terrain Tiles と同じ。まわりから飛び抜けた値（例：富山の平野で 18111m）がわずかにあるので、home_prep.py で直す |
 
-- 国土地理院 全国最新写真（シームレス。`seamlessphoto`、ズーム 14〜18）：標高タイルと同じ「■2」の欄で、出典を書けば使える。
+確かめた条件（2026-11-20 に原文で確認）：
+
+- 国土地理院 全国最新写真（シームレス）：
   備考の原文：「一部において、米国航空宇宙局（NASA）/米国地質調査所（USGS）の地球観測衛星Landsat-8の画像、Axelspace CorporationのGRUS画像を使用しております。」
   GRUS 画像（© Axelspace の表示が要る）は「北緯20度24分28秒～北緯20度27分21秒、東経136度3分58秒～東経136度8分25秒」（沖ノ鳥島のあたり）だけで、上高地には無い
-- 国土地理院 世界衛星モザイク画像（ズーム 2〜8。出典に NASA LP DAAC・USGS EROS）：列島全体の地面の色に使う案。使う前に、その欄の原文を読む
-- Poly Haven・ambientCG の素材（CC0。出典は要らない）
+- まだ使っていない：Poly Haven・ambientCG の素材（CC0。出典は要らない）
 
 使わないもの：NASA の衛星画像を直接（会社の宣伝に使うときの条件が確かめきれていない）、Google の地図や 3D の画像。
 
