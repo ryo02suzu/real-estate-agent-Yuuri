@@ -1,9 +1,11 @@
 """PC のオープニング CG の時間割とカメラの動き（numpy だけ。Blender の外でも確かめられる）。
 
-場面は3つで、つなぎ目は雲の中（画面が白いうち）で切り替える：
-  global … 列島の場面（夜明けの太平洋 → 列島が海から現れる → 列島を見渡して、北アルプスへ降りる）。単位は km
-  local  … 上高地の場面（穂高の稜線を越え、上高地の谷へ降り、梓川の上を飛び、東の稜線より高く上がると、雲海と朝日）。単位は m
-  top    … 真上から見た日本列島（PC のホームの地図へつなぐ）。単位は km（global と同じ場面）
+構成「ひとつの夜明け」（約16秒・30コマ/秒）。光は朝日だけ。カットは割らず、場面のつなぎは雲の中で行う：
+  global … 列島の場面。日本海の高い空から、夜明け前の日本を東へ見る。朝日が太平洋の側から上がり、光が列島を
+            なでて日本が浮かび上がる。そのまま北アルプスへ降りて、薄い雲の中へ。単位は km
+  local  … 上高地の場面（晩秋）。涸沢の上で朝焼けの穂高を見て、吊尾根をかすめ、岳沢を降り、朝もやの谷を飛び、
+            徳本峠のあたりで東の稜線より高く上がると、雲海と朝日。白鳥が朝日へ向かい、ロゴ（アプリが動画の上に
+            描く）。最後は高く上がりながら見下ろし、薄い雲を抜けて、真上から見た日本（PC のホーム）へ。単位は m
 
 キー（通る所）は「秒・緯度・経度・高さ・向き（北 0°・東 90°）・見下ろす角（下が負）・傾き（右に傾くと正）・焦点距離 mm」。
 キーの間は、速さがつながるように補間する（急に止まったり向きが跳んだりしない）。
@@ -18,60 +20,58 @@ import numpy as np
 from geo import R_EARTH, enu, local_axes
 
 FPS = 30
-T_END = 13.5
-# 雲の中で場面を切り替える秒
-CUT_LOCAL = 5.6
-CUT_TOP = 12.9
-# 列島の場面の原点と、高さの強調（列島を高い空から見ると、本当の高さでは起伏がほとんど見えないので 2.5 倍にする）
+T_END = 16.0
+# 雲の中で、列島の場面から上高地の場面へ切り替える秒
+CUT_LOCAL = 4.3
+# 列島の場面の原点と、高さの強調（高い空から見ると、本当の高さでは起伏がほとんど見えないので強める）
 P0 = (36.0, 137.6)
-EXAG = 2.5
+EXAG = 1.3
 # 上高地の場面の原点（梓川の谷のあたり）
 P1 = (36.265, 137.68)
-# 朝日の向き（方位・高さ）。上高地の場面では、稜線を越えた先の正面に来るように。
-# 列島の場面は、九州の南西から北東を見るので、右前から光が当たり、太平洋が光るように少し高く
-SUN_AZ = 104.0
-SUN_EL = 5.0
-GLOBAL_SUN = (80.0, 11.0)
-# 列島が海から現れる間（秒）と、現れる前に沈めておく深さ（km。強調した高さで、富士山より深く）
-RISE = (0.4, 3.6)
-RISE_DEPTH = 3.8 * EXAG + 0.6
+# 朝日の向き（方位。11月上旬の上高地の日の出のころ）と、上高地の場面の太陽の高さ
+SUN_AZ = 113.0
+SUN_EL = 3.0
+# 列島の場面の太陽の高さ（上高地での高さ。秒ごと）。地平線の下から上がり、明るい所が東（太平洋の側）から西へ広がる
+GLOBAL_SUN_EL = [(0.0, -1.8), (0.5, -1.3), (2.4, 4.6), (CUT_LOCAL + 0.2, 6.5)]
 
-# 列島の場面（高さは km）。九州の南西の空から、北東へ弓なりに伸びる列島を見る（朝日は右前）
+# 列島の場面（高さは km）。九州の南の高い空から、北東へ弓なりに伸びる夜明け前の列島を見る（朝日は右＝太平洋の側）。
+# 光が右から左へ列島をなでたら、北アルプスへ降りる
 GLOBAL_KEYS = [
-    # 秒, 緯度, 経度, 高さkm, 向き, 見下ろす角, 傾き, 焦点距離
-    (0.0, 27.8, 127.0, 160.0, 32.0, -14.0, 0.0, 30.0),  # 夜明けの東シナ海〜太平洋。高い空から北東を見る
-    (1.2, 28.1, 127.3, 175.0, 32.0, -15.0, 0.0, 30.0),  # 列島が現れ始める
-    (3.7, 28.4, 128.0, 560.0, 34.0, -28.0, 0.0, 30.0),  # 引きながら上がって、列島全体
-    (4.6, 31.8, 132.0, 300.0, 40.0, -38.0, 0.0, 30.0),  # 北アルプスへ降り始める
-    (5.2, 34.8, 136.0, 120.0, 45.0, -50.0, 0.0, 30.0),
-    (5.6, 35.9, 137.3, 60.0, 48.0, -55.0, 0.0, 30.0),  # 雲の中へ
+    (0.0, 33.0, 132.6, 340.0, 47.0, -29.0, 0.0, 30.0),
+    (2.4, 33.5, 133.4, 300.0, 50.0, -31.0, 0.0, 30.0),
+    (3.3, 35.2, 135.9, 120.0, 54.0, -42.0, 0.0, 30.0),
+    (3.95, 36.0, 137.2, 36.0, 60.0, -52.0, 0.0, 30.0),
+    (CUT_LOCAL + 0.2, 36.17, 137.47, 12.0, 63.0, -56.0, 0.0, 30.0),
 ]
+# 降りるときは、北アルプス（穂高）を画面の真ん中に保つ（見る向きを、この秒の間に、キーの向きから穂高へ移す）
+DIVE = (2.2, 3.3)
+DIVE_TARGET = (36.29, 137.65, 2800.0)
 # 上高地の場面の道筋（高さは自動：地面からの高さの目安を保ち、山の手前で先に上がる。海抜の下限も付けられる。
 # 速さは目安の比で、全体を ROUTE_START〜ROUTE_END に合わせる）。
 # 緯度, 経度, 地面からの高さの目安 m, 海抜の下限 m, 速さの目安, 見下ろす角の足し（度）, 焦点距離
 LOCAL_ROUTE = [
-    (36.2985, 137.6555, 700.0, 0.0, 1.00, -16.0, 30.0),  # 雲を抜けると、涸沢の上（奥穂高の北東）
-    (36.2868, 137.6505, 200.0, 0.0, 0.90, -14.0, 30.0),  # 吊尾根（奥穂高と前穂高の間）をかすめる
-    (36.2745, 137.6468, 330.0, 0.0, 1.00, -20.0, 28.0),  # 岳沢を谷へ降りる
-    (36.2590, 137.6455, 220.0, 0.0, 0.72, -8.0, 26.0),  # 河童橋の東。谷底の森と梓川
-    (36.2532, 137.6530, 200.0, 0.0, 0.62, -6.0, 26.0),  # 谷底で大きく左へ弧を描く
-    (36.2522, 137.6640, 200.0, 0.0, 0.62, -5.0, 27.0),  # 明神
-    (36.2545, 137.6770, 260.0, 2000.0, 0.65, -2.0, 31.0),  # 上がり始める（前を見たまま）
-    (36.2558, 137.6900, 400.0, 2900.0, 0.60, -4.0, 32.0),  # 東の稜線より高く出る（朝日が見える）
-    (36.2552, 137.7000, 400.0, 3300.0, 0.34, -3.0, 34.0),  # 雲海と朝日。少し右（東南東）へ向けて、富士山も入れる（ロゴ）
-    (36.2522, 137.7082, 400.0, 3400.0, 0.20, -4.0, 34.0),
+    (36.2985, 137.6555, 700.0, 0.0, 1.00, -16.0, 30.0),  # 雲を抜けると、涸沢の上（奥穂高の北東）。朝焼けの穂高
+    (36.2868, 137.6505, 220.0, 0.0, 0.90, -14.0, 30.0),  # 吊尾根（奥穂高と前穂高の間）をかすめる
+    (36.2745, 137.6468, 330.0, 0.0, 1.00, -18.0, 28.0),  # 岳沢を谷へ降りる
+    (36.2632, 137.6482, 240.0, 0.0, 0.70, -10.0, 26.0),  # 河童橋の上。左へ大きく弧を描き始める
+    (36.2566, 137.6560, 210.0, 0.0, 0.58, -6.0, 26.0),  # 谷底の森と梓川（朝もや）
+    (36.2541, 137.6665, 210.0, 0.0, 0.60, -5.0, 27.0),  # 明神の下流
+    (36.2550, 137.6770, 270.0, 2000.0, 0.66, -3.0, 30.0),  # 上がり始める（前を見たまま）
+    (36.2548, 137.6895, 420.0, 2950.0, 0.58, -4.0, 32.0),  # 徳本峠のあたりで、東の稜線より高く出る（朝日が見える）
+    (36.2500, 137.6985, 420.0, 3300.0, 0.34, -3.0, 34.0),  # 雲海と朝日（南東へ向く。朝日は画面の左寄り）
+    (36.2455, 137.7062, 420.0, 3380.0, 0.20, -3.0, 34.0),
 ]
-ROUTE_START = CUT_LOCAL - 0.35  # 白い間に少し前から動かしておく
-ROUTE_END = 11.9
-# 道筋のあと：雲海を見下ろしながら上がる（雲の中で、真上から見た日本へ切り替える）
-TILT_TO = -50.0
-# 真上から見た日本列島（高さは km）
-TOP_KEYS = [
-    (12.9, 37.2, 137.8, 4200.0, 0.0, -90.0, 0.0, 35.0),
-    (13.5, 37.2, 137.8, 3700.0, 0.0, -90.0, 0.0, 35.0),
-]
-# 画面が白くなる（雲の中）ときの、白さの山（秒：始め・いちばん白い・終わり）
-WHITEOUTS = [(5.1, CUT_LOCAL, 5.95), (12.35, CUT_TOP, 13.2)]
+ROUTE_START = CUT_LOCAL - 0.3  # 雲の中で少し前から動かしておく
+ROUTE_END = 11.5
+# 道筋のあと：ほとんど止まって雲海と朝日を見せ（ロゴ）、最後は高く上がりながら見下ろす（薄い雲を抜けてホームへ）
+HOLD_END = 14.9
+TILT_TO = -58.0
+# 白鳥（7羽）が朝日へ向かう間（秒）。カメラがほとんど止まってから、右から入って朝日の中へ消える
+SWANS = (9.7, 11.7)
+# ロゴの光の点がまたたく秒（白鳥が光の中へ消えたところ）。アプリはこの秒からロゴを出す
+LOGO_START = 11.6
+# 薄い雲の中を通る（画面が雲で白くなる）ときの、濃さの山（秒：始め・いちばん濃い・終わり）
+CLOUD_PASSES = [(3.75, CUT_LOCAL, 4.8), (15.2, T_END, T_END)]
 
 
 def ease(u):
@@ -79,21 +79,14 @@ def ease(u):
     return u * u * (3.0 - 2.0 * u)
 
 
-def rise_offset(t: float) -> float:
-    """列島の高さのずれ（km。負は海の下）。RISE の間に持ち上がり、ゆっくり止まる（動き出しは海の下なので見えない。
-    高い山から順に海の上へ出て、海岸線は最後にゆっくり決まる）"""
-    u = min(1.0, max(0.0, (t - RISE[0]) / (RISE[1] - RISE[0])))
-    return -RISE_DEPTH * (1.0 - u) ** 2
-
-
-def whiteness(t: float) -> float:
-    """画面の白さ（0〜1。雲の中）"""
+def cloudiness(t: float) -> float:
+    """雲の中の濃さ（0〜1）"""
     w = 0.0
-    for a, m, b in WHITEOUTS:
+    for a, m, b in CLOUD_PASSES:
         if a <= t <= m:
-            w = max(w, float(ease((t - a) / (m - a))))
+            w = max(w, float(ease((t - a) / max(1e-6, m - a))))
         elif m < t <= b:
-            w = max(w, float(1.0 - ease((t - m) / (b - m))))
+            w = max(w, float(1.0 - ease((t - m) / max(1e-6, b - m))))
     return w
 
 
@@ -150,22 +143,19 @@ def orientation(hdg: float, pitch: float, roll: float, axes: np.ndarray) -> np.n
 
 
 def frames(scene: str) -> list[int]:
-    """その場面で描くコマの番号"""
+    """その場面で描くコマの番号（つなぎ目のまわりは、雲の中で混ぜられるように両方の場面で描く）"""
     total = int(round(T_END * FPS))
-    a = int(round(CUT_LOCAL * FPS))
-    b = int(round(CUT_TOP * FPS))
+    cut = int(round(CUT_LOCAL * FPS))
     if scene == "global":
-        return list(range(0, a + 1))
-    if scene == "local":
-        return list(range(a, b + 1))
-    return list(range(b, total))
+        return list(range(0, cut + 4))
+    return list(range(cut - 3, total))
 
 
 def camera(scene: str, f: int) -> dict:
     """コマ f のカメラ（その場面の座標での位置・右・上・前・焦点距離）"""
     t = f / FPS
-    if scene in ("global", "top"):
-        keys = unwrap_heading(GLOBAL_KEYS if scene == "global" else TOP_KEYS)
+    if scene == "global":
+        keys = unwrap_heading(GLOBAL_KEYS)
         vals = [[k[1], k[2], math.log(k[3]), k[4], k[5], k[6], k[7]] for k in keys]
         lat, lon, la, hdg, pitch, roll, focal = hermite([k[0] for k in keys], vals, t)
         alt = math.exp(la)
@@ -181,6 +171,18 @@ def camera(scene: str, f: int) -> dict:
         lat = P1[0] + math.degrees(y / R_EARTH)
         lon = P1[1] + math.degrees(x / (R_EARTH * math.cos(math.radians(P1[0]))))
     rot = orientation(float(hdg), float(pitch), float(roll), axes)
+    if scene == "global" and t > DIVE[0]:
+        w = float(ease((t - DIVE[0]) / (DIVE[1] - DIVE[0])))
+        te, tn, tu = enu(DIVE_TARGET[0], DIVE_TARGET[1], DIVE_TARGET[2] * EXAG, *P0)
+        to = np.array([float(te), float(tn), float(tu)]) / 1000.0 - pos
+        to /= np.linalg.norm(to)
+        fwd = rot[2] * (1 - w) + to * w
+        fwd /= np.linalg.norm(fwd)
+        upv = axes[2]
+        right = np.cross(fwd, upv)
+        right /= np.linalg.norm(right)
+        up = np.cross(right, fwd)
+        rot = np.array([right, up, fwd])
     return dict(t=t, pos=pos, right=rot[0], up=rot[1], fwd=rot[2], focal=float(focal), lat=float(lat), lon=float(lon))
 
 
@@ -300,13 +302,13 @@ def route() -> dict:
     # 向き・見下ろす角・傾きは、なめらかにした道筋から（高さを地形に合わせたときの細かい段差で、向きが跳ねないように）
     xs, ys, zs = _smooth(x, 40), _smooth(y, 40), _smooth(z, 40)
     hdg = np.degrees(np.unwrap(np.arctan2(np.gradient(xs), np.gradient(ys))))
-    hdg = _smooth(hdg, 30)
+    hdg = _smooth(hdg, 110)  # 向きは約 0.5km の幅でならす（曲がるときに先を見る。向きの変わる速さを抑える）
     slope = np.gradient(zs) / np.maximum(np.hypot(np.gradient(xs), np.gradient(ys)), 1e-6)
     ang = np.degrees(np.arctan(slope))
-    pitch = _smooth(np.where(ang > 0, ang * 0.15, ang * 0.6), 30) + bias
+    pitch = _smooth(np.where(ang > 0, ang * 0.15, ang * 0.6), 70) + bias
     rate = np.gradient(hdg) / np.maximum(np.gradient(t), 1e-6)  # 度/秒
     level = np.clip((s[-1] * 0.82 - s) / (s[-1] * 0.12), 0.0, 1.0)  # 最後（雲海と朝日の景色）は水平に戻す
-    roll = _smooth(np.clip(rate * 0.25, -10.0, 10.0) * level, 30)
+    roll = _smooth(np.clip(rate * 0.3, -14.0, 14.0) * level, 40)
     _ROUTE.update(s=s, x=x, y=y, z=z, ground=g, t=t, bias=bias, focal=focal, hdg=hdg, pitch=pitch, roll=roll)
     return _ROUTE
 
@@ -318,25 +320,38 @@ def local_state(t: float) -> tuple[float, float, float, float, float, float, flo
         s = float(np.interp(t, r["t"], r["s"]))
         x, y, z, hdg, pitch, focal, roll = (float(np.interp(s, r["s"], r[k])) for k in ("x", "y", "z", "hdg", "pitch", "focal", "roll"))
         return x, y, z, hdg, pitch, focal, roll
-    # 道筋のあと：同じ向きにゆっくり進みながら上がり、雲海を見下ろす
+    # 道筋のあと：同じ向きにゆっくり進み（ほとんど止まる。ロゴ）、HOLD_END からは高く上がりながら見下ろす
     x0, y0, z0, h0, p0, f0, r0 = local_state(ROUTE_END)
-    xe, ye = local_state(ROUTE_END - 0.1)[:2]
-    vx, vy = (x0 - xe) / 0.1, (y0 - ye) / 0.1
+    xe, ye, ze = local_state(ROUTE_END - 0.1)[:3]
+    vx, vy, vz = (x0 - xe) / 0.1, (y0 - ye) / 0.1, (z0 - ze) / 0.1
     d = t - ROUTE_END
-    span = CUT_TOP - ROUTE_END
-    u = float(ease(d / span))
-    slow = d - 0.5 * d * d / span  # 進む速さを、だんだん落とす
-    return x0 + vx * slow, y0 + vy * slow, z0 + 2200.0 * u * u, h0, p0 + (TILT_TO - p0) * u, f0, r0 * (1.0 - u)
+    tau = 0.9
+    glide = tau * (1.0 - math.exp(-d / tau)) + 0.05 * d  # 進む量（秒に直した量。速さはだんだん落ち、少しだけ残る）
+    x, y, z = x0 + vx * glide, y0 + vy * glide, z0 + max(vz, 0.0) * glide + 25.0 * d
+    pitch, roll = p0, r0 * math.exp(-d / 0.6)
+    if t > HOLD_END:
+        e = t - HOLD_END
+        span = T_END - HOLD_END
+        u = float(ease(e / span))
+        z += 2600.0 * (e / span) ** 2  # 上がる（だんだん速く）
+        pitch = p0 + (TILT_TO - p0) * u
+    return x, y, z, h0, pitch, f0, roll
 
 
-def sun_dir(scene: str) -> np.ndarray:
-    """太陽の向き（その場面の座標）"""
-    a, e = math.radians(SUN_AZ), math.radians(SUN_EL)
+def global_sun_el(t: float) -> float:
+    """列島の場面の、時刻 t の太陽の高さ（度。上高地での高さ）"""
+    ts = [k[0] for k in GLOBAL_SUN_EL]
+    vs = [[k[1]] for k in GLOBAL_SUN_EL]
+    return float(hermite(ts, vs, t)[0])
+
+
+def sun_dir(scene: str, t: float | None = None) -> np.ndarray:
+    """太陽の向き（その場面の座標）。列島の場面は時刻 t で高さが変わる（地平線の下から上がる）"""
+    el = SUN_EL if scene == "local" else global_sun_el(0.0 if t is None else t)
+    a, e = math.radians(SUN_AZ), math.radians(el)
     s = np.array([math.cos(e) * math.sin(a), math.cos(e) * math.cos(a), math.sin(e)])
     if scene == "local":
         return s
-    a, e = math.radians(GLOBAL_SUN[0]), math.radians(GLOBAL_SUN[1])
-    s = np.array([math.cos(e) * math.sin(a), math.cos(e) * math.cos(a), math.sin(e)])
     E, N, U = local_axes(P1[0], P1[1], *P0)
     return s[0] * E + s[1] * N + s[2] * U
 
@@ -345,7 +360,7 @@ def report(near=None, near_meta=None, mid=None, mid_meta=None) -> None:
     """カメラの速さ・向きの変わる速さ・地面からの高さを、0.1 秒ごとに出す（確かめる用）"""
     from geo import height_at
 
-    for scene in ("global", "local", "top"):
+    for scene in ("global", "local"):
         fs = frames(scene)
         prev = None
         print(f"--- {scene}")

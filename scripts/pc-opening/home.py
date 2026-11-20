@@ -23,7 +23,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from animatic import grid_object, principled  # noqa: E402
+from film import grid_object, principled  # noqa: E402
 
 WORK = os.environ.get("PC_OPENING_WORK", os.path.join(HERE, "work"))
 JAPAN_BOUNDS = ((128.6, 30.9), (145.9, 45.6))  # lib/map-style.ts と同じ
