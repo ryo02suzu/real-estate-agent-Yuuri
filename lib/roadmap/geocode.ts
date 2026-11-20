@@ -323,10 +323,14 @@ export function matchedNumbers(matchedAddress: string): number[] {
  * 分からないのは地番だけ。地番のことは地番の欄に書く）。地図で選んだ地点と、町の中心の点（番地まで見つからなかった・
  * 番地を書かずに町名で調べた）のときだけ、そう書く。地番で探した筆が見つかったときは、場所はその筆なので何も付けない
  */
-export function placeSuffix(r: { approximate: boolean; picked?: true; parcel?: unknown; matchedAddress: string }): string {
+export function placeSuffix(r: { approximate: boolean; picked?: true; parcel?: unknown; matchedAddress: string }, input?: string): string {
   if (r.picked) return "（地図で選んだ地点）";
   if (r.parcel) return "";
-  return r.approximate || matchedNumbers(r.matchedAddress).length === 0 ? "（町の中心）" : "";
+  if (r.approximate || matchedNumbers(r.matchedAddress).length === 0) return "（町の中心）";
+  // 入れた号・枝番が国のデータに無く、番・番地までの代表点になっている（「丸の内1-9-1」→「丸の内一丁目９番」の代表点）。
+  // 代表点を正確な位置のように見せない
+  if (input && partialMatch(input, r.matchedAddress)) return /番地$/.test(r.matchedAddress.normalize("NFKC")) ? "（番地の代表点）" : "（街区の代表点）";
+  return "";
 }
 
 /** 見つかった住所から終わりの番地・号を外した、町までの部分（「千葉県松戸市松戸３番地」→「千葉県松戸市松戸」） */

@@ -4,12 +4,13 @@
 // 書類・比較・使い方・表示）、物件を調べる前の真ん中のカード（ホーム）、調べている・通信の失敗の一言
 import Image from "next/image";
 import { CircleHelp, Columns2, FileText, History, LoaderCircle, MapPin, Search, Settings, SlidersHorizontal, Star, TriangleAlert, X } from "lucide-react";
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DeskTod } from "@/lib/app/desk";
 import { TOD_LABEL, TODS } from "@/lib/app/desk";
 import { placeTitle } from "@/lib/app/scene";
 import { historyKey, type HistoryItem } from "@/lib/history";
 import { MUNICIPALITIES } from "@/lib/roadmap";
+import { suggestAddresses, wantsSuggest, type Suggestion } from "@/lib/roadmap/suggest";
 import { Wordmark } from "../header";
 
 const MARK = { src: "/logo-mark.webp", w: 204, h: 202 };
@@ -23,6 +24,7 @@ export function Topbar({
   setInput,
   loading,
   onSearch,
+  onPick,
   onHome,
   tod,
   todAuto,
@@ -35,6 +37,8 @@ export function Topbar({
   setInput: (v: string) => void;
   loading: boolean;
   onSearch: () => void;
+  /** 入力途中の候補を選んだ（その住所で調べる） */
+  onPick?: (address: string) => void;
   onHome: () => void;
   tod: DeskTod;
   /** 時計に合わせている（押すと上の帯で選ぶに変わる） */
@@ -45,6 +49,38 @@ export function Topbar({
   mac: boolean;
 }) {
   const field = useRef<HTMLInputElement>(null);
+  // 入力途中の候補：入力が止まって 0.35 秒たったら、国土地理院の住所検索に聞く（古い返事は捨てる）
+  const [sugs, setSugs] = useState<Suggestion[]>([]);
+  const [active, setActive] = useState(-1);
+  const [focused, setFocused] = useState(false);
+  const asked = useRef("");
+  useEffect(() => {
+    if (!onPick || !focused || loading || !wantsSuggest(input)) return;
+    const q = input;
+    const timer = setTimeout(() => {
+      asked.current = q;
+      suggestAddresses(q)
+        .then((list) => {
+          if (asked.current === q) {
+            setSugs(list);
+            setActive(-1);
+          }
+        })
+        .catch(() => asked.current === q && setSugs([]));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [input, focused, loading, onPick]);
+  const showSugs = !!onPick && focused && !loading && wantsSuggest(input) && sugs.length > 0;
+  const pick = (s: Suggestion, i: number) => {
+    setSugs([]);
+    setActive(-1);
+    field.current?.blur();
+    // 号・枝番まで当たらない先頭の候補は、入れたとおりの住所で調べる（国の返した住所に置き換えると、入れた号が消えて
+    // 「街区の代表点」と分からなくなる。先頭の候補は、入れたとおりに調べたときと同じ場所）
+    const q = s.level !== "full" && i === 0 ? input : s.title;
+    setInput(q);
+    onPick?.(q);
+  };
   return (
     <header className="desk-topbar glass">
       <button type="button" className="desk-brand" onClick={onHome} aria-label="MICHILU のホームへ" title="ホームへ">
@@ -68,7 +104,31 @@ export function Topbar({
           ref={field}
           id="address"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value);
+            if (!wantsSuggest(e.target.value)) setSugs([]);
+          }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onKeyDown={(e) => {
+            if (!showSugs) return;
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault();
+              const n = sugs.length;
+              setActive((a) => (e.key === "ArrowDown" ? (a + 1) % n : (a - 1 + n) % n));
+            } else if (e.key === "Enter" && active >= 0) {
+              e.preventDefault();
+              pick(sugs[active], active);
+            } else if (e.key === "Escape") {
+              setSugs([]);
+              setActive(-1);
+            }
+          }}
+          role="combobox"
+          aria-expanded={showSugs}
+          aria-controls="address-suggest"
+          aria-autocomplete="list"
+          aria-activedescendant={showSugs && active >= 0 ? `address-suggest-${active}` : undefined}
           placeholder="住所・地番を入れる（例：渋谷区神南1-19-11、地番 熊谷市下奈良391-3）"
           autoComplete="off"
           enterKeyHint="search"
@@ -94,6 +154,30 @@ export function Topbar({
           {loading ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : null}
           {loading ? "調べています" : "調べる"}
         </button>
+        {showSugs && (
+          <ul id="address-suggest" role="listbox" aria-label="住所の候補" className="desk-suggest">
+            {sugs.map((s, i) => (
+              <li
+                key={s.title}
+                id={`address-suggest-${i}`}
+                role="option"
+                aria-selected={i === active}
+                className={i === active ? "on" : undefined}
+                // 押したときに検索欄の focus が外れて候補が消える前に選ぶ
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pick(s, i);
+                }}
+                onMouseEnter={() => setActive(i)}
+              >
+                <MapPin size={14} aria-hidden className="shrink-0 text-[var(--muted)]" />
+                <span className="addr">{s.title}</span>
+                <span className={`lv ${s.level}`}>{s.label}</span>
+              </li>
+            ))}
+            <li role="presentation" className="src">住所の候補：国土地理院の住所検索</li>
+          </ul>
+        )}
       </form>
       <div className="desk-topright">
         <div className="seg" role="group" aria-label={`3D の光の時間帯（${todAuto ? "いまは時計に合わせています" : "上の帯で選んでいます"}）`}>

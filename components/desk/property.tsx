@@ -347,7 +347,7 @@ export function DeskProperty(props: Props) {
               </h2>
             </>
           ) : (
-            <h2 className="addr">{`${where}${placeSuffix(result)}`}</h2>
+            <h2 className="addr">{`${where}${placeSuffix(result, query)}`}</h2>
           )}
           <span className="acts">
             <button type="button" className="btn ghost icon" onClick={copyAddress} aria-label="住所と地番をコピー" title="住所と地番をコピー（地図の住所検索に貼る）">

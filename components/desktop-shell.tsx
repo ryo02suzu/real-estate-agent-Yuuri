@@ -330,7 +330,7 @@ export function DesktopShell({
       </div>
 
       <div className="desk-ui">
-        <Topbar input={input} setInput={setInput} loading={loading} onSearch={onSearch} onHome={goHome} tod={tod} todAuto={prefs.todMode === "clock"} onTod={pickTod} onOpen={(k) => setOverlay(overlay === k ? null : k)} open={overlay} mac={mac} />
+        <Topbar input={input} setInput={setInput} loading={loading} onSearch={onSearch} onPick={onPickAddress} onHome={goHome} tod={tod} todAuto={prefs.todMode === "clock"} onTod={pickTod} onOpen={(k) => setOverlay(overlay === k ? null : k)} open={overlay} mac={mac} />
         <Rail
           open={overlay}
           onOpen={onRail}
