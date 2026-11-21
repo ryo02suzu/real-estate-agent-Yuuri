@@ -568,8 +568,9 @@ describe("地点の筆", () => {
     expect(estimatedNote("low")).toContain("5m");
     // 物件の上の帯の文も、確度の低い推定は測った結果どおり（「数mずれることがあります」のままだった）。
     // 市区町村が分からないときは、測った地域のうち一番多い割合（今は確度の低い推定は関東だけ・確度の高い推定はどこも1%未満）
-    expect(estimatedSentence("high")).toBe("数mずれることがあります。");
-    expect(estimatedSentence("low")).toBe("5m前後ずれることがあり、1割弱は30m以上離れた別の場所に置かれています。");
+    const NOW = { kanto: KOZU_SETS.kanto, kinki: KOZU_SETS.kinki }; // 関東と大阪府だけを公開しているとき（ほかの地域を公開しても、この確かめは変わらない）
+    expect(estimatedSentence("high", undefined, NOW)).toBe("数mずれることがあります。");
+    expect(estimatedSentence("low", undefined, NOW)).toBe("5m前後ずれることがあり、1割弱は30m以上離れた別の場所に置かれています。");
     const r = await searchParcel({ city: "横浜市港北区", town: "日吉5丁目", chiban: "1234" }, START, src);
     expect(r.status === "found" && r.parcel.estimated).toBe("high");
     const r2 = await searchParcel({ city: "横浜市港北区", town: "日吉5丁目", chiban: "1240" }, START, src);
@@ -1566,9 +1567,10 @@ describe("公図から推定した筆の注意書き（地域ごとに国の地�
       "この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置で、合わせ方の確かさが低いため、5m前後ずれて隣の筆の地番になっていることがあり、1割弱は30m以上離れた別の場所に置かれています（国の地価の地点で確かめた結果）。隣の筆も候補にして、謄本・公図で確かめてください。",
     );
     expect(estimatedCardNote("high", "27141")).toBe("この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、数mずれて隣の筆の地番になることがあります。謄本・公図で確かめてください。");
-    expect(estimatedCardNote("high")).toBe(estimatedCardNote("high", "14109"));
-    // 地図の凡例は地域を決めない（今の測った結果では、前の文と同じ）
-    expect(estimatedLegend()).toBe("点線は、公図（任意座標）の形を道路の縁に合わせて置いた推定の位置です。数m（薄い点線は5m前後。その1割弱は30m以上）ずれることがあります。");
+    const NOW = { kanto: KOZU_SETS.kanto, kinki: KOZU_SETS.kinki }; // 関東と大阪府だけを公開しているとき
+    expect(estimatedCardNote("high", undefined, NOW)).toBe(estimatedCardNote("high", "14109", NOW));
+    // 地図の凡例は地域を決めない（関東と大阪府だけのときは、前の文と同じ）
+    expect(estimatedLegend(NOW)).toBe("点線は、公図（任意座標）の形を道路の縁に合わせて置いた推定の位置です。数m（薄い点線は5m前後。その1割弱は30m以上）ずれることがあります。");
   });
 
   it("取り違えが1%以上の地域の確度の高い推定は、地域の名前を添えて割合を言う（近畿の5府県を公開したとき）", () => {
