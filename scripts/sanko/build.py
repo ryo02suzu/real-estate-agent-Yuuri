@@ -95,7 +95,7 @@ CCBY = "CC BY 4.0"
 #   shp：zip の中の筆のポリゴンの shapefile（パスの正規表現）。epsg：座標系（.prj が無いものも平面直角座標系 IX 系）
 #   shp_all：shp に合う同じ形の shapefile を全部読む（宇都宮市の筆界線01〜07）。flatten：展開したファイルを1つのフォルダに集める
 #            （shapefile の部品が別々の zip にある奈良市）
-#   labels：筆の面に地番が無く、地番の文字の点（shp・id の列）と引出線（leaders）が別にある所（高崎市）。文字を引出線の先か文字の点で面に当てる
+#   labels：筆の面に地番が無く、地番の文字の点（shp・id の列）が別にある所（高崎市）。文字の点を含む面に地番を付ける。引出線（leaders）のある文字は使わない
 #   chiban：地番の列（複数なら「本番-枝番-小枝番」とつなぐ）。key：大字の列（コードか名前。列の一覧なら「_」でつなぐ：京都市の区＋町名）。
 #   oname：大字名の列。koaza：小字名の列
 #   only：この列がこの値の筆だけ使う（長岡京市の「長狭物区分」＝地番）。drop_lots：地番の頭の数字がこれに合えば地番ではない（道・水路の番号）
@@ -429,8 +429,8 @@ SOURCES = [
         "shp": r"/筆界線\.shp$", "chiban": ["地番本番", "地番枝番", "地番小枝"], "key": "大字cd", "oname": "大字名",
     },
     {
-        # 筆の面（筆ポリゴン）は図形の番号だけで、地番は文字の点（地番注記）にある。文字は引出線（注記の番号で結び付く）か、
-        # 文字の点そのもので筆に当てる（labels）。大字の名前の表は仕様書（PDF）にしか無いので、町は法務省の筆との重なりと地番の集まりで決める
+        # 筆の面（筆ポリゴン）は図形の番号だけで、地番は文字の点（地番注記）にある。文字の点を含む面に地番を付け、引出線（注記の番号で
+        # 結び付く）のある文字は使わない（labels）。大字の名前の表は仕様書（PDF）にしか無いので、町は法務省の筆との重なりと地番の集まりで決める
         "code": "10202", "name": "高崎市", "credit": "高崎市「地番図」", "license": CCBY,
         "terms": "https://www.city.takasaki.gunma.jp/uploaded/attachment/6063.pdf（高崎市オープンデータ利用規約。政府標準利用規約第2.0版に準拠し、CC BY 4.0 と互換。加工して利用したことを書く）",
         "fetch": {"kind": "page", "page": "https://www.city.takasaki.gunma.jp/page/3130.html", "resource": r"^(?:地番_地番図|地番引出線_地番図|筆ポリゴン_地番図)\s", "by_text": True, "bundle": True},
@@ -1142,10 +1142,10 @@ def read_lines_mode(src: dict, root: str) -> tuple[list, list[str], list[str], l
 
 
 def read_labels_mode(src: dict, root: str) -> tuple[list, list[str], list[str], list[str], list[str]]:
-    """筆の面（shp）に地番が無く、地番の文字の点（labels）が別にある所（高崎市）。文字から筆の外へ引出線が引かれているもの（引出線の
-    列 id で文字と結び付く）は、引出線の端のうち文字から遠い方の点、引出線の無い文字は文字の点そのものを含む面に、その文字の地番と
-    大字を付ける。引出線のある文字の点は、ほとんど（高崎市は 138,630 のうち 138,465）が引出線の先の筆とは別の所（隣の筆・道など）にあるので、
-    引出線の先で当てる。
+    """筆の面（shp）に地番が無く、地番の文字の点（labels）が別にある所（高崎市）。文字の点を含む面に、その文字の地番と大字を付ける。
+    文字から筆の外へ引出線が引かれている文字（引出線の列 id で文字と結び付く）は使わない：文字の点はほとんど（高崎市は 138,630 のうち
+    138,465）が別の筆・道の中にあり、引出線の文字から遠い方の端で当てても、法務省の公共座標の筆と同じ所で地番が同じなのは 82.5% だけ
+    （同じ大きさの筆で比べても、引出線の先は 80〜94%、文字の点で当てた筆は 96.8〜99.8%。2026-11-21）。引出線の文字の筆は、地番の分からない面として入らない。
     地番（数字）の文字が2つ以上入る面は、どの地番の筆か決められないので入れない。2つ以上の面に入る点の文字は使わない"""
     sp = src["labels"]
     r = reader(find(root, src["shp"]), src["enc"])
@@ -1159,13 +1159,13 @@ def read_labels_mode(src: dict, root: str) -> tuple[list, list[str], list[str], 
             except Exception:
                 g = None
         polys.append(g if g is not None else shapely.Polygon())
-    leads: dict[str, list] = collections.defaultdict(list)
+    leads: set[str] = set()  # 引出線のある文字の id
     if sp.get("leaders"):
         er = reader(find(root, sp["leaders"]), src["enc"])
         ie = [f[0] for f in er.fields[1:]].index(sp["id"])
         for shp, rec in shape_records(er):
             if shp is not None and len(shp.points) >= 2:
-                leads[str(rec[ie]).strip()].append(shp.points)
+                leads.add(str(rec[ie]).strip())
     lr = reader(find(root, sp["shp"]), src["enc"])
     names = [f[0] for f in lr.fields[1:]]
     ic = [names.index(c) for c in src["chiban"]]
@@ -1179,11 +1179,10 @@ def read_labels_mode(src: dict, root: str) -> tuple[list, list[str], list[str], 
         ch = norm_chiban([rec[i] for i in ic])
         if not ch:
             continue  # 道・水路・無番地などの文字
-        x, y = shp.points[0][:2]
-        ends = [p for line in leads.get(str(rec[iid]).strip(), []) for p in (line[0], line[-1])] if iid is not None else []
-        if ends:
-            x, y = max(ends, key=lambda p: (p[0] - x) ** 2 + (p[1] - y) ** 2)[:2]
+        if iid is not None and str(rec[iid]).strip() in leads:
             led += 1
+            continue  # 引出線のある文字は使わない（上の説明）
+        x, y = shp.points[0][:2]
         targets.append(shapely.Point(x, y))
         labels.append((str(rec[ik]).strip(), ch))
     tree = STRtree(polys)
@@ -1215,7 +1214,7 @@ def read_labels_mode(src: dict, root: str) -> tuple[list, list[str], list[str], 
         onames.append(table.get(key, ""))
         koazas.append("")
     log(
-        f"  面 {len(polys)}・地番の文字 {len(targets)}（引出線の先で当てた {led}）→ 地番の付いた面 {len(geoms)}"
+        f"  面 {len(polys)}・地番の文字 {len(targets)}（引出線のある文字 {led} は使わない）→ 地番の付いた面 {len(geoms)}"
         f"（地番の文字が2つ以上の面 {multi}・地番の文字の無い面（道・水路など） {len(polys) - len(by_poly)}・面に入らない文字 {outside}・2つ以上の面に入る文字 {multi_poly} は入れない）"
     )
     return geoms, chibans, keys, onames, koazas

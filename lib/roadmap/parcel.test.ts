@@ -703,10 +703,11 @@ describe("地点の筆", () => {
     expect(py).toContain("jr = sorted(jac, key=lambda t: (-jac[t], t))");
   });
 
-  it("参考図を作る仕組み：地番の文字が筆の面と別にある市（高崎市）は引出線の先で筆に当て、文字が2つ以上の面は入れない。同意してから進む所の図・粗い図は使わない", () => {
+  it("参考図を作る仕組み：地番の文字が筆の面と別にある市（高崎市）は文字の点を含む面に地番を付け、引出線のある文字と、文字が2つ以上の面は使わない。同意してから進む所の図・粗い図は使わない", () => {
     const py = readFileSync(new URL("../../scripts/sanko/build.py", import.meta.url), "utf8");
-    // 引出線のある文字は、引出線の端のうち文字から遠い方の点で当てる（高崎市では、引出線のある文字の点のほとんどが別の筆・道の中にある）
-    expect(py).toContain("x, y = max(ends, key=lambda p: (p[0] - x) ** 2 + (p[1] - y) ** 2)[:2]");
+    // 引出線のある文字は使わない（引出線の先で当てても、法務省の公共座標の筆と同じ所で地番が同じなのは 82.5% だけ。文字の点で当てた筆は 99.5%）
+    expect(py).toMatch(/if iid is not None and str\(rec\[iid\]\)\.strip\(\) in leads:\n\s+led \+= 1\n\s+continue/);
+    expect(py).not.toContain("x, y = max(ends,");
     // 地番の文字が2つ以上入る面は、どの地番の筆か決められないので入れない
     expect(py).toMatch(/for p_, ts in by_poly\.items\(\):\n\s+if len\(ts\) > 1:\n\s+multi \+= 1\n\s+continue/);
     // 高崎市は、文字の点と引出線を注記の番号（chibanid）で結び付けて読む
