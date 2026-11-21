@@ -27,8 +27,8 @@ export const OPENING = {
   ],
 } as const;
 
-/** 映像（public/opening/）を入れたら true にする。入れるまでは流さない（読めない映像で一瞬暗くならないように） */
-export const OPENING_READY = false;
+/** 映像（public/opening/）が入っているか。入っていないあいだは流さない（読めない映像で一瞬暗くならないように） */
+export const OPENING_READY = true;
 
 export const OPENING_SESSION_KEY = "michilu:opening-played";
 /** 流さない設定（あとで設定の画面から変えられるようにする。今は "off" のときだけ流さない） */
