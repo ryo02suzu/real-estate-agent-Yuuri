@@ -622,6 +622,60 @@ def compose_final(out: str, frames: list[int], post: str) -> None:
         print(f"仕上げ コマ {f}", flush=True)
 
 
+# ---------------------------------------------------------------- 消し込み（上高地の場面）
+
+# 低い朝日（高さ 3°）で、日の当たる斜面の小さなくぼみに、すぐ横の小さな尾根の影が丸く落ち、斜面に黒い穴が開いたように
+# 見える所（計算としては正しい影だが、穴に見える）。同じ斜面の少し左の日なたの細かい模様を写し込んで消す（映画の消し込みと
+# 同じ考え方。大きな明るさと色は、まわりの日なたに合わせる）。緯度・経度・高さ（m）・半径（m）・コマの範囲
+RETOUCH = [(36.26382, 137.63315, 2023.0, 45.0, (126, 175))]
+_LUMA = np.array([0.2126, 0.7152, 0.0722], np.float32)
+
+
+def retouch(f: int, rgb: np.ndarray, Z: np.ndarray) -> np.ndarray:
+    """RETOUCH の所が映るコマで、その所の影の穴を消す（光の量のまま。空気を足す前）"""
+    for la, lo, alt, rad, (f0, f1) in RETOUCH:
+        if not f0 <= f <= f1:
+            continue
+        x = math.radians(lo - P.P1[1]) * P.R_EARTH * math.cos(math.radians(P.P1[0]))
+        y = math.radians(la - P.P1[0]) * P.R_EARTH
+        c = P.camera("local", f)
+        v = np.array([x, y, alt - (x * x + y * y) / (2.0 * P.R_EARTH)]) - c["pos"]
+        zc = float(v @ c["fwd"])  # 奥行き（Depth.Z と同じく、カメラの前の向きに測る）
+        if zc <= 0:
+            continue
+        h, w = Z.shape
+        fpx = c["focal"] / 36.0 * w
+        u = w / 2 + float(v @ c["right"]) / zc * fpx
+        q = h / 2 - float(v @ c["up"]) / zc * fpx
+        r = rad / zc * fpx
+        if not (-3 * r < u < w + 3 * r and -3 * r < q < h + 3 * r):
+            continue
+        x0, x1 = int(max(0, u - 4 * r)), int(min(w, u + 4 * r + 1))
+        y0, y1 = int(max(0, q - 4 * r)), int(min(h, q + 4 * r + 1))
+        sub = rgb[y0:y1, x0:x1]
+        yy, xx = np.mgrid[y0:y1, x0:x1]
+        d = np.hypot(xx - u, yy - q) / r
+        same = np.abs(Z[y0:y1, x0:x1] - zc) < 0.12 * zc  # 同じ斜面（奥行きが近い所）だけ
+        L = sub @ _LUMA
+        ring = (d > 1.8) & (d < 3.2) & same
+        if ring.sum() < 20:
+            continue
+        sun = ring & (L >= np.percentile(L[ring], 50))  # まわりの日なた（明るい方の半分）
+        target = sub[sun].mean(axis=0)
+        tl = float(target @ _LUMA)
+        Lb = ndimage.gaussian_filter(L, max(1.0, r * 0.10))
+        m = smoothstep(0.55, 0.3, Lb / tl) * smoothstep(1.9, 1.2, d) * same  # まわりよりずっと暗い、穴の所
+        m = np.clip(ndimage.gaussian_filter(ndimage.grey_dilation(m, size=int(max(3, r * 0.4))), max(1.5, r * 0.3)) * 1.15, 0.0, 1.0)
+        # 写し込む元：同じ高さで 2.6 倍の半径だけ左（同じ斜面の日なた）。画面の左の外は端をのばす
+        sh = int(round(2.6 * r))
+        src = np.pad(rgb, ((0, 0), (sh, 0), (0, 0)), mode="edge")[y0:y1, x0:x1]
+        lo_src = np.stack([ndimage.gaussian_filter(src[..., i], max(2.0, r * 0.35)) for i in range(3)], -1)
+        filled = (target * 0.82)[None, None, :] * (src / np.maximum(lo_src, 1e-6))  # 明るさ・色は日なたの少し暗め、模様は元から
+        rgb = rgb.copy()
+        rgb[y0:y1, x0:x1] = sub * (1.0 - m[..., None]) + filled * m[..., None]
+    return rgb
+
+
 _ATM: dict = {}
 
 
@@ -634,7 +688,10 @@ def _scene_frame(job: tuple) -> int:
     d = scene_exr(src, f)
     if d is None:
         return f
-    lin = _ATM[scene].apply(f, d["Combined"][..., :3], d["Depth.Z"])
+    rgb = d["Combined"][..., :3]
+    if scene == "local":
+        rgb = retouch(f, rgb, d["Depth.Z"])
+    lin = _ATM[scene].apply(f, rgb, d["Depth.Z"])
     lin = over_swans(lin, os.path.join(swans, f"{f:04d}.exr"), f / P.FPS)
     v = tone(lin, f, look)
     Image.fromarray((np.clip(v, 0, 1) * 255.0 + 0.5).astype(np.uint8)).save(os.path.join(out, f"{f:04d}.png"))
