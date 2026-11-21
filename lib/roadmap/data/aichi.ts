@@ -273,7 +273,9 @@ const OBU: Municipality = {
 const PREF_TOWNS: Municipality[] = [
   // 尾張建設事務所 企画グループ
   prefTown("津島市", "23208", "owariKikaku"),
-  prefTown("犬山市", "23215", "owariKikaku", [portal("わんマップ（犬山市・市道の路線名と幅員）", "http://webgis.alandis.jp/inuyama23/portal/top/", "入口から道路情報を選ぶ")]),
+  // 市のページ（犬山市地図情報ポータルサイト「わんマップ」）のリンクは http。同じ地図サービス（webgis.alandis.jp）は、ほかの市のページが https でリンクしていて、
+  // https の地図で確かめた市もある（千葉市など）ので、https の入口を置く（この作業の環境からは開けない。2026-11-21）
+  prefTown("犬山市", "23215", "owariKikaku", [portal("わんマップ（犬山市・市道の路線名と幅員）", "https://webgis.alandis.jp/inuyama23/portal/top/", "入口から道路情報を選ぶ")]),
   prefTown("豊山町", "23342", "owariKikaku"),
   prefTown("大口町", "23361", "owariKikaku"),
   prefTown("扶桑町", "23362", "owariKikaku"),

@@ -31,8 +31,11 @@
 //   廿日市市：市の地図情報システムに「建築基準法道路情報」。
 //   地図サイト（www2.wagmap.jp・www.sonicweb-asp.jp・webgis.alandis.jp）は、この作業の環境から開けないので、市が出している入口のリンクを開く。
 //   中の表示は確かめていない（verified: false。凡例が確かめられない市は coverage を partial にしている）。
+//   呉市の「建築基準法道路情報」だけは、市のリンクにある地図番号（MapId=9）が分かっているので、ほかの wagmap の地図と同じ形で物件の位置を指定して開く
+//   （2026-11-21。開く位置は確かめていないので verified: false のまま）。
 // まだ：県が扱う市町で、市町が出している地図（市町道の地図など）と市町の窓口は調べている途中。地図サイトの中の表示は、日本の回線から確かめる。
 import type { Contact, MapLink, Municipality } from "../municipalities";
+import { wagmap } from "../vendors";
 
 const pref = "広島県" as const;
 
@@ -159,10 +162,10 @@ export const HIROSHIMA_CITIES: Municipality[] = [
       {
         kind: "road_type",
         label: "呉地理情報マップ（呉市の地図）の「建築基準法道路情報」",
-        build: null,
-        url: "https://www2.wagmap.jp/kurecity/Agreement?IsPost=False&MapId=9&RequestPage=%2fkurecity%2fPositionSelect%3fmid%3d9",
+        // 市「地図情報」のリンク（利用条件のページ。MapId=9）と同じ地図を、物件の位置で開く。海外の回線から開けないので、開く位置は確かめていない
+        build: wagmap("kurecity", 9, { scale: 2500 }),
         verified: false,
-        tip: "呉地理情報マップの「建築基準法道路情報」の利用条件のページが開く（市「地図情報」のページと同じリンク）。利用条件を読み、自分で同意して進んで、住所や地図から場所を探す（MICHILU は地図の中を開いて確かめていない。どの種別まで載っているかも確かめられていない）。はっきりしない道は、建築指導課に相談する。",
+        tip: "呉地理情報マップの「建築基準法道路情報」を、物件の位置を指定して開く（市「地図情報」のページのリンクと同じ地図。地図のサイトは海外の回線から開けないので、MICHILU は物件の位置で開くことを確かめていない）。最初に利用条件のページが出るので、読んで、自分で同意して進む（MICHILU は地図の中を開いて確かめていない。どの種別まで載っているかも確かめられていない）。物件の場所で開かないときは、住所や地図から場所を探す。はっきりしない道は、建築指導課に相談する。",
       },
       {
         kind: "public_road",

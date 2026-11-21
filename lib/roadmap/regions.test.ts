@@ -337,10 +337,13 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
         expect(link.tip, m.name).toMatch(/MICHILU (の確認では|は中)/);
       }
     }
-    expect(by["八尾市"].maps[0].url).toBe("https://www.sonicweb-asp.jp/yao/agreement?theme=th_16");
+    // 八尾市は、市「指定道路図」のリンク（同意の画面）と同じテーマ（th_16）を、ほかの Sonicweb の地図と同じ形で物件の位置で開く（開く位置は確かめていない）
+    expect(by["八尾市"].maps[0].url).toBeUndefined();
+    expect(by["八尾市"].maps[0].build?.(34.626887, 135.601074)).toBe("https://www.sonicweb-asp.jp/yao/map?theme=th_16&pos=135.601074%2C34.626887&scale=1000");
+    expect(by["八尾市"].maps[0].tip).toContain("物件の位置で開くことも確かめていない");
     expect(by["守口市"].maps[0].url).toBe("https://www.sonicweb-asp.jp/moriguchi/");
-    // 豊中市だけは、市のページのリンクと同じ形に物件の位置を付けて開く
-    expect(cities.flatMap((m) => m.maps.filter((l) => l.build).map(() => m.name))).toEqual(["豊中市"]);
+    // 豊中市は市のページのリンクと同じ形に、八尾市は市のページのリンクのテーマ番号で、物件の位置を付けて開く
+    expect(cities.flatMap((m) => m.maps.filter((l) => l.build).map(() => m.name))).toEqual(["豊中市", "八尾市"]);
     expect(by["豊中市"].maps[0].build?.(34.781545, 135.46976)).toBe("https://gis.city.toyonaka.osaka.jp/webgis/?mp=21&bg=BG0&vlf=-1&ar=1&z=18&ll=34.781545%2C135.469760");
     // 載る種別を、市のページ・手引きのとおりに書く
     expect(by["吹田市"].maps[0].tip).toMatch(/第42条第1項第1号〜第5号の道路と第2項の道路.*令和3年4月現在/);
@@ -560,10 +563,12 @@ describe("岡山県の、市が扱う市（登録した市）", () => {
     // 1項1号は載らないので「一部の種別」
     expect(m.coverage).toBe("partial");
     expect(m.maps[0].kind).toBe("designated_only");
-    // 市のページと同じリンク（利用規約の同意の画面）。同意の先は開かない
-    expect(m.maps[0].build).toBeNull();
-    expect(m.maps[0].url).toBe("http://www.gis.pref.okayama.jp/okayamacity/Agreement?IsPost=False&MapId=60000&RequestPage=%2fokayamacity%2fPositionSelect%3fmid%3d60000");
-    expect(m.maps[0].tip).toContain("自分で同意して進み");
+    // 市のページのリンク（利用規約の同意の画面。MapId=60000）と同じ地図を、wagmap と同じ形で物件の位置を指定して開く（https。開く位置は確かめていない）
+    expect(m.maps[0].url).toBeUndefined();
+    expect(m.maps[0].build?.(34.655146, 133.919502)).toBe("https://www.gis.pref.okayama.jp/okayamacity/Map?mid=60000&mpx=133.919502&mpy=34.655146&mps=2500&gprj=2");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("自分で同意して進む");
+    expect(m.maps[0].tip).toContain("物件の位置で開くことを確かめていない");
     expect(m.maps[0].tip).toContain("1項1号");
     expect(m.contact?.phone).toBe("086-803-1446");
     expect(m.contact?.noPhoneInquiry).toBe(true);
@@ -577,11 +582,11 @@ describe("岡山県の、市が扱う市（登録した市）", () => {
     expect(m.codes).toEqual(["33202"]);
     expect(m.coverage).toBe("partial");
     expect(m.maps.map((x) => x.kind)).toEqual(["road_type", "public_road"]);
-    // 市のページと同じリンク（利用規約の同意の画面）。同意の先は開かない
-    expect(m.maps[0].build).toBeNull();
-    expect(m.maps[0].url).toBe("http://www.gis.pref.okayama.jp/kurashiki/Agreement?IsPost=False&MapId=70001&RequestPage=%2fkurashiki%2fPositionSelect%3fmid%3d70001");
+    // 市のページのリンク（利用規約の同意の画面。MapId=70001）と同じ地図を、物件の位置を指定して開く（https。開く位置は確かめていない）
+    expect(m.maps[0].url).toBeUndefined();
+    expect(m.maps[0].build?.(34.585126, 133.771974)).toBe("https://www.gis.pref.okayama.jp/kurashiki/Map?mid=70001&mpx=133.771974&mpy=34.585126&mps=2500&gprj=2");
     expect(m.maps[0].verified).toBe(false);
-    expect(m.maps[0].tip).toContain("自分で同意して進み");
+    expect(m.maps[0].tip).toContain("自分で同意して進む");
     // 確かめられていないことは、そう書く
     expect(m.maps[0].tip).toContain("どの種別まで載っているかは、MICHILU では確かめられていない");
     // 市道の地図は、市のページ「倉敷地理情報」から
@@ -623,7 +628,8 @@ describe("岡山県の、市が扱う市（登録した市）", () => {
 
   it("玉野市：市道は玉野市統合型GIS の認定路線網図（岡山県の地図システムの上。中は確かめていない）", () => {
     const m = city("玉野市");
-    expect(m.maps[0].url).toBe("http://www.gis.pref.okayama.jp/tamano/Portal");
+    // 市のページのリンクは http。同じホストを倉敷市・岡山市のページが https でリンクしているので https
+    expect(m.maps[0].url).toBe("https://www.gis.pref.okayama.jp/tamano/Portal");
     expect(m.maps[0].verified).toBe(false);
     expect(m.maps[0].tip).toContain("「玉野市マップ」→ マップ選択で「玉野市認定路線網図」");
     expect(m.maps[0].tip).toContain("自分で同意");
@@ -744,7 +750,8 @@ describe("鳥取県の、市が扱う市（登録した市）", () => {
 
 describe("島根県の、市が扱う市（登録した市）", () => {
   const city = (name: string) => SHIMANE_CITIES.find((x) => x.name === name)!;
-  const PREF_SYSTEM = "https://web-gis.pref.shimane.lg.jp/shimane/Agreement?IsPost=False&MapId=29&RequestPage=%2fshimane%2fPositionSelect%3fmid%3d29";
+  // 県のページのリンク（同意の画面）は …/shimane/Agreement?IsPost=False&MapId=29&…。同じ地図を物件の位置（ここでは松江市役所のあたり）で開く URL
+  const PREF_SYSTEM_AT = "https://web-gis.pref.shimane.lg.jp/shimane/Map?mid=29&mpx=133.050500&mpy=35.468000&mps=2500&gprj=2";
 
   it("8市を登録したので、調査中の一覧に島根県は残っていない（中国地方の調査中は 0）", () => {
     const codes: Record<string, string> = { 松江市: "32201", 浜田市: "32202", 出雲市: "32203", 益田市: "32204", 大田市: "32205", 安来市: "32206", 江津市: "32207", 雲南市: "32209" };
@@ -782,14 +789,17 @@ describe("島根県の、市が扱う市（登録した市）", () => {
     }
   });
 
-  it("島根県の地図システムを開く5市：同意の画面を開き、中は確かめていないと書く。国の一覧の「公開済」「一部公開」をそのまま書く", () => {
+  it("島根県の地図システムを開く5市：物件の位置を指定して開き、中は確かめていないと書く。国の一覧の「公開済」「一部公開」をそのまま書く", () => {
     const status: Record<string, string> = { 浜田市: "一部公開", 大田市: "一部公開", 江津市: "公開済", 雲南市: "公開済" };
     for (const name of ["松江市", ...Object.keys(status)]) {
       const m = city(name);
       expect(m.coverage, name).toBe("partial");
       expect(m.maps[0].kind, name).toBe("designated_only");
-      expect(m.maps[0].build, name).toBeNull();
-      expect(m.maps[0].url, name).toBe(PREF_SYSTEM);
+      // 県のページのリンク（同意の画面。MapId=29）と同じ地図を、wagmap と同じ形で物件の位置を指定して開く（開く位置は確かめていない）
+      expect(m.maps[0].url, name).toBeUndefined();
+      expect(m.maps[0].build?.(35.468, 133.0505), name).toBe(PREF_SYSTEM_AT);
+      expect(m.maps[0].verified, name).toBe(false);
+      expect(m.maps[0].tip, name).toContain("物件の位置で開くことを確かめていない");
       expect(m.maps[0].label, name).toContain(`${name}の指定道路`);
       // 県のサイトの決まり：島根県のホームページへのリンクだと書く
       expect(m.maps[0].label, name).toContain("島根県の地図システムへのリンク");
@@ -924,10 +934,12 @@ describe("鹿児島県の、市が扱う市（登録した市）", () => {
     expect(m.codes).toEqual(["46201"]);
     expect(m.coverage).toBe("full");
     expect(m.maps[0].kind).toBe("road_type");
-    // 市の資料「建築基準法第42条に基づく道路種別の確認について」に載っているリンク（利用条件の同意の先は開かない）
-    expect(m.maps[0].build).toBeNull();
-    expect(m.maps[0].url).toBe("https://www2.wagmap.jp/kagoshima/PositionSelect?mid=9");
+    // 市の資料「建築基準法第42条に基づく道路種別の確認について」に載っているリンク（PositionSelect?mid=9）と同じ地図を、
+    // ほかの wagmap の地図と同じ形で物件の位置を指定して開く（利用条件の同意の先は開かない。開く位置は確かめていない）
+    expect(m.maps[0].url).toBeUndefined();
+    expect(m.maps[0].build?.(31.5966, 130.5571)).toBe("https://www2.wagmap.jp/kagoshima/Map?mid=9&mpx=130.557100&mpy=31.596600&mps=2500&gprj=2");
     expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("物件の位置で開くことを確かめていない");
     expect(m.maps[0].tip).toContain("自分で「同意する」を押して進む");
     // 市道は路線名で出る。種別は市の表で読む。国道・県道は出ない
     expect(m.maps[0].tip).toContain("幅員4m以上は1項1号");
@@ -1196,11 +1208,13 @@ describe("沖縄県の、市が扱う市（登録した市）", () => {
     expect(m.codes).toEqual(["47201"]);
     expect(m.coverage).toBe("partial");
     expect(m.maps[0].kind).toBe("road_type");
-    // 市のページと同じリンク（利用条件の同意の画面）。同意の先は開かない
-    expect(m.maps[0].build).toBeNull();
-    expect(m.maps[0].url).toBe("https://www.sonicweb-asp.jp/naha/agreement?theme=th_56");
+    // 市のページのリンク（利用条件の同意の画面。theme=th_56）と同じテーマを、ほかの Sonicweb の地図と同じ形で物件の位置を指定して開く。
+    // 同意の先は開かない。開く位置は確かめていない
+    expect(m.maps[0].url).toBeUndefined();
+    expect(m.maps[0].build?.(26.212401, 127.680932)).toBe("https://www.sonicweb-asp.jp/naha/map?theme=th_56&pos=127.680932%2C26.212401&scale=1000");
     expect(m.maps[0].verified).toBe(false);
-    expect(m.maps[0].tip).toContain("表示テーマを「道路種別マップ」に変えて");
+    expect(m.maps[0].tip).toContain("物件の位置で開くことを確かめていない");
+    expect(m.maps[0].tip).toContain("表示テーマが「道路種別マップ」でないときは切り替え");
     expect(m.maps[0].tip).toContain("どの種別まで色分けされているかは、MICHILU では確かめられていない");
     expect(m.contact?.phone).toBe("098-951-3244");
     expect(m.contact?.fax).toBe("098-951-3245");
@@ -1296,19 +1310,23 @@ describe("山口県の、市が扱う市（登録した市）", () => {
     expect(CHUGOKU_PENDING.filter((x) => x.pref === "山口県")).toEqual([]);
   });
 
-  it("山口県の9市は全部登録した。地図のある7市は市のページと同じ入口のリンク（中は開けていないので verified は false）", () => {
+  it("山口県の9市は全部登録した。地図のある7市は市のページと同じ入口のリンク（宇部市は同じテーマを物件の位置で開く。中は開けていないので verified は false）", () => {
     expect(YAMAGUCHI_CITIES.map((x) => x.name)).toEqual(["下関市", "宇部市", "山口市", "萩市", "防府市", "岩国市", "長門市", "周南市", "山陽小野田市"]);
     const of = (name: string) => YAMAGUCHI_CITIES.find((x) => x.name === name)!;
     // 道路種別の地図が市のページに見つからなかった市は「非公開」の扱い（地図なし）
     for (const name of ["萩市", "長門市"]) expect([of(name).coverage, of(name).maps.length], name).toEqual(["none", 0]);
-    // 地図のリンクは、市のページに載っているもの
-    expect(of("宇部市").maps.map((x) => x.url)).toEqual(["https://www.sonicweb-asp.jp/ube/agreement?theme=th_6", "https://www.sonicweb-asp.jp/ube/agreement?theme=th_5"]);
+    // 地図のリンクは、市のページに載っているもの。宇部市は、市のよくある質問のリンク（同意の画面）のテーマ（指定道路 th_6・道路情報 th_5）を、
+    // ほかの Sonicweb の地図と同じ形で物件の位置を指定して開く
+    expect(of("宇部市").maps.map((x) => x.build?.(33.951451, 131.246861))).toEqual([
+      "https://www.sonicweb-asp.jp/ube/map?theme=th_6&pos=131.246861%2C33.951451&scale=1000",
+      "https://www.sonicweb-asp.jp/ube/map?theme=th_5&pos=131.246861%2C33.951451&scale=1000",
+    ]);
     expect(of("山口市").maps[0].url).toBe("https://www2.wagmap.jp/yamaguchi");
     expect(of("防府市").maps[0].url).toBe("https://www2.wagmap.jp/hofu/");
     expect(of("岩国市").maps[0].url).toBe("https://www2.wagmap.jp/iwakuni/Portal");
     expect(of("周南市").maps[0].url).toBe("https://webgis.alandis.jp/shunan35/portal/index.html");
     expect(of("山陽小野田市").maps[0].url).toBe("https://www.sonicweb-asp.jp/sanyo-onoda/");
-    for (const m of YAMAGUCHI_CITIES) for (const link of m.maps) expect([link.build, link.verified], m.name).toEqual([null, false]);
+    for (const m of YAMAGUCHI_CITIES) for (const link of m.maps) expect([m.name === "宇部市" || link.build === null, link.verified], m.name).toEqual([true, false]);
     // 種別を確かめられていない地図は「一部」とし、そのことを道順に書く
     for (const name of ["宇部市", "山口市", "周南市", "山陽小野田市"]) {
       expect(of(name).coverage, name).toBe("partial");
@@ -1400,7 +1418,29 @@ describe("福岡県の、市が扱う市（登録した市）", () => {
     expect(m.maps[0].tip).toContain("不動産取引など権利・義務が発生するものや建築確認申請の資料には使えない");
     expect(m.contact?.phone).toBe("093-582-2535");
     expect(m.contact?.noPhoneInquiry).toBe(true);
-    expect(KYUSHU_PENDING.filter((x) => x.pref === "福岡県").map((x) => x.name)).toEqual(["福岡市"]);
+    // 市が扱う4市は全部登録した（2026-11-21 に福岡市も）
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "福岡県").map((x) => x.name)).toEqual([]);
+    expect(FUKUOKA_CITIES.map((x) => x.name)).toEqual(["北九州市", "福岡市", "久留米市", "大牟田市"]);
+  });
+
+  it("福岡市：福岡市Webマップで1項1号と2項道路（私道は除く）だけを公開。市はトップページ以外へのリンクに問い合わせを求めるので、トップページを開いて道順を書く。電話では受けない", () => {
+    const m = FUKUOKA_CITIES.find((x) => x.name === "福岡市")!;
+    // 政令市は区のコード（市そのもののコード 40130 は使わない）
+    expect(m.codes).toEqual(["40131", "40132", "40133", "40134", "40135", "40136", "40137"]);
+    for (const c of m.codes) expect(findMunicipality(c)?.name, c).toBe("福岡市");
+    expect(findMunicipality("40130")).toBeUndefined();
+    // 地図に載るのは一部の種別だけ
+    expect(m.coverage).toBe("partial");
+    expect(m.maps).toHaveLength(1);
+    expect(m.maps[0]).toMatchObject({ kind: "road_type", build: null, url: "https://www.city.fukuoka.lg.jp/", verified: true });
+    expect(m.maps[0].label).toContain("福岡市ホームページのトップページから進む");
+    expect(m.maps[0].tip).toContain("サイト内検索で「建築基準法上の道路について」と探して");
+    expect(m.maps[0].tip).toContain("法42条1項1号の道路と、2項道路（私道は除く）だけ");
+    expect(m.maps[0].tip).toContain("MICHILU は地図の中を確かめていない");
+    expect(m.contact).toMatchObject({ phone: "092-711-4584", fax: "092-733-5584", noPhoneInquiry: true });
+    expect(m.contact?.dept).toContain("建築指導課 道路判定係");
+    expect(m.contact?.note).toContain("道路相談カード");
+    expect(m.note).toContain("福岡市の一部は都市計画区域の外");
   });
 
   it("久留米市：市の公式ホームページの「指定道路図」（くるめMAP と、地区ごとの PDF）。道路種別の電話での問い合わせは断っている", () => {
@@ -1463,7 +1503,7 @@ describe("佐賀県の、市が扱う市（登録した市）", () => {
 
 describe("熊本県の、市が扱う市（登録した市）", () => {
   it("天草市：道路種別の地図は無い。建築住宅課へ（道路判定事前協議書・位置指定道路の一覧）", () => {
-    expect(KUMAMOTO_CITIES.map((m) => m.name)).toEqual(["天草市", "熊本市"]);
+    expect(KUMAMOTO_CITIES.map((m) => m.name)).toEqual(["天草市", "熊本市", "八代市"]);
     const m = KUMAMOTO_CITIES[0];
     expect(m.codes).toEqual(["43215"]);
     expect(findMunicipality("43215")?.name).toBe("天草市");
@@ -1477,7 +1517,7 @@ describe("熊本県の、市が扱う市（登録した市）", () => {
     expect(m.note).toContain("天草市の一部は都市計画区域の外");
   });
 
-  it("熊本市：市の地図情報サービスに、市が道路判定をした道と位置指定道路（一部）。電話・FAX・メールでは道路を調べない。八代市だけ調査中に残る", () => {
+  it("熊本市：市の地図情報サービスに、市が道路判定をした道と位置指定道路（一部）。電話・FAX・メールでは道路を調べない", () => {
     const m = KUMAMOTO_CITIES[1];
     expect(m.name).toBe("熊本市");
     // 政令市は区のコード（市そのもののコード 43100 は使わない）
@@ -1498,7 +1538,28 @@ describe("熊本県の、市が扱う市（登録した市）", () => {
     expect(m.contact?.note).toContain("道等の判定申込書");
     expect(m.contact?.note).toContain("1か月ほど");
     expect(m.note).toContain("熊本市の一部は都市計画区域の外");
-    expect(KYUSHU_PENDING.filter((x) => x.pref === "熊本県").map((x) => x.name)).toEqual(["八代市"]);
+  });
+
+  it("八代市：市の地図「やつしろデジタルマップ」の指定道路（2026年3月から）。地図のサイトは開けないので入口を開き、種別は「一部」の扱い。市が扱う3市は全部登録した", () => {
+    const m = KUMAMOTO_CITIES[2];
+    expect(m.name).toBe("八代市");
+    expect(m.codes).toEqual(["43202"]);
+    expect(findMunicipality("43202")?.name).toBe("八代市");
+    expect(m.coverage).toBe("partial");
+    expect(m.maps).toHaveLength(1);
+    // 市のページのリンクと同じ入口。テーマの番号は市のページに無いので、物件の位置で開く形にはしない
+    expect(m.maps[0]).toMatchObject({ kind: "road_type", build: null, url: "https://www.sonicweb-asp.jp/yatsushiro/", verified: false });
+    expect(m.maps[0].tip).toContain("「指定道路」を選び");
+    expect(m.maps[0].tip).toContain("MICHILU は地図の中を確かめていない");
+    // 市の留意事項：営利目的などの利用はできない・取引などは窓口で
+    expect(m.maps[0].tip).toContain("営利目的など特定の目的で使うことはできない");
+    expect(m.maps[0].tip).toContain("来庁して建築指導課の窓口で確かめる");
+    expect(m.contact).toMatchObject({ phone: "0965-33-4750", fax: "0965-33-4461" });
+    expect(m.contact?.dept).toContain("建築指導課");
+    // 電話を断るとは書かれていない
+    expect(m.contact?.noPhoneInquiry).toBeUndefined();
+    expect(m.note).toContain("坂本町・東陽町・泉町は都市計画区域の外");
+    expect(KYUSHU_PENDING.filter((x) => x.pref === "熊本県").map((x) => x.name)).toEqual([]);
   });
 });
 
@@ -1727,7 +1788,7 @@ describe("広島県（県が扱う15市町と、市が扱う8市を登録）", (
 
   const city = (name: string) => HIROSHIMA_CITIES.find((x) => x.name === name)!;
 
-  it("7市とも：コードは1つで、都市計画区域が市の一部（国の都市別一覧）。地図サイトはここから開けないので、場所を指定して開く形は使わない", () => {
+  it("7市とも：コードは1つで、都市計画区域が市の一部（国の都市別一覧）。地図サイトはここから開けないので、場所を指定して開く形は、地図の番号が分かっている呉市の道路種別の地図だけ", () => {
     const codes: Record<string, string> = { 呉市: "34202", 三原市: "34204", 尾道市: "34205", 福山市: "34207", 三次市: "34209", 東広島市: "34212", 廿日市市: "34213" };
     for (const [name, code] of Object.entries(codes)) {
       const m = city(name);
@@ -1735,7 +1796,8 @@ describe("広島県（県が扱う15市町と、市が扱う8市を登録）", (
       expect(findMunicipality(code)?.name, name).toBe(name);
       expect(m.note, name).toContain(`${name}の一部は都市計画区域の外`);
       for (const l of m.maps) {
-        expect(l.build, `${name} ${l.label}`).toBeNull();
+        const located = name === "呉市" && l.kind === "road_type";
+        expect(l.build === null, `${name} ${l.label}`).toBe(!located);
         // 外の地図サイト（wagmap・sonicweb・alandis）は中を確かめていない。市のページそのものを開くリンクだけ確かめ済み
         expect(l.verified, `${name} ${l.label}`).toBe((l.url ?? "").includes(".hiroshima.jp/"));
         if (!l.verified) expect(l.tip, `${name} ${l.label}`).toContain("MICHILU は地図の中を開いて確かめていない");
@@ -1751,8 +1813,12 @@ describe("広島県（県が扱う15市町と、市が扱う8市を登録）", (
     const m = city("呉市");
     expect(m.coverage).toBe("partial");
     expect(m.maps.map((l) => l.kind)).toEqual(["road_type", "public_road"]);
-    // 市「地図情報」のページが出しているリンク（利用条件に同意して進む形）
-    expect(m.maps[0].url).toBe("https://www2.wagmap.jp/kurecity/Agreement?IsPost=False&MapId=9&RequestPage=%2fkurecity%2fPositionSelect%3fmid%3d9");
+    // 市「地図情報」のページが出しているリンク（利用条件のページ。MapId=9）と同じ地図を、ほかの wagmap の地図と同じ形で物件の位置を指定して開く
+    // （利用条件に同意して進む形。開く位置は確かめていない）
+    expect(m.maps[0].url).toBeUndefined();
+    expect(m.maps[0].build?.(34.249011, 132.565729)).toBe("https://www2.wagmap.jp/kurecity/Map?mid=9&mpx=132.565729&mpy=34.249011&mps=2500&gprj=2");
+    expect(m.maps[0].verified).toBe(false);
+    expect(m.maps[0].tip).toContain("物件の位置で開くことを確かめていない");
     expect(m.maps[0].tip).toContain("自分で同意");
     expect(m.maps[0].tip).toContain("どの種別まで載っているかも確かめられていない");
     expect(m.maps[1].url).toBe("https://www2.wagmap.jp/kurecity/Portal");
@@ -1938,8 +2004,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       total: 56,
       // 都市計画区域も準都市計画区域も無い村だけ（準都市計画区域のある うきは市・大木町・香春町・糸田町・大任町・福智町・上毛町 は区域外にしない）
       outside: ["東峰村", "赤村"],
-      // 市が扱う4市のうち、まだ調べている途中の市（北九州市・久留米市・大牟田市は登録した）
-      cities: ["福岡市"],
+      // 市が扱う4市（北九州市・福岡市・久留米市・大牟田市）は、全部登録した（上の「福岡県の、市が扱う市」）
+      cities: [],
       offices: { 福岡県土整備事務所: 9, 那珂県土整備事務所: 5, 朝倉県土整備事務所: 3, 久留米県土整備事務所: 3, 南筑後県土整備事務所: 4, 八女県土整備事務所: 3, 飯塚県土整備事務所: 3, 直方県土整備事務所: 4, 田川県土整備事務所: 8, 北九州県土整備事務所: 7, 京築県土整備事務所: 7 },
     },    {
       pref: "佐賀県",
@@ -1967,8 +2033,8 @@ describe("中国・四国・九州沖縄・北海道で登録した県（県が�
       total: 42,
       // 都市計画区域の無い25市町村のうち、準都市計画区域のある玉東町・西原村は区域外にしない
       outside: ["上天草市", "美里町", "南関町", "和水町", "南小国町", "小国町", "産山村", "高森町", "南阿蘇村", "甲佐町", "山都町", "氷川町", "津奈木町", "錦町", "多良木町", "湯前町", "水上村", "相良村", "五木村", "山江村", "球磨村", "あさぎり町", "苓北町"],
-      // 市が扱う3市のうち、まだ調べている途中の市（天草市・熊本市は登録した。下の「熊本県の、市が扱う市」）
-      cities: ["八代市"],
+      // 市が扱う3市（天草市・熊本市・八代市）は、全部登録した（上の「熊本県の、市が扱う市」）
+      cities: [],
       offices: { 県央広域本部: 10, 県北広域本部: 18, 県南広域本部: 14 },
     },    {
       pref: "大分県",

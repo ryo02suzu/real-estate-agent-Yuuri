@@ -307,7 +307,9 @@ describe("長野県の道路図", () => {
 
   it("県が扱う市町村は道路種別の地図が無く、建設事務所が問い合わせ先。市の道路台帳があれば添える", () => {
     const suzaka = findMunicipality("20207")!;
-    expect(suzaka.coverage).toBe("none");
+    // 県の指定道路図はネットに無いが、須坂市の位置指定道路は長野建設事務所の調書の一覧表（指定道路の位置＝地名地番つき）で探せるので「一部」
+    expect(suzaka.coverage).toBe("partial");
+    expect(suzaka.note).toContain("指定道路調書の一覧表");
     expect(resolveContact(suzaka, "20207")!.dept).toContain("長野建設事務所");
     const links = buildLinks(suzaka, 36.6512, 138.3072);
     expect(links.map((l) => l.kind)).toEqual(["public_road", "designated_only"]);
@@ -553,7 +555,10 @@ describe("福井県の道路図", () => {
 
   it("福井市は特定行政庁で県の地図に載らない。若狭町は旧三方町が敦賀、旧上中町が小浜の土木事務所", () => {
     const fukui = findMunicipality("18201")!;
-    expect(fukui.coverage).toBe("none");
+    // 道路種別の地図は無いが、位置指定道路は市の一覧表（指定当時の地名地番つき）で探せるので「一部」（2026-11-21）
+    expect(fukui.coverage).toBe("partial");
+    expect(fukui.maps[0]).toMatchObject({ kind: "designated_only", build: null });
+    expect(fukui.maps[0].tip).toContain("指定当時の地名地番");
     expect(fukui.maps.some((l) => l.build && l.build(36, 136).includes("fukuidouro"))).toBe(false);
     expect(resolveContact(fukui, "18201")!.phone).toBe("0776-20-5574");
     expect(resolveContact(findMunicipality("18501")!, "18501")).toMatchObject({ phone: "0770-22-5486", note: expect.stringContaining("0770-56-5914") });
@@ -1093,7 +1098,7 @@ describe("lookup", () => {
     expect(r.status).toBe("unsupported");
   });
 
-  it("全国対応で足した地方の市町村も対応（広島市は区ごとの区役所 建築課。福岡市は、道路の調べ方が調査中）", async () => {
+  it("全国対応で足した地方の市町村も対応（広島市は区ごとの区役所 建築課。福岡市は、市の地図で一部の種別を公開）", async () => {
     stubFetch(
       [{ geometry: { coordinates: [132.4553, 34.3853] }, properties: { title: "広島県広島市中区国泰寺町一丁目" } }],
       { results: { muniCd: "34101", lv01Nm: "国泰寺町一丁目" } },
@@ -1115,11 +1120,14 @@ describe("lookup", () => {
     expect(f.status).toBe("ok");
     if (f.status === "ok") {
       expect(f.municipality.name).toBe("福岡市");
-      expect(f.municipality.coverage).toBe("unknown");
+      expect(f.municipality.coverage).toBe("partial");
+      // 市はトップページ以外へのリンクに問い合わせを求めるので、市のトップページを開いて道順を書く
+      expect(f.links[0]).toMatchObject({ kind: "road_type", url: "https://www.city.fukuoka.lg.jp/", pinpoint: false });
+      expect(f.contact).toMatchObject({ phone: "092-711-4584", noPhoneInquiry: true });
     }
   });
 
-  it("中部の市町村も対応（福井市は道路種別が非公開で、位置指定道路の一覧表と市道の地図）", async () => {
+  it("中部の市町村も対応（福井市は道路種別の地図が無く、位置指定道路の一覧表と市道の地図）", async () => {
     stubFetch(
       [{ geometry: { coordinates: [136.2196, 36.0641] }, properties: { title: "福井県福井市大手三丁目" } }],
       { results: { muniCd: "18201", lv01Nm: "大手三丁目" } },
@@ -1128,7 +1136,7 @@ describe("lookup", () => {
     expect(r.status).toBe("ok");
     if (r.status === "ok") {
       expect(r.municipality.name).toBe("福井市");
-      expect(r.municipality.coverage).toBe("none");
+      expect(r.municipality.coverage).toBe("partial");
       expect(r.links[0]).toMatchObject({ kind: "designated_only", pinpoint: false });
     }
   });

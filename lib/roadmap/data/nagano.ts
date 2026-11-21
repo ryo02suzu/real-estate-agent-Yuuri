@@ -47,12 +47,27 @@ const outsideTown = (name: string, code: string, office: keyof typeof OFFICE): M
 /** PDF や画像の分割図で公開している入口ページ */
 const sheets = (kind: MapLink["kind"], label: string, url: string, tip: string): MapLink => ({ kind, label, build: null, url, verified: true, tip });
 
-/** 建設事務所が公開している位置指定道路の調書・図面（PDF）。地名地番では探せず、指定番号・指定日で見る */
+/**
+ * 建設事務所が公開している位置指定道路の調書・図面（PDF）。調書の一覧表に「指定道路の位置」（指定したときの地名地番）が載っているので、
+ * 物件の近くの地番で探せる（2026-11-21 に県のページで確かめた。佐久建設事務所のページは 2026年8月13日の更新で、指定の位置をページに並べ、ページ内検索で探せるようにした）
+ */
 const prefDesignatedPdf = (office: string, url: string, tip: string): MapLink =>
   sheets("designated_only", `位置指定道路の調書・図面（${office}・PDF）`, url, tip);
-const SAKU_PDF_TIP = "2009年度以前の指定分。地名地番では探せないので、指定番号と指定日を市町の窓口で確かめてから開く";
+const SAKU_PDF_TIP =
+  "佐久建設事務所のページが開く。平成21年度（2009年度）以前に指定した位置指定道路の指定道路調書と図面（PDF）。ページに指定番号・指定年月日・指定の位置（地名地番）が並ぶので、ページ内検索（Ctrl＋F など）で物件の近くの地番を探す（市町ごとの一覧表の PDF もある）。指定の位置は指定したときの地名地番。平成22年度以降の指定分は、佐久建設事務所 建築課に問い合わせる（県のページ）";
 const NAGANO_PDF_LIST = "https://www.pref.nagano.lg.jp/choken/kannai/renrakusaki/kenchikuka/index.html";
-const NAGANO_PDF_TIP = "位置指定道路の一覧表と調書（適宜公開）。地図ではないので、指定番号で探す";
+const NAGANO_PDF_TIP =
+  "長野建設事務所 建築課のページが開く。「位置指定道路の公表について」に、市町ごとの指定道路調書の一覧表（PDF）と調書（PDF）がある（県は「適宜公開予定」と書いている）。一覧表に、指定番号・道路の種類・指定年月日・延長・幅員・指定道路の位置（地名地番）が並ぶので、物件の近くの地番を探す。載っていない道・くわしいことは、長野建設事務所 建築課で確かめる";
+
+/**
+ * 建設事務所の位置指定道路の調書の一覧表（地名地番つき）で、位置指定道路（の一部）をネットで探せる市町。県の指定道路図はネットに無いので、
+ * ほかの種別は建設事務所の窓口で（だから「一部」）
+ */
+const prefTownWithList = (name: string, code: string, office: keyof typeof OFFICE, maps: MapLink[], scope: string): Municipality => ({
+  ...prefTown(name, code, office, maps),
+  coverage: "partial",
+  note: `${PREF_NOTE} 位置指定道路（42条1項5号）のうち${scope}は、${OFFICE[office].dept.replace("長野県 ", "")}のページの指定道路調書の一覧表（指定道路の位置＝指定したときの地名地番つき）で探せる。ほかの種別は窓口で。`,
+});
 
 // --- 特定行政庁の3市 ---------------------------------------------------------
 
@@ -162,22 +177,22 @@ const SUWA: Municipality = {
 
 const PREF_TOWNS: Municipality[] = [
   // 佐久建設事務所
-  prefTown("小諸市", "20208", "saku", [
+  prefTownWithList("小諸市", "20208", "saku", [
     sheets("public_road", "小諸市道路線網図（PDF・索引図と16枚、令和7年版）", "https://www.city.komoro.lg.jp/soshikikarasagasu/kensetsusuidoubu/kensetsuka/1/1/5/18118.html", "索引図で区域を選び、その番号の路線図を開く"),
     prefDesignatedPdf("佐久建設事務所", "https://www.pref.nagano.lg.jp/sakuken/kannai/kakuka/kenchikuka/ichishitei_komoro.html", SAKU_PDF_TIP),
-  ]),
-  prefTown("佐久市", "20217", "saku", [
+  ], "平成21年度以前に指定したもの"),
+  prefTownWithList("佐久市", "20217", "saku", [
     sheets("public_road", "市道認定網図（PDF・位置図と55枚、2015年）", "https://www.city.saku.nagano.jp/machizukuri/doro_koen_kenchiku/mozu.html", "位置図で区画の記号（A-5〜I-3）を調べ、その図を開く。2015年の図なので最新の認定は土木課（0267-62-3298）で"),
     prefDesignatedPdf("佐久建設事務所", "https://www.pref.nagano.lg.jp/sakuken/kannai/kakuka/kenchikuka/ichisitei_saku.html", SAKU_PDF_TIP),
-  ]),
+  ], "平成21年度以前に指定したもの"),
   prefTown("小海町", "20303", "saku"),
   outsideTown("川上村", "20304", "saku"),
   outsideTown("南牧村", "20305", "saku"),
   outsideTown("南相木村", "20306", "saku"),
   outsideTown("北相木村", "20307", "saku"),
   prefTown("佐久穂町", "20309", "saku"),
-  prefTown("軽井沢町", "20321", "saku", [prefDesignatedPdf("佐久建設事務所", "https://www.pref.nagano.lg.jp/sakuken/kannai/kakuka/kenchikuka/ichishitei_karuizawa.html", SAKU_PDF_TIP)]),
-  prefTown("御代田町", "20323", "saku", [prefDesignatedPdf("佐久建設事務所", "https://www.pref.nagano.lg.jp/sakuken/kannai/kakuka/kenchikuka/ichisitei_miyota.html", SAKU_PDF_TIP)]),
+  prefTownWithList("軽井沢町", "20321", "saku", [prefDesignatedPdf("佐久建設事務所", "https://www.pref.nagano.lg.jp/sakuken/kannai/kakuka/kenchikuka/ichishitei_karuizawa.html", SAKU_PDF_TIP)], "平成21年度以前に指定したもの"),
+  prefTownWithList("御代田町", "20323", "saku", [prefDesignatedPdf("佐久建設事務所", "https://www.pref.nagano.lg.jp/sakuken/kannai/kakuka/kenchikuka/ichisitei_miyota.html", SAKU_PDF_TIP)], "平成21年度以前に指定したもの"),
   outsideTown("立科町", "20324", "saku"),
   // 上田建設事務所
   prefTown("東御市", "20219", "ueda"),
@@ -248,7 +263,7 @@ const PREF_TOWNS: Municipality[] = [
   prefTown("白馬村", "20485", "omachi"),
   outsideTown("小谷村", "20486", "omachi"),
   // 長野建設事務所
-  prefTown("須坂市", "20207", "nagano", [
+  prefTownWithList("須坂市", "20207", "nagano", [
     {
       // 須坂マップポータル（ArcGIS Experience Builder）の「市道路線網図マップ」。地図のウィジェットは widget_6
       kind: "public_road",
@@ -258,17 +273,17 @@ const PREF_TOWNS: Municipality[] = [
       tip: "最初に「マップを開く」で利用規約に同意する",
     },
     prefDesignatedPdf("長野建設事務所", NAGANO_PDF_LIST, NAGANO_PDF_TIP),
-  ]),
-  prefTown("千曲市", "20218", "nagano", [
+  ], "県が公開しているもの（適宜公開）"),
+  prefTownWithList("千曲市", "20218", "nagano", [
     sheets("public_road", "千曲市道路網図（画像の分割図・市道、2018年3月時点）", "https://www.city.chikuma.lg.jp/soshiki/kensetsu/doro_kotsu/2/2064.html", "「承諾して利用します」のあと、区域の場所を押して開く。最新の認定は道路河川課（026-273-1111）で"),
     prefDesignatedPdf("長野建設事務所", NAGANO_PDF_LIST, NAGANO_PDF_TIP),
-  ]),
-  prefTown("坂城町", "20521", "nagano", [prefDesignatedPdf("長野建設事務所", NAGANO_PDF_LIST, NAGANO_PDF_TIP)]),
+  ], "県が公開しているもの（適宜公開）"),
+  prefTownWithList("坂城町", "20521", "nagano", [prefDesignatedPdf("長野建設事務所", NAGANO_PDF_LIST, NAGANO_PDF_TIP)], "県が公開しているもの（適宜公開）"),
   prefTown("小布施町", "20541", "nagano"),
   outsideTown("高山村", "20543", "nagano"),
-  prefTown("信濃町", "20583", "nagano", [prefDesignatedPdf("長野建設事務所", NAGANO_PDF_LIST, NAGANO_PDF_TIP)]),
+  prefTownWithList("信濃町", "20583", "nagano", [prefDesignatedPdf("長野建設事務所", NAGANO_PDF_LIST, NAGANO_PDF_TIP)], "県が公開しているもの（適宜公開）"),
   outsideTown("小川村", "20588", "nagano"),
-  prefTown("飯綱町", "20590", "nagano", [prefDesignatedPdf("長野建設事務所", NAGANO_PDF_LIST, NAGANO_PDF_TIP)]),
+  prefTownWithList("飯綱町", "20590", "nagano", [prefDesignatedPdf("長野建設事務所", NAGANO_PDF_LIST, NAGANO_PDF_TIP)], "県が公開しているもの（適宜公開）"),
   // 北信建設事務所
   prefTown("中野市", "20211", "hokushin"),
   prefTown("飯山市", "20213", "hokushin", [
