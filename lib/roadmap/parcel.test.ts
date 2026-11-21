@@ -1572,34 +1572,38 @@ describe("公図から推定した筆の注意書き（地域ごとに国の地�
   });
 
   it("取り違えが1%以上の地域の確度の高い推定は、地域の名前を添えて割合を言う（近畿の5府県を公開したとき）", () => {
+    // 割合は、記録した測った数から（測り直しても文の形を確かめられるように）
+    const pct = Math.round((100 * kinki2.accuracy.high.elsewhere) / kinki2.accuracy.high.points);
     expect(kinki2.accuracy.high.elsewhere / kinki2.accuracy.high.points).toBeGreaterThanOrEqual(0.01);
-    expect(estimatedSentence("high", "28204", withKinki2)).toBe("数mずれることがあり、この地域（近畿）では約3%が30m以上離れた別の場所に置かれています。");
-    expect(estimatedNote("high", "28204", withKinki2)).toBe("数m（この地域では約3%が30m以上）ずれることあり");
-    expect(estimatedMisplacedText("high", "25201", "", withKinki2)).toBe("この地域（近畿）では約3%が30m以上離れた別の場所に置かれています");
+    expect(estimatedSentence("high", "28204", withKinki2)).toBe(`数mずれることがあり、この地域（近畿）では約${pct}%が30m以上離れた別の場所に置かれています。`);
+    expect(estimatedNote("high", "28204", withKinki2)).toBe(`数m（この地域では約${pct}%が30m以上）ずれることあり`);
+    expect(estimatedMisplacedText("high", "25201", "", withKinki2)).toBe(`この地域（近畿）では約${pct}%が30m以上離れた別の場所に置かれています`);
     expect(estimatedCardNote("high", "28204", withKinki2)).toBe(
-      "この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、数mずれて隣の筆の地番になることがあり、この地域（近畿）では約3%が30m以上離れた別の場所に置かれています（国の地価の地点で確かめた結果）。謄本・公図で確かめてください。",
+      `この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、数mずれて隣の筆の地番になることがあり、この地域（近畿）では約${pct}%が30m以上離れた別の場所に置かれています（国の地価の地点で確かめた結果）。謄本・公図で確かめてください。`,
     );
     // 同じ近畿でも、大阪府（取り違え 0）・関東の筆は今までどおり
     expect(estimatedSentence("high", "27141", withKinki2)).toBe("数mずれることがあります。");
     expect(estimatedSentence("high", "14109", withKinki2)).toBe("数mずれることがあります。");
     expect(estimatedSentence("low", "14109", withKinki2)).toBe("5m前後ずれることがあり、1割弱は30m以上離れた別の場所に置かれています。");
     // 筆の市区町村が分からない文（スマホの帯など）と地図の凡例は、地域によって違うことを言う
-    expect(estimatedSentence("high", undefined, withKinki2)).toBe("数mずれることがあり、地域によっては約3%が30m以上離れた別の場所に置かれています。");
-    expect(estimatedNote("high", undefined, withKinki2)).toBe("数m（地域によっては約3%が30m以上）ずれることあり");
+    expect(estimatedSentence("high", undefined, withKinki2)).toBe(`数mずれることがあり、地域によっては約${pct}%が30m以上離れた別の場所に置かれています。`);
+    expect(estimatedNote("high", undefined, withKinki2)).toBe(`数m（地域によっては約${pct}%が30m以上）ずれることあり`);
     expect(estimatedLegend(withKinki2)).toBe(
-      "点線は、公図（任意座標）の形を道路の縁に合わせて置いた推定の位置です。数m（地域によっては約3%が30m以上。薄い点線は5m前後。その1割弱は30m以上）ずれることがあります。",
+      `点線は、公図（任意座標）の形を道路の縁に合わせて置いた推定の位置です。数m（地域によっては約${pct}%が30m以上。薄い点線は5m前後。その1割弱は30m以上）ずれることがあります。`,
     );
   });
 
   it("測っていないまとまり・1つの府県のまとまりの言い方", () => {
+    // 割合は、記録した測った数から（測り直しても文の形を確かめられるように）
+    const pct = Math.round((100 * kinki2.accuracy.high.elsewhere) / kinki2.accuracy.high.points);
     const sets: Record<string, KozuSet> = {
       kanto: KOZU_SETS.kanto,
       tohoku: { file: "tohoku-20261201-0900.pmtiles", codes: ["04101"], edition: "2026年4月公開版", high_only: true },
       hyogo: { file: "hyogo-20261201-0900.pmtiles", codes: ["28204", "28202"], edition: "2026年4月公開版", high_only: true, accuracy: { ...(kinki2.accuracy as KozuAccuracy), file: "hyogo-20261201-0900.pmtiles" } },
     };
     // 測っていないまとまりの筆は、測った地域のうち一番多い割合で言う（言い過ぎにならない方）
-    expect(estimatedSentence("high", "04101", sets)).toBe("数mずれることがあり、地域によっては約3%が30m以上離れた別の場所に置かれています。");
-    expect(estimatedSentence("high", "28204", sets)).toBe("数mずれることがあり、この地域（兵庫県）では約3%が30m以上離れた別の場所に置かれています。");
+    expect(estimatedSentence("high", "04101", sets)).toBe(`数mずれることがあり、地域によっては約${pct}%が30m以上離れた別の場所に置かれています。`);
+    expect(estimatedSentence("high", "28204", sets)).toBe(`数mずれることがあり、この地域（兵庫県）では約${pct}%が30m以上離れた別の場所に置かれています。`);
     // どのまとまりも測っていなければ、今までの言い方
     expect(estimatedSentence("high", "04101", { tohoku: sets.tohoku })).toBe("数mずれることがあります。");
     expect(estimatedSentence("low", "04101", { tohoku: sets.tohoku })).toBe("5m前後ずれることがあります。");
