@@ -1,8 +1,9 @@
 // PC のホームと検索の動き（PC の地図＝skin "desk" だけ。スマホの地図には使わない）。
-//  - ホーム：Blender で描いた真上から見た日本（scripts/pc-opening の home.py --extent。PC の地図と同じメルカトル図法・
-//    ズーム 5 の2倍の細かさ）を、四隅の経度・緯度で地図に重ねる。画面の大きさによらず海岸線が地図と重なる。
-//    ズーム 7.4 より寄ると薄くなり、8.8 で消える（その先は今の地図）。絵は上の帯の時間帯（朝・昼・夕・夜。時計に合わせるときは
-//    今の太陽）の1枚（lib/app/desk-home.ts）。開いたときは今の時間帯の絵だけを読み、時間帯が変わったら、その絵を読んで約 1.2 秒で
+//  - ホーム：Blender で描いた真上から見た日本（scripts/pc-opening の home.py --extent と、陸を4倍の細かさで描き直した home_hd.py。
+//    PC の地図と同じメルカトル図法）を、拡大の段階ごとのタイル（home_tiles.py）で地図に重ねる。画面の大きさによらず海岸線が地図と
+//    重なり、寄っても細部まで見える。絵がくっきり見える一番寄った高さ（細かい画面ではズーム 7、ふつうの画面では 8）から薄くなり、
+//    その少し先で消える（その先は今の地図）。絵は上の帯の時間帯（朝・昼・夕・夜。時計に合わせるときは今の太陽）の
+//    1つ（lib/app/desk-home.ts）。開いたときは今の時間帯の絵だけを読み、時間帯が変わったら、その絵を読んで約 1.2 秒で
 //    溶かして替える（動きを減らす設定では、届いたらすぐ替える）
 //  - 検索：物件の場所へ、真上から降りる。降り始めに、ホームの上空の雲（空気の層。lib/app/desk-air-layer.ts）を通り抜ける。
 //    途中は国土地理院の写真（ズーム 2〜8 は世界衛星モザイク、9〜13 はランドサット、
@@ -12,7 +13,7 @@
 // 背景の日本の出典（加工して作成）と、夕・夜の絵を出している間は夜の街の明かりの出典を、地図の出典の欄に出す。
 import type { ExpressionSpecification, GeoJSONSource, LayerSpecification, MapSourceDataEvent, Map as MapLibreMap } from "maplibre-gl";
 import type { DeskTod } from "./desk";
-import { HOME_CORNERS, HOME_IMAGE_OF, homeFadeMs, homeImage, homeImageByKey, homeLightsCredit, nextHomeStep, type HomeFade, type HomeImageKey } from "./desk-home";
+import { HOME_BOUNDS, HOME_IMAGE_OF, HOME_TILE_ZOOMS, homeFadeMs, homeFadeZooms, homeImage, homeImageByKey, homeLightsCredit, nextHomeStep, type HomeFade, type HomeImageKey } from "./desk-home";
 import { deskAirPass } from "./desk-air-layer";
 
 import { PHOTO_ATTRIBUTION } from "../map-style";
@@ -65,10 +66,11 @@ export function addDeskCinema(map: MapLibreMap, baseIds: string[], tod: DeskTod 
     },
   };
   map.addLayer(photo, before);
-  // ホームの背景：いまの時間帯の絵だけを読む（ほかの時間帯の絵は、その時間帯になったときに読む）
+  // ホームの背景：いまの時間帯の絵だけを読む（ほかの時間帯の絵は、その時間帯になったときに読む）。薄くなる高さは画面の細かさから
   const first = homeImage(tod);
-  addHome(map, first.key, before, 1);
-  const run: HomeRun = { shown: first.key, want: first.key, motion: !reduceMotion(), dead: false };
+  const fade = homeFadeZooms(typeof window !== "undefined" ? window.devicePixelRatio : 1);
+  addHome(map, first.key, before, 1, fade);
+  const run: HomeRun = { shown: first.key, want: first.key, motion: !reduceMotion(), dead: false, fade };
   HOMES.set(map, run);
   map.once("remove", () => {
     run.dead = true;
@@ -76,14 +78,14 @@ export function addDeskCinema(map: MapLibreMap, baseIds: string[], tod: DeskTod 
   });
   // 背景の日本の出典（画像の重ねものには出典を付けられないので、空の入れ物に付ける。絵が見える高さだけ使い、出典の欄に出す）
   map.addSource("desk-credit", { type: "geojson", data: EMPTY, attribution: DESK_JAPAN_ATTRIBUTION });
-  map.addLayer({ id: "desk-credit", type: "circle", source: "desk-credit", maxzoom: HOME_MAX_ZOOM, paint: { "circle-radius": 0 } });
+  map.addLayer({ id: "desk-credit", type: "circle", source: "desk-credit", maxzoom: fade[1], paint: { "circle-radius": 0 } });
   // 夜の街の明かりの出典（明かりの入った絵（夕・夜）が見えている間だけ）
   map.addSource("desk-credit-lights", { type: "geojson", data: EMPTY, attribution: NIGHT_LIGHTS_ATTRIBUTION });
   map.addLayer({
     id: "desk-credit-lights",
     type: "circle",
     source: "desk-credit-lights",
-    maxzoom: HOME_MAX_ZOOM,
+    maxzoom: fade[1],
     layout: { visibility: first.lights ? "visible" : "none" },
     paint: { "circle-radius": 0 },
   });
@@ -99,27 +101,29 @@ export function addDeskCinema(map: MapLibreMap, baseIds: string[], tod: DeskTod 
 
 // ---- ホームの背景の時間帯
 
-/** 背景の絵が消える高さ（ズーム）。7.4 より寄ると薄くなる */
-const HOME_MAX_ZOOM = 8.8;
-/** 絵の濃さ（k は溶かす途中の割合。寄ると薄くなるのは同じ） */
-const homeOpacity = (k: number): ExpressionSpecification => ["interpolate", ["linear"], ["zoom"], 7.4, k, HOME_MAX_ZOOM, 0];
+/** 絵の濃さ（k は溶かす途中の割合。fade の高さで寄ると薄くなるのは同じ） */
+const homeOpacity = (fade: [number, number], k: number): ExpressionSpecification => ["interpolate", ["linear"], ["zoom"], fade[0], k, fade[1], 0];
 const homeId = (key: HomeImageKey) => `desk-japan-${key}`;
 
-/** 溶かして替える様子（desk-home.ts の HomeFade）と、出したい絵・溶かすか・読み込みをやめる関数・外している途中の下の絵 */
-type HomeRun = HomeFade & { want: HomeImageKey; motion: boolean; dead: boolean; stop?: () => void; removing?: HomeImageKey };
+/**
+ * 溶かして替える様子（desk-home.ts の HomeFade）と、出したい絵・溶かすか・読み込みをやめる関数・外している途中の下の絵・
+ * 寄ると薄くなる高さ
+ */
+type HomeRun = HomeFade & { want: HomeImageKey; motion: boolean; dead: boolean; stop?: () => void; removing?: HomeImageKey; fade: [number, number] };
 const HOMES = new WeakMap<MapLibreMap, HomeRun>();
 
-function addHome(map: MapLibreMap, key: HomeImageKey, before: string | undefined, opacity: number): void {
+function addHome(map: MapLibreMap, key: HomeImageKey, before: string | undefined, opacity: number, fade: [number, number]): void {
   const id = homeId(key);
-  map.addSource(id, { type: "image", url: homeImageByKey(key).url, coordinates: HOME_CORNERS });
-  // 濃さは溶かす動き（下の loadHome）でコマごとに決めるので、地図の決まりの 0.3 秒の移り変わりは付けない
+  map.addSource(id, { type: "raster", tiles: [homeImageByKey(key).tiles], tileSize: 256, ...HOME_TILE_ZOOMS, bounds: HOME_BOUNDS });
+  // 濃さは溶かす動き（下の loadHome）でコマごとに決めるので、地図の決まりの 0.3 秒の移り変わりは付けない。
+  // 寄って細かい段のタイルが届いたときは、粗い段から短く溶かして替える（くっきりするのが、ぱっと切り替わらない）
   map.addLayer(
     {
       id,
       type: "raster",
       source: id,
-      maxzoom: HOME_MAX_ZOOM,
-      paint: { "raster-opacity": homeOpacity(opacity), "raster-opacity-transition": { duration: 0, delay: 0 }, "raster-fade-duration": 0 },
+      maxzoom: fade[1],
+      paint: { "raster-opacity": homeOpacity(fade, opacity), "raster-opacity-transition": { duration: 0, delay: 0 }, "raster-fade-duration": 200 },
     },
     before,
   );
@@ -167,22 +171,24 @@ function loadHome(map: MapLibreMap, run: HomeRun, key: HomeImageKey): void {
   const id = homeId(key);
   // 今の絵のすぐ上に、透明で重ねて読む
   const order = map.getLayersOrder();
-  addHome(map, key, order[order.indexOf(homeId(run.shown)) + 1], 0);
+  addHome(map, key, order[order.indexOf(homeId(run.shown)) + 1], 0, run.fade);
   run.incoming = { key, fading: false };
   let timer = 0;
   let frame = 0;
+  let got = 0;
   const current = () => !run.dead && run.incoming?.key === key;
   const onData = (e: MapSourceDataEvent) => {
     if (e.sourceId !== id || !current() || run.incoming?.fading) return;
-    if (e.sourceDataType === "metadata") {
-      // 絵が届いた。寄っていて背景が見えなければすぐ替える。見えていれば GPU に載る（idle）のを待つ（念のため 1.5 秒まで）
-      if (map.getZoom() >= HOME_MAX_ZOOM) fade(0);
-      else timer = window.setTimeout(() => fade(homeFadeMs(run.motion)), 1500);
-    } else if (e.sourceDataType === "idle") fade(homeFadeMs(run.motion));
+    if (e.tile) got++;
+    // 寄っていて背景が見えなければ、すぐ替える。見えていれば、いま見えている所のタイルが全部届くのを待つ（念のため 2.5 秒まで。
+    // 届いていない所は、下の今の絵が見えたまま）
+    if (map.getZoom() >= run.fade[1]) fade(0);
+    else if (map.isSourceLoaded(id)) fade(homeFadeMs(run.motion));
+    else timer ||= window.setTimeout(() => fade(homeFadeMs(run.motion)), 2500);
   };
-  // 読めなかったら、今の絵のまま（次に時間帯が変わったときに、また読む）
+  // 1枚も読めなかったら、今の絵のまま（次に時間帯が変わったときに、また読む）。何枚か届いていれば、そのまま続ける
   const onError = (e: { error?: unknown; sourceId?: string }) => {
-    if (e.sourceId !== id || !current() || run.incoming?.fading) return;
+    if (e.sourceId !== id || !current() || run.incoming?.fading || got > 0) return;
     run.stop?.();
     removeHome(map, key);
     run.incoming = run.stop = undefined;
@@ -207,24 +213,39 @@ function loadHome(map: MapLibreMap, run: HomeRun, key: HomeImageKey): void {
       if (!current() || !map.getLayer(id)) return;
       t0 ||= now;
       const u = ms > 0 ? Math.min(1, (now - t0) / ms) : 1;
-      map.setPaintProperty(id, "raster-opacity", homeOpacity(smooth(u)));
+      map.setPaintProperty(id, "raster-opacity", homeOpacity(run.fade, smooth(u)));
       if (u < 1) {
         frame = requestAnimationFrame(step);
         return;
       }
-      // 溶かし終えた。下の絵は、新しい絵がすっかり描かれたあとで外す（同じコマで外すと、一瞬だけ下の地図が見える）。
-      // 外すと GPU の分も空く。まだ別の時間帯を待っていれば、続けて替える
+      // 溶かし終えた。下の絵は、新しい絵のタイルが見えている所の分すべて届き、描かれたあとで外す（届く前や同じコマで外すと、
+      // その所だけ下の地図が見える。10 秒たったら待たない）。外すと GPU の分も空く。まだ別の時間帯を待っていれば、続けて替える
       const old = run.shown;
       run.shown = key;
       run.incoming = run.stop = undefined;
       run.removing = old;
       showLightsCredit(map, run);
-      map.once("render", () => {
-        run.removing = undefined;
+      let gone = false;
+      const giveUp = window.setTimeout(() => removeOld(), 10000);
+      const onLoaded = (e: MapSourceDataEvent) => {
+        if (e.sourceId === id && map.isSourceLoaded(id)) removeOld();
+      };
+      const removeOld = () => {
+        if (gone) return;
+        gone = true;
+        clearTimeout(giveUp);
+        map.off("sourcedata", onLoaded);
         if (run.dead) return;
-        removeHome(map, old);
-        pumpHome(map, run);
-      });
+        map.once("render", () => {
+          run.removing = undefined;
+          if (run.dead) return;
+          removeHome(map, old);
+          pumpHome(map, run);
+        });
+        map.triggerRepaint();
+      };
+      if (!map.getSource(id) || map.isSourceLoaded(id)) removeOld();
+      else map.on("sourcedata", onLoaded);
     };
     frame = requestAnimationFrame(step);
   };

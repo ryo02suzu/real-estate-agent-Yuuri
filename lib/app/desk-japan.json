@@ -17,21 +17,20 @@
    17.978733
   ]
  ],
+ "tiles": "/home/tiles/{tod}/{z}/{x}/{y}.webp?v=202611212314",
+ "minzoom": 4,
+ "maxzoom": 8,
  "images": {
   "morning": {
-   "url": "/home/desk-japan-morning.webp",
    "lights": false
   },
   "day": {
-   "url": "/home/desk-japan-day.webp",
    "lights": false
   },
   "dusk": {
-   "url": "/home/desk-japan-dusk.webp",
    "lights": true
   },
   "night": {
-   "url": "/home/desk-japan-night.webp",
    "lights": true
   }
  }

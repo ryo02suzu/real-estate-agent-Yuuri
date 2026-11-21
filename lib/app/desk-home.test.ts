@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { TODS, todOfSun } from "./desk";
-import { HOME_CORNERS, HOME_FADE_MS, homeFadeMs, homeImage, homeLightsCredit, nextHomeStep } from "./desk-home";
+import { HOME_BOUNDS, HOME_CORNERS, HOME_FADE_MS, HOME_TILE_ZOOMS, homeCrispZoom, homeFadeMs, homeFadeZooms, homeImage, homeLightsCredit, nextHomeStep } from "./desk-home";
 import { BASE, solar } from "./sun";
 
 /** WebP の大きさ（RIFF の見出しから。VP8・VP8L・VP8X） */
@@ -20,6 +20,8 @@ function webpSize(buf: Buffer): [number, number] {
 }
 
 const mercY = (lat: number) => (1 - Math.asinh(Math.tan((lat * Math.PI) / 180)) / Math.PI) / 2;
+/** 経度・緯度を含むタイルの番号 */
+const tileOf = (lon: number, lat: number, z: number) => [Math.floor(((lon + 180) / 360) * 2 ** z), Math.floor(mercY(lat) * 2 ** z)];
 
 describe("PC のホームの背景：時間帯の絵", () => {
   it("上の帯の時間帯ごとの絵。「夕」は dusk の絵。明かりの入った絵は夕と夜だけ", () => {
@@ -27,19 +29,45 @@ describe("PC のホームの背景：時間帯の絵", () => {
     expect(TODS.map((t) => homeImage(t).lights)).toEqual([false, false, true, true]);
   });
 
-  it("4枚とも public/home にあり、同じ四隅（メルカトルで横・縦の比が四隅の範囲と同じ）", () => {
+  it("4つとも同じ四隅。タイルを読む範囲は四隅と同じ", () => {
     const [[w, n], [e], [, s]] = HOME_CORNERS;
     expect(HOME_CORNERS[1][1]).toBe(n);
     expect(HOME_CORNERS[3]).toEqual([w, s]);
-    const ratio = (e - w) / 360 / (mercY(s) - mercY(n));
+    expect(HOME_BOUNDS).toEqual([w, s, e, n]);
+  });
+
+  it("タイルは時間帯ごとに public/home/tiles にあり、1枚 512 画素（粗い段から細かい段まで。東京も那覇も、いちばん細かい段まで）", () => {
+    expect(HOME_TILE_ZOOMS).toEqual({ minzoom: 4, maxzoom: 8 });
     for (const t of TODS) {
-      const { url } = homeImage(t);
-      expect(url).toMatch(/^\/home\/desk-japan(-(morning|day|dusk|night))?\.webp$/);
-      const file = join(process.cwd(), "public", url);
-      expect(existsSync(file), url).toBe(true);
-      const [iw, ih] = webpSize(readFileSync(file));
-      expect(Math.abs(iw / ih / ratio - 1), `${url} ${iw}×${ih}`).toBeLessThan(0.005);
+      const { tiles } = homeImage(t);
+      // 作り直すたびに後ろの印（?v=作った日時）が変わる（タイルは長く覚えてよい決まりなので、古いものを出さない）
+      expect(tiles).toMatch(/^\/home\/tiles\/(morning|day|dusk|night)\/\{z\}\/\{x\}\/\{y\}\.webp\?v=\d{12}$/);
+      for (const [lon, lat] of [
+        [139.767, 35.681], // 東京駅
+        [127.681, 26.212], // 那覇
+        [141.354, 43.062], // 札幌
+      ]) {
+        for (let z = HOME_TILE_ZOOMS.minzoom; z <= HOME_TILE_ZOOMS.maxzoom; z++) {
+          const [x, y] = tileOf(lon, lat, z);
+          const url = tiles.split("?")[0].replace("{z}", String(z)).replace("{x}", String(x)).replace("{y}", String(y));
+          const file = join(process.cwd(), "public", url);
+          expect(existsSync(file), url).toBe(true);
+          expect(webpSize(readFileSync(file)), url).toEqual([512, 512]);
+        }
+      }
     }
+  });
+
+  it("くっきり見える一番寄った高さ：ふつうの画面はズーム 8、細かい画面（Mac・iPad）は 7。そこから薄くなり、少し先で今の地図になる", () => {
+    expect(homeCrispZoom(1)).toBe(8);
+    expect(homeCrispZoom(2)).toBe(7);
+    expect(homeCrispZoom(NaN)).toBe(8);
+    expect(homeCrispZoom(0.5)).toBe(8);
+    expect(homeFadeZooms(2)).toEqual([7, 7.8]);
+    expect(homeFadeZooms(1)[0]).toBe(8);
+    expect(homeFadeZooms(1)[1]).toBeCloseTo(8.8);
+    // ホームを開いたとき（ズーム 5〜6）は、どちらの画面でも薄くならない
+    expect(homeFadeZooms(3)[0]).toBeGreaterThan(6);
   });
 
   it("時計に合わせるときは、物件の場所（無ければ東京駅）の今の太陽の時間帯の絵", () => {
