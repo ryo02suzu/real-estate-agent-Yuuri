@@ -36,7 +36,9 @@ import { modelCredit, type Engine, type StageControls } from "./desk/stage-3d";
 import { DeskOpening } from "./desk/opening";
 import { ToastView, useToast } from "./desk/ui";
 
-type Shown = { query: string; result: LookupResult; literal?: AddressFix };
+/** place：地図で選んだ場所を覚えた（saved）か、覚えた場所で出した（recalled）。lib/app/picked-places.ts */
+type PickedPlaceNote = { q: string; at: number; kind: "saved" | "recalled" };
+type Shown = { query: string; result: LookupResult; literal?: AddressFix; place?: PickedPlaceNote };
 type ShellOverlay = "favorites" | "history" | "compare" | "guide" | "area" | "settings";
 type AnyOverlay = ShellOverlay | PropOverlay;
 
@@ -131,6 +133,7 @@ export function DesktopShell({
   onPickHistory,
   onRemoveHistory,
   onClearHistory,
+  onForgetPlace,
   onHome,
 }: {
   shown: Shown | null;
@@ -151,6 +154,8 @@ export function DesktopShell({
   onPickHistory: (item: HistoryItem) => void;
   onRemoveHistory: (items: HistoryItem[]) => void;
   onClearHistory: () => void;
+  /** 覚えた物件の場所を消す（覚えた場所で出していたときは、住所・地番で探し直す） */
+  onForgetPlace: (place: PickedPlaceNote) => void;
   onHome?: () => void;
 }) {
   const ok = shown?.result.status === "ok" ? shown.result : null;
@@ -583,6 +588,8 @@ export function DesktopShell({
             key={propKey}
             query={shown.query}
             result={ok}
+            place={shown.place}
+            onForgetPlace={onForgetPlace}
             mode={view}
             section={section}
             setSection={setSection}

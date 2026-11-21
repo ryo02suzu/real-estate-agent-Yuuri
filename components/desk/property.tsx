@@ -22,6 +22,7 @@ import type { MapPlace } from "../live-map";
 import { propertyIdOf } from "@/lib/property-id";
 import { loadRecords, RECORDS_EVENT, type PropertyRecords, type RecordTopic } from "@/lib/records";
 import { branchUnmatched, partialMatch, placeSuffix } from "@/lib/roadmap/geocode";
+import { placeDate } from "@/lib/app/picked-places";
 import type { AddressFix } from "@/lib/roadmap";
 import { distanceText } from "@/lib/roadmap/land-price";
 import { chibanLabel, chibanQueryOf, estimatedSentence, isLotChiban, kuikiLabel, registryChiban, type Neighbor } from "@/lib/roadmap/parcel";
@@ -62,6 +63,10 @@ export function itemOf(query: string, r: Ok): HistoryItem {
 type Props = {
   query: string;
   result: Ok;
+  /** 地図で選んだ場所を、入れた住所・地番 q の場所として覚えた（saved）か、覚えた場所で出した（recalled）。lib/app/picked-places.ts */
+  place?: { q: string; at: number; kind: "saved" | "recalled" };
+  /** 覚えた場所を消す（recalled のときは、住所・地番で探し直す） */
+  onForgetPlace: (place: { q: string; at: number; kind: "saved" | "recalled" }) => void;
   mode: "map" | "3d";
   section: SectionKey | null;
   setSection: (k: SectionKey | null) => void;
@@ -338,6 +343,19 @@ export function DeskProperty(props: Props) {
           </span>
           {shownParcel && <span className="chip">{shownParcel.sanko ? "市の地番参考図" : shownParcel.estimated ? "公図から推定した位置" : "登記所備付地図データを加工"}</span>}
         </div>
+        {props.place && (
+          // 地図で選んだ場所を覚えた・覚えた場所で出した（この端末の中だけ）。見出しは選んだ地点の住所のまま（正確な住所のように見せない）
+          <p className="picked-note">
+            <span>
+              {props.place.kind === "saved"
+                ? `「${props.place.q}」の場所として、この端末に覚えました。次からすぐこの場所を出します。`
+                : `「${props.place.q}」は、前に地図で選んだ場所（${placeDate(props.place.at)}）で出しています。`}
+            </span>
+            <button type="button" className="link" onClick={() => props.onForgetPlace(props.place!)}>
+              {props.place.kind === "saved" ? "取り消す" : "住所で探し直す"}
+            </button>
+          </p>
+        )}
         <div className="big-num">
           {lotNumber ? (
             <>

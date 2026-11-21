@@ -1454,6 +1454,29 @@
   white-space: nowrap;
   min-width: 0;
 }
+/* 地図で選んだ場所を覚えた・覚えた場所で出した（components/desk/property.tsx。lib/app/picked-places.ts） */
+.desk-karte .picked-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.desk-karte .picked-note .link {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gold-3);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.desk-karte .picked-note .link:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 .desk-karte .big-num {
   display: flex;
   align-items: center;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DesktopShell } from "@/components/desktop-shell";
 import { useDesktop } from "@/lib/use-desktop";
 import { MobileApp } from "@/components/app/mobile-app";
@@ -9,10 +9,14 @@ import { addHistory, clearHistory, loadHistory, removeHistory, restoreHistory, t
 import { propertyIdOf } from "@/lib/property-id";
 import { GeocoderUnavailable, lookup, lookupPoint, pastedAddress, type AddressFix, type LookupResult } from "@/lib/roadmap";
 import { buildHash, pageUrl, readUrlState } from "@/lib/app/url";
+import { clearPlaces, forgetPlace, needsPick, recallPlace, rememberPlace } from "@/lib/app/picked-places";
 import { AREA_SHORT } from "@/lib/roadmap/regions";
 
-/** literal：書き間違いを直した住所を、入れたとおりに探し直した（そのときの直し。スマホで「直した住所で探す」に使う） */
-type Shown = { query: string; result: LookupResult; literal?: AddressFix };
+/**
+ * literal：書き間違いを直した住所を、入れたとおりに探し直した（そのときの直し。スマホで「直した住所で探す」に使う）。
+ * place：地図で選んだ場所を覚えた（saved。入れた住所・地番 q の場所として）か、覚えた場所で出した（recalled）。PC だけ
+ */
+type Shown = { query: string; result: LookupResult; literal?: AddressFix; place?: { q: string; at: number; kind: "saved" | "recalled" } };
 
 /** いまの画面が、ホームから何画面進んだところか（pushState で積んだ数） */
 function historyDepth(): number {
@@ -34,6 +38,13 @@ export default function Home() {
   // 住所で調べた回数。変わると PC の地図が物件の場所へ戻る（同じ住所で調べ直したときも）
   const [focus, setFocus] = useState(0);
   const desktop = useDesktop();
+  // PC だけ：調べた物件の場所を端末に覚える（lib/app/picked-places.ts）。スマホの画面はまだ変えない
+  const desktopRef = useRef(desktop);
+  useEffect(() => {
+    desktopRef.current = desktop;
+  }, [desktop]);
+  // 場所が確かでない結果（町の中心・代表点・見つからない）を出しているときの、入れた住所・地番。この画面から地図で選んだら覚える
+  const pendingPick = useRef<string | null>(null);
 
   /**
    * 住所（q）か、地図で選んだ地点（ll）で調べて結果を出す。literal は、書き間違いを直さずに入れたとおりに探す
@@ -44,12 +55,24 @@ export default function Home() {
     setError(null);
     try {
       const literal = "q" in target ? target.literal : undefined;
-      const result = "q" in target ? await lookup(target.q, { exact: !!literal }) : await lookupPoint(...target.ll);
+      const pc = desktopRef.current;
+      // PC：前に地図で選んだ場所を覚えている住所・地番なら、その場所で調べる（住所検索はしない）
+      const saved = pc && "q" in target && !literal ? recallPlace(target.q) : undefined;
+      const result = saved ? await lookupPoint(saved.lat, saved.lng) : "q" in target ? await lookup(target.q, { exact: !!literal }) : await lookupPoint(...target.ll);
       // 書き間違いを直して見つけたら、履歴・URL には直した住所を残す（次に開くと直さずに一度で見つかる）
       const fixed = result.status === "ok" ? result.fix?.query : undefined;
-      const query = "q" in target ? (fixed ?? target.q) : result.status === "ok" || result.status === "unsupported" ? result.matchedAddress : "";
+      const query = "q" in target ? (saved ? target.q : (fixed ?? target.q)) : result.status === "ok" || result.status === "unsupported" ? result.matchedAddress : "";
+      // 場所が確かでない結果の画面から、地図で選んだら覚える（その1回だけ）
+      let place: Shown["place"];
+      const found = result.status === "ok" || result.status === "unsupported";
+      if (saved && found) place = { q: saved.q, at: saved.at, kind: "recalled" };
+      else if (pc && "ll" in target && pendingPick.current && found) {
+        const item = rememberPlace(pendingPick.current, target.ll[0], target.ll[1]);
+        if (item) place = { q: item.q, at: item.at, kind: "saved" };
+      }
+      pendingPick.current = pc && "q" in target && !saved && !literal && needsPick(result, target.q) ? target.q : null;
       setInput("q" in target ? target.q : query);
-      setShown({ query, result, ...(literal ? { literal } : {}) });
+      setShown({ query, result, ...(literal ? { literal } : {}), ...(place ? { place } : {}) });
       if ("q" in target) setFocus((n) => n + 1);
       if (!literal && (result.status === "ok" || result.status === "unsupported")) {
         setHistory(
@@ -92,6 +115,15 @@ export default function Home() {
     [run],
   );
   const searchPoint = useCallback((lat: number, lng: number, push = true) => run({ ll: [lat, lng] }, push), [run]);
+  // PC：覚えた場所を消す。覚えた場所で出していたときは、住所・地番で探し直す
+  const forgetPicked = useCallback(
+    (place: NonNullable<Shown["place"]>) => {
+      forgetPlace(place.q);
+      if (place.kind === "recalled") void run({ q: place.q }, false);
+      else setShown((s) => (s?.place === place ? { query: s.query, result: s.result, ...(s.literal ? { literal: s.literal } : {}) } : s));
+    },
+    [run],
+  );
   const pickHistory = (h: HistoryItem) => (h.ll ? searchPoint(h.ll[0], h.ll[1]) : search(h.address, true));
 
   // 初回表示: 端末の履歴を読み、?q= / ?ll= 付きで開かれたらそのまま調べる
@@ -148,8 +180,10 @@ export default function Home() {
         onRemoveHistory={(items) => setHistory(removeHistory(history, items).items)}
         onClearHistory={() => {
           clearHistory();
+          clearPlaces(); // 調べた住所から覚えた場所も、履歴と一緒に消す
           setHistory([]);
         }}
+        onForgetPlace={forgetPicked}
         onHome={shown ? backHome : undefined}
       />
     );
