@@ -32,8 +32,10 @@ import geo3  # noqa: E402
 WORK = os.environ.get("PC_OPENING3_WORK", os.path.join(HERE, "work"))
 ASSETS = os.path.join(WORK, "assets")
 
-# 朝日（方位は北 0°・東 90°）。日の出から少したった、低い光
-SUN = dict(az=110.0, el=23.0, energy=6.5, color=(1.0, 0.84, 0.66))
+# 太陽（方位は北 0°・東 90°）：カラマツが金になる 10 月下旬の、朝 9 時半ごろ（高さ 33°。この日の高さ 33° の方位は約 141°）。
+# 1回目の高さ 23°（方位 110°）では、川を飛ぶ 0〜10 秒が全部、東の山（霞沢岳の尾根）の陰に入り、川と森に日が当たらず平板だった
+# （地形で光の道をたどって確かめた：高さ 33° なら、見える川と岸の 9 割以上に日が当たる）。右岸の木の影が川へ長く落ちる
+SUN = dict(az=138.0, el=33.0, energy=6.5, color=(1.0, 0.90, 0.78))
 # 空：HDRI と、その回し方（HDRI の太陽を、SUN の方位に合わせる）・明るさ
 SKY = dict(name="kloppenheim_06_puresky", sun_az_in_hdri=None, strength=1.2)
 

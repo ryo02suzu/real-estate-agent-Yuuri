@@ -5,5 +5,5 @@
  "spp": 26,
  "prev_run": "",
  "note": "描く設定。書き換えて push すると .github/workflows/opening3-render.yml が動く。足りないコマだけ描き直すときは frames にそのコマ、prev_run に前の回の番号。仕上げだけ直すときは repost_run に EXR を残した回の番号",
- "pass": 2
+ "pass": 2.1
 }
