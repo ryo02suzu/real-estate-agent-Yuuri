@@ -374,47 +374,58 @@ SOURCES = [
         "date": "2024-01-01", "epsg": 2454, "enc": "utf-8",
         "gdb": {"layer": "hude"}, "chiban": ["地番", "枝番"], "key": "町字", "oname": "町字名",
     },
-    # ---- 2026-11-21 に足した（WIP） ----
+    # ---- 2026-11-21 に足した（市のページ・オープンデータのサイトでライセンスと利用規約を確かめた） ----
     {
-        "code": "01204", "name": "旭川市", "credit": "旭川市「地番参考図データ」", "license": "CC BY 2.1 JP",
-        "terms": "",
-        "fetch": {"kind": "page", "page": "https://www.city.asahikawa.hokkaido.jp/kurashi/112/113/116/d080184.html", "resource": r"^012041_tiban_\d{4}\.zip$"},
-        "date": "2025-01-01", "epsg": 6680, "enc": "cp932",
-        "shp": r"(?i)tochi_poly\.shp$", "chiban": ["TXTCD"], "key": "AZACD",
-        "names": {"shp": r"(?i)oaza_poly\.shp$", "key": "AZAC", "name": "AZACNAM"},
-    },
-    {
-        "code": "07204", "name": "いわき市", "credit": "いわき市「地番参考図データ」", "license": "CC BY 2.1 JP",
-        "terms": "",
+        # 字ごとに地番が付く（大字のコードは小字まで。「三和町下三坂字南作」は大字「三和町下三坂」と小字「南作」に分ける）。.prj は無い（平面直角座標系 IX 系）
+        "code": "07204", "name": "いわき市", "credit": "いわき市「地番参考図」", "license": "CC BY 2.1 JP",
+        "terms": "https://creativecommons.org/licenses/by/2.1/jp/legalcode（いわき市の地番参考図のページ。「本ページに掲載しているデータは、自由に利用・改変できます」）",
         "fetch": {"kind": "page", "page": "https://www.city.iwaki.lg.jp/www/contents/1755050006519/index.html", "resource": r"^chibansankouzu\.zip$"},
         "date": "2026-01-01", "epsg": 6677, "enc": "cp932",
-        "shp": r"筆界\.shp$", "chiban": ["地番"], "key": "大字",
+        "shp": r"(?i)/tochi_poly\.shp$", "chiban": ["TXTCD"], "key": "AZACD",
+        "names": {"shp": r"(?i)/ooaza\.shp$", "key": "AZAC", "name": "AZACNAM"}, "split_aza": True,
     },
     {
+        # 水戸市オープンデータのページ。zip の中に筆の面（大字コード・表示文字列）と大字コードの表（csv）
         "code": "08201", "name": "水戸市", "credit": "水戸市「地形地番集成編纂図データファイル」", "license": "CC BY（版の記載なし）",
-        "terms": "",
+        "terms": "https://creativecommons.org/licenses/by/4.0/legalcode.ja（データのページの表示は「CC-BY」で版の記載なし。コピーライトは水戸市役所）",
         "fetch": {"kind": "page", "page": "https://www.city.mito.lg.jp/site/open-data/97836.html", "resource": r"^data\.zip$"},
         "date": "2026-01-01", "epsg": 6677, "enc": "cp932",
-        "shp": r"\.shp$", "chiban": ["地番"], "key": "大字",
+        "shp": r"/地番集成編纂図データファイル\.shp$", "chiban": ["表示文字列"], "key": "大字コード",
+        "names": {"csv": r"/大字コード\.csv$", "key": "大字コード", "name": "大字名称", "pad": 3},
     },
     {
+        # 筆の面（筆界線01〜07）が7つの zip に、大字の名前（大字界）が字界の zip に分かれて置かれている（bundle で全部取り、shp_all で全部読む）
         "code": "09201", "name": "宇都宮市", "credit": "宇都宮市「地籍図データ」", "license": "CC BY（版の記載なし）",
-        "terms": "",
+        "terms": "https://data.city.utsunomiya.tochigi.jp/terms/（宇都宮市オープンデータポータルサイト利用規約。データセットのライセンスは「クリエイティブ・コモンズ 表示」で版の記載なし。"
+        "編集・加工したことと、した者を書き、市が作ったように見せない）",
         "fetch": {"kind": "ckan", "api": "https://catalog.city.utsunomiya.tochigi.jp/api/3/action", "dataset": "chibannzu-070101", "resource": r"^\d\d_(?:字界|地番図\d+)\.zip$", "bundle": True},
         "date": "2026-01-01", "epsg": 6677, "enc": "cp932",
         "shp": r"/筆界線\d+\.shp$", "shp_all": True, "chiban": ["SYO_HON", "SYO_EDA", "SYO_KOEDA"], "key": "SYO_CHO_CD",
         "names": {"shp": r"大字界\.shp$", "key": "CYO_CD", "name": "CYO_MEI"},
     },
     {
+        # 年ごとにリソースが増える（前の年のものがあとから更新された）ので、時点の名前で選ぶ（大牟田市と同じ）
         "code": "16201", "name": "富山市", "credit": "富山市「地番参考図」", "license": CCBY,
-        "terms": "",
+        "terms": "https://opdt.city.toyama.lg.jp/pages/terms（富山市オープンデータ利用規約。CC BY 4.0。編集・加工した情報を市が作ったように見せない）",
         "fetch": {"kind": "ckan", "api": "https://opdt.city.toyama.lg.jp/api/3/action", "dataset": "chiban", "resource": r"令和[8８]年[1１]月[1１]日"},
-        "date": "2026-01-01", "epsg": 6675, "enc": "cp932",
-        "shp": r"\.shp$", "chiban": ["地番"], "key": "大字",
+        "date": "2026-01-01", "epsg": 2449, "enc": "cp932",
+        "shp": r"(?i)/tochi_poly\.shp$", "chiban": ["TXTCD"], "key": "大字コード", "oname": "大字名", "koaza": "小字名",
     },
     {
+        # 筆界線（筆の面。大字と地番の列がある）の .dbf・.shp・.shx と .prj が3つの zip に分かれている（bundle で取り、flatten で集める）。
+        # 地番の文字の点（地番1・2）と引出線は表示用で、使わない。市のサイトは「408 Request Timeout」を返すことが多い（2026-11-21 に手元で、
+        # 何度か読み直してやっと取れた）ので、一度取れたファイルは R2 の写しから読む（mirror）
+        "code": "29201", "mirror": True, "name": "奈良市", "credit": "奈良市「地番図」", "license": "CC BY 2.1 JP",
+        "terms": "https://creativecommons.org/licenses/by/2.1/jp/legalcode（奈良市の地番図オープンデータのページ。データの利用をもって奈良市オープンデータカタログの利用規約を承諾したものとみなす）",
+        "fetch": {"kind": "page", "page": "https://www.city.nara.lg.jp/soshiki/14/104605.html", "resource": r"^筆界線\d\s*\[", "by_text": True, "bundle": True},
+        "date": "2025-01-01", "epsg": 2448, "enc": "cp932", "flatten": True,
+        "shp": r"/筆界線\.shp$", "chiban": ["地番本番", "地番枝番", "地番小枝"], "key": "大字cd", "oname": "大字名",
+    },
+    {
+        # 筆の面（筆ポリゴン）は図形の番号だけで、地番は文字の点（地番注記）にある。文字は引出線（注記の番号で結び付く）か、
+        # 文字の点そのもので筆に当てる（labels）。大字の名前の表は仕様書（PDF）にしか無いので、町は法務省の筆との重なりと地番の集まりで決める
         "code": "10202", "name": "高崎市", "credit": "高崎市「地番図」", "license": CCBY,
-        "terms": "",
+        "terms": "https://www.city.takasaki.gunma.jp/uploaded/attachment/6063.pdf（高崎市オープンデータ利用規約。政府標準利用規約第2.0版に準拠し、CC BY 4.0 と互換。加工して利用したことを書く）",
         "fetch": {"kind": "page", "page": "https://www.city.takasaki.gunma.jp/page/3130.html", "resource": r"^(?:地番_地番図|地番引出線_地番図|筆ポリゴン_地番図)\s", "by_text": True, "bundle": True},
         "date": "2026-01-01", "epsg": 6677, "enc": "cp932",
         "shp": r"筆ポリゴン_地番図\.shp$", "chiban": ["label"], "key": "oazacd",
@@ -446,6 +457,11 @@ EXCLUDED = {
     "川西市": "G空間情報センターの地番参考図は2018年1月1日時点のもので、案内先の市のページが無くなり、市のオープンデータの一覧にも無い（古く、今の公開が確かめられないので入れない）",
     "静岡市": "G空間情報センターの地番図は2015〜2017年のもの。新しいものは市の地図サイト（しずマップ）で利用条件に同意してから取る所にある（MICHILU は同意の先を開かない）",
     "日野町": "地籍図は明治の地引絵図などを写した PDF（筆のデータではない）",
+    # 2026-11-21 に確かめたもの
+    "福島市": "地番参考図（CC BY 2.1 JP）のファイルは、市のオープンデータのページで「本規約に同意する」を押してから進む一覧の先にある"
+    "（押すことで規約を承諾したとみなす決まり。MICHILU は同意の先を開かない）",
+    "旭川市": "地番参考図データ（CC BY 2.1 JP）は、法務省の公共座標の筆と同じ所で地番が同じ筆が 82.6% だけで、同じ地番の筆の位置のずれは"
+    "中央値 1.19m・4分の1は 2.2m より大きい（向きはそろっていないので、平行移動では直らない）。入れている市町村の図より粗いので、今は入れない",
 }
 
 KANJI_NUM = {"〇": 0, "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
@@ -836,6 +852,19 @@ def extract(zip_path: str, out: str) -> None:
                 extract(p, p[:-4])
 
 
+def flatten(root: str) -> None:
+    """展開したファイルを全部 root の直下に集める。shapefile の部品（.shp・.dbf・.shx）が別々の zip に分けて置かれている所
+    （奈良市の筆界線は .dbf・.shp・.shx と .prj が3つの zip に分かれている）。同じ名前のファイルが2つあれば止める"""
+    for d, _, fs in os.walk(root):
+        if d == root:
+            continue
+        for f in fs:
+            dst = os.path.join(root, f)
+            if os.path.exists(dst):
+                raise RuntimeError(f"同じ名前のファイルが2つあります: {f}")
+            os.replace(os.path.join(d, f), dst)
+
+
 def find_all(root: str, pattern: str) -> list[str]:
     """pattern に合うファイル（パスの順）"""
     pat = re.compile(pattern)
@@ -925,9 +954,12 @@ def read_moj(paths: list[str]) -> dict:
 
 
 def norm_chiban(parts: list[str]) -> str:
-    """「４４２－７」「0008」「0193」「0000」→「442-7」「8-193」。数字でなければ空"""
+    """「４４２－７」「0008」「0193」「0000」→「442-7」「8-193」。数字でなければ空。
+    小数の列（奈良市の地番本番「70.0」）は、整数の値なら整数にする"""
     out = []
     for i, s in enumerate(parts):
+        if isinstance(s, float) and s.is_integer():
+            s = int(s)
         s = unicodedata.normalize("NFKC", str(s or "")).strip()
         s = re.sub(r"[‐－ーｰ−—–]", "-", s).replace("番地", "-").replace("番", "-").strip("-")
         if not s:
@@ -1386,6 +1418,8 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
     root = os.path.join(work, "src", f"{code}-{meta['id']}")
     if not os.path.isdir(root):
         extract(dl, root + ".tmp")
+        if src.get("flatten"):
+            flatten(root + ".tmp")
         os.replace(root + ".tmp", root)
     muni = read_muni(src, root)
     n = len(muni["geom"])
