@@ -1,9 +1,10 @@
 {
- "frames": "0-506",
- "jobs": 39,
- "res": "1920x1080",
- "spp": 26,
+ "frames": "240-506",
+ "jobs": 20,
+ "res": "2560x1440",
+ "spp": 32,
  "prev_run": "",
- "note": "描く設定。書き換えて push すると .github/workflows/opening3-render.yml が動く。足りないコマだけ描き直すときは frames にそのコマ、prev_run に前の回の番号。仕上げだけ直すときは repost_run に EXR を残した回の番号",
- "pass": 2.3
+ "note": "描く設定。書き換えて push すると .github/workflows/opening3-render.yml が動く。3回目（全力版）は、コマ 0-239 を手伝いの作業場（worker.sh）、240-506 をここで描き、手元で合わせて動画にする（encode: false）。足りないコマだけ描き直すときは frames にそのコマ、prev_run に前の回の番号。仕上げだけ直すときは repost_run に EXR を残した回の番号",
+ "pass": 3,
+ "encode": false
 }

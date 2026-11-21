@@ -1448,7 +1448,9 @@ def run_anim(a) -> None:
     sc = bpy.context.scene
     sc.render.fps = P["fps"]
     sc.render.use_motion_blur = True
-    sc.render.motion_blur_shutter = 0.5  # 24 コマ/秒で 1/48 秒（映画の 180° シャッター）
+    # 24 コマ/秒で 1/80 秒（108° シャッター）。映画の 180°（1/48 秒）だと、時速 250km で川面や木のすぐ上を飛ぶ所で近くが大きく
+    # 流れ、ぼやけた絵に見えた。速さの感じは残しつつ、ぶれを約 6 割に
+    sc.render.motion_blur_shutter = 0.3
     sc.view_layers[0].use_pass_z = True
     sc.render.use_compositing = False
     st = sc.render.image_settings
