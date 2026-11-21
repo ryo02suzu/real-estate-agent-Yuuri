@@ -10,7 +10,6 @@ import { propertyIdOf } from "@/lib/property-id";
 import { GeocoderUnavailable, lookup, lookupPoint, pastedAddress, type AddressFix, type LookupResult } from "@/lib/roadmap";
 import { buildHash, pageUrl, readUrlState } from "@/lib/app/url";
 import { clearPlaces, forgetPlace, needsPick, recallPlace, rememberPlace } from "@/lib/app/picked-places";
-import { AREA_SHORT } from "@/lib/roadmap/regions";
 
 /**
  * literal：書き間違いを直した住所を、入れたとおりに探し直した（そのときの直し。スマホで「直した住所で探す」に使う）。
@@ -23,9 +22,6 @@ function historyDepth(): number {
   const d = (window.history.state as { depth?: unknown } | null)?.depth;
   return typeof d === "number" ? d : 0;
 }
-
-// PC の「対応エリア」。対応している地方の名前（lib/roadmap/regions.ts の AREA_SHORT。例「関東・中部・東北」）
-const AREA_TEXT = AREA_SHORT;
 
 export default function Home() {
   const [input, setInput] = useState("");
@@ -171,7 +167,6 @@ export default function Home() {
         history={history}
         favorites={favorites}
         setFavorites={setFavorites}
-        areaText={AREA_TEXT}
         onSearch={() => search(input, true)}
         onPickAddress={(a) => search(a, false)}
         onLiteral={(fix) => void run({ q: fix.input, literal: fix }, false)}

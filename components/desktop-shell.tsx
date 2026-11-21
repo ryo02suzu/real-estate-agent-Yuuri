@@ -27,7 +27,7 @@ import type { MapPlace } from "./live-map";
 import { MapPanel } from "./map-panel";
 import { MapPreview } from "./map-preview";
 import { ResultView } from "./result-view";
-import { Banner, isMac, Rail, Topbar, Welcome, type RailKey } from "./desk/chrome";
+import { Banner, isMac, Rail, Topbar, type RailKey } from "./desk/chrome";
 import type { DocKind } from "./desk/docs";
 import { googleFailed, GOOGLE_3D_CONFIGURED } from "./desk/google-3d";
 import { AreaOverlay, CompareOverlay, FavoritesOverlay, GuideOverlay, HistoryOverlay, placeLabel, SettingsOverlay } from "./desk/overlays";
@@ -126,7 +126,6 @@ export function DesktopShell({
   history,
   favorites,
   setFavorites,
-  areaText,
   onSearch,
   onPickAddress,
   onLiteral,
@@ -147,7 +146,6 @@ export function DesktopShell({
   history: HistoryItem[];
   favorites: FavoriteItem[];
   setFavorites: (f: FavoriteItem[]) => void;
-  areaText: string;
   onSearch: () => void;
   onPickAddress: (address: string) => void;
   onLiteral?: (fix: AddressFix) => void;
@@ -384,7 +382,9 @@ export function DesktopShell({
       </div>
 
       <div className="desk-ui">
-        <Topbar input={input} setInput={setInput} loading={loading} onSearch={onSearch} onPick={onPickAddress} onHome={goHome} tod={tod} todAuto={prefs.todMode === "clock"} onTod={pickTod} onOpen={(k) => setOverlay(overlay === k ? null : k)} open={overlay} mac={mac} />
+        {/* ページの見出し（画面には出さない。前はホームの真ん中のカードにあった） */}
+        <h1 className="sr-only">MICHILU：住所か地番から、物件のまわりの道路・法令・ハザードを地図と 3D で調べる</h1>
+        <Topbar input={input} setInput={setInput} loading={loading} onSearch={onSearch} onPick={onPickAddress} onHome={goHome} tod={tod} todAuto={prefs.todMode === "clock"} onTod={pickTod} onOpen={(k) => setOverlay(overlay === k ? null : k)} open={overlay} mac={mac} recent={history} onPickHistory={onPickHistory} />
         <Rail
           open={overlay}
           onOpen={onRail}
@@ -524,7 +524,6 @@ export function DesktopShell({
 
           <Banner loading={loading} error={error} />
 
-          {!shown && !overlay && <Welcome history={history} areaText={areaText} onPick={onPickHistory} onExample={(q) => { setInput(q); onPickAddress(q); }} onAll={() => setOverlay("history")} onArea={() => setOverlay("area")} />}
           {shown && !ok && !overlay && (
             <div className="desk-card glass">
               <ResultView query={shown.query} result={shown.result} onPick={onPickAddress} desktop />

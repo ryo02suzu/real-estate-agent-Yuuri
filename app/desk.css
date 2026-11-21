@@ -460,6 +460,18 @@
   font-size: 11px;
   color: var(--muted);
 }
+/* 入力が空のときの一覧（例・最近の検索。前はホームの真ん中のカードにあった） */
+.desk-suggest .grp {
+  padding: 8px 10px 2px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.desk-suggest.home .src {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
 .desk-search:focus-within {
   border-color: var(--gold);
   box-shadow: 0 0 0 3px rgba(184, 138, 77, 0.24);
@@ -940,73 +952,6 @@
   color: #625849;
 }
 
-/* ---- ホーム（物件を調べる前の真ん中のカード） */
-.desk-welcome {
-  position: absolute;
-  left: 50%;
-  top: 46%;
-  transform: translate(-50%, -50%);
-  width: min(640px, 100% - 24px);
-  max-height: calc(100% - 24px);
-  overflow: auto;
-  padding: 30px 34px 24px;
-  text-align: center;
-}
-.desk-welcome h1 {
-  font-size: 26px;
-  line-height: 1.45;
-  margin: 0 0 8px;
-  font-weight: 700;
-  text-wrap: balance;
-  letter-spacing: 0.01em;
-}
-.desk-welcome p {
-  margin: 0;
-  color: var(--muted);
-}
-.desk-welcome .ex {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 16px;
-}
-.desk-welcome .stats {
-  display: flex;
-  justify-content: center;
-  gap: 22px;
-  margin: 18px 0 0;
-}
-.desk-welcome .stats div {
-  display: flex;
-  flex-direction: column-reverse;
-  align-items: center;
-  font-size: 12px;
-  color: var(--muted);
-}
-.desk-welcome .stats dd {
-  margin: 0;
-  font-family: var(--font-num);
-  font-weight: 500;
-  font-size: 20px;
-  color: var(--ink);
-  white-space: nowrap;
-}
-.desk-welcome .stats dd.small {
-  font-family: var(--font-ui);
-  font-size: 16px;
-  font-weight: 600;
-}
-.desk-welcome .recent {
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
 .desk-card {
   position: absolute;
   left: 50%;

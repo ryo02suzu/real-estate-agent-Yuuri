@@ -1,17 +1,19 @@
 "use client";
 
-// PC の「調査デスク」の枠：上の帯（ロゴ・検索欄・時間帯・対応エリア・使い方・設定）、左の細い列（検索・いまの物件・お気に入り・履歴・
-// 書類・比較・使い方・表示）、物件を調べる前の真ん中のカード（ホーム）、調べている・通信の失敗の一言
+// PC の「調査デスク」の枠：上の帯（ロゴ・検索欄・時間帯・対応エリア・使い方・設定。検索欄を押すと、入力が空なら例・最近の検索・
+// 地図で調べる案内の一覧）、左の細い列（検索・いまの物件・お気に入り・履歴・書類・比較・使い方・表示）、調べている・通信の失敗の一言
 import Image from "next/image";
 import { CircleHelp, Columns2, FileText, History, LoaderCircle, MapPin, Search, Settings, SlidersHorizontal, Star, TriangleAlert, X } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import type { DeskTod } from "@/lib/app/desk";
 import { TOD_LABEL, TODS } from "@/lib/app/desk";
 import { placeTitle } from "@/lib/app/scene";
 import { historyKey, type HistoryItem } from "@/lib/history";
-import { MUNICIPALITIES } from "@/lib/roadmap";
 import { suggestAddresses, wantsSuggest, type Suggestion } from "@/lib/roadmap/suggest";
 import { Wordmark } from "../header";
+
+/** 検索欄の下に出す例（入力が空のとき） */
+const EXAMPLES = ["渋谷区神南1-19-11", "地番 熊谷市下奈良391-3", "松戸市古ヶ崎四丁目3556-1"];
 
 const MARK = { src: "/logo-mark.webp", w: 204, h: 202 };
 /** 端末が Mac か（検索欄の近道の字を ⌘K にする。ほかは Ctrl+K） */
@@ -32,6 +34,8 @@ export function Topbar({
   onOpen,
   open,
   mac,
+  recent = [],
+  onPickHistory,
 }: {
   input: string;
   setInput: (v: string) => void;
@@ -47,6 +51,9 @@ export function Topbar({
   onOpen: (k: "area" | "guide" | "settings") => void;
   open: string | null;
   mac: boolean;
+  /** 入力が空のとき、検索欄の下に例と一緒に出す最近の検索（押すとその物件を開く） */
+  recent?: HistoryItem[];
+  onPickHistory?: (item: HistoryItem) => void;
 }) {
   const field = useRef<HTMLInputElement>(null);
   // 入力途中の候補：入力が止まって 0.35 秒たったら、国土地理院の住所検索に聞く（古い返事は捨てる）
@@ -71,6 +78,18 @@ export function Topbar({
     return () => clearTimeout(timer);
   }, [input, focused, loading, onPick]);
   const showSugs = !!onPick && focused && !loading && wantsSuggest(input) && sugs.length > 0;
+  // 入力が空で検索欄を押したとき：例の住所・地番と最近の検索（前はホームの真ん中のカードにあった。日本の絵を隠さないように、ここへ移した）
+  const homeOpts = [
+    ...EXAMPLES.map((q) => ({ key: `ex:${q}`, label: q, recent: false, run: () => { setInput(q); onPick?.(q); } })),
+    ...recent.slice(0, 3).map((h) => ({ key: `h:${historyKey(h)}`, label: placeTitle(h).title || h.address, recent: true, run: () => onPickHistory?.(h) })),
+  ];
+  const showHome = !!onPick && focused && !loading && !input.trim();
+  const listSize = showSugs ? sugs.length : showHome ? homeOpts.length : 0;
+  const runHome = (i: number) => {
+    setActive(-1);
+    field.current?.blur();
+    homeOpts[i]?.run();
+  };
   const pick = (s: Suggestion, i: number) => {
     setSugs([]);
     setActive(-1);
@@ -111,24 +130,26 @@ export function Topbar({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onKeyDown={(e) => {
-            if (!showSugs) return;
+            if (!listSize) return;
             if (e.key === "ArrowDown" || e.key === "ArrowUp") {
               e.preventDefault();
-              const n = sugs.length;
+              const n = listSize;
               setActive((a) => (e.key === "ArrowDown" ? (a + 1) % n : (a - 1 + n) % n));
             } else if (e.key === "Enter" && active >= 0) {
               e.preventDefault();
-              pick(sugs[active], active);
+              if (showSugs) pick(sugs[active], active);
+              else runHome(active);
             } else if (e.key === "Escape") {
               setSugs([]);
               setActive(-1);
+              if (showHome) field.current?.blur();
             }
           }}
           role="combobox"
-          aria-expanded={showSugs}
+          aria-expanded={showSugs || showHome}
           aria-controls="address-suggest"
           aria-autocomplete="list"
-          aria-activedescendant={showSugs && active >= 0 ? `address-suggest-${active}` : undefined}
+          aria-activedescendant={(showSugs || showHome) && active >= 0 ? `address-suggest-${active}` : undefined}
           placeholder="住所・地番を入れる（例：渋谷区神南1-19-11、地番 熊谷市下奈良391-3）"
           autoComplete="off"
           enterKeyHint="search"
@@ -176,6 +197,37 @@ export function Topbar({
               </li>
             ))}
             <li role="presentation" className="src">住所の候補：国土地理院の住所検索</li>
+          </ul>
+        )}
+        {showHome && (
+          <ul id="address-suggest" role="listbox" aria-label="例と最近の検索" className="desk-suggest home">
+            {homeOpts.map((o, i) => (
+              <Fragment key={o.key}>
+                {(i === 0 || (o.recent && !homeOpts[i - 1].recent)) && (
+                  <li role="presentation" className="grp">
+                    {o.recent ? "最近の検索" : "例"}
+                  </li>
+                )}
+                <li
+                  id={`address-suggest-${i}`}
+                  role="option"
+                  aria-selected={i === active}
+                  className={i === active ? "on" : undefined}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    runHome(i);
+                  }}
+                  onMouseEnter={() => setActive(i)}
+                >
+                  {o.recent ? <History size={14} aria-hidden className="shrink-0 text-[var(--muted)]" /> : <Search size={14} aria-hidden className="shrink-0 text-[var(--muted)]" />}
+                  <span className="addr">{o.label}</span>
+                </li>
+              </Fragment>
+            ))}
+            <li role="presentation" className="src">
+              <MapPin size={13} aria-hidden className="mr-1 inline-block align-[-2px]" />
+              住所が分からない土地は、地図をクリックして「ここで調べる」
+            </li>
           </ul>
         )}
       </form>
@@ -245,62 +297,6 @@ export function Rail({ open, onOpen, favorites, compare, docsReady, props }: { o
   );
 }
 
-/** 物件を調べる前の真ん中のカード */
-export function Welcome({ history, areaText, onPick, onExample, onAll, onArea }: { history: HistoryItem[]; areaText: string; onPick: (h: HistoryItem) => void; onExample: (q: string) => void; onAll: () => void; onArea: () => void }) {
-  const recent = history.slice(0, 3);
-  return (
-    <section className="desk-welcome glass" aria-labelledby="desk-welcome-title">
-      <h1 id="desk-welcome-title">
-        住所か地番を1つ入れると、
-        <br />
-        地図と 3D で周りごと見えます。
-      </h1>
-      <p>道路・法令・ハザード・周辺・相場・筆が右のカルテに並び、照会文や重説の下書きまで同じ画面で作れます。</p>
-      <div className="ex">
-        {["渋谷区神南1-19-11", "地番 熊谷市下奈良391-3", "松戸市古ヶ崎四丁目3556-1"].map((q) => (
-          <button key={q} type="button" className="btn" onClick={() => onExample(q)}>
-            {q}
-          </button>
-        ))}
-      </div>
-      <p className="hint mt-3 flex items-center justify-center gap-1.5">
-        <MapPin size={14} aria-hidden />
-        住所が分からない土地は、地図をクリックして「ここで調べる」
-      </p>
-      <dl className="stats">
-        <div>
-          <dt>対応市区町村</dt>
-          <dd>{MUNICIPALITIES.length}</dd>
-        </div>
-        <div>
-          <dt>対応エリア</dt>
-          <dd className="small">
-            <button type="button" className="btn ghost small" onClick={onArea} aria-label={`対応エリア：${areaText}（一覧を開く）`}>
-              {areaText}
-            </button>
-          </dd>
-        </div>
-        <div>
-          <dt>地図リンクの自動確認</dt>
-          <dd className="small">毎週</dd>
-        </div>
-      </dl>
-      {recent.length > 0 && (
-        <div className="recent">
-          <span className="hint">最近の検索</span>
-          {recent.map((h) => (
-            <button key={historyKey(h)} type="button" className="btn ghost small" onClick={() => onPick(h)}>
-              {placeTitle(h).title || h.address}
-            </button>
-          ))}
-          <button type="button" className="btn ghost small" onClick={onAll}>
-            すべて見る
-          </button>
-        </div>
-      )}
-    </section>
-  );
-}
 
 /** 調べている・失敗の一言（真ん中の上） */
 export function Banner({ loading, error }: { loading: boolean; error: string | null }) {
