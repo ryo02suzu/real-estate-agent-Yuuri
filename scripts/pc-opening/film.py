@@ -611,8 +611,10 @@ def main() -> None:
     if a.frames:
         sel = set()
         for part in a.frames.split(","):
-            lo, _, hi = part.partition("-")
-            sel |= set(range(int(lo), int(hi or lo) + 1))
+            # 「126-200」「366-446:4」（4 コマごと）「310」
+            rng, _, step = part.partition(":")
+            lo, _, hi = rng.partition("-")
+            sel |= set(range(int(lo), int(hi or lo) + 1, int(step or 1)))
         frames = [f for f in frames if f in sel]
     frames = frames[:: a.every]
     out = a.out or os.path.join(WORK, "film", a.scene)

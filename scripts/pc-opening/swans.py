@@ -267,8 +267,9 @@ def place(swans: list[dict], frames: list[int]) -> None:
         c = P.camera("local", f)
         axes = np.array([c["right"], c["up"], c["fwd"]])  # 行：カメラの右・上・前（場面の座標）
         rel = lead_relative(t)
-        rel2 = lead_relative(t + 0.05)
-        vel = (rel2 - rel) / 0.05
+        # 進む向き：道筋の終わり（朝日に着いた所）では止まるので、終わりの少し手前の向きを使う（0 で割らない）
+        ta = min(t, P.SWANS[1] - 0.06)
+        vel = (lead_relative(ta + 0.05) - lead_relative(ta)) / 0.05
         fwd_c = vel / max(np.linalg.norm(vel), 1e-6)  # 進む向き（カメラの座標）
         fwd_w = fwd_c @ axes
         fwd_w /= np.linalg.norm(fwd_w)

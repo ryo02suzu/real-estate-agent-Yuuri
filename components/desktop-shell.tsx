@@ -9,6 +9,8 @@
 import { Box, Compass, LocateFixed, Map as MapIcon, Maximize2, Minimize2, Minus, Plus, RotateCcw, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { addCompare, clearCompare, loadCompare, removeCompare, type CompareItem } from "@/lib/app/compare";
+import { OPENING_PREF_KEY, OPENING_READY, OPENING_SESSION_KEY, shouldPlayOpening } from "@/lib/app/opening";
+import { readUrlState } from "@/lib/app/url";
 import { loadPrefs, samePlaces, savePrefs, todOfSun, ZOOM_DIST, type DeskPrefs, type DeskTod, type GoogleFail } from "@/lib/app/desk";
 import { placeParts } from "@/lib/app/scene";
 import { BASE, solar } from "@/lib/app/sun";
@@ -17,7 +19,7 @@ import { historyKey, type HistoryItem } from "@/lib/history";
 import { setMapOverlay, showHazardOnMap, showLandPriceOnMap } from "@/lib/map-style";
 import type { AddressFix, LookupResult } from "@/lib/roadmap";
 import type { HazardKind } from "@/lib/roadmap/hazard";
-import { setMotionSetting, useMotionSetting } from "./app/motion";
+import { motionSetting, setMotionSetting, useMotionSetting } from "./app/motion";
 import { reducedMotion } from "./app/tokens";
 import { MapIllustration } from "./illustrations";
 import type { MapPlace } from "./live-map";
@@ -31,6 +33,7 @@ import { AreaOverlay, CompareOverlay, FavoritesOverlay, GuideOverlay, HistoryOve
 import { DeskProperty, itemOf, type Layers3D, type PropOverlay } from "./desk/property";
 import type { MapLayer, SectionKey } from "./desk/sections";
 import { modelCredit, type Engine, type StageControls } from "./desk/stage-3d";
+import { DeskOpening } from "./desk/opening";
 import { ToastView, useToast } from "./desk/ui";
 
 type Shown = { query: string; result: LookupResult; literal?: AddressFix };
@@ -67,6 +70,34 @@ function useReduced(): boolean {
     reducedMotion,
     () => false,
   );
+}
+
+/** オープニング映像を流すか（ページを開いたときに一度だけ決める。lib/app/opening.ts の shouldPlayOpening） */
+function openingAtStart(): boolean {
+  if (!OPENING_READY) return false;
+  let played = false;
+  let off = false;
+  try {
+    played = sessionStorage.getItem(OPENING_SESSION_KEY) === "1";
+  } catch {
+    // 読めなければ、流したことは無いとみなす
+  }
+  try {
+    off = localStorage.getItem(OPENING_PREF_KEY) === "off";
+  } catch {
+    // 読めなければ、流す設定
+  }
+  const url = readUrlState(window.location);
+  const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+  return shouldPlayOpening({
+    reduced: reducedMotion(),
+    motion: motionSetting(),
+    deepLink: !!(url.q || url.ll),
+    played,
+    off,
+    saveData: !!conn?.saveData,
+    hidden: document.visibilityState === "hidden",
+  });
 }
 
 /** 時計に合わせた時間帯と太陽（物件の場所の太陽。5 分ごとに見直す） */
@@ -129,6 +160,16 @@ export function DesktopShell({
   const motion = useMotionSetting();
   const [mac] = useState(isMac);
   const [toast, showToast, hideToast] = useToast();
+  // オープニング映像（このタブで一度だけ。流し始めたら覚える：読み込み直しでは流さない）
+  const [opening, setOpening] = useState(openingAtStart);
+  useEffect(() => {
+    if (!opening) return;
+    try {
+      sessionStorage.setItem(OPENING_SESSION_KEY, "1");
+    } catch {
+      // 覚えられなくても流す（読み込み直すと、また流れる）
+    }
+  }, [opening]);
 
   // 設定（端末に保存）
   const [prefs, setPrefsState] = useState<DeskPrefs>(loadPrefs);
@@ -579,6 +620,7 @@ export function DesktopShell({
         )}
       </div>
       <ToastView toast={toast} onHide={hideToast} />
+      {opening && <DeskOpening onDone={() => setOpening(false)} />}
     </div>
   );
 }

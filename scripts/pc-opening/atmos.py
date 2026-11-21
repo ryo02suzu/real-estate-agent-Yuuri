@@ -435,13 +435,17 @@ LOOK_LOCAL = {
 }
 
 
-def over_swans(lin: np.ndarray, path: str) -> np.ndarray:
-    """白鳥（swans.py。背景は透明で、色は透明度をかけた値）を重ねる。光のにじみの前なので、朝日の中では光に溶ける"""
+def over_swans(lin: np.ndarray, path: str, t: float) -> np.ndarray:
+    """白鳥（swans.py。背景は透明で、色は透明度をかけた値）を重ねる。光のにじみの前なので、朝日の中では光に溶ける。
+    朝日に着く前の少しの間で、だんだん淡くして光の中へ消す（白鳥が消えたところで、ロゴの光の点がまたたく）"""
     if not os.path.exists(path):
         return lin
     s = read_exr(path)["Combined"]
-    a = np.clip(s[..., 3:4], 0.0, 1.0)
-    return s[..., :3] + lin * (1.0 - a)
+    fade = 1.0 - float(smoothstep(P.SWANS[1] - 0.45, P.SWANS[1], t))
+    if not np.isfinite(s).all():
+        return lin
+    a = np.clip(s[..., 3:4], 0.0, 1.0) * fade
+    return s[..., :3] * fade + lin * (1.0 - a)
 
 
 # ---------------------------------------------------------------- 雲の中を抜ける（場面のつなぎ目と、最後）
@@ -480,8 +484,8 @@ class Clouds:
         N = 22
         col = np.zeros((h, w, 3), np.float32)
         trans = np.ones((h, w), np.float32)
-        lit_c = np.array([1.0, 0.95, 0.86], np.float32)
-        shade_c = np.array([0.8, 0.81, 0.85], np.float32)
+        lit_c = np.array([1.0, 0.955, 0.885], np.float32)  # 朝日に照らされた雲（暖かい白）
+        shade_c = np.array([0.86, 0.855, 0.86], np.float32)
         off = flow * t
         for i in range(N):
             z0 = 2.0 + 260.0 * (i / N) ** 2
@@ -508,6 +512,26 @@ class Clouds:
 END_WHITE = (0.955, 0.945, 0.925)  # 最後の雲の白（アプリはこの色からホームへ移る）
 
 
+# 間引いて描いてよい所（カメラがほとんど動かない・ゆっくりの所）：描いていないコマは、前後のコマを混ぜて作る（何コマおきまでか）
+INTERP = [(0, 71, 2), (366, 446, 4)]
+
+
+def post_frame(post: str, scene: str, f: int) -> np.ndarray | None:
+    """その場面の仕上げたコマ（画面の色 0〜1）。無ければ、間引いてよい所に限り、前後のコマを混ぜて作る"""
+    path = lambda k: os.path.join(post, scene, f"{k:04d}.png")
+    load = lambda k: np.asarray(Image.open(path(k)).convert("RGB"), np.float32) / 255.0
+    if os.path.exists(path(f)):
+        return load(f)
+    for lo, hi, step in INTERP:
+        if lo <= f <= hi:
+            a = next((k for k in range(f - 1, f - step - 1, -1) if os.path.exists(path(k))), None)
+            b = next((k for k in range(f + 1, f + step + 1) if os.path.exists(path(k))), None)
+            if a is not None and b is not None:
+                w = (f - a) / (b - a)
+                return load(a) * (1 - w) + load(b) * w
+    return None
+
+
 def compose_final(out: str, frames: list[int], post: str) -> None:
     """2つの場面をつなぎ、雲の中を抜けるところを重ね、粒と周辺の暗さを足して、最後のコマにする"""
     clouds = Clouds()
@@ -516,11 +540,9 @@ def compose_final(out: str, frames: list[int], post: str) -> None:
     for f in frames:
         t = f / P.FPS
         scene = "global" if f < cut else "local"
-        src = os.path.join(post, scene, f"{f:04d}.png")
-        if not os.path.exists(src):
+        v = post_frame(post, scene, f)
+        if v is None:
             continue  # まだ描いていないコマ（間引いて描いたとき）
-        im = Image.open(src).convert("RGB")
-        v = np.asarray(im, np.float32) / 255.0
         amount = P.cloudiness(t)
         if amount > 0.003:
             H, W = v.shape[:2]
@@ -546,7 +568,7 @@ def _scene_frame(job: tuple) -> int:
     look = LOOK_LOCAL if scene == "local" else LOOK_GLOBAL
     d = read_exr(os.path.join(src, f"{f:04d}.exr"))
     lin = _ATM[scene].apply(f, d["Combined"][..., :3], d["Depth.Z"])
-    lin = over_swans(lin, os.path.join(swans, f"{f:04d}.exr"))
+    lin = over_swans(lin, os.path.join(swans, f"{f:04d}.exr"), f / P.FPS)
     v = tone(lin, f, look)
     Image.fromarray((np.clip(v, 0, 1) * 255.0 + 0.5).astype(np.uint8)).save(os.path.join(out, f"{f:04d}.png"))
     return f

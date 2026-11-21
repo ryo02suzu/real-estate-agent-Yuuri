@@ -63,9 +63,9 @@ LOCAL_ROUTE = [
 ]
 ROUTE_START = CUT_LOCAL - 0.3  # 雲の中で少し前から動かしておく
 ROUTE_END = 11.5
-# 道筋のあと：ほとんど止まって雲海と朝日を見せ（ロゴ）、最後は高く上がりながら見下ろす（薄い雲を抜けてホームへ）
+# 道筋のあと：ほとんど止まって雲海と朝日を見せ（ロゴ）、最後は静かに上がりながら少し上を向き、光の中の薄い雲へ（白くなってホームへ）
 HOLD_END = 14.9
-TILT_TO = -58.0
+TILT_TO = 5.0
 # 白鳥（7羽）が朝日へ向かう間（秒）。カメラがほとんど止まってから、右から入って朝日の中へ消える
 SWANS = (9.7, 11.7)
 # ロゴの光の点がまたたく秒（白鳥が光の中へ消えたところ）。アプリはこの秒からロゴを出す
@@ -320,7 +320,7 @@ def local_state(t: float) -> tuple[float, float, float, float, float, float, flo
         s = float(np.interp(t, r["t"], r["s"]))
         x, y, z, hdg, pitch, focal, roll = (float(np.interp(s, r["s"], r[k])) for k in ("x", "y", "z", "hdg", "pitch", "focal", "roll"))
         return x, y, z, hdg, pitch, focal, roll
-    # 道筋のあと：同じ向きにゆっくり進み（ほとんど止まる。ロゴ）、HOLD_END からは高く上がりながら見下ろす
+    # 道筋のあと：同じ向きにゆっくり進み（ほとんど止まる。ロゴ）、HOLD_END からは静かに上がりながら少し上を向く
     x0, y0, z0, h0, p0, f0, r0 = local_state(ROUTE_END)
     xe, ye, ze = local_state(ROUTE_END - 0.1)[:3]
     vx, vy, vz = (x0 - xe) / 0.1, (y0 - ye) / 0.1, (z0 - ze) / 0.1
@@ -333,7 +333,7 @@ def local_state(t: float) -> tuple[float, float, float, float, float, float, flo
         e = t - HOLD_END
         span = T_END - HOLD_END
         u = float(ease(e / span))
-        z += 2600.0 * (e / span) ** 2  # 上がる（だんだん速く）
+        z += 700.0 * (e / span) ** 2  # 静かに上がる（だんだん速く）
         pitch = p0 + (TILT_TO - p0) * u
     return x, y, z, h0, pitch, f0, roll
 
