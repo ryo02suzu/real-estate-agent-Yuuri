@@ -2,6 +2,8 @@
 """真上から見た日本（オープニングの最後・PC のホームの背景）の、地面の色の地図を作る。
 
   python3 home_prep.py   # → work/home_albedo.png（色。透明度＝陸の割合）と work/home_dem.npy（標高 m）
+  python3 home_prep.py --wide   # 広い版（home.py --extent）→ work/home_albedo_w.png・home_dem_w.npy と、細かい版の下地の
+                                #   work/home_land_w.npy・home_sea_w.npy（混ぜる前の陸の色・海の色）
 
 陸：日本は国土地理院 全国ランドサットモザイク画像（lndst）、まわりの国は世界衛星モザイク画像（modis）。
 海：衛星画像の海（海底の地形の陰影・雲・抜け）は使わず、海の深さ（dem8）で色を決める。
@@ -145,6 +147,10 @@ def main() -> None:
     # 陸の割合（海岸は 1 画素ほどでなめらかに）
     land = np.clip((h + 4.0) / 8.0, 0.0, 1.0)
     rgb = sea * (1 - land[..., None]) + land_rgb * land[..., None]
+    if wide:
+        # 細かい版（home_hd_prep.py）の下地：混ぜる前の陸の色と海の色（線形。大きな範囲の色合わせ済み）
+        np.save(os.path.join(WORK, "home_land_w.npy"), land_rgb.astype(np.float16))
+        np.save(os.path.join(WORK, "home_sea_w.npy"), sea.astype(np.float16))
     out = np.dstack([to_srgb(rgb), land]) * 255.0 + 0.5
     Image.fromarray(out.astype(np.uint8), mode="RGBA").save(os.path.join(WORK, f"home_albedo{suffix}.png"))
     with open(os.path.join(WORK, f"home_albedo{suffix}.json"), "w") as f:

@@ -67,7 +67,8 @@ python3 encode.py                                    # → public/opening/openin
 | `home_prep.py`・`home.py` | 真上から見た日本（PC のホームの背景）。`home.py --tod` は時刻の版 |
 | `night_lights.py` | 夜の街の明かり（国勢調査の 500m メッシュの人口 → home_prep.py と同じ格子の明るさ。国勢調査の範囲の外は `ghsl.py` の人口） |
 | `ghsl.py` | 日本のまわりの国の人口（JRC の GHSL の GHS-POP。タイルを取り、GeoTIFF（BigTIFF・LZW）を読んで格子に分ける） |
-| `home_webp.py` | 時刻の版の4枚 → アプリの WebP（`public/home/desk-japan-*.webp`）と `lib/app/desk-japan.json`（四隅が同じか確かめる） |
+| `home_hd_prep.py`・`home_hd.py` | 背景の細かい版：陸のある区画（1024 画素四方）だけ、広い版の4倍（ズーム 9）の細かさで描き直す（拡大しても細部まで見える） |
+| `home_tiles.py` | 広い版と細かい版 → アプリのタイル（`public/home/tiles/{時間帯}/{z}/{x}/{y}.webp`、ズーム 4〜8）と `lib/app/desk-japan.json` |
 | `air_clouds.py` | PC のホームの空気の層：雲の形（つなぎ目の無いくり返しの模様。`fields`）と、Blender の絵 → アプリの WebP（`webp`） |
 | `air_render.py` | PC のホームの空気の層：雲（積雲・巻雲）・地面に落ちる影・オープニングから晴れていく厚い雲を、Cycles の体積で描く（`home.py` と同じ光） |
 | `assets/michilu-logo.webp` | 金と白のロゴ（元の画像） |
@@ -86,18 +87,39 @@ python home.py --extent --tod night         # → work/home/home_wide_night.png�
 python home.py --view 1440x900 --scale 0.6667 --spp 8 --tod dusk --out 見本.png   # 小さく試す（960×600）
 ```
 
-**本番の大きさで描いて、アプリに入れる**（1 枚 約 12 分。描くのは CPU だけ。描いた絵の四隅は、絵と同じ名前の .json）：
+**本番の大きさで描いて、アプリに入れる**（広い版は 1 枚 約 10 分。細かい版は 1 区画 約 20 秒 × 169 区画 × 4 つの時間帯。描くのは CPU だけ）：
 
 ```bash
-for t in morning day dusk night; do python home.py --extent --scale 2 --spp 24 --tod $t; done   # → work/home/home_wide_{morning,day,dusk,night}.png（5120×3968）
-python3 home_webp.py       # → public/home/desk-japan-{morning,day,dusk,night}.webp と lib/app/desk-japan.json（四隅が違えば何も書かずに止まる）
+for t in morning day dusk night; do python home.py --extent --scale 2 --spp 24 --tod $t; done   # 広い版 → work/home/home_wide_{tod}.png（5120×3968）
+python home.py --extent --scale 2 --spp 24 --tod night --glow-exr work/home/home_wide_night_glow.exr  # 夜の明かりのにじみだけ（細かい版が使う）
+python3 home_prep.py --wide                 # 細かい版の下地（混ぜる前の陸の色・海の色）も書く
+python3 home_hd_prep.py --parts             # 描く区画（陸のある所）→ work/home_hd/parts.json
+python3 home_hd_prep.py --fetch             # ズーム 9 の標高（AWS）・ランドサット、ズーム 8 の世界衛星モザイク（国土地理院は1枚ずつ）
+python3 home_hd_prep.py --build             # 区画ごとの入力（地面の色・標高・明かり）→ work/home_hd/in/
+for t in morning day dusk night; do python home_hd.py --tod $t; done   # 細かい版 → work/home_hd/{tod}/{列}_{行}.png（描いた区画は飛ばす）
+python3 home_tiles.py                       # → public/home/tiles/{tod}/ と lib/app/desk-japan.json
 ```
 
-- `home_webp.py` は、絵の四隅（.json。無ければ `work/home_dem_w.json` から同じ計算）と縦横の比が、アプリの `lib/app/desk-japan.json` の
-  四隅と合うか確かめてから書く。明かりの入った絵か（`home.py` の `TOD` の `lights` が 0 より大きい）も JSON に書く（アプリはそれで出典を出す）。
-  `--only day,night` で一部だけ、`--src '見本/wide_{tod}.png'` で別の場所の絵から作れる。
-- 4枚とも本番の大きさ（5120×3968、1枚 約10分）で描いて入れた（2026-11-21。WebP は1枚 0.5〜0.6MB）。前の `public/home/desk-japan.webp`
-  （`--tod` なしの絵）は使わなくなったので消した。
+#### 細かい版（拡大しても細部まで）
+
+広い版は、ズーム 7（256 画素のタイルで）の細かさ＝地図のズーム 6 で絵の 1 画素が画面の 1 画素なので、細かい画面（Mac・iPad。画面の
+1 画素が CSS の半分）では、開いたときのズーム 5 がもう限界で、寄るとすぐぼやけていた（持ち主の iPad の画面写真、2026-11-21）。
+そこで陸のある所を、4倍（ズーム 9）の細かさで Blender で描き直し、拡大の段階ごとのタイルにした。
+
+- 区画：広い版の範囲を、ズーム 9 で 1024 画素四方に分けた 320 区画のうち、陸のある 169 区画（日本のまわりの国の陸も。区画の境目で
+  細かさや起伏の濃さが変わらないように）。海だけの区画は、広い版を引き伸ばして使う（海はなめらかなので変わらない）。
+- 地面の色：広い版の色（`home_prep.py` の大きな範囲の色合わせが済んだ、混ぜる前の陸の色・海の色）に、ズーム 9 のランドサット（無い
+  陸は世界衛星モザイク）の細かい模様（まわりの平均との比）を掛ける。広い版の 1 画素の中の平均の色は変わらない。陸と海の境目は
+  ズーム 9 の標高で決め直す。
+- 起伏：ズーム 9 の標高（AWS Terrain Tiles）。起伏の大きな形（標高をぼかしたもの）は広い版と同じ 6 倍、それより細かい起伏は 2.5 倍に
+  強調する（細かい起伏まで 6 倍だと谷の影が濃すぎる）。区画の外の山の影も落ちるよう、地面は区画のまわり 672 画素まで作る（カメラには
+  入れない）。それでも細かい起伏の影の分、縮めて見ると広い版より山が少し暗く、くっきりする（明るさの平均で約 8%）。
+- 光・露出・かすみ・地面の鮮やかさ・街の明かりは `home.py` の時刻の版と同じ値・同じ式。夜の明かりのにじみ（Fog Glow）は区画より
+  大きく広がるので、広い版で Blender が作ったにじみ（`--glow-exr`）を4倍に引き伸ばし、かすみの前に足す（広い版と同じ順番）。
+- タイル（`home_tiles.py`）：いちばん細かい段（ズーム 8。512 画素の絵を 256 画素のタイルとして出す）は、区画を隣の区画・広い版と
+  重ねた幅（64 画素）でなめらかに混ぜる。それより粗い段は、1つ細かい段の4枚を光の量で平均して半分にする。範囲の外は透明。
+- アプリ（`lib/app/desk-home.ts`・`desk-cinema.ts`）：絵がくっきり見える一番寄った高さ（ふつうの画面はズーム 8、細かい画面は 7）
+  から薄くし、その 0.8 先で今の地図に替わる。
 
 - `--tod` を付けないときは、今までと同じ絵（アプリの絵）を描く。
 - 朝：東から低い金の光（影は空の青）。昼：南の高い白い光。夕：西から低い茜の光、影は藍、街の明かりがともり始める。

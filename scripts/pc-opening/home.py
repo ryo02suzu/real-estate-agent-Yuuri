@@ -2,6 +2,7 @@
 
   python home.py [--view 1440x900] [--scale 2] [--spp 24] [--out 出力]
   python home.py --tod night [...]    # 時刻の版（morning 朝・day 昼・dusk 夕・night 夜）。構図は同じで、光だけ変える
+  python home.py --extent --tod night --glow-exr work/home/home_wide_night_glow.exr   # 夜の明かりのにじみだけ（home_hd.py が使う）
 
 python は bpy（Blender 5.3）を入れたもの。地面の色は home_prep.py の work/home_albedo.png、起伏は work/home_dem.npy。
 --tod を付けないときは、今までと同じ絵（朝の光。アプリの絵）。夜と夕の街の明かりは night_lights.py の work/night_lights.png
@@ -267,6 +268,33 @@ def finish(haze: float, color=(0.20, 0.32, 0.55), glow: float = 0.0, exposure: f
     ng.links.new(mix.outputs[2], out.inputs[0])
 
 
+def glow_only(glow: float, exposure: float, glow_size: float) -> None:
+    """夜の明かりのにじみだけを出す（finish の Fog Glow の出力 − 入力。かすみ・露出の前の光の量）。細かい版（home_hd.py）は、
+    区画より大きく広がるにじみを区画ごとには作れないので、これを引き伸ばして足す"""
+    sc = bpy.context.scene
+    ng = bpy.data.node_groups.new("glow", "CompositorNodeTree")
+    ng.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
+    sc.compositing_node_group = ng
+    sc.render.use_compositing = True
+    sc.render.compositor_device = "CPU"
+    rl = ng.nodes.new("CompositorNodeRLayers")
+    gl = ng.nodes.new("CompositorNodeGlare")
+    gl.inputs["Type"].default_value = "Fog Glow"
+    gl.inputs["Quality"].default_value = "High"
+    gl.inputs["Threshold"].default_value = 0.5 / 2**exposure
+    gl.inputs["Strength"].default_value = glow
+    gl.inputs["Size"].default_value = glow_size
+    ng.links.new(rl.outputs["Image"], gl.inputs["Image"])
+    sub = ng.nodes.new("ShaderNodeMix")
+    sub.data_type = "RGBA"
+    sub.blend_type = "SUBTRACT"
+    sub.inputs["Factor"].default_value = 1.0
+    ng.links.new(gl.outputs["Image"], sub.inputs[6])
+    ng.links.new(rl.outputs["Image"], sub.inputs[7])
+    out = ng.nodes.new("NodeGroupOutput")
+    ng.links.new(sub.outputs[2], out.inputs[0])
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--view", default="1440x900")
@@ -279,6 +307,8 @@ def main() -> None:
     ap.add_argument("--extent", action="store_true")
     # 時刻の版（構図は同じで光だけ変える）。付けないときは今までの絵。出力の名前の後ろに _morning などを付ける
     ap.add_argument("--tod", choices=list(TOD))
+    # 夜の明かりのにじみだけを EXR（線形）に書く（細かい版の home_hd.py が使う。--extent と、にじみのある --tod と一緒に）
+    ap.add_argument("--glow-exr", default="")
     a = ap.parse_args()
     tod = TOD[a.tod] if a.tod else None
     global SUFFIX
@@ -340,6 +370,17 @@ def main() -> None:
         sc.view_settings.exposure = 0.3 - math.log2(g) + tod["stops"]
         finish(0.06, tuple(c * g for c in tod["haze"]), tod["glow"], sc.view_settings.exposure, 0.5 * 1440 / W)
         print(f"{a.tod}：地面に届く光 {g:.3f} 倍、露出 {sc.view_settings.exposure:+.2f}", flush=True)
+        if a.glow_exr:
+            if tod["glow"] <= 0:
+                sys.exit(f"{a.tod} には明かりのにじみが無い")
+            glow_only(tod["glow"], sc.view_settings.exposure, 0.5 * 1440 / W)
+            sc.render.image_settings.file_format = "OPEN_EXR"
+            sc.render.image_settings.color_mode = "RGB"
+            sc.render.image_settings.color_depth = "32"
+            sc.render.filepath = a.glow_exr
+            bpy.ops.render.render(write_still=True)
+            print(a.glow_exr, flush=True)
+            return
     tail = f"_{a.tod}" if a.tod else ""
     out = a.out or os.path.join(WORK, "home", f"home_wide{tail}.png" if a.extent else f"home_{W}x{H}{tail}.png")
     os.makedirs(os.path.dirname(out), exist_ok=True)
