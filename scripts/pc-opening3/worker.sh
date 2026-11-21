@@ -30,6 +30,8 @@ esac
 mkdir -p "$OUT"
 cd "$HERE"
 
+# システムの python3 に、道具（path3.py・post3.py）が使う部品が無い機械がある（無いと 5 コマ描いたあとの仕上げで止まった）
+python3 -c "import numpy, scipy, PIL, OpenEXR" 2>/dev/null || pip install -q numpy scipy pillow OpenEXR
 if [ ! -x "$BL" ] || ! "$BL" -c "import bpy" 2>/dev/null; then
   echo "Blender（bpy）を入れる"
   python3 -m venv /tmp/blv
@@ -78,11 +80,12 @@ i=0
 while [ $i -lt ${#todo[@]} ]; do
   batch=("${todo[@]:$i:5}")
   spec=$(IFS=,; echo "${batch[*]}")
-  rm -rf work/exr_w work/png_w
+  # 描いた EXR は消さない（仕上げで止まっても、もう一度動かすと描き直さずに仕上げから続く。scene3.py は EXR のあるコマを飛ばす）
   "$BL" scene3.py -- --frames "$spec" --res "$RES" --spp "$SPP" --out work/exr_w
   python3 post3.py --frames work/exr_w work/png_w
-  for p in work/png_w/*.png; do
-    n=$(basename "$p" .png)
+  for f in "${batch[@]}"; do
+    n=$(printf %04d "$f")
+    p="work/png_w/$n.png"
     python3 -c "import sys; from PIL import Image; Image.open(sys.argv[1]).save(sys.argv[2], quality=96, method=4)" "$p" "$OUT/$n.webp"
   done
   push "$spec"
