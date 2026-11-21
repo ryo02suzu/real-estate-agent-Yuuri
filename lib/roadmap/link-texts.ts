@@ -2,8 +2,16 @@
 // スマホの「道路」タブ（lib/app/road-guide.ts）が同じ文を使う
 import type { ResolvedLink } from "./municipalities";
 
-/** 地図ボタンの説明（何が開くか）と、開いたあとの操作の手順 */
-export function linkTexts(link: ResolvedLink, agree?: boolean, copyHint = "上の「住所コピー」を押し、地図の住所検索に貼り付けてください。"): { sub: string; tip?: string } {
+/**
+ * 地図ボタンの説明（何が開くか）と、開いたあとの操作の手順。
+ * centered：PDF を物件の場所を真ん中にして拡大して開く（PC の Chrome・Firefox。lib/roadmap/sheet-pdf.ts）
+ */
+export function linkTexts(
+  link: ResolvedLink,
+  agree?: boolean,
+  copyHint = "上の「住所コピー」を押し、地図の住所検索に貼り付けてください。",
+  centered = false,
+): { sub: string; tip?: string } {
   const sheet = link.sheet;
   const sub = sheet
     ? sheet.zip
@@ -11,8 +19,12 @@ export function linkTexts(link: ResolvedLink, agree?: boolean, copyHint = "上�
       : sheet.howto
       ? `物件が載っている図（${sheet.label}）の場所で地図が開きます`
       : sheet.whole
-        ? "市全体の図が開きます"
-        : `物件が載っている図（${sheet.label}）が開きます`
+        ? centered
+          ? "市全体の図を物件のあたりで拡大して開きます"
+          : "市全体の図が開きます"
+        : centered
+          ? `図（${sheet.label}）を物件のあたりで拡大して開きます`
+          : `物件が載っている図（${sheet.label}）が開きます`
     : link.pinpoint
       ? link.verified
         ? agree

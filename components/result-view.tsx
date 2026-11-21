@@ -9,7 +9,9 @@ import { linkTexts } from "@/lib/roadmap/link-texts";
 import { chibanLabel, chibanQueryOf, isLotChiban, kuikiLabel, parcelMark, registryChiban } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { awayNote, elsewhereNote } from "@/lib/roadmap/parcel-sub";
+import { centeredPdfUrl } from "@/lib/roadmap/sheet-pdf";
 import { sheetName } from "@/lib/roadmap/sheets";
+import { usePdfView } from "@/lib/use-pdf-view";
 import type { DraftInput } from "@/lib/draft";
 import { buildSummary } from "@/lib/summary";
 import { BuildingCard, BuildingDetail, useBuilding, type BuildingState } from "./building-card";
@@ -810,11 +812,15 @@ export function MapButton({
   desktop?: boolean;
 }) {
   const sheet = link.sheet;
-  const { sub, tip } = linkTexts(link, agree);
+  // PC：PDF の図は、Chrome・Firefox なら物件の場所を真ん中にして拡大して開く（lib/roadmap/sheet-pdf.ts。測っていない図・Safari は今までどおり）
+  const pdf = usePdfView();
+  const centered = desktop && sheet && pdf ? centeredPdfUrl(sheet, sheet.bounds, pdf.viewer, pdf.size) : undefined;
+  const neighborUrl = desktop && sheet?.neighbor && pdf ? centeredPdfUrl(sheet.neighbor, sheet.bounds, pdf.viewer, pdf.size) : undefined;
+  const { sub, tip } = linkTexts(link, agree, undefined, !!centered);
   return (
     <div>
       <a
-        href={link.url}
+        href={centered ?? link.url}
         target="_blank"
         rel="noreferrer"
         className={
@@ -853,7 +859,7 @@ export function MapButton({
                 {" "}
                 端に近いので、隣の図
                 <a
-                  href={sheet.neighbor.url}
+                  href={neighborUrl ?? sheet.neighbor.url}
                   target="_blank"
                   rel="noreferrer"
                   className="mx-0.5 underline"

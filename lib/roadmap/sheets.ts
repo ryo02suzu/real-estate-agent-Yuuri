@@ -35,12 +35,17 @@ export type SheetHit = {
   where: string;
   /** 図の範囲 [北端の緯度, 西端の経度, 南端の緯度, 東端の経度]。図と同じ範囲の地図を描くのに使う */
   bounds: [number, number, number, number];
+  /**
+   * 物件が図の範囲のどこか [左からの割合, 上からの割合]（図の範囲の左上が 0、右下が 1）。
+   * PDF を物件の場所を中心に開くのに使う（lib/roadmap/sheet-pdf.ts）
+   */
+  at: [number, number];
   /** 地図システムで図を開いてもらう市の手順（SheetIndex.howto） */
   howto?: string;
   /** 図が ZIP にまとめて配られている（url は ZIP を落とす入口のページ） */
   zip?: true;
-  /** 物件が図の端に近いとき、隣の図 */
-  neighbor?: { label: string; url: string };
+  /** 物件が図の端に近いとき、隣の図（at は隣の図の範囲から見た物件の場所。図の外なので 0〜1 を少しはみ出す） */
+  neighbor?: { label: string; url: string; at: [number, number] };
   /** 市全体で1枚の図（西東京市など）。画面では「図 ○○」ではなく「市全体の図」と呼ぶ */
   whole?: true;
 };
@@ -80,6 +85,9 @@ function where(fx: number, fy: number): string {
   return `${h}${v}`;
 }
 
+/** 図の中心からのずれ（図の大きさで割った値）→ 図の範囲の左上から見た割合（小数5桁。1m より細かい） */
+const atOf = (s: { u: number; v: number }): [number, number] => [Math.round((s.u + 0.5) * 1e5) / 1e5, Math.round((s.v + 0.5) * 1e5) / 1e5];
+
 /** 町名の「ヶ」「ケ」の表記ゆれをそろえる（「袖ケ浦」と「袖ヶ浦」） */
 const normTown = (t: string) => t.replace(/[ヶヵ]/g, "ケ").replace(/\s/g, "");
 
@@ -100,7 +108,7 @@ export function findSheet(ix: SheetIndex, lat: number, lng: number, town?: strin
   const m = (s: (typeof scored)[number]) => Math.max(Math.abs(s.u), Math.abs(s.v));
   const inside = within.sort((a, b) => m(a) - m(b))[0];
   if (!inside) return undefined;
-  const hit: SheetHit = { label: inside.label, url: inside.url, where: where(inside.u + 0.5, inside.v + 0.5), bounds: boundsOf(ix, inside.cell) };
+  const hit: SheetHit = { label: inside.label, url: inside.url, where: where(inside.u + 0.5, inside.v + 0.5), bounds: boundsOf(ix, inside.cell), at: atOf(inside) };
   if (ix.howto) hit.howto = ix.howto.replaceAll("{label}", inside.label);
   if (ix.zip) hit.zip = true;
   if (ix.cells.length === 1) hit.whole = true;
@@ -111,7 +119,7 @@ export function findSheet(ix: SheetIndex, lat: number, lng: number, town?: strin
     const sv = Math.abs(inside.v) > edge ? Math.sign(inside.v) : 0;
     const n =
       within.find((s) => s !== inside) ?? scored.find((s) => s !== inside && Math.abs(s.u - inside.u + su) < 0.3 && Math.abs(s.v - inside.v + sv) < 0.3);
-    if (n) hit.neighbor = { label: n.label, url: n.url };
+    if (n) hit.neighbor = { label: n.label, url: n.url, at: atOf(n) };
   }
   return hit;
 }
