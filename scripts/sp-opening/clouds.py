@@ -215,15 +215,25 @@ def density(tex, rots, top, px, py, alt, foot, near, cp, climb):
         if skin <= 0.0:
             return 0.0, 0.0
     # 上の薄い所（カメラが昇る所のまわりだけ。雲が薄くなって富士が透ける）と、下の濃い所。境はゆらぎで崩す
-    wthin = smooth(520.0, 160.0, seg_dist(px, py, climb))
+    wthin = smooth(560.0, 140.0, seg_dist(px, py, climb) + 150.0 * (2.0 * n1 - 1.0))  # 境は雲のむらに沿ってぎざぎざ
     dd = d + 90.0 * (n1 - 0.5) + 45.0 * (n2 - 0.5)
     rho = cp[2] + (cp[1] - cp[2]) * smooth(cp[6] * wthin, cp[7] * wthin + 35.0 * (1.0 - wthin), dd)
+    # 山頂への見通しのまわり（細い円すい）：かたまりと切れ端を置かない（富士の影が読めるように）
+    vx = px - climb[6]
+    vy = py - climb[7]
+    vz = alt - climb[8]
+    vn = math.sqrt(vx * vx + vy * vy + vz * vz) + 1e-6
+    # 山頂の方ほど、かたまりが少しまばら（広く・なめらかに。むらに沿わせて、ふちのある窓にはしない）
+    cang = (vx * climb[9] + vy * climb[10] + vz * climb[11]) / vn
+    win = 0.55 * smooth(0.9613, 0.99966, cang) * min(1.0, max(0.0, 0.4 + 1.2 * n2))  # 約 16° → 1.5°
     if wthin > 0.0:  # 薄い所の中の雲のかたまり（百 m ほど）とすき間。すき間から差し込む光が、かたまりの影で筋になる
-        g3 = 0.6 * noise(tex, rots, 5, px, py, alt * 0.7, 70.0) + 0.4 * noise(tex, rots, 1, px, py, alt, 30.0)
-        rho = rho * ((1.0 - 0.75 * wthin) + wthin * 9.0 * smooth(0.52, 0.70, g3))
-    if near > 0.0:  # レンズのすぐ前の雲の切れ端：まばらな濃い切れ端（幅 数 m・縦長）が、動きのぶれで筋になる
-        f = noise(tex, rots, 4, px, py, alt * 0.4, 9.0)
-        rho = rho + near * 1.2 * smooth(0.62, 0.78, f) * smooth(-30.0, 10.0, d)
+        g3 = 0.65 * noise(tex, rots, 5, px, py, alt * 0.7, 100.0) + 0.35 * noise(tex, rots, 1, px, py, alt, 35.0)
+        if climb[12] > 0.5:  # 雲の中にいる間：細かいむら（十数 m）も足す（差し込む光が細い筋に分かれる）
+            g3 = 0.75 * g3 + 0.25 * noise(tex, rots, 2, px, py, alt * 0.5, 14.0)
+        rho = rho * ((1.0 - 0.75 * wthin) + wthin * 5.0 * smooth(0.52, 0.70, g3) * (1.0 - win))
+    if near > 0.0:  # レンズのすぐ前の雲の切れ端：まばらな濃い切れ端（幅 1〜3m・縦長）が、動きのぶれで筋になる
+        f = noise(tex, rots, 4, px, py, alt * 0.4, 3.5)
+        rho = rho + near * 2.5 * smooth(0.64, 0.76, f) * smooth(-30.0, 10.0, d) * (1.0 - 0.7 * win)
         if rho < 0.0:
             rho = 0.0
     return rho * skin * smooth(base, base + 90.0, alt), d
@@ -239,11 +249,11 @@ def density_cheap(tex, rots, top, px, py, alt, cp, climb):
     d = d0 + cp[3] * (n1 - 0.5) * 2.0
     if d < -8.0:
         return 0.0
-    wthin = smooth(520.0, 160.0, seg_dist(px, py, climb))
+    wthin = smooth(560.0, 140.0, seg_dist(px, py, climb) + 150.0 * (2.0 * n1 - 1.0))
     rho = cp[2] + (cp[1] - cp[2]) * smooth(cp[6] * wthin, cp[7] * wthin + 35.0 * (1.0 - wthin), d + 90.0 * (n1 - 0.5))
     if wthin > 0.0:  # かたまりの影は遠くまで数える（光の筋）
-        g3 = noise(tex, rots, 5, px, py, alt * 0.7, 70.0)
-        rho = rho * ((1.0 - 0.75 * wthin) + wthin * 9.0 * smooth(0.52, 0.70, 0.6 * g3 + 0.2))
+        g3 = noise(tex, rots, 5, px, py, alt * 0.7, 100.0)
+        rho = rho * ((1.0 - 0.75 * wthin) + wthin * 6.0 * smooth(0.52, 0.70, 0.65 * g3 + 0.175))
     return rho * smooth(-6.0, 10.0, d) * smooth(cp[0], cp[0] + 90.0, alt)
 
 
@@ -276,7 +286,7 @@ def phase(c, k):
 
 @njit(parallel=True, fastmath=True, cache=True)
 def render(w, h, jx, jy, pos, rgt, upv, fwd, fpx, tmax_map, sky_map, sun, esun, amb_up, amb_dn,
-           hf, mf, hm, mm, hr, mr, sh, shm, tex, rots, cp, ap, near_dist, aur, eaur, sha, climb, t_start, t_end, outL, outT):
+           hf, mf, hm, mm, hr, mr, sh, shm, tex, rots, cp, ap, near_dist, aur, eaur, sha, climb, t_start, t_end, near_pass, outL, outT):
     sx_, sy_, sz_ = sun[0], sun[1], sun[2]
     for j in prange(h):
         for i in range(w):
@@ -336,7 +346,7 @@ def render(w, h, jx, jy, pos, rgt, upv, fwd, fpx, tmax_map, sky_map, sun, esun, 
                     lo_ = 0.0035 * t + 0.3
                     hi_ = 0.02 * t + 2.0
                     if t < near_dist:
-                        hi_ = 0.25 + 0.02 * t
+                        hi_ = 0.4 + 0.03 * t
                     if hi_ > 60.0:
                         hi_ = 60.0
                     if rho > 1e-6:
@@ -383,6 +393,12 @@ def render(w, h, jx, jy, pos, rgt, upv, fwd, fpx, tmax_map, sky_map, sun, esun, 
                     ds = 8.0
                     acc = 0.0
                     nls = 5 if t < 3000.0 else 3
+                    fine = climb[12] > 0.5 and t < 400.0 and not near_pass
+                    grow = 3.0
+                    if fine:  # 雲の中の近く：細かく 7 歩（6m から）。差し込む光の細い筋を、かたまりの影で切り分ける
+                        ds = 6.0
+                        nls = 7
+                        grow = 2.0
                     # 近くの雲（約 1〜2.5km より手前）ほど、もくもくの細かい形で影を数える（頭のふちが光り、くびれが暗い）。
                     # 切り替えは距離でなめらかに（境に線が出ないように）
                     wdet = smooth(2500.0, 1000.0, t)
@@ -394,6 +410,10 @@ def render(w, h, jx, jy, pos, rgt, upv, fwd, fpx, tmax_map, sky_map, sun, esun, 
                         rq = 0.0
                         rc = 0.0
                         kd = 4 if t < 400.0 else 2  # カメラの近く：かたまりの影まで細かく（雲の中の光の筋。約 320m まで）
+                        if fine:
+                            kd = 5
+                        if near_pass:
+                            kd = 1  # レンズの前の切れ端：細かい影はいらない（速い）
                         if k < kd and wdet > 0.0:
                             rq, _dq = density(tex, rots, tq, qx, qy, qa, foot, 0.0, cp, climb)
                         if k >= kd or wdet < 1.0:
@@ -403,7 +423,7 @@ def render(w, h, jx, jy, pos, rgt, upv, fwd, fpx, tmax_map, sky_map, sun, esun, 
                         else:
                             tau_s += rc * ds
                         acc += ds
-                        ds *= 3.0
+                        ds *= grow
                     # 富士の影：多重散乱の項ほど、影のふちをゆるく（光が影の中へにじむ）
                     dzs = pz - shh
                     lsun = 0.0
@@ -422,7 +442,7 @@ def render(w, h, jx, jy, pos, rgt, upv, fwd, fpx, tmax_map, sky_map, sun, esun, 
                     if dep < 0.0:
                         dep = 0.0
                     tau_up = 0.010 * dep
-                    if wdet > 0.0:  # 近くの雲：真上へ短く見て、空の光のさえぎり（くびれは暗い）。遠くは平均で
+                    if wdet > 0.0 and not near_pass:  # 近くの雲：真上へ短く見て、空の光のさえぎり（くびれは暗い）。遠くは平均で
                         tl = 0.0
                         for k in range(2):
                             uz = alt + 10.0 + 30.0 * k
@@ -452,11 +472,8 @@ def render(w, h, jx, jy, pos, rgt, upv, fwd, fpx, tmax_map, sky_map, sun, esun, 
                 T0 *= e0
                 T1 *= e1
                 T2 *= e2
-                if T0 < 0.008 and T1 < 0.008 and T2 < 0.008:
-                    # 残りはこの先も同じ雲が続くとみなして閉じる（奥の明るい空が、わずかに透けて点々にならないように）
-                    L0 += T0 * s0 / max(ex0, 1e-9)
-                    L1 += T1 * s1 / max(ex1, 1e-9)
-                    L2 += T2 * s2 / max(ex2, 1e-9)
+                if T0 < 0.004 and T1 < 0.004 and T2 < 0.004:
+                    # ほとんど見通せない：奥の明るい空がわずかに透けて点々にならないよう、残りは 0 に
                     T0 = 0.0
                     T1 = 0.0
                     T2 = 0.0
@@ -538,7 +555,7 @@ def frame_inputs(f: int, scale: float, film_dir: str = ""):
     return cam, Z, w, h
 
 
-def run(f: int, scale: float = 1.0, sub: int = 1, threads: int = 2, out: str | None = None, film_dir: str = "") -> str:
+def run(f: int, scale: float = 1.0, sub: int = 1, threads: int = 2, out: str | None = None, film_dir: str = "", farscale: float = 1.0) -> str:
     import path as P
 
     set_num_threads(threads)
@@ -571,7 +588,13 @@ def run(f: int, scale: float = 1.0, sub: int = 1, threads: int = 2, out: str | N
     fx_, fy_ = -c2[0], -c2[1]
     fl_ = math.hypot(fx_, fy_)
     ch = P.camera(int(round(CF.HEAD_T * C.FPS)))["pos"]  # 抜ける頭のてっぺん
-    climb = np.array([c1[0], c1[1], c2[0] + fx_ / fl_ * 1200.0, c2[1] + fy_ / fl_ * 1200.0, ch[0], ch[1]], np.float64)
+    cpos = cam["pos"]
+    calt = float(cpos[2] + (cpos[0] ** 2 + cpos[1] ** 2) / (2 * R_E))
+    to_s = np.array([-cpos[0], -cpos[1], 3774.0 - calt])  # 山頂への向き（高さは海抜で）
+    to_s /= np.linalg.norm(to_s)
+    in_cloud = 1.0 if f / C.FPS < CF.HEAD_T else 0.0  # 雲の頭を抜ける前（雲の中）
+    climb = np.array([c1[0], c1[1], c2[0] + fx_ / fl_ * 1200.0, c2[1] + fy_ / fl_ * 1200.0, ch[0], ch[1],
+                      cpos[0], cpos[1], calt, to_s[0], to_s[1], to_s[2], in_cloud], np.float64)
     fpx = cam["focal"] / cam["sensor"] * w
     # 奥行き（カメラの前の向きの距離）→ 光の道の長さ。空は 80km まで
     ys, xs = np.mgrid[0:h, 0:w].astype(np.float64)
@@ -584,19 +607,33 @@ def run(f: int, scale: float = 1.0, sub: int = 1, threads: int = 2, out: str | N
     c_next = P.camera(min(f + 1, C.N_FRAMES - 1))
     vel = (c_next["pos"] - c_prev["pos"]) / max(1, (min(f + 1, C.N_FRAMES - 1) - max(f - 1, 0))) * C.FPS
     speed = float(np.linalg.norm(vel))
-    def one(pos_k, t_a, t_b, seed):
+    def one(pos_k, t_a, t_b, seed, fs=1.0):
+        """fs < 1：小さく描いて広げる（雲の中の奥の、やわらかいもやだけ）"""
+        ww, hh = max(8, int(round(w * fs))), max(8, int(round(h * fs)))
         r = np.random.default_rng(seed)
-        jx = (r.random((h, w)) - 0.5).astype(np.float64)
-        jy = (r.random((h, w)) - 0.5).astype(np.float64)
-        oL = np.zeros((h, w, 3), np.float64)
-        oT = np.zeros((h, w, 3), np.float64)
-        render(w, h, jx, jy, pos_k, cam["right"], cam["up"], cam["fwd"], fpx, tmax, sky, sun, esun, amb_up, amb_dn,
-               hf, mf, hm, mm, hr, mr, sh["h"], sh["meta"], tex, rots, cp, ap, NEAR, aur, eaur, sha["h"], climb, t_a, t_b, oL, oT)
+        jx = (r.random((hh, ww)) - 0.5).astype(np.float64)
+        jy = (r.random((hh, ww)) - 0.5).astype(np.float64)
+        oL = np.zeros((hh, ww, 3), np.float64)
+        oT = np.zeros((hh, ww, 3), np.float64)
+        if fs != 1.0:
+            from PIL import Image as _I
+
+            tm = np.asarray(_I.fromarray(tmax.astype(np.float32)).resize((ww, hh), _I.NEAREST)).astype(np.float64)
+            sk = np.asarray(_I.fromarray(sky.astype(np.uint8) * 255).resize((ww, hh), _I.NEAREST)) > 127
+        else:
+            tm, sk = tmax, sky
+        render(ww, hh, jx, jy, pos_k, cam["right"], cam["up"], cam["fwd"], fpx * fs, tm, sk, sun, esun, amb_up, amb_dn,
+               hf, mf, hm, mm, hr, mr, sh["h"], sh["meta"], tex, rots, cp, ap, NEAR, aur, eaur, sha["h"], climb, t_a, t_b, t_b <= NEAR, oL, oT)
+        if fs != 1.0:
+            from PIL import Image as _I
+
+            up = lambda a: np.stack([np.asarray(_I.fromarray(a[..., c].astype(np.float32)).resize((w, h), _I.BILINEAR)) for c in range(3)], -1)
+            oL, oT = up(oL).astype(np.float64), up(oT).astype(np.float64)
         return oL, oT
 
     # 手前（レンズから NEAR m まで）：シャッターの間を細かく分けて、流れ去る切れ端を筋に。奥：sub 回
     shutter = 1.0 / 36.0 if speed > 150.0 else 1.0 / 60.0  # 速く昇る間はシャッターを長く（切れ端の筋で速さが分かる）
-    nsub = max(sub, 1) * (3 if speed > 60.0 else 1)
+    nsub = max(sub, 1) * (2 if speed > 60.0 else 1)
     Ln = np.zeros((h, w, 3))
     Tn = np.zeros((h, w, 3))
     for k in range(nsub):
@@ -604,11 +641,12 @@ def run(f: int, scale: float = 1.0, sub: int = 1, threads: int = 2, out: str | N
         oL, oT = one(cam["pos"] + vel * dtk, 0.0, NEAR, 1000 * f + k)
         Ln += oL / nsub
         Tn += oT / nsub
+    t_near = time.time() - t0
     Lf = np.zeros((h, w, 3))
     Tf = np.zeros((h, w, 3))
     for k in range(sub):
         dtk = ((k + 0.5) / sub - 0.5) * shutter if sub > 1 else 0.0
-        oL, oT = one(cam["pos"] + vel * dtk, NEAR, 1e9, 7000 * f + k)
+        oL, oT = one(cam["pos"] + vel * dtk, NEAR, 1e9, 7000 * f + k, farscale)
         Lf += oL / sub
         Tf += oT / sub
     L = Ln + Tn * Lf  # 手前から奥へ重ねる
@@ -617,7 +655,7 @@ def run(f: int, scale: float = 1.0, sub: int = 1, threads: int = 2, out: str | N
     out = out or os.path.join(C.WORK, "clouds", f"{f:04d}.npz")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     np.savez_compressed(out, L=L.astype(np.float16), T=Tt.astype(np.float16))
-    print(f"雲 コマ {f}（{f / C.FPS:.2f} 秒）{w}×{h}、{sub} 回、{dt:.1f} 秒", flush=True)
+    print(f"雲 コマ {f}（{f / C.FPS:.2f} 秒）{w}×{h}、{sub} 回、{dt:.1f} 秒（手前 {t_near:.1f}・奥 {dt - t_near:.1f}）", flush=True)
     return out
 
 
@@ -629,8 +667,9 @@ def main() -> None:
     ap.add_argument("--threads", type=int, default=2)
     ap.add_argument("--out", default="")
     ap.add_argument("--film", default="", help="film.py の出力のフォルダ（既定 work/film）")
+    ap.add_argument("--farscale", type=float, default=1.0, help="奥（レンズの前 40m より先）を描く大きさの割合（雲の中は 0.5 で十分）")
     a = ap.parse_args()
-    run(a.frame, a.scale, a.sub, a.threads, a.out or None, a.film)
+    run(a.frame, a.scale, a.sub, a.threads, a.out or None, a.film, a.farscale)
 
 
 if __name__ == "__main__":

@@ -29,7 +29,7 @@ LUMA = np.array([0.2126, 0.7152, 0.0722], np.float32)
 # 時間で変わる仕上げの値（秒, 値）。雲の中は暗い藍（静寂）、抜けると光が満ちる
 LOOK = {
     # 雲の中は暗い藍（静寂）。抜けると光が満ちる。太陽のまわりだけが明るく見えるよう、全体は低めに
-    "exposure": [(0.0, -1.1), (0.6, -1.25), (1.6, -1.65), (2.2, -2.3), (2.9, -3.35), (4.2, -3.6), (7.5, -3.5)],
+    "exposure": [(0.0, -1.1), (0.6, -1.3), (1.6, -1.95), (2.2, -2.5), (2.9, -3.6), (4.2, -3.75), (7.5, -3.65)],
     "streak": [(3.7, 0.0), (4.2, 1.0), (4.9, 0.0)],  # 横の光の筋（ダイヤモンドの瞬間に一筋だけ）
     "star": [(3.0, 0.0), (3.6, 0.5), (4.2, 1.0), (5.0, 0.75), (7.5, 0.6)],  # 絞りの形の光芒（太陽が出ている間）
     "glare": [(0.0, 0.5), (2.6, 0.6), (4.2, 0.7), (7.5, 0.6)],
@@ -148,10 +148,10 @@ def sun_star(x: np.ndarray, amount: float) -> np.ndarray:
         a = math.radians(15.0 + 60.0 * k)
         along = np.maximum(dx * math.cos(a) + dy * math.sin(a), 0.0)
         perp = np.abs(-dx * math.sin(a) + dy * math.cos(a))
-        spikes += (along > 0) * np.exp(-((perp / (0.0006 + 0.005 * along)) ** 2)) * (1.0 + along / 0.0025) ** -2.3
+        spikes += (along > 0) * np.exp(-((perp / (0.0005 + 0.004 * along)) ** 2)) * (1.0 + along / 0.0018) ** -2.9
     spikes /= spikes.sum()
     col = np.array([1.0, 0.92, 0.8], np.float32)
-    return x + amount * (0.022 * halo[..., None] * e + 0.0018 * spikes[..., None] * e * col)
+    return x + amount * (0.022 * halo[..., None] * e + 0.0011 * spikes[..., None] * e * col)
 
 
 def grad_filter(x: np.ndarray, sun_xy, amount: float) -> np.ndarray:
@@ -167,8 +167,19 @@ def grad_filter(x: np.ndarray, sun_xy, amount: float) -> np.ndarray:
     return x * (1.0 - amount * g[..., None] * np.array([0.78, 0.66, 0.30], np.float32))
 
 
+def warm_sun(x: np.ndarray, sun_xy, amount: float = 1.0) -> np.ndarray:
+    """太陽のまわりの明るい空を、金〜橙へ（白っぽいクリームにならないように。明るい所ほど色が抜けやすいので先に寄せる）"""
+    if sun_xy is None:
+        return x
+    h, w = x.shape[:2]
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    k = amount * np.exp(-((np.hypot(xx - sun_xy[0], yy - sun_xy[1]) / w) / 0.35) ** 2)
+    return x * (1.0 + k[..., None] * (np.array([1.05, 0.95, 0.74], np.float32) - 1.0))
+
+
 def grade(lin: np.ndarray, t: float, sun_xy) -> np.ndarray:
     x = lin * 2.0 ** look_at("exposure", t)
+    x = warm_sun(x, sun_xy, float(smoothstep(1.0, 3.0, t)) * 0.9 + 0.3)
     x = sun_star(x, look_at("star", t))
     x = glare(x, look_at("glare", t))
     x = streak(x, sun_xy, look_at("streak", t))
@@ -208,6 +219,8 @@ GROUND = np.array([0.012, 0.014, 0.018], np.float32)  # 雲海の下の地面（
 def compose(f: int) -> np.ndarray:
     d = C.read_exr(os.path.join(FILM, f"{f:04d}.exr"))
     rgb = d["Combined"][..., :3].astype(np.float32)
+    if "Noisy Image" in d:  # ノイズ除去は 7 割だけ（細かいざらつきを少し残す）
+        rgb = 0.7 * rgb + 0.3 * d["Noisy Image"][..., :3].astype(np.float32)
     # 面の絵で何にも当たらず、地平線より下を向く所は、空の計算の「地面」（太陽の方は明るいかすみ）が出ている。
     # 本当は雲海の下の暗い地面なので、暗い色に置き換える（雲のすき間から明るい色がのぞいて、線にならないように）
     h, w = rgb.shape[:2]
@@ -218,6 +231,7 @@ def compose(f: int) -> np.ndarray:
     if os.path.exists(cl):
         z = np.load(cl)
         L, T = z["L"].astype(np.float32), z["T"].astype(np.float32)
+        L = 0.6 * L + 0.4 * np.stack([ndimage.gaussian_filter(L[..., c], 0.7) for c in range(3)], -1)  # 雲の光の細かいざらつきを少しだけならす
         if L.shape[:2] != rgb.shape[:2]:
             h, w = rgb.shape[:2]
             up = lambda a: np.stack([np.asarray(Image.fromarray(a[..., c]).resize((w, h), Image.BILINEAR)) for c in range(3)], -1)
@@ -266,14 +280,40 @@ def deepen_sky(lin: np.ndarray, cam: dict, sky: np.ndarray, amount: float) -> np
     return lin * (1.0 - amount * deep[..., None] * np.array([1.0, 0.86, 0.38], np.float32))
 
 
-def run(f: int, out: str) -> str:
-    t = f / C.FPS
+# 間引いて描いてよい所（カメラがほとんど止まる 5.6 秒〜）：lo から step コマおきに描き、描いていないコマは前後のコマを
+# 混ぜて作る（色の仕上げの前、光の量のままで混ぜる）
+INTERP = [(168, 224, 3)]
+
+
+def rendered(f: int) -> bool:
+    return os.path.exists(os.path.join(FILM, f"{f:04d}.exr")) and os.path.exists(os.path.join(CLOUDS, f"{f:04d}.npz"))
+
+
+def prepared(f: int) -> np.ndarray:
+    """そのコマの、仕上げの前の光の量（上の空を藍に・雲海の明暗まで）"""
     lin = compose(f)
     h, w = lin.shape[:2]
-    cam = P.camera(f)
     z = C.read_exr(os.path.join(FILM, f"{f:04d}.exr"))["Depth.Z"]
-    lin = deepen_sky(lin, cam, z > 1e8, 0.6)
-    lin = cloud_relief(lin, f)
+    lin = deepen_sky(lin, P.camera(f), z > 1e8, 0.6)
+    return cloud_relief(lin, f)
+
+
+def run(f: int, out: str) -> str:
+    t = f / C.FPS
+    if rendered(f):
+        lin = prepared(f)
+    else:
+        a = b = None
+        for lo, hi, step in INTERP:
+            if lo <= f <= hi:
+                a = next((k for k in range(f - 1, f - step - 1, -1) if rendered(k)), None)
+                b = next((k for k in range(f + 1, f + step + 1) if rendered(k)), None)
+        if a is None or b is None:
+            raise FileNotFoundError(f"コマ {f} の面か雲がまだ描かれていない")
+        u = (f - a) / (b - a)
+        lin = prepared(a) * (1 - u) + prepared(b) * u
+    h, w = lin.shape[:2]
+    cam = P.camera(f)
     sx, sy = P.project(cam, P.sun_dir(), w, h)
     v = grade(lin, t, (sx, sy))
     img = finish(v, f)

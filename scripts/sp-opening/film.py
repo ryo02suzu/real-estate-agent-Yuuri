@@ -341,14 +341,17 @@ def sun_lamp(direction: np.ndarray, el: float) -> None:
     ob.rotation_quaternion = Vector((0.0, 0.0, 1.0)).rotation_difference(Vector(direction.tolist()))
 
 
-def setup_render(w: int, h: int, spp: int, threads: int, preview: bool) -> None:
+def setup_render(w: int, h: int, spp: int, threads: int, preview: bool, denoise: bool = False) -> None:
     sc = bpy.context.scene
     sc.render.engine = "CYCLES"
     sc.cycles.device = "CPU"
     sc.cycles.samples = spp
     sc.cycles.use_adaptive_sampling = True
     sc.cycles.adaptive_threshold = 0.02
-    sc.cycles.use_denoising = preview  # 本番はノイズ除去をかけない（2 倍で描いて縮めると、ざらつきは消える）
+    # ノイズ除去：かけた絵と、かける前の絵の両方を書き出し、post.py で 7:3 に混ぜる（かけすぎてのっぺりしないように）
+    sc.cycles.use_denoising = preview or denoise
+    sc.cycles.denoiser = "OPENIMAGEDENOISE"
+    sc.cycles.denoising_prefilter = "ACCURATE"
     sc.cycles.max_bounces = 4
     sc.cycles.diffuse_bounces = 2
     sc.cycles.glossy_bounces = 1
@@ -364,6 +367,7 @@ def setup_render(w: int, h: int, spp: int, threads: int, preview: bool) -> None:
     vl = sc.view_layers[0]
     vl.use_pass_z = True
     vl.use_pass_object_index = True
+    vl.cycles.denoising_store_passes = denoise
     st = sc.render.image_settings
     st.media_type = "MULTI_LAYER_IMAGE"
     st.file_format = "OPEN_EXR_MULTILAYER"
@@ -397,6 +401,7 @@ def main() -> None:
     ap.add_argument("--spp", type=int, default=32)
     ap.add_argument("--threads", type=int, default=2)
     ap.add_argument("--preview", action="store_true")
+    ap.add_argument("--denoise", action="store_true", help="ノイズ除去をかけ、かける前の絵も残す（本番の 1 倍の大きさ用）")
     ap.add_argument("--out", default="")
     a = ap.parse_args(sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else sys.argv[1:])
     p = P.plan()
@@ -410,7 +415,7 @@ def main() -> None:
     build_cloud_surface()
     sky_world(az, el)
     sun_lamp(sv, el)
-    setup_render(w, h, a.spp, a.threads, a.preview)
+    setup_render(w, h, a.spp, a.threads, a.preview, a.denoise)
     print(f"場面を組んだ（{time.time() - t0:.1f} 秒）。太陽 方位 {az:.2f}° 高さ {el:.2f}°（原点の座標で）", flush=True)
     out = a.out or os.path.join(C.WORK, "film")
     os.makedirs(out, exist_ok=True)
