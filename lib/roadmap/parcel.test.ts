@@ -703,6 +703,22 @@ describe("地点の筆", () => {
     expect(py).toContain("jr = sorted(jac, key=lambda t: (-jac[t], t))");
   });
 
+  it("参考図を作る仕組み：地番の文字が筆の面と別にある市（高崎市）は引出線の先で筆に当て、文字が2つ以上の面は入れない。同意してから進む所の図・粗い図は使わない", () => {
+    const py = readFileSync(new URL("../../scripts/sanko/build.py", import.meta.url), "utf8");
+    // 引出線のある文字は、引出線の端のうち文字から遠い方の点で当てる（高崎市では、引出線のある文字の点のほとんどが別の筆・道の中にある）
+    expect(py).toContain("x, y = max(ends, key=lambda p: (p[0] - x) ** 2 + (p[1] - y) ** 2)[:2]");
+    // 地番の文字が2つ以上入る面は、どの地番の筆か決められないので入れない
+    expect(py).toMatch(/for p_, ts in by_poly\.items\(\):\n\s+if len\(ts\) > 1:\n\s+multi \+= 1\n\s+continue/);
+    // 高崎市は、文字の点と引出線を注記の番号（chibanid）で結び付けて読む
+    expect(py).toMatch(/"code": "10202"[\s\S]{0,1500}"labels": \{"shp": r"地番_地番図\\\.shp\$", "id": "chibanid", "leaders": r"地番引出線_地番図\\\.shp\$"\}/);
+    // 利用規約に同意してから進む所にファイルがある市（岸和田市・福島市）と、位置や地番の粗い図（旭川市）は入れない（MICHILU は同意の先を開かない）
+    const start = py.indexOf("EXCLUDED = {");
+    const excluded = py.slice(start, py.indexOf("\n}\n", start));
+    for (const city of ["岸和田市", "福島市"]) expect(excluded).toMatch(new RegExp(`"${city}": "[^"]*同意`));
+    expect(excluded).toContain('"旭川市":');
+    for (const code of ["07201", "01204"]) expect(py).not.toContain(`"code": "${code}"`);
+  });
+
   it("住所の地点が道路の上だったときの、地番で探し直す文字（町に丁目があれば、すぐ後ろの番号を丁目に）", () => {
     expect(chibanQueryOf("千葉県松戸市古ヶ崎4-3556-1", true)).toBe("地番 千葉県松戸市古ヶ崎4丁目3556-1");
     expect(chibanQueryOf("千葉県松戸市古ヶ崎4-3556", true)).toBe("地番 千葉県松戸市古ヶ崎4丁目3556");
