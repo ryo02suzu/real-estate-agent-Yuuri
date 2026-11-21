@@ -12,7 +12,7 @@ import { HOUREI_LAWS, houreiGroups, houreiOffice, houreiOfficeAll, PREF_NAMES, t
 import { isekiFor } from "../roadmap/iseki";
 import type { Liquefaction } from "../roadmap/liquefaction";
 import { moridoAuthority, type Morido } from "../roadmap/morido";
-import { chibanLabel, hasPieceMark, isLotChiban, kuikiLabel, kuikiLabelFrom, neighborList, registryChiban, type Parcel } from "../roadmap/parcel";
+import { chibanLabel, estimatedMisplacedText, hasPieceMark, isLotChiban, kuikiLabel, kuikiLabelFrom, neighborList, registryChiban, type Parcel } from "../roadmap/parcel";
 import { PARCEL_DATA } from "../roadmap/parcel-data";
 import { awayNote, elsewhereNote } from "../roadmap/parcel-sub";
 import type { RirekiRecord } from "../roadmap/rireki";
@@ -324,7 +324,12 @@ function placeIssues(input: TriageInput): Issue[] {
       else if (parcels.neighbors.length >= 30) out.push({ id: "off-lot", level: "check", topic: "place", title: `住所の地点の筆（${chibanLabel(raw)}）は隣地が${parcels.neighbors.length}筆`, detail: "道路など物件の外の土地の可能性があります。この筆の面積・隣地は物件のものではないかもしれません。", confirm: "公図で物件の筆を" });
       else out.push({ id: "address-parcel", level: "check", topic: "place", title: `住所の地点の筆は${chibanLabel(raw)}（参考）`, detail: "住居表示の住所と地番は別のものです。物件の土地がこの筆かどうかは、公図・登記で確かめます。", confirm: "法務局の公図・登記で" });
     }
-    if (p.estimated) out.push({ id: "estimated", level: "check", topic: "place", title: `筆の位置は公図から推定${p.estimated === "low" ? "（確度低）" : ""}`, detail: `この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、${p.estimated === "low" ? "5m前後ずれて隣の筆の地番になることがあり、確度の低い推定の1割弱は30m以上離れた別の場所に置かれています（国の地価の地点で確かめた結果）。" : "数mずれて隣の筆の地番になることがあります。"}`, confirm: "法務局の公図で" });
+    if (p.estimated) {
+      // 30m 以上の取り違えの割合は、その地域の推定の筆のまとまりで国の地価の地点を使って測った結果（lib/roadmap/kozu-data.ts）
+      const far = estimatedMisplacedText(p.estimated, m.codes, p.estimated === "low" ? "確度の低い推定の" : "");
+      const shift = p.estimated === "low" ? "5m前後" : "数m";
+      out.push({ id: "estimated", level: "check", topic: "place", title: `筆の位置は公図から推定${p.estimated === "low" ? "（確度低）" : ""}`, detail: `この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、${shift}ずれて隣の筆の地番になることがあ${far ? `り、${far}（国の地価の地点で確かめた結果）` : "ります"}。`, confirm: "法務局の公図で" });
+    }
     if (p.sanko) out.push({ id: "sanko", level: "check", topic: "place", title: "市町村の地番参考図の筆", detail: `${p.undetermined ? "登記所の地図では筆界未定地です。" : ""}参考図は登記の地番・筆の形と違うことがあります。`, confirm: "法務局の公図・登記で" });
     if (/^筆界未定/.test(p.chibanRaw)) out.push({ id: "undetermined", level: "warn", topic: "place", title: "筆界未定地", detail: "隣の筆との境界が決まっていない土地です。境界の確定（筆界特定・測量）が要ることがあり、融資や売買に効きます。", confirm: "法務局の公図・登記で" });
     if (hasPieceMark(p.chibanRaw) && p.chibanRaws && p.chibanRaws.length > 1) out.push({ id: "pieces", level: "check", topic: "place", title: `地図データでは${p.chibanRaws.length}つの区画に分かれた筆`, detail: `地番 ${registryChiban(p.chibanRaw)} は地図データで「${p.chibanRaws.join("」「")}」に分かれています（登記の地番は1つ）。面積は区画を合わせたものです。`, confirm: "公図・地積測量図で" });

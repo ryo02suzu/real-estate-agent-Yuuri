@@ -77,7 +77,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
       label: "所在（地番）",
       value: `${kuikiLabel(found.kuiki)} ${chibanLabel(found.chibanRaw).replace(/^地番 /, "")}${parcelMark(found)}`,
       note: found.estimated
-        ? `公図から推定した位置（${estimatedNote(found.estimated)}）`
+        ? `公図から推定した位置（${estimatedNote(found.estimated, result.municipality.codes)}）`
         : found.sanko
           ? `${found.undetermined ? "登記所の地図では筆界未定地。" : ""}${SANKO_NOTE}`
           : undefined,

@@ -10,7 +10,7 @@ import { withRetry } from "@/lib/retry";
 import type { LookupResult } from "@/lib/roadmap";
 import type { ChibanzuLink } from "@/lib/roadmap/chibanzu";
 import { KOZU_DATA } from "@/lib/roadmap/kozu-data";
-import { adjacentParcels, chibanLabel, hasPieceMark, isLotChiban, kuikiLabel, kuikiLabelFrom, parcelAt, parcelMark, pickedChibanText, registryChiban, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
+import { adjacentParcels, chibanLabel, estimatedCardNote, hasPieceMark, isLotChiban, kuikiLabel, kuikiLabelFrom, parcelAt, parcelMark, pickedChibanText, registryChiban, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
 import { SANKO_CITIES, sankoSource } from "@/lib/roadmap/sanko-data";
@@ -37,11 +37,13 @@ export type ParcelInfo =
   | { status: "none"; approximate?: boolean }
   /** 地図データを読めなかった（通信の失敗など） */
   | { status: "error" }
-  | { status: "ok"; parcel: Parcel; kind: ParcelKind; neighbors: Neighbor[] };
+  /** codes：物件の市区町村コード（公図から推定した筆の確かさを、その地域で測った結果で言うのに使う） */
+  | { status: "ok"; parcel: Parcel; kind: ParcelKind; neighbors: Neighbor[]; codes?: readonly string[] };
 
 /** 物件の筆と隣の筆を読む（筆が分かっていればそれを、無ければ地点の筆を探す） */
 export function useParcelInfo(result: Ok): ParcelInfo {
   const { lat, lng, parcel, picked } = result;
+  const codes = result.municipality.codes;
   // 番地まで見つからず町の中心を出しているときは、そこにある筆は物件と関係ないので探さない
   const townCenter = !parcel && !picked && !!result.approximate;
   const key = `${lat},${lng},${parcel ? `${parcel.kuiki}|${parcel.chibanRaw}` : ""}`;
@@ -54,7 +56,7 @@ export function useParcelInfo(result: Ok): ParcelInfo {
       if (!p) return { status: "none" } as const;
       const kind: ParcelKind = picked ? "picked" : parcel ? "chiban" : "address";
       const neighbors = await adjacentParcels(p, pmtilesParcelSource);
-      return { status: "ok", parcel: p, kind, neighbors } as const;
+      return { status: "ok", parcel: p, kind, neighbors, codes } as const;
     })
       .catch(() => ({ status: "error" }) as const)
       .then((value) => alive && setState({ key, value }));
@@ -315,9 +317,8 @@ export function ParcelDetail({ info, chibanzu, pick }: { info: Extract<ParcelInf
       )}
       {parcel.estimated && (
         <p className="mt-0.5 text-[12px] leading-[1.55] text-[#8a4f3a] dense:leading-[1.45] denser:text-[11.5px]">
-          {parcel.estimated === "low"
-            ? "この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置で、合わせ方の確かさが低いため、5m前後ずれて隣の筆の地番になっていることがあり、1割弱は30m以上離れた別の場所に置かれています（国の地価の地点で確かめた結果）。隣の筆も候補にして、謄本・公図で確かめてください。"
-            : "この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、数mずれて隣の筆の地番になることがあります。謄本・公図で確かめてください。"}
+          {/* 30m 以上の取り違えの割合は、その地域の推定の筆で国の地価の地点を使って測った結果（lib/roadmap/kozu-data.ts） */}
+          {estimatedCardNote(parcel.estimated, info.codes)}
         </p>
       )}
       {parcel.sanko && (

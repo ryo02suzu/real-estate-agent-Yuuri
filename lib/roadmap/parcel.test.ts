@@ -2,7 +2,9 @@ import { ALL_PREF_NAMES } from "./regions";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import KOZU_SOURCE from "./data/kozu-source.json";
+import KOZU_UNPUBLISHED from "../../scripts/kozu-tiles/accuracy-unpublished.json";
 import { lookup, registryStyle } from "./index";
+import { KOZU_SETS, kozuMisplaced, kozuSetOf, shareText, type KozuAccuracy, type KozuSet } from "./kozu-data";
 import { loadParcelIndex } from "./parcel-index";
 import { mergeParcelSources, withoutCities } from "./parcel-tiles";
 import { coversCity, sankoCovers } from "./sanko-data";
@@ -12,6 +14,9 @@ import {
   cityMatches,
   estimatedMark,
   parcelMark,
+  estimatedCardNote,
+  estimatedLegend,
+  estimatedMisplacedText,
   estimatedNote,
   estimatedSentence,
   kuikiChome,
@@ -561,7 +566,8 @@ describe("地点の筆", () => {
     expect(c).toMatchObject({ chibanRaw: "1240", estimated: "low" });
     expect(estimatedMark(c!)).toBe("（推定・確度低）");
     expect(estimatedNote("low")).toContain("5m");
-    // 物件の上の帯の文も、確度の低い推定は測った結果どおり（「数mずれることがあります」のままだった）
+    // 物件の上の帯の文も、確度の低い推定は測った結果どおり（「数mずれることがあります」のままだった）。
+    // 市区町村が分からないときは、測った地域のうち一番多い割合（今は確度の低い推定は関東だけ・確度の高い推定はどこも1%未満）
     expect(estimatedSentence("high")).toBe("数mずれることがあります。");
     expect(estimatedSentence("low")).toBe("5m前後ずれることがあり、1割弱は30m以上離れた別の場所に置かれています。");
     const r = await searchParcel({ city: "横浜市港北区", town: "日吉5丁目", chiban: "1234" }, START, src);
@@ -1492,6 +1498,127 @@ describe("公図から推定した筆のデータの置き場所（data/kozu-sou
       all.push(...s.codes);
     }
     expect(all.sort()).toEqual([...KOZU_SOURCE.codes].sort());
+  });
+});
+
+describe("公図から推定した筆の注意書き（地域ごとに国の地価の地点で測った確かさ）", () => {
+  const kinki2 = KOZU_UNPUBLISHED.kinki2;
+  // 公開していない近畿の5府県（兵庫・京都・奈良・滋賀・和歌山）を、測った結果のまま公開したときのまとまり
+  const withKinki2: Record<string, KozuSet> = { ...KOZU_SETS, kinki2: { file: kinki2.accuracy.file, codes: kinki2.codes, edition: "2026年4月公開版", high_only: true, accuracy: kinki2.accuracy as KozuAccuracy } };
+
+  it("筆の市区町村のまとまりを引く（コードが無いまとまりは、同じ都府県のまとまり）", () => {
+    expect(kozuSetOf("14109")).toBe(KOZU_SETS.kanto);
+    expect(kozuSetOf(["14101", "14109"])).toBe(KOZU_SETS.kanto);
+    expect(kozuSetOf("27141")).toBe(KOZU_SETS.kinki);
+    // 鶴ヶ島市（11241）は推定の筆が無く関東のまとまりのコードに無いが、埼玉県の筆なら関東のまとまり
+    expect(KOZU_SETS.kanto.codes).not.toContain("11241");
+    expect(kozuSetOf("11241")).toBe(KOZU_SETS.kanto);
+    expect(kozuSetOf("01101")).toBeUndefined();
+    expect(kozuSetOf(undefined)).toBeUndefined();
+    expect(kozuSetOf("28204", withKinki2)?.file).toBe(kinki2.accuracy.file);
+  });
+
+  it("割合の言い方：1%未満は言わない・7%未満は「約N%」・1割未満は「1割弱」・それより多ければ「約N割」", () => {
+    expect(shareText(0.004)).toBeUndefined();
+    expect(shareText(0)).toBeUndefined();
+    expect(shareText(Number.NaN)).toBeUndefined();
+    expect(shareText(0.01)).toBe("約1%");
+    expect(shareText(6 / 204)).toBe("約3%");
+    expect(shareText(54 / 718)).toBe("1割弱");
+    expect(shareText(0.3)).toBe("約3割");
+  });
+
+  it("関東・大阪府は測った結果どおり（確度の高い推定は「数m」のまま、関東の確度の低い推定は「1割弱は30m以上」）", () => {
+    const kanto = KOZU_SETS.kanto.accuracy!;
+    expect(kanto.high!.elsewhere / kanto.high!.points).toBeLessThan(0.01);
+    expect(shareText(kanto.low!.elsewhere / kanto.low!.points)).toBe("1割弱");
+    const osaka = KOZU_SETS.kinki.accuracy!.high!;
+    expect(osaka.elsewhere / osaka.points).toBeLessThan(0.01);
+    expect(estimatedSentence("high", "14109")).toBe("数mずれることがあります。");
+    expect(estimatedSentence("low", "14109")).toBe("5m前後ずれることがあり、1割弱は30m以上離れた別の場所に置かれています。");
+    expect(estimatedNote("high", "14109")).toBe("数mずれることあり");
+    expect(estimatedNote("low", ["14101", "14109"])).toBe("確度が低く、5m前後（1割弱は30m以上）ずれることあり");
+    expect(estimatedSentence("high", "27141")).toBe("数mずれることがあります。");
+    expect(estimatedNote("high", "27141")).toBe("数mずれることあり");
+    expect(kozuMisplaced("high", "27141")).toBeUndefined();
+    // 筆のカードの文も前と同じ
+    expect(estimatedCardNote("low", "14109")).toBe(
+      "この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置で、合わせ方の確かさが低いため、5m前後ずれて隣の筆の地番になっていることがあり、1割弱は30m以上離れた別の場所に置かれています（国の地価の地点で確かめた結果）。隣の筆も候補にして、謄本・公図で確かめてください。",
+    );
+    expect(estimatedCardNote("high", "27141")).toBe("この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、数mずれて隣の筆の地番になることがあります。謄本・公図で確かめてください。");
+    expect(estimatedCardNote("high")).toBe(estimatedCardNote("high", "14109"));
+    // 地図の凡例は地域を決めない（今の測った結果では、前の文と同じ）
+    expect(estimatedLegend()).toBe("点線は、公図（任意座標）の形を道路の縁に合わせて置いた推定の位置です。数m（薄い点線は5m前後。その1割弱は30m以上）ずれることがあります。");
+  });
+
+  it("取り違えが1%以上の地域の確度の高い推定は、地域の名前を添えて割合を言う（近畿の5府県を公開したとき）", () => {
+    expect(kinki2.accuracy.high.elsewhere / kinki2.accuracy.high.points).toBeGreaterThanOrEqual(0.01);
+    expect(estimatedSentence("high", "28204", withKinki2)).toBe("数mずれることがあり、この地域（近畿）では約3%が30m以上離れた別の場所に置かれています。");
+    expect(estimatedNote("high", "28204", withKinki2)).toBe("数m（この地域では約3%が30m以上）ずれることあり");
+    expect(estimatedMisplacedText("high", "25201", "", withKinki2)).toBe("この地域（近畿）では約3%が30m以上離れた別の場所に置かれています");
+    expect(estimatedCardNote("high", "28204", withKinki2)).toBe(
+      "この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、数mずれて隣の筆の地番になることがあり、この地域（近畿）では約3%が30m以上離れた別の場所に置かれています（国の地価の地点で確かめた結果）。謄本・公図で確かめてください。",
+    );
+    // 同じ近畿でも、大阪府（取り違え 0）・関東の筆は今までどおり
+    expect(estimatedSentence("high", "27141", withKinki2)).toBe("数mずれることがあります。");
+    expect(estimatedSentence("high", "14109", withKinki2)).toBe("数mずれることがあります。");
+    expect(estimatedSentence("low", "14109", withKinki2)).toBe("5m前後ずれることがあり、1割弱は30m以上離れた別の場所に置かれています。");
+    // 筆の市区町村が分からない文（スマホの帯など）と地図の凡例は、地域によって違うことを言う
+    expect(estimatedSentence("high", undefined, withKinki2)).toBe("数mずれることがあり、地域によっては約3%が30m以上離れた別の場所に置かれています。");
+    expect(estimatedNote("high", undefined, withKinki2)).toBe("数m（地域によっては約3%が30m以上）ずれることあり");
+    expect(estimatedLegend(withKinki2)).toBe(
+      "点線は、公図（任意座標）の形を道路の縁に合わせて置いた推定の位置です。数m（地域によっては約3%が30m以上。薄い点線は5m前後。その1割弱は30m以上）ずれることがあります。",
+    );
+  });
+
+  it("測っていないまとまり・1つの府県のまとまりの言い方", () => {
+    const sets: Record<string, KozuSet> = {
+      kanto: KOZU_SETS.kanto,
+      tohoku: { file: "tohoku-20261201-0900.pmtiles", codes: ["04101"], edition: "2026年4月公開版", high_only: true },
+      hyogo: { file: "hyogo-20261201-0900.pmtiles", codes: ["28204", "28202"], edition: "2026年4月公開版", high_only: true, accuracy: { ...(kinki2.accuracy as KozuAccuracy), file: "hyogo-20261201-0900.pmtiles" } },
+    };
+    // 測っていないまとまりの筆は、測った地域のうち一番多い割合で言う（言い過ぎにならない方）
+    expect(estimatedSentence("high", "04101", sets)).toBe("数mずれることがあり、地域によっては約3%が30m以上離れた別の場所に置かれています。");
+    expect(estimatedSentence("high", "28204", sets)).toBe("数mずれることがあり、この地域（兵庫県）では約3%が30m以上離れた別の場所に置かれています。");
+    // どのまとまりも測っていなければ、今までの言い方
+    expect(estimatedSentence("high", "04101", { tohoku: sets.tohoku })).toBe("数mずれることがあります。");
+    expect(estimatedSentence("low", "04101", { tohoku: sets.tohoku })).toBe("5m前後ずれることがあります。");
+  });
+});
+
+describe("推定の筆のまとまりの確かさ（kozu-source.json の accuracy・scripts/kozu-tiles/accuracy-unpublished.json）", () => {
+  const valid = (a: KozuAccuracy) => {
+    expect(a.file).toMatch(/^[a-z0-9-]+\.pmtiles$/);
+    expect(a.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(a.method).toMatch(/地価/);
+    expect(Object.keys(a).every((k) => ["file", "date", "method", "high", "low"].includes(k))).toBe(true);
+    for (const n of [a.high, a.low]) {
+      if (!n) continue;
+      expect(n.points).toBeGreaterThan(0);
+      expect(n.exact).toBeLessThanOrEqual(n.within30);
+      expect(n.within30).toBeLessThanOrEqual(n.points);
+      expect(n.within30 + n.elsewhere).toBeLessThanOrEqual(n.points);
+    }
+  };
+
+  it("公開しているまとまりの確かさは、国の地価の地点で測った数（確度の高い推定だけのまとまりに、確度の低い推定の数は無い）", () => {
+    for (const s of Object.values(KOZU_SETS)) {
+      if (!s.accuracy) continue;
+      valid(s.accuracy);
+      if (s.high_only) expect(s.accuracy.low).toBeUndefined();
+    }
+    // 関東と大阪府は 2026-11-21 に測った
+    expect(KOZU_SETS.kanto.accuracy?.high?.points).toBeGreaterThan(1000);
+    expect(KOZU_SETS.kinki.accuracy?.high?.points).toBeGreaterThan(100);
+  });
+
+  it("公開していないまとまりの確かさは別のファイルに置き、アプリは読まない（置き場所の一覧に入れると公開になる）", () => {
+    for (const [name, u] of Object.entries(KOZU_UNPUBLISHED as Record<string, { codes: string[]; accuracy: KozuAccuracy }>)) {
+      expect(name).toMatch(/^[a-z][a-z0-9]{1,15}$/);
+      for (const c of u.codes) expect(/^\d{2}(?:\d{3})?$/.test(c) && c.slice(0, 2) in ALL_PREF_NAMES, c).toBe(true);
+      valid(u.accuracy);
+    }
+    for (const f of ["./kozu-data.ts", "./parcel.ts"]) expect(readFileSync(new URL(f, import.meta.url), "utf8")).not.toMatch(/import[^;]*accuracy-unpublished/);
   });
 });
 

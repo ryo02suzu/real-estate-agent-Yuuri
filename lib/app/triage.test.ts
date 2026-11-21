@@ -100,6 +100,16 @@ describe("要注意点（問題になりそうな所）", () => {
     expect(town.issues.map((i) => i.id)).not.toContain("no-parcel");
   });
 
+  it("公図から推定した筆は、その地域で国の地価の地点を使って測った確かさで注意する（関東・大阪府は今までの言い方）", () => {
+    const est = (estimated: "high" | "low", result = base) => triageOf(loaded({ result, parcels: { status: "ok", parcel: { ...parcel, estimated }, kind: "chiban", neighbors: [] } })).issues.find((i) => i.id === "estimated");
+    const head = "この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、";
+    expect(est("low")?.title).toBe("筆の位置は公図から推定（確度低）");
+    expect(est("low")?.detail).toBe(`${head}5m前後ずれて隣の筆の地番になることがあり、確度の低い推定の1割弱は30m以上離れた別の場所に置かれています（国の地価の地点で確かめた結果）。`);
+    expect(est("high")?.detail).toBe(`${head}数mずれて隣の筆の地番になることがあります。`);
+    const sakai = findMunicipality("27141")!; // 堺市（大阪府は確度の高い推定だけ。測った 136地点に別の場所は無かった）
+    expect(est("high", { ...base, municipality: sakai })?.detail).toBe(`${head}数mずれて隣の筆の地番になることがあります。`);
+  });
+
   it("地図データで筆が重なる所は要確認にし、候補の地番と法務局で確かめる案内を添える", () => {
     const t = triageOf(loaded({ parcels: { status: "ok", parcel: { ...parcel, overlaps: [{ kuiki: "渋谷区_神南_１丁目__", chiban: "60-2" }, { kuiki: "渋谷区_宇田川町___", chiban: "7" }] }, kind: "chiban", neighbors: [] } }));
     const i = t.issues.find((x) => x.id === "overlap");

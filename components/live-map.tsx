@@ -50,7 +50,7 @@ import { pmtilesBuildingSource } from "@/lib/roadmap/building-tiles";
 import { HAZARD_KINDS, HAZARD_LAYERS, hazardAt, hazardPointLabel, HAZARDS, type HazardKind } from "@/lib/roadmap/hazard";
 import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
 import { LAND_USAGE_COLORS, landPriceSummary, usageFromCode } from "@/lib/roadmap/land-price";
-import { chibanLabel, isLotChiban, kuikiLabel, registryChiban } from "@/lib/roadmap/parcel";
+import { chibanLabel, estimatedLegend, isLotChiban, kuikiLabel, registryChiban } from "@/lib/roadmap/parcel";
 import { readRoadShapes, type RoadRead } from "@/lib/roadmap/road-read";
 import { sheetName, type SheetHit } from "@/lib/roadmap/sheets";
 import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
@@ -1013,7 +1013,8 @@ export default function LiveMap({
         compact={compact}
         foot={[
           hasSanko() && "緑の線は、市町村が公開している課税用の地番参考図の筆で、登記の地番・筆の形と違うことがあります。",
-          hasKozu() && "点線は、公図（任意座標）の形を道路の縁に合わせて置いた推定の位置です。数m（薄い点線は5m前後。その1割弱は30m以上）ずれることがあります。",
+          // 凡例はどの地域の筆か決めないので、測った地域のうち一番多い取り違えの割合で言う（lib/roadmap/parcel.ts）
+          hasKozu() && estimatedLegend(),
           "謄本・公図で確かめてください",
         ]
           .filter(Boolean)

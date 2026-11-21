@@ -2,6 +2,7 @@
 // 法務省の登記所備付地図データをベクトルタイル（PMTiles、レイヤ fude、z16 で全件）にしたものを、
 // 国土地理院で調べた町・大字の代表点のまわりから近い順に読み、地番区域と地番が一致する筆を探す。
 // タイルの読み込みは ParcelSource に任せる（実物は parcel-tiles.ts、テストでは作り物を渡す）。
+import { kozuMisplaced, type KozuMisplaced, type KozuSet } from "./kozu-data";
 import { SANKO_MARK } from "./sanko-data";
 import { subCompatible, subNorm, subParse, type AddressSub } from "./parcel-sub";
 import type { ParcelIndex } from "./parcel-index";
@@ -917,17 +918,64 @@ export function parcelMark(p: { estimated?: Estimated; sanko?: string }): string
 }
 
 /**
- * 公図から推定した位置の筆の、ずれの目安（見出しや注記に添える）。
- * 関東の地価公示・地価調査の地点（2026-11-13）で確かめると、確度の高い推定（q=1・1,868地点）は 99.3% が 30m 以内に同じ地番の筆があり、
- * 確度の低い推定（q=2・715地点）は 91.2%。残りの 7.6% は 30m より離れた所・別の町に置かれていた
+ * 30m 以上離れた別の場所に置かれていた割合の、文の頭（「1割弱は」「この地域（近畿）では約3%が」「地域によっては約3%が」）。
+ * 確度の高い推定は、ふつうは数mのずれなので、取り違えの多かった地域ではその地域の名前を添える（area：その名前を書くか「この地域では」か）
  */
-export function estimatedNote(e: Estimated): string {
-  return e === "low" ? "確度が低く、5m前後（1割弱は30m以上）ずれることあり" : "数mずれることあり";
+function misplacedHead(e: Estimated, m: KozuMisplaced, subject: string, area: boolean): string {
+  if (m.varies) return `地域によっては${subject}${m.share}が`;
+  if (e === "high" && m.area) return `${area ? `この地域（${m.area}）` : "この地域"}では${subject}${m.share}が`;
+  return `${subject}${m.share}は`;
 }
 
-/** 画面の案内の文（物件の上の帯）。確度の低い推定は、国の地価の地点で測った結果（docs/features.md の 120）のとおりに書く */
-export function estimatedSentence(e: Estimated): string {
-  return e === "low" ? "5m前後ずれることがあり、1割弱は30m以上離れた別の場所に置かれています。" : "数mずれることがあります。";
+/**
+ * 公図から推定した筆が、30m 以上離れた別の場所に置かれていた割合を言う句（国の地価の地点で測った結果。lib/roadmap/kozu-data.ts の kozuMisplaced）。
+ * 「1割弱は30m以上離れた別の場所に置かれています」「この地域（近畿）では約3%が30m以上離れた別の場所に置かれています」。1% に満たなければ undefined。
+ * codes：筆（物件）の市区町村コード（政令市は区のコード。いくつか渡してもよい）。無ければ、測った地域のうち一番多い割合で言う。
+ * subject：割合の前に置く言葉（「確度の低い推定の」）
+ */
+export function estimatedMisplacedText(e: Estimated, codes?: string | readonly string[], subject = "", sets?: Record<string, KozuSet>): string | undefined {
+  const m = kozuMisplaced(e, codes, sets);
+  return m && `${misplacedHead(e, m, subject, true)}30m以上離れた別の場所に置かれています`;
+}
+
+/**
+ * 公図から推定した位置の筆の、ずれの目安（見出しや注記に添える短い言い方）。「数mずれることあり」「確度が低く、5m前後（1割弱は30m以上）ずれることあり」。
+ * 30m 以上の取り違えは、国の地価公示・地価調査の地点で測った割合（筆のまとまりごと。kozu-source.json の accuracy）で書く。
+ * 2026-11-21 に測ると、関東の確度の高い推定（1,871地点）は 0.4%・確度の低い推定（718地点）は 7.5%、大阪府（確度の高い推定だけ・136地点）は 0。
+ * codes：筆（物件）の市区町村コード。無ければ、測った地域のうち一番多い割合で言う
+ */
+export function estimatedNote(e: Estimated, codes?: string | readonly string[], sets?: Record<string, KozuSet>): string {
+  const m = kozuMisplaced(e, codes, sets);
+  const far = m ? `（${misplacedHead(e, m, "", false)}30m以上）` : "";
+  return e === "low" ? `確度が低く、5m前後${far}ずれることあり` : `数m${far}ずれることあり`;
+}
+
+/** 画面の案内の文（物件の上の帯）。30m 以上の取り違えは、国の地価の地点で測った結果（estimatedNote と同じ）のとおりに書く */
+export function estimatedSentence(e: Estimated, codes?: string | readonly string[], sets?: Record<string, KozuSet>): string {
+  const base = e === "low" ? "5m前後" : "数m";
+  const far = estimatedMisplacedText(e, codes, "", sets);
+  return far ? `${base}ずれることがあり、${far}。` : `${base}ずれることがあります。`;
+}
+
+/**
+ * 筆のカード（PC・スマホの「謄本・公図用の地番」）の注意の文。「…数mずれて隣の筆の地番になることがあります。」、
+ * 取り違えが 1% 以上の地域・確度の低い推定は「…ことがあり、1割弱は30m以上離れた別の場所に置かれています（国の地価の地点で確かめた結果）。」
+ */
+export function estimatedCardNote(e: Estimated, codes?: string | readonly string[], sets?: Record<string, KozuSet>): string {
+  const far = estimatedMisplacedText(e, codes, "", sets);
+  const tail = far ? `り、${far}（国の地価の地点で確かめた結果）` : "ります";
+  return e === "low"
+    ? `この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置で、合わせ方の確かさが低いため、5m前後ずれて隣の筆の地番になっていることがあ${tail}。隣の筆も候補にして、謄本・公図で確かめてください。`
+    : `この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、数mずれて隣の筆の地番になることがあ${tail}。謄本・公図で確かめてください。`;
+}
+
+/** 地図の筆界の凡例の文（どの地域の筆か決めない。測った地域のうち一番多い割合で言う） */
+export function estimatedLegend(sets?: Record<string, KozuSet>): string {
+  const high = kozuMisplaced("high", undefined, sets);
+  const low = kozuMisplaced("low", undefined, sets);
+  const hi = high ? `${high.varies ? `地域によっては${high.share}が` : `${high.share}は`}30m以上。` : "";
+  const lo = low ? `。${low.varies ? `地域によってはその${low.share}が` : `その${low.share}は`}30m以上` : "";
+  return `点線は、公図（任意座標）の形を道路の縁に合わせて置いた推定の位置です。数m（${hi}薄い点線は5m前後${lo}）ずれることがあります。`;
 }
 
 /** 地番区域を「熊谷市下奈良」「川口市青木２丁目」のように読める形に */

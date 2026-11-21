@@ -631,7 +631,7 @@ function PlaceNotes({ query, result, data, onPick, onPickPoint, onFix, onLiteral
     notes.push({ body: "地図で選んだ地点です（番地は分からないので町名まで）。" });
   }
   const sp = data.parcels.status === "ok" ? data.parcels.parcel : undefined;
-  if (sp?.estimated) notes.push({ warn: true, body: `この筆の位置は、公図（任意座標）を道路の縁に合わせて推定したものです（確かさ：${sp.estimated === "high" ? "高め" : "低め"}）。${estimatedSentence(sp.estimated)}` });
+  if (sp?.estimated) notes.push({ warn: true, body: `この筆の位置は、公図（任意座標）を道路の縁に合わせて推定したものです（確かさ：${sp.estimated === "high" ? "高め" : "低め"}）。${estimatedSentence(sp.estimated, result.municipality.codes)}` });
   if (sp?.sanko) notes.push({ warn: true, body: "この筆の形は、市町村の地番参考図から作ったものです。登記所の地図とは違うことがあります。" });
   if (result.parcelOthers)
     notes.push({

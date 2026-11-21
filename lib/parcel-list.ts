@@ -46,7 +46,7 @@ export function parcelListText(result: Ok, parcels: ParcelListInput | undefined)
     else lines.push(`■ 隣の筆（境界が接している筆・${parcels.neighbors.length}筆）`, ...parcels.neighbors);
   }
   lines.push("", `※${PARCEL_LIST_HOWTO}`);
-  if (parcels.estimated) lines.push(`※筆の位置は公図から推定したもの（${estimatedNote(parcels.estimated)}）。`);
+  if (parcels.estimated) lines.push(`※筆の位置は公図から推定したもの（${estimatedNote(parcels.estimated, result.municipality.codes)}）。`);
   if (parcels.sanko) lines.push(`※${SANKO_NOTE}。`);
   lines.push(`※${parcelCreditLine(!!parcels.estimated, parcels.sanko)}。`);
   return lines.join("\n");

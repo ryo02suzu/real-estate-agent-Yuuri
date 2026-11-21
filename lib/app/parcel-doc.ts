@@ -30,7 +30,7 @@ export function parcelDoc(result: Ok, parcels: ParcelListInput | undefined, date
     : parcels.reference
       ? "住所の地点にある筆（参考）。住居表示と地番は別のものなので、公図で物件の筆を確かめてください"
       : parcels.estimated
-        ? `公図から推定した位置（${estimatedNote(parcels.estimated)}）`
+        ? `公図から推定した位置（${estimatedNote(parcels.estimated, result.municipality.codes)}）`
         : parcels.sanko
           ? SANKO_NOTE
           : undefined;

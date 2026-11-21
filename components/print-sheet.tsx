@@ -398,7 +398,7 @@ function Memo({
             <>
               <p className="text-[10px] text-[#7a6a55]">
                 {addressOffLot(parcels) === "large" ? "住所の地点にある筆（参考。隣地がとても多く、道路など物件の外の土地の可能性）" : parcels.kind === "address" ? "住所の地点にある筆（参考。住居表示と地番は別）" : "物件の筆"}
-                {parcels.parcel.estimated && `・公図から推定した位置（${estimatedNote(parcels.parcel.estimated)}）`}
+                {parcels.parcel.estimated && `・公図から推定した位置（${estimatedNote(parcels.parcel.estimated, m.codes)}）`}
                 {parcels.parcel.sanko && `・地番参考図（${SANKO_NOTE}）`}
               </p>
               <p className="font-semibold">{lines.target ?? `${kuikiLabel(parcels.parcel.kuiki)} ${chibanLabel(parcels.parcel.chibanRaw)}`}</p>

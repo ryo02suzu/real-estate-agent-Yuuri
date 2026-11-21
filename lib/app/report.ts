@@ -132,7 +132,7 @@ export function buildReport(result: Ok, input: ReportInput, opts: ReportOptions)
 
   // 物件の概要（重説・図面で最初に見る所）
   const outline: DocItem[] = [];
-  if (found) outline.push({ label: "地番", text: `${half(kuikiLabel(found.kuiki))} ${chibanLabel(found.chibanRaw).replace(/^地番 /, "")}${parcelMark(found)}`, note: found.estimated ? `公図から推定した位置・${estimatedNote(found.estimated)}` : found.sanko ? SANKO_NOTE : undefined });
+  if (found) outline.push({ label: "地番", text: `${half(kuikiLabel(found.kuiki))} ${chibanLabel(found.chibanRaw).replace(/^地番 /, "")}${parcelMark(found)}`, note: found.estimated ? `公図から推定した位置・${estimatedNote(found.estimated, m.codes)}` : found.sanko ? SANKO_NOTE : undefined });
   else if (parcels?.target) outline.push({ label: "地番", text: `${half(parcels.target)}（参考）`, note: parcels.offLot ? "住所の地点にある筆。道路など物件の外の土地の可能性があるので公図で確認" : "住所の地点にある筆。住居表示と地番は別なので公図で確認", tone: "check" });
   if (opts.area) outline.push({ label: "面積", text: opts.area, note: "地図上の目安。登記の地積で確認" });
   const zr = zoning ? zoningRows(zoning.zoning, zoning.st) : [];
@@ -247,7 +247,7 @@ export function buildReport(result: Ok, input: ReportInput, opts: ReportOptions)
     else if (parcels.neighbors.length) items.push({ label: `隣の筆（${parcels.neighbors.length}筆）`, text: compactParcels(parcels.neighbors).join("／") });
     const chibanzu = chibanzuFor(m, result.lat, result.lng);
     if (chibanzu) items.push({ text: `${chibanzu.name}（${CHIBANZU_NOTE}）`, link: { label: chibanzu.name, url: chibanzu.url } });
-    sections.push({ title: "謄本・公図用の地番", items, lead: parcels.estimated ? `筆の位置は公図から推定（${estimatedNote(parcels.estimated)}）。` : parcels.sanko ? `${SANKO_NOTE}。` : undefined });
+    sections.push({ title: "謄本・公図用の地番", items, lead: parcels.estimated ? `筆の位置は公図から推定（${estimatedNote(parcels.estimated, m.codes)}）。` : parcels.sanko ? `${SANKO_NOTE}。` : undefined });
   }
 
   // 上下水道・ガスの照会先（詳しくだけ）
