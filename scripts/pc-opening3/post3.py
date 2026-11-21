@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "pc-opening"))
 from atmos import agx, bloom, grain_vignette, read_exr, smoothstep  # noqa: E402
 
 LOOK = dict(
-    air_km=13.0,  # 空気のかすみが約 63% になる距離（谷の高さで）
+    air_km=19.0,  # 空気のかすみが約 63% になる距離（谷の高さで）
     air_max=0.85,
     mist_density=0.0045,  # 川の水面の高さの霧の濃さ（1/m）
     mist_height=5.5,  # 霧が 1/e になる高さ（m）

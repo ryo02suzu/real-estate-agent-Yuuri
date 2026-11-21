@@ -44,10 +44,26 @@ jobs:
           python - <<'EOF' >> "$GITHUB_OUTPUT"
           import json
           r = json.load(open("render.json"))
-          f0, f1 = (int(v) for v in r["frames"].split("-"))
-          n = int(r.get("jobs", 20))
-          step = -(-(f1 - f0 + 1) // n)
-          chunks = [f"{a}-{min(f1, a + step - 1)}" for a in range(f0, f1 + 1, step)]
+          want = []
+          for part in r["frames"].split(","):
+              if "-" in part:
+                  a, b = (int(v) for v in part.split("-"))
+                  want += list(range(a, b + 1))
+              elif part.strip():
+                  want.append(int(part))
+          want = sorted(set(want))
+          n = max(1, min(int(r.get("jobs", 20)), len(want)))
+          size = -(-len(want) // n)
+          chunks = []
+          for k in range(0, len(want), size):
+              part = want[k:k + size]
+              # 続いた番号は「a-b」にまとめる
+              runs, s0 = [], part[0]
+              for x, y in zip(part, part[1:] + [None]):
+                  if y != x + 1:
+                      runs.append(f"{s0}-{x}" if x != s0 else f"{x}")
+                      s0 = y
+              chunks.append(",".join(runs))
           print("chunks=" + json.dumps(chunks))
           EOF
       - name: 渡すもの（地形・土地の種類・素材・飛び方）
@@ -76,6 +92,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - name: Blender（bpy）が使う画面まわりの部品
+        run: sudo apt-get update && sudo apt-get install -y libxi6 libxxf86vm1 libxfixes3 libxrender1 libgl1 libegl1 libxkbcommon0 libsm6 libice6
       - run: pip install bpy==5.3.0 numpy scipy pillow OpenEXR
       - uses: actions/download-artifact@v4
         with:
@@ -87,11 +105,14 @@ jobs:
           mkdir -p work && tar -xf ../../bundle/scene.tar -C work
           RES=$(python -c "import json;print(json.load(open('render.json'))['res'])")
           SPP=$(python -c "import json;print(json.load(open('render.json'))['spp'])")
-          python scene3.py --frames "${{ matrix.chunk }}" --res "$RES" --spp "$SPP" --out "$GITHUB_WORKSPACE/exr"
+          # 時間切れの前に止め、描けたコマは仕上げて渡す（足りないコマは、次の回で frames に入れて描き直す）
+          timeout --signal=INT 315m python scene3.py --frames "${{ matrix.chunk }}" --res "$RES" --spp "$SPP" --out "$GITHUB_WORKSPACE/exr"
       - name: 仕上げ
+        if: always()
         working-directory: scripts/pc-opening3
         run: python post3.py --frames "$GITHUB_WORKSPACE/exr" "$GITHUB_WORKSPACE/png"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: frames-${{ strategy.job-index }}
           path: png/*.png
@@ -110,6 +131,31 @@ jobs:
           pattern: frames-*
           path: png
           merge-multiple: true
+      - name: 前の回のコマ（render.json の prev_run。描き直した分と合わせる）
+        id: prev
+        run: echo "run=$(python3 -c "import json;print(json.load(open('scripts/pc-opening3/render.json')).get('prev_run',''))")" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        if: steps.prev.outputs.run != ''
+        with:
+          pattern: frames-*
+          path: png_prev
+          merge-multiple: true
+          run-id: ${{ steps.prev.outputs.run }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: コマがそろっているか
+        run: |
+          mkdir -p png png_prev
+          cp -n png_prev/*.png png/ 2>/dev/null || true
+          python3 - <<'EOF'
+          import os, sys
+          have = {int(f[:4]) for f in os.listdir("png") if f.endswith(".png")}
+          want = set(range(0, 507))
+          miss = sorted(want - have)
+          print(f"コマ {len(have)} / {len(want)}")
+          if miss:
+              print("足りないコマ:", miss)
+              sys.exit(1)
+          EOF
       - name: 動画にする
         run: |
           command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)

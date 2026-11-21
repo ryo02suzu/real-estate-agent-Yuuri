@@ -1,0 +1,8 @@
+{
+ "frames": "0-506",
+ "jobs": 20,
+ "res": "1920x1080",
+ "spp": 26,
+ "prev_run": "",
+ "note": "描く設定。書き換えて push すると .github/workflows/opening3-render.yml が動く。足りないコマだけ描き直すときは frames にそのコマ、prev_run に前の回の番号"
+}

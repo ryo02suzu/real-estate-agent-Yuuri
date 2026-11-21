@@ -74,7 +74,7 @@ def main() -> None:
     # ---- 位置：9.6 秒までは川の上。そのあとは、その時の向きから穂高の方へ曲がりながら進む
     pos = np.zeros((n, 3))
     hx, hy = (float(v_) for v_ in geo3.local(*HOTAKA))
-    cut = int(9.6 * FPS)
+    cut = int(10.4 * FPS)
     for i in range(n):
         if i <= cut:
             pos[i, 0] = np.interp(s_now[i], ss, rx)
@@ -84,7 +84,7 @@ def main() -> None:
             dprev = pos[i - 1, :2] - pos[i - 2, :2]
             head = math.atan2(dprev[0], dprev[1])
             want = math.atan2(hx - prev[0], hy - prev[1])
-            k = float(smooth((t[i] - 9.6) / 3.0))
+            k = float(smooth((t[i] - 10.4) / 3.0))
             dh = (want - head + math.pi) % (2 * math.pi) - math.pi
             head += dh * (0.10 * k + 0.01)
             step = v[i] / FPS
@@ -95,9 +95,12 @@ def main() -> None:
     water = zr0 + (zr1 - zr0) * s_frac
     ground = geo3.sample(near, nm, pos[:, 0], pos[:, 1]) - geo3.curvature_drop(pos[:, 0], pos[:, 1])
     agl = 8.5 + 1.5 * np.sin(t * 0.9) - 2.0 * smooth((t - 4.0) / 1.5) * (1 - smooth((t - 6.0) / 1.5))  # 4〜6 秒は少し下がる
-    climb = 255.0 * smooth((t - 9.4) / 5.0) + 120.0 * smooth((t - 14.0) / 6.0)
-    base = np.where(t <= 9.6, water, np.maximum(water, ground))
-    pos[:, 2] = base + agl + climb
+    climb = 255.0 * smooth((t - 8.8) / 5.0) + 120.0 * smooth((t - 14.0) / 6.0)
+    pos[:, 2] = water + agl + climb
+    # 森の上では、木の上 30m より下に行かない（木の高さは 25m ほど）
+    off_river = t > 10.4
+    pos[:, 2] = np.where(off_river, np.maximum(pos[:, 2], ground + 55.0), pos[:, 2])
+    pos[:, 2] = ndimage.gaussian_filter1d(pos[:, 2], 6.0, mode="nearest")
 
     # ---- 向き：進む向き（先の方を見る）。上がるときは穂高へ。曲がりでは傾く
     fwd = np.zeros((n, 3))
@@ -106,12 +109,16 @@ def main() -> None:
         j = min(n - 1, i + look_ahead)
         d = pos[j] - pos[i] if j > i else pos[i] - pos[i - 1]
         d = d / (np.linalg.norm(d) + 1e-9)
-        tgt = np.array([hx, hy, 2900.0]) - pos[i]
+        tgt = np.array([hx, hy, 0.0]) - pos[i]
+        tgt[2] = 0.0
         tgt = tgt / np.linalg.norm(tgt)
-        w = float(smooth((t[i] - 9.0) / 4.5))
+        w = float(smooth((t[i] - 10.0) / 4.0))
         f = d * (1 - w) + tgt * w
-        f[2] -= 0.05 * (1 - w)  # 低い所では少し見下ろす
-        f[2] += 0.02 * smooth((t[i] - 15.0) / 4.0)
+        f[2] = 0.0
+        f = f / np.linalg.norm(f)
+        # 見下ろす角：低い所は少し（-3°）。上がるにつれ谷と森を見下ろし（-11°）、最後は少し上げて山と空へ（-4°）
+        pitch = -3.0 - 8.0 * float(smooth((t[i] - 9.0) / 3.5)) + 7.0 * float(smooth((t[i] - 15.5) / 4.0))
+        f[2] = math.tan(math.radians(pitch))
         fwd[i] = f / np.linalg.norm(f)
     fwd = np.stack([ndimage.gaussian_filter1d(fwd[:, k], 3.0, mode="nearest") for k in range(3)], -1)
     fwd /= np.linalg.norm(fwd, axis=1, keepdims=True)

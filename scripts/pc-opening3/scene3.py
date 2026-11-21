@@ -390,7 +390,7 @@ def ground_material(name: str, cover: str | None) -> bpy.types.Material:
     gravel_n = mix(nt, pmr.outputs["Result"], peb_n, fin_n, (-300, 1600))
     forest_c, forest_r, forest_n, _ = surface(nt, "forest_leaves_02", pos, 3.0, -600, 800, tint=(0.47, 1.1, 0.8))
     grass_c, grass_r, grass_n, _ = surface(nt, "aerial_grass_rock", pos, 14.0, -600, 0, tint=(0.46, 0.75, 1.05))
-    rock_c, rock_r, rock_n, _ = surface(nt, "rock_face_03", pos, 9.0, -600, -800, tint=(0.5, 0.35, 0.95))
+    rock_c, rock_r, rock_n, _ = surface(nt, "rock_face_03", pos, 9.0, -600, -800, tint=(0.5, 0.35, 0.62))  # 花崗岩の灰色（白く光りすぎない）
 
     if cover:
         ct = node(nt, "ShaderNodeTexImage", (-1000, 600))
@@ -423,6 +423,24 @@ def ground_material(name: str, cover: str | None) -> bpy.types.Material:
     lar_col = node(nt, "ShaderNodeRGB", (-800, 1700))
     lar_col.outputs[0].default_value = (0.20, 0.105, 0.025, 1.0)
     can = mix(nt, lm.outputs[0], fir_col.outputs[0], lar_col.outputs[0], (-400, 1900))
+    # 中腹の紅葉（ナナカマドの赤・ダケカンバの黄）：標高 1900〜2400m に、まだらに
+    band = node(nt, "ShaderNodeMapRange", (-800, 2700), **{"From Min": 1850.0, "From Max": 2050.0})
+    link(nt, sep.outputs["Z"], band.inputs["Value"])
+    band2 = node(nt, "ShaderNodeMapRange", (-800, 2850), **{"From Min": 2450.0, "From Max": 2300.0})
+    link(nt, sep.outputs["Z"], band2.inputs["Value"])
+    bm_ = node(nt, "ShaderNodeMath", (-600, 2750), operation="MULTIPLY")
+    link(nt, band.outputs["Result"], bm_.inputs[0])
+    link(nt, band2.outputs["Result"], bm_.inputs[1])
+    rn = node(nt, "ShaderNodeTexNoise", (-800, 3000), Scale=0.02, Detail=4.0)
+    link(nt, pos, rn.inputs["Vector"])
+    rr_ = node(nt, "ShaderNodeMapRange", (-600, 3000), **{"From Min": 0.48, "From Max": 0.66, "To Max": 0.75})
+    link(nt, rn.outputs["Fac"], rr_.inputs["Value"])
+    red_amt = node(nt, "ShaderNodeMath", (-400, 2800), operation="MULTIPLY")
+    link(nt, bm_.outputs[0], red_amt.inputs[0])
+    link(nt, rr_.outputs["Result"], red_amt.inputs[1])
+    red_col = node(nt, "ShaderNodeRGB", (-600, 2600))
+    red_col.outputs[0].default_value = (0.15, 0.050, 0.018, 1.0)  # 遠くから見た紅葉（赤い葉と針葉樹の混じり。くすんだ橙）
+    can = mix(nt, red_amt.outputs[0], can, red_col.outputs[0], (-300, 2400))
     shade = node(nt, "ShaderNodeMapRange", (-600, 1950), **{"From Min": 0.0, "From Max": 1.0, "To Min": 1.25, "To Max": 0.55})
     link(nt, crown.outputs["Distance"], shade.inputs["Value"])
     can2 = node(nt, "ShaderNodeMix", (-200, 1900))
@@ -464,6 +482,24 @@ def ground_material(name: str, cover: str | None) -> bpy.types.Material:
         c = grass_c
     c = mix(nt, rockf, c, rock_c, (600, 600))
     c = mix(nt, canopy_f, c, canopy_c, (700, 700))
+    # 頂の初雪（標高 2700m より上の、なだらかな所に。まだら）
+    sn_h = node(nt, "ShaderNodeMapRange", (300, 1300), **{"From Min": 2760.0, "From Max": 2950.0})
+    link(nt, sep.outputs["Z"], sn_h.inputs["Value"])
+    sn_f = node(nt, "ShaderNodeMapRange", (300, 1150), **{"From Min": 0.62, "From Max": 0.82})
+    link(nt, nsep.outputs["Z"], sn_f.inputs["Value"])
+    sn_n = node(nt, "ShaderNodeTexNoise", (300, 1000), Scale=0.05, Detail=6.0)
+    link(nt, pos, sn_n.inputs["Vector"])
+    sn_nr = node(nt, "ShaderNodeMapRange", (500, 1000), **{"From Min": 0.38, "From Max": 0.58})
+    link(nt, sn_n.outputs["Fac"], sn_nr.inputs["Value"])
+    sn1 = node(nt, "ShaderNodeMath", (500, 1250), operation="MULTIPLY")
+    link(nt, sn_h.outputs["Result"], sn1.inputs[0])
+    link(nt, sn_f.outputs["Result"], sn1.inputs[1])
+    sn2 = node(nt, "ShaderNodeMath", (650, 1150), operation="MULTIPLY")
+    link(nt, sn1.outputs[0], sn2.inputs[0])
+    link(nt, sn_nr.outputs["Result"], sn2.inputs[1])
+    snow_col = node(nt, "ShaderNodeRGB", (650, 1350))
+    snow_col.outputs[0].default_value = (0.80, 0.83, 0.88, 1.0)
+    c = mix(nt, sn2.outputs[0], c, snow_col.outputs[0], (850, 800))
     r = mix(nt, rockf, gravel_r or grass_r, rock_r, (600, 300), kind="FLOAT") if rock_r else None
     nm = node(nt, "ShaderNodeNormalMap", (900, -400), Strength=0.8)
     nrm_mix = mix(nt, rockf, gravel_n, rock_n, (600, -400))
@@ -688,8 +724,8 @@ def far_material(core: bpy.types.Material) -> bpy.types.Material:
     nt = m.node_tree
     b = nt.nodes["Principled BSDF"]
     mx = next(n for n in nt.nodes if n.type == "MIX")
-    mx.inputs[6].default_value = (0.020, 0.036, 0.022, 1.0)
-    mx.inputs[7].default_value = (0.20, 0.11, 0.028, 1.0)
+    mx.inputs[6].default_value = (0.018, 0.042, 0.022, 1.0)
+    mx.inputs[7].default_value = (0.22, 0.12, 0.026, 1.0)
     ns = nt.nodes.new("ShaderNodeTexNoise")
     ns.inputs["Scale"].default_value = 3.0
     ns.inputs["Detail"].default_value = 6.0
@@ -986,12 +1022,24 @@ def haze() -> None:
     ng.links.new(mix.outputs[2], out.inputs[0])
 
 
-def anim_trees(frames: list[dict], f0: int, f1: int) -> tuple[np.ndarray, tuple | None, np.ndarray]:
-    """動画の f0〜f1 コマで見える木だけ（コマごとの見える向きの和）と、木の細かさを決めるカメラの位置"""
-    cams = np.array([frames[f]["pos"][:2] for f in range(f0, f1 + 1)])
-    fw = np.array([frames[f]["fwd"][:2] for f in range(f0, f1 + 1)])
+def parse_frames(spec: str, n: int) -> list[int]:
+    """コマの指定：「0-120」（両端を含む）か「0,120,240」、組み合わせ「0-23,100」"""
+    out = []
+    for part in spec.split(","):
+        if "-" in part:
+            a_, b_ = (int(v) for v in part.split("-"))
+            out += list(range(a_, min(b_, n - 1) + 1))
+        elif part.strip():
+            out.append(int(part))
+    return sorted(set(f for f in out if 0 <= f < n))
+
+
+def anim_trees(frames: list[dict], todo: list[int]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """描くコマで見える木だけ（コマごとの見える向きの和）と、木の細かさを決めるカメラの位置"""
+    cams = np.array([frames[f]["pos"][:2] for f in todo])
+    fw = np.array([frames[f]["fwd"][:2] for f in todo])
     az = np.degrees(np.arctan2(fw[:, 0], fw[:, 1]))
-    return cams, az, np.array([frames[f]["lens"] for f in range(f0, f1 + 1)])
+    return cams, az, np.array([frames[f]["lens"] for f in todo])
 
 
 def camera_anim(frames: list[dict], f0: int, f1: int) -> None:
@@ -1025,11 +1073,10 @@ def run_anim(a) -> None:
     with open(os.path.join(WORK, "path3.json")) as f:
         P = json.load(f)
     frames = P["frames"]
-    f0, f1 = (int(v) for v in a.frames.split("-"))
-    f1 = min(f1, len(frames) - 1)
+    want = parse_frames(a.frames, len(frames))
     out_dir = a.out or os.path.join(WORK, "frames")
     os.makedirs(out_dir, exist_ok=True)
-    todo = [f for f in range(f0, f1 + 1) if not os.path.exists(os.path.join(out_dir, f"{f:04d}.exr"))]
+    todo = [f for f in want if not os.path.exists(os.path.join(out_dir, f"{f:04d}.exr"))]
     if not todo:
         print("描くコマは残っていない", flush=True)
         return
@@ -1043,7 +1090,7 @@ def run_anim(a) -> None:
     build_water(nm)
     sky_and_sun()
     camera_anim(frames, f0, f1)
-    cams, az, lens = anim_trees(frames, f0, f1)
+    cams, az, lens = anim_trees(frames, todo)
     objs = append_trees()
     half = float(math.degrees(math.atan(18.0 / lens.min())))
     plant_forest(objs, near, nm, valley, vm, cams, view=(az, half))
