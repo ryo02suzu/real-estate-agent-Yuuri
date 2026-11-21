@@ -231,6 +231,36 @@ def merc_lat(y: float) -> float:
     return float(np.degrees(np.arctan(np.sinh(np.pi * (1 - 2 * y)))))
 
 
+# 人口のわりに夜の明かりがとても少ない所（GHSL の人口にかける係数）。北朝鮮は、夜の衛星写真で平壌のほかは街の明かりが
+# ほとんど見えない（人口から決めると、韓国と同じくらい光ってしまう）。見え方を本物の夜の衛星写真に近づけるための係数で、
+# 測った値ではない。国境はおおよそ（数 km の違いは、この絵の大きさでは見えない。海の上も含めてよい）。経度・緯度の多角形
+DIM_ABROAD = [
+    (
+        "北朝鮮",
+        0.05,
+        [
+            (124.25, 39.75), (124.45, 40.05), (124.9, 40.45), (125.4, 40.65), (126.0, 41.05), (126.6, 41.65), (127.2, 41.5),
+            (128.0, 41.6), (128.1, 42.0), (128.9, 42.1), (129.3, 42.4), (129.75, 42.85), (130.25, 42.75), (130.6, 42.45),
+            (130.70, 42.29), (131.2, 42.0), (131.2, 38.6), (128.37, 38.62), (128.0, 38.33), (127.5, 38.30), (127.1, 38.18),
+            (126.68, 37.96), (126.3, 37.80), (126.0, 37.72), (124.5, 37.6), (124.0, 38.5), (124.0, 39.6),
+        ],
+    ),
+]
+
+
+def dim_map(H: int, W: int, px, py) -> np.ndarray:
+    """DIM_ABROAD の係数の地図（格子の画素ごと。外は 1。境目は少しぼかす）"""
+    from PIL import ImageDraw
+
+    out = np.ones((H, W), np.float32)
+    for _, factor, poly in DIM_ABROAD:
+        mask = Image.new("L", (W, H), 0)
+        ImageDraw.Draw(mask).polygon([(float(px(lo)), float(py(la))) for lo, la in poly], fill=255)
+        m = ndimage.gaussian_filter(np.asarray(mask, np.float32) / 255.0, 2.0)
+        out *= 1.0 - (1.0 - factor) * m
+    return out
+
+
 def build(suffix: str, code: np.ndarray, pop: np.ndarray, use_ghsl: bool = True) -> None:
     with open(os.path.join(WORK, f"home_dem{suffix}.json")) as f:
         meta = json.load(f)
@@ -266,6 +296,7 @@ def build(suffix: str, code: np.ndarray, pop: np.ndarray, use_ghsl: bool = True)
         bbox = (gx0 / n * 360 - 180, merc_lat((gy0 + H / TILE) / n), (gx0 + W / TILE) / n * 360 - 180, merc_lat(gy0 / n))
         abroad, _ = ghsl.people_on_grid(H, W, px, py, bbox)
         abroad[cover] = 0.0
+        abroad *= dim_map(H, W, px, py)
         outside = int(round(abroad.sum()))
         people += abroad
         del abroad, cover
