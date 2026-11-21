@@ -61,32 +61,54 @@ from shapely.geometry import MultiPolygon, Point, Polygon, mapping, shape
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+# G空間情報センターの、法務省の地図XMLの組織（47都道府県。地番の筆のタイルと同じ表 scripts/moj_orgs.py）
+sys.path.insert(0, os.path.join(HERE, ".."))
+from moj_orgs import ORGS  # noqa: E402
+
 UA = {"User-Agent": "michilu-kozu (+https://github.com/ryo02suzu/real-estate-agent-Yuuri)"}
 CKAN = "https://www.geospatial.jp/ckan/api/3/action/package_search"
-# G空間情報センターの、法務省の地図XMLの組織（都府県ごと）。対応している4地方（関東・中部・東北・近畿）
-ORGS = {
-    "02": "moj-02aomori", "03": "moj-03iwate", "04": "moj-04miyagi", "05": "moj-05akita", "06": "moj-06yamagata", "07": "moj-07fukushima",
-    "08": "moj-08ibaraki", "09": "moj-09tochigi", "10": "moj-10gunma", "11": "moj-11saitama", "12": "moj-12chiba", "13": "moj-13tokyo", "14": "moj-14kanagawa",
-    "15": "moj-15niigata", "16": "moj-16toyama", "17": "moj-17ishikawa", "18": "moj-18fukui", "19": "moj-19yamanashi", "20": "moj-20nagano",
-    "21": "moj-21gifu", "22": "moj-22shizuoka", "23": "moj-23aichi", "24": "moj-24mie",
-    "25": "moj-25shiga", "26": "moj-26kyoto", "27": "moj-27osaka", "28": "moj-28hyogo", "29": "moj-29nara", "30": "moj-30wakayama",
-}  # fmt: skip
 ESTAT = "https://www.e-stat.go.jp/gis/statmap-search/data?dlserveyId=A002005212020&code={code}&coordSys=1&format=shape&downloadType=5&datum=2011"
 FGD = "https://cyberjapandata.gsi.go.jp/xyz/experimental_fgd/18/{x}/{y}.geojson"
 GEOCODE = "https://msearch.gsi.go.jp/address-search/AddressSearch?q={q}"
-# 平面直角座標系の系（平成14年国土交通省告示第9号。都府県コード → 系の番号。東京都の島しょ部は別の系だが、本土と同じ第IX系で置く）。
-# 置く計算は m の座標でするので、都府県に合った系を使う（系が違うと縮尺・向きが少しずれ、1m の判定に響く）
-ZONES = {
-    "02": 10, "03": 10, "04": 10, "05": 10, "06": 10, "07": 9,
-    "08": 9, "09": 9, "10": 9, "11": 9, "12": 9, "13": 9, "14": 9,
-    "15": 8, "16": 7, "17": 7, "18": 6, "19": 8, "20": 8, "21": 7, "22": 8, "23": 7, "24": 6,
-    "25": 6, "26": 6, "27": 6, "28": 5, "29": 6, "30": 6,
-}  # fmt: skip
+# 国土地理院の市区町村の表（系の表のテストで、系が分かれる道県の市区町村が全部あるかを見る）
+GSI_CODES = os.path.join(HERE, "..", "..", "lib", "roadmap", "data", "gsi-muni-codes.json")
+# 平面直角座標系の系（平成十四年国土交通省告示第九号の「適用区域」。国土地理院 https://www.gsi.go.jp/LAW/heimencho.html）。
+# 置く計算は m の座標でするので、市区町村に合った系を使う（系が違うと縮尺・向きが少しずれ、1m の判定に響く）。
+# 表は scripts/kozu-tiles/zones.json：prefs は都府県ごとの系、split は県の中で系が分かれる道県の市区町村ごとの系
+# （告示の区域の線と島の位置で決めた。決め方は notes。old は法務省の地図XMLにだけある古い市区町村コード）。告示の抜き書き:
+#   I 系「長崎県 鹿児島県のうち北方北緯32度南方北緯27度西方東経128度18分東方東経130度を境界線とする区域内（奄美群島は
+#         東経130度13分までを含む。)にあるすべての島、小島、環礁及び岩礁」、II 系「…鹿児島県（I系に規定する区域を除く。)」
+#   IX 系「東京都（XIV系、XVIII系及びXIX系に規定する区域を除く。)…」、XIV 系「東京都のうち北緯28度から南であり、かつ
+#         東経140度30分から東であり東経143度から西である区域」（XVIII 系はその西、XIX 系は東経143度から東）
+#   XI 系「小樽市 函館市 伊達市 北斗市 北海道後志総合振興局の所管区域 北海道胆振総合振興局の所管区域のうち豊浦町、壮瞥町
+#         及び洞爺湖町 北海道渡島総合振興局の所管区域 北海道檜山振興局の所管区域」、XII 系「北海道（XI系及びXIII系に規定する区域を除く。）」
+#   XIII 系「北見市 帯広市 釧路市 網走市 根室市 北海道オホーツク総合振興局の所管区域のうち美幌町、津別町、斜里町、清里町、
+#         小清水町、訓子府町、置戸町、佐呂間町及び大空町 北海道十勝総合振興局の所管区域 北海道釧路総合振興局の所管区域 北海道根室振興局の所管区域」
+#   XV 系「沖縄県のうち東経126度から東であり、かつ東経130度から西である区域」、XVI 系「沖縄県のうち東経126度から西である区域」、
+#         XVII 系「沖縄県のうち東経130度から東である区域」
+with open(os.path.join(HERE, "zones.json"), encoding="utf-8") as _f:
+    _ZONE_TABLE = json.load(_f)
+ZONES: dict[str, int] = {k: int(v) for k, v in _ZONE_TABLE["prefs"].items()}
+ZONES_BY_MUNI: dict[str, dict[str, int]] = {pref: {c: int(z) for z, cs in zs.items() for c in cs} for pref, zs in _ZONE_TABLE["split"].items()}
 
 
 def zone_of(code: str) -> int:
-    """市区町村コード（か都府県コード）の平面直角座標系の系。表に無い都府県は第IX系（今までどおり）"""
-    return ZONES.get(code[:2], 9)
+    """市区町村コード（5桁。「27382:図面#3」のように後ろに続きがあってもよい）か都府県コード（2桁）の、平面直角座標系の系。
+    県の中で系が分かれる北海道・東京都・鹿児島県・沖縄県は市区町村コードで引く。表に無いコードは止める（違う系で置かない）"""
+    m = re.match(r"(\d{2})(\d{3})?(?!\d)", code)
+    if not m:
+        raise ValueError(f"市区町村コードの書き方が違います: {code!r}")
+    pref = m.group(1)
+    if pref in ZONES:
+        return ZONES[pref]
+    if pref in ZONES_BY_MUNI:
+        if m.group(0) in ZONES_BY_MUNI[pref]:
+            return ZONES_BY_MUNI[pref][m.group(0)]
+        raise ValueError(
+            f"{code}: この道県は市区町村で平面直角座標系の系が分かれますが、系の表（scripts/kozu-tiles/zones.json）に無いコードです（告示の適用区域で確かめて足す）"
+        )
+    raise ValueError(f"{code}: 平面直角座標系の系が分からない都道府県コードです（01〜47）")
 
 
 def zone_epsg(zone: int) -> str:
@@ -94,13 +116,13 @@ def zone_epsg(zone: int) -> str:
     return f"EPSG:{6668 + zone}"
 
 
-# 緯度経度 ⇔ 平面直角座標（m）。市区町村を置き始める前に use_zone で、その都府県の系に切り替える（子プロセスは fork で引き継ぐ）
+# 緯度経度 ⇔ 平面直角座標（m）。市区町村を置き始める前に use_zone で、その市区町村の系に切り替える（子プロセスは fork で引き継ぐ）
 TO_M = Transformer.from_crs("EPSG:4326", zone_epsg(9), always_xy=True)
 TO_LL = Transformer.from_crs(zone_epsg(9), "EPSG:4326", always_xy=True)
 
 
 def use_zone(code: str) -> int:
-    """市区町村コードの都府県の系に切り替える。系の番号を返す"""
+    """市区町村コードの系に切り替える。系の番号を返す（系の表に無いコードは止める）"""
     global TO_M, TO_LL
     zone = zone_of(code)
     TO_M = Transformer.from_crs("EPSG:4326", zone_epsg(zone), always_xy=True)
@@ -853,11 +875,14 @@ def to_ll(g):
     return {"type": m["type"], "coordinates": conv(m["coordinates"])}
 
 
-def plan(prefs: list[str], year: str | None, chunk_mb: float) -> dict:
-    """都県の地図XMLの zip（市区町村ごと）を、大きさで束ねてジョブに分ける（GitHub Actions の matrix）。年を省けば一番新しい年。
-    chunk_mb より大きい市区町村は、図面をいくつかの組に分けて別のジョブにする（「12219:2/3」）"""
+def plan(prefs: list[str], year: str | None, chunk_mb: float, check_zones: bool = True) -> dict:
+    """都道府県の地図XMLの zip（市区町村ごと）を、大きさで束ねてジョブに分ける（GitHub Actions の matrix）。年を省けば一番新しい年。
+    chunk_mb より大きい市区町村は、図面をいくつかの組に分けて別のジョブにする（「12219:2/3」）。
+    check_zones：どの市区町村も平面直角座標系の系が決まるかを先に確かめる（決まらなければ、ジョブを始める前に止める）"""
     zips = []
-    for pref in prefs:
+    for pref in (p.strip() for p in prefs):
+        if pref not in ORGS:
+            raise SystemExit(f"都道府県コードが違います: {pref!r}（01〜47 の2桁）")
         data = json.loads(get(f"{CKAN}?fq=organization:{ORGS[pref]}&rows=1000"))
         for pkg in data["result"]["results"]:
             for res in pkg["resources"]:
@@ -869,6 +894,15 @@ def plan(prefs: list[str], year: str | None, chunk_mb: float) -> dict:
     for code, y, size in zips:
         if y == year:
             sizes[code] = sizes.get(code, 0) + size
+    if check_zones:
+        bad = []
+        for code in sorted(sizes):
+            try:
+                zone_of(code)
+            except ValueError as e:
+                bad.append(str(e))
+        if bad:
+            raise SystemExit("平面直角座標系の系が決まらない市区町村があります:\n" + "\n".join(bad))
     items: list[tuple[str, float]] = []
     for code, size in sizes.items():
         mb = size / 1e6
@@ -988,9 +1022,76 @@ def resolve(src: str, out: str, stats_out: str | None, high_only: bool = False) 
         json.dump(summary, open(stats_out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
 
+def zone_test() -> None:
+    """法務省の組織の表と平面直角座標系の系の表のテスト（47都道府県のすべて・告示の適用区域のとおり・分からないコードは止める）"""
+    all_prefs = [f"{i:02d}" for i in range(1, 48)]
+    assert sorted(ORGS) == all_prefs and all(re.fullmatch(rf"moj-{k}[a-z]+", v) for k, v in ORGS.items()), ORGS
+    # 系は、都道府県ごとの系か、市区町村ごとの系（北海道・東京都・鹿児島県・沖縄県）のどちらか一方
+    assert sorted([*ZONES, *ZONES_BY_MUNI]) == all_prefs and sorted(ZONES_BY_MUNI) == ["01", "13", "46", "47"]
+    assert all(1 <= z <= 19 for z in [*ZONES.values(), *(z for m in ZONES_BY_MUNI.values() for z in m.values())])
+    # 告示の適用区域で確かめた例（政令市は区のコード）
+    samples = {
+        "01101": 12,  # 札幌市中央区（XI 系・XIII 系に名前の無い市）
+        "01202": 11,  # 函館市（XI 系に名前がある）
+        "01206": 13,  # 釧路市（XIII 系に名前がある）
+        "01584": 11,  # 洞爺湖町（胆振のうち XI 系の町）
+        "01213": 12,  # 苫小牧市（胆振の市で、告示に名前が無い）
+        "01219": 12,  # 紋別市（オホーツクの市で、告示に名前が無い）
+        "01543": 13,  # 美幌町（オホーツクのうち XIII 系の町）
+        "01572": 11,  # 虻田町（法務省の地図XMLの古いコード。今は洞爺湖町）
+        "01439": 12,  # 幌加内町（法務省の地図XMLの古いコード）
+        "47201": 15,  # 那覇市
+        "47207": 16,  # 石垣市（東経126度より西）
+        "47214": 16,  # 宮古島市（東経126度より西）
+        "47358": 17,  # 北大東村（東経130度より東）
+        "46222": 1,  # 奄美市（奄美群島）
+        "46304": 1,  # 十島村
+        "46201": 2,  # 鹿児島市
+        "46209": 2,  # 大口市（法務省の地図XMLの古いコード。今は伊佐市）
+        "40131": 2,  # 福岡市東区
+        "42201": 1,  # 長崎市
+        "34101": 3,  # 広島市中区
+        "37201": 4,  # 高松市
+        "33101": 5,  # 岡山市北区
+        "13101": 9,  # 千代田区
+        "13421": 14,  # 小笠原村
+        "14109": 9,  # 横浜市港北区
+        "27141": 6,  # 堺市堺区
+        "28204": 5,  # 西宮市
+        "02201": 10,  # 青森市
+    }
+    for code, zone in samples.items():
+        assert zone_of(code) == zone, (code, zone_of(code), zone)
+    # まとめ（resolve）は切れ端の名前（「市区町村コード:図面#番号」）で引く。系が1つの都府県は2桁でもよい
+    assert zone_of("27382:河南町#3") == 6 and zone_of("01202:函館#0") == 11 and zone_of("14") == 9
+    # 分からないコードは止める（前は第IX系で置いていた）。系が分かれる道県は、2桁や表に無い市区町村では決めない
+    for bad in ("48001", "00000", "99", "01999", "01", "13", "46", "47999", "4720", "472010", "abc", ""):
+        try:
+            zone_of(bad)
+        except ValueError:
+            continue
+        raise AssertionError(f"止まらなかった: {bad!r}")
+    # 国土地理院の市区町村の表の、系が分かれる道県の市区町村は全部、表にある
+    gsi = json.load(open(GSI_CODES, encoding="utf-8"))
+    for name in ("北海道", "東京都", "鹿児島県", "沖縄県"):
+        for code in gsi[name]:
+            zone_of(code)
+    # 系の番号 → JGD2011 の EPSG。切り替えると、その系の平面直角座標で計算する（告示の座標系原点が 0, 0 になる）
+    assert zone_epsg(1) == "EPSG:6669" and zone_epsg(19) == "EPSG:6687"
+    for code, origin in (("47207", (124.0, 26.0)), ("01206", (144.25, 44.0)), ("46222", (129.5, 33.0)), ("14109", (139 + 50 / 60, 36.0))):
+        use_zone(code)
+        x, y = TO_M.transform(*origin)
+        assert abs(x) < 0.01 and abs(y) < 0.01, (code, x, y)
+        lon, lat = TO_LL.transform(0.0, 0.0)
+        assert abs(lon - origin[0]) < 1e-9 and abs(lat - origin[1]) < 1e-9, (code, lon, lat)
+
+
 def self_test() -> None:
-    """まとめ（resolve）のテスト：やり直した市区町村は新しい回の結果だけを使う・確度の高い推定だけの書き出し。通信はしない"""
+    """まとめ（resolve）のテスト：やり直した市区町村は新しい回の結果だけを使う・確度の高い推定だけの書き出し。
+    系の表と法務省の組織の表のテスト（zone_test）。通信はしない"""
     import tempfile
+
+    zone_test()
 
     def square(x: float) -> str:
         return f"POLYGON (({x} 0, {x + 10} 0, {x + 10} 10, {x} 10, {x} 0))"
@@ -1036,7 +1137,7 @@ def main() -> None:
     if "--self-test" in sys.argv[1:]:
         return self_test()
     ap = argparse.ArgumentParser()
-    ap.add_argument("--plan", help="都府県コード（カンマ区切り。02〜30）。ジョブの分け方を JSON で書き出すだけ")
+    ap.add_argument("--plan", help="都道府県コード（カンマ区切り。01〜47 の全部に対応）。ジョブの分け方を JSON で書き出すだけ")
     ap.add_argument("--chunk-mb", type=float, default=100, help="1つのジョブで扱う地図XMLの zip の大きさの目安（MB）")
     ap.add_argument("--codes", help="市区町村コード（カンマ区切り。政令市は区。「12219:2/3」は図面を3組に分けた2組目）")
     ap.add_argument("--year", help="地図XMLの年（省略時は一番新しい年）")
@@ -1062,7 +1163,7 @@ def main() -> None:
         ap.error("--codes と --out が要ります")
     deadline = time.time() + a.minutes * 60 if a.minutes else None
     items = [parse_item(s) for s in a.codes.split(",")]
-    a.year = a.year or plan([items[0][0][:2]], None, 1e9)["year"]
+    a.year = a.year or plan([items[0][0][:2]], None, 1e9, check_zones=False)["year"]
     os.makedirs(a.work, exist_ok=True)
     all_stats = {}
     with open(a.out, "w", encoding="utf-8") as fo, open(a.frags or os.devnull, "w", encoding="utf-8") as ff:
@@ -1074,8 +1175,9 @@ def main() -> None:
                 continue
             t0 = time.time()
             zp = None
-            use_zone(code)
             try:
+                # 系の表に無い市区町村コードは、この市区町村の失敗として数える（--plan で先に確かめている）
+                use_zone(code)
                 zp = moj_zip(code, a.year, a.work)
                 sheets, public = read_zip(zp)
                 sheets = split_sheets(sheets, i, n)
