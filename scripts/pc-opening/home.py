@@ -36,6 +36,7 @@ EARTH = 40075016.7  # 赤道の長さ（m）
 
 # 時刻の版（--tod）。カメラ・構図・地面は同じで、光（太陽か月の向き・高さ・色、空の光、かすみ、街の明かり）だけを変える。
 # 方位は北 0°・東 90°。太陽の色は高さから（film.py の sun_color：空気を長く通るほど赤い）。色は藍・金・白の中で。
+#   az・el  太陽（月）の方位・高さ（影の向きと長さ）   tint  光の色に使う太陽の高さ（朝夕は低めにして金・茜を濃く。無ければ el）
 #   energy  太陽（月）の強さ       sky   空の光（色、強さ）      sat  地面の色の鮮やかさ（夜は色が見えにくい）
 #   stops   今の絵（--tod なし）と比べた明るさ（段。地面に届く光の量の違いは、露出で自動で打ち消してから、これだけ変える）
 #   haze    かすみの色（空気が散らす光。地面に届く光の量に比例させる。今の絵は (0.20, 0.32, 0.55)）
@@ -43,11 +44,11 @@ EARTH = 40075016.7  # 赤道の長さ（m）
 #   glow    明かりのにじみ（仕上げ。夜だけ）
 TOD = {
     # 朝：東から低い朝日。光は金、影の側は空の青
-    "morning": dict(az=104.0, el=13.0, energy=4.4, sky=((0.40, 0.50, 0.74), 0.30), sat=1.0, stops=-0.15, haze=(0.24, 0.30, 0.50), lights=0.0, glow=0.0),
+    "morning": dict(az=104.0, el=12.0, tint=6.0, energy=4.6, sky=((0.40, 0.50, 0.74), 0.22), sat=1.0, stops=-0.15, haze=(0.22, 0.30, 0.54), lights=0.0, glow=0.0),
     # 昼：南の高い太陽。白い光、空の青いかすみ
-    "day": dict(az=168.0, el=56.0, energy=4.6, sky=((0.36, 0.52, 0.80), 0.38), sat=1.0, stops=0.15, haze=(0.20, 0.32, 0.55), lights=0.0, glow=0.0),
+    "day": dict(az=160.0, el=50.0, energy=4.6, sky=((0.36, 0.52, 0.80), 0.38), sat=1.0, stops=0.15, haze=(0.20, 0.32, 0.55), lights=0.0, glow=0.0),
     # 夕：西から低い夕日。光は茜がかった金、影は藍。街の明かりがともり始める
-    "dusk": dict(az=256.0, el=8.0, energy=3.6, sky=((0.30, 0.30, 0.52), 0.24), sat=0.95, stops=-0.6, haze=(0.30, 0.26, 0.48), lights=0.08, glow=0.0),
+    "dusk": dict(az=256.0, el=8.0, tint=3.5, energy=3.6, sky=((0.30, 0.30, 0.52), 0.24), sat=0.95, stops=-0.6, haze=(0.30, 0.26, 0.48), lights=0.08, glow=0.0),
     # 夜：南東の高い月の青い光で、陸と海の境目がうっすら分かる。人が住んでいる所に街の明かり
     "night": dict(az=150.0, el=42.0, energy=0.10, moon=(0.56, 0.68, 1.0), sky=((0.05, 0.08, 0.18), 0.10), sat=0.35, stops=-3.0, haze=(0.06, 0.10, 0.25), lights=0.25, glow=0.25),
 }
@@ -65,7 +66,7 @@ def ground_light(el: float, energy: float, color, sky) -> float:
 
 
 def tod_color(p: dict):
-    return p["moon"] if "moon" in p else sun_color(p["el"])
+    return p["moon"] if "moon" in p else sun_color(p.get("tint", p["el"]))
 
 
 def tod_gain(p: dict) -> float:
@@ -224,8 +225,9 @@ def tod_lights(p: dict) -> None:
     ob.rotation_quaternion = Vector((0.0, 0.0, 1.0)).rotation_difference(Vector(d))
 
 
-def finish(haze: float, color=(0.20, 0.32, 0.55), glow: float = 0.0) -> None:
-    """仕上げ：宇宙から見たときの、空気のうっすらした青いかすみ（時刻の版は、かすみの色と、夜の街の明かりのにじみ）"""
+def finish(haze: float, color=(0.20, 0.32, 0.55), glow: float = 0.0, exposure: float = 0.0) -> None:
+    """仕上げ：宇宙から見たときの、空気のうっすらした青いかすみ（時刻の版は、かすみの色と、夜の街の明かりのにじみ）。
+    合成は露出の前の光の量なので、にじませる明るさの境目は露出で割る"""
     sc = bpy.context.scene
     ng = bpy.data.node_groups.new("finish", "CompositorNodeTree")
     ng.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
@@ -239,7 +241,7 @@ def finish(haze: float, color=(0.20, 0.32, 0.55), glow: float = 0.0) -> None:
         gl = ng.nodes.new("CompositorNodeGlare")
         gl.inputs["Type"].default_value = "Fog Glow"
         gl.inputs["Quality"].default_value = "High"
-        gl.inputs["Threshold"].default_value = 0.35
+        gl.inputs["Threshold"].default_value = 0.5 / 2**exposure
         gl.inputs["Strength"].default_value = glow
         gl.inputs["Size"].default_value = 0.5
         ng.links.new(img, gl.inputs["Image"])
@@ -323,7 +325,7 @@ def main() -> None:
         # 地面に届く光の量の違いは露出で打ち消し、stops だけ明るさを変える。かすみ（空気が散らす光）は光の量に比例
         g = tod_gain(tod)
         sc.view_settings.exposure = 0.3 - math.log2(g) + tod["stops"]
-        finish(0.06, tuple(c * g for c in tod["haze"]), tod["glow"])
+        finish(0.06, tuple(c * g for c in tod["haze"]), tod["glow"], sc.view_settings.exposure)
         print(f"{a.tod}：地面に届く光 {g:.3f} 倍、露出 {sc.view_settings.exposure:+.2f}", flush=True)
     tail = f"_{a.tod}" if a.tod else ""
     out = a.out or os.path.join(WORK, "home", f"home_wide{tail}.png" if a.extent else f"home_{W}x{H}{tail}.png")

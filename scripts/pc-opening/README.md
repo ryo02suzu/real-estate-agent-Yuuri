@@ -49,6 +49,26 @@ python3 atmos.py final --jobs 4                      # 2つの場面をつなぎ
 python3 encode.py                                    # → public/opening/opening-av1.webm・opening.mp4
 ```
 
+### PC のホームの背景：時刻の版（朝・昼・夕・夜）
+
+今の背景（`home.py --extent`、朝の光）と同じ構図・同じ四隅のまま、光だけを変えた4枚。アプリは今のところ使っていない
+（時刻に合わせて出し分け、溶かして替えるのは、あとで組み込むとき）。
+
+```bash
+python3 night_lights.py                     # 国勢調査の人口 → 夜の街の明かり（work/night_lights{,_w}.npy・.png・.json。e-Stat から約 150 回、間をあけて取る）
+python home.py --extent --tod night         # → work/home/home_wide_night.png（--tod は morning・day・dusk・night）
+python home.py --view 1440x900 --scale 0.6667 --spp 8 --tod dusk --out 見本.png   # 小さく試す（960×600）
+```
+
+- `--tod` を付けないときは、今までと同じ絵（アプリの絵）を描く。
+- 朝：東から低い金の光（影は空の青）。昼：南の高い白い光。夕：西から低い茜の光、影は藍、街の明かりがともり始める。
+  夜：南東の月の青い光で陸と海の境目がうっすら分かり、人が住んでいる所に街の明かり（琥珀〜白に近い金）。
+  地面に届く光の量の違いは露出で打ち消し、`TOD` の `stops` だけ明るさを変える（夜は今の絵より 3 段暗い）。
+- 街の明かりは、人が住んでいる所だけに出す（作り物の明かりは足さない）。明るさは 500m メッシュの人口を画素に面積の割合で
+  分けた人口密度の 0.6 乗（1 万人/km² で 1）。約 2〜25 人/km² より少ない所はなめらかに消し、街のまわりに少しにじみを足す。
+  人口は常住人口なので、人の住まない都心のビル街・工場・港・道路は、本物の夜景より暗い。日本の外（韓国・中国など）は
+  このデータに無いので、明かりは無い。
+
 `film.py` は `--frames 126-200`・`--every 8`（間引いて先に流れを見る）・`--res`・`--spp` を選べる。`encode.py --preview` は、
 間引いて描いたコマから仮の動画を作る（足りないコマは前のコマをくり返す）。`swans.py --look` は白鳥の形を近くから確かめる。
 
@@ -64,7 +84,8 @@ python3 encode.py                                    # → public/opening/openin
 | `atmos.py` | 奥行きを使って空気を足す。列島の場面：地球の大気（空気の分子とちりの散乱・地球の丸い影）。上高地の場面：低い所ほど濃いかすみ、山の影で分かれる光の筋、谷底の朝もや。仕上げ：光のにじみ・AgX の色・金色の光と藍の影・雲の中・粒 |
 | `encode.py` | 最後のコマ → AV1（WebM）と H.264（MP4） |
 | `logo_assets.py` | ロゴを、出し方のための部品（光の点・円弧・山・文字 1 字ずつ・波・金の所）に分ける（形は変えない） |
-| `home_prep.py`・`home.py` | 真上から見た日本（PC のホームの背景） |
+| `home_prep.py`・`home.py` | 真上から見た日本（PC のホームの背景）。`home.py --tod` は時刻の版 |
+| `night_lights.py` | 夜の街の明かり（国勢調査の 500m メッシュの人口 → home_prep.py と同じ格子の明るさ） |
 | `assets/michilu-logo.webp` | 金と白のロゴ（元の画像） |
 | `work/` | 取ってきたタイル・描いたコマ・動画（Git には入れない） |
 
@@ -79,5 +100,6 @@ python3 encode.py                                    # → public/opening/openin
 | 国土地理院 全国ランドサットモザイク画像（`lndst`、ズーム 8） | 列島の場面の、日本の陸の色 | 「■2」。備考の原文：「データソース：Landsat8画像（GSI,TSIC,GEO Grid/AIST）, Landsat8画像（courtesy of the U.S. Geological Survey）, 海底地形（GEBCO）」も合わせて書く |
 | 国土地理院 世界衛星モザイク画像（`modis`、ズーム 7） | 列島の場面の、まわりの国の陸の色 | 「■2」。備考の英文の出所（LP DAAC・USGS/EROS）も合わせて書く |
 | AWS Terrain Tiles（terrarium、ズーム 8） | 列島の場面の、陸と海の境目・山の起伏 | 出典は元のデータごと（[attribution.md](https://github.com/tilezen/joerd/blob/master/docs/attribution.md)）。海は ETOPO1（NOAA。「Not to be used for navigation.」）、陸は SRTM・GMTED2010（USGS）など |
+| e-Stat「令和2年国勢調査に関する地域メッシュ統計」（総務省）4次メッシュ（500m）「人口及び世帯（JGD2011）」（統計表 T001141。人口（総数）だけ使う） | ホームの背景の時刻の版の、夜と夕の街の明かり | [e-Stat 利用規約](https://www.e-stat.go.jp/terms-of-use)（政府標準利用規約（第2.0版）に準拠、CC BY 4.0 と互換。統計地理情報システムのデータも[同じ規約に準じる](https://www.e-stat.go.jp/gis-terms)）。出典を書き、編集・加工したことも書く。加工したものを国が作ったように見せない。出典の書き方：「夜の街の明かり：政府統計の総合窓口（e-Stat）の「令和2年国勢調査に関する地域メッシュ統計」（総務省）の500mメッシュの人口を加工して作成」（`night_lights.py` の `ATTRIBUTION`） |
 
 空（Blender の空の計算）・雲・かすみ・白鳥は、データを使わずに計算で描いたもの。使わないもの：NASA の衛星画像を直接、Google の地図や 3D の画像。
