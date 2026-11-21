@@ -455,20 +455,40 @@ class Clouds:
     """カメラのまわりの薄い雲（3次元のゆらぎ。カメラに対して流れる）。画面の色で重ねる（半分の大きさで数えて広げる）"""
 
     def __init__(self) -> None:
-        self.g = np.random.default_rng(17).random((64, 64, 64)).astype(np.float32)
+        g = np.random.default_rng(17).random((64, 64, 64)).astype(np.float32)
+        # なめらかにつなぐ（3次のスプライン）。直線でつなぐと、格子の面で折れ目ができ、画面に縦・横の筋が出る
+        self.coef = ndimage.spline_filter(g, order=3, mode="grid-wrap")
+        # ゆらぎの格子をカメラの軸から斜めに置く（格子の向きの癖が、画面の縦・横にそろわないように）
+        q, _ = np.linalg.qr(np.random.default_rng(5).normal(size=(3, 3)))
+        self.rot = q.astype(np.float32)
 
     def field(self, p: np.ndarray) -> np.ndarray:
-        """ゆらぎ（0〜1）。p は m（…, 3）"""
+        """ゆらぎ（0〜1 のあたり）。p は m（…, 3）"""
         out = np.zeros(p.shape[:-1], np.float32)
         tot = 0.0
+        pr = p @ self.rot.T
         for scale, amp in ((70.0, 1.0), (28.0, 0.5), (11.0, 0.25)):
-            q = p / scale
-            out += amp * ndimage.map_coordinates(self.g, [q[..., 0] % 64, q[..., 1] % 64, q[..., 2] % 64], order=1, mode="grid-wrap")
+            q = pr / scale
+            out += amp * ndimage.map_coordinates(self.coef, [q[..., 0] % 64, q[..., 1] % 64, q[..., 2] % 64], order=3, mode="grid-wrap", prefilter=False)
             tot += amp
-        return out / tot
+        # なめらかにつなぐと値の散らばりが大きくなる（標準偏差 0.154）。直線でつないでいたときの散らばり（0.103）に戻し、
+        # 雲の濃さ（amount）と覆う割合の関係を前と同じにする（雲が晴れていく速さを変えない）
+        return (out / tot - 0.4986) * 0.665 + 0.4985
 
-    def layer(self, f: int, scene: str, W: int, H: int, amount: float, flow: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """雲の色（画面の色）と、覆う割合。flow はカメラから見た雲の流れ（右・上・前 m/秒）"""
+    def layer(
+        self,
+        f: int,
+        scene: str,
+        W: int,
+        H: int,
+        amount: float,
+        flow: np.ndarray,
+        lit: tuple = (1.0, 0.955, 0.885),
+        shade: tuple = (0.86, 0.855, 0.86),
+        bias: float = 0.0,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """雲の色（画面の色。覆う割合をかけ済み）と、覆う割合。flow はカメラから見た雲の流れ（右・上・前 m/秒）。
+        lit は朝日に照らされた所、shade は影の所の色。bias を上げると、同じ濃さでも雲の所が減る"""
         w, h = W // 2, H // 2
         t = f / P.FPS
         cam = P.camera(scene, f)
@@ -479,13 +499,13 @@ class Clouds:
         ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
         d = np.stack([(xs + 0.5 - w / 2) / fpx, -(ys + 0.5 - h / 2) / fpx, np.ones_like(xs)], -1)
         d /= np.linalg.norm(d, axis=-1, keepdims=True)
-        thr = 0.72 - 0.42 * amount  # 濃くなるほど、雲の所が増える
+        thr = 0.72 - 0.42 * amount + bias  # 濃くなるほど、雲の所が増える
         k = 0.05 + 0.5 * amount**2
         N = 22
         col = np.zeros((h, w, 3), np.float32)
         trans = np.ones((h, w), np.float32)
-        lit_c = np.array([1.0, 0.955, 0.885], np.float32)  # 朝日に照らされた雲（暖かい白）
-        shade_c = np.array([0.86, 0.855, 0.86], np.float32)
+        lit_c = np.array(lit, np.float32)  # 朝日に照らされた雲（暖かい白）
+        shade_c = np.array(shade, np.float32)
         off = flow * t
         for i in range(N):
             z0 = 2.0 + 260.0 * (i / N) ** 2
@@ -548,8 +568,12 @@ def compose_final(out: str, frames: list[int], post: str) -> None:
             H, W = v.shape[:2]
             ending = t > P.CUT_LOCAL + 2.0
             flow = np.array([0.0, -95.0, 30.0], np.float32) if ending else np.array([0.0, 0.0, 140.0], np.float32)
-            col, alpha = clouds.layer(f, scene, W, H, amount, flow)
-            v = v * (1.0 - alpha[..., None]) + col * alpha[..., None]
+            # 最後は、朝日の中の薄い雲へ上がる（灰色の霧に入るのではなく、光の中の白へ）
+            tint = {"lit": (1.0, 0.962, 0.9), "shade": (0.93, 0.925, 0.915)} if ending else {}
+            # 上高地に入ったあとの雲は、前へ飛ぶ向きに流れるぶん厚く見えるので、少し早く晴らす（谷が見えてくる速さを決めた形に合わせる）
+            bias = 0.08 if (scene == "local" and not ending) else 0.0
+            col, alpha = clouds.layer(f, scene, W, H, amount, flow, bias=bias, **tint)
+            v = v * (1.0 - alpha[..., None]) + col  # col は覆う割合をかけ済みの色（もう一度かけると、薄い雲が空より暗い灰色になる）
             if ending:  # 最後はむらのない白へ
                 e = float(smoothstep(P.T_END - 0.35, P.T_END - 1.0 / P.FPS, t))
                 v = v * (1 - e) + np.array(END_WHITE, np.float32) * e
