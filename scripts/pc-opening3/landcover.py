@@ -4,6 +4,8 @@
   python3 landcover.py      # → work/landcover/near_cover.png（R=水・G=川原の石・B=岩・A=森。near の標高の格子の範囲、2倍の細かさ）
                             #   work/terrain/near_carved.npy（川床をならした near の標高。川原は平らに、流れは少し低く）
                             #   work/landcover/trees.npz（x, y：場面の座標 m、kind：0 モミ・1 カラマツ・2 川岸の若木、size：大きさの倍率）
+                            #   work/landcover/rocks.npz（川原と浅い流れの石・流木）・plants.npz（森の床のシダ・川原の草むら）
+                            #   work/landcover/near_depth.png（水深。1.2m で白）・near_wet.png（水際の濡れ）
                             #   work/landcover/check.jpg（確かめ用）
 
 航空写真はつぎはぎ（撮った日・向きの違う写真）で、色から水や石を分けると、つぎ目で崩れる。そこで川は、写真から目で写した
@@ -46,6 +48,33 @@ def smooth_noise(s: np.ndarray, period: float, seed: int) -> np.ndarray:
         total += amp
         amp *= 0.55
     return out / total
+
+
+def aniso_noise(s: np.ndarray, v: np.ndarray, cell_s: float, cell_v: float, sigma: float, seed: int, s_max: float, v_max: float = 200.0) -> np.ndarray:
+    """川に沿った座標（s：川に沿った距離、v：横の距離。m）の、流れの向きに長いゆらぎ（平均 0・ばらつき 1）。
+    川原の州（寄州・中州）や、くぼみ（わきの流れ）は、流れの向きに長い"""
+    rng = np.random.default_rng(seed)
+    ns = int(s_max / cell_s) + 6
+    nv = int(2 * v_max / cell_v) + 6
+    g = ndimage.gaussian_filter(rng.normal(0, 1, (ns, nv)), sigma)
+    g = (g - g.mean()) / g.std()
+    return ndimage.map_coordinates(g, [np.clip(s / cell_s + 2, 0, ns - 1), np.clip((v + v_max) / cell_v + 2, 0, nv - 1)], order=1, mode="nearest")
+
+
+def smooth_field(px: np.ndarray, py: np.ndarray, cell: float, sigma: float, seed: int) -> np.ndarray:
+    """場面の座標（m）の、なめらかなまだら（平均 0・ばらつき 1）。cell m の格子の乱数を sigma 升でぼかす"""
+    rng = np.random.default_rng(seed)
+    x0, y0 = float(px.min()), float(py.min())
+    nx = int((px.max() - x0) / cell) + 6
+    ny = int((py.max() - y0) / cell) + 6
+    g = ndimage.gaussian_filter(rng.normal(0, 1, (ny, nx)), sigma)
+    g = (g - g.mean()) / g.std()
+    return ndimage.map_coordinates(g, [(py - y0) / cell + 2, (px - x0) / cell + 2], order=1, mode="nearest")
+
+
+def sstep(e0: float, e1: float, x):
+    t = np.clip((np.asarray(x) - e0) / (e1 - e0), 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
 
 
 def pond_radius(dx: np.ndarray, dy: np.ndarray) -> np.ndarray:
@@ -107,17 +136,29 @@ def main() -> None:
     zc = np.maximum.accumulate(zc)  # s が大きいほど高い
     zbed = np.interp(s_g, ss, zc)
     # 幅（川原・流れ）。大正池に近いほど広い
-    wg = 17.0 + 9.0 * smooth_noise(s_g, 520.0, 1) + np.interp(s_g, [0, 150, 350], [45, 12, 0])
+    wg = 20.0 + 9.0 * smooth_noise(s_g, 520.0, 1) + np.interp(s_g, [0, 150, 350], [45, 12, 0])
     off = 0.40 * wg * smooth_noise(s_g, 380.0, 2)  # 流れは川原の中を蛇行する
-    ww = 6.0 + 2.5 * smooth_noise(s_g, 260.0, 3)
-    signed = d_g * side_g
+    ww = 10.0 + 4.0 * smooth_noise(s_g, 260.0, 3)  # 流れの幅の半分（12〜28m の流れ）
+    signed = np.where(np.isfinite(d_g), d_g * side_g, 1e4)
     in_bed = d_g < wg
     in_water = np.abs(signed - off) < ww
     bank = np.clip((d_g - wg) / 22.0, 0.0, 1.0)  # 川原の外 22m で元の地面へ
-    bump = 0.35 * ndimage.gaussian_filter(np.random.default_rng(5).normal(0, 1, dem.shape), 2.0)
     carved = dem.copy()
-    zband = np.where(in_water, zbed - 0.6, zbed + 0.25 + np.maximum(bump, -0.2))
-    zband = ndimage.gaussian_filter(zband, 1.3)  # 流れと川原の境目の段差を、なだらかな水際に
+    # 川床の形（前は流れの帯を一様に掘っただけで、水際がなめらかな線になり、用水路のように見えた）：
+    #   ・流れ：真ん中ほど深い（約 0.85m）。約 85m おきに瀬（浅く速い所。白い波が立つ）と淵（深い所）
+    #   ・川原：流れから離れるほど少し高い。流れの向きに長い州（長さ約 60m・幅約 16m）と小さな高まり・くぼみ
+    #   水面（下の level）と川床の交わりが水際になるので、水際は入り組み、中州・わきの流れ・たまりが自然にできる
+    s_max = float(ss[-1]) + 50.0
+    q = np.abs(signed - off) / np.maximum(ww, 1.0)  # 流れの真ん中で 0、流れの縁で 1
+    n1 = aniso_noise(s_g, signed, 15.0, 4.0, 2.0, 21, s_max)
+    n2 = aniso_noise(s_g, signed, 6.0, 2.5, 1.5, 22, s_max)
+    riffle = sstep(0.55, 0.85, 0.5 + 0.5 * np.sin(2 * np.pi * s_g / 85.0 + 1.3))
+    ch = 0.85 * np.clip(1.0 - q ** 4, 0.0, 1.0) * (1.0 - 0.45 * riffle)  # 底は平らめ、縁で浅く
+    wn = 0.35 + 0.65 * sstep(0.6, 1.4, q)  # 流れの真ん中では、州のゆらぎを弱く（流れが途切れない）
+    zrel = 0.08 + 0.30 * np.clip((q - 1.0) / 2.0, 0.0, 1.0) + wn * (0.30 * n1 + 0.10 * n2) - ch
+    zrel = np.where(q < 0.75, np.minimum(zrel, -0.27), zrel)  # 流れの真ん中は水深 0.12m 以上（流れが途切れない）
+    zband = zbed + zrel
+    zband = ndimage.gaussian_filter(np.where(np.isfinite(zband), zband, dem), 0.7)
     near_bank = d_g < wg + 22.0
     carved[near_bank] = zband[near_bank] * (1 - bank[near_bank]) + dem[near_bank] * bank[near_bank]
     # 大正池：池の水面（まわりより低く平ら）
@@ -137,6 +178,10 @@ def main() -> None:
     np.save(os.path.join(WORK, "terrain", "water_level.npy"), level.astype(np.float32))
     # 水深（瀬の白い波に使う）と、流れの向き（下流へ。川の真ん中の線の向きの逆。池はほとんど流れない）
     depth = np.where(np.isnan(level), 0.0, np.clip(level - carved, 0.0, 3.0))
+    # 白い波とさざ波は、流れの瀬だけ（淵・池・わきのたまりは静か）。水の材料は水深 0.28m より浅い所に波を立てるので、
+    # 瀬の外は 0.32m 以上として渡す
+    rif_core = (riffle > 0.3) & (q < 1.15) & ~(pond_r < 1.0)
+    depth = np.where(rif_core, depth, np.maximum(depth, 0.32))
     tx = np.gradient(fine[:, 0])
     ty = np.gradient(fine[:, 1])
     tn = np.hypot(tx, ty) + 1e-9
@@ -162,14 +207,16 @@ def main() -> None:
     side_c = np.zeros((H, W))
     dd, sv, sd = polyline_frame(CX[cbox], CY[cbox], fine)
     d_c[cbox], s_c[cbox], side_c[cbox] = dd, sv, sd
-    wg_c = 17.0 + 9.0 * smooth_noise(s_c, 520.0, 1) + np.interp(s_c, [0, 150, 350], [45, 12, 0])
-    off_c = 0.40 * wg_c * smooth_noise(s_c, 380.0, 2)
-    ww_c = 6.0 + 2.5 * smooth_noise(s_c, 260.0, 3)
-    water_c = (np.abs(d_c * side_c - off_c) < ww_c) & (d_c < wg_c)
+    wg_c = 20.0 + 9.0 * smooth_noise(s_c, 520.0, 1) + np.interp(s_c, [0, 150, 350], [45, 12, 0])
+    # 水の所は、水面（level）が川床より高い所（川床の州・くぼみで、入り組んだ水際になる）
+    z_c = ndimage.zoom(carved, COVER_SCALE, order=1)
+    lv_c = ndimage.zoom(np.nan_to_num(level, nan=-1e4), COVER_SCALE, order=1)
+    dep_c = lv_c - z_c
+    water_c = (dep_c > 0.02) & (d_c < wg_c + 3.0)
     pond_c = pond_radius(CX - px_, CY - py_) < 1.0
     water_c |= pond_c
     gravel_c = (d_c < wg_c) & ~water_c
-    z_c = ndimage.zoom(carved, COVER_SCALE, order=1)
+    Image.fromarray((np.clip(np.where(water_c, dep_c, 0.0) / 1.2, 0, 1) * 255 + 0.5).astype(np.uint8), "L").save(os.path.join(OUT, "near_depth.png"))
     gy, gx = np.gradient(z_c, 3.85 / COVER_SCALE)
     slope = np.degrees(np.arctan(np.hypot(gx, gy)))
     rock_c = ((slope > ROCK_SLOPE) | (z_c > 2520)) & ~water_c & ~gravel_c
@@ -207,7 +254,10 @@ def main() -> None:
     near_line = np.clip((zz - (TREELINE - 400)) / 400, 0, 1)
     keep &= rng.uniform(0, 1, len(PX)) > near_line * 0.6
     PX, PY, zz, near_line = PX[keep], PY[keep], zz[keep], near_line[keep]
-    p_larch = np.interp(zz, [1480, 1650, 2000], [0.50, 0.32, 0.08])
+    # カラマツは林ごとにまとまって生える：差し渡し 100〜300m のまだらで、多い所（金の林）と少ない所（暗い緑の林）。
+    # 一本ずつ同じ割合で混ぜると、遠くから一様な橙に見えた
+    clump = sstep(-0.6, 0.6, smooth_field(PX, PY, 40.0, 2.5, 31))
+    p_larch = np.interp(zz, [1480, 1650, 2000], [0.50, 0.32, 0.08]) * (0.25 + 1.5 * clump)
     kind = (rng.uniform(0, 1, len(PX)) < p_larch).astype(np.int8)
     size = rng.uniform(0.78, 1.25, len(PX)) * (1.0 - 0.35 * near_line)
     # 川岸の茂み（若木。川原の縁から外へ 0〜14m）：kind 2
@@ -233,7 +283,9 @@ def main() -> None:
     rj = np.clip(np.round((rx - x.min()) / (x.max() - x.min()) * (W - 1)).astype(int), 0, W - 1)
     wet = ndimage.distance_transform_edt(~water_c) * (3.85 / COVER_SCALE)  # 水からの距離（m）
     g = gravel_c[ri, rj]
-    p_rock = np.where(g, np.interp(wet[ri, rj], [0, 3, 12], [0.55, 0.30, 0.12]), 0.0)
+    # 川原の石（水際ほど多い）と、浅い流れの中の石（水面から頭を出す。瀬の白い波のまわり）
+    shallow_w = water_c[ri, rj] & (dep_c[ri, rj] < 0.45) & ~pond_c[ri, rj]
+    p_rock = np.where(g, np.interp(wet[ri, rj], [0, 3, 12], [0.75, 0.42, 0.18]), np.where(shallow_w, 0.22, 0.0))
     rk = rng.uniform(0, 1, len(rx)) < p_rock
     rx, ry = rx[rk], ry[rk]
     rkind = rng.integers(0, 14, len(rx)).astype(np.int8)
@@ -242,6 +294,28 @@ def main() -> None:
     rsize = np.where(drift, rng.uniform(0.8, 1.4, len(rx)), rng.uniform(0.18, 0.75, len(rx)) ** 1.3)
     np.savez_compressed(os.path.join(OUT, "rocks.npz"), x=rx.astype(np.float32), y=ry.astype(np.float32), kind=rkind, size=rsize.astype(np.float32))
     print(f"川原の石 {int((~drift).sum())}・流木 {int(drift.sum())}", flush=True)
+    # 下草と草むら（低く飛ぶ所で、森の床と川原がむき出しに見えないように）：
+    #   kind 0〜3：シダ（fern_02 a〜d。ササの茂る森の床の代わり）。森の中、川原の縁から 0〜160m（川に近いほど密に）
+    #   kind 4〜8：草むら（grass_medium_02 a〜e）。川原の縁の内側 0〜7m に多く、川原の中にもまばらに
+    fx_, fy_ = np.meshgrid(np.arange(x.min(), x.max(), 1.7), np.arange(y.min(), y.max(), 1.7))
+    near_river = (fx_ > fine[:, 0].min() - 260) & (fx_ < fine[:, 0].max() + 260) & (fy_ > fine[:, 1].min() - 260) & (fy_ < fine[:, 1].max() + 260)
+    fx_ = (fx_[near_river] + rng.uniform(-0.5, 0.5, int(near_river.sum())) * 1.7)
+    fy_ = (fy_[near_river] + rng.uniform(-0.5, 0.5, int(near_river.sum())) * 1.7)
+    fi = np.clip(np.round((y.max() - fy_) / (y.max() - y.min()) * (H - 1)).astype(int), 0, H - 1)
+    fj = np.clip(np.round((fx_ - x.min()) / (x.max() - x.min()) * (W - 1)).astype(int), 0, W - 1)
+    e_out = edge[fi, fj]  # 川原・水から外への距離（m）
+    e_in = ndimage.distance_transform_edt(~forest_c)[fi, fj] * (3.85 / COVER_SCALE)  # 森から川原の内への距離（m）
+    patchy = sstep(-0.4, 0.8, smooth_field(fx_, fy_, 12.0, 1.5, 41))  # 茂った所とまばらな所
+    p_fern = np.where(forest_c[fi, fj] & (e_out > 0.5), np.interp(e_out, [0.5, 30, 160], [0.75, 0.45, 0.25]) * (0.35 + 0.65 * patchy), 0.0)
+    p_grass = np.where(gravel_c[fi, fj], np.interp(e_in, [0, 3, 7, 20], [0.55, 0.40, 0.12, 0.03]), 0.0)
+    u = rng.uniform(0, 1, len(fx_))
+    is_fern = u < p_fern
+    is_grass = (~is_fern) & (u < p_fern + p_grass)
+    sel = is_fern | is_grass
+    pk = np.where(is_fern, rng.integers(0, 4, len(fx_)), 4 + rng.integers(0, 5, len(fx_)))[sel].astype(np.int8)
+    psz = np.where(is_fern, rng.uniform(1.1, 1.9, len(fx_)), rng.uniform(1.6, 3.2, len(fx_)))[sel]
+    np.savez_compressed(os.path.join(OUT, "plants.npz"), x=fx_[sel].astype(np.float32), y=fy_[sel].astype(np.float32), kind=pk, size=psz.astype(np.float32))
+    print(f"下草（シダ）{int(is_fern.sum())}・川原の草むら {int(is_grass.sum())}", flush=True)
     print(f"木 {len(PX)} 本（カラマツ {int(kind.sum())}）。川床 {zc[0]:.1f}〜{zc[-1]:.1f}m（長さ {ss[-1]:.0f}m）", flush=True)
 
 

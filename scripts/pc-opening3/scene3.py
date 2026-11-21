@@ -89,10 +89,42 @@ def grid_mesh(name: str, X, Y, Z, mat, uv=None, mask=None, skirt: float = 0.0) -
     return ob
 
 
+def sample_step(arr: np.ndarray, meta: dict, x, y, step: int) -> np.ndarray:
+    """geo3.sample と同じ読み方で、step つおきに間引いた格子（arr[::step, ::step]。描く面と同じ格子）を読む（双線形）"""
+    sub = arr[::step, ::step]
+    n = 2.0 ** meta["z"]
+    mx, my = geo3.merc_from_local(x, y)
+    c = (mx * n * 256.0 - meta["x0"] * 256.0 - 0.5) / step
+    r = (my * n * 256.0 - meta["y0"] * 256.0 - 0.5) / step
+    H, W = sub.shape
+    c = np.clip(c, 0, W - 1.000001)
+    r = np.clip(r, 0, H - 1.000001)
+    c0 = np.floor(c).astype(int)
+    r0 = np.floor(r).astype(int)
+    fc, fr = c - c0, r - r0
+    a = sub[r0, c0] * (1 - fc) + sub[r0, c0 + 1] * fc
+    b = sub[r0 + 1, c0] * (1 - fc) + sub[r0 + 1, c0 + 1] * fc
+    return a * (1 - fr) + b * fr
+
+
+def blend_near_edge(near: np.ndarray, nm: dict, valley: np.ndarray, vm: dict, step: int = 3, band: float = 450.0) -> np.ndarray:
+    """near（5m）の縁から band m の帯で、標高を valley の描く面（step つおきの格子）へなだらかに寄せる。
+    5m と 10m の標高は急な山で十数 m ずれ、境目の垂らした帯が山肌に黒い線となって見えていた（第3版の1回目）。
+    縁で 2 つの面の高さがそろうので、線も段も出ない（川からは 1.7km 以上離れていて、川には触れない）"""
+    x, y = geo3.grid_xy(nm, near.shape)
+    XX, YY = np.meshgrid(x, y)
+    hv = sample_step(valley, vm, XX, YY, step)
+    d = np.minimum.reduce([XX - x.min(), x.max() - XX, YY - y.min(), y.max() - YY])
+    w = np.clip(d / band, 0.0, 1.0)
+    w = w * w * (3.0 - 2.0 * w)
+    return (near * w + hv * (1.0 - w)).astype(near.dtype)
+
+
 def build_terrain(mats: dict) -> dict:
     near, nm = load_dem("near_carved" if os.path.exists(os.path.join(WORK, "terrain", "near_carved.npy")) else "near")
     valley, vm = load_dem("valley")
     far, fm = load_dem("far")
+    near = blend_near_edge(near, nm, valley, vm)
     # near：全体は 2 つおき（約 7.7m）。川のまわりだけ、そのまま（約 3.85m）の細かさ（描く前の形の索引づくりで、メモリが
     # 一時に大きくなるので、細かい所を絞る）。細かい所は粗い所の穴にはめ、境目のすき間は下へ垂らした帯でふさぐ
     x, y = geo3.grid_xy(nm, near.shape)
@@ -131,7 +163,9 @@ def build_terrain(mats: dict) -> dict:
     vx, vy = geo3.grid_xy(vm, valley.shape)
     XX, YY = np.meshgrid(x, y)
     keep = ~((XX > vx.min() + 600) & (XX < vx.max() - 600) & (YY > vy.min() + 600) & (YY < vy.max() - 600))
-    Z = far - geo3.curvature_drop(XX, YY) - 6.0
+    # valley と重なる所は、内へ入るほど深く沈める（粗い面が谷の上へ突き出して、山肌に継ぎ目が出ないように）
+    inside_v = np.minimum.reduce([XX - vx.min(), vx.max() - XX, YY - vy.min(), vy.max() - YY])
+    Z = far - geo3.curvature_drop(XX, YY) - 6.0 - 120.0 * np.clip(inside_v / 600.0, 0.0, 1.0)
     grid_mesh("far", x, y, Z.astype(np.float32), mats["far"], mask=keep)
     return dict(near=(near, nm), valley=(valley, vm), near_box=nb)
 
@@ -451,7 +485,7 @@ def ground_material(name: str, cover: str | None) -> bpy.types.Material:
     # 石の色むら（数 m の広さで明るさ 0.8〜1.2）
     cv = node(nt, "ShaderNodeTexNoise", (-900, 2300), Scale=0.18, Detail=3.0)
     link(nt, pos, cv.inputs["Vector"])
-    cvr = node(nt, "ShaderNodeMapRange", (-700, 2300), **{"To Min": 0.78, "To Max": 1.22})
+    cvr = node(nt, "ShaderNodeMapRange", (-700, 2300), **{"To Min": 0.58, "To Max": 1.16})  # 動きのぶれで均されても、むらが残るように強め
     link(nt, cv.outputs["Fac"], cvr.inputs["Value"])
     cvc = node(nt, "ShaderNodeCombineColor", (-500, 2300))
     for i in range(3):
@@ -541,9 +575,10 @@ def ground_material(name: str, cover: str | None) -> bpy.types.Material:
     if cover:
         forest_mask = forest
     else:
-        under = node(nt, "ShaderNodeMapRange", (-1200, 1300), **{"From Min": 2500.0, "From Max": 2400.0})
+        # landcover.py の森（森林限界 TREELINE+120m より下・50° より緩い斜面）とそろえる（違うと near との境目で森が切れる）
+        under = node(nt, "ShaderNodeMapRange", (-1200, 1300), **{"From Min": 2570.0, "From Max": 2470.0})
         link(nt, sep.outputs["Z"], under.inputs["Value"])
-        flat = node(nt, "ShaderNodeMapRange", (-1200, 1100), **{"From Min": 0.60, "From Max": 0.70})
+        flat = node(nt, "ShaderNodeMapRange", (-1200, 1100), **{"From Min": 0.60, "From Max": 0.68})
         link(nt, nsep.outputs["Z"], flat.inputs["Value"])
         fm = node(nt, "ShaderNodeMath", (-1000, 1200), operation="MULTIPLY")
         link(nt, under.outputs["Result"], fm.inputs[0])
@@ -563,8 +598,46 @@ def ground_material(name: str, cover: str | None) -> bpy.types.Material:
         rockf = mx.outputs[0]
         c = mix(nt, gravel, forest_c, gravel_c, (400, 600))
     else:
-        c = grass_c
-    c = mix(nt, rockf, c, rock_c, (600, 600))
+        # 森の所は near と同じ森の地面（前は草地の色で、near との境目で地面の色が変わって線に見えた）。森林限界より上は草地と岩
+        c = mix(nt, forest_mask, grass_c, forest_c, (400, 600))
+    # 森林限界より上：ハイマツ（暗い緑）のまだらと、秋の草（くすんだ金茶）。前は明るい草地の絵のままで、山の上が白っぽく平らに見えた
+    al_h = node(nt, "ShaderNodeMapRange", (200, 1500), **{"From Min": 2380.0, "From Max": 2520.0})
+    link(nt, sep.outputs["Z"], al_h.inputs["Value"])
+    hm_n = node(nt, "ShaderNodeTexNoise", (0, 1700), Scale=0.03, Detail=5.0, Roughness=0.6)
+    link(nt, pos, hm_n.inputs["Vector"])
+    hm = node(nt, "ShaderNodeMapRange", (200, 1700), **{"From Min": 0.42, "From Max": 0.56})
+    link(nt, hm_n.outputs["Fac"], hm.inputs["Value"])
+    haimatsu = node(nt, "ShaderNodeRGB", (200, 1900))
+    haimatsu.outputs[0].default_value = (0.020, 0.036, 0.022, 1.0)
+    agrass = node(nt, "ShaderNodeRGB", (200, 2000))
+    agrass.outputs[0].default_value = (0.15, 0.11, 0.055, 1.0)
+    alp = mix(nt, hm.outputs["Result"], agrass.outputs[0], haimatsu.outputs[0], (400, 1800))
+    c = mix(nt, al_h.outputs["Result"], c, alp, (500, 1500))
+    # 岩肌：数百 m の明暗のむらと、縦の筋（雨や落石で削られた溝）。9m の質感だけだと、遠い山が粘土のように平らに見えた
+    rm_n = node(nt, "ShaderNodeTexNoise", (-400, -1200), Scale=0.004, Detail=4.0, Roughness=0.55)
+    link(nt, pos, rm_n.inputs["Vector"])
+    rm = node(nt, "ShaderNodeMapRange", (-200, -1200), **{"To Min": 0.62, "To Max": 1.25})
+    link(nt, rm_n.outputs["Fac"], rm.inputs["Value"])
+    st_mp = node(nt, "ShaderNodeMapping", (-600, -1450))
+    st_mp.inputs["Scale"].default_value = (0.05, 0.05, 0.004)
+    link(nt, pos, st_mp.inputs["Vector"])
+    st_n = node(nt, "ShaderNodeTexNoise", (-400, -1450), Scale=1.0, Detail=6.0, Roughness=0.65)
+    link(nt, st_mp.outputs["Vector"], st_n.inputs["Vector"])
+    st = node(nt, "ShaderNodeMapRange", (-200, -1450), **{"From Min": 0.3, "From Max": 0.7, "To Min": 0.72, "To Max": 1.18})
+    link(nt, st_n.outputs["Fac"], st.inputs["Value"])
+    rmul = node(nt, "ShaderNodeMath", (0, -1300), operation="MULTIPLY")
+    link(nt, rm.outputs["Result"], rmul.inputs[0])
+    link(nt, st.outputs["Result"], rmul.inputs[1])
+    rcm = node(nt, "ShaderNodeCombineColor", (150, -1300))
+    for i in range(3):
+        link(nt, rmul.outputs[0], rcm.inputs[i])
+    rock_v = node(nt, "ShaderNodeMix", (300, -1000))
+    rock_v.data_type = "RGBA"
+    rock_v.blend_type = "MULTIPLY"
+    rock_v.inputs["Factor"].default_value = 1.0
+    link(nt, rock_c, rock_v.inputs[6])
+    link(nt, rcm.outputs["Color"], rock_v.inputs[7])
+    c = mix(nt, rockf, c, rock_v.outputs[2], (600, 600))
     c = mix(nt, canopy_f, c, canopy_c, (700, 700))
     # 頂の初雪（標高 2700m より上の、なだらかな所に。まだら）
     sn_h = node(nt, "ShaderNodeMapRange", (300, 1300), **{"From Min": 2760.0, "From Max": 2950.0})
@@ -596,7 +669,22 @@ def ground_material(name: str, cover: str | None) -> bpy.types.Material:
         tint.blend_type = "MULTIPLY"
         tint.inputs["Factor"].default_value = 1.0
         link(nt, gravel_c, tint.inputs[6])
-        tint.inputs[7].default_value = (0.22, 0.55, 0.50, 1.0)
+        dpath = os.path.join(os.path.dirname(cover), "near_depth.png")
+        if os.path.exists(dpath):
+            # 水深（landcover.py。1.2m で 1）：浅い所は石がそのまま少し青緑に、深い所ほど澄んだ青緑（梓川の色）で暗く
+            dt = node(nt, "ShaderNodeTexImage", (400, 1100))
+            dt.image = image(dpath, True)
+            dt.interpolation = "Cubic"
+            dt.extension = "EXTEND"
+            link(nt, uv.outputs["UV"], dt.inputs["Vector"])
+            shallow_t = node(nt, "ShaderNodeRGB", (400, 1300))
+            shallow_t.outputs[0].default_value = (0.62, 0.84, 0.78, 1.0)
+            deep_t = node(nt, "ShaderNodeRGB", (400, 1400))
+            deep_t.outputs[0].default_value = (0.10, 0.36, 0.38, 1.0)
+            tcol = mix(nt, dt.outputs["Color"], shallow_t.outputs[0], deep_t.outputs[0], (600, 1200))
+            link(nt, tcol, tint.inputs[7])
+        else:
+            tint.inputs[7].default_value = (0.22, 0.55, 0.50, 1.0)
         c = mix(nt, water, c, tint.outputs[2], (1000, 600))
         # 水際の濡れ：暗く、なめらかに
         wt = node(nt, "ShaderNodeTexImage", (-1000, 1000))
@@ -771,29 +859,75 @@ def add_core(ob: bpy.types.Object, mat: bpy.types.Material) -> None:
     bm.free()
 
 
-def far_cone(src: bpy.types.Object, core: bpy.types.Material) -> bpy.types.Object:
-    """遠くの木：src の大きさに合わせた、縁の不揃いな円すい（針葉樹の冠）と細い幹。材料は芯と同じ暗い色に、凹凸と明暗のむら"""
-    import bmesh
-    from mathutils import Matrix
+def crown_profile(co: np.ndarray, bands: int = 10) -> tuple[float, float, np.ndarray, np.ndarray]:
+    """木の形（頂点）から、高さごとの枝の広がり（半径）。返すのは（根元の高さ, 高さ, 帯の真ん中の高さ, 帯の半径）"""
+    z0, z1 = float(co[:, 2].min()), float(co[:, 2].max())
+    h = z1 - z0
+    rr = np.hypot(co[:, 0], co[:, 1])
+    zc = z0 + h * (np.arange(bands) + 0.5) / bands
+    rb = np.zeros(bands)
+    for k in range(bands):
+        m = (co[:, 2] >= z0 + h * k / bands) & (co[:, 2] < z0 + h * (k + 1) / bands)
+        rb[k] = float(np.percentile(rr[m], 88)) if m.sum() > 20 else 0.0
+    return z0, h, zc, rb
 
+
+def far_cone(src: bpy.types.Object, core: bpy.types.Material) -> bpy.types.Object:
+    """遠くの木：src（同じ木の細かい形）の、高さごとの枝の広がりに合わせた冠（ろくろで回した形）と細い幹。
+    枝の段（下が広く、上へすぼむ）と、向きごとのでこぼこで、縁を不揃いに。材料は暗い緑（カラマツは金）に、木ごとの色むら。
+    （前は半径を実物の約 3 分の 1 にしていて、遠くの森が「細い針の並び」に見え、すき間から地面がのぞいていた）"""
     co = np.empty(len(src.data.vertices) * 3, np.float32)
     src.data.vertices.foreach_get("co", co)
     co = co.reshape(-1, 3)
-    z0, z1 = float(co[:, 2].min()), float(co[:, 2].max())
-    h = z1 - z0
-    r = 0.5 * float(np.percentile(np.hypot(co[:, 0], co[:, 1]), 85)) * 0.8
-    bm = bmesh.new()
-    res = bmesh.ops.create_cone(bm, cap_ends=True, segments=10, radius1=r, radius2=0.0, depth=h * 0.82, matrix=Matrix.Translation((0, 0, z0 + h * 0.18 + h * 0.41)))
+    z0, h, zc, rb = crown_profile(co)
+    rmax = float(rb.max())
+    kb = int(np.where(rb >= 0.45 * rmax)[0][0])  # 冠の下の端（枝の広がりが最大の 45% を超える一番下の帯）
+    zb = z0 + h * kb / len(rb)
+    zt = z0 + h
     rng = np.random.default_rng(len(co))
-    for v in res["verts"]:
-        if v.co.z < z0 + h * 0.2:
-            k = 1.0 + rng.uniform(-0.25, 0.2)
-            v.co.x *= k
-            v.co.y *= k
-    bmesh.ops.create_cone(bm, cap_ends=False, segments=5, radius1=0.18, radius2=0.08, depth=h * 0.25, matrix=Matrix.Translation((0, 0, z0 + h * 0.125)))
+    seg = 11
+    tiers = 6
+    verts: list[tuple[float, float, float]] = []
+    rings: list[list[int]] = []
+    ang0 = rng.uniform(0, 2 * math.pi)
+    for t in range(tiers):
+        za = zb + (zt - zb) * t / tiers
+        zt_ = zb + (zt - zb) * (t + 1) / tiers
+        # 段の下（広い・枝先が少し垂れる）→ 少し上 → 段の上（すぼむ）
+        for frac, k in ((0.0, 1.0), (0.18, 0.96), (0.92, 0.70)):
+            z = za + (zt_ - za) * frac
+            base = float(np.interp(z, zc, rb)) * 0.92
+            top_taper = min(1.0, (zt - z) / (0.28 * (zt - zb)))  # 頂の近くは細く尖る
+            ring = []
+            for s in range(seg):
+                a = ang0 + 2 * math.pi * (s + rng.uniform(-0.25, 0.25)) / seg
+                r = base * k * top_taper * (1.0 + rng.uniform(-0.18, 0.15))
+                ring.append(len(verts))
+                verts.append((r * math.cos(a), r * math.sin(a), z - (0.25 if frac == 0.0 and t > 0 else 0.0)))
+            rings.append(ring)
+    apex = len(verts)
+    verts.append((0.0, 0.0, zt))
+    bottom = len(verts)
+    verts.append((0.0, 0.0, zb + 0.4))
+    faces = []
+    for ra, rb_ in zip(rings[:-1], rings[1:]):
+        for s in range(seg):
+            faces.append((ra[s], ra[(s + 1) % seg], rb_[(s + 1) % seg], rb_[s]))
+    for s in range(seg):
+        faces.append((rings[-1][s], rings[-1][(s + 1) % seg], apex))
+        faces.append((rings[0][(s + 1) % seg], rings[0][s], bottom))
+    # 幹（冠の下の端まで。5 角の細い筒）
+    tb = len(verts)
+    for z, r in ((z0, 0.22), (zb + 0.5, 0.12)):
+        for s in range(5):
+            a = 2 * math.pi * s / 5
+            verts.append((r * math.cos(a), r * math.sin(a), z))
+    for s in range(5):
+        faces.append((tb + s, tb + (s + 1) % 5, tb + 5 + (s + 1) % 5, tb + 5 + s))
     me = bpy.data.meshes.new(src.name + "_cone")
-    bm.to_mesh(me)
-    bm.free()
+    me.from_pydata(verts, [], faces)
+    me.update(calc_edges=True)
+    me.polygons.foreach_set("use_smooth", np.ones(len(me.polygons), dtype=bool))
     me.materials.append(far_material(core))
     ob = bpy.data.objects.new(src.name.replace("LOD2", "CONE"), me)
     return ob
@@ -809,7 +943,32 @@ def far_material(core: bpy.types.Material) -> bpy.types.Material:
     b = nt.nodes["Principled BSDF"]
     mx = next(n for n in nt.nodes if n.type == "MIX")
     mx.inputs[6].default_value = (0.018, 0.042, 0.022, 1.0)
-    mx.inputs[7].default_value = (0.22, 0.12, 0.026, 1.0)
+    mx.inputs[7].default_value = (0.21, 0.115, 0.026, 1.0)
+    # 木ごとの色むら（明るさ 0.72〜1.28・色合い少し・鮮やかさ）：同じ色の木が並ぶと作り物に見える
+    oi = nt.nodes.new("ShaderNodeObjectInfo")
+    hue = nt.nodes.new("ShaderNodeMath")
+    hue.operation = "MULTIPLY_ADD"
+    nt.links.new(oi.outputs["Random"], hue.inputs[0])
+    hue.inputs[1].default_value = 0.06
+    hue.inputs[2].default_value = 0.47
+    r2 = nt.nodes.new("ShaderNodeMath")
+    r2.operation = "MULTIPLY"
+    nt.links.new(oi.outputs["Random"], r2.inputs[0])
+    r2.inputs[1].default_value = 7.31
+    fr = nt.nodes.new("ShaderNodeMath")
+    fr.operation = "FRACT"
+    nt.links.new(r2.outputs[0], fr.inputs[0])
+    val = nt.nodes.new("ShaderNodeMath")
+    val.operation = "MULTIPLY_ADD"
+    nt.links.new(fr.outputs[0], val.inputs[0])
+    val.inputs[1].default_value = 0.56
+    val.inputs[2].default_value = 0.72
+    hsv = nt.nodes.new("ShaderNodeHueSaturation")
+    nt.links.new(hue.outputs[0], hsv.inputs["Hue"])
+    nt.links.new(val.outputs[0], hsv.inputs["Value"])
+    hsv.inputs["Saturation"].default_value = 1.05
+    nt.links.new(mx.outputs[2], hsv.inputs["Color"])
+    nt.links.new(hsv.outputs["Color"], b.inputs["Base Color"])
     ns = nt.nodes.new("ShaderNodeTexNoise")
     ns.inputs["Scale"].default_value = 3.0
     ns.inputs["Detail"].default_value = 6.0
@@ -968,6 +1127,80 @@ def plant_forest(objs: dict, near, nm, valley, vm, cam_xy: np.ndarray, view: tup
     print(f"木 {len(x)} 本（細かい形 {int((lod == 0).sum())}・中 {int((lod == 1).sum())}・粗い {int((lod == 2).sum())}）", flush=True)
 
 
+def clean_rock(mat: bpy.types.Material | None) -> None:
+    """川原の石：苔むした石の絵の色を、洗われた花崗岩の明るい灰色に（彩度を下げ、少し明るく）。梓川の川原の石は白っぽい。
+    1回目は苔の緑のまま暗く、川原に「しみ」が散ったように見えた"""
+    if mat is None or not mat.use_nodes or mat.get("clean_rock"):
+        return
+    nt = mat.node_tree
+    for b in [n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"]:
+        inp = b.inputs["Base Color"]
+        if not inp.links:
+            continue
+        src = inp.links[0].from_socket
+        hsv = nt.nodes.new("ShaderNodeHueSaturation")
+        hsv.inputs["Saturation"].default_value = 0.30
+        hsv.inputs["Value"].default_value = 1.30
+        nt.links.new(src, hsv.inputs["Color"])
+        nt.links.new(hsv.outputs["Color"], inp)
+    mat["clean_rock"] = True
+
+
+def plant_plants(near, nm, valley, vm, cam_xy: np.ndarray, radius: float = 320.0, view: tuple | None = None) -> None:
+    """下草（シダ。ササの茂る森の床の代わり）と川原の草むら（landcover.py の plants.npz）。カメラから radius m の所だけ。
+    view（コマごとの方位°の並び, 見える角の半分°）があれば、見える向きとカメラのまわり 40m だけ"""
+    f = os.path.join(WORK, "landcover", "plants.npz")
+    if not os.path.exists(f):
+        return
+    d = np.load(f)
+    x, y, kind, size = d["x"], d["y"], d["kind"], d["size"]
+    dist = np.full(len(x), np.inf)
+    for cx, cy in cam_xy:
+        dist = np.minimum(dist, np.hypot(x - cx, y - cy))
+    sel = dist < radius
+    if view is not None:
+        azs = np.atleast_1d(view[0])
+        vis = np.zeros(len(x), bool)
+        step = max(1, len(azs) // 24)
+        for k in range(0, len(azs), step):
+            cx, cy = cam_xy[min(k, len(cam_xy) - 1)]
+            ang = (np.degrees(np.arctan2(x - cx, y - cy)) - azs[k] + 180.0) % 360.0 - 180.0
+            vis |= (np.abs(ang) < view[1] + 20.0) | (np.hypot(x - cx, y - cy) < 40.0)
+        sel &= vis
+    x, y, kind, size = x[sel], y[sel], kind[sel], size[sel]
+    names = []
+    for asset, want in (("fern_02", [f"fern_02_{v}" for v in "abcd"]), ("grass_medium_02", [f"grass_medium_02_{v}" for v in "abcde"])):
+        p = os.path.join(ASSETS, "models", asset, f"{asset}.blend")
+        with bpy.data.libraries.load(p, link=False) as (src, dst):
+            dst.objects = list(want)
+        names += want
+    col = bpy.data.collections.new("plant_order")
+    bpy.context.scene.collection.children.link(col)
+    col.hide_render = True
+    col.hide_viewport = True
+    for i, nme in enumerate(names):
+        ob = bpy.data.objects[nme]
+        ob.location = (0, 0, 0)
+        ob.name = f"{i:02d}_{nme}"
+        col.objects.link(ob)
+    z = ground_height(x, y, near, nm, valley, vm) - 0.05
+    rng = np.random.default_rng(13)
+    me = bpy.data.meshes.new("plant_points")
+    me.vertices.add(len(x))
+    me.vertices.foreach_set("co", np.stack([x, y, z], -1).astype(np.float32).ravel())
+    for nme, typ, val in (("inst", "INT", kind.astype(np.int32)), ("scl", "FLOAT", size.astype(np.float32)), ("rot", "FLOAT", rng.uniform(0, 2 * math.pi, len(x)).astype(np.float32))):
+        a = me.attributes.new(nme, typ, "POINT")
+        a.data.foreach_set("value", val)
+    ob = bpy.data.objects.new("plants", me)
+    bpy.context.scene.collection.objects.link(ob)
+    mod = ob.modifiers.new("plants", "NODES")
+    mod.node_group = bpy.data.node_groups["forest"].copy()
+    for n in mod.node_group.nodes:
+        if n.type == "COLLECTION_INFO":
+            n.inputs["Collection"].default_value = col
+    print(f"下草・草むら {len(x)} 株", flush=True)
+
+
 def plant_rocks(near, nm, valley, vm, cam_xy: np.ndarray, radius: float = 700.0) -> None:
     """川原の石と流木（landcover.py の rocks.npz）。カメラから radius m の所だけ。少し埋める"""
     f = os.path.join(WORK, "landcover", "rocks.npz")
@@ -999,6 +1232,9 @@ def plant_rocks(near, nm, valley, vm, cam_xy: np.ndarray, radius: float = 700.0)
         ob.location = (0, 0, 0)
         ob.name = f"{i:02d}_{nme}"
         col.objects.link(ob)
+        if "rock" in nme or "boulder" in nme:
+            for m in ob.data.materials:
+                clean_rock(m)
     z = ground_height(x, y, near, nm, valley, vm) - 0.18 * size
     rng = np.random.default_rng(11)
     me = bpy.data.meshes.new("rock_points")
@@ -1179,6 +1415,7 @@ def run_anim(a) -> None:
     half = float(math.degrees(math.atan(18.0 / lens.min())))
     plant_forest(objs, near, nm, valley, vm, cams, view=(az, half))
     plant_rocks(near, nm, valley, vm, cams)
+    plant_plants(near, nm, valley, vm, cams, view=(az, half))
     W, H = (int(v) for v in a.res.split("x"))
     setup_render((W, H), a.spp)
     sc = bpy.context.scene
@@ -1239,6 +1476,7 @@ def main() -> None:
         half = math.degrees(math.atan(18.0 / look["lens"]))  # 横の見える角の半分（36mm 幅のセンサー）
         plant_forest(objs, near, nm, valley, vm, np.array([[cx, cy]]), view=(look["az"], half))
         plant_rocks(near, nm, valley, vm, np.array([[cx, cy]]))
+        plant_plants(near, nm, valley, vm, np.array([[cx, cy]]), view=(look["az"], half))
     W, H = (int(v) for v in a.res.split("x"))
     setup_render((W, H), a.spp)
     out = a.out or os.path.join(WORK, "look", f"look{a.look}" + (".exr" if a.exr else ".png"))

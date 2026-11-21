@@ -1,4 +1,4 @@
-# PC のオープニング第3版（scripts/pc-opening3）を、GitHub Actions の何台かに分けて描き、動画にしてブランチに入れる
+# PC のオープニング第3版（scripts/pc-opening3）を、GitHub Actions の何台か（render.json の jobs の組に分け、同時に 20 台まで）で描き、動画にしてブランチに入れる
 # （公開リポジトリなので GitHub Actions の分は無料）。手元の 4 コアでは 1 コマ約 12 分・全部で約 100 時間かかるので、分けて描く。
 #   prep:   地形と写真（国土地理院）・土地の種類と木の位置・素材（Poly Haven、CC0）・カメラの飛び方を作り、ひとまとめにして渡す
 #   render: コマを分けて描く（Blender 5.3 の bpy・Cycles）→ 仕上げ（post3.py：かすみ・朝もや・色）→ PNG
