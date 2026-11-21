@@ -1,0 +1,133 @@
+# PC のオープニング第3版（scripts/pc-opening3）を、GitHub Actions の何台かに分けて描き、動画にしてブランチに入れる
+# （公開リポジトリなので GitHub Actions の分は無料）。手元の 4 コアでは 1 コマ約 12 分・全部で約 100 時間かかるので、分けて描く。
+#   prep:   地形と写真（国土地理院）・土地の種類と木の位置・素材（Poly Haven、CC0）・カメラの飛び方を作り、ひとまとめにして渡す
+#   render: コマを分けて描く（Blender 5.3 の bpy・Cycles）→ 仕上げ（post3.py：かすみ・朝もや・色）→ PNG
+#   encode: 全部のコマを集めて動画（H.264・AV1）にし、public/opening3/ に入れて、このブランチに push する
+# scripts/pc-opening3/render.json（描く設定）を書き換えて push すると動く（main に無いワークフローは、手で動かせないため）。
+name: オープニング第3版を描く
+
+on:
+  push:
+    branches: ["claude/**"]
+    paths: ["scripts/pc-opening3/render.json"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: opening3-render
+  cancel-in-progress: true
+
+jobs:
+  prep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    outputs:
+      chunks: ${{ steps.plan.outputs.chunks }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install numpy scipy pillow OpenEXR
+      - name: 地形・写真・土地の種類・素材・飛び方
+        working-directory: scripts/pc-opening3
+        run: |
+          python data.py
+          python landcover.py
+          python assets.py
+          python path3.py
+      - id: plan
+        name: コマの分け方
+        working-directory: scripts/pc-opening3
+        run: |
+          python - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json
+          r = json.load(open("render.json"))
+          f0, f1 = (int(v) for v in r["frames"].split("-"))
+          n = int(r.get("jobs", 20))
+          step = -(-(f1 - f0 + 1) // n)
+          chunks = [f"{a}-{min(f1, a + step - 1)}" for a in range(f0, f1 + 1, step)]
+          print("chunks=" + json.dumps(chunks))
+          EOF
+      - name: 渡すもの（地形・土地の種類・素材・飛び方）
+        run: |
+          mkdir -p bundle
+          cd scripts/pc-opening3/work
+          tar -cf ../../../bundle/scene.tar terrain landcover assets path3.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scene
+          path: bundle/scene.tar
+          retention-days: 3
+          compression-level: 0
+
+  render:
+    needs: prep
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        chunk: ${{ fromJson(needs.prep.outputs.chunks) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install bpy==5.3.0 numpy scipy pillow OpenEXR
+      - uses: actions/download-artifact@v4
+        with:
+          name: scene
+          path: bundle
+      - name: 描く
+        working-directory: scripts/pc-opening3
+        run: |
+          mkdir -p work && tar -xf ../../bundle/scene.tar -C work
+          RES=$(python -c "import json;print(json.load(open('render.json'))['res'])")
+          SPP=$(python -c "import json;print(json.load(open('render.json'))['spp'])")
+          python scene3.py --frames "${{ matrix.chunk }}" --res "$RES" --spp "$SPP" --out "$GITHUB_WORKSPACE/exr"
+      - name: 仕上げ
+        working-directory: scripts/pc-opening3
+        run: python post3.py --frames "$GITHUB_WORKSPACE/exr" "$GITHUB_WORKSPACE/png"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frames-${{ strategy.job-index }}
+          path: png/*.png
+          retention-days: 7
+          compression-level: 0
+
+  encode:
+    needs: render
+    if: always() && needs.render.result != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: frames-*
+          path: png
+          merge-multiple: true
+      - name: 動画にする
+        run: |
+          command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+          ls png | wc -l
+          mkdir -p public/opening3
+          ffmpeg -version | head -1
+          ffmpeg -y -framerate 24 -i png/%04d.png -c:v libx264 -preset slow -crf 17 -profile:v high -level 4.1 -pix_fmt yuv420p -g 48 -movflags +faststart public/opening3/opening.mp4
+          if ffmpeg -hide_banner -encoders | grep -q libsvtav1; then
+            ffmpeg -y -framerate 24 -i png/%04d.png -c:v libsvtav1 -preset 4 -crf 28 -pix_fmt yuv420p10le -g 48 public/opening3/opening-av1.webm
+          fi
+          ls -la public/opening3
+      - name: ブランチに入れる
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/opening3
+          git commit -m "オープニング第3版の動画（自動で描いたもの）" || exit 0
+          for i in 1 2 3 4; do
+            git pull --rebase -X theirs && git push && break
+            sleep $((i * 5))
+          done
