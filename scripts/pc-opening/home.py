@@ -320,8 +320,11 @@ def main() -> None:
     if tod is None:
         finish(0.06)
     else:
-        sc.view_settings.exposure = tod["exposure"]
-        finish(tod["haze"][1], tod["haze"][0], tod["glow"])
+        # 地面に届く光の量の違いは露出で打ち消し、stops だけ明るさを変える。かすみ（空気が散らす光）は光の量に比例
+        g = tod_gain(tod)
+        sc.view_settings.exposure = 0.3 - math.log2(g) + tod["stops"]
+        finish(0.06, tuple(c * g for c in tod["haze"]), tod["glow"])
+        print(f"{a.tod}：地面に届く光 {g:.3f} 倍、露出 {sc.view_settings.exposure:+.2f}", flush=True)
     tail = f"_{a.tod}" if a.tod else ""
     out = a.out or os.path.join(WORK, "home", f"home_wide{tail}.png" if a.extent else f"home_{W}x{H}{tail}.png")
     os.makedirs(os.path.dirname(out), exist_ok=True)
