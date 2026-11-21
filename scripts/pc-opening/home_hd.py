@@ -115,6 +115,29 @@ def materials(mat, b, tex, uvn, p: dict, inp: str) -> None:
         return n.outputs[0]
 
     light = op("MULTIPLY", lt.outputs["Color"], 1.0)  # 明かりの強さ（人口密度 1 万人/km² で 1）
+    # 明かりを街並みに沿わせる：人口の明かり（約 1km の細かさを引き伸ばしたもの）は、寄るとぼんやりした四角いにじみに見えた。
+    # 地面の色（ランドサット）の明るさで細かく分ける：建物や道路の多い所（明るい灰色。東京の明るい明かりの所で真ん中 0.088）は
+    # 強く、田畑・森・公園・川（暗い。明かりの少ない所で真ん中 0.021）は弱く。明かりを足すのではなく、人口の明かりの分け方だけ
+    sp = nt.nodes.new("ShaderNodeSeparateColor")
+    nt.links.new(tex.outputs["Color"], sp.inputs["Color"])
+    lum = op("MULTIPLY", sp.outputs["Red"], 0.2126)
+    for ch, w in (("Green", 0.7152), ("Blue", 0.0722)):
+        add = nt.nodes.new("ShaderNodeMath")
+        add.operation = "MULTIPLY_ADD"
+        nt.links.new(sp.outputs[ch], add.inputs[0])
+        add.inputs[1].default_value = w
+        nt.links.new(lum, add.inputs[2])
+        lum = add.outputs[0]
+    urb = nt.nodes.new("ShaderNodeMapRange")
+    urb.interpolation_type = "SMOOTHSTEP"
+    urb.inputs["From Min"].default_value, urb.inputs["From Max"].default_value = 0.03, 0.12
+    urb.inputs["To Min"].default_value, urb.inputs["To Max"].default_value = 0.3, 1.7
+    nt.links.new(lum, urb.inputs["Value"])
+    mod = nt.nodes.new("ShaderNodeMath")
+    mod.operation = "MULTIPLY"
+    nt.links.new(light, mod.inputs[0])
+    nt.links.new(urb.outputs["Result"], mod.inputs[1])
+    light = mod.outputs[0]
     nt.links.new(op("MULTIPLY", light, p["lights"]), b.inputs["Emission Strength"])
     t = nt.nodes.new("ShaderNodeMapRange")
     t.inputs["From Min"].default_value, t.inputs["From Max"].default_value = 0.0, 1.6
