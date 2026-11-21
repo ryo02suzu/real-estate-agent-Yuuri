@@ -48,9 +48,9 @@ TOD = {
     # 昼：南の高い太陽。白い光、空の青いかすみ
     "day": dict(az=160.0, el=50.0, energy=4.6, sky=((0.36, 0.52, 0.80), 0.38), sat=1.0, stops=0.15, haze=(0.20, 0.32, 0.55), lights=0.0, glow=0.0),
     # 夕：西から低い夕日。光は茜がかった金、影は藍。街の明かりがともり始める
-    "dusk": dict(az=256.0, el=8.0, tint=3.5, energy=3.6, sky=((0.30, 0.30, 0.52), 0.24), sat=0.95, stops=-0.6, haze=(0.30, 0.26, 0.48), lights=0.08, glow=0.0),
+    "dusk": dict(az=256.0, el=8.0, tint=3.5, energy=3.6, sky=((0.30, 0.30, 0.52), 0.24), sat=0.95, stops=-0.6, haze=(0.30, 0.26, 0.48), lights=0.03, glow=0.0),
     # 夜：南東の高い月の青い光で、陸と海の境目がうっすら分かる。人が住んでいる所に街の明かり
-    "night": dict(az=150.0, el=42.0, energy=0.10, moon=(0.56, 0.68, 1.0), sky=((0.05, 0.08, 0.18), 0.10), sat=0.35, stops=-3.0, haze=(0.06, 0.10, 0.25), lights=0.25, glow=0.25),
+    "night": dict(az=150.0, el=42.0, energy=0.10, moon=(0.56, 0.68, 1.0), sky=((0.05, 0.08, 0.18), 0.10), sat=0.35, stops=-2.6, haze=(0.20, 0.36, 1.10), lights=0.17, glow=0.12),
 }
 DEFAULT_LIGHT = dict(el=26.0, energy=4.2, color=(1.0, 0.88, 0.74), sky=((0.36, 0.52, 0.80), 0.35))  # lights() と同じ（今の絵）
 
@@ -171,10 +171,10 @@ def tod_material(nt, b, tex, uvn, p: dict) -> None:
     nt.links.new(light, t.inputs["Value"])
     ramp = nt.nodes.new("ShaderNodeValToRGB")
     els = ramp.color_ramp.elements
-    els[0].position, els[0].color = 0.0, (1.0, 0.46, 0.16, 1.0)
-    els[1].position, els[1].color = 1.0, (1.0, 0.90, 0.74, 1.0)
+    els[0].position, els[0].color = 0.0, (1.0, 0.64, 0.30, 1.0)
+    els[1].position, els[1].color = 1.0, (1.0, 0.90, 0.76, 1.0)
     mid = els.new(0.35)
-    mid.color = (1.0, 0.68, 0.36, 1.0)
+    mid.color = (1.0, 0.77, 0.47, 1.0)
     nt.links.new(t.outputs["Result"], ramp.inputs["Fac"])
     nt.links.new(ramp.outputs["Color"], b.inputs["Emission Color"])
 
