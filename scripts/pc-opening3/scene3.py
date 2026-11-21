@@ -41,6 +41,9 @@ SKY = dict(name="kloppenheim_06_puresky", sun_az_in_hdri=None, strength=1.2)
 
 # 木を一本ずつ植える距離（m）。その先の森は、地面の色と凹凸で（ground_material の canopy）
 TREE_RADIUS = 2800.0
+# 木の細かさを替える、カメラの道筋からの距離（m）：細かい形（写真から作られた形）・中くらいの形。その先は冠の塊
+LOD_NEAR = 110.0
+LOD_MID = 800.0
 
 # 見た目の確認のカメラ：位置（経度・緯度・川面からの高さ m）・向き（方位・見下ろす角）・レンズ（mm）
 LOOKS = {
@@ -1065,7 +1068,8 @@ def plant_forest(objs: dict, near, nm, valley, vm, cam_xy: np.ndarray, view: tup
     dist = np.full(len(x), np.inf)
     for cx, cy in cam_xy:
         dist = np.minimum(dist, np.hypot(x - cx, y - cy))
-    lod = np.select([dist < 70, dist < 600], [0, 1], 2)
+    # 細かい形は道筋から 110m（2560×1440 で、100m 先の木は高さ約 250 画素）、中くらいの形は 800m まで
+    lod = np.select([dist < LOD_NEAR, dist < LOD_MID], [0, 1], 2)
     rng = np.random.default_rng(7)
     var = rng.integers(0, 3, len(x))
     rot = rng.uniform(0, 2 * math.pi, len(x))
