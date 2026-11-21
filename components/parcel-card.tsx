@@ -3,12 +3,13 @@
 // 謄本・公図を取るときの地番。物件の筆と、境界が接する隣の筆の地番を並べ、コピーと登記情報提供サービスへの入口を出す。
 // 筆は登記所備付地図データ（lib/roadmap/parcel.ts）。公図（任意座標）の地域は、市町村の地番参考図（sanko-data.ts）か
 // 推定の位置（kozu-data.ts）の筆。住所で調べたときは、住所の地点にある筆を参考として出す。
-// 市町村が地番図を公開していれば、物件の場所で開く入口も出す（lib/roadmap/chibanzu.ts。筆が無い地点ではそれだけを出す）
+// 市町村が地番図を公開していれば、物件の場所（地図の場所を渡せない市は、市のページ・地図の入口）で開く入口も出す
+// （lib/roadmap/chibanzu.ts。筆が無い地点ではそれだけを出す）
 import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { withRetry } from "@/lib/retry";
 import type { LookupResult } from "@/lib/roadmap";
-import type { ChibanzuLink } from "@/lib/roadmap/chibanzu";
+import type { ChibanzuLink, ChibanzuOpens } from "@/lib/roadmap/chibanzu";
 import { KOZU_DATA } from "@/lib/roadmap/kozu-data";
 import { adjacentParcels, chibanLabel, estimatedCardNote, hasPieceMark, isLotChiban, kuikiLabel, kuikiLabelFrom, parcelAt, parcelMark, pickedChibanText, registryChiban, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
@@ -149,7 +150,7 @@ export function ParcelButton({
   extra?: React.ReactNode;
   /** 一覧に建物も入っている（ボタンを「地番・建物」にする） */
   withBuilding?: boolean;
-  /** 市町村の地番図（物件の場所で開く） */
+  /** 市町村の地番図（物件の場所か、市のページ・地図の入口で開く） */
   chibanzu?: ChibanzuLink;
   /** スマホの要点のマス（components/fact.tsx） */
   tile?: boolean;
@@ -276,9 +277,16 @@ function LinkButton({ href, title, sub }: { href: string; title: string; sub: st
 
 const TOUKI = { href: "https://www1.touki.or.jp/", title: "登記情報提供サービス", sub: "謄本と同じ内容と公図（有料・要登録）" };
 
-/** 市町村の地番図を物件の場所で開くボタン */
+/** 地番図のボタンの添え書き（開き方で書き分ける。その場所で開くことを確かめていない地図・入口しか開けない市は、そう言い切らない） */
+const CHIBANZU_SUB: Record<ChibanzuOpens, string> = {
+  place: "物件の場所で開く（登記と違うことがある）",
+  aim: "物件の場所を指定して開く（登記と違うことがある）",
+  entry: "入口が開く（登記と違うことがある）",
+};
+
+/** 市町村の地番図を開くボタン（物件の場所で開く地図のほか、市のページ・地図の入口しか開けない市がある） */
 function ChibanzuButton({ link }: { link: ChibanzuLink }) {
-  return <LinkButton href={link.url} title={link.name} sub="物件の場所で開く（登記と違うことがある）" />;
+  return <LinkButton href={link.url} title={link.name} sub={CHIBANZU_SUB[link.opens]} />;
 }
 
 const KIND_LABEL: Record<ParcelKind, string> = {

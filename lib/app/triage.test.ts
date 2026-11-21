@@ -100,6 +100,14 @@ describe("要注意点（問題になりそうな所）", () => {
     expect(town.issues.map((i) => i.id)).not.toContain("no-parcel");
   });
 
+  it("筆が無い地点で市の地番図があれば、その名前で案内する（市の名前を重ねない）", () => {
+    const kumagaya = findMunicipality("11202")!; // 熊谷市
+    const r = { ...base, municipality: kumagaya, links: buildLinks(kumagaya, 36.153221, 139.392611), contact: resolveContact(kumagaya, "11202") };
+    const detail = triageOf(loaded({ result: r, parcels: { status: "none" } })).issues.find((i) => i.id === "no-parcel")?.detail;
+    expect(detail).toContain("熊谷市の地番情報で地番を確かめられます。");
+    expect(detail).not.toContain("熊谷市の熊谷市");
+  });
+
   it("公図から推定した筆は、その地域で国の地価の地点を使って測った確かさで注意する（関東・大阪府は今までの言い方）", () => {
     const est = (estimated: "high" | "low", result = base) => triageOf(loaded({ result, parcels: { status: "ok", parcel: { ...parcel, estimated }, kind: "chiban", neighbors: [] } })).issues.find((i) => i.id === "estimated");
     const head = "この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、";

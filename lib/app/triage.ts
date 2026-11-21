@@ -339,7 +339,7 @@ function placeIssues(input: TriageInput): Issue[] {
     }
   } else if (parcels.status === "none" && !parcels.approximate && !result.parcelMiss) {
     const chibanzu = chibanzuFor(m, result.lat, result.lng);
-    out.push({ id: "no-parcel", level: "check", topic: "place", title: "この地点の筆が地図データに無い", detail: `登記所の地図データにこの地点の筆がありません（データの無い地域か、道路・河川など）。${chibanzu ? `${m.name}の${chibanzu.name}で地番を確かめられます。` : ""}`, confirm: "法務局の公図で" });
+    out.push({ id: "no-parcel", level: "check", topic: "place", title: "この地点の筆が地図データに無い", detail: `登記所の地図データにこの地点の筆がありません（データの無い地域か、道路・河川など）。${chibanzu ? `${chibanzu.name}で地番を確かめられます。` : ""}`, confirm: "法務局の公図で" });
   } else if (parcels.status === "error") out.push({ id: "parcel-error", level: "check", topic: "place", title: "地番の地図データを読めなかった", detail: "通信の問題で筆を読めませんでした。時間をおいて調べ直してください。" });
   return out;
 }

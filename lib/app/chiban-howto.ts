@@ -22,9 +22,7 @@ export type ChibanStep = { title: string; text: string; link?: { label: string; 
  */
 export function chibanHowto(chibanzu?: ChibanzuLink): ChibanStep[] {
   return [
-    ...(chibanzu
-      ? [{ title: chibanzu.name, text: "市町村が公開している地番の参考図で、場所から地番を見られます（登記の地番と違うことがあるので、謄本・公図で確認）。", link: { label: chibanzu.name, url: chibanzu.url } }]
-      : []),
+    ...(chibanzu ? [{ title: chibanzu.name, text: chibanzuText(chibanzu), link: { label: chibanzu.name, url: chibanzu.url } }] : []),
     {
       title: "登記情報提供サービスの「地番検索サービス」",
       text: "ログインしたあとの請求の画面の「地番検索サービス」で、住居表示の住所から、おおよその地番を確かめられることがあります（サービスの提供エリアの中）。登記情報提供サービスは有料で、利用者の登録か一時利用が要ります。",
@@ -40,6 +38,20 @@ export function chibanHowto(chibanzu?: ChibanzuLink): ChibanStep[] {
       text: "登記済証（権利証）・登記識別情報通知書・固定資産税の課税明細書に地番が書かれています。お客さまに見せてもらえれば、いちばん確かです。",
     },
   ];
+}
+
+/**
+ * 市町村の地番図の説明。開き方で書き分ける（物件の場所で開く・場所を指定して開く（その場所で開くことは確かめていない）・
+ * 市のページか地図の入口が開く）。開いたあとの手順と市の利用条件の主な決まり（tip）を続ける
+ */
+function chibanzuText(c: ChibanzuLink): string {
+  const lead =
+    c.opens === "place"
+      ? "市町村が公開している地番の参考図で、場所から地番を見られます"
+      : c.opens === "aim"
+        ? "市町村が公開している地番の参考図を、物件の場所を指定して開きます。開く位置は地図で確かめてください"
+        : "市町村が公開している地番の参考図です";
+  return `${lead}（登記の地番と違うことがあるので、謄本・公図で確認）。${c.tip ?? ""}`;
 }
 
 /** 文面（書類・共有）用の1行ずつ（箇条書きの印は付けない。書類の箇条書き・共有の文面の側で付ける） */
