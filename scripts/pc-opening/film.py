@@ -193,6 +193,16 @@ def near_material() -> bpy.types.Material:
     fm.extension = "EXTEND"
     link(nt, uv.outputs["UV"], fm.inputs["Vector"])
     geo = nt.nodes.new("ShaderNodeNewGeometry")
+    # 写真は真上から貼っているので、急な斜面では縦に引きのばされて筋になる。急な所（約 32°〜50°）は、
+    # ぼかした写真（色の並びだけ）に替え、細かさは下の木の一本ずつ（3次元の模様）で出す
+    soft = nt.nodes.new("ShaderNodeTexImage")
+    soft.image = bpy.data.images.load(os.path.join(WORK, "near_photo_autumn_soft.jpg"))
+    soft.interpolation = "Cubic"
+    soft.extension = "EXTEND"
+    link(nt, uv.outputs["UV"], soft.inputs["Vector"])
+    nrm = nt.nodes.new("ShaderNodeSeparateXYZ")
+    link(nt, geo.outputs["Normal"], nrm.inputs["Vector"])
+    photo = mix_rgb(nt, map_range(nt, nrm.outputs["Z"], 0.85, 0.65), tex.outputs["Color"], soft.outputs["Color"])
     # 木の一本ずつ（約 6m）：丸い頭と、木ごとの明るさ・色のばらつき
     vor = node(nt, "ShaderNodeTexVoronoi", Scale=1.0 / 6.0, Randomness=0.9)
     vor.feature = "F1"
@@ -208,7 +218,7 @@ def near_material() -> bpy.types.Material:
         link(nt, k, kk.inputs[i])
     col = node(nt, "ShaderNodeMix", data_type="RGBA", blend_type="MULTIPLY")
     col.inputs[0].default_value = 1.0
-    link(nt, tex.outputs["Color"], col.inputs[6])
+    link(nt, photo, col.inputs[6])
     link(nt, kk.outputs[0], col.inputs[7])
     link(nt, col.outputs[2], b.inputs["Base Color"])
     # 細かい凹凸：木の頭（森だけ）＋岩や地面のざらつき
@@ -630,7 +640,7 @@ def main() -> None:
     else:
         build_global()
     # 動きのぶれ：列島の場面は、高い空から一気に降りるので短く（ぶれで絵が流れすぎないように）
-    setup_render(res, a.spp, 0.15 if a.scene == "global" else 0.35)
+    setup_render(res, a.spp, 0.15 if a.scene == "global" else 0.22)
     camera_object(a.scene, todo)
     if a.scene == "global":
         animate_global_sun(todo)

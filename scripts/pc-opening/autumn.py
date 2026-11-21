@@ -23,7 +23,7 @@ import os
 import sys
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -166,6 +166,8 @@ def main() -> None:
 
     res = (to_srgb(out) * 255.0 + 0.5).astype(np.uint8)
     Image.fromarray(res).save(os.path.join(WORK, "near_photo_autumn.jpg"), quality=94)
+    # 急な斜面用：真上から貼った写真は斜面で縦に引きのばされて筋になるので、急な所は色の並びだけ（ぼかした写真）を使う
+    Image.fromarray(res).filter(ImageFilter.GaussianBlur(2.5)).save(os.path.join(WORK, "near_photo_autumn_soft.jpg"), quality=92)
     forest = (np.clip(veg * (1.0 - snow[..., 0]) * (1.0 - meadow), 0, 1) * 255 + 0.5).astype(np.uint8)
     Image.fromarray(forest).resize((W // 2, H // 2), Image.BOX).save(os.path.join(WORK, "near_forest.png"))
     print("near_photo_autumn.jpg", res.shape, f"雪 {float(snow.mean()):.3f}", f"落葉樹 {float((decid * veg).mean()):.3f}", f"岩 {float(rock.mean()):.3f}", f"影 {float(shade.mean()):.3f}")

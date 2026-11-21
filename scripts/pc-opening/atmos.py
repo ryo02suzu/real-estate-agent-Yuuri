@@ -121,6 +121,12 @@ def tone(lin: np.ndarray, f: int, look: dict) -> np.ndarray:
     t = f / P.FPS
     x = bloom(lin * (2.0 ** look_at(look, "exposure", t, 0.0)), look.get("bloom", 1.0))
     lum = x @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+    cl = look_at(look, "clarity", t, 0.0)
+    if cl > 0.0:  # 明るさの細部（まわりより明るい所を少し明るく、暗い所を暗く。色は変えない）
+        base = np.exp(ndimage.gaussian_filter(np.log(lum + 1e-4), 0.008 * lum.shape[1]))
+        gain = np.clip((lum + 1e-4) / base, 0.25, 4.0) ** cl
+        x = x * gain[..., None]
+        lum = lum * gain
     k = smoothstep(0.02, 0.6, lum)[..., None]
     x = x * (np.array(look.get("shadow", (0.94, 0.98, 1.08)), np.float32) * (1 - k) + np.array(look.get("light", (1.06, 1.0, 0.9)), np.float32) * k)
     return agx(x, look.get("slope", (1.0, 1.0, 1.0)), look_at(look, "power", t, (1.0, 1.0, 1.0)), look_at(look, "sat", t, 1.0))
@@ -178,8 +184,9 @@ class Local:
             self.S = self.shadow_height(self.H)
             np.savez(cache, H=self.H, S=self.S)
         self.sky = self.load_sky()
-        az = math.atan2(self.sun[0], self.sun[1])
-        self.c_amb = self.sky_at(np.array([[math.sin(az + math.pi), math.cos(az + math.pi), 0.035]], np.float32))[0]
+        # 影の所の空気・朝もやを照らす光：空全体（上半分。太陽のまわりを除く）の平均。青い。
+        # 前は太陽と反対の地平線の色を使っていて、4〜5倍明るい暖かい灰色で、影の谷が茶色く濁っていた
+        self.c_amb = self.sky_dome_mean()
 
     def shadow_height(self, H: np.ndarray) -> np.ndarray:
         """「この高さより上は朝日が当たる」高さの地図。太陽の向きにそろえて回した格子で、太陽の側から順に見ていく"""
@@ -209,6 +216,15 @@ class Local:
         v = -dxg * uy + dyg * ux + diag / 2
         return ndimage.map_coordinates(Sr, [v, u], order=1, mode="nearest").astype(np.float32)
 
+    def sky_dome_mean(self) -> np.ndarray:
+        h, w = self.sky.shape[:2]
+        el = (0.5 - (np.arange(h) + 0.5) / h) * np.pi
+        az = ((np.arange(w) + 0.5) / w - 0.5) * 2 * np.pi + PANO_AZ0
+        EL, AZ = np.meshgrid(el, az, indexing="ij")
+        d = np.stack([np.cos(EL) * np.sin(AZ), np.cos(EL) * np.cos(AZ), np.sin(EL)], -1)
+        wgt = np.cos(EL) * (EL > 0) * ((d @ self.sun) < math.cos(math.radians(12.0)))
+        return ((self.sky * wgt[..., None]).sum((0, 1)) / wgt.sum()).astype(np.float32)
+
     def load_sky(self) -> np.ndarray:
         d = read_exr(os.path.join(WORK, "sky_local.exr"))
         return d["Combined"][..., :3]
@@ -229,6 +245,9 @@ class Local:
         h, w = Z.shape
         cam, d, norm = rays(f, "local", w, h)
         t_now = f / P.FPS
+        # 奥行き Z は 1 画素につき 1 回分の値で、動きのぶれでぼけた色と合わない。近い尾根のふちで遠い谷の値が混じり、
+        # 朝もやが点々に付く。まわり 5×5 の中央値でならす（空は遠い値のまま）
+        Z = np.exp(ndimage.median_filter(np.log(np.clip(Z, 1.0, 1e9)), size=5))
         sky = Z > 1e8
         L = np.where(sky, 40000.0, Z * norm).astype(np.float32)
         pos = cam["pos"].astype(np.float32)
@@ -263,6 +282,7 @@ class Local:
             wsum += wgt
         frac = lit / np.maximum(wsum, 1e-9)
         frac = ndimage.uniform_filter(frac, 3)
+        # 日の当たる空気が遠くまで続けば、その向きの地平線の空の色に近づく。影の空気は空の青い光だけ
         c_dir = self.sky_at(np.concatenate([d[..., :2], np.clip(d[..., 2:3], 0.02, 0.07)], -1))
         c_sun = np.maximum(c_dir - self.c_amb, 0.0)
         inscat = (1.0 - T)[..., None] * (self.c_amb + frac[..., None] * c_sun)
@@ -276,9 +296,11 @@ class Local:
         sina = np.maximum(-dz, 0.035)
         Hm = 45.0
         taum = LOOK_LOCAL["mist"] * valley * n * Hm / sina * (1.0 - np.exp(-L * sina / Hm))
+        taum = ndimage.gaussian_filter(taum, 1.5)  # 朝もやのふちをやわらかく（ぶれた色となじむように）
         Tm = np.exp(-taum)[..., None]
         vis_hit = smoothstep(-30.0, 30.0, (g + 25.0) - self.grid(self.S, hx, hy))[..., None]
-        c_mist = self.c_amb * 0.95 + vis_hit * self.sky_at(np.concatenate([d[..., :2], np.full_like(d[..., 2:3], 0.05)], -1)) * 0.5
+        # 影の朝もやは、空の光を受けた青みの白。日の当たる所は朝日の色
+        c_mist = self.c_amb * 1.7 + vis_hit * self.sky_at(np.concatenate([d[..., :2], np.full_like(d[..., 2:3], 0.05)], -1)) * 0.5
         out = out * Tm + (1.0 - Tm) * c_mist * T[..., None] ** 0.3
         # 空の上の方は深い青に（偏光フィルターをかけたように。太陽から離れるほど）
         cos_sun = d @ self.sun
@@ -397,9 +419,10 @@ LOOK_GLOBAL = {
     "space": (0.0004, 0.0007, 0.0016),
     "power": (1.12, 1.14, 1.18),
     "slope": (1.04, 1.0, 0.96),
-    "exposure": -1.2,
+    "exposure": [(0.0, -1.2), (2.4, -1.05), (4.0, -0.9)],
     "bloom": 0.8,
     "sat": 1.15,
+    "clarity": [(0.0, 0.12), (2.4, 0.24)],  # 山の起伏が、朝日でくっきり浮かび上がるように
     "shadow": (0.9, 0.96, 1.14),
     "light": (1.1, 1.0, 0.86),
     "vignette": 0.2,
@@ -424,11 +447,12 @@ LOOK_LOCAL = {
     "power": [(4.2, (1.06, 1.07, 1.1)), (8.6, (1.08, 1.09, 1.12)), (9.6, (1.2, 1.22, 1.28))],
     "slope": (1.05, 1.0, 0.95),
     "haze": 1.0 / 65000.0,
-    "mist": 1.0 / 2200.0,
-    "exposure": [(4.2, -0.55), (8.3, -0.75), (9.6, -1.5)],
+    "mist": 1.0 / 1800.0,
+    "exposure": [(4.2, -0.15), (8.3, -0.4), (9.6, -1.5)],
     "bloom": 1.0,
     "sat": [(4.2, 1.18), (9.6, 1.3)],
-    "shadow": (0.88, 0.96, 1.16),
+    "clarity": [(4.2, 0.28), (8.3, 0.22), (9.6, 0.12)],
+    "shadow": (0.94, 0.98, 1.07),
     "light": (1.14, 1.0, 0.8),
     "vignette": 0.16,
     "grain": 0.006,
@@ -437,11 +461,11 @@ LOOK_LOCAL = {
 
 def over_swans(lin: np.ndarray, path: str, t: float) -> np.ndarray:
     """白鳥（swans.py。背景は透明で、色は透明度をかけた値）を重ねる。光のにじみの前なので、朝日の中では光に溶ける。
-    朝日に着く前の少しの間で、だんだん淡くして光の中へ消す（白鳥が消えたところで、ロゴの光の点がまたたく）"""
+    朝日に着く前の約 0.9 秒で、だんだん淡くして光の中へ消す（白鳥が消えたところで、ロゴの光の点がまたたく）"""
     if not os.path.exists(path):
         return lin
     s = read_exr(path)["Combined"]
-    fade = 1.0 - float(smoothstep(P.SWANS[1] - 0.45, P.SWANS[1], t))
+    fade = 1.0 - float(smoothstep(P.SWANS[1] - 0.9, P.SWANS[1], t))
     if not np.isfinite(s).all():
         return lin
     a = np.clip(s[..., 3:4], 0.0, 1.0) * fade
@@ -532,8 +556,25 @@ class Clouds:
 END_WHITE = (0.955, 0.945, 0.925)  # 最後の雲の白（アプリはこの色からホームへ移る）
 
 
-# 間引いて描いてよい所（カメラがほとんど動かない・ゆっくりの所）：描いていないコマは、前後のコマを混ぜて作る（何コマおきまでか）
-INTERP = [(0, 71, 2), (366, 446, 4)]
+# 間引いて描いてよい所（カメラがほとんど動かない・ゆっくりの所）：lo から step コマおきに描き、描いていないコマは、
+# 前後のコマの EXR（光の量と奥行き）を混ぜて作る。白鳥はそのあとに重ねる（仕上げた絵を混ぜると白鳥が二重になる）
+INTERP = [(0, 71, 2), (384, 600, 4)]
+
+
+def scene_exr(src: str, f: int) -> dict | None:
+    """その場面のコマ f の EXR（Combined・Depth.Z）。無ければ、間引いてよい所に限り、前後のコマを混ぜて作る"""
+    path = lambda k: os.path.join(src, f"{k:04d}.exr")
+    if os.path.exists(path(f)):
+        return read_exr(path(f))
+    for lo, hi, step in INTERP:
+        if lo <= f <= hi:
+            a = next((k for k in range(f - 1, f - step - 1, -1) if os.path.exists(path(k))), None)
+            b = next((k for k in range(f + 1, f + step + 1) if os.path.exists(path(k))), None)
+            if a is not None and b is not None:
+                w = (f - a) / (b - a)
+                da, db = read_exr(path(a)), read_exr(path(b))
+                return {k: da[k] * (1 - w) + db[k] * w for k in ("Combined", "Depth.Z")}
+    return None
 
 
 def post_frame(post: str, scene: str, f: int) -> np.ndarray | None:
@@ -590,7 +631,9 @@ def _scene_frame(job: tuple) -> int:
     if scene not in _ATM:
         _ATM[scene] = Local() if scene == "local" else Global()
     look = LOOK_LOCAL if scene == "local" else LOOK_GLOBAL
-    d = read_exr(os.path.join(src, f"{f:04d}.exr"))
+    d = scene_exr(src, f)
+    if d is None:
+        return f
     lin = _ATM[scene].apply(f, d["Combined"][..., :3], d["Depth.Z"])
     lin = over_swans(lin, os.path.join(swans, f"{f:04d}.exr"), f / P.FPS)
     v = tone(lin, f, look)
@@ -631,7 +674,9 @@ def main() -> None:
     src = a.src or os.path.join(WORK, "film", a.scene)
     out = a.out or os.path.join(a.post, a.scene)
     os.makedirs(out, exist_ok=True)
-    frames = sorted(int(n[:4]) for n in os.listdir(src) if n.endswith(".exr"))
+    have = {int(n[:4]) for n in os.listdir(src) if n.endswith(".exr")}
+    # 描いたコマと、間引いた所で前後から作れるコマ
+    frames = sorted(have | {f for lo, hi, _ in INTERP for f in range(lo, hi + 1) if min(have, default=10**9) <= f <= max(have, default=-1)})
     if sel is not None:
         frames = [f for f in frames if f in sel]
     if a.scene == "local":

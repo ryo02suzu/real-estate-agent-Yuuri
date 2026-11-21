@@ -1,11 +1,13 @@
 """PC のオープニング CG：雲海の上を、朝日へ向かって飛ぶ白鳥（7羽）を描く（背景は透明。atmos.py で重ねる）。
 
-  python swans.py [--frames 309-369] [--res 1920x1080] [--spp 32] [--out work/film/swans]
+  python swans.py [--frames 363-499:3] [--res 1920x1080] [--spp 32] [--out work/film/swans]
   python swans.py --look     # 形を確かめる（白鳥 1 羽を近くから。羽ばたきの 4 つの姿勢）
 
 python は bpy（Blender 5.3）を入れたもの。本物に合わせる：安曇野で冬を越すコハクチョウ・オオハクチョウの大きさ
-（翼を広げて約 2.2m、くちばしから尾まで約 1.3m）、まっすぐ前へのばした首、黒と黄色のくちばし、羽ばたきは 1 秒に約 2.4 回。
-朝日の側から見るので、羽のふちが透けて光る。カメラ（path.py）とほぼ一緒に進みながら、右から入って、朝日の中へ遠ざかる。
+（翼を広げて約 2.2m、くちばしから尾まで約 1.3m）、まっすぐ前へのばした首、黒と黄色のくちばし。
+優雅に見せるため、本物（約 16 m/秒・羽ばたき 1 秒に約 2.5 回）の約 0.7 倍のゆっくりにする（スローモーションのように）。
+V 字の群れが、カメラがほとんど止まってから右の近く（約 33m）から入り、朝日の中へ遠ざかる（約 88m）。
+朝日の側から見るので、羽のふちが透けて光る。
 """
 
 from __future__ import annotations
@@ -26,7 +28,8 @@ import film as F  # noqa: E402
 import path as P  # noqa: E402
 
 WORK = F.WORK
-FLAP_HZ = 2.4
+FLAP_HZ = 1.75  # 本物の約 0.7 倍（ゆっくり、大きく）
+SPEED_JITTER = 0.04  # 1 羽ごとに羽ばたきの速さを少し変える（そろいすぎない）
 HALF_SPAN = 1.12  # 体の真ん中から翼の先まで（m）
 POSES = 24  # 羽ばたき 1 回を、いくつの姿勢で表すか
 
@@ -84,20 +87,22 @@ def metaball_mesh(name: str, balls: list[tuple], mat) -> bpy.types.Mesh:
 
 
 def body_mesh(feather) -> bpy.types.Mesh:
-    """体・首・頭・尾（前が +Y、上が +Z）"""
+    """体・首・頭・尾（前が +Y、上が +Z）。胴は長い卵形、首は付け根が太く、頭は額から嘴へなだらか、尾は短いくさび形"""
     balls = [
-        ((0.0, 0.0, 0.0), (0.2, 0.4, 0.155), 1.0),  # 胴（白鳥はがっしりしている）
-        ((0.0, 0.24, 0.015), (0.16, 0.2, 0.14), 1.0),  # 胸
-        ((0.0, -0.38, 0.03), (0.1, 0.2, 0.07), 1.0),  # 尾のつけ根
+        ((0.0, 0.0, 0.0), (0.19, 0.42, 0.15), 1.0),  # 胴（白鳥はがっしりしている）
+        ((0.0, 0.25, 0.01), (0.155, 0.2, 0.135), 1.0),  # 胸
+        ((0.0, -0.34, 0.025), (0.13, 0.18, 0.06), 1.0),  # 尾のつけ根（平たい。胴とつながる）
+        ((0.0, -0.45, 0.03), (0.085, 0.11, 0.032), 1.0),  # 尾（短いくさび）
     ]
-    # 首：胸から前へ、少し下がりながら細くなる（丸を細かく重ねて、なめらかに）
-    for i in range(30):
-        u = i / 29.0
-        y = 0.38 + 0.6 * u
-        z = 0.05 - 0.05 * u * u
-        r = 0.072 - 0.03 * u
-        balls.append(((0.0, y, z), (r, r * 1.6, r), 1.0))
-    balls.append(((0.0, 1.05, -0.005), (0.048, 0.085, 0.05), 1.0))  # 頭
+    # 首：胸から前へまっすぐのばす（付け根は太く、少し上がってから水平に）。丸を細かく重ねて、なめらかに
+    for i in range(34):
+        u = i / 33.0
+        y = 0.36 + 0.62 * u
+        z = 0.055 + 0.03 * math.sin(math.pi * u * 0.8) - 0.035 * u * u
+        r = 0.085 - 0.043 * u**0.8
+        balls.append(((0.0, y, z), (r, r * 1.5, r * 1.05), 1.0))
+    balls.append(((0.0, 1.035, 0.0), (0.05, 0.078, 0.05), 1.0))  # 頭
+    balls.append(((0.0, 1.085, -0.012), (0.034, 0.05, 0.03), 1.0))  # 額から嘴へ
     return metaball_mesh("swan_body", balls, feather)
 
 
@@ -126,51 +131,101 @@ def cone_mesh(name: str, base: tuple, tip: tuple, r0: float, r1: float, mat, n: 
     return me
 
 
-def wing_rest(side: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """翼の形（広げた姿勢）：翼の根元から先への位置 s（0〜1）と、前後の位置 v（0〜1）の格子。
-    戻り値は (s, v, 平たい形の点 N×3) と面"""
-    ns, nv = 28, 7
-    s = np.linspace(0.0, 1.0, ns)
-    v = np.linspace(0.0, 1.0, nv)
-    S, V = np.meshgrid(s, v, indexing="ij")
-    chord = (0.40 - 0.17 * S) * np.sqrt(np.maximum(1.0 - S**6, 0.0)) + 0.012
-    y_le = 0.17 - 0.07 * S**2  # 前のふち（先の方は少し後ろへ）
-    y = y_le - chord * V
-    # 後ろのふち：羽（初列風切）が少し分かれて見える、ゆるいぎざぎざ
-    y -= 0.025 * V**3 * np.abs(np.sin(S * math.pi * 6.0)) * (S > 0.6)
-    z = 0.03 * chord / 0.4 * np.sin(math.pi * V)  # 少し丸い（上へふくらむ）
-    pts = np.stack([S, y, z], -1).reshape(-1, 3)
-    i, j = np.meshgrid(np.arange(ns - 1), np.arange(nv - 1), indexing="ij")
-    v0 = i * nv + j
-    faces = np.stack([v0, v0 + 1, v0 + nv + 1, v0 + nv], -1).reshape(-1, 4)
-    if side < 0:
-        faces = faces[:, ::-1]
-    return S.ravel(), V.ravel(), pts, faces
+WRIST = 0.6  # 翼の根元から手首まで（m）。ここから先が手（初列風切）
+WING_LEN = 1.0  # 翼の根元（体のふち x=0.12）から先まで
 
 
-def wing_pose(s: np.ndarray, pts: np.ndarray, phi: float, side: int) -> np.ndarray:
-    """羽ばたきの位相 phi（0 で一番上）の、翼の点の位置（体の座標。side は右 +1・左 −1）。
-    翼は根元から先へ曲がる 1 本の骨のように：肩・ひじ・手首の角度を、先ほど遅れて動かす（むちのように）"""
-    sh = math.radians(6.0 + 26.0 * math.cos(phi))
-    el = math.radians(10.0 * math.cos(phi - 0.75))
-    wr = math.radians(15.0 * math.cos(phi - 1.35))
-    sweep = math.radians(7.0 * math.sin(phi))  # 打ち上げのとき、少し後ろへたたむ
-    # 根元からの長さ L（m）ごとの、上がる角度
-    n = 200
-    L = np.linspace(0.0, HALF_SPAN - 0.12, n)
-    x = L / (HALF_SPAN - 0.12)
+def wing_geometry() -> tuple[np.ndarray, np.ndarray, list]:
+    """翼の形（広げた姿勢・右の翼）。点（x：根元から先へ、y：前へ、z：上へ。m）、点ごとの骨の上の位置（x）、面。
+    内側（腕〜手首の先）は前のふちが厚く丸い 1 枚、手の先は初列風切 6 枚を指のように分ける"""
+    verts, station, faces = [], [], []
+
+    def add(p, st):
+        verts.append(p)
+        station.append(st)
+        return len(verts) - 1
+
+    # 内側の翼：上の面と下の面（前のふちで閉じる）。後ろのふちは次列風切の先が小さく波打つ
+    ns, nv, x_in = 30, 9, 0.74
+    xs = np.linspace(0.0, x_in, ns)
+    vs = np.linspace(0.0, 1.0, nv) ** 1.3  # 前のふちの近くを細かく
+    top, bot = np.zeros((ns, nv), int), np.zeros((ns, nv), int)
+    for i, x in enumerate(xs):
+        q = x / x_in
+        y_le = 0.17 - 0.06 * q * q
+        chord = 0.42 - 0.13 * q
+        th = 0.046 * (1.0 - 0.55 * q)
+        for j, v in enumerate(vs):
+            y = y_le - chord * v
+            if v > 0.85:
+                y -= 0.014 * abs(math.sin(x * math.pi * 15.0)) * (v - 0.85) / 0.15 * (q < 0.9)
+            camber = 0.028 * math.sin(math.pi * v) * chord / 0.42
+            t = th * (1.0 - v) ** 1.5
+            top[i, j] = add((x, y, camber + t), x)
+            bot[i, j] = add((x, y - 0.004 * (1 - v), camber - 0.35 * t), x)
+    for i in range(ns - 1):
+        for j in range(nv - 1):
+            faces.append((top[i, j], top[i + 1, j], top[i + 1, j + 1], top[i, j + 1]))
+            faces.append((bot[i, j], bot[i, j + 1], bot[i + 1, j + 1], bot[i + 1, j]))
+        faces.append((bot[i, 0], bot[i + 1, 0], top[i + 1, 0], top[i, 0]))  # 前のふち
+    # 手の先：初列風切 6 枚（外ほど長く、ほぼ横向き。内ほど少し後ろへ開く）。白鳥は羽が詰まっていて、
+    # 先の方だけ少し分かれて見える。根元は内側の翼の下に隠れる
+    for k in range(6):
+        bx, by = 0.70 - 0.022 * k, 0.11 - 0.034 * k
+        ang = math.radians(2.0 + 4.2 * k)
+        length = 0.34 - 0.016 * k
+        ux, uy = math.cos(ang), -math.sin(ang)
+        px_, py_ = -uy, ux  # 羽の幅の向き（前へ）
+        nseg = 8
+        row = []
+        for m in range(nseg + 1):
+            u = m / nseg
+            w = (0.078 - 0.04 * u) * (1.0 - u**6) ** 0.5 + 0.004  # 先は丸く細る（根元は重なり、先で分かれる）
+            cx, cy = bx + ux * length * u, by + uy * length * u
+            z = 0.012 * math.sin(math.pi * u) - 0.004 * k  # 少し上へ反る。内の羽ほど下
+            st = cx
+            a_ = add((cx + px_ * w * 0.35, cy + py_ * w * 0.35, z + 0.002), st)  # 前の羽弁（細い）
+            b_ = add((cx, cy, z + 0.004), st)  # 羽軸
+            c_ = add((cx - px_ * w * 0.65, cy - py_ * w * 0.65, z), st)  # 後ろの羽弁（広い）
+            row.append((a_, b_, c_))
+        for m in range(nseg):
+            a0, b0, c0 = row[m]
+            a1, b1, c1 = row[m + 1]
+            faces.append((a0, a1, b1, b0))
+            faces.append((b0, b1, c1, c0))
+    return np.array(verts, float), np.array(station, float), faces
+
+
+def wing_pose(verts: np.ndarray, station: np.ndarray, phi: float, side: int) -> np.ndarray:
+    """羽ばたきの位相 phi（0 で一番上、π で一番下）の、翼の点の位置（体の座標。side は右 +1・左 −1）。
+    - 上下：肩・ひじ・手首の角度を、先ほど遅れて動かす（むちのように）。ゆっくり大きく打つ（上 32°〜下 −24°）
+    - 打ち上げ（π〜2π）では手首から先を後ろへたたみ、打ち下ろしでいっぱいに広げる。羽の指は打ち下ろしで少し開く"""
+    sh = math.radians(4.0 + 28.0 * math.cos(phi))
+    el = math.radians(10.0 * math.cos(phi - 0.7))
+    wr = math.radians(14.0 * math.cos(phi - 1.3))
+    fold = math.radians(20.0) * max(0.0, -math.sin(phi)) ** 1.2
+    p = verts.copy()
+    # 手首から先を、手首のまわりに後ろへ回す（翼の面の中で）
+    hand = smooth(WRIST - 0.08, WRIST + 0.06, station)
+    wx, wy = WRIST, 0.17 - 0.06 * (WRIST / 0.74) ** 2
+    ca, sa = math.cos(fold), math.sin(fold)
+    dx, dy = p[:, 0] - wx, p[:, 1] - wy
+    rx, ry = wx + dx * ca + dy * sa, wy - dx * sa + dy * ca
+    p[:, 0] = p[:, 0] * (1 - hand) + rx * hand
+    p[:, 1] = p[:, 1] * (1 - hand) + ry * hand
+    # 骨の上の位置ごとの、上がる角度（根元から先へ曲がる 1 本の骨）
+    n = 240
+    L = np.linspace(0.0, 1.15, n)
+    x = L / WING_LEN
     ang = sh + el * smooth(0.28, 0.45, x) + wr * smooth(0.62, 0.78, x)
-    dx = np.cos(ang) * (L[1] - L[0])
-    dz = np.sin(ang) * (L[1] - L[0])
-    X = np.concatenate([[0.0], np.cumsum(dx)[:-1]])
-    Zc = np.concatenate([[0.0], np.cumsum(dz)[:-1]])
-    li = s * (n - 1)
+    step = L[1] - L[0]
+    X = np.concatenate([[0.0], np.cumsum(np.cos(ang) * step)[:-1]])
+    Zc = np.concatenate([[0.0], np.cumsum(np.sin(ang) * step)[:-1]])
+    li = np.clip(p[:, 0], 0.0, 1.15) / step
     xs = np.interp(li, np.arange(n), X)
     zs = np.interp(li, np.arange(n), Zc)
     a_s = np.interp(li, np.arange(n), ang)
-    # 翼の厚み方向（z）は、その所の角度で回す
-    y = pts[:, 1] + xs * math.sin(-sweep) * 0.6
-    out = np.stack([0.12 + xs - pts[:, 2] * np.sin(a_s), y, 0.05 + zs + pts[:, 2] * np.cos(a_s)], -1)
+    out = np.stack([0.12 + xs - p[:, 2] * np.sin(a_s), p[:, 1], 0.05 + zs + p[:, 2] * np.cos(a_s)], -1)
     out[:, 0] *= side
     return out
 
@@ -192,10 +247,11 @@ def make_swan(name: str, mats: dict, phase0: float) -> dict:
     knob = bpy.data.objects.new(name + "_knob", mats["knob_mesh"])
     parts.append(knob)
     wings = []
+    verts, station, faces0 = wing_geometry()
     for side in (1, -1):
-        s, v, pts, faces = wing_rest(side)
+        faces = faces0 if side > 0 else [tuple(reversed(fc)) for fc in faces0]
         me = bpy.data.meshes.new(f"{name}_wing{side}")
-        rest = wing_pose(s, pts, 0.0, side)
+        rest = wing_pose(verts, station, 0.0, side)
         me.from_pydata([tuple(p) for p in rest], [], [tuple(int(k) for k in fc) for fc in faces])
         me.update()
         me.materials.append(mats["feather"])
@@ -204,7 +260,7 @@ def make_swan(name: str, mats: dict, phase0: float) -> dict:
         ob.shape_key_add(name="Basis")
         for k in range(POSES):
             key = ob.shape_key_add(name=f"p{k}")
-            co = wing_pose(s, pts, 2 * math.pi * k / POSES, side)
+            co = wing_pose(verts, station, 2 * math.pi * k / POSES, side)
             key.data.foreach_set("co", co.astype(np.float32).ravel())
         parts.append(ob)
         wings.append(ob)
@@ -224,18 +280,25 @@ def build_swans(n: int = 7) -> list[dict]:
     mats["bill_mesh"] = cone_mesh("bill", (0.0, 1.11, -0.012), (0.0, 1.21, -0.03), 0.026, 0.011, black)
     mats["knob_mesh"] = cone_mesh("knob", (0.0, 1.085, -0.006), (0.0, 1.135, -0.016), 0.03, 0.022, yellow)
     rng = np.random.default_rng(5)
-    return [make_swan(f"swan{i}", mats, float(rng.uniform(0, 2 * math.pi))) for i in range(n)]
+    out = []
+    for i in range(n):
+        sw = make_swan(f"swan{i}", mats, float(rng.uniform(0, 2 * math.pi)))
+        sw["hz"] = 1.0 + SPEED_JITTER * float(rng.uniform(-1.0, 1.0))
+        out.append(sw)
+    return out
 
 
 # ---------------------------------------------------------------- 動き
 
 
 def flock_offsets(n: int) -> np.ndarray:
-    """群れの並び（先頭の白鳥からのずれ：前・右・上 m）。右後ろへ斜めの列（朝日の側が先頭）"""
+    """群れの並び（先頭の白鳥からのずれ：前・右・上 m）。V 字（先頭のうしろに左右へ 3 羽ずつ。少し不ぞろい）"""
     rng = np.random.default_rng(9)
-    out = []
-    for i in range(n):
-        out.append((-4.2 * i + rng.uniform(-0.6, 0.6), 2.9 * i + rng.uniform(-0.5, 0.5), rng.uniform(-0.9, 0.9) - 0.15 * i))
+    out = [(0.0, 0.0, 0.0)]
+    for i in range(1, n):
+        k = (i + 1) // 2
+        side = 1.0 if i % 2 else -1.0
+        out.append((-2.7 * k + rng.uniform(-0.35, 0.35), side * (2.25 * k + rng.uniform(-0.25, 0.25)), rng.uniform(-0.3, 0.3) - 0.12 * k))
     return np.array(out)
 
 
@@ -245,17 +308,22 @@ def ease(u):
 
 
 def lead_relative(t: float) -> np.ndarray:
-    """先頭の白鳥の、カメラから見た位置（右・上・前 m）。右の外から入り、横顔を見せながら左へ渡り、朝日の中へ遠ざかる"""
+    """先頭の白鳥の、カメラから見た位置（右・上・前 m）。画面の右のふち（約 33m）から入り、朝日の中（約 88m）へ。
+    画面の上を一定の速さ（約 300px/秒）で渡り、遠ざかるほど小さくなる（近い所で横切ると画面の上で速く見えるので、
+    見える向きの角度を時間に比例させ、距離は等比でのばす）"""
     t0, t1 = P.SWANS
     u = min(1.0, max(0.0, (t - t0) / (t1 - t0)))
-    c = P.camera("local", int(round(P.LOGO_START * P.FPS)))
+    c = P.camera("local", int(round((t0 + t1) / 2 * P.FPS)))
     sun = P.sun_dir("local")
     sv = np.array([sun @ c["right"], sun @ c["up"], sun @ c["fwd"]])
-    start = np.array([36.0, 1.0, 62.0])
-    end = sv * 215.0
-    k = 1.0 - (1.0 - u) ** 1.35  # はじめは少し速く、朝日に近づくとゆっくり
-    mid = (start + end) / 2 + np.array([0.0, 5.0, 0.0])  # 少し上へ弧を描く
-    return (1 - k) ** 2 * start + 2 * (1 - k) * k * mid + k * k * end
+    ax0, ay0 = math.radians(30.0), math.radians(4.0)  # 地平線と遠くの山より上（空を背に）
+    ax1 = math.atan2(sv[0], sv[2]) - math.radians(0.5)  # 先頭は朝日の真ん中を少し越える（群れが朝日に重なって消える）
+    ay1 = math.atan2(sv[1], sv[2])
+    ax = ax0 + (ax1 - ax0) * u
+    ay = ay0 + (ay1 - ay0) * u
+    r = 33.0 * (88.0 / 33.0) ** u
+    d = np.array([math.tan(ax), math.tan(ay), 1.0])
+    return d / np.linalg.norm(d) * r
 
 
 def place(swans: list[dict], frames: list[int]) -> None:
@@ -280,7 +348,7 @@ def place(swans: list[dict], frames: list[int]) -> None:
         rot = Matrix([right_w.tolist(), fwd_w.tolist(), up_w.tolist()]).transposed()  # 体の +Y を進む向きへ
         for i, sw in enumerate(swans):
             o = offs[i]
-            phi = 2 * math.pi * FLAP_HZ * t + sw["phase0"]
+            phi = 2 * math.pi * FLAP_HZ * sw["hz"] * t + sw["phase0"]
             bob = -0.07 * math.cos(phi + 0.4)
             pos = c["pos"] + rel @ axes + fwd_w * o[0] + right_w * o[1] + up_w * (o[2] + bob)
             sw["root"].matrix_world = Matrix.Translation(Vector(pos.tolist())) @ rot.to_4x4()
@@ -302,7 +370,7 @@ def place(swans: list[dict], frames: list[int]) -> None:
 
 
 def setup(res, spp: int) -> None:
-    F.setup_render(res, spp, 0.35)
+    F.setup_render(res, spp, 0.3)
     sc = bpy.context.scene
     sc.render.film_transparent = True
     sc.cycles.use_adaptive_sampling = True
@@ -372,9 +440,10 @@ def main() -> None:
         return
     t0, t1 = P.SWANS
     frames = list(range(int(math.floor(t0 * P.FPS)), int(math.ceil(t1 * P.FPS)) + 1))
-    if a.frames:
-        lo, _, hi = a.frames.partition("-")
-        frames = [f for f in frames if int(lo) <= f <= int(hi or lo)]
+    if a.frames:  # 「363-498」「363-498:3」（3 コマおき。流れを先に見る）
+        rng, _, step = a.frames.partition(":")
+        lo, _, hi = rng.partition("-")
+        frames = [f for f in frames if int(lo) <= f <= int(hi or lo)][:: int(step or 1)]
     os.makedirs(a.out, exist_ok=True)
     todo = [f for f in frames if not os.path.exists(os.path.join(a.out, f"{f:04d}.exr"))]
     bpy.ops.wm.read_factory_settings(use_empty=True)
