@@ -53,6 +53,20 @@ export function roadWidthOf(width?: string): number | undefined {
   return m ? Number(m[1]) : undefined;
 }
 
+/**
+ * データの幅員が 4m より狭いと言えるか（幅の区分の上限で見る）。「3.5m」「4m未満」「2.5〜3.5m」は狭い。
+ * 「3.0m以上5.5m未満」「4.0〜4.5m」「5.5m以上」のように 4m 以上の幅を含む区分は、狭いとは言わない
+ */
+export function roadNarrowerThan4(width?: string): boolean {
+  const t = width?.normalize("NFKC");
+  if (!t) return false;
+  const nums = [...t.matchAll(/(\d+(?:\.\d+)?)\s*m?\s*(以上|未満|以下)?/g)].map((m) => ({ v: Number(m[1]), k: m[2] }));
+  if (!nums.length) return false;
+  const last = nums[nums.length - 1];
+  if (last.k === "以上") return false; // 上限が無い
+  return last.k === "未満" ? last.v <= 4 : last.v < 4;
+}
+
 export type NoteIcon = "fire" | "volume" | "sun" | "warn" | "plan" | "road" | "old";
 export type Note = { icon: NoteIcon; title: string; body: string; /** 注意が要る（区域の指定・計画道路など） */ warn?: boolean };
 

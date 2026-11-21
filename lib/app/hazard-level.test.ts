@@ -44,3 +44,23 @@ describe("ハザードのカードと総合の目安", () => {
     expect(hazardTotal(r)).toBeNull();
   });
 });
+
+describe("読み込めなかった種類があるとき（「低い」「国のデータが無い」と言わない）", () => {
+  const fail: KindReport = { status: "error" };
+  it("どの種類も区域にかからなければ、総合の目安は「確認できず」で、針を出さない", () => {
+    const r: HazardReport = { flood: fail, naisui: out("naisui"), takashio: out("takashio"), tsunami: out("tsunami"), dosha: out("dosha") };
+    expect(hazardCards(r)[0].chip).toBe("読み込めず");
+    const t = hazardTotal(r)!;
+    expect(t).toMatchObject({ level: "確認できず", tone: "none" });
+    expect(t.needle).toBeUndefined();
+    expect(t.comment).toContain("洪水は国のデータを読み込めませんでした");
+    expect(t.comment).not.toContain("国のデータが無いため");
+  });
+  it("区域にかかる種類があれば、その目安に、読み込めなかった種類を書き添える", () => {
+    const r: HazardReport = { flood: fail, naisui: out("naisui"), takashio: out("takashio"), tsunami: out("tsunami"), dosha: at("dosha", "警戒区域") };
+    const t = hazardTotal(r)!;
+    expect(t.level).toBe("やや高い");
+    expect(t.comment).toContain("土砂災害のリスクがあるエリアです");
+    expect(t.comment).toContain("洪水は国のデータを読み込めませんでした");
+  });
+});

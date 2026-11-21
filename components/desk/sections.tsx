@@ -303,6 +303,9 @@ function Law({ ctx }: { ctx: SectionCtx }) {
   );
 }
 
+/** 読み込めなかった（「なし」とは言わない） */
+const NOT_READ = "読み込めませんでした（開き直すか、市区町村の資料で確認）";
+
 function Hazard({ ctx }: { ctx: SectionCtx }) {
   const { result, data } = ctx;
   const m = result.municipality;
@@ -317,7 +320,7 @@ function Hazard({ ctx }: { ctx: SectionCtx }) {
     <>
       {total && (
         <p className="desk-stat mb-2">
-          <span className={`chip st ${total.tone === "out" ? "ok" : total.tone === "caution" ? "gold" : "warn"}`}>{total.level}</span>
+          <span className={`chip st ${total.tone === "out" ? "ok" : total.tone === "caution" ? "gold" : total.tone === "none" ? "" : "warn"}`}>{total.level}</span>
           <span className="v">
             総合の目安（MICHILU の目安）
             <small>{total.comment}</small>
@@ -330,13 +333,13 @@ function Hazard({ ctx }: { ctx: SectionCtx }) {
       <p className="desk-subhead">国の地点データ</p>
       <dl className="desk-kv">
         <dt>液状化の発生傾向</dt>
-        <dd>{data.liq.status === "loading" ? "確認中…" : liq ? `${liq.label}（${liq.landform}）` : data.liq.status === "none" ? "データ準備中" : "データなし"}</dd>
+        <dd>{data.liq.status === "loading" ? "確認中…" : liq ? `${liq.label}（${liq.landform}）` : data.liq.status === "none" ? "データ準備中" : data.liq.status === "error" ? NOT_READ : "データなし"}</dd>
         <dt>大規模盛土造成地</dt>
-        <dd>{data.zousei.status === "loading" ? "確認中…" : zousei ? zouseiText(zousei) : data.zousei.status === "none" ? "データ準備中" : "—"}</dd>
+        <dd>{data.zousei.status === "loading" ? "確認中…" : zousei ? zouseiText(zousei) : data.zousei.status === "none" ? "データ準備中" : data.zousei.status === "error" ? NOT_READ : "—"}</dd>
         <dt>災害履歴</dt>
-        <dd>{data.rireki.status === "loading" ? "確認中…" : rireki.length ? `${rireki.length}件（${rirekiLine(rireki[0])}）` : data.rireki.status === "ok" ? "近くの記録なし" : "—"}</dd>
+        <dd>{data.rireki.status === "loading" ? "確認中…" : rireki.length ? `${rireki.length}件（${rirekiLine(rireki[0])}）` : data.rireki.status === "ok" ? "近くの記録なし" : data.rireki.status === "error" ? NOT_READ : "—"}</dd>
         <dt>避難場所</dt>
-        <dd>{data.evac.status === "loading" ? "確認中…" : evac[0] ? `${evac[0].name}（${evac[0].walk ? `徒歩${evac[0].walk.minutes}分` : `直線${Math.round(evac[0].straight)}m`}）` : "3km以内になし"}</dd>
+        <dd>{data.evac.status === "loading" ? "確認中…" : evac[0] ? `${evac[0].name}（${evac[0].walk ? `徒歩${evac[0].walk.minutes}分` : `直線${Math.round(evac[0].straight)}m`}）` : data.evac.status === "ok" ? "3km以内になし" : NOT_READ}</dd>
       </dl>
       <p className="desk-small">{liq ? LIQ_CREDIT : "国土交通省 不動産情報ライブラリ・国土数値情報など（参考）。"}</p>
       <Row>

@@ -22,7 +22,7 @@ import { tochiCheck, type Tochi } from "../roadmap/tochi";
 import { contactName, NO_CITY_GAS, NO_SEWER, utilitiesFor, type UtilityContact } from "../roadmap/utilities";
 import type { Zoning, ZoningStatus } from "../roadmap/zoning";
 import type { Zousei } from "../roadmap/zousei";
-import { roadWidthOf } from "./legal";
+import { roadNarrowerThan4 } from "./legal";
 
 type Ok = Extract<LookupResult, { status: "ok" }>;
 
@@ -142,13 +142,12 @@ function roadIssues(roads: NearbyRoad[]): Issue[] {
     });
   else if (/予定道路/.test(s))
     out.push({ id: "road-yotei", level: "check", topic: "road", title: "前面道路が予定道路", detail: `${where}は市の地図で「${r.label}」。道路としての扱いを窓口で確かめてください。` });
-  const w = roadWidthOf(r.width);
-  if (w !== undefined && w < 4 && !/^2項/.test(s))
+  if (roadNarrowerThan4(r.width) && !/^2項/.test(s))
     out.push({
       id: "road-narrow",
       level: "warn",
       topic: "road",
-      title: `前面道路の幅員が4m未満（${r.width}）`,
+      title: `データでは前面道路の幅員が4m未満（${r.width}）`,
       detail: "幅4m未満の道路は、セットバックや建築の制限がかかることがあります。現況の幅と道路の種別をあわせて確かめてください。",
     });
   return out;
@@ -321,7 +320,7 @@ function placeIssues(input: TriageInput): Issue[] {
     const p = parcels.parcel;
     if (parcels.kind === "address") {
       const raw = p.chibanRaw;
-      if (/^(道|水)/.test(raw)) out.push({ id: "on-road", level: "check", topic: "place", title: `住所の地点が${/^水/.test(raw) ? "水路" : "道路"}の上`, detail: "住所の点が建物の入口側に置かれているためです。物件の土地の地番は、地番で探すか、地図で建物の位置を選ぶと出ます。", confirm: "地番で探し直す・場所を直す" });
+      if (/^(道|水)/.test(raw)) out.push({ id: "on-road", level: "check", topic: "place", title: `住所の地点が${/^水/.test(raw) ? "水路" : "道路"}の上`, detail: "住所の点が、建物ではなく道路・水路の上にあります（住所の点の置き方によることがあります）。物件の土地の地番は、地番で探すか、地図で建物の位置を選ぶと出ます。", confirm: "地番で探し直す・場所を直す" });
       else if (parcels.neighbors.length >= 30) out.push({ id: "off-lot", level: "check", topic: "place", title: `住所の地点の筆（${chibanLabel(raw)}）は隣地が${parcels.neighbors.length}筆`, detail: "道路など物件の外の土地の可能性があります。この筆の面積・隣地は物件のものではないかもしれません。", confirm: "公図で物件の筆を" });
       else out.push({ id: "address-parcel", level: "check", topic: "place", title: `住所の地点の筆は${chibanLabel(raw)}（参考）`, detail: "住居表示の住所と地番は別のものです。物件の土地がこの筆かどうかは、公図・登記で確かめます。", confirm: "法務局の公図・登記で" });
     }

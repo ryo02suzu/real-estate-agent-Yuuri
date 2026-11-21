@@ -34,9 +34,24 @@ import { LOADING } from "@/lib/app/load-state";
 export type ZoningState =
   | { status: "loading" }
   | { status: "error" }
-  | { status: "ok"; zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi; iseki?: Iseki; suido?: SuidoLink[]; utilities?: Utilities };
+  | {
+      status: "ok";
+      zoning: Zoning;
+      st?: ZoningStatus;
+      morido?: Morido;
+      hourei?: Hourei;
+      tochi?: Tochi;
+      iseki?: Iseki;
+      suido?: SuidoLink[];
+      utilities?: Utilities;
+      /** 読み込めなかった区域のデータ（無かったことにしない。画面に「読み込めませんでした」と出す） */
+      failed?: string[];
+    };
 
 /** 地点の都市計画を読む（市区町村のデータの有無と時点も） */
+/** 読み込めなかった（区域のデータ） */
+const FAILED = "failed" as const;
+
 export function useZoning(lat: number, lng: number, municipality: Municipality): ZoningState {
   const codes = municipality.codes.join(",");
   const key = `${lat},${lng},${codes}`;
@@ -46,13 +61,19 @@ export function useZoning(lat: number, lng: number, municipality: Municipality):
     Promise.all([
       withRetry(() => zoningAt(lat, lng, pmtilesZoningSource)),
       import("@/lib/roadmap/data/zoning-status.json"),
-      // 盛土規制法・砂防指定地などの区域は読めなくても都市計画は出す
-      withRetry(() => moridoAt(lat, lng, codes.split(",")[0], pmtilesMoridoSource)).catch(() => null),
-      withRetry(() => houreiAt(lat, lng, codes.split(",")[0], pmtilesHoureiSource)).catch(() => null),
-      withRetry(() => { const src = tochiSourceFor(codes.split(",")[0]); return src ? tochiAt(lat, lng, codes.split(",")[0], src) : Promise.resolve(null); }).catch(() => null),
+      // 盛土規制法・砂防指定地などの区域は読めなくても都市計画は出す（読めなかったことは覚えて、画面に出す）
+      withRetry(() => moridoAt(lat, lng, codes.split(",")[0], pmtilesMoridoSource)).catch(() => FAILED),
+      withRetry(() => houreiAt(lat, lng, codes.split(",")[0], pmtilesHoureiSource)).catch(() => FAILED),
+      withRetry(() => { const src = tochiSourceFor(codes.split(",")[0]); return src ? tochiAt(lat, lng, codes.split(",")[0], src) : Promise.resolve(null); }).catch(() => FAILED),
     ])
-      .then(([zoning, mod, morido, hourei, tochi]) => {
+      .then(([zoning, mod, moridoR, houreiR, tochiR]) => {
         if (!alive) return;
+        const failed = [moridoR === FAILED && "盛土規制法の区域", houreiR === FAILED && "砂防指定地・急傾斜地などの区域", tochiR === FAILED && "自然公園・農業振興地域・森林"].filter(
+          (x): x is string => !!x,
+        );
+        const morido = moridoR === FAILED ? null : moridoR;
+        const hourei = houreiR === FAILED ? null : houreiR;
+        const tochi = tochiR === FAILED ? null : tochiR;
         const st = statusFor(codes.split(","), mod.default as Record<string, ZoningStatus>);
         const iseki = isekiFor(municipality, lat, lng);
         const suido = suidoFor(municipality, lat, lng);
@@ -60,7 +81,7 @@ export function useZoning(lat: number, lng: number, municipality: Municipality):
         setState({
           key,
           value: zoning
-            ? { status: "ok", zoning, st, morido: morido ?? undefined, hourei: hourei ?? undefined, tochi: tochi ?? undefined, iseki, suido, utilities }
+            ? { status: "ok", zoning, st, morido: morido ?? undefined, hourei: hourei ?? undefined, tochi: tochi ?? undefined, iseki, suido, utilities, ...(failed.length ? { failed } : {}) }
             : { status: "error" },
         });
       })
@@ -94,7 +115,13 @@ function tochiChips(t?: Tochi): string[] {
 export function ZoningLine({ state, city, onOpen, tile }: { state: ZoningState; city: string; onOpen?: () => void; tile?: boolean }) {
   const [open, setOpen] = useState(false);
   // 砂防指定地・急傾斜地などの区域に入っていれば、用途地域の次に注意の印を出す
-  const chips = state.status === "ok" ? zoningChips(state.zoning).flatMap((c, i) => (i === 0 ? [c, ...houreiChips(state.hourei), ...tochiChips(state.tochi)] : [c])) : [];
+  const chips =
+    state.status === "ok"
+      ? [
+          ...zoningChips(state.zoning, state.st).flatMap((c, i) => (i === 0 ? [c, ...houreiChips(state.hourei), ...tochiChips(state.tochi)] : [c])),
+          ...(state.failed?.length ? ["区域の一部読めず"] : []),
+        ]
+      : [];
   return (
     <>
       {tile ? (
@@ -258,11 +285,20 @@ function ZoningPart({ state: { zoning, st }, city }: { state: Extract<ZoningStat
 }
 
 /** その他の法令の下調べ：盛土規制法・砂防指定地や急傾斜地などの区域・自然公園と農業振興地域と森林・埋蔵文化財と、その出典・特記事項 */
-function OtherPart({ state: { morido, hourei, tochi, iseki }, city }: { state: Extract<ZoningState, { status: "ok" }>; city: string }) {
+function OtherPart({ state: { morido, hourei, tochi, iseki, failed }, city }: { state: Extract<ZoningState, { status: "ok" }>; city: string }) {
   const notes = hourei && houreiNotesLine(hourei.pref);
   return (
     <div>
       <dl className="divide-y divide-line/70">
+        {failed?.length ? (
+          <div className={ROW}>
+            <dt className={LABEL}>読み込めず</dt>
+            <dd className="min-w-0 flex-1">
+              <span className={`block ${VALUE} text-ink`}>{failed.join("・")}</span>
+              <span className={SUB}>国のデータを読み込めませんでした（区域に入っていないという意味ではありません）。開き直すか、区域を指定した都道府県・市の資料で確かめてください。</span>
+            </dd>
+          </div>
+        ) : null}
         {morido && <MoridoRow morido={morido} />}
         {hourei && <HoureiRow hourei={hourei} />}
         {tochi && <TochiRow tochi={tochi} city={city} />}

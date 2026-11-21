@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Zoning } from "../roadmap/zoning";
-import { buildingNotes, roadWidthOf, shadeRule, slopeRule, zoneGroup } from "./legal";
+import { buildingNotes, roadNarrowerThan4, roadWidthOf, shadeRule, slopeRule, zoneGroup } from "./legal";
 
 const zoning = (over: Partial<Zoning> = {}): Zoning => ({ youto: [], youtoNear: [], tokei: true, jyuntoshi: false, koudoti: false, others: [], ...over });
 
@@ -36,6 +36,17 @@ describe("法令・規制の一般的なルールの目安", () => {
     expect(roadWidthOf("4.0〜4.5m")).toBe(4);
     expect(roadWidthOf("６ｍ")).toBe(6);
     expect(roadWidthOf(undefined)).toBeUndefined();
+  });
+
+  it("幅員が 4m より狭いと言えるのは、幅の区分の上限が 4m 以下のときだけ", () => {
+    expect(roadNarrowerThan4("3.5m")).toBe(true);
+    expect(roadNarrowerThan4("4m未満")).toBe(true);
+    expect(roadNarrowerThan4("２．５〜３．５ｍ")).toBe(true);
+    expect(roadNarrowerThan4("3.0m以上5.5m未満")).toBe(false);
+    expect(roadNarrowerThan4("4.0〜4.5m")).toBe(false);
+    expect(roadNarrowerThan4("5.5m以上")).toBe(false);
+    expect(roadNarrowerThan4("4m")).toBe(false);
+    expect(roadNarrowerThan4(undefined)).toBe(false);
   });
 
   it("商業地域・防火地域・建ぺい率80%：耐火なら建ぺい率の制限なし。前面道路4mなら容積率240%の目安", () => {

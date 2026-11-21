@@ -89,8 +89,8 @@ export type HazardTotal = {
   /** 「低い」「注意」「やや高い」「高い」 */
   level: string;
   tone: Tone;
-  /** メーターの針（0=左端、1=右端） */
-  needle: number;
+  /** メーターの針（0=左端、1=右端）。読み込めない種類があって目安を出せないときは無し（針を出さない） */
+  needle: number | undefined;
   /** 一言（区域にかかる種類） */
   comment: string;
 };
@@ -99,6 +99,9 @@ export type HazardTotal = {
 export function hazardTotal(report: HazardReport): HazardTotal | null {
   const cards = hazardCards(report);
   if (cards.some((c) => c.chip === "確認中")) return null;
+  // 読み込めなかった種類があるときは、その種類を「区域の外」「国のデータが無い」とは言わない。どの種類も区域にかからなければ、
+  // 総合の目安は出せない（「低い」と言わない）
+  const failed = cards.filter((c) => c.chip === "読み込めず").map((c) => c.title);
   const order: Tone[] = ["out", "caution", "mid", "high"];
   let worst: Tone = "out";
   for (const c of cards) if (order.indexOf(c.tone) > order.indexOf(worst)) worst = c.tone;
@@ -106,13 +109,15 @@ export function hazardTotal(report: HazardReport): HazardTotal | null {
   if (kaoku) worst = "high";
   const hit = cards.filter((c) => c.tone === "caution" || c.tone === "mid" || c.tone === "high").map((c) => c.title);
   if (kaoku) hit.unshift("家屋倒壊等氾濫");
+  const failedNote = failed.length ? `${failed.join("・")}は国のデータを読み込めませんでした（通信のよい所で開き直すか、市区町村のハザードマップで確認してください）。` : "";
+  if (failed.length && !hit.length) return { level: "確認できず", tone: "none", needle: undefined, comment: failedNote };
   const level = { out: "低い", caution: "注意", mid: "やや高い", high: "高い" }[worst as "out" | "caution" | "mid" | "high"];
   const needle = { out: 0.15, caution: 0.42, mid: 0.66, high: 0.88 }[worst as "out" | "caution" | "mid" | "high"];
-  // データの無い種類（内水など）は「区域外」と言わない
+  // データの無い種類（内水など）は「区域外」と言わない。読み込めなかった種類は「データが無い」とも言わない
   const out = cards.filter((c) => c.tone === "out").map((c) => c.title);
-  const none = cards.filter((c) => c.tone === "none").map((c) => c.title);
+  const none = cards.filter((c) => c.chip === "データなし").map((c) => c.title);
   const comment = hit.length
-    ? `${hit.join("・")}のリスクがあるエリアです。市区町村のハザードマップで詳細を確認してください。`
+    ? `${hit.join("・")}のリスクがあるエリアです。市区町村のハザードマップで詳細を確認してください。${failedNote}`
     : `国のデータでは、${out.join("・")}の想定区域の外です。${none.length ? `${none.join("・")}は国のデータが無いため、市区町村のハザードマップで確認してください。` : ""}`;
   return { level, tone: worst, needle, comment };
 }

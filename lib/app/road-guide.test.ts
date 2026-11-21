@@ -28,7 +28,8 @@ describe("スマホの「道路」タブの、地図の開き方（lib/app/road-
     expect(saitama.some((l) => l.pinpoint && !l.tip)).toBe(true);
     for (const x of roadGuide(saitama)) expect(saitama.find((l) => l.url === x.url)?.tip ?? "").not.toBe("");
     const amagasaki = roadGuide(links("28202", 34.7335, 135.4065));
-    expect(amagasaki[1].what).toBe("物件の場所が開きます");
+    // 尼崎市の市道の地図は、物件の場所を指定して開く作りだが、その場所で開くことを実機で確かめていない（verified: false）
+    expect(amagasaki[1].what).toBe("物件の場所を指定して開きます（開く位置は地図で確かめてください）");
     expect(amagasaki[1].tip).toMatch(/読んで自分で同意する/);
   });
 

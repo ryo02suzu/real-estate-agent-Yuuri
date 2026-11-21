@@ -139,7 +139,9 @@ describe("地点の都市計画", () => {
     const z = zoningFrom([], P);
     expect(zoningRows(z, STATUS_ALL)).toEqual([{ label: "区域", value: "都市計画区域外", warn: false }]);
     expect(zoningRows(z, undefined)[0].value).toBe("データなし");
-    expect(zoningChips(z)).toEqual(["都市計画区域外"]);
+    expect(zoningChips(z, STATUS_ALL)).toEqual(["都市計画区域外"]);
+    // その市の都市計画区域のデータが無ければ「区域外」と言わない
+    expect(zoningChips(z)).toEqual(["区域のデータなし"]);
   });
 });
 

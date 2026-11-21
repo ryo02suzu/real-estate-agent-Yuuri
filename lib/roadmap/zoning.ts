@@ -276,13 +276,14 @@ export function zoningRows(z: Zoning, st: ZoningStatus | undefined): ZoningRow[]
 }
 
 /** スマホの1行に並べる短い印。用途地域（と数値）、注意が要るもの（計画道路・境目）、防火・高度地区・地区計画の順 */
-export function zoningChips(z: Zoning): string[] {
+export function zoningChips(z: Zoning, st?: ZoningStatus): string[] {
   const y = z.youto[0];
   const chips: string[] = [];
   if (y) chips.push(`${youtoShort(y.name)}${y.bcr && y.far ? ` ${y.bcr}/${y.far}` : ""}`);
   else if (z.senbiki === "市街化調整区域") chips.push("調整区域");
-  else if (!z.tokei && !z.jyuntoshi) chips.push("都市計画区域外");
-  else chips.push("用途地域なし");
+  // 「都市計画区域外」「用途地域なし」と言えるのは、その市のデータがあるときだけ（無ければ「データなし」。zoningArea・noneLabel と同じ決まり）
+  else if (!z.tokei && !z.jyuntoshi) chips.push(zoningArea(z, st) === "都市計画区域外" ? "都市計画区域外" : "区域のデータなし");
+  else chips.push(noneLabel(st, "youto") === "データなし" ? "用途地域のデータなし" : "用途地域なし");
   if (z.road !== undefined) chips.push("計画道路");
   if (z.youtoNear.length) chips.push("境目注意");
   if (z.bouka) chips.push(z.bouka.replace(/地域$/, ""));

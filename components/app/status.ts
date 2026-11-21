@@ -89,6 +89,8 @@ export function topicStatuses(result: Ok, data: PropertyData, records: PropertyR
     const hint = "区域の該当を担当課で確認 → 上下水道・ガスは台帳で";
     if (zoning.status === "loading") push("law", { status: "loading", chip: "確認中", value: "区域のデータを読んでいます", hint });
     else if (zoning.status === "error") push("law", { status: "failed", chip: "読み込めず", value: "区域のデータを読めませんでした", hint: "再試行、または担当課で確認" });
+    else if (zoning.status === "ok" && zoning.failed?.length)
+      push("law", { status: "failed", chip: "一部読めず", value: `${zoning.failed.join("・")}のデータを読めませんでした${issues.length ? `。要注意 ${warn}・要確認 ${issues.length - warn}` : ""}`, hint: "再試行、または担当課で確認" });
     else push("law", { status: "auto", chip: "取得済み", value: issues.length ? `要注意 ${warn}・要確認 ${issues.length - warn}：${issues.slice(0, 2).map((i) => i.title).join("・")}` : "データで見つかった注意はありません", hint });
   }
   // ハザード
@@ -100,7 +102,9 @@ export function topicStatuses(result: Ok, data: PropertyData, records: PropertyR
     else if (hazard.status === "ok") {
       // 種類のどれかがまだ読めていなければ総合の目安は出ない（確認中）
       const t = hazardTotal(hazard.report);
-      if (t) push("hazard", { status: "auto", chip: "取得済み", value: `総合の目安：${t.level}。${t.comment}`, hint });
+      // 種類のどれかを読み込めなかったときは「取得済み」と言わない
+      if (t && t.tone === "none") push("hazard", { status: "failed", chip: "一部読めず", value: t.comment, hint: "再試行、または市のハザードマップで確認" });
+      else if (t) push("hazard", { status: "auto", chip: "取得済み", value: `総合の目安：${t.level}。${t.comment}`, hint });
       else push("hazard", { status: "loading", chip: "確認中", value: "国のハザードマップを読んでいます", hint });
     } else push("hazard", { status: "unconfirmed", chip: "未確認", value: "国のデータなし", hint });
   }
