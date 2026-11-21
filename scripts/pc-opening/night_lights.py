@@ -67,8 +67,8 @@ LIST = "https://www.e-stat.go.jp/gis/statmap-search/search_detail?" + urllib.par
 )
 DATA = "https://www.e-stat.go.jp/gis/statmap-search/data?statsId={stats}&code={code}&downloadType=2"
 ATTRIBUTION = (
-    "夜の街の明かり：政府統計の総合窓口（e-Stat）の「令和2年国勢調査に関する地域メッシュ統計」（総務省）の"
-    "500mメッシュの人口を加工して作成"
+    "夜の街の明かり：政府統計の総合窓口（e-Stat）（https://www.e-stat.go.jp/）の"
+    "「令和2年国勢調査に関する地域メッシュ統計」（総務省）の500mメッシュの人口を加工して作成"
 )
 
 # 明かりの強さ（上の説明）
@@ -223,8 +223,13 @@ def build(suffix: str, code: np.ndarray, pop: np.ndarray) -> None:
     n = 2.0**z
     lat, lon = mesh_sw(code)
     dlat, dlon = 15 / 3600, 22.5 / 3600
-    px = lambda lo: ((lo + 180.0) / 360.0 * n - gx0) * TILE  # noqa: E731
-    py = lambda la: (merc_y(la) * n - gy0) * TILE  # noqa: E731
+
+    def px(lo):  # 経度 → 格子の横の位置（画素）
+        return ((lo + 180.0) / 360.0 * n - gx0) * TILE
+
+    def py(la):  # 緯度 → 格子の縦の位置（画素。北が 0）
+        return (merc_y(la) * n - gy0) * TILE
+
     people = splat(H, W, px(lon), px(lon + dlon), py(lat + dlat), py(lat), pop.astype(np.float64))
     inside = int(round(people.sum()))
     # 画素の面積（km²）は緯度で変わる（行ごと）

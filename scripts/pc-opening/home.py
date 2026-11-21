@@ -40,7 +40,8 @@ EARTH = 40075016.7  # 赤道の長さ（m）
 #   energy  太陽（月）の強さ       sky   空の光（色、強さ）      sat  地面の色の鮮やかさ（夜は色が見えにくい）
 #   stops   今の絵（--tod なし）と比べた明るさ（段。地面に届く光の量の違いは、露出で自動で打ち消してから、これだけ変える）
 #   haze    かすみの色（空気が散らす光。地面に届く光の量に比例させる。今の絵は (0.20, 0.32, 0.55)）
-#   lights  街の明かり（人口密度 1 万人/km² の所の光の強さ。0 は明かりなし）。夜と夕で同じ明かりなら同じ値
+#   lights  街の明かり（人口密度 1 万人/km² の所の光の強さ。0 は明かりなし。露出の前の値なので、夜と夕で同じ明るさの
+#           明かりなら同じ値。夕はともり始めなので夜の 2 割ほど）
 #   glow    明かりのにじみ（仕上げ。夜だけ）
 TOD = {
     # 朝：東から低い朝日。光は金、影の側は空の青
@@ -49,7 +50,8 @@ TOD = {
     "day": dict(az=160.0, el=50.0, energy=4.6, sky=((0.38, 0.52, 0.78), 0.30), sat=1.0, stops=0.15, haze=(0.20, 0.30, 0.52), lights=0.0, glow=0.0),
     # 夕：西から低い夕日。光は茜がかった金、影は藍。街の明かりがともり始める
     "dusk": dict(az=256.0, el=8.0, tint=3.5, energy=3.6, sky=((0.30, 0.30, 0.52), 0.24), sat=0.95, stops=-0.6, haze=(0.24, 0.26, 0.50), lights=0.03, glow=0.0),
-    # 夜：南東の高い月の青い光で、陸と海の境目がうっすら分かる。人が住んでいる所に街の明かり
+    # 夜：南東の高い月の青い光で、陸と海の境目がうっすら分かる。人が住んでいる所に街の明かり。
+    # 海は真っ黒ではなく深い藍（月の光と夜空の光が空気で散る分。かすみを強めにしている）
     "night": dict(az=150.0, el=42.0, energy=0.10, moon=(0.56, 0.68, 1.0), sky=((0.05, 0.08, 0.18), 0.10), sat=0.35, stops=-2.6, haze=(0.28, 0.50, 1.54), lights=0.17, glow=0.12),
 }
 DEFAULT_LIGHT = dict(el=26.0, energy=4.2, color=(1.0, 0.88, 0.74), sky=((0.36, 0.52, 0.80), 0.35))  # lights() と同じ（今の絵）
@@ -109,6 +111,13 @@ def build(view_mx: float, view_my: float, zoom: float, exag: float, tod: dict | 
     n = 2.0 ** meta["z"]
     cols = np.arange(0, Wf, S) + 0.5 * S
     rows = np.arange(0, Hf, S) + 0.5 * S
+    ucols, urows = cols, rows
+    if tod is not None:
+        # 時刻の版は、いちばん外側の点をデータの端より少し外に出す（広い版で、絵の端の 2 画素ほどに空の色が映らないように。
+        # 色は端の色のまま。--tod なしの絵は今までどおり）
+        cols, rows = cols.copy(), rows.copy()
+        cols[0], cols[-1], rows[0], rows[-1] = -S, Wf + S, -S, Hf + S
+        ucols, urows = np.clip(cols, 0, Wf), np.clip(rows, 0, Hf)
     mx = (meta["x0"] + cols / 256.0) / n
     my = (meta["y0"] + rows / 256.0) / n
     MX, MY = np.meshgrid(mx, my)
@@ -118,7 +127,7 @@ def build(view_mx: float, view_my: float, zoom: float, exag: float, tod: dict | 
     lat = np.degrees(np.arctan(np.sinh(np.pi * (1 - 2 * MY))))
     m_per_unit = EARTH * np.cos(np.radians(lat)) / world
     Z = np.where(h > 0, h, 0.0) * exag / m_per_unit
-    uv = np.stack([cols[None, :].repeat(len(rows), 0) / Wf, 1.0 - rows[:, None].repeat(len(cols), 1) / Hf], -1)
+    uv = np.stack([ucols[None, :].repeat(len(urows), 0) / Wf, 1.0 - urows[:, None].repeat(len(ucols), 1) / Hf], -1)
     mat = principled("ground", (0.1, 0.1, 0.1), 0.9, 0.3)
     nt = mat.node_tree
     b = nt.nodes["Principled BSDF"]
@@ -136,12 +145,13 @@ def build(view_mx: float, view_my: float, zoom: float, exag: float, tod: dict | 
     nt.links.new(tex.outputs["Alpha"], rough.inputs["Value"])
     nt.links.new(rough.outputs["Result"], b.inputs["Roughness"])
     if tod is not None:
-        tod_material(nt, b, tex, uvn, tod)
+        tod_material(mat, b, tex, uvn, tod)
     grid_object("japan", X, Y, Z, h, None, mat, uv=uv)
 
 
-def tod_material(nt, b, tex, uvn, p: dict) -> None:
+def tod_material(mat, b, tex, uvn, p: dict) -> None:
     """時刻の版だけ：地面の色の鮮やかさ（夜は落とす）と、街の明かり（night_lights.py。人口密度から。人が住んでいる所だけ）"""
+    nt = mat.node_tree
     if p["sat"] != 1.0:
         hsv = nt.nodes.new("ShaderNodeHueSaturation")
         hsv.inputs["Saturation"].default_value = p["sat"]
@@ -149,6 +159,8 @@ def tod_material(nt, b, tex, uvn, p: dict) -> None:
         nt.links.new(hsv.outputs["Color"], b.inputs["Base Color"])
     if p["lights"] <= 0:
         return
+    # 明かりは見えるだけでよい（地面をほとんど照らさない）。光源として選ばせないと、とても速く描ける
+    mat.cycles.emission_sampling = "NONE"
     with open(os.path.join(WORK, f"night_lights{SUFFIX}.json")) as f:
         scale = json.load(f)["scale"]
     lt = nt.nodes.new("ShaderNodeTexImage")
@@ -225,9 +237,9 @@ def tod_lights(p: dict) -> None:
     ob.rotation_quaternion = Vector((0.0, 0.0, 1.0)).rotation_difference(Vector(d))
 
 
-def finish(haze: float, color=(0.20, 0.32, 0.55), glow: float = 0.0, exposure: float = 0.0) -> None:
+def finish(haze: float, color=(0.20, 0.32, 0.55), glow: float = 0.0, exposure: float = 0.0, glow_size: float = 0.5) -> None:
     """仕上げ：宇宙から見たときの、空気のうっすらした青いかすみ（時刻の版は、かすみの色と、夜の街の明かりのにじみ）。
-    合成は露出の前の光の量なので、にじませる明るさの境目は露出で割る"""
+    合成は露出の前の光の量なので、にじませる明るさの境目は露出で割る。にじみの広さ（glow_size）は絵の幅に対する割合"""
     sc = bpy.context.scene
     ng = bpy.data.node_groups.new("finish", "CompositorNodeTree")
     ng.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
@@ -243,7 +255,7 @@ def finish(haze: float, color=(0.20, 0.32, 0.55), glow: float = 0.0, exposure: f
         gl.inputs["Quality"].default_value = "High"
         gl.inputs["Threshold"].default_value = 0.5 / 2**exposure
         gl.inputs["Strength"].default_value = glow
-        gl.inputs["Size"].default_value = 0.5
+        gl.inputs["Size"].default_value = glow_size
         ng.links.new(img, gl.inputs["Image"])
         img = gl.outputs["Image"]
     mix = ng.nodes.new("ShaderNodeMix")  # Blender 5 の合成でも、シェーダーと同じ Mix を使う
@@ -322,10 +334,11 @@ def main() -> None:
     if tod is None:
         finish(0.06)
     else:
-        # 地面に届く光の量の違いは露出で打ち消し、stops だけ明るさを変える。かすみ（空気が散らす光）は光の量に比例
+        # 地面に届く光の量の違いは露出で打ち消し、stops だけ明るさを変える。かすみ（空気が散らす光）は光の量に比例。
+        # にじみの広さは、地面の上で同じ広さになるように（1440×900 の画面の幅で 0.5）
         g = tod_gain(tod)
         sc.view_settings.exposure = 0.3 - math.log2(g) + tod["stops"]
-        finish(0.06, tuple(c * g for c in tod["haze"]), tod["glow"], sc.view_settings.exposure)
+        finish(0.06, tuple(c * g for c in tod["haze"]), tod["glow"], sc.view_settings.exposure, 0.5 * 1440 / W)
         print(f"{a.tod}：地面に届く光 {g:.3f} 倍、露出 {sc.view_settings.exposure:+.2f}", flush=True)
     tail = f"_{a.tod}" if a.tod else ""
     out = a.out or os.path.join(WORK, "home", f"home_wide{tail}.png" if a.extent else f"home_{W}x{H}{tail}.png")

@@ -148,6 +148,15 @@ export const machiInfoMap =
   (lat, lng) =>
     `https://${host}/?map_id=${mapId}&lt=${lat.toFixed(6)}&lg=${lng.toFixed(6)}&z=${zoom}`;
 
+/**
+ * 高松市スマートマップ（maps.takamatsu-fact.com。Geolonia の地図）。?center=経度/緯度&zoom= で開き、#layers= に表示するデータの
+ * 短いID（サイトの api/catalog.json の shortId。地番現況図は cGz）を書く。その場所が中心に開き、そのデータが表示されることを確かめた（2026-11-21）
+ */
+export const takamatsuSmartMap =
+  (layers: string, zoom = 18): Build =>
+  (lat, lng) =>
+    `https://maps.takamatsu-fact.com/?center=${lng.toFixed(6)}%2F${lat.toFixed(6)}&zoom=${zoom}&baseMap=gsi-base#layers=${layers}`;
+
 /** 中央区都市計画情報等閲覧システム。map.php?lat=&lon=（表示図の切替は画面上で行う） */
 export const chuoMap: Build = (lat, lng) => `https://chuo-map.jp/map.php?lat=${lat.toFixed(6)}&lon=${lng.toFixed(6)}`;
 
