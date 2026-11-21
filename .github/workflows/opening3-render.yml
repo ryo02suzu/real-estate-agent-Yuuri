@@ -191,20 +191,29 @@ jobs:
           run-id: ${{ steps.prev.outputs.run }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: コマがそろっているか
+        id: check
         run: |
           mkdir -p png png_prev
           cp -n png_prev/*.png png/ 2>/dev/null || true
-          python3 - <<'EOF'
-          import os, sys
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, os, sys
+          r = json.load(open("scripts/pc-opening3/render.json"))
           have = {int(f[:4]) for f in os.listdir("png") if f.endswith(".png")}
           want = set(range(0, 507))
           miss = sorted(want - have)
-          print(f"コマ {len(have)} / {len(want)}")
-          if miss:
-              print("足りないコマ:", miss)
+          print(f"コマ {len(have)} / {len(want)}", file=sys.stderr)
+          if r.get("encode", True) is False:
+              # 手伝いの作業場（worker.sh）と手分けして描いた回：コマは手元で集めて動画にする
+              print("動画にしない回（render.json の encode が false）", file=sys.stderr)
+              print("ok=0")
+          elif miss:
+              print("足りないコマ:", miss, file=sys.stderr)
               sys.exit(1)
+          else:
+              print("ok=1")
           EOF
       - name: 動画にする
+        if: steps.check.outputs.ok == '1'
         run: |
           command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
           ls png | wc -l
@@ -214,8 +223,13 @@ jobs:
           if ffmpeg -hide_banner -encoders | grep -q libsvtav1; then
             ffmpeg -y -framerate 24 -i png/%04d.png -c:v libsvtav1 -preset 4 -crf 28 -pix_fmt yuv420p10le -g 48 public/opening3/opening-av1.webm
           fi
+          # Apple の機器（AV1 を再生できないもの）向け：HEVC（H.264 より軽い）
+          if ffmpeg -hide_banner -encoders | grep -q libx265; then
+            ffmpeg -y -framerate 24 -i png/%04d.png -c:v libx265 -preset slow -crf 22 -pix_fmt yuv420p10le -tag:v hvc1 -g 48 -movflags +faststart public/opening3/opening-hevc.mp4
+          fi
           ls -la public/opening3
       - name: ブランチに入れる
+        if: steps.check.outputs.ok == '1'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
