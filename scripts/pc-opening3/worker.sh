@@ -35,13 +35,14 @@ if [ ! -x "$BL" ] || ! "$BL" -c "import bpy" 2>/dev/null; then
   python3 -m venv /tmp/blv
   /tmp/blv/bin/pip install -q bpy==5.3.0 numpy scipy pillow OpenEXR
 fi
-if [ ! -f work/path3.json ] || [ ! -f work/landcover/plants.npz ]; then
-  echo "地形・土地の種類・素材・飛び方を作る"
+if [ ! -f work/terrain/near_carved.npy ] || [ ! -f work/landcover/plants.npz ]; then
+  echo "地形・土地の種類・素材を作る"
   python3 data.py
   python3 landcover.py
   python3 assets.py
-  python3 path3.py
 fi
+# 飛び方は、いつも今のコードで作り直す（数秒。取り込んだ材料の path3.json が古くても、そろう）
+python3 path3.py
 
 # 描くコマの一覧（「a-b」「a,b」）
 LIST=$(python3 - "$FRAMES" <<'EOF'

@@ -513,7 +513,7 @@ def ground_material(name: str, cover: str | None) -> bpy.types.Material:
     gravel_n = mix(nt, pmr.outputs["Result"], peb_n, fin_n, (-300, 1600))
     forest_c, forest_r, forest_n, _ = surface(nt, "forest_leaves_02", pos, 3.0, -600, 800, tint=(0.47, 1.1, 0.8))
     grass_c, grass_r, grass_n, _ = surface(nt, "aerial_grass_rock", pos, 14.0, -600, 0, tint=(0.46, 0.75, 1.05))
-    rock_c, rock_r, rock_n, _ = surface(nt, "rock_face_03", pos, 9.0, -600, -800, tint=(0.5, 0.35, 0.62))  # 花崗岩の灰色（白く光りすぎない）
+    rock_c, rock_r, rock_n, _ = surface(nt, "rock_face_03", pos, 9.0, -600, -800, tint=(0.5, 0.35, 0.52))  # 花崗岩の灰色（日なたで白いしみに見えないよう少し暗く）
 
     if cover:
         ct = node(nt, "ShaderNodeTexImage", (-1000, 600))
@@ -642,7 +642,20 @@ def ground_material(name: str, cover: str | None) -> bpy.types.Material:
     rock_v.inputs["Factor"].default_value = 1.0
     link(nt, rock_c, rock_v.inputs[6])
     link(nt, rcm.outputs["Color"], rock_v.inputs[7])
-    c = mix(nt, rockf, c, rock_v.outputs[2], (600, 600))
+    # 岩場の割れ目や棚に生える低木・ハイマツ（暗い緑のまだら）。岩だけだと、遠くから模様の無い白っぽいしみに見えた
+    veg_n = node(nt, "ShaderNodeTexNoise", (100, -1600), Scale=0.08, Detail=6.0, Roughness=0.7)
+    link(nt, pos, veg_n.inputs["Vector"])
+    veg = node(nt, "ShaderNodeMapRange", (300, -1600), **{"From Min": 0.50, "From Max": 0.62, "To Max": 0.85})
+    link(nt, veg_n.outputs["Fac"], veg.inputs["Value"])
+    veg_hi = node(nt, "ShaderNodeMapRange", (300, -1700), **{"From Min": 2500.0, "From Max": 2850.0, "To Min": 1.0, "To Max": 0.15})  # 高い岩峰はほとんど裸の岩
+    link(nt, sep.outputs["Z"], veg_hi.inputs["Value"])
+    veg_amt = node(nt, "ShaderNodeMath", (400, -1650), operation="MULTIPLY")
+    link(nt, veg.outputs["Result"], veg_amt.inputs[0])
+    link(nt, veg_hi.outputs["Result"], veg_amt.inputs[1])
+    veg_col = node(nt, "ShaderNodeRGB", (300, -1800))
+    veg_col.outputs[0].default_value = (0.026, 0.040, 0.020, 1.0)
+    rock_mix = mix(nt, veg_amt.outputs[0], rock_v.outputs[2], veg_col.outputs[0], (450, -1300))
+    c = mix(nt, rockf, c, rock_mix, (600, 600))
     c = mix(nt, canopy_f, c, canopy_c, (700, 700))
     # 頂の初雪（標高 2700m より上の、なだらかな所に。まだら）
     sn_h = node(nt, "ShaderNodeMapRange", (300, 1300), **{"From Min": 2760.0, "From Max": 2950.0})

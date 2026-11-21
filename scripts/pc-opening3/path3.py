@@ -84,9 +84,9 @@ def main() -> None:
             dprev = pos[i - 1, :2] - pos[i - 2, :2]
             head = math.atan2(dprev[0], dprev[1])
             want = math.atan2(hx - prev[0], hy - prev[1])
-            k = float(smooth((t[i] - 10.4) / 3.0))
+            k = float(smooth((t[i] - 10.4) / 4.0))
             dh = (want - head + math.pi) % (2 * math.pi) - math.pi
-            head += dh * (0.10 * k + 0.01)
+            head += dh * (0.05 * k + 0.005)  # 道筋はゆっくり穂高へ曲げる（向きはカメラが先に回っている）
             step = v[i] / FPS
             pos[i, 0] = prev[0] + step * math.sin(head)
             pos[i, 1] = prev[1] + step * math.cos(head)
@@ -105,14 +105,19 @@ def main() -> None:
     # ---- 向き：進む向き（先の方を見る）。上がるときは穂高へ。曲がりでは傾く
     fwd = np.zeros((n, 3))
     look_ahead = int(0.7 * FPS)
+    # 川の流れの向き（0.7 秒先の川の上の点へ）。川を離れたあとも川の線の上で数える（道筋の曲がり始めで向きが折れないように）
+    rpx = np.interp(s_now, ss, rx)
+    rpy = np.interp(s_now, ss, ry)
     for i in range(n):
         j = min(n - 1, i + look_ahead)
-        d = pos[j] - pos[i] if j > i else pos[i] - pos[i - 1]
+        d = np.array([rpx[j] - rpx[i], rpy[j] - rpy[i], 0.0]) if j > i else np.array([rpx[i] - rpx[i - 1], rpy[i] - rpy[i - 1], 0.0])
         d = d / (np.linalg.norm(d) + 1e-9)
         tgt = np.array([hx, hy, 0.0]) - pos[i]
         tgt[2] = 0.0
         tgt = tgt / np.linalg.norm(tgt)
-        w = float(smooth((t[i] - 10.0) / 4.0))
+        # 穂高へ向ける：川の上にいる 7.6 秒から、6.2 秒かけてゆっくり（ヘリのカメラが早めに目標へ回る）。前は 10〜14 秒で、
+        # 川を離れて曲がる道筋に引っぱられ、10.5〜12 秒に 1 秒 33° の急な旋回になり、画面全体が流れてぶれた
+        w = float(smooth((t[i] - 7.6) / 6.2))
         f = d * (1 - w) + tgt * w
         f[2] = 0.0
         f = f / np.linalg.norm(f)
