@@ -374,6 +374,52 @@ SOURCES = [
         "date": "2024-01-01", "epsg": 2454, "enc": "utf-8",
         "gdb": {"layer": "hude"}, "chiban": ["地番", "枝番"], "key": "町字", "oname": "町字名",
     },
+    # ---- 2026-11-21 に足した（WIP） ----
+    {
+        "code": "01204", "name": "旭川市", "credit": "旭川市「地番参考図データ」", "license": "CC BY 2.1 JP",
+        "terms": "",
+        "fetch": {"kind": "page", "page": "https://www.city.asahikawa.hokkaido.jp/kurashi/112/113/116/d080184.html", "resource": r"^012041_tiban_\d{4}\.zip$"},
+        "date": "2025-01-01", "epsg": 6680, "enc": "cp932",
+        "shp": r"(?i)tochi_poly\.shp$", "chiban": ["TXTCD"], "key": "AZACD",
+        "names": {"shp": r"(?i)oaza_poly\.shp$", "key": "AZAC", "name": "AZACNAM"},
+    },
+    {
+        "code": "07204", "name": "いわき市", "credit": "いわき市「地番参考図データ」", "license": "CC BY 2.1 JP",
+        "terms": "",
+        "fetch": {"kind": "page", "page": "https://www.city.iwaki.lg.jp/www/contents/1755050006519/index.html", "resource": r"^chibansankouzu\.zip$"},
+        "date": "2026-01-01", "epsg": 6677, "enc": "cp932",
+        "shp": r"筆界\.shp$", "chiban": ["地番"], "key": "大字",
+    },
+    {
+        "code": "08201", "name": "水戸市", "credit": "水戸市「地形地番集成編纂図データファイル」", "license": "CC BY（版の記載なし）",
+        "terms": "",
+        "fetch": {"kind": "page", "page": "https://www.city.mito.lg.jp/site/open-data/97836.html", "resource": r"^data\.zip$"},
+        "date": "2026-01-01", "epsg": 6677, "enc": "cp932",
+        "shp": r"\.shp$", "chiban": ["地番"], "key": "大字",
+    },
+    {
+        "code": "09201", "name": "宇都宮市", "credit": "宇都宮市「地籍図データ」", "license": "CC BY（版の記載なし）",
+        "terms": "",
+        "fetch": {"kind": "ckan", "api": "https://catalog.city.utsunomiya.tochigi.jp/api/3/action", "dataset": "chibannzu-070101", "resource": r"^\d\d_(?:字界|地番図\d+)\.zip$", "bundle": True},
+        "date": "2026-01-01", "epsg": 6677, "enc": "cp932",
+        "shp": r"/筆界線\d+\.shp$", "shp_all": True, "chiban": ["SYO_HON", "SYO_EDA", "SYO_KOEDA"], "key": "SYO_CHO_CD",
+        "names": {"shp": r"大字界\.shp$", "key": "CYO_CD", "name": "CYO_MEI"},
+    },
+    {
+        "code": "16201", "name": "富山市", "credit": "富山市「地番参考図」", "license": CCBY,
+        "terms": "",
+        "fetch": {"kind": "ckan", "api": "https://opdt.city.toyama.lg.jp/api/3/action", "dataset": "chiban", "resource": r"令和[8８]年[1１]月[1１]日"},
+        "date": "2026-01-01", "epsg": 6675, "enc": "cp932",
+        "shp": r"\.shp$", "chiban": ["地番"], "key": "大字",
+    },
+    {
+        "code": "10202", "name": "高崎市", "credit": "高崎市「地番図」", "license": CCBY,
+        "terms": "",
+        "fetch": {"kind": "page", "page": "https://www.city.takasaki.gunma.jp/page/3130.html", "resource": r"^(?:地番_地番図|地番引出線_地番図|筆ポリゴン_地番図)\s", "by_text": True, "bundle": True},
+        "date": "2026-01-01", "epsg": 6677, "enc": "cp932",
+        "shp": r"筆ポリゴン_地番図\.shp$", "chiban": ["label"], "key": "oazacd",
+        "labels": {"shp": r"地番_地番図\.shp$", "id": "chibanid", "leaders": r"地番引出線_地番図\.shp$"},
+    },
 ]
 # 確かめて外したもの（--check で「入れていない市町村」として知らせない）。
 EXCLUDED = {
@@ -534,15 +580,22 @@ def ckan_resources(api: str, dataset: str) -> tuple[dict, list[dict]]:
     return info, out
 
 
-def page_resources(page: str, pattern: str) -> tuple[dict, list[dict]]:
+def page_resources(page: str, pattern: str, by_text: bool = False) -> tuple[dict, list[dict]]:
     """市町村のページに直接置かれたファイル（オープンデータのサイトに無い所。長岡京市）。ページのリンクのうち pattern に合うものを、
-    ページに載っている順に（新しい年が上）。更新日はファイルの Last-Modified"""
+    ページに載っている順に（新しい年が上）。更新日はファイルの Last-Modified。
+    by_text：ファイル名が番号だけの所（高崎市の「42709.zip」）は、リンクの文字（「地番_地番図 [その他のファイル／12.87MB]」）で選ぶ"""
     t = get(page).decode("utf-8", "replace")
+    if by_text:
+        links = [(h, html.unescape(re.sub(r"<[^>]+>", "", x)).strip()) for h, x in re.findall(r'<a\s[^>]*href="([^"]+)"[^>]*>(.*?)</a>', t, flags=re.S)]
+    else:
+        links = [(h, "") for h in re.findall(r'href="([^"]+)"', t)]
     out = []
-    for href in dict.fromkeys(re.findall(r'href="([^"]+)"', t)):
+    seen = set()
+    for href, text in links:
         url = urllib.parse.urljoin(page, html.unescape(href))
-        if not re.search(pattern, urllib.parse.unquote(url.rsplit("/", 1)[-1])):
+        if url in seen or not re.search(pattern, text if by_text else urllib.parse.unquote(url.rsplit("/", 1)[-1])):
             continue
+        seen.add(url)
         modified, size = "", 0
         try:
             req = urllib.request.Request(url, headers=UA, method="HEAD")
@@ -556,7 +609,7 @@ def page_resources(page: str, pattern: str) -> tuple[dict, list[dict]]:
         except Exception:
             pass
         name = url.rsplit("/", 1)[-1]
-        out.append({"id": re.sub(r"\.zip$", "", name, flags=re.I), "name": name, "file": name, "modified": modified, "size": size, "license": "", "url": url, "order": len(out)})
+        out.append({"id": re.sub(r"\.zip$", "", name, flags=re.I), "name": text or name, "file": name, "modified": modified, "size": size, "license": "", "url": url, "order": len(out)})
     return {"title": "", "org": ""}, out
 
 
@@ -566,7 +619,7 @@ def resolve(src: dict, known: dict | None = None) -> dict:
     f = src["fetch"]
     if f["kind"] == "page":
         try:
-            info, res = page_resources(f["page"], f["resource"])
+            info, res = page_resources(f["page"], f["resource"], f.get("by_text", False))
         except Exception as e:
             k = (known or {}).get(src["code"])
             if not k:
@@ -575,6 +628,8 @@ def resolve(src: dict, known: dict | None = None) -> dict:
             return k
         if not res:
             raise RuntimeError(f"{src['name']}: ページにファイルが見つかりません（{f['page']}）")
+        if f.get("bundle"):
+            return {**bundle_parts(src, res), "title": info.get("title", ""), "org": info.get("org", ""), "page": f["page"]}
         best = min(res, key=lambda r: r["order"])
         best = {k: v for k, v in best.items() if k != "order"}
         return {**best, "title": info.get("title", ""), "org": info.get("org", ""), "page": f["page"]}
@@ -593,6 +648,8 @@ def resolve(src: dict, known: dict | None = None) -> dict:
     page = f"{f['base']}/datasets/{f['dataset']}" if f["kind"] == "dataeye" else f"{f['api'].replace('/api/3/action', '')}/dataset/{f['dataset']}"
     if f.get("parts"):
         return {**shapefile_parts(src, cand), "title": info.get("title", ""), "org": info.get("org", ""), "page": page}
+    if f.get("bundle"):
+        return {**bundle_parts(src, cand), "title": info.get("title", ""), "org": info.get("org", ""), "page": page}
     best = max(cand, key=lambda r: (r["modified"], r["id"]))
     return {**best, "title": info.get("title", ""), "org": info.get("org", ""), "page": page}
 
@@ -617,6 +674,28 @@ def shapefile_parts(src: dict, cand: list[dict]) -> dict:
     shp = by_ext[".shp"]
     return {
         **shp,
+        "file": " ".join(part_name(r) for r in parts),
+        "modified": max(r["modified"] for r in parts),
+        "size": sum(r["size"] for r in parts),
+        "parts": [{"file": part_name(r), "url": r["url"], "size": r["size"]} for r in parts],
+    }
+
+
+def bundle_parts(src: dict, cand: list[dict]) -> dict:
+    """1つのデータが、いくつものファイル（zip）に分けて置かれている所（宇都宮市の地番図01〜07と字界）。合うファイルを名前ごとに
+    一番新しいものだけ全部取る。id・URL は名前の順で最初のもの、更新日は一番新しい日、大きさは合計にする（parts に一覧。
+    fetch_archive が1つの zip にまとめ、extract が中の zip を展開する）"""
+    by_name: dict[str, dict] = {}
+    for r in cand:
+        n = part_name(r)
+        if n and (n not in by_name or (r["modified"], r["id"]) > (by_name[n]["modified"], by_name[n]["id"])):
+            by_name[n] = r
+    if len(by_name) < 2:
+        raise RuntimeError(f"{src['name']}: 分けて置かれたファイルが足りません（{sorted(by_name)}）")
+    parts = [by_name[n] for n in sorted(by_name)]
+    first = {k: v for k, v in parts[0].items() if k != "order"}
+    return {
+        **first,
         "file": " ".join(part_name(r) for r in parts),
         "modified": max(r["modified"] for r in parts),
         "size": sum(r["size"] for r in parts),
@@ -757,12 +836,27 @@ def extract(zip_path: str, out: str) -> None:
                 extract(p, p[:-4])
 
 
-def find(root: str, pattern: str) -> str:
+def find_all(root: str, pattern: str) -> list[str]:
+    """pattern に合うファイル（パスの順）"""
     pat = re.compile(pattern)
     hits = sorted(os.path.join(d, f) for d, _, fs in os.walk(root) for f in fs if pat.search(os.path.join(d, f).replace(os.sep, "/")))
     if not hits:
         raise RuntimeError(f"{pattern} が {root} にありません")
-    return hits[0]
+    return hits
+
+
+def find(root: str, pattern: str) -> str:
+    return find_all(root, pattern)[0]
+
+
+def check_prj(path: str, epsg: int) -> None:
+    """shapefile の .prj の測地系が SOURCES の座標系と違えば知らせる（.prj の無いものは見ない）"""
+    prj = [f for f in os.listdir(os.path.dirname(path)) if f.lower() == os.path.basename(path)[:-4].lower() + ".prj"]
+    if prj:
+        t = open(os.path.join(os.path.dirname(path), prj[0]), "rb").read().decode("latin1")
+        datum = "JGD2011" if "2011" in t else "JGD2000" if "2000" in t else "Tokyo" if "Tokyo" in t or "Bessel" in t else "?"
+        if datum != datum_of(epsg):
+            log(f"  ::warning:: {os.path.basename(path)} の .prj は {datum}、SOURCES は {datum_of(epsg)}")
 
 
 # ---- 法務省のデータ ----
@@ -997,6 +1091,86 @@ def read_lines_mode(src: dict, root: str) -> tuple[list, list[str], list[str], l
     return geoms, chibans, keys, onames, koazas
 
 
+def read_labels_mode(src: dict, root: str) -> tuple[list, list[str], list[str], list[str], list[str]]:
+    """筆の面（shp）に地番が無く、地番の文字の点（labels）が別にある所（高崎市）。文字から筆の外へ引出線が引かれているもの（引出線の
+    列 id で文字と結び付く）は、引出線の端のうち文字から遠い方の点、引出線の無い文字は文字の点そのものを含む面に、その文字の地番と
+    大字を付ける。引出線のある文字の点は、ほとんど（高崎市は 138,630 のうち 138,465）が引出線の先の筆とは別の所（隣の筆・道など）にあるので、
+    引出線の先で当てる。
+    地番（数字）の文字が2つ以上入る面は、どの地番の筆か決められないので入れない。2つ以上の面に入る点の文字は使わない"""
+    sp = src["labels"]
+    r = reader(find(root, src["shp"]), src["enc"])
+    polys = []
+    for shp, _rec in shape_records(r):
+        g = None
+        if shp is not None and shp.points:
+            try:
+                g = shape(shp.__geo_interface__)
+                g = g if g.is_valid else shapely.make_valid(g)
+            except Exception:
+                g = None
+        polys.append(g if g is not None else shapely.Polygon())
+    leads: dict[str, list] = collections.defaultdict(list)
+    if sp.get("leaders"):
+        er = reader(find(root, sp["leaders"]), src["enc"])
+        ie = [f[0] for f in er.fields[1:]].index(sp["id"])
+        for shp, rec in shape_records(er):
+            if shp is not None and len(shp.points) >= 2:
+                leads[str(rec[ie]).strip()].append(shp.points)
+    lr = reader(find(root, sp["shp"]), src["enc"])
+    names = [f[0] for f in lr.fields[1:]]
+    ic = [names.index(c) for c in src["chiban"]]
+    ik = names.index(src["key"])
+    iid = names.index(sp["id"]) if sp.get("leaders") else None
+    targets, labels = [], []
+    led = 0
+    for shp, rec in shape_records(lr):
+        if shp is None or not shp.points:
+            continue
+        ch = norm_chiban([rec[i] for i in ic])
+        if not ch:
+            continue  # 道・水路・無番地などの文字
+        x, y = shp.points[0][:2]
+        ends = [p for line in leads.get(str(rec[iid]).strip(), []) for p in (line[0], line[-1])] if iid is not None else []
+        if ends:
+            x, y = max(ends, key=lambda p: (p[0] - x) ** 2 + (p[1] - y) ** 2)[:2]
+            led += 1
+        targets.append(shapely.Point(x, y))
+        labels.append((str(rec[ik]).strip(), ch))
+    tree = STRtree(polys)
+    ti, pi = tree.query(np.array(targets, dtype=object), predicate="within")
+    by_label: dict[int, list[int]] = collections.defaultdict(list)
+    for t_, p_ in zip(ti, pi):
+        by_label[int(t_)].append(int(p_))
+    by_poly: dict[int, list[int]] = collections.defaultdict(list)
+    outside = multi_poly = 0
+    for t_ in range(len(targets)):
+        ps = by_label.get(t_, [])
+        if len(ps) == 1:
+            by_poly[ps[0]].append(t_)
+        elif ps:
+            multi_poly += 1
+        else:
+            outside += 1
+    geoms, chibans, keys, onames, koazas = [], [], [], [], []
+    table = name_table(root, src.get("names"), src["enc"])
+    multi = 0
+    for p_, ts in by_poly.items():
+        if len(ts) > 1:
+            multi += 1
+            continue
+        key, ch = labels[ts[0]]
+        geoms.append(polys[p_])
+        chibans.append(ch)
+        keys.append(key)
+        onames.append(table.get(key, ""))
+        koazas.append("")
+    log(
+        f"  面 {len(polys)}・地番の文字 {len(targets)}（引出線の先で当てた {led}）→ 地番の付いた面 {len(geoms)}"
+        f"（地番の文字が2つ以上の面 {multi}・地番の文字の無い面（道・水路など） {len(polys) - len(by_poly)}・面に入らない文字 {outside}・2つ以上の面に入る文字 {multi_poly} は入れない）"
+    )
+    return geoms, chibans, keys, onames, koazas
+
+
 def oaza_by_polygon(src: dict, root: str, geoms: list, chibans: list[str], keys: list[str], onames: list[str]) -> None:
     """筆に大字の列が無い所（伊丹市）：大字の境の面（oaza_poly の shapefile。同じ座標系）のうち、筆の中の点を含む面がちょうど1つなら、
     その大字のコードを鍵、名前を大字名にする（keys・onames を書き換える）。含む面が無い・2つ以上の筆は大字が分からないので、地番を消して入れない"""
@@ -1049,8 +1223,8 @@ def read_muni(src: dict, root: str) -> dict:
     """市町村の筆（元の座標系の形・地番・大字のキー・大字名・小字名）"""
     wardl: list[str] = []  # 区のある市の、筆の区の名前（「南区」。ward_field）
     subs: list[str] = []  # 小字のコード（subkey。小字ごとに地番が付く市の、小字の名前の代わり）
-    if "lines" in src:
-        geoms, chibans, keys, onames, koazas = read_lines_mode(src, root)
+    if "lines" in src or "labels" in src:
+        geoms, chibans, keys, onames, koazas = read_lines_mode(src, root) if "lines" in src else read_labels_mode(src, root)
         raw_n = len(geoms)
         wardl = [""] * len(geoms)
         subs = [""] * len(geoms)
@@ -1058,16 +1232,18 @@ def read_muni(src: dict, root: str) -> dict:
         if src.get("gdb"):
             names, rows = gdb_rows(root, src["gdb"], src["epsg"])
         else:
-            path = find(root, src["shp"])
-            prj = [f for f in os.listdir(os.path.dirname(path)) if f.lower() == os.path.basename(path)[:-4].lower() + ".prj"]
-            if prj:
-                t = open(os.path.join(os.path.dirname(path), prj[0]), "rb").read().decode("latin1")
-                datum = "JGD2011" if "2011" in t else "JGD2000" if "2000" in t else "Tokyo" if "Tokyo" in t or "Bessel" in t else "?"
-                if datum != datum_of(src["epsg"]):
-                    log(f"  ::warning:: .prj は {datum}、SOURCES は {datum_of(src['epsg'])}")
-            r = reader(path, src["enc"])
-            names = [f[0] for f in r.fields[1:]]
-            rows = shape_records(r)
+            # shp_all：同じ形の shapefile がいくつものファイルに分かれている所（宇都宮市の地番図01〜07）は、合うものを全部読む
+            paths = find_all(root, src["shp"]) if src.get("shp_all") else [find(root, src["shp"])]
+            for path in paths:
+                check_prj(path, src["epsg"])
+            readers = [reader(p, src["enc"]) for p in paths]
+            names = [f[0] for f in readers[0].fields[1:]]
+            for p, r in zip(paths[1:], readers[1:]):
+                if [f[0] for f in r.fields[1:]] != names:
+                    raise RuntimeError(f"{p} の列が {paths[0]} と違います")
+            if len(paths) > 1:
+                log(f"  shapefile {len(paths)} 個（{', '.join(os.path.relpath(p, root) for p in paths)}）")
+            rows = (row for r in readers for row in shape_records(r))
         table = name_table(root, src.get("names"), src["enc"])
         pad = (src.get("names") or {}).get("pad", 0)
         # 大字名に小字名がつながった名前（豊田市の町字名「福受町下ノ切」）を、大字の名前の一覧（大字界の shapefile）の一番長く合う頭で、
