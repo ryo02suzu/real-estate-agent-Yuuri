@@ -9,6 +9,7 @@
 import { Box, Compass, LocateFixed, Map as MapIcon, Maximize2, Minimize2, Minus, Plus, RotateCcw, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { addCompare, clearCompare, loadCompare, removeCompare, type CompareItem } from "@/lib/app/compare";
+import type { AirIntro } from "@/lib/app/desk-air";
 import { OPENING_PREF_KEY, OPENING_READY, OPENING_SESSION_KEY, shouldPlayOpening } from "@/lib/app/opening";
 import { readUrlState } from "@/lib/app/url";
 import { loadPrefs, samePlaces, savePrefs, todOfSun, ZOOM_DIST, type DeskPrefs, type DeskTod, type GoogleFail } from "@/lib/app/desk";
@@ -167,6 +168,9 @@ export function DesktopShell({
   const [toast, showToast, hideToast] = useToast();
   // オープニング映像（このタブで一度だけ。流し始めたら覚える：読み込み直しでは流さない）
   const [opening, setOpening] = useState(openingAtStart);
+  // 地図の空気の層とのつなぎ：流している間は白い雲で覆って待ち（hold）、最後の白い雲に溶けて終わったら、雲が晴れて日本が
+  // 見えてくる（reveal）。飛ばしたとき・流さなかったときは、ふだんどおり（none。lib/app/desk-air.ts）
+  const [intro, setIntro] = useState<AirIntro>(() => (opening ? "hold" : "none"));
   useEffect(() => {
     if (!opening) return;
     try {
@@ -366,6 +370,9 @@ export function DesktopShell({
             skin="desk"
             places={ok ? places : undefined}
             waitLabel={loading ? input : undefined}
+            deskTod={tod}
+            deskMotion={motionOn}
+            deskIntro={intro}
             fallback={
               <div className="absolute inset-0" style={{ paddingLeft: frame.left, paddingRight: frame.right, paddingTop: frame.top, paddingBottom: frame.bottom }}>
                 {point ? <MapPreview lat={point.lat} lng={point.lng} className="h-full" large /> : <MapIllustration className="h-full w-full opacity-70" />}
@@ -627,7 +634,7 @@ export function DesktopShell({
         )}
       </div>
       <ToastView toast={toast} onHide={hideToast} />
-      {opening && <DeskOpening onDone={() => setOpening(false)} />}
+      {opening && <DeskOpening onLeave={(how) => setIntro(how === "end" ? "reveal" : "none")} onDone={() => setOpening(false)} />}
     </div>
   );
 }

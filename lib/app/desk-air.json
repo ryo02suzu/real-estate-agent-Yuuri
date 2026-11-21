@@ -1,0 +1,38 @@
+{
+ "tile": 2048,
+ "images": {
+  "morning": {
+   "cumulus": "/home/air/cumulus-morning.webp",
+   "cirrus": "/home/air/cirrus-morning.webp",
+   "shadow": "/home/air/shadow-morning.webp",
+   "deckA": "/home/air/deck-a-morning.webp",
+   "deckB": "/home/air/deck-b-morning.webp"
+  },
+  "day": {
+   "cumulus": "/home/air/cumulus-day.webp",
+   "cirrus": "/home/air/cirrus-day.webp",
+   "shadow": "/home/air/shadow-day.webp",
+   "deckA": "/home/air/deck-a-day.webp",
+   "deckB": "/home/air/deck-b-day.webp"
+  },
+  "dusk": {
+   "cumulus": "/home/air/cumulus-dusk.webp",
+   "cirrus": "/home/air/cirrus-dusk.webp",
+   "shadow": "/home/air/shadow-dusk.webp",
+   "deckA": "/home/air/deck-a-dusk.webp",
+   "deckB": "/home/air/deck-b-dusk.webp"
+  },
+  "night": {
+   "cumulus": "/home/air/cumulus-night.webp",
+   "cirrus": "/home/air/cirrus-night.webp",
+   "shadow": "/home/air/shadow-night.webp",
+   "deckA": "/home/air/deck-a-night.webp",
+   "deckB": "/home/air/deck-b-night.webp"
+  }
+ },
+ "wind": -10.0,
+ "render": {
+  "spp": 16,
+  "scale": 0.5
+ }
+}

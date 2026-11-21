@@ -16,7 +16,14 @@ function mask(el: HTMLElement | null, m: string) {
   el.style.setProperty("-webkit-mask-image", m);
 }
 
-export function DeskOpening({ onDone }: { onDone: () => void }) {
+export function DeskOpening({
+  onDone,
+  onLeave,
+}: {
+  onDone: () => void;
+  /** 消え始めたとき（end：最後の白い雲に溶けて終わる・skip：飛ばした）。ホームの空気の層が、白い雲から晴れていくのに使う */
+  onLeave?: (how: "skip" | "end") => void;
+}) {
   const video = useRef<HTMLVideoElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const backdrop = useRef<HTMLDivElement>(null);
@@ -26,14 +33,17 @@ export function DeskOpening({ onDone }: { onDone: () => void }) {
   const left = useRef(false);
   // 親が描き直すたびに onDone が新しくなっても、流し始め・時刻合わせをやり直さないように（いつも最新を呼ぶ）
   const done = useRef(onDone);
+  const leaveCb = useRef(onLeave);
   useEffect(() => {
     done.current = onDone;
-  }, [onDone]);
+    leaveCb.current = onLeave;
+  }, [onDone, onLeave]);
 
   const leave = useCallback((how: "skip" | "end") => {
     if (left.current) return;
     left.current = true;
     setLeaving(how);
+    leaveCb.current?.(how);
     window.setTimeout(() => done.current(), how === "end" ? 1150 : 520);
   }, []);
 

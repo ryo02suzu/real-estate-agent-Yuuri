@@ -8,7 +8,10 @@
 // 重ねた色の凡例も出す
 import "maplibre-gl/dist/maplibre-gl.css";
 import { addProtocol, getVersion, MapLibreMap, Marker, NavigationControl, Popup, ScaleControl, setWorkerUrl, type GeoJSONSource, type PointLike } from "maplibre-gl";
-import { addDeskCinema, flyToProperty, headToward } from "@/lib/app/desk-cinema";
+import type { DeskTod } from "@/lib/app/desk";
+import { airLayerOn, type AirIntro } from "@/lib/app/desk-air";
+import { addDeskAir, type DeskAir } from "@/lib/app/desk-air-layer";
+import { addDeskCinema, flyToProperty, headToward, setDeskTod } from "@/lib/app/desk-cinema";
 import { waitViewOf } from "./app/flight-wait";
 import { Protocol } from "pmtiles";
 import { useEffect, useRef, useState } from "react";
@@ -249,6 +252,12 @@ export type LiveMapProps = {
   places?: MapPlace[];
   /** PC：調べている間の入力（場所が分かる前に、入れた住所の都道府県の上へゆっくり向かう） */
   waitLabel?: string;
+  /** PC：ホームの背景の日本の時間帯（上の帯の朝・昼・夕・夜。時計に合わせるときは今の太陽）。変わると絵を溶かして替える */
+  deskTod?: DeskTod;
+  /** PC：動きを出すか（false なら、時間帯の絵を溶かさずにすぐ替える。空気の層の雲も流さない） */
+  deskMotion?: boolean;
+  /** PC：オープニングとのつなぎ（hold：流している間、reveal：最後の白い雲から晴れていく。lib/app/desk-air.ts） */
+  deskIntro?: AirIntro;
 };
 
 /** 濃さを変えるレイヤとその不透明度の属性（ハザードのタイルはこれに加えて raster-opacity） */
@@ -301,6 +310,9 @@ export default function LiveMap({
   skin,
   waitLabel,
   places,
+  deskTod,
+  deskMotion,
+  deskIntro,
 }: LiveMapProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -355,6 +367,15 @@ export default function LiveMap({
   useEffect(() => {
     cb.current = { onPick, onCenter, onFail, parcelPick };
   });
+  // PC：地図ができたときの時間帯（最初は今の時間帯の絵だけを読む）・動き・物件・オープニング（空気の層を作るときに使う）
+  const deskTodRef = useRef(deskTod);
+  const deskAirInit = useRef({ motion: deskMotion ?? true, property: !!point, intro: deskIntro ?? "none" });
+  useEffect(() => {
+    deskTodRef.current = deskTod;
+    deskAirInit.current = { motion: deskMotion ?? true, property: !!point, intro: deskIntro ?? "none" };
+  });
+  // PC：空気の層（日本の上空の雲と影。lib/app/desk-air-layer.ts）
+  const airRef = useRef<DeskAir | null>(null);
   const pad: Padding = { top: 0, bottom: 0, left: 0, right: 0, ...padding };
   const padKey = `${pad.top},${pad.bottom},${pad.left},${pad.right}`;
 
@@ -400,8 +421,10 @@ export default function LiveMap({
     map.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
     map.addControl(new ScaleControl({ maxWidth: 110 }), "bottom-right");
     map.on("load", () => {
-      // PC：ホームの背景（Blender の日本）と、検索の途中の写真・着いた所の輪（lib/app/desk-cinema.ts）
-      if (skin === "desk") addDeskCinema(map, Object.keys(BASEMAPS));
+      // PC：ホームの背景（Blender の日本。今の時間帯の絵）と、検索の途中の写真・着いた所の輪（lib/app/desk-cinema.ts）、
+      // その上の空気の層（雲と影。lib/app/desk-air-layer.ts）
+      if (skin === "desk") addDeskCinema(map, Object.keys(BASEMAPS), deskTodRef.current);
+      if (airLayerOn(skin)) airRef.current = addDeskAir(map, { tod: deskTodRef.current ?? "day", ...deskAirInit.current });
       setLoaded(true);
     });
     // スマホの狭い地図では、出典（地理院タイル・PLATEAU・登記所備付地図など）の帯を最初から畳んでおく（ⓘ で開ける）。
@@ -598,6 +621,7 @@ export default function LiveMap({
       mapRef.current = null;
       pinRef.current = null;
       labelRef.current = null;
+      airRef.current = null;
     };
     // 地図は1回だけ作り、位置や図の変化は下の effect で反映する
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -648,6 +672,25 @@ export default function LiveMap({
     const view = waitViewOf(waitLabel);
     if (view) headToward(map, view);
   }, [waitLabel, loaded, skin, point]);
+
+  // PC：ホームの背景を、上の帯の時間帯の絵にする（変わったら、その絵を読んで溶かして替える。lib/app/desk-cinema.ts）。
+  // 空気の層の雲も同じ時間帯の光の絵にする
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded || skin !== "desk" || !deskTod) return;
+    setDeskTod(map, deskTod, deskMotion ?? true);
+    airRef.current?.setMotion(deskMotion ?? true);
+    airRef.current?.setTod(deskTod);
+  }, [deskTod, deskMotion, loaded, skin]);
+
+  // PC：空気の層：物件を見ている間は雲を流さない。オープニングの最後の白から、雲が晴れて日本が見えてくる
+  const hasPoint = lat !== undefined && lng !== undefined;
+  useEffect(() => {
+    if (loaded) airRef.current?.setProperty(hasPoint);
+  }, [hasPoint, loaded]);
+  useEffect(() => {
+    if (loaded && deskIntro) airRef.current?.setIntro(deskIntro);
+  }, [deskIntro, loaded]);
 
   // 現在地の青い点（脈打つ輪と、誤差の円。誤差の円はズームに合わせて大きさを変える）。指は地図に通す
   const here = me ?? located;

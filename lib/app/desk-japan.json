@@ -1,5 +1,4 @@
 {
- "url": "/home/desk-japan.webp",
  "coordinates": [
   [
    109.6875,
@@ -17,5 +16,23 @@
    109.6875,
    17.978733
   ]
- ]
+ ],
+ "images": {
+  "morning": {
+   "url": "/home/desk-japan-morning.webp",
+   "lights": false
+  },
+  "day": {
+   "url": "/home/desk-japan-day.webp",
+   "lights": false
+  },
+  "dusk": {
+   "url": "/home/desk-japan-dusk.webp",
+   "lights": true
+  },
+  "night": {
+   "url": "/home/desk-japan-night.webp",
+   "lights": true
+  }
+ }
 }

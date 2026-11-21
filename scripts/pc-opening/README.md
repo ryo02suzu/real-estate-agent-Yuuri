@@ -65,20 +65,37 @@ python3 encode.py                                    # → public/opening/openin
 | `encode.py` | 最後のコマ → AV1（WebM）と H.264（MP4） |
 | `logo_assets.py` | ロゴを、出し方のための部品（光の点・円弧・山・文字 1 字ずつ・波・金の所）に分ける（形は変えない） |
 | `home_prep.py`・`home.py` | 真上から見た日本（PC のホームの背景）。`home.py --tod` は時刻の版 |
-| `night_lights.py` | 夜の街の明かり（国勢調査の 500m メッシュの人口 → home_prep.py と同じ格子の明るさ） |
+| `night_lights.py` | 夜の街の明かり（国勢調査の 500m メッシュの人口 → home_prep.py と同じ格子の明るさ。国勢調査の範囲の外は `ghsl.py` の人口） |
+| `ghsl.py` | 日本のまわりの国の人口（JRC の GHSL の GHS-POP。タイルを取り、GeoTIFF（BigTIFF・LZW）を読んで格子に分ける） |
+| `home_webp.py` | 時刻の版の4枚 → アプリの WebP（`public/home/desk-japan-*.webp`）と `lib/app/desk-japan.json`（四隅が同じか確かめる） |
 | `assets/michilu-logo.webp` | 金と白のロゴ（元の画像） |
 | `work/` | 取ってきたタイル・描いたコマ・動画（Git には入れない） |
 
 ### PC のホームの背景：時刻の版（朝・昼・夕・夜）
 
-今の背景（`home.py --extent`、朝の光）と同じ構図・同じ四隅のまま、光だけを変えた4枚。アプリは今のところ使っていない
-（時刻に合わせて出し分け、溶かして替えるのは、あとで組み込むとき）。
+今の背景（`home.py --extent`、朝の光）と同じ構図・同じ四隅のまま、光だけを変えた4枚。アプリ（PC だけ）は、上の帯の時間帯
+（朝・昼・夕・夜。時計に合わせるときは今の太陽）の1枚を出し、変わったら約 1.2 秒で溶かして替える（`lib/app/desk-home.ts`・
+`lib/app/desk-cinema.ts`。開いたときは今の時間帯の絵だけを読み、ほかはその時間帯になったときに読む。動きを減らす設定ではすぐ替える）。
+夕と夜の絵を出している間は、地図の出典の欄に明かりの出典（e-Stat・GHSL）も出す。
 
 ```bash
-python3 night_lights.py                     # 国勢調査の人口 → 夜の街の明かり（work/night_lights{,_w}.npy・.png・.json。e-Stat から約 150 回、間をあけて取る）
+python3 night_lights.py                     # 人口 → 夜の街の明かり（work/night_lights{,_w}.npy・.png・.json。e-Stat から約 150 回、GHSL から約 30 回、間をあけて取る）
 python home.py --extent --tod night         # → work/home/home_wide_night.png（--tod は morning・day・dusk・night）
 python home.py --view 1440x900 --scale 0.6667 --spp 8 --tod dusk --out 見本.png   # 小さく試す（960×600）
 ```
+
+**本番の大きさで描いて、アプリに入れる**（1 枚 約 12 分。描くのは CPU だけ。描いた絵の四隅は、絵と同じ名前の .json）：
+
+```bash
+for t in morning day dusk night; do python home.py --extent --scale 2 --spp 24 --tod $t; done   # → work/home/home_wide_{morning,day,dusk,night}.png（5120×3968）
+python3 home_webp.py       # → public/home/desk-japan-{morning,day,dusk,night}.webp と lib/app/desk-japan.json（四隅が違えば何も書かずに止まる）
+```
+
+- `home_webp.py` は、絵の四隅（.json。無ければ `work/home_dem_w.json` から同じ計算）と縦横の比が、アプリの `lib/app/desk-japan.json` の
+  四隅と合うか確かめてから書く。明かりの入った絵か（`home.py` の `TOD` の `lights` が 0 より大きい）も JSON に書く（アプリはそれで出典を出す）。
+  `--only day,night` で一部だけ、`--src '見本/wide_{tod}.png'` で別の場所の絵から作れる。
+- 4枚とも本番の大きさ（5120×3968、1枚 約10分）で描いて入れた（2026-11-21。WebP は1枚 0.5〜0.6MB）。前の `public/home/desk-japan.webp`
+  （`--tod` なしの絵）は使わなくなったので消した。
 
 - `--tod` を付けないときは、今までと同じ絵（アプリの絵）を描く。
 - 朝：東から低い金の光（影は空の青）。昼：南の高い白い光。夕：西から低い茜の光、影は藍、街の明かりがともり始める。
@@ -86,8 +103,13 @@ python home.py --view 1440x900 --scale 0.6667 --spp 8 --tod dusk --out 見本.pn
   地面に届く光の量の違いは露出で打ち消し、`TOD` の `stops` だけ明るさを変える（夜は今の絵より約 2.6 段暗い）。
 - 街の明かりは、人が住んでいる所だけに出す（作り物の明かりは足さない）。明るさは 500m メッシュの人口を画素に面積の割合で
   分けた人口密度の 0.75 乗（1 万人/km² で 1）。約 8〜60 人/km² より少ない所はなめらかに消し、街のまわりに少しにじみを足す。
-  人口は常住人口（住んでいる人）なので、人の住まない都心のビル街・工場・港・道路は、本物の夜景より暗い。日本の外（韓国・
-  中国など）はこのデータに無いので、明かりは無い。取ってきた CSV は `work/estat/`（約 21MB）に置き、2回目からは読まない。
+  人口は常住人口（住んでいる人）なので、人の住まない都心のビル街・工場・港・道路は、本物の夜景より暗い。取ってきた CSV は
+  `work/estat/`（約 21MB）に置き、2回目からは読まない。
+- 国勢調査の範囲の外（韓国・中国・台湾・ロシアなどと、国勢調査をしていない北方領土）は、JRC の GHSL の人口の格子（GHS-POP R2023A の 2020 年、
+  30 秒角＝約 1km。`ghsl.py`）を、同じ明るさの式で光らせる。国勢調査の範囲（人の住む 500m メッシュから 10km と、そのメッシュの
+  ある島の陸の全部と、それに囲まれた所）の中は国勢調査だけ（同じ人を2回数えない。2020 年に人の住めなかった原発事故の
+  帰還困難区域に、GHSL の人口で明かりを出さない）。どちらも人口から決めるので、電気の少ない国（北朝鮮など）も人口に応じて光り、
+  本物の夜景より明るい。タイル（10 度×10 度、31 枚・約 90MB）は `work/ghsl/` に置き、2回目からは読まない。
 
 ## 使っているデータと出典
 
@@ -101,5 +123,6 @@ python home.py --view 1440x900 --scale 0.6667 --spp 8 --tod dusk --out 見本.pn
 | 国土地理院 世界衛星モザイク画像（`modis`、ズーム 7） | 列島の場面の、まわりの国の陸の色 | 「■2」。備考の英文の出所（LP DAAC・USGS/EROS）も合わせて書く |
 | AWS Terrain Tiles（terrarium、ズーム 8） | 列島の場面の、陸と海の境目・山の起伏 | 出典は元のデータごと（[attribution.md](https://github.com/tilezen/joerd/blob/master/docs/attribution.md)）。海は ETOPO1（NOAA。「Not to be used for navigation.」）、陸は SRTM・GMTED2010（USGS）など |
 | e-Stat「令和2年国勢調査に関する地域メッシュ統計」（総務省）4次メッシュ（500m）「人口及び世帯（JGD2011）」（統計表 T001141。人口（総数）だけ使う） | ホームの背景の時刻の版の、夜と夕の街の明かり | [e-Stat 利用規約](https://www.e-stat.go.jp/terms-of-use)（政府標準利用規約（第2.0版）に準拠、CC BY 4.0 と互換。統計地理情報システムのデータも[同じ規約に準じる](https://www.e-stat.go.jp/gis-terms)）。出典を書き、編集・加工したことも書く。加工したものを国が作ったように見せない。出典の書き方：「夜の街の明かり：政府統計の総合窓口（e-Stat）（https://www.e-stat.go.jp/）の「令和2年国勢調査に関する地域メッシュ統計」（総務省）の500mメッシュの人口を加工して作成」（`night_lights.py` の `ATTRIBUTION`）。人口（総数）は秘匿しない項目（e-Stat の定義書） |
+| JRC「GHS-POP R2023A - GHS population grid multitemporal (1975-2030)」の 2020 年（`GHS_POP_E2020_GLOBE_R2023A_4326_30ss` のタイル。[JRC のデータカタログ](https://data.jrc.ec.europa.eu/dataset/2ff68a52-5b5b-4a22-8f40-c41da8332cfe)） | ホームの背景の時刻の版の、夜と夕の、国勢調査の範囲の外の明かり | 配布元の [copyright.txt](https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/copyright.txt)：「(c) European Union, 1995-2026 … Any copyright and/or sui generis right on the dataset is licensed under the Creative Commons Attribution 4.0 International (CC BY 4.0) licence. Reuse is allowed provided appropriate credit is given and any changes are indicated.」（データのフォルダの copyright.txt も同じ文。JRC のデータカタログも「reuse is authorised, provided the source is acknowledged」。2026-11-21 に確かめた）。作った所・著作権の表示・ライセンスへのリンク・加工したことを書く。出典の書き方：e-Stat の出典に続けて「国勢調査の範囲の外（日本のまわりの国など）は欧州委員会 共同研究センター（JRC）の「GHS-POP R2023A」（© European Union, 1995-2026、CC BY 4.0）の2020年の人口を加工して作成」（アプリは `lib/app/desk-cinema.ts` の `NIGHT_LIGHTS_ATTRIBUTION`。DOI とライセンスへのリンク付き。夕・夜の絵を出している間だけ地図の出典の欄に出す。`ghsl.py` の `ATTRIBUTION`・`CITATION`） |
 
 空（Blender の空の計算）・雲・かすみ・白鳥は、データを使わずに計算で描いたもの。使わないもの：NASA の衛星画像を直接、Google の地図や 3D の画像。
