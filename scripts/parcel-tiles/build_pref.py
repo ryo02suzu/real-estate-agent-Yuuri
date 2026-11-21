@@ -29,56 +29,9 @@ import io
 
 import fiona
 
-# G空間情報センターの法務省の組織名（都道府県ごと）。API（organization_list / package_search）で実在を確かめたものだけ入れる
-ORGS = {
-    "01": "moj-01hokkaido",
-    "02": "moj-02aomori",
-    "03": "moj-03iwate",
-    "04": "moj-04miyagi",
-    "05": "moj-05akita",
-    "06": "moj-06yamagata",
-    "07": "moj-07fukushima",
-    "08": "moj-08ibaraki",
-    "09": "moj-09tochigi",
-    "10": "moj-10gunma",
-    "11": "moj-11saitama",
-    "12": "moj-12chiba",
-    "13": "moj-13tokyo",
-    "14": "moj-14kanagawa",
-    "15": "moj-15niigata",
-    "16": "moj-16toyama",
-    "17": "moj-17ishikawa",
-    "18": "moj-18fukui",
-    "19": "moj-19yamanashi",
-    "20": "moj-20nagano",
-    "21": "moj-21gifu",
-    "22": "moj-22shizuoka",
-    "23": "moj-23aichi",
-    "24": "moj-24mie",
-    "25": "moj-25shiga",
-    "26": "moj-26kyoto",
-    "27": "moj-27osaka",
-    "28": "moj-28hyogo",
-    "29": "moj-29nara",
-    "30": "moj-30wakayama",
-    "31": "moj-31tottori",
-    "32": "moj-32shimane",
-    "33": "moj-33okayama",
-    "34": "moj-34hiroshima",
-    "35": "moj-35yamaguchi",
-    "36": "moj-36tokushima",
-    "37": "moj-37kagawa",
-    "38": "moj-38ehime",
-    "39": "moj-39kochi",
-    "40": "moj-40fukuoka",
-    "41": "moj-41saga",
-    "42": "moj-42nagasaki",
-    "43": "moj-43kumamoto",
-    "44": "moj-44oita",
-    "45": "moj-45miyazaki",
-    "46": "moj-46kagoshima",
-    "47": "moj-47okinawa",
-}
+# G空間情報センターの法務省の組織名（都道府県ごと）。公図の推定（scripts/kozu-tiles/kozu.py）と同じ表（scripts/moj_orgs.py）を使う
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from moj_orgs import ORGS  # noqa: E402
 CKAN = "https://www.geospatial.jp/ckan/api/3/action/package_search"
 UA = {"User-Agent": "michilu-parcel-tiles (+https://github.com/ryo02suzu/real-estate-agent-Yuuri)"}
 ATTRIBUTION = (
