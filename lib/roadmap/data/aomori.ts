@@ -140,6 +140,7 @@ export const AOMORI: Municipality[] = [
       {
         kind: "road_type",
         label: "指定道路情報（八戸市公開地理情報システム・42条1項1号・2号・4号・5号）",
+        // http のまま：https で開くと、このホスト名に合わない証明書（a248.e.akamai.net）が返る（2026-11-21 に確かめた）
         build: (lat, lng) => `http://map.city.hachinohe.aomori.jp/maps?mode=theme&lid=1&mid=5&lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&z=17`,
         verified: true,
         tip: "3号と2項は載らない（市道でも幅員4m未満の区間は2項道路の扱いで、この地図には無い）。載っていない道は建築指導課のカウンターの備え付けの地図で。",

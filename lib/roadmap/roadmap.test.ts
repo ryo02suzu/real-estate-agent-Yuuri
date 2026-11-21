@@ -1554,6 +1554,29 @@ describe("習志野市の市道認定網図（地区ごとの6枚）", () => {
   });
 });
 
+describe("久留米市の指定道路図（地区ごとの PDF 14枚）", () => {
+  const m = () => findMunicipality("40203")!;
+  // 地点は国土地理院の住所検索の点（市役所・駅・町）。図ごとの範囲は docs/pdf-sheets.md の「久留米市」
+  it("物件が載っている地区の PDF を位置で選ぶ（市役所は A-2。市のページの表では B-2 の町だが、B-2 の図の外）", () => {
+    const at = (lat: number, lng: number) => buildLinks(m(), lat, lng)[0];
+    expect(at(33.319248, 130.508356).sheet?.label).toBe("A-2");
+    expect(at(33.319248, 130.508356).url).toBe("https://www.city.kurume.fukuoka.jp/1050kurashi/2080juutaku/3030taterutoki/files/siteidouro2024A2.pdf");
+    expect(at(33.329595, 130.52817).sheet?.label).toBe("A-3"); // 宮の陣駅
+    expect(at(33.270563, 130.474071).sheet?.label).toBe("B-2"); // 大善寺駅
+    expect(at(33.342606, 130.693512).sheet?.label).toBe("A-6"); // 田主丸町田主丸
+    expect(at(33.26054, 130.533661).sheet?.label).toBe("C-3"); // 荒木町藤田
+  });
+  it("14枚とも市のサイトの PDF。どの図にも入らない所（耳納の山の中）は、市の「指定道路図」のページを開く", () => {
+    const link = m().maps[0];
+    expect(link.sheets?.cells.map((c) => c[0])).toEqual(["A-2", "A-3", "A-4", "A-5", "A-6", "B-1", "B-2", "B-3", "B-4", "B-5", "B-6", "C-1", "C-2", "C-3"]);
+    for (const c of link.sheets!.cells) expect(c[1]).toMatch(/^https:\/\/www\.city\.kurume\.fukuoka\.jp\/1050kurashi\/2080juutaku\/3030taterutoki\/files\/siteidouro2024[ABC]\d\.pdf$/);
+    const [none] = buildLinks(m(), 33.284107, 130.58989); // 高良内町の代表点
+    expect(none.sheet).toBeUndefined();
+    expect(none.url).toBe("https://www.city.kurume.fukuoka.jp/1050kurashi/2080juutaku/3030taterutoki/2013-0924-1402-207.html");
+    expect(none.tip).toContain("この場所を含む図は見つかりませんでした");
+  });
+});
+
 describe("ふじみ野市の道路網図（市全体で1枚）", () => {
   it("市役所（福岡1-1-1）は図の上の方（図は北が上）", () => {
     const [link] = buildLinks(findMunicipality("11245")!, 35.879875, 139.519592);

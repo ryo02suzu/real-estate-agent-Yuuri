@@ -1450,9 +1450,14 @@ describe("福岡県の、市が扱う市（登録した市）", () => {
     expect(m.maps[0].kind).toBe("road_type");
     expect(m.maps[0].build).toBeNull();
     expect(m.maps[0].url).toBe("https://www.city.kurume.fukuoka.jp/1050kurashi/2080juutaku/3030taterutoki/2013-0924-1402-207.html");
+    // 地区ごとの PDF（14枚）から、物件が載っている図を位置で選ぶ（どの図にも入らない所は、上の市のページを開く）
+    expect(m.maps[0].sheets?.cells).toHaveLength(14);
     // 市の決まり：久留米市公式ホームページだと明記する
     expect(m.maps[0].label).toContain("久留米市公式ホームページ");
     expect(m.maps[0].tip).toContain("町名から地区（A-2〜C-3）を選んで PDF を開く");
+    // 図の注意（参考図・無断の複製の禁止）は、図を直接開くときも見えるように、市の注に書く
+    expect(m.note).toContain("内容を証明するものではない");
+    expect(m.note).toContain("無断の複製・利用を禁じている");
     expect(m.maps[0].tip).toContain("指定道路の表示が無い道は、建築指導課の窓口で確かめる");
     expect(m.contact?.phone).toBe("0942-30-9089");
     expect(m.contact?.fax).toBe("0942-30-9743");
