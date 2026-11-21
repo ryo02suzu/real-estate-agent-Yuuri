@@ -183,7 +183,7 @@ def water_material() -> bpy.types.Material:
     nt.nodes.clear()
     out = node(nt, "ShaderNodeOutputMaterial", (1400, 0))
     b = node(nt, "ShaderNodeBsdfPrincipled", (900, 200))
-    b.inputs["Base Color"].default_value = (0.92, 0.98, 0.97, 1.0)
+    b.inputs["Base Color"].default_value = (0.86, 0.97, 0.95, 1.0)  # 通る光をわずかに青緑に（梓川の色）
     b.inputs["Transmission Weight"].default_value = 1.0
     b.inputs["Roughness"].default_value = 0.015
     b.inputs["IOR"].default_value = 1.333
@@ -683,9 +683,9 @@ def ground_material(name: str, cover: str | None) -> bpy.types.Material:
             dt.extension = "EXTEND"
             link(nt, uv.outputs["UV"], dt.inputs["Vector"])
             shallow_t = node(nt, "ShaderNodeRGB", (400, 1300))
-            shallow_t.outputs[0].default_value = (0.62, 0.84, 0.78, 1.0)
+            shallow_t.outputs[0].default_value = (0.78, 0.93, 0.86, 1.0)
             deep_t = node(nt, "ShaderNodeRGB", (400, 1400))
-            deep_t.outputs[0].default_value = (0.10, 0.36, 0.38, 1.0)
+            deep_t.outputs[0].default_value = (0.16, 0.44, 0.44, 1.0)
             tcol = mix(nt, dt.outputs["Color"], shallow_t.outputs[0], deep_t.outputs[0], (600, 1200))
             link(nt, tcol, tint.inputs[7])
         else:
@@ -697,8 +697,16 @@ def ground_material(name: str, cover: str | None) -> bpy.types.Material:
         wt.interpolation = "Cubic"
         wt.extension = "EXTEND"
         link(nt, uv.outputs["UV"], wt.inputs["Vector"])
+        # 水の中の石は暗くしない（澄んだ水の底の石は、乾いた石と同じくらい明るく、青緑がかって見える。
+        # 濡れて暗くなるのは、水から出ている水際だけ）
+        dry = node(nt, "ShaderNodeMath", (-900, 900), operation="SUBTRACT")
+        dry.inputs[0].default_value = 1.0
+        link(nt, water, dry.inputs[1])
+        wet_out = node(nt, "ShaderNodeMath", (-850, 950), operation="MULTIPLY")
+        link(nt, wt.outputs["Color"], wet_out.inputs[0])
+        link(nt, dry.outputs[0], wet_out.inputs[1])
         dark = node(nt, "ShaderNodeMath", (-800, 1000), operation="MULTIPLY_ADD")
-        link(nt, wt.outputs["Color"], dark.inputs[0])
+        link(nt, wet_out.outputs[0], dark.inputs[0])
         dark.inputs[1].default_value = -0.45
         dark.inputs[2].default_value = 1.0
         wetc = node(nt, "ShaderNodeMix", (1200, 600))
@@ -1134,8 +1142,8 @@ def plant_forest(objs: dict, near, nm, valley, vm, cam_xy: np.ndarray, view: tup
 
 
 def clean_rock(mat: bpy.types.Material | None) -> None:
-    """川原の石：苔むした石の絵の色を、洗われた花崗岩の明るい灰色に（彩度を下げ、少し明るく）。梓川の川原の石は白っぽい。
-    1回目は苔の緑のまま暗く、川原に「しみ」が散ったように見えた"""
+    """川原の石：苔むした石の絵の色を、洗われた花崗岩の灰色に（彩度を下げる）。1回目は苔の緑のまま暗く、川原に「しみ」が
+    散ったように見えた。2回目は明るくしすぎて、日なたで模様の無い白いかたまりに見えた"""
     if mat is None or not mat.use_nodes or mat.get("clean_rock"):
         return
     nt = mat.node_tree
@@ -1145,8 +1153,8 @@ def clean_rock(mat: bpy.types.Material | None) -> None:
             continue
         src = inp.links[0].from_socket
         hsv = nt.nodes.new("ShaderNodeHueSaturation")
-        hsv.inputs["Saturation"].default_value = 0.30
-        hsv.inputs["Value"].default_value = 1.30
+        hsv.inputs["Saturation"].default_value = 0.6  # 苔の緑を抑えた灰色。明るくしすぎると、日なたで白いかたまりに見えた
+        hsv.inputs["Value"].default_value = 1.0
         nt.links.new(src, hsv.inputs["Color"])
         nt.links.new(hsv.outputs["Color"], inp)
     mat["clean_rock"] = True
