@@ -90,7 +90,12 @@ CCBY = "CC BY 4.0"
 #   fetch：dataeye（埼玉県・千葉県のオープンデータサイト。dataset はデータセットの番号）か ckan（api・dataset）。
 #          resource はリソース名・ファイル名に合う正規表現（合うものが複数あれば一番新しいもの）。
 #          parts：shapefile の部品（.shp・.dbf・.shx など）が zip でなく別々のリソースの所。合う部品を全部取って1つの zip にまとめる
+#          bundle：1つのデータが、いくつもの zip に分けて置かれている所（宇都宮市・高崎市・奈良市）。合うものを全部取って1つの zip にまとめる
+#          page（市町村のページに直接置かれたファイル）の by_text：ファイル名が番号だけの所は、リンクの文字で選ぶ（高崎市・奈良市）
 #   shp：zip の中の筆のポリゴンの shapefile（パスの正規表現）。epsg：座標系（.prj が無いものも平面直角座標系 IX 系）
+#   shp_all：shp に合う同じ形の shapefile を全部読む（宇都宮市の筆界線01〜07）。flatten：展開したファイルを1つのフォルダに集める
+#            （shapefile の部品が別々の zip にある奈良市）
+#   labels：筆の面に地番が無く、地番の文字の点（shp・id の列）と引出線（leaders）が別にある所（高崎市）。文字を引出線の先か文字の点で面に当てる
 #   chiban：地番の列（複数なら「本番-枝番-小枝番」とつなぐ）。key：大字の列（コードか名前。列の一覧なら「_」でつなぐ：京都市の区＋町名）。
 #   oname：大字名の列。koaza：小字名の列
 #   only：この列がこの値の筆だけ使う（長岡京市の「長狭物区分」＝地番）。drop_lots：地番の頭の数字がこれに合えば地番ではない（道・水路の番号）
@@ -376,7 +381,8 @@ SOURCES = [
     },
     # ---- 2026-11-21 に足した（市のページ・オープンデータのサイトでライセンスと利用規約を確かめた） ----
     {
-        # 字ごとに地番が付く（大字のコードは小字まで。「三和町下三坂字南作」は大字「三和町下三坂」と小字「南作」に分ける）。.prj は無い（平面直角座標系 IX 系）
+        # 字ごとに地番が付く（大字のコードは小字まで。「三和町下三坂字南作」は大字「三和町下三坂」と小字「南作」に分ける）。.prj は無い（平面直角座標系 IX 系）。
+        # 法務省の公共座標の筆と比べると、図全体が西へ約1.9m・北へ約0.3m ずれているので、平行移動で合わせる（ずれの中央値 1.96m → 0.46m。2026-11-21）
         "code": "07204", "name": "いわき市", "credit": "いわき市「地番参考図」", "license": "CC BY 2.1 JP",
         "terms": "https://creativecommons.org/licenses/by/2.1/jp/legalcode（いわき市の地番参考図のページ。「本ページに掲載しているデータは、自由に利用・改変できます」）",
         "fetch": {"kind": "page", "page": "https://www.city.iwaki.lg.jp/www/contents/1755050006519/index.html", "resource": r"^chibansankouzu\.zip$"},
@@ -1013,6 +1019,16 @@ def norm_town(s: str) -> str:
     return s.replace("ヶ", "ケ").replace("ヵ", "ケ").replace("が", "ケ")
 
 
+def geta_name(name: str, names) -> str:
+    """〓（げた。市町村の図で字が出せないときの印。いわき市の「内郷御〓町一丁目」「権現〓」）を含む名前（比べ方をそろえたもの）を、
+    〓を1文字の何にでも合うとして names の中から探す。ちょうど1つの名前に合えばその名前、合わない・2つ以上に合えば空。〓の無い名前はそのまま"""
+    if "〓" not in name:
+        return name
+    pat = re.compile(re.escape(name).replace("〓", "."))
+    hit = {n for n in names if pat.fullmatch(n)}
+    return next(iter(hit)) if len(hit) == 1 else ""
+
+
 def datum_of(epsg: int) -> str:
     """座標系の測地系（「JGD2011」「JGD2000」「Tokyo」）"""
     if epsg == 30169:
@@ -1535,7 +1551,8 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         jac = {t: v / (len(A) + len(town_ch[t]) - v) for t, v in cnt.items()}
         jr = sorted(jac, key=lambda t: (-jac[t], t))
         nm = collections.Counter(muni["name"][i] for i in idx).most_common(1)[0][0]
-        named = [t for t in town_by_name.get(norm_town(nm), []) if in_ward(t)] if nm else []
+        nkey = geta_name(norm_town(nm), town_by_name) if nm else ""
+        named = [t for t in town_by_name.get(nkey, []) if in_ward(t)] if nkey else []
         # 括弧を除くと同じ名前になる、同じ区の町（京都市の「下丸屋町（小川通竹屋町）」「下丸屋町（河原町通二条）」、括弧なしの「上之町」と「上之町（大宮通木津屋橋）」）
         pn = [t for t in town_by_base.get(norm_town(nm), []) if in_ward(t)] if nm else []
         if not named and len(pn) == 1:
@@ -1614,7 +1631,8 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
         if any(muni["koaza"][i] for i in idx) or any(muni["sub"][i] for i in idx):
             continue
         nm = collections.Counter(muni["name"][i] for i in idx).most_common(1)[0][0]
-        cands = full_kuiki.get(norm_town(nm), []) if nm else []
+        nkey = geta_name(norm_town(nm), full_kuiki) if nm else ""
+        cands = full_kuiki.get(nkey, []) if nkey else []
         ward = collections.Counter(muni["ward"][i] for i in idx).most_common(1)[0][0]
         if ward:
             cands = [K for K in cands if K[0].endswith(ward)]
@@ -1670,6 +1688,8 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
                 # 伊丹市 22・豊中市 124・直方市 192・豊田市 85・京都市 105、高島市・加古川市・福山市の抜き出し各 150（合わせて 978）のうち、
                 # 付け替えた先の町にあったのは2つだけで、ほとんどが元の町にあった。法務省の地図データに無い地番は、その町の地番の抜けで、ほかの町の筆ではない）
                 koaza = norm_town(muni["koaza"][i]) if muni["koaza"][i] else ""
+                if "〓" in koaza:
+                    koaza = geta_name(koaza, {norm_town(p[3]) for p in town_kuiki[t]}) or koaza
                 # 市町村の図の小字が法務省のこの町にある（その小字に、この地番が無くても）
                 kz_town = [p for p in town_kuiki[t] if koaza and norm_town(p[3]) == koaza]
                 if ch in town_ch[t]:
@@ -1734,8 +1754,9 @@ def build_one(src: dict, work: str, year: str | None, align: bool, keep_public: 
                 stats["dropped_unmapped"] += 1
                 continue
             nm = unicodedata.normalize("NFKC", muni["name"][i]).replace(" ", "") if muni["name"][i] else ""
-            if not nm:
-                # 町の名前が分からない筆（地番区域が市の名前だけになり、住所の町と照らし合わせられない）は入れない
+            if not nm or "〓" in nm or "〓" in muni["koaza"][i]:
+                # 町の名前が分からない筆（地番区域が市の名前だけになり、住所の町と照らし合わせられない）と、法務省の町に当たらず、
+                # 名前に字の出せない印（〓）が残る筆（地番区域が「いわき市_内郷御〓町一丁目___」のようになる）は入れない
                 stats["dropped_noname"] += 1
                 continue
             nm = re.sub(r"(\d+)丁目", lambda m: chr(0xFF10 + int(m.group(1))) + "丁目" if len(m.group(1)) == 1 else m.group(0), nm)

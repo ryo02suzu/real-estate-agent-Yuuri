@@ -717,6 +717,9 @@ describe("地点の筆", () => {
     for (const city of ["岸和田市", "福島市"]) expect(excluded).toMatch(new RegExp(`"${city}": "[^"]*同意`));
     expect(excluded).toContain('"旭川市":');
     for (const code of ["07201", "01204"]) expect(py).not.toContain(`"code": "${code}"`);
+    // 字の出せない印（〓。いわき市の「内郷御〓町」）は1文字の何にでも合うとし、法務省の名前のちょうど1つに合うときだけ使う
+    expect(py).toContain('pat = re.compile(re.escape(name).replace("〓", "."))');
+    expect(py).toContain('return next(iter(hit)) if len(hit) == 1 else ""');
   });
 
   it("住所の地点が道路の上だったときの、地番で探し直す文字（町に丁目があれば、すぐ後ろの番号を丁目に）", () => {
