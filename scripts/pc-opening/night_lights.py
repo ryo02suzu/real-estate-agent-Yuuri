@@ -13,8 +13,9 @@
 
 国勢調査の範囲の外（韓国・中国・ロシアなど、日本のまわりの国）：欧州委員会 共同研究センター（JRC）の GHSL の人口の格子
 （GHS-POP R2023A の 2020 年。約 1km。ghsl.py。CC BY 4.0）を、同じ明るさの式で使う。国勢調査の範囲は、人の住む 500m メッシュに
-触れる画素を COVER_KM 広げ、まわりを囲まれた所（人の住まない山など）を埋めたもの。その中は国勢調査だけを使い、GHSL は使わない
-（同じ人を2回数えない）。出典は ATTRIBUTION と ghsl.ATTRIBUTION の両方を書く。
+触れる画素を COVER_KM 広げたものと、そのメッシュのある島の陸の全部と、それに囲まれた所。その中は国勢調査だけを使い、GHSL は
+使わない（同じ人を2回数えない。2020 年に人の住めなかった所に、GHSL の人口で明かりを出さない）。
+出典は ATTRIBUTION と ghsl.ATTRIBUTION の両方を書く。
 
 格子：home_prep.py が作った work/home_dem{,_w}.json・.npy と同じ（メルカトル図法。タイルの番号 x0・y0 とズーム z、256 画素/タイル）。
 500m のメッシュ（緯度・経度の四角）は、メルカトルでも横・縦にまっすぐな四角になるので、重なる画素に面積の割合で人数を分ける。
@@ -87,7 +88,7 @@ REF = 10000.0  # 人/km²
 LOW = (8.0, 60.0)  # 人/km²：この間でなめらかに 0 → 1
 HALO = ((0.12, 1.2), (0.04, 5.0))  # にじみ（強さ、広がり＝ズーム 7 の画素。約 1km・4km）
 HALO_SEA = 0.4  # 海の上のにじみ（陸の上を 1 として）
-COVER_KM = 5.0  # 国勢調査の範囲：人の住むメッシュからこれより近い所（その外だけ GHSL の人口を使う）
+COVER_KM = 10.0  # 国勢調査の範囲：人の住むメッシュからこれより近い所（その外だけ GHSL の人口を使う。国勢調査の外の近い町（釜山・サハリン・国後島）も 30km より遠い）
 
 _last = 0.0
 
@@ -250,11 +251,17 @@ def build(suffix: str, code: np.ndarray, pop: np.ndarray, use_ghsl: bool = True)
     inside = int(round(people.sum()))
     outside = 0
     if use_ghsl:
-        # 国勢調査の範囲：人の住むメッシュに触れる画素から COVER_KM（画素の幅は北緯 36 度で測る）と、そのまわりを囲まれた所
+        # 国勢調査の範囲：人の住むメッシュに触れる画素から COVER_KM（画素の幅は北緯 36 度で測る）と、そのメッシュのある島の陸の
+        # 全部（人の住まない山や、2020 年に人の住めなかった原発事故の帰還困難区域も。GHSL はそこにも人を置いている）と、
+        # それに囲まれた所
         touched = splat(H, W, px(lon), px(lon + dlon), py(lat + dlat), py(lat), np.ones(len(pop))) > 0
         km = EARTH * np.cos(np.radians(36.0)) / (TILE * n) / 1000.0
-        cover = ndimage.binary_fill_holes(ndimage.distance_transform_edt(~touched) <= COVER_KM / km)
-        del touched
+        cover = ndimage.distance_transform_edt(~touched) <= COVER_KM / km
+        isl, _ = ndimage.label(dem > 0)
+        ids = np.unique(isl[touched])
+        cover |= np.isin(isl, ids[ids > 0])
+        cover = ndimage.binary_fill_holes(cover)
+        del touched, isl
         # その外だけ、GHSL の人口（同じ格子に面積の割合で分けたもの）を足す
         bbox = (gx0 / n * 360 - 180, merc_lat((gy0 + H / TILE) / n), (gx0 + W / TILE) / n * 360 - 180, merc_lat(gy0 / n))
         abroad, _ = ghsl.people_on_grid(H, W, px, py, bbox)

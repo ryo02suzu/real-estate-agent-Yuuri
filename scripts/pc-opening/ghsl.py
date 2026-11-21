@@ -50,10 +50,10 @@ CITATION = (
     "multitemporal (1975-2030). European Commission, Joint Research Centre [Dataset] doi: 10.2905/JRC.CXKEDRR; "
     "10.2905/2FF68A52-5B5B-4A22-8F40-C41DA8332CFE PID: http://data.europa.eu/89h/2ff68a52-5b5b-4a22-8f40-c41da8332cfe"
 )
+# アプリの地図の出典（lib/app/desk-cinema.ts の NIGHT_LIGHTS_ATTRIBUTION。e-Stat の出典に続けて書く）と同じ中身
 ATTRIBUTION = (
-    "国勢調査の範囲の外（日本のまわりの国など）の夜の明かり：欧州委員会 共同研究センター（JRC）の"
-    "「GHS-POP R2023A - GHS population grid multitemporal (1975-2030)」（GHSL。© European Union, 1995-2026。CC BY 4.0）"
-    "の2020年の人口を加工して作成"
+    "国勢調査の範囲の外（日本のまわりの国など）は欧州委員会 共同研究センター（JRC）の「GHS-POP R2023A」"
+    f"（© European Union, 1995-2026、CC BY 4.0（https://creativecommons.org/licenses/by/4.0/）、{DOI}）の2020年の人口を加工して作成"
 )
 
 _last = 0.0
