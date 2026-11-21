@@ -137,43 +137,95 @@ def build_terrain(mats: dict) -> dict:
 
 
 def water_material() -> bpy.types.Material:
-    """水面：澄んだ水（透ける・空と森を映す）。さざ波は流れの向きに少し伸びた細かい凹凸"""
+    """水面：澄んだ水（透ける・空と森を映す）。さざ波は流れの向き（点の属性 fx・fy）に沿って下流へ流れ、浅い瀬（属性 wdepth）
+    ほど強く、白い波（泡）が立つ"""
     mat = bpy.data.materials.new("water")
     nt = mat.node_tree
     nt.nodes.clear()
-    out = node(nt, "ShaderNodeOutputMaterial", (800, 0))
-    b = node(nt, "ShaderNodeBsdfPrincipled", (500, 0))
+    out = node(nt, "ShaderNodeOutputMaterial", (1400, 0))
+    b = node(nt, "ShaderNodeBsdfPrincipled", (900, 200))
     b.inputs["Base Color"].default_value = (0.92, 0.98, 0.97, 1.0)
     b.inputs["Transmission Weight"].default_value = 1.0
     b.inputs["Roughness"].default_value = 0.015
     b.inputs["IOR"].default_value = 1.333
-    link(nt, b.outputs["BSDF"], out.inputs["Surface"])
-    geo = node(nt, "ShaderNodeNewGeometry", (-600, 0))
-    mp = node(nt, "ShaderNodeMapping", (-400, 0))
-    mp.name = "flow"
-    mp.inputs["Scale"].default_value = (1.0, 2.5, 1.0)
-    link(nt, geo.outputs["Position"], mp.inputs["Vector"])
-    # 流れ：模様を下流（南）へ動かす（1 秒に約 1.3m。動画のコマで直線に）
-    loc = mp.inputs["Location"]
-    loc.default_value = (0.0, 0.0, 0.0)
-    loc.keyframe_insert("default_value", frame=0)
-    loc.default_value = (0.0, 1.3 * 2.5 * 30.0, 0.0)
-    loc.keyframe_insert("default_value", frame=30 * 24)
-    if mat.node_tree.animation_data and mat.node_tree.animation_data.action:
-        for fc in getattr(mat.node_tree.animation_data.action, "fcurves", []):
+    foam_b = node(nt, "ShaderNodeBsdfPrincipled", (900, -300))
+    foam_b.inputs["Base Color"].default_value = (0.82, 0.86, 0.86, 1.0)
+    foam_b.inputs["Roughness"].default_value = 0.55
+    mixs = node(nt, "ShaderNodeMixShader", (1200, 0))
+    link(nt, b.outputs["BSDF"], mixs.inputs[1])
+    link(nt, foam_b.outputs["BSDF"], mixs.inputs[2])
+    link(nt, mixs.outputs["Shader"], out.inputs["Surface"])
+    geo = node(nt, "ShaderNodeNewGeometry", (-1400, 0))
+    sep = node(nt, "ShaderNodeSeparateXYZ", (-1200, 0))
+    link(nt, geo.outputs["Position"], sep.inputs["Vector"])
+
+    def att(name, y):
+        n = node(nt, "ShaderNodeAttribute", (-1200, y))
+        n.attribute_type = "GEOMETRY"
+        n.attribute_name = name
+        return n.outputs["Fac"]
+
+    fx, fy, dep = att("fx", -300), att("fy", -450), att("wdepth", -600)
+
+    def m(op, a_, b_=None, v=None, y=0):
+        n = node(nt, "ShaderNodeMath", (-900, y), operation=op)
+        link(nt, a_, n.inputs[0])
+        if b_ is not None:
+            link(nt, b_, n.inputs[1])
+        elif v is not None:
+            n.inputs[1].default_value = v
+        return n.outputs[0]
+
+    # 流れに沿った座標：u（下流へ）・v（横）
+    u = m("ADD", m("MULTIPLY", sep.outputs["X"], fx, y=100), m("MULTIPLY", sep.outputs["Y"], fy, y=0), y=50)
+    v = m("SUBTRACT", m("MULTIPLY", sep.outputs["Y"], fx, y=-100), m("MULTIPLY", sep.outputs["X"], fy, y=-200), y=-150)
+    # 時間とともに下流へ（1 秒に約 1.4m）：u から引く
+    tval = node(nt, "ShaderNodeValue", (-1200, 300))
+    tval.name = "time"
+    tval.outputs[0].default_value = 0.0
+    tval.outputs[0].keyframe_insert("default_value", frame=0)
+    tval.outputs[0].default_value = 30.0
+    tval.outputs[0].keyframe_insert("default_value", frame=30 * 24)
+    u_t = m("SUBTRACT", u, m("MULTIPLY", tval.outputs[0], v=1.4, y=300), y=200)
+    co1 = node(nt, "ShaderNodeCombineXYZ", (-600, 100))
+    link(nt, m("MULTIPLY", u_t, v=0.55, y=150), co1.inputs["X"])
+    link(nt, m("MULTIPLY", v, v=1.8, y=0), co1.inputs["Y"])
+    co2 = node(nt, "ShaderNodeCombineXYZ", (-600, -200))
+    link(nt, m("MULTIPLY", u_t, v=2.2, y=-250), co2.inputs["X"])
+    link(nt, m("MULTIPLY", v, v=0.9, y=-350), co2.inputs["Y"])
+    n1 = node(nt, "ShaderNodeTexNoise", (-400, 100), Scale=0.8, Detail=8.0, Roughness=0.6)
+    n2 = node(nt, "ShaderNodeTexNoise", (-400, -200), Scale=1.6, Detail=5.0, Roughness=0.55)
+    link(nt, co1.outputs["Vector"], n1.inputs["Vector"])
+    link(nt, co2.outputs["Vector"], n2.inputs["Vector"])
+    h = m("MULTIPLY_ADD", n2.outputs["Fac"], v=None, y=-50)
+    h.node.inputs[1].default_value = 0.45
+    link(nt, n1.outputs["Fac"], h.node.inputs[2])
+    # 浅い瀬：水深 0.25m で 0、0m で 1
+    shallow = node(nt, "ShaderNodeMapRange", (-600, -600), **{"From Min": 0.28, "From Max": 0.04})
+    link(nt, dep, shallow.inputs["Value"])
+    strength = m("MULTIPLY_ADD", shallow.outputs["Result"], v=None, y=-700)
+    strength.node.inputs[1].default_value = 0.9
+    strength.node.inputs[2].default_value = 0.28
+    bump = node(nt, "ShaderNodeBump", (600, -100), Distance=0.05)
+    link(nt, strength, bump.inputs["Strength"])
+    link(nt, h, bump.inputs["Height"])
+    link(nt, bump.outputs["Normal"], b.inputs["Normal"])
+    link(nt, bump.outputs["Normal"], foam_b.inputs["Normal"])
+    # 白い波：浅い所の、流れに沿った筋（細かい模様のしきい値）
+    fn = node(nt, "ShaderNodeTexNoise", (-400, -900), Scale=2.6, Detail=6.0, Roughness=0.65)
+    co3 = node(nt, "ShaderNodeCombineXYZ", (-600, -900))
+    link(nt, m("MULTIPLY", u_t, v=0.7, y=-850), co3.inputs["X"])
+    link(nt, m("MULTIPLY", v, v=2.6, y=-950), co3.inputs["Y"])
+    link(nt, co3.outputs["Vector"], fn.inputs["Vector"])
+    fr = node(nt, "ShaderNodeMapRange", (-200, -900), **{"From Min": 0.56, "From Max": 0.70})
+    link(nt, fn.outputs["Fac"], fr.inputs["Value"])
+    foam = m("MULTIPLY", fr.outputs["Result"], shallow.outputs["Result"], y=-800)
+    foam = m("MULTIPLY", foam, v=0.85, y=-750)
+    link(nt, foam, mixs.inputs["Fac"])
+    if nt.animation_data and nt.animation_data.action:
+        for fc in getattr(nt.animation_data.action, "fcurves", []):
             for kp in fc.keyframe_points:
                 kp.interpolation = "LINEAR"
-    n1 = node(nt, "ShaderNodeTexNoise", (-200, 100), Scale=0.7, Detail=8.0, Roughness=0.6)
-    n2 = node(nt, "ShaderNodeTexNoise", (-200, -150), Scale=3.5, Detail=4.0, Roughness=0.5)
-    link(nt, mp.outputs["Vector"], n1.inputs["Vector"])
-    link(nt, mp.outputs["Vector"], n2.inputs["Vector"])
-    add = node(nt, "ShaderNodeMath", (0, 0), operation="MULTIPLY_ADD")
-    link(nt, n2.outputs["Fac"], add.inputs[0])
-    add.inputs[1].default_value = 0.35
-    link(nt, n1.outputs["Fac"], add.inputs[2])
-    bump = node(nt, "ShaderNodeBump", (250, -200), Strength=0.25, Distance=0.04)
-    link(nt, add.outputs[0], bump.inputs["Height"])
-    link(nt, bump.outputs["Normal"], b.inputs["Normal"])
     return mat
 
 
@@ -192,7 +244,17 @@ def build_water(nm: dict) -> None:
     x, y = geo3.grid_xy(nm, lv.shape)
     x, y = x[c0:c1], y[r0:r1]
     Z = np.nan_to_num(sub, nan=0.0) - geo3.curvature_drop(x[None, :], y[:, None])
-    grid_mesh("water_surface", x, y, Z.astype(np.float32), water_material(), mask=np.pad(face, ((0, 1), (0, 1))))
+    ob = grid_mesh("water_surface", x, y, Z.astype(np.float32), water_material(), mask=np.pad(face, ((0, 1), (0, 1))))
+    # 点ごとの水深と流れの向き（瀬の白い波・流れに沿ったさざ波）
+    fd = os.path.join(WORK, "terrain", "water_depth.npy")
+    ff = os.path.join(WORK, "terrain", "water_flow.npy")
+    if os.path.exists(fd) and os.path.exists(ff):
+        dep = np.load(fd)[r0:r1, c0:c1].astype(np.float32).ravel()
+        flow = np.load(ff)[r0:r1, c0:c1].astype(np.float32).reshape(-1, 2)
+        me = ob.data
+        for name, val in (("wdepth", dep), ("fx", flow[:, 0]), ("fy", flow[:, 1])):
+            a = me.attributes.new(name, "FLOAT", "POINT")
+            a.data.foreach_set("value", np.ascontiguousarray(val))
 
 
 RIVER_HI = 420.0  # 川の真ん中の線から、細かい地形にする幅（m）
@@ -386,6 +448,28 @@ def ground_material(name: str, cover: str | None) -> bpy.types.Material:
     pmr = node(nt, "ShaderNodeMapRange", (-700, 2000), **{"From Min": 0.40, "From Max": 0.62})
     link(nt, pm.outputs["Fac"], pmr.inputs["Value"])
     gravel_c = mix(nt, pmr.outputs["Result"], peb_c, fin_c, (-300, 2000))
+    # 石の色むら（数 m の広さで明るさ 0.8〜1.2）
+    cv = node(nt, "ShaderNodeTexNoise", (-900, 2300), Scale=0.18, Detail=3.0)
+    link(nt, pos, cv.inputs["Vector"])
+    cvr = node(nt, "ShaderNodeMapRange", (-700, 2300), **{"To Min": 0.78, "To Max": 1.22})
+    link(nt, cv.outputs["Fac"], cvr.inputs["Value"])
+    cvc = node(nt, "ShaderNodeCombineColor", (-500, 2300))
+    for i in range(3):
+        link(nt, cvr.outputs["Result"], cvc.inputs[i])
+    gv = node(nt, "ShaderNodeMix", (-300, 2300))
+    gv.data_type = "RGBA"
+    gv.blend_type = "MULTIPLY"
+    gv.inputs["Factor"].default_value = 1.0
+    link(nt, gravel_c, gv.inputs[6])
+    link(nt, cvc.outputs["Color"], gv.inputs[7])
+    # 砂のまだら（流れが運んだ細かい砂。明るい灰褐色で、なめらか）
+    sd = node(nt, "ShaderNodeTexNoise", (-900, 2500), Scale=0.05, Detail=5.0, Roughness=0.65)
+    link(nt, pos, sd.inputs["Vector"])
+    sdr = node(nt, "ShaderNodeMapRange", (-700, 2500), **{"From Min": 0.56, "From Max": 0.66})
+    link(nt, sd.outputs["Fac"], sdr.inputs["Value"])
+    sand = node(nt, "ShaderNodeRGB", (-500, 2600))
+    sand.outputs[0].default_value = (0.30, 0.27, 0.22, 1.0)
+    gravel_c = mix(nt, sdr.outputs["Result"], gv.outputs[2], sand.outputs[0], (-100, 2300))
     gravel_r = mix(nt, pmr.outputs["Result"], peb_r, fin_r, (-300, 1800), kind="FLOAT")
     gravel_n = mix(nt, pmr.outputs["Result"], peb_n, fin_n, (-300, 1600))
     forest_c, forest_r, forest_n, _ = surface(nt, "forest_leaves_02", pos, 3.0, -600, 800, tint=(0.47, 1.1, 0.8))

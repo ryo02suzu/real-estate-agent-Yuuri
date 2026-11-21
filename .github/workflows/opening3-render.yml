@@ -19,7 +19,47 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  config:
+    runs-on: ubuntu-latest
+    outputs:
+      repost_run: ${{ steps.c.outputs.repost_run }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: c
+        run: echo "repost_run=$(python3 -c "import json;print(json.load(open('scripts/pc-opening3/render.json')).get('repost_run',''))")" >> "$GITHUB_OUTPUT"
+
+  # 仕上げだけ直す回（render.json の repost_run に、EXR を残した回の番号）：描き直さず、残した EXR から仕上げ直す
+  repost:
+    needs: config
+    if: needs.config.outputs.repost_run != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install numpy scipy pillow OpenEXR
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: exr-*
+          path: exr
+          merge-multiple: true
+          run-id: ${{ needs.config.outputs.repost_run }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: 仕上げ
+        working-directory: scripts/pc-opening3
+        run: python post3.py --frames "$GITHUB_WORKSPACE/exr" "$GITHUB_WORKSPACE/png"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frames-repost
+          path: png/*.png
+          retention-days: 7
+          compression-level: 0
+
   prep:
+    needs: config
+    if: needs.config.outputs.repost_run == ''
     runs-on: ubuntu-latest
     timeout-minutes: 120
     outputs:
@@ -114,14 +154,22 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
+          # 光の量そのまま（EXR）も残す：仕上げ（post3.py）だけを直すときは、描き直さずに使える
+          name: exr-${{ strategy.job-index }}
+          path: exr/*
+          retention-days: 7
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
           name: frames-${{ strategy.job-index }}
           path: png/*.png
           retention-days: 7
           compression-level: 0
 
   encode:
-    needs: render
-    if: always() && needs.render.result != 'cancelled'
+    needs: [render, repost]
+    if: always() && (needs.render.result == 'success' || needs.render.result == 'failure' || needs.repost.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:

@@ -34,7 +34,7 @@ LOOK = dict(
     exposure=0.15,
     shadow=(0.90, 0.97, 1.10),  # 影の色（藍）
     light=(1.08, 1.0, 0.88),  # 光の色（金）
-    sat=1.08,
+    sat=1.12,
     haze_color=(0.753, 1.132, 1.673),  # 地平線近くの空の色（見た目の確認の絵から。コマごとに測るとちらつくので決めておく）
     wind=(1.2, 2.0),  # 朝もやが流れる速さ（m/秒。東・北）
     end_white=(19.6, 21.1),  # 最後に雲の中へ（END の白へ溶かす）秒
@@ -120,7 +120,11 @@ def finish(src: str, out: str) -> None:
     alt = np.clip((c[2] + pz) / 2 - zr, 0, None)
     air = LOOK["air_max"] * (1.0 - np.exp(-dist / (LOOK["air_km"] * 1000.0) * np.exp(-alt / 8000.0)))
     air = np.where(sky, 0.0, air)
-    out_rgb = rgb * (1 - air[..., None]) + haze_col[None, None, :] * air[..., None]
+    sun = np.array(cam["sun"], np.float32)
+    side = np.clip(d @ sun, 0.0, 1.0) ** 1.5  # 太陽の側ほど 1
+    warm = np.array([1.0, 0.86, 0.66], np.float32)
+    haze_px = haze_col[None, None, :] * (1 + 0.35 * side[..., None] * (warm - 1)[None, None, :]) * (1 + 0.25 * side[..., None])
+    out_rgb = rgb * (1 - air[..., None]) + haze_px * air[..., None]
 
     # 朝もや（指数の高さの霧）：τ = ρ0·H·(e^{-(z0-zr)/H} − e^{-(z1-zr)/H}) / (z1 − z0) × 距離
     H_m = LOOK["mist_height"]
@@ -136,10 +140,9 @@ def finish(src: str, out: str) -> None:
     patch = 0.15 + 1.5 * fbm(c[0] + 0.5 * dmax * d[..., 0] - wx * tsec, c[1] + 0.5 * dmax * d[..., 1] - wy * tsec, 180.0, 5)
     tau = LOOK["mist_density"] * per * dmax * patch
     mist = 1.0 - np.exp(-np.clip(tau, 0, 20))
-    sun = np.array(cam["sun"], np.float32)
     toward = np.clip((d @ sun), 0, 1) ** 4
     mcol = np.array(LOOK["mist_color"], np.float32) * float(haze_col.mean()) * LOOK["mist_shade"]
-    mcol = mcol[None, None, :] * (1 + 0.6 * toward[..., None] * np.array([1.0, 0.85, 0.6], np.float32))
+    mcol = mcol[None, None, :] * (1 + 0.6 * toward[..., None] * np.array([1.0, 0.85, 0.6], np.float32)) * (1 + 0.35 * side[..., None] * (warm - 1)[None, None, :]) * (1 + 0.3 * side[..., None])
     out_rgb = out_rgb * (1 - mist[..., None]) + mcol * mist[..., None]
 
     # 仕上げ：光のにじみ・金色の光と藍の影・AgX・周辺の暗さと粒
@@ -150,7 +153,7 @@ def finish(src: str, out: str) -> None:
     v = agx(x, (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), LOOK["sat"])
     # AgX の出力（ガンマ約 2.2）→ 少しコントラスト（S 字）
     v = np.clip(v, 0, 1)
-    v = v + 0.06 * np.sin((v - 0.5) * np.pi) * 0.5
+    v = v + 0.09 * np.sin((v - 0.5) * np.pi) * 0.5  # 少しコントラスト（S 字）
     # 最後は雲の中へ：END の白へ溶かす
     a0, a1 = LOOK["end_white"]
     w = float(smoothstep(a0, a1, tsec))

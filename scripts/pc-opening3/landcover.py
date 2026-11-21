@@ -135,6 +135,17 @@ def main() -> None:
     level = np.where(grow & np.isnan(level), filled, level)
     level[level < -1e8] = np.nan
     np.save(os.path.join(WORK, "terrain", "water_level.npy"), level.astype(np.float32))
+    # 水深（瀬の白い波に使う）と、流れの向き（下流へ。川の真ん中の線の向きの逆。池はほとんど流れない）
+    depth = np.where(np.isnan(level), 0.0, np.clip(level - carved, 0.0, 3.0))
+    tx = np.gradient(fine[:, 0])
+    ty = np.gradient(fine[:, 1])
+    tn = np.hypot(tx, ty) + 1e-9
+    fxs, fys = -tx / tn, -ty / tn  # s が増える向き（上流）の逆
+    fx = np.interp(s_g, ss, fxs)
+    fy = np.interp(s_g, ss, fys)
+    slow = np.clip(1.0 - pond_r, 0.0, 1.0) * 0.9  # 池の中はゆっくり
+    np.save(os.path.join(WORK, "terrain", "water_depth.npy"), depth.astype(np.float32))
+    np.save(os.path.join(WORK, "terrain", "water_flow.npy"), np.stack([fx * (1 - slow), fy * (1 - slow)], -1).astype(np.float32))
     with open(os.path.join(WORK, "terrain", "near_carved.json"), "w") as f:
         json.dump(dict(dm, carved_from="near", river=dict(z_low=float(zc[0]), z_high=float(zc[-1]), length=float(ss[-1]))), f, indent=1)
 
@@ -222,7 +233,7 @@ def main() -> None:
     rj = np.clip(np.round((rx - x.min()) / (x.max() - x.min()) * (W - 1)).astype(int), 0, W - 1)
     wet = ndimage.distance_transform_edt(~water_c) * (3.85 / COVER_SCALE)  # 水からの距離（m）
     g = gravel_c[ri, rj]
-    p_rock = np.where(g, np.interp(wet[ri, rj], [0, 3, 12], [0.30, 0.16, 0.07]), 0.0)
+    p_rock = np.where(g, np.interp(wet[ri, rj], [0, 3, 12], [0.55, 0.30, 0.12]), 0.0)
     rk = rng.uniform(0, 1, len(rx)) < p_rock
     rx, ry = rx[rk], ry[rk]
     rkind = rng.integers(0, 14, len(rx)).astype(np.int8)
