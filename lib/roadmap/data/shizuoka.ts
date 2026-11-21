@@ -3,7 +3,9 @@
 // 静岡県ではこの9市も建築基準法上の道路（道路種別・指定道路図）を市が扱う（県の指定道路図の公開は土木事務所の管内だけ）。
 // 残り20市町は県の5土木事務所（下田・熱海・沼津・島田・袋井）。松崎町・西伊豆町・川根本町は全域が都市計画区域外。
 import type { Contact, MapLink, Municipality } from "../municipalities";
+import type { SheetIndex } from "../sheets";
 import { arcgisExperienceAt, geocloud, geocloudMp, sonicweb, wagmap } from "../vendors";
+import MISHIMA_SHEETS from "./sheets/mishima.json";
 
 const pref = "静岡県" as const;
 
@@ -52,8 +54,16 @@ const outsideTown = (name: string, code: string, office: keyof typeof OFFICE): M
   note: "全域が都市計画区域外（県の資料）。建築基準法6条1項4号の知事指定区域の有無と建築の扱いは土木事務所で確認。",
 });
 
-/** PDF の分割図で公開している市の入口ページ */
-const pdfSheets = (kind: MapLink["kind"], label: string, url: string, tip: string): MapLink => ({ kind, label, build: null, url, verified: true, tip });
+/** PDF の分割図で公開している市の入口ページ。sheets（図ごとの範囲）があれば、物件が載っている図を直接開く（図の無い所は url の一覧ページ） */
+const pdfSheets = (kind: MapLink["kind"], label: string, url: string, tip: string, sheets?: SheetIndex): MapLink => ({
+  kind,
+  label,
+  build: null,
+  url,
+  verified: true,
+  tip,
+  ...(sheets ? { sheets } : {}),
+});
 
 // --- 特定行政庁の6市 ---------------------------------------------------------
 
@@ -97,11 +107,13 @@ const CITIES: Municipality[] = [
     codes: ["22203"],
     coverage: "partial",
     maps: [
+      // 市のサイトポリシーが「リンクされる場合は、トップページ宛でお願いします」としているので、福岡市と同じく
+      // トップページを開き、探し方を書く（2026-11-21 に原文を確かめた。docs/shizuoka-research.md）
       pdfSheets(
         "road_type",
-        "指定道路図（PDF 43枚・2号/3号/4号/5号/2項）",
-        "https://www.city.numazu.shizuoka.jp/shisei/office/ichiran/toshikei/jyutakuseisaku/shiteidourozu.htm",
-        "一覧ページの索引図から物件の載っている番号の図を開く（2024年3月31日時点）",
+        "指定道路図（PDF 43枚・2号/3号/4号/5号/2項）※沼津市のホームページのトップページから進む",
+        "https://www.city.numazu.shizuoka.jp/",
+        "沼津市のホームページのトップページが開く（市が、リンクはトップページ宛にするよう求めているため）。サイト内検索で「指定道路図」と探して住宅政策課の「指定道路図」のページを開き、索引図から物件の載っている番号の図（PDF。2024年3月31日時点）を開く。市は、ホームページの内容の複製・使用・ダウンロードを、個人的かつ非営利的な使用目的に限っている（市の著作権のページ）",
       ),
     ],
     contact: { dept: "都市計画部 住宅政策課", phone: "055-934-4766" },
@@ -137,7 +149,14 @@ const LIMITED_CITIES: Municipality[] = [
     codes: ["22206"],
     coverage: "partial",
     maps: [
-      pdfSheets("road_type", "指定道路図（PDF 38枚・4号/5号/2項）", "https://www.city.mishima.shizuoka.jp/page/2249.html", "一覧ページの索引図から物件の載っている図を開く（2025年3月14日時点）。凡例と整合表も同じページ"),
+      // 国土基本図の図郭ごとの図（37枚）から、物件が載っている図を位置で選ぶ（図ごとの範囲は docs/pdf-sheets.md の「三島市」）
+      pdfSheets(
+        "road_type",
+        "指定道路図（PDF 37枚・4号/5号/2項）",
+        "https://www.city.mishima.shizuoka.jp/page/2249.html",
+        "物件が載っている図（PDF。2025年3月14日時点）が開く。図の無い所は市のページが開くので、索引の表から物件の載っている図を開く。凡例と整合表は市のページにある。市は、図を開いたら利用上の注意事項に同意したとみなす（市のページ）",
+        MISHIMA_SHEETS as SheetIndex,
+      ),
       {
         kind: "public_road",
         label: "道路台帳図（三島市地図情報提供システム）",
@@ -148,7 +167,7 @@ const LIMITED_CITIES: Municipality[] = [
       },
     ],
     contact: { dept: "計画まちづくり部 住宅政策課 建築指導係", phone: "055-983-2644" },
-    note: "図に 1号（公道）は載っていない。最新の指定は住宅政策課で確認。",
+    note: "図に 1号（公道）は載っていない。最新の指定は住宅政策課で確認。MICHILU は、物件が載っている図を開く。市は、図を開いたら利用上の注意事項に同意したとみなす：図は道路種別の大まかな位置を示す参考図で、内容を証明するものではなく、敷地と道路の関係・土地の境界・不動産取引などの内容を証明する資料には使えない。無断の複製・利用は禁じられている（市「指定道路図の公開について」）。",
   },
   {
     pref,

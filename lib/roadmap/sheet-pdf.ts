@@ -39,6 +39,8 @@ type Template = PdfLayout & {
   prefix: string;
   /** 同じ市の中で作りの違う図（図の名前で選ぶ） */
   variants?: { labels: string[]; layout: PdfLayout }[];
+  /** 付けない図（地図が頁の中で逆さまに描かれた図など、この作りで物件を真ん中にできない図）の名前 */
+  skip?: string[];
 };
 
 // 測り方：PDF の中の図の枠（線・矩形）の位置を読み、図の範囲の大きさ・縦横比と比べた。地理院地図（標準地図）を同じ範囲に並べ直して重ね、
@@ -185,6 +187,48 @@ const TEMPLATES: Template[] = [
     rotate: 0,
     frame: [128.23, 124.78, 2395.77, 1825.43],
   },
+  // 国土基本図 1/2500 の図郭（第VI系、2km×1.5km）を A3 に縮めたスキャン画像。図郭の線（11・72・165 ほか8枚で 1pt 以内）
+  {
+    name: "津市 指定道路図",
+    prefix: "https://www.info.city.tsu.mie.jp/_res/projects/default_project/_page_/001/005/857/",
+    page: [1190.55, 841.89],
+    rotate: 0,
+    frame: [172.92, 134.41, 948.28, 716.65],
+  },
+  // 国土基本図 1/2500 の図郭（第VIII系）。地図の線の枠（PDF の矩形。37枚とも同じ）
+  {
+    name: "三島市 指定道路図",
+    prefix: "https://www.city.mishima.shizuoka.jp/uploaded/attachment/",
+    page: [2919.69, 2063.62],
+    rotate: 0,
+    frame: [162.57, 154.32, 2534.13, 1932.81],
+  },
+  // 国土基本図 1/2500 の図郭（第II系）。鹿児島県のページの28枚。縦の A0 を 90° 回して表示。図の内枠（28枚とも測った。02NC874 だけ位置が違う）
+  {
+    name: "さつま町 指定道路図（鹿児島県）",
+    prefix: "https://www.pref.kagoshima.jp/ah12/infra/kentiku/shidou/kijunhou/documents/42150_",
+    page: [2591, 1984],
+    rotate: 90,
+    frame: [65.88, 158.2, 2333.52, 1859.04],
+    variants: [{ labels: ["02NC874"], layout: { page: [2591, 1984], rotate: 90, frame: [72.36, 141.48, 2340.36, 1842.48] } }],
+  },
+  // 750m×500m の格子（1/2500）。10枚ずつの PDF の頁（#page=）。図の内枠（80頁すべて測った）。頁の作りが3通りあり、名前で分けた。
+  // 70 は頁の中で地図が逆さま（南が上）に描かれているので付けない
+  {
+    name: "浦添市 指定道路図",
+    prefix: "https://www.city.urasoe.lg.jp/doc/609e7c273d59ae2434bfead4/file_contents/",
+    page: [1191, 842],
+    rotate: 0,
+    frame: [92.88, 151.44, 944.4, 719.28],
+    variants: [
+      {
+        labels: ["61", "62", "63", "64", "65", "66", "67", "68", "69", "71", "72", "74", "75", "76", "77", "78", "79", "80"],
+        layout: { page: [1191, 842], rotate: 90, frame: [108.24, 137.52, 958.8, 704.4] },
+      },
+      { labels: ["24", "31", "55", "56", "73"], layout: { page: [1191, 842], rotate: 0, frame: [107.08, 136.85, 957.55, 703.63] } },
+    ],
+    skip: ["70"],
+  },
 ];
 
 /** 図の作りの表（テストで中身を確かめる用） */
@@ -194,7 +238,7 @@ export const PDF_TEMPLATES: readonly Readonly<Template>[] = TEMPLATES;
 export function pdfLayout(label: string, url: string): PdfLayout | undefined {
   const base = url.split("#")[0];
   const t = TEMPLATES.find((x) => (x.prefix.endsWith(".pdf") ? base === x.prefix : base.startsWith(x.prefix)));
-  if (!t) return undefined;
+  if (!t || t.skip?.includes(label)) return undefined;
   return t.variants?.find((v) => v.labels.includes(label))?.layout ?? t;
 }
 

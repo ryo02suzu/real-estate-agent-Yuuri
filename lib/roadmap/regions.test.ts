@@ -267,7 +267,10 @@ describe("近畿2府5県の市町村（調査中から始める）", () => {
     expect(otsu.maps[0]).toMatchObject({ kind: "road_type", url: "https://www.city.otsu.lg.jp/soshiki/035/1309/g/douro/67087.html" });
     expect(otsu.maps[0].tip).toMatch(/緑＝1項1号.*水色＝2項.*色なし＝未判定/);
     expect(higashiomi.maps[0]).toMatchObject({ kind: "road_type", url: "https://www.city.higashiomi.shiga.jp/machizukuri_kankyou/kenchiku/1003563/1003572.html" });
-    expect(higashiomi.maps[0].tip).toMatch(/自分で同意してから使う決まり/);
+    // 東近江市：利用条件はページの文だけ（同意のボタンは無い）なので、物件が載っている図（85枚）を開く。条件の要点は市の注にも書く
+    expect(higashiomi.maps[0].tip).toMatch(/以上の事項について同意の上、利用してください/);
+    expect(higashiomi.maps[0].sheets?.cells).toHaveLength(85);
+    expect(higashiomi.note).toContain("不動産取引の資料・接道を示す資料・道路種別を証明する資料には使えない");
     // 守山市はリンク先をトップページにするよう求めているので、トップページを開く（市道の参考の地図だけ）
     expect(moriyama.maps).toHaveLength(1);
     expect(moriyama.maps[0]).toMatchObject({ kind: "public_road", url: "https://www.city.moriyama.lg.jp/" });

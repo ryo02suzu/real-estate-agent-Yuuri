@@ -116,6 +116,12 @@ describe("図の作りの表", () => {
     const nara = "https://www.city.narashino.lg.jp/material/files/group/38/";
     expect(pdfLayout("袖ケ浦・鷺沼ほか", `${nara}sode.pdf`)?.rotate).toBe(0);
     expect(pdfLayout("谷津・津田沼ほか", `${nara}yatsu.pdf`)?.rotate).toBe(270);
+    // 浦添市：10枚ずつの PDF の頁ごとに作りが3通り。70 は頁の中で地図が逆さまなので付けない
+    const urasoe = "https://www.city.urasoe.lg.jp/doc/609e7c273d59ae2434bfead4/file_contents/";
+    expect(pdfLayout("43", `${urasoe}20240531133932601.pdf#page=3`)?.frame).toEqual([92.88, 151.44, 944.4, 719.28]);
+    expect(pdfLayout("64", `${urasoe}file_2026515512316_1.pdf#page=4`)?.rotate).toBe(90);
+    expect(pdfLayout("56", `${urasoe}5160.pdf#page=6`)?.frame).toEqual([107.08, 136.85, 957.55, 703.63]);
+    expect(pdfLayout("70", `${urasoe}file_2026515512316_1.pdf#page=10`)).toBeUndefined();
   });
   it("市全体で1枚の図は、測った図の URL だけ（作り直された図に差し替わったら付けない）", () => {
     expect(pdfLayout("市全体", "https://www.city.fujimino.saitama.jp/material/files/group/31/R8douromouzu.pdf")).toBeDefined();
@@ -150,6 +156,22 @@ describe("本物の市で作る URL", () => {
     const s = link("05212", 39.452633, 140.476227).sheet!;
     expect(centeredPdfUrl(s, s.bounds, "chromium", SIZE)).toBe(`${s.url}#page=1&zoom=500,502,294&navpanes=0`);
     expect(centeredPdfUrl(s, s.bounds, "pdfjs", SIZE)).toBe(`${s.url}#page=1&zoom=500,217,373&pagemode=none`);
+  });
+
+  it("津市役所（98）は 500%。浦添市の内間（64。90° 回して表示）は Firefox では回転の前の向きの座標にする", () => {
+    const tsu = link("24201", 34.719013, 136.505478).sheet!;
+    expect(centeredPdfUrl(tsu, tsu.bounds, "chromium", SIZE)).toBe(`${tsu.url}#page=1&zoom=500,246,608&navpanes=0`);
+    expect(centeredPdfUrl(tsu, tsu.bounds, "pdfjs", SIZE)).toBe(`${tsu.url}#page=1&zoom=500,181,390&pagemode=none`);
+    const uchima = link("47208", 26.239622, 127.707329).sheet!;
+    const base = uchima.url.split("#")[0];
+    expect(centeredPdfUrl(uchima, uchima.bounds, "chromium", SIZE)).toBe(`${base}#page=4&zoom=318,900,621&navpanes=0`);
+    expect(centeredPdfUrl(uchima, uchima.bounds, "pdfjs", SIZE)).toBe(`${base}#page=4&zoom=318,461,671&pagemode=none`);
+    const mishima = link("22206", 35.118809, 138.918945).sheet!;
+    expect(centeredPdfUrl(mishima, mishima.bounds, "chromium", SIZE)).toBe(`${mishima.url}#page=1&zoom=304,286,352&navpanes=0`);
+    // さつま町役場（02OC071。縦の A0 を 90° 回して表示）
+    const satsuma = link("46392", 31.905945, 130.455704).sheet!;
+    expect(centeredPdfUrl(satsuma, satsuma.bounds, "chromium", SIZE)).toBe(`${satsuma.url}#page=1&zoom=318,659,1870&navpanes=0`);
+    expect(centeredPdfUrl(satsuma, satsuma.bounds, "pdfjs", SIZE)).toBe(`${satsuma.url}#page=1&zoom=318,1397,490&pagemode=none`);
   });
 
   it("隣の図も、物件のいる側（図の外）を真ん中にして開く（桐生市役所：L023L の左の端、隣は K023R）", () => {

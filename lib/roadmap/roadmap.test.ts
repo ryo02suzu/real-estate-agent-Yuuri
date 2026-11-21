@@ -1577,6 +1577,113 @@ describe("久留米市の指定道路図（地区ごとの PDF 14枚）", () => 
   });
 });
 
+describe("津市の指定道路図（番号ごとの PDF 39枚。1/2,500 の図郭）", () => {
+  const m = () => findMunicipality("24201")!;
+  // 地点は国土地理院の住所検索の点。図ごとの範囲は docs/pdf-sheets.md の「津市」
+  it("物件が載っている番号の図を位置で選ぶ（市役所は 98）", () => {
+    const at = (lat: number, lng: number) => buildLinks(m(), lat, lng)[0];
+    expect(at(34.719013, 136.505478).sheet?.label).toBe("98"); // 津市役所（西丸之内23番）
+    expect(at(34.719013, 136.505478).url).toBe("https://www.info.city.tsu.mie.jp/_res/projects/default_project/_page_/001/005/857/98.pdf");
+    expect(at(34.733288, 136.510971).sheet?.label).toBe("86"); // 羽所町（津駅の西）
+    expect(at(34.760693, 136.441986).sheet?.label).toBe("59"); // 安濃町東観音寺
+    expect(at(34.811752, 136.43248).sheet?.label).toBe("11"); // 芸濃町椋本
+    expect(at(34.669476, 136.5121).sheet?.label).toBe("149"); // 高茶屋
+  });
+  it("39枚とも市のサイトの PDF。図の公開されていない升目（61 など）は、市の「指定道路図」のページを開く", () => {
+    const link = m().maps[0];
+    expect(link.sheets?.cells).toHaveLength(39);
+    for (const c of link.sheets!.cells) expect(c[1]).toMatch(/^https:\/\/www\.info\.city\.tsu\.mie\.jp\/_res\/projects\/default_project\/_page_\/001\/005\/857\/\d+\.pdf$/);
+    const [none] = buildLinks(m(), 34.761813, 136.491571); // 升目 61 の真ん中（図が無い）
+    expect(none.sheet).toBeUndefined();
+    expect(none.url).toBe("https://www.info.city.tsu.mie.jp/shisei/keikaku_matizukuri_torikumi/1005750/1005854/1005857.html");
+    // 図を直接開くときも、市の利用条件の要点が見えるように市の注に書く
+    expect(m().note).toContain("利用条件のすべてに同意の上");
+    expect(m().note).toContain("無断の複写・複製・転載・ファイル化・配布は禁じられている");
+  });
+});
+
+describe("浦添市の指定道路図（索引図の番号ごとの図 80枚。10枚ずつの PDF）", () => {
+  const m = () => findMunicipality("47208")!;
+  it("物件が載っている番号の図を、PDF の頁で開く（市役所は 56＝51〜60 の PDF の6頁目）", () => {
+    const at = (lat: number, lng: number) => buildLinks(m(), lat, lng)[0];
+    const hall = at(26.246172, 127.722527); // 浦添市役所（安波茶一丁目1番1号）
+    expect(hall.sheet?.label).toBe("56");
+    expect(hall.url).toBe("https://www.city.urasoe.lg.jp/doc/609e7c273d59ae2434bfead4/file_contents/5160.pdf#page=6");
+    expect(at(26.241159, 127.736435).sheet?.label).toBe("68"); // 前田
+    expect(at(26.239622, 127.707329).sheet?.label).toBe("64"); // 内間
+    expect(at(26.255545, 127.708862).sheet?.label).toBe("31"); // 城間
+  });
+  it("80枚とも8つの PDF のどれかの頁。格子の外（海の上）は市のページを開く", () => {
+    const cells = m().maps[0].sheets!.cells;
+    expect(cells.map((c) => c[0])).toEqual(Array.from({ length: 80 }, (_, i) => String(i + 1)));
+    for (const c of cells) expect(c[1]).toMatch(/^https:\/\/www\.city\.urasoe\.lg\.jp\/doc\/609e7c273d59ae2434bfead4\/file_contents\/[\w.]+\.pdf#page=([1-9]|10)$/);
+    const [sea] = buildLinks(m(), 26.25, 127.66);
+    expect(sea.sheet).toBeUndefined();
+    expect(sea.url).toBe("https://www.city.urasoe.lg.jp/doc/609e7c273d59ae2434bfead4/");
+  });
+});
+
+describe("三島市の指定道路図（国土基本図の図郭ごとの PDF 37枚）", () => {
+  const m = () => findMunicipality("22206")!;
+  it("物件が載っている図を位置で選ぶ（市役所は F-2）", () => {
+    const at = (lat: number, lng: number) => buildLinks(m(), lat, lng)[0];
+    expect(at(35.118809, 138.918945).sheet?.label).toBe("F-2"); // 三島市役所（北田町4番47号）
+    expect(at(35.118809, 138.918945).url).toBe("https://www.city.mishima.shizuoka.jp/uploaded/attachment/3193.pdf");
+    expect(at(35.124771, 138.912567).sheet?.label).toBe("E-1"); // 一番町（三島駅の南）
+    expect(at(35.099045, 138.946259).sheet?.label).toBe("G-3"); // 大場
+    expect(at(35.086784, 138.913834).sheet?.label).toBe("H-1"); // 長伏
+  });
+  it("図郭の名前の字が隣と食い違う図（A-5・Z-1 など）も、並びどおりの位置。図の外は市のページを開く", () => {
+    const cells = m().maps[0].sheets!.cells;
+    expect(cells).toHaveLength(37);
+    const box = (label: string) => cells.find((c) => c[0] === label)!;
+    // A-5 は A-4 の東どなり、Z-1 は A-5 の北どなり（図の幅・高さの分だけ離れる）
+    const [a4, a5, z1] = [box("A-4"), box("A-5"), box("Z-1")];
+    expect(a5[2] - a4[2]).toBeCloseTo(0.022, 3);
+    expect(Math.abs(a5[3] - a4[3])).toBeLessThan(0.0002);
+    expect(a5[3] - z1[3]).toBeCloseTo(0.0136, 3);
+    expect(buildLinks(m(), 35.1935, 139.0)[0].sheet?.label).toBe("Z-1");
+    const [none] = buildLinks(m(), 35.2, 139.05);
+    expect(none.sheet).toBeUndefined();
+    expect(none.url).toBe("https://www.city.mishima.shizuoka.jp/page/2249.html");
+  });
+});
+
+describe("さつま町の指定道路図（鹿児島県のページ。国土基本図の図郭ごとの PDF 28枚）", () => {
+  const m = () => findMunicipality("46392")!;
+  it("図の名前（02OC071 など）は第II系の図郭。物件が載っている図を位置で選ぶ（役場は 02OC071 の左下）", () => {
+    const at = (lat: number, lng: number) => buildLinks(m(), lat, lng)[0];
+    const hall = at(31.905945, 130.455704); // さつま町役場（宮之城屋地1565番地）
+    expect(hall.sheet?.label).toBe("02OC071");
+    expect(hall.sheet?.where).toBe("左下");
+    expect(hall.url).toBe("https://www.pref.kagoshima.jp/ah12/infra/kentiku/shidou/kijunhou/documents/42150_20141023095121-1.pdf");
+    expect(at(31.912121, 130.438843).sheet?.label).toBe("02OC062"); // 虎居
+    expect(m().maps[0].sheets?.cells).toHaveLength(28);
+    // 図の無い所（求名）は、県の「さつま町指定道路図」のページを開く
+    const [none] = buildLinks(m(), 31.96423, 130.55072);
+    expect(none.sheet).toBeUndefined();
+    expect(none.url).toBe("https://www.pref.kagoshima.jp/ah12/infra/kentiku/shidou/kijunhou/satumachoushiteidouro.html");
+  });
+});
+
+describe("東近江市の指定道路参考図（6地区のページの PDF 85枚。国土基本図の図郭）", () => {
+  const m = () => findMunicipality("25213")!;
+  it("図の名前（24-4 など）は第VI系の図郭から 1/50000 の区画の字を除いたもの。物件が載っている図を位置で選ぶ（市役所は 24-4）", () => {
+    const at = (lat: number, lng: number) => buildLinks(m(), lat, lng)[0];
+    const hall = at(35.113026, 136.207718); // 東近江市役所（八日市緑町10番5号）
+    expect(hall.sheet?.label).toBe("24-4");
+    expect(hall.url).toBe("https://www.city.higashiomi.shiga.jp/_res/projects/default_project/_page_/001/003/573/2404.3.pdf");
+    expect(at(35.15263, 136.187576).sheet?.label).toBe("14-1"); // 五個荘竜田町
+    expect(at(35.040806, 136.166321).sheet?.label).toBe("53-2"); // 蒲生堂町
+    // 能登川の北（行の番号 9 は北の区画）
+    expect(at(35.2135, 136.09).sheet?.label).toBe("92-1");
+    // 旧永源寺町（都市計画区域の外。図が無い）は、市のページを開く
+    const [none] = buildLinks(m(), 35.0975, 136.3216);
+    expect(none.sheet).toBeUndefined();
+    expect(none.url).toBe("https://www.city.higashiomi.shiga.jp/machizukuri_kankyou/kenchiku/1003563/1003572.html");
+  });
+});
+
 describe("ふじみ野市の道路網図（市全体で1枚）", () => {
   it("市役所（福岡1-1-1）は図の上の方（図は北が上）", () => {
     const [link] = buildLinks(findMunicipality("11245")!, 35.879875, 139.519592);

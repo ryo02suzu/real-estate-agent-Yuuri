@@ -28,7 +28,9 @@
 // 市のサイトの決まり：霧島市は、市のサイトへリンクしたら問い合わせフォームで知らせる決まり（いまは地図サービスの入口だけで、市のサイトへのリンクは置いていない）。
 // まだ：県が扱う市町村も、市町村が出している地図（市町村道の地図など）と市町村の窓口は調べている途中。
 import type { Contact, MapLink, Municipality } from "../municipalities";
+import type { SheetIndex } from "../sheets";
 import { wagmap } from "../vendors";
+import SATSUMA_SHEETS from "./sheets/satsuma.json";
 
 const pref = "鹿児島県" as const;
 
@@ -63,7 +65,9 @@ const SATSUMA_MAP: MapLink = {
   build: null,
   url: "https://www.pref.kagoshima.jp/ah12/infra/kentiku/shidou/kijunhou/satumachoushiteidouro.html",
   verified: true,
-  tip: "鹿児島県ホームページの「さつま町指定道路図」が開く。索引図を見て、場所の図（番号）を選ぶと PDF が開く。凡例は、法42条1項1号・1項3号・1項5号・2項・法43条ただし書き・非道路（図の中の凡例）。図のファイルは2014年10月のものなので、そのあとの指定（県の「2項道路の指定に係る公告」に令和6年7月26日指定分がある）は載っていないことがある。最新の情報とくわしいことは、北薩地域振興局の建築の窓口で確かめる。",
+  // 図の名前（例 02OC071）は国土基本図の図郭（第II系）。物件が載っている図を位置で選ぶ（docs/pdf-sheets.md の「さつま町」）
+  sheets: SATSUMA_SHEETS as SheetIndex,
+  tip: "物件が載っている図郭の図（PDF）が開く。図の無い所は鹿児島県ホームページの「さつま町指定道路図」が開くので、索引図を見て、場所の図（番号）を選ぶと PDF が開く。凡例は、法42条1項1号・1項3号・1項5号・2項・法43条ただし書き・非道路（図の中の凡例）。図のファイルは2014年10月のものなので、そのあとの指定（県の「2項道路の指定に係る公告」に令和6年7月26日指定分がある）は載っていないことがある。最新の情報とくわしいことは、北薩地域振興局の建築の窓口で確かめる。",
 };
 
 /** 県の「2項道路の指定に係る公告」（平成22年4月1日以降に都市計画区域が指定された区域。地番・延長・幅員の表の PDF） */
@@ -117,7 +121,7 @@ export const KAGOSHIMA: Municipality[] = [
   prefTown("出水市", "46208", "hokusatsu", { maps: [koukoku("出水市", "平成28年4月1日")], mapNote: KOUKOKU_NOTE("平成28年4月1日") }),
   prefTown("さつま町", "46392", "hokusatsu", {
     maps: [SATSUMA_MAP, koukoku("さつま町", "平成26年3月18日")],
-    mapNote: "県の「さつま町指定道路図」（図郭ごとの PDF）で、道路種別を見られる（図のファイルは2014年10月のもの）。県は、2項道路の指定の公告（地番・延長・幅員の表）も出している。",
+    mapNote: "県の「さつま町指定道路図」（図郭ごとの PDF）で、道路種別を見られる（図のファイルは2014年10月のもの）。MICHILU は、物件が載っている図郭の図を開く。県は、2項道路の指定の公告（地番・延長・幅員の表）も出している。",
   }),
   outsideTown("長島町", "46404", "hokusatsu"),
   // 姶良・伊佐地域振興局（姶良市・姶良郡）
