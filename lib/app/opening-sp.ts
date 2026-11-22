@@ -28,14 +28,14 @@ export const SP_OPENING = {
   startTimeout: 2.5,
   /** 上から順に、再生できる最初のもの（AV1 → AV1 を再生できない iPhone は HEVC → ほかは H.264）。?v= は作り直したら変える */
   sources: [
-    { src: "/opening-sp/opening-av1.webm?v=__V__", type: 'video/webm; codecs="av01.0.12M.10"' },
-    { src: "/opening-sp/opening-hevc.mp4?v=__V__", type: 'video/mp4; codecs="hvc1.2.4.L153.B0"' },
-    { src: "/opening-sp/opening.mp4?v=__V__", type: 'video/mp4; codecs="avc1.640020"' },
+    { src: "/opening-sp/opening-av1.webm?v=2026112214", type: 'video/webm; codecs="av01.0.12M.10"' },
+    { src: "/opening-sp/opening-hevc.mp4?v=2026112214", type: 'video/mp4; codecs="hvc1.2.4.L150.B0"' },
+    { src: "/opening-sp/opening.mp4?v=2026112214", type: 'video/mp4; codecs="avc1.640020"' },
   ],
 } as const;
 
 /** 映像（public/opening-sp/）が入っているか。入っていないあいだは、いつもの起動の演出のまま（components/app/launch-script.ts） */
-export const SP_OPENING_READY = false;
+export const SP_OPENING_READY = true;
 
 /** 出典（映像に使ったデータ。映像の下に出し、地理院タイル一覧へのリンクを付ける） */
 export const SP_OPENING_CREDIT = {

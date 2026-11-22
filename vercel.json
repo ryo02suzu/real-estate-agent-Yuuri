@@ -39,6 +39,15 @@
       ]
     },
     {
+      "source": "/opening-sp/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
       "source": "/opening3/(.*)",
       "headers": [
         {

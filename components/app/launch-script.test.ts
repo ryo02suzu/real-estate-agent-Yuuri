@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SP_OPENING_READY } from "@/lib/app/opening-sp";
 import { LAUNCH_QUICK_WITHIN_MS, LAUNCH_SCRIPT, launchScript } from "./launch-script";
 
 /** <head> で動く起動の演出の決め方（本物の文字列をそのまま動かす）。端末の幅・動きを減らす設定・URL・端末に覚えた値を差し替える */
@@ -19,7 +20,7 @@ function run({ wide = false, reduced = false, hash = "", search = "", store = {}
     : { getItem: (k: string) => store[k] ?? null, setItem: (k: string, v: string) => void (store[k] = v) };
   const date = { now: () => now };
   const navigator = { connection: { saveData } };
-  new Function("document", "location", "matchMedia", "localStorage", "Date", "navigator", film ? launchScript(true) : LAUNCH_SCRIPT)(
+  new Function("document", "location", "matchMedia", "localStorage", "Date", "navigator", launchScript(film))(
     document,
     location,
     matchMedia,
@@ -70,6 +71,10 @@ describe("アプリを開いたときの演出の決め方（html の data-launc
   it("映像が入っていないあいだは、スマホのオープニング（film）にしない", () => {
     expect(run().mode).toBe("full");
     expect(run().store["michilu:film-day"]).toBeUndefined();
+  });
+
+  it("<head> に入れる文字列は、映像が入っているか（SP_OPENING_READY）に合わせて作ったもの", () => {
+    expect(LAUNCH_SCRIPT).toBe(launchScript(SP_OPENING_READY));
   });
 });
 
