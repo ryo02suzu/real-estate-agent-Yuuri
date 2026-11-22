@@ -1,0 +1,91 @@
+# スマホのオープニング「富士の目覚め」（scripts/sp-opening）の 225 コマを、GitHub Actions の何台かで手分けして描く
+# （公開リポジトリなので GitHub Actions の分は無料）。手元の 4 コアでは 8〜16 時間かかるので、組に分けて同時に描く。
+#   prep:   国土地理院の標高タイル・時間割と太陽・雲海の上面・富士の影の地図を作り、ひとまとめにして渡す
+#   render: 組ごとに 面（Blender 5.3 の bpy・Cycles）→ 雲と空気（numba）→ 仕上げ（post.py）→ PNG（frames-<番号>）
+# 動画にするのは、集めたあと手元で（scripts/sp-opening/README.md）。
+# scripts/sp-opening/render.json（組の分け方）を書き換えて push すると動く（main に無いワークフローは、手で動かせないため）。
+name: スマホのオープニングを描く
+
+on:
+  push:
+    branches: ["claude/**"]
+    paths: ["scripts/sp-opening/render.json"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sp-opening-render
+  cancel-in-progress: true
+
+jobs:
+  prep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    outputs:
+      chunks: ${{ steps.plan.outputs.chunks }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install numpy scipy pillow OpenEXR
+      - name: 標高（国土地理院）・時間割と太陽・雲海の上面
+        working-directory: scripts/sp-opening
+        run: |
+          python fetch.py
+          python path.py --report
+          python cloudfield.py
+      - id: plan
+        name: 組の分け方
+        working-directory: scripts/sp-opening
+        run: python -c "import json; print('chunks=' + json.dumps(json.load(open('render.json'))['chunks']))" >> "$GITHUB_OUTPUT"
+      - name: 渡すもの
+        run: |
+          mkdir -p bundle
+          cd scripts/sp-opening/work
+          tar -cf ../../../bundle/scene.tar *.npy *.json *.npz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scene
+          path: bundle/scene.tar
+          retention-days: 3
+          compression-level: 0
+
+  render:
+    needs: prep
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    strategy:
+      fail-fast: false
+      max-parallel: 22
+      matrix:
+        chunk: ${{ fromJson(needs.prep.outputs.chunks) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Blender（bpy）が使う画面まわりの部品
+        run: sudo apt-get update && sudo apt-get install -y libxi6 libxxf86vm1 libxfixes3 libxrender1 libgl1 libegl1 libxkbcommon0 libsm6 libice6
+      - name: Blender（bpy）と、雲を描く numba（別の場所に）
+        run: |
+          pip install bpy==5.3.0 numpy scipy pillow OpenEXR
+          python -m venv /tmp/nb
+          /tmp/nb/bin/pip install numba==0.68.1 numpy scipy pillow OpenEXR
+      - uses: actions/download-artifact@v4
+        with:
+          name: scene
+      - run: mkdir -p scripts/sp-opening/work && tar -xf scene.tar -C scripts/sp-opening/work
+      - name: 描く（面 → 雲と空気 → 仕上げ）
+        working-directory: scripts/sp-opening
+        run: python run_all.py --blender "$(which python)" --numba /tmp/nb/bin/python --threads 4 --frames "${{ matrix.chunk }}"
+      - name: 名前（組の最初のコマ）
+        id: name
+        run: echo "first=$(echo '${{ matrix.chunk }}' | sed 's/[-,].*//')" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frames-${{ steps.name.outputs.first }}
+          path: scripts/sp-opening/work/frames/*.png
+          retention-days: 7
+          compression-level: 0
