@@ -67,11 +67,13 @@ echo "描くコマ：${#todo[@]} 枚（${todo[*]:-なし}）"
 
 push() {
   [ -n "${WORKER_NOPUSH:-}" ] && return 0
+  # 数える変数は local に（前は下の組の番号 i を書き換えてしまい、2 組目の最初の 1 コマを飛ばしていた）
+  local k
   cd "$ROOT"
   git add frames3
   if ! git diff --cached --quiet; then
     git commit -q -m "オープニング第3版のコマ（$1。worker.sh で描いたもの）"
-    for i in 1 2 3 4; do git push -q -u origin HEAD && break; sleep $((i * 5)); done
+    for k in 1 2 3 4; do git push -q -u origin HEAD && break; sleep $((k * 5)); done
   fi
   cd "$HERE"
 }
