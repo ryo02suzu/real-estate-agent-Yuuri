@@ -2,7 +2,7 @@
 // components/app/app-sheets.tsx で同じ並び）。不動産会社の物件調査の流れ（机上で要点をつかむ → 役所・法務局で確かめる →
 // 現地を見る → 書類にまとめる）に合わせて3つの組に分け、いちばん使う「要注意点と次にやること」は組の外で大きく出す。
 // どれも参考の資料（法令上の判断はしない）
-import { ClipboardCopy, Landmark, ListChecks, Mail, Map as MapIcon, Printer, ScrollText, type LucideIcon } from "lucide-react";
+import { ClipboardCopy, FileSpreadsheet, Landmark, ListChecks, Mail, Map as MapIcon, Printer, type LucideIcon } from "lucide-react";
 
 export type DocKind = "triage" | "inquiry" | "parcels" | "guide" | "memo" | "draft" | "copy";
 
@@ -46,7 +46,7 @@ export const DOC_GROUPS: { title: string; docs: DocDef[] }[] = [
     title: "書類にする",
     docs: [
       { kind: "memo", Icon: Printer, title: "調査メモ", short: "A4・PDF", action: "調査メモを印刷・PDF保存", sub: "道路・法令・ハザード・地番・地価・周辺環境と、要注意点・あなたの確認の記録を A4 に" },
-      { kind: "draft", Icon: ScrollText, title: "重説の下書き", short: "物件概要つき", action: "重説・物件概要の下書き", sub: "重要事項説明書・販売図面の欄の順に、コピーして使える下書き" },
+      { kind: "draft", Icon: FileSpreadsheet, title: "物件概要書", short: "Excel・重説", action: "物件概要書（Excel）・重説の下書き", sub: "物件概要書を Excel で保存（編集できる）。重要事項説明書・販売図面の欄の順の下書きのコピーも" },
       { kind: "copy", Icon: ClipboardCopy, title: "結果の文面", short: "コピー・共有", action: "結果の文面をコピー・共有", sub: "メール・チャット・社内の報告にそのまま貼れる文（入れる項目を選べます）" },
     ],
   },

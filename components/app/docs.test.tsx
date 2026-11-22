@@ -42,7 +42,7 @@ describe("書類・出力のページ（components/app/docs.tsx）", () => {
     expect(html).toContain("要注意点と次にやること");
     expect(html).toContain("問題になりそうな所と、確かめる窓口");
     const labels = [...html.matchAll(/aria-label="([^"]+（[^"]+）)"/g)].map((m) => m[1]);
-    expect(labels).toEqual(["窓口の照会文（FAX・メール用）", "地番の一覧（謄本・公図用）", "案内図（A4・PDF）", "調査メモ（A4・PDF）", "重説の下書き（物件概要つき）", "結果の文面（コピー・共有）"]);
+    expect(labels).toEqual(["窓口の照会文（FAX・メール用）", "地番の一覧（謄本・公図用）", "案内図（A4・PDF）", "調査メモ（A4・PDF）", "物件概要書（Excel・重説）", "結果の文面（コピー・共有）"]);
     // ほかの物件から作る
     expect(html).toContain("ほかの物件から作る");
     expect(html).toContain("松戸市古ケ崎");

@@ -30,7 +30,7 @@ import { BodyPortal, copyText, Overlay, type Toast } from "./ui";
 export type DocKind = "draft" | "report" | "inquiry" | "parcels" | "guide" | "memo" | "todo" | "sender";
 
 const KINDS: { key: DocKind; name: string; sub: string }[] = [
-  { key: "draft", name: "重説の下書き", sub: "物件の表示・法令・道路・災害の欄" },
+  { key: "draft", name: "物件概要書・重説の下書き", sub: "Excel で保存（編集できる）・欄ごとにコピー" },
   { key: "report", name: "調査レポート", sub: "結果の文面（メール・チャットに貼る）" },
   { key: "inquiry", name: "役所への照会文", sub: "印刷・メール・FAX で送る" },
   { key: "parcels", name: "謄本・公図用の地番", sub: "物件の筆と隣地の一覧" },
@@ -150,7 +150,8 @@ export function DocsOverlay({ kind, setKind, result, data, records, checklist, t
               </button>
             )}
           </div>
-          <div className="mb">
+          {/* 本文の欄。名前は dbody（スマホの ≡ の線の .mb（app/globals.css）とぶつかって、欄が幅 36px に縮んでいた） */}
+          <div className="dbody">
             {kind === "draft" && (
               <div className="paper">
                 <DraftBody sections={draftSections} />

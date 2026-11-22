@@ -1360,7 +1360,7 @@ function RowSheet({
       <ul className="mt-2 divide-y divide-line">
         <ActionRow Icon={ArrowUpRight} title="この物件を開く" sub={resumed ? `前に見ていた「${resumeTab}」から続けます` : "調べ直して、物件の画面を開きます"} onClick={() => onPick(h)} />
         <ActionRow Icon={Star} title={fav ? "お気に入りから外す" : "お気に入りに保存"} sub={fav ? "お気に入りのページから外します" : "お気に入りのページに並びます"} onClick={() => onFav(h)} />
-        <ActionRow Icon={FileText} title="書類を作る" sub="要注意点と次にやること・調査メモ・重説の下書き・案内図" onClick={() => onDocs(h)} />
+        <ActionRow Icon={FileText} title="書類を作る" sub="要注意点と次にやること・調査メモ・物件概要書（Excel）・案内図" onClick={() => onDocs(h)} />
         <ActionRow Icon={Copy} title={`${label}をコピー`} sub={copyText(h)} onClick={() => onCopy(h)} />
         <ActionRow Icon={Trash2} title="履歴から消す" sub={g.members.length > 1 ? `同じ物件の${g.members.length}件をまとめて消します。お気に入りと確認の記録は残ります` : "お気に入りと確認の記録は残ります"} danger onClick={() => onRemove(g)} />
       </ul>

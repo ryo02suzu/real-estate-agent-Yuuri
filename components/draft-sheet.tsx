@@ -2,17 +2,21 @@
 
 // 重説・物件概要の下書きのシート（中身は lib/draft.ts）。欄ごとにタブで見せ（スマホでも1画面に収める。欄が長ければ
 // シートが dense → denser → densest の順に詰める。components/sheet.tsx）、欄ごと・全部をコピーできる。
+// 「Excel」で、同じ中身を物件概要書（.xlsx。編集できる。lib/overview-xlsx.ts）として保存できる（端末の中で作る）。
 // スマホはメニュー（app/page.tsx）から DRAFT_EVENT で開き、PC は結果の印刷・書類の欄から開く
-import { Check, ClipboardCopy } from "lucide-react";
+import { Check, ClipboardCopy, FileSpreadsheet } from "lucide-react";
 import { Fragment, useState } from "react";
 import { createPortal } from "react-dom";
 import { docText } from "@/lib/app/doc";
 import { draftDoc, draftSectionDoc, uniqueSentences } from "@/lib/app/draft-doc";
 import { buildDraft, draftText, sectionLines, DRAFT_NOTE, type DraftInput, type DraftSection } from "@/lib/draft";
+import { overviewFileName, overviewName, overviewXlsx } from "@/lib/overview-xlsx";
 import type { LookupResult } from "@/lib/roadmap";
+import { XLSX_MIME } from "@/lib/xlsx";
 import { DOC_BODY, DOC_PANE } from "./app/doc-sheets";
 import { DocSectionView } from "./app/doc-view";
 import { CopyIcon } from "./icons";
+import { saveFile } from "./save-file";
 import { Sheet } from "./sheet";
 import { useCopy } from "./use-copy";
 
@@ -52,11 +56,31 @@ export function DraftSheet({ result, input, open, onClose, tidy }: { result: Ok;
   );
 }
 
+/** 物件概要書（Excel）を作って保存する（押した操作の中で作り、共有のシート・ダウンロードへ渡す） */
+function useSaveXlsx(sections: DraftSection[]) {
+  const [state, setState] = useState<"" | "busy" | "done" | "error">("");
+  const save = async () => {
+    if (state === "busy") return;
+    setState("busy");
+    try {
+      const at = new Date();
+      const name = overviewName(sections);
+      const r = await saveFile(overviewXlsx(sections, name, at), overviewFileName(name, at), XLSX_MIME);
+      setState(r === "cancelled" ? "" : "done");
+    } catch {
+      setState("error");
+    }
+    window.setTimeout(() => setState((s) => (s === "busy" ? s : "")), 2200);
+  };
+  return { state, save };
+}
+
 /** スマホの下書き：欄のタブ（1行。横にすべらせる）・欄の中身（同じ高さの枠の中）・全部コピー／この欄をコピー */
 function TidyDraftBody({ sections }: { sections: DraftSection[] }) {
   const [tab, setTab] = useState(0);
   const all = useCopy();
   const part = useCopy();
+  const xlsx = useSaveXlsx(sections);
   const s = sections[Math.min(tab, sections.length - 1)];
   const checks = sections.reduce((n, x) => n + x.rows.filter((r) => r.check).length, 0);
   const confirmed = sections.reduce((n, x) => n + x.rows.filter((r) => r.confirmed).length, 0);
@@ -92,6 +116,15 @@ function TidyDraftBody({ sections }: { sections: DraftSection[] }) {
         )}
       </div>
       <div className="mt-2.5 flex shrink-0 gap-2">
+        <button
+          onClick={xlsx.save}
+          aria-label="物件概要書を Excel で保存"
+          className="press flex h-[48px] shrink-0 items-center justify-center gap-1.5 rounded-[16px] px-3.5 text-[14px] font-bold text-white transition-colors duration-200"
+          style={{ background: xlsx.state === "error" ? "#a8432a" : "#1d6f42" }}
+        >
+          {xlsx.state === "done" ? <Check className="td-bump h-[18px] w-[18px]" strokeWidth={3} /> : <FileSpreadsheet className="h-[18px] w-[18px]" />}
+          {xlsx.state === "done" ? "保存" : xlsx.state === "error" ? "失敗" : "Excel"}
+        </button>
         <button onClick={() => all.copy(docText(draftDoc(sections, new Date())))} className="press flex h-[48px] flex-1 items-center justify-center gap-2 rounded-[16px] text-[15px] font-bold text-white transition-colors duration-200" style={{ background: all.done ? "#1f8f5a" : "#133664" }}>
           {all.done ? <Check key="done" className="td-bump h-5 w-5" strokeWidth={3} /> : <ClipboardCopy className="h-[18px] w-[18px]" />}
           {all.done ? "コピーしました" : "全部コピー"}
@@ -110,6 +143,7 @@ export function DraftBody({ sections }: { sections: DraftSection[] }) {
   const [tab, setTab] = useState(0);
   const all = useCopy();
   const part = useCopy();
+  const xlsx = useSaveXlsx(sections);
   const s = sections[Math.min(tab, sections.length - 1)];
   const checks = sections.reduce((n, x) => n + x.rows.filter((r) => r.check).length, 0);
   // あなたが確かめた結果を入れた欄の数（スマホの「次にやること」で書いたとき。PC は入れないので出ない）
@@ -123,13 +157,26 @@ export function DraftBody({ sections }: { sections: DraftSection[] }) {
         <span className="hidden densest:inline">確認。法令の判断はしません</span>
         {confirmed > 0 && <b className="ml-1 font-semibold text-[#1f8f5a]">確認済み（{confirmed}）は、あなたが確かめた結果です。</b>}
       </p>
-      <button
-        onClick={() => all.copy(draftText(sections))}
-        className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-light to-brand py-2.5 text-[14px] font-bold text-white shadow-soft dense:py-2 densest:mt-1.5 densest:py-1 densest:text-[13px]"
-      >
-        <CopyIcon className="h-4 w-4" />
-        {all.done ? "コピーしました" : "全部コピー"}
-      </button>
+      <div className="mt-2 flex gap-2 densest:mt-1.5">
+        {/* 字の色は style で白に（PC の .desk button は字の色を周りから受け継ぐので、text-white が効かない） */}
+        <button
+          onClick={() => all.copy(draftText(sections))}
+          className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-light to-brand py-2.5 text-[14px] font-bold text-white shadow-soft dense:py-2 densest:py-1 densest:text-[13px]"
+          style={{ color: "#fff" }}
+        >
+          <CopyIcon className="h-4 w-4" />
+          {all.done ? "コピーしました" : "全部コピー"}
+        </button>
+        <button
+          onClick={xlsx.save}
+          title="物件概要書（Excel。編集できる .xlsx）として保存"
+          className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-2.5 text-[14px] font-bold text-white shadow-soft transition-colors dense:py-2 densest:py-1 densest:text-[13px]"
+          style={{ background: xlsx.state === "error" ? "#a8432a" : "#1d6f42", color: "#fff" }}
+        >
+          {xlsx.state === "done" ? <Check className="h-4 w-4" strokeWidth={3} /> : <FileSpreadsheet className="h-4 w-4" />}
+          {xlsx.state === "done" ? "保存しました" : xlsx.state === "error" ? "保存できませんでした" : "Excel で保存"}
+        </button>
+      </div>
       <div role="tablist" className="mt-2.5 flex flex-wrap gap-1 dense:mt-2 densest:mt-1.5">
         {sections.map((x, i) => (
           <button

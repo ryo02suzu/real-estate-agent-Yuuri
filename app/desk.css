@@ -1183,7 +1183,7 @@
   flex-wrap: wrap;
   flex: none;
 }
-.desk-two .main .mb {
+.desk-two .main .dbody {
   flex: 1;
   min-height: 0;
   overflow: auto;
