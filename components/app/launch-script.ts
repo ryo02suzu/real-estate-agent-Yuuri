@@ -3,9 +3,19 @@
 //   full  … 長い版（紺の幕の真ん中で、ロゴのマークが光で描かれ、MICHILU の字が寄って並び、光が走る。ロゴが左上の定位置へ飛び、
 //            幕が上がって街の写真が奥から落ち着き、ひとこと・検索欄・最近の検索・下のメニューが順に現れる。約1.8秒）
 //   quick … 短い版（紺からふわっと街が現れ、中身が順に浮き上がる。約0.9秒）。前に開いてから10分以内・≡ の「動きの演出」がオフのとき
+//   film  … スマホのオープニング「富士の目覚め」（約 8 秒の映像。components/app/film-intro.tsx・lib/app/opening-sp.ts）。
+//            その日に最初に開いたときだけ（長い版になるときの代わりに）。映像が入っていない・通信量を減らす設定・端末に覚えられない
+//            （プライベートブラウズなど）ときは流さない。流した日は端末だけに覚える（michilu:film-day。端末の時刻の日）
 //   （無し）… PC の幅・動きを減らす設定・住所や地点のリンク（#q= / #ll=）で開いたとき
-// #launch=full / #launch=quick で選べる（確かめる用）。開いた時刻は端末だけに覚える（michilu:launch）
+// #launch=full / #launch=quick / #launch=film で選べる（確かめる用）。開いた時刻は端末だけに覚える（michilu:launch）
+import { SP_OPENING_READY } from "@/lib/app/opening-sp";
+
 /** 続けて開いたとき（前に開いてから、この時間のうち）は短い版 */
 export const LAUNCH_QUICK_WITHIN_MS = 10 * 60 * 1000;
 
-export const LAUNCH_SCRIPT = `(function(){try{var d=document.documentElement,h=location.hash,m="full",n=Date.now(),l=0,f;if(matchMedia("(min-width: 1024px)").matches||matchMedia("(prefers-reduced-motion: reduce)").matches)return;if(/(^|[#?&])(q|ll)=/.test(h+location.search))return;try{l=Number(localStorage.getItem("michilu:launch"))||0;localStorage.setItem("michilu:launch",String(n));if(localStorage.getItem("michilu:motion")==="off")m="quick"}catch(e){}if(m==="full"&&n-l<${LAUNCH_QUICK_WITHIN_MS})m="quick";f=/(?:^|[#&])launch=(full|quick)/.exec(h);if(f)m=f[1];d.setAttribute("data-launch",m)}catch(e){}})();`;
+/** <head> で動く決め方の文字列。filmReady：スマホのオープニングの映像が入っているか（確かめるときは true で作る） */
+export function launchScript(filmReady: boolean): string {
+  return `(function(){try{var d=document.documentElement,h=location.hash,m="full",n=Date.now(),l=0,f,s=0,o=0,y;if(matchMedia("(min-width: 1024px)").matches||matchMedia("(prefers-reduced-motion: reduce)").matches)return;if(/(^|[#?&])(q|ll)=/.test(h+location.search))return;try{l=Number(localStorage.getItem("michilu:launch"))||0;localStorage.setItem("michilu:launch",String(n));if(localStorage.getItem("michilu:motion")==="off")m="quick";s=1}catch(e){}if(m==="full"&&n-l<${LAUNCH_QUICK_WITHIN_MS})m="quick";if(${filmReady ? 1 : 0}&&m==="full"&&s){try{o=new Date(n).getTimezoneOffset()}catch(e){}y=String(Math.floor((n-o*60000)/86400000));try{if(!(navigator.connection&&navigator.connection.saveData)&&localStorage.getItem("michilu:film-day")!==y){localStorage.setItem("michilu:film-day",y);m="film"}}catch(e){}}f=/(?:^|[#&])launch=(full|quick|film)/.exec(h);if(f)m=f[1];d.setAttribute("data-launch",m)}catch(e){}})();`;
+}
+
+export const LAUNCH_SCRIPT = launchScript(SP_OPENING_READY);

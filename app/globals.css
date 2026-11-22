@@ -428,6 +428,144 @@ html.launch-skip {
     animation: none;
   }
 }
+/*
+ * スマホのオープニング「富士の目覚め」（components/app/film-intro.tsx・lib/app/opening-sp.ts。html の data-launch が film の間だけ。
+ * その日に最初に開いたとき）。React が動く前から、映像の始まりと同じ紺の幕で覆う（読み込めないときも 6 秒で外れる）。部品が出たら
+ * （html の data-film）その幕は外し、部品が覆う。帯・光の点・ロゴの位置と濃さは、部品が映像の時刻に合わせて毎コマ決める。
+ * 最後は映像とロゴがホームへ溶ける（end：0.7 秒）。触れて飛ばしたときは 0.38 秒で消える（その間も指は受け止める）
+ */
+@media (max-width: 1023px) {
+  html[data-launch="film"]:not([data-film]) body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 96;
+    background: #0a1830;
+    animation: film-veil-timeout 0.3s linear 6s forwards;
+  }
+  .film {
+    position: fixed;
+    inset: 0;
+    z-index: 96;
+    overflow: hidden;
+    background: #0a1830;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .film[data-leaving="skip"] {
+    opacity: 0;
+    transition-duration: 0.36s;
+  }
+  .film[data-leaving="end"] {
+    opacity: 0;
+  }
+  .film-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 50%;
+    opacity: 0;
+    transition: opacity 0.45s ease;
+  }
+  .film[data-started] .film-video {
+    opacity: 1;
+  }
+  .film-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 0;
+    background: #000;
+  }
+  .film-bar.is-top {
+    top: 0;
+  }
+  .film-bar.is-bottom {
+    bottom: 0;
+  }
+  .film-rise {
+    position: absolute;
+    left: -9px;
+    top: -9px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 0%, rgba(255, 236, 196, 0.95) 22%, rgba(255, 196, 120, 0.35) 48%, rgba(255, 180, 100, 0) 72%);
+    opacity: 0;
+    will-change: transform, opacity;
+  }
+  .film-logo,
+  .film-backdrop {
+    position: absolute;
+    pointer-events: none;
+  }
+  .film-logo img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    will-change: opacity, filter;
+  }
+  /* 光が金の所をなでる（金の所だけの層を、明るく重ねる。PC と同じ） */
+  .film-logo img.is-glint {
+    mix-blend-mode: screen;
+    filter: brightness(1.6) saturate(1.1);
+  }
+  /* ロゴの後ろの空を少しだけ落ち着かせる（白い文字を読みやすく。ロゴと一緒に出る）。画面の上からロゴの少し下まで、
+     撮影のグラデーションのフィルターのように上ほど濃く（丸い影にしない。高さは部品が決める） */
+  .film-backdrop {
+    left: 0;
+    right: 0;
+    top: 0;
+    opacity: 0;
+    background: linear-gradient(180deg, rgb(12 18 34 / 0.34) 0%, rgb(12 18 34 / 0.26) 55%, rgb(12 18 34 / 0) 100%);
+  }
+  .film-credit {
+    position: absolute;
+    left: 12px;
+    right: 96px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+    margin: 0;
+    font-size: 9.5px;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.62);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+  .film-credit a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .film-skip {
+    position: absolute;
+    right: 12px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+    min-height: 32px;
+    padding: 0 14px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 999px;
+    background: rgba(10, 24, 48, 0.32);
+    color: rgba(255, 255, 255, 0.86);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+  .film-skip:active {
+    transform: scale(0.96);
+    background: rgba(10, 24, 48, 0.5);
+  }
+}
+@keyframes film-veil-timeout {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
 @keyframes launch-end {
   0%,
   99.9% {

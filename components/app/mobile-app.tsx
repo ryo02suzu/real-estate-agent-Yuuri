@@ -173,6 +173,7 @@ import {
 import { AccountPage, TabBanner } from "./tab-pages";
 import { HistoryBackdrop, HistoryPage, historyPhoto, historyTop, HistoryUndoToast, type HistorySnapshot } from "./history";
 import { LaunchIntro } from "./launch";
+import { FilmIntro } from "./film-intro";
 import { propertyCount, removedText } from "@/lib/app/history-view";
 import {
   SHEET_KINDS,
@@ -948,6 +949,8 @@ export function MobileApp(props: MobileAppProps) {
     >
       {/* アプリを開いたときの演出（紺の幕とロゴ。終わったら外れる。components/app/launch.tsx） */}
       <LaunchIntro />
+      {/* その日に最初に開いたときのオープニング「富士の目覚め」（映像。終わったら外れる。components/app/film-intro.tsx） */}
+      <FilmIntro />
       {/* ホーム・お気に入り・書類・出力は画面いっぱいの写真（下のメニューの後ろまで） */}
       {showHome && <HomeBackdrop drift={motionOn} />}
       {page === "favorites" && (
