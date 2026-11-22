@@ -160,7 +160,7 @@ export function DeskOpening({
     >
       <video ref={video} className="desk-opening-video" muted playsInline autoPlay preload="auto" disablePictureInPicture disableRemotePlayback aria-hidden tabIndex={-1}>
         {OPENING.sources.map((s) => (
-          <source key={s.src} src={s.src} type={s.type} />
+          <source key={s.src} src={s.src} type={s.type} media={s.media} />
         ))}
       </video>
       <div ref={backdrop} className="desk-opening-backdrop" aria-hidden />

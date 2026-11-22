@@ -2,6 +2,8 @@
 
 PC 版（横幅 1024px 以上）で、アプリを開いたときに流すオープニング映像を、Blender で作る道具。スマホの画面には使わない。
 できた動画は `public/opening/`（`opening-av1.webm`・`opening.mp4`）、ロゴの部品は `public/opening/logo/`。
+いまアプリで流しているのは第3版（`scripts/pc-opening3`。動画は `public/opening3/`）で、この第2版の動画は消した（ここの道具で作り直すと
+`public/opening/` にできる）。ロゴの部品 `public/opening/logo/` と `lib/app/opening-logo.json` は、第3版でも使う。
 アプリでの流し方は `components/desk/opening.tsx` と `lib/app/opening.ts`（ロゴの出し方は映像の秒の関数）。
 
 ## 構成「ひとつの夜明け」（21.1 秒・30 コマ/秒・音なし）

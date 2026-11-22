@@ -37,12 +37,28 @@
 | `worker.sh` | 手伝いのクラウドの作業場（Claude Code のセッション）で決めたコマを描き、そのセッションのブランチに `frames3b/*.webp`（品質 96）で入れる。5 コマ描くごとに push するので、途中で止まっても描けた分は残る |
 | `grade3.py` | 最後の色の仕上げ（集めた 507 コマ全部に同じだけ）：持ち上がった黒を締め、明るい雲は肩を丸めて白く飛ばさず、ごく弱い S 字と彩度を少し。最後の白い雲ではかけない（最後のコマはアプリの白 #f3f1ec のまま） |
 | `assemble.sh` | 手分けして描いたコマ（作業場のブランチと Actions の PNG）を集め、`grade3.py` をかけて動画（AV1 2 つ・HEVC・H.264）にする |
+| `flicker.py` | 集めたコマの、描く組の境目のちらつきを調べる（となりのコマとの変化を、前後のコマ送りと比べる。`--bounds` に組の始まりのコマ） |
 
 ```bash
 python3 data.py && python3 landcover.py && python3 assets.py && python3 path3.py
 python scene3.py -- --look 1 --res 960x540 --spp 48 --exr --out 見本.exr && python3 post3.py 見本.exr 見本.png   # 見た目の確認
 python scene3.py -- --frames 0-23 --res 1920x1080 --spp 40 --out work/frames && python3 post3.py --frames work/frames work/png
 ```
+
+## できた動画（`public/opening3/`。24 コマ/秒・507 コマ・21.1 秒）
+
+アプリ（`lib/app/opening.ts` の `sources`）は、上から順に、再生できる最初のものを使う。
+
+| 動画 | 中身 | 大きさ | 使う画面 |
+| --- | --- | --- | --- |
+| `opening-av1.webm` | AV1（10 ビット）2560×1440 | 25.1MB（約 9.5Mbps） | 大きい画面・細かい画面（`OPENING_BIG_SCREEN`：細かい画面の横 1200px 以上か、横 2100px 以上） |
+| `opening-av1-1080.webm` | AV1（10 ビット）1920×1080 | 13.5MB | ふつうの画面（軽く、弱い PC でもなめらか） |
+| `opening-hevc.mp4` | HEVC（Main 10）2560×1440 | 26.1MB | AV1 を再生できない Apple の機器 |
+| `opening.mp4` | H.264（High）1920×1080 | 27.3MB | ほかの古い機器 |
+
+- 4回目（2026-11-22）：GitHub Actions（4 つの流れで同時に最大 22 台）と、手伝いの作業場 32 か所で手分けして描いた（作業場：0〜239、Actions：240〜506）。
+  集めたあと、描く組の境目（81 か所）で、となりのコマとの変化が前後のコマ送りと同じ（0.93〜1.06 倍）で、ちらつきが無いことを確かめた
+- `vercel.json` で 1 年覚えさせているので、作り直したら `lib/app/opening.ts` の `?v=` を変える
 
 ## 作りの工夫（本物らしさと、描く時間・メモリ）
 

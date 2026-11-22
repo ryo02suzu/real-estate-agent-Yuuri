@@ -1889,7 +1889,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 30%; /* lib/app/opening.ts の COVER_Y と同じ（上の空とロゴを多く残す） */
+  object-position: 50% 15%; /* lib/app/opening.ts の COVER_Y と同じ（上の空とロゴを多く残す） */
   opacity: 0;
   transition: opacity 0.6s ease;
 }

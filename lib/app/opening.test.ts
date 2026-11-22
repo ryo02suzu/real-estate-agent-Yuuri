@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import logo from "./opening-logo.json";
-import { arcMask, coverRect, ease, glintMask, logoBox, logoFrame, OPENING, shouldPlayOpening, sweepMask } from "./opening";
+import { arcMask, coverRect, ease, glintMask, logoBox, logoFrame, OPENING, OPENING_BIG_SCREEN, shouldPlayOpening, sweepMask } from "./opening";
 
 const base = { reduced: false, motion: true, deepLink: false, played: false, off: false };
 
@@ -34,17 +34,22 @@ describe("映像を画面いっぱいに置く", () => {
     expect(tall.y).toBeCloseTo(0);
     expect(tall.x).toBeLessThan(0);
   });
-  it("ロゴの箱は、映像の中の決まった所（朝日の右の空）で、どの画面でも切れない", () => {
+  it("ロゴの箱は、映像の中の決まった所（穂高の稜線の上の空）で、どの画面でも切れない", () => {
+    // 画面そのものの大きさと、ブラウザーの枠で縦が縮んだ窓（1920×1080 の画面・拡大 125%・150% のノート PC など）
     for (const [w, h] of [
       [1024, 640],
       [1440, 900],
+      [1440, 790],
       [1920, 1080],
+      [1920, 940],
+      [1536, 730],
+      [1280, 590],
       [2560, 1080],
       [1366, 1024],
     ]) {
       const b = logoBox(w, h);
       expect(b.left).toBeGreaterThan(0);
-      expect(b.top).toBeGreaterThan(h * 0.05);
+      expect(b.top).toBeGreaterThan(h * 0.03);
       expect(b.left + b.width).toBeLessThan(w);
       expect(b.top + b.height).toBeLessThan(h * 0.6);
       expect(b.height / b.width).toBeCloseTo(logo.height / logo.width, 3);
@@ -89,6 +94,20 @@ describe("ロゴの出し方（朝日の光から生まれる）", () => {
     expect(logoFrame(OPENING.logoOut[1]).all).toBe(0);
     expect(logoFrame(OPENING.logoOut[1]).backdrop).toBe(0);
     expect(OPENING.logoOut[1]).toBeLessThanOrEqual(OPENING.duration);
+  });
+});
+
+describe("映像の選び方", () => {
+  it("大きい画面・細かい画面だけ 2560×1440 を選び、ほかの映像は画面を問わない（一番下の H.264 はいつでも選べる）", () => {
+    const [big, ...rest] = OPENING.sources;
+    expect(big.media).toBe(OPENING_BIG_SCREEN);
+    expect(rest.every((s) => s.media === undefined)).toBe(true);
+    expect(OPENING.sources.at(-1)?.type).toMatch(/^video\/mp4; codecs="avc1\./);
+  });
+  it("映像を作り直したときに変える印（?v=）は、全部の映像で同じ", () => {
+    const v = new Set(OPENING.sources.map((s) => new URL(s.src, "https://x").searchParams.get("v")));
+    expect(v.size).toBe(1);
+    expect([...v][0]).toMatch(/^\d{8,}$/);
   });
 });
 
