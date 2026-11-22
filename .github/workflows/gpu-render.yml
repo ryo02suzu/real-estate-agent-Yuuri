@@ -1,0 +1,115 @@
+# GPU の機械（Runpod）を借りて Blender で描き、できたものを受け取って、必ず機械を消す（オープニングの映像など。持ち主 2026-11-22）。
+#  1. 前の回の止め忘れ（michilu-render- で始まる、3 時間より古い機械）を消す
+#  2. GPU を借りる（前から順に試す）→ 動き始めるまで待つ
+#  3. 仕事（scripts/gpu-render/jobs/<job>）と、できたものを送る先（R2 の期限付き URL）を機械に送り、scripts/gpu-render/pod-wrap.sh を動かす
+#     （Blender を入れて run.sh を動かし、/root/out を tar にして送る。SSH は使わず、Runpod の API の exec で動かす）
+#  4. 終わるまで記録を出しながら待つ → R2 から受け取り、Actions の成果物（artifact）にする
+#  5. 成功しても失敗しても、取り消しても、機械を消す
+# 鍵：RUNPOD_API_KEY（Runpod）・R2_*（できたものの置き場）は GitHub の Secrets。中身はログに出さない。
+name: GPU で描く（Runpod）
+
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 描く仕事（scripts/gpu-render/jobs の下のフォルダの名前）
+        default: smoke
+      gpu:
+        description: GPU の種類（カンマ区切り。前から順に試す）
+        default: "NVIDIA GeForce RTX 4090,NVIDIA GeForce RTX 5090,NVIDIA L40S,NVIDIA RTX 6000 Ada Generation,NVIDIA RTX A6000"
+      cloud:
+        description: SECURE（安定）か COMMUNITY（安い）
+        type: choice
+        options: [SECURE, COMMUNITY]
+        default: SECURE
+      minutes:
+        description: 仕事を待つ上限（分。過ぎたら止めて機械を消す）
+        default: "60"
+      env:
+        description: 仕事に渡す設定（「SAMPLES=1024 RES=1920x1080」のように、空白で区切る）
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpu-render
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+      R2_BUCKET: ${{ vars.R2_BUCKET || 'michilu-chiban' }}
+      R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+      JOB: ${{ inputs.job }}
+      GPU: ${{ inputs.gpu }}
+      CLOUD: ${{ inputs.cloud }}
+      MINUTES: ${{ inputs.minutes }}
+      ENV_IN: ${{ inputs.env }}
+      KEY: gpu/${{ github.run_id }}/out.tar
+    steps:
+      - uses: actions/checkout@v4
+      - name: 前の回の止め忘れを消す・借りられる GPU と値段
+        run: |
+          [[ "$JOB" =~ ^[a-z0-9-]+$ ]] && [ -d "scripts/gpu-render/jobs/$JOB" ] || { echo "::error::仕事 $JOB がありません"; exit 1; }
+          [[ "$MINUTES" =~ ^[0-9]+$ ]] || { echo "::error::minutes は数で"; exit 1; }
+          python3 scripts/gpu-render/runpod_job.py cleanup --prefix michilu-render- --hours 3
+          python3 scripts/gpu-render/runpod_job.py catalog | head -n 30
+      - name: 仕事のファイルを作る（できたものを送る先の、期限付きの URL も入れる）
+        run: |
+          pip install -q boto3
+          mkdir -p work/job && cp -r "scripts/gpu-render/jobs/$JOB/." work/job/ && cp scripts/gpu-render/pod-wrap.sh work/job/_wrap.sh
+          # 仕事に渡す設定（run.sh の前に読む）
+          : > work/job/_env
+          for kv in $ENV_IN; do
+            [[ "$kv" =~ ^[A-Z_][A-Z0-9_]*=[A-Za-z0-9._,:x/-]*$ ]] || { echo "::error::設定の書き方が違います: $kv"; exit 1; }
+            echo "export $kv" >> work/job/_env
+          done
+          python3 - <<'PY'
+          import os, boto3
+          s3 = boto3.client("s3", endpoint_url=f"https://{os.environ['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com", region_name="auto")
+          url = s3.generate_presigned_url("put_object", Params={"Bucket": os.environ["R2_BUCKET"], "Key": os.environ["KEY"]}, ExpiresIn=6 * 3600)
+          open("work/job/_put_url", "w").write(url)
+          PY
+          tar -czf work/job.tgz -C work/job . && ls -la work/job.tgz
+      - name: GPU を借りる
+        id: pod
+        run: python3 scripts/gpu-render/runpod_job.py create --name "michilu-render-${{ github.run_id }}" --gpu "$GPU" --cloud "$CLOUD"
+      - name: 動き始めるまで待つ
+        run: python3 scripts/gpu-render/runpod_job.py wait --id "${{ steps.pod.outputs.id }}" --minutes 20
+      - name: 仕事を送って動かす
+        run: |
+          python3 scripts/gpu-render/runpod_job.py push --id "${{ steps.pod.outputs.id }}" --tar work/job.tgz
+          python3 scripts/gpu-render/runpod_job.py exec --id "${{ steps.pod.outputs.id }}" -- sh -c "nohup bash /root/job/_wrap.sh > /root/log.txt 2>&1 &"
+      - name: 終わるまで待つ（記録を出す）
+        run: python3 scripts/gpu-render/runpod_job.py follow --id "${{ steps.pod.outputs.id }}" --minutes "$MINUTES" --every 30
+      - name: できたものを受け取る
+        if: always() && steps.pod.outputs.id != ''
+        run: |
+          mkdir -p work/out
+          if aws s3 cp "s3://$R2_BUCKET/$KEY" work/out.tar --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com" --only-show-errors; then
+            tar -xf work/out.tar -C work/out && ls -la work/out
+            echo "できたもの（R2）：${R2_PUBLIC_URL%/}/$KEY" >> "$GITHUB_STEP_SUMMARY"
+            [ -f work/out/report.txt ] && cat work/out/report.txt >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::できたものがまだ R2 にありません"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.pod.outputs.id != ''
+        with:
+          name: gpu-${{ inputs.job }}-${{ github.run_id }}
+          path: work/out
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: 機械を消す（必ず）
+        if: always()
+        run: python3 scripts/gpu-render/runpod_job.py terminate --id "${{ steps.pod.outputs.id }}"
