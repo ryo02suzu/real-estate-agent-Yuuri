@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DraftSection } from "./draft";
 import { buildDraft, DRAFT_NOTE } from "./draft";
-import { AREA_ROWS, OVERVIEW_COLS, OVERVIEW_HEAD, overviewFileName, overviewName, overviewParts, overviewSheet, overviewXlsx, PHOTO_HEIGHT, type OverviewItem } from "./overview-xlsx";
+import { AREA_ROWS, OVERVIEW_COLS, overviewFileName, overviewName, overviewParts, overviewSheet, overviewXlsx, PHOTO_HEIGHT, type OverviewItem } from "./overview-xlsx";
 import { buildLinks, findMunicipality } from "./roadmap";
 import { HAZARDS } from "./roadmap/hazard";
 import { colName, crc32, sheetName, XLSX_STYLE, xmlText } from "./xlsx";
@@ -37,7 +37,7 @@ const SECTIONS: DraftSection[] = [
     title: "物件の表示",
     rows: [
       { label: "所在（住所）", value: "東京都千代田区丸の内1丁目9-1" },
-      { label: "所在（地番）", value: "丸の内一丁目 1番1", note: "公図から推定した位置", check: true, src: "parcel" },
+      { label: "所在（地番）", value: "丸の内一丁目 1番1（推定）", note: "公図から推定した位置", check: true, src: "parcel" },
       { label: "隣地の地番", value: "丸の内一丁目 1番2" },
       { label: "地番の参考図", value: "千代田区の地番参考図（https://example.jp/chiban）", note: "課税用の参考図" },
       { label: "緯度・経度", value: "35.681236, 139.767125" },
@@ -192,6 +192,12 @@ describe("下書き（buildDraft）からの通し", () => {
   const { parts, credits } = overviewParts(draft);
   const part = (re: RegExp) => parts.find((p) => re.test(p.title))!;
 
+  it("住所の地点の筆（参考）の地番は、内容に「（参考）」を添える（確認先の列が無いため）", () => {
+    const chiban = part(/^物件の表示/).items.find((it) => "row" in it && it.row.label === "所在（地番）");
+    expect(chiban && "row" in chiban && chiban.row.value).toBe("千代田区三番町 2-1（参考）");
+    expect(overviewName(draft)).toBe("千代田区三番町 2-1");
+  });
+
   it("下書きの欄に付けた区域の印（area）と、何のデータか（src）で選ぶ", () => {
     expect(labels(part(/^物件の表示/).items)).toEqual(["所在（住所）", "[土地]", "所在（地番）", `{${AREA_ROWS.land}}`, "[建物]", `{${AREA_ROWS.building}}`]);
     const law = labels(part(/^都市計画法/).items);
@@ -215,7 +221,7 @@ describe("下書き（buildDraft）からの通し", () => {
 
 describe("Excel のファイル（.xlsx）の作り", () => {
   it("圧縮しない ZIP に、決まった名前のファイルがそろい、CRC が中身と合う。A4 縦 1 ページに収めて印刷し、画面の枠線は出さない", () => {
-    const bytes = overviewXlsx(SECTIONS, "丸の内一丁目 1番1", new Date(2026, 10, 22, 9, 30));
+    const bytes = overviewXlsx(SECTIONS, "丸の内一丁目 1番1（推定）", new Date(2026, 10, 22, 9, 30));
     const files = readZip(bytes);
     expect(files.map((f) => f.name)).toEqual([
       "[Content_Types].xml",
@@ -231,7 +237,8 @@ describe("Excel のファイル（.xlsx）の作り", () => {
     const text = (name: string) => new TextDecoder().decode(files.find((f) => f.name === name)!.data);
     const sheet = text("xl/worksheets/sheet1.xml");
     // 記号は書き換え、文字はそのまま
-    expect(sheet).toContain("東京都が指定 &lt;告示&gt; &amp; 地図");
+    const odd = new TextDecoder().decode(readZip(overviewXlsx(SECTIONS, "A&B <テスト>")).find((f) => f.name === "xl/worksheets/sheet1.xml")!.data);
+    expect(odd).toContain("物件概要書（下書き）　A&amp;B &lt;テスト&gt;");
     expect(sheet).toContain("商業地域");
     expect(sheet).toContain('<pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="1"/>');
     expect(sheet).toContain('<printOptions horizontalCentered="1"/>');
@@ -257,19 +264,23 @@ describe("Excel のファイル（.xlsx）の作り", () => {
   });
 });
 
-describe("物件概要書の表（A4 縦 1 枚）", () => {
-  const sheet = overviewSheet(SECTIONS, "丸の内一丁目 1番1", new Date(2026, 10, 22));
+describe("物件概要書の表（A4 縦 1 枚。項目と内容の 2 列）", () => {
+  const sheet = overviewSheet(SECTIONS, "丸の内一丁目 1番1（推定）", new Date(2026, 10, 22));
   const text = (r: number, c: number) => sheet.rows[r]?.[c]?.v ?? "";
   const at = (label: string) => sheet.rows.findIndex((r) => r[0]?.v === label);
 
-  it("表題・作成日・列の見出しのあとに、欄ごとの見出しと項目を並べる", () => {
-    expect(text(0, 0)).toBe("物件概要書（下書き）　丸の内一丁目 1番1");
+  it("表題・作成日のあとに、欄ごとの見出しと項目・内容の行を並べる（確認・確認先・備考の列は無い）", () => {
+    expect(text(0, 0)).toBe("物件概要書（下書き）　丸の内一丁目 1番1（推定）");
     expect(text(1, 0)).toContain("作成 2026年11月22日");
     expect(text(1, 0)).toContain("法令上の判断はしていません");
-    expect(sheet.rows[2].map((c) => c?.v)).toEqual([...OVERVIEW_HEAD]);
-    expect(text(3, 0)).toBe("物件の表示");
-    expect(sheet.rows[3][0]?.s).toBe(XLSX_STYLE.section);
-    expect(sheet.rows[4].map((c) => c?.v)).toEqual(["所在（住所）", "東京都千代田区丸の内1丁目9-1", "", ""]);
+    expect(text(2, 0)).toBe("物件の表示");
+    expect(sheet.rows[2][0]?.s).toBe(XLSX_STYLE.section);
+    expect(sheet.rows[3]).toEqual([
+      { v: "所在（住所）", s: XLSX_STYLE.label },
+      { v: "東京都千代田区丸の内1丁目9-1", s: XLSX_STYLE.value },
+    ]);
+    expect(OVERVIEW_COLS).toHaveLength(2);
+    for (const r of sheet.rows) expect(r.length).toBeLessThanOrEqual(2);
     expect(sheet.print).toBe("page");
     expect(sheet.hideGrid).toBe(true);
     expect(sheet.freezeBelow).toBeUndefined();
@@ -284,22 +295,20 @@ describe("物件概要書の表（A4 縦 1 枚）", () => {
     for (const label of [AREA_ROWS.land, AREA_ROWS.building]) expect(sheet.rows[at(label)][1]).toEqual({ v: "", s: XLSX_STYLE.area });
   });
 
-  it("確かめる必要のある欄は「要確認」、あなたが確かめた欄は「確認済み」。確かめる先は右の列", () => {
-    const row = (label: string) => sheet.rows[at(label)];
-    expect(row("所在（地番）")[2]).toEqual({ v: "要確認", s: XLSX_STYLE.check });
-    expect(row("所在（地番）")[3]?.v).toBe("公図から推定した位置");
-    expect(row("砂防・急傾斜地などの区域")[2]).toEqual({ v: "確認済み", s: XLSX_STYLE.done });
-    expect(row("用途地域")[2]?.v).toBe("");
+  it("確かめた結果は内容だけ（確認済みの印・確認先は出さない）。推定の地番は印のまま", () => {
+    expect(sheet.rows[at("砂防・急傾斜地などの区域")]).toEqual([
+      { v: "砂防・急傾斜地などの区域", s: XLSX_STYLE.label },
+      { v: "区域内", s: XLSX_STYLE.value },
+    ]);
+    expect(text(at("所在（地番）"), 1)).toBe("丸の内一丁目 1番1（推定）");
   });
 
-  it("いちばん下に写真を貼る枠（左右 2 つ。同じ幅）、その下に注意と出典（小さな字）", () => {
+  it("いちばん下に写真を貼る枠（横いっぱい）、その下に注意と出典（小さな字）", () => {
     const head = at("写真");
     expect(sheet.rows[head][0]?.s).toBe(XLSX_STYLE.section);
     const n = head + 2; // 写真の枠の行（1 から数える）
-    expect(sheet.rows[head + 1].map((c) => c?.s)).toEqual(Array(4).fill(XLSX_STYLE.photo));
+    expect(sheet.rows[head + 1].map((c) => c?.s)).toEqual([XLSX_STYLE.photo, XLSX_STYLE.photo]);
     expect(sheet.merges).toContain(`A${n}:B${n}`);
-    expect(sheet.merges).toContain(`C${n}:D${n}`);
-    expect(OVERVIEW_COLS[0] + OVERVIEW_COLS[1]).toBe(OVERVIEW_COLS[2] + OVERVIEW_COLS[3]);
     expect(sheet.heights![n]).toBeGreaterThanOrEqual(PHOTO_HEIGHT.min);
     expect(sheet.heights![n]).toBeLessThanOrEqual(PHOTO_HEIGHT.max);
     const last = sheet.rows[sheet.rows.length - 1];
@@ -310,25 +319,26 @@ describe("物件概要書の表（A4 縦 1 枚）", () => {
     expect(sheet.heights![sheet.rows.length]).toBeGreaterThanOrEqual(40);
   });
 
-  it("セルをつなぐのは、表題・作成日・欄の見出し・小見出し・注意の行と写真の枠だけ（長い文は折り返して、Excel が高さを合わせる）", () => {
+  it("セルをつなぐのは、表題・作成日・欄の見出し・小見出し・注意の行と写真の枠だけ（項目と内容の行はつながず、Excel が高さを合わせる）", () => {
     for (const m of sheet.merges!) {
-      const r = Number(m.match(/^[A-D](\d+):/)![1]) - 1;
+      expect(m).toMatch(/^A(\d+):B\1$/);
+      const r = Number(m.match(/^A(\d+):/)![1]) - 1;
       expect([XLSX_STYLE.title, XLSX_STYLE.small, XLSX_STYLE.section, XLSX_STYLE.sub, XLSX_STYLE.fine, XLSX_STYLE.photo]).toContain(sheet.rows[r][0]?.s);
     }
   });
 
-  it("載せない欄の言葉は表に出ない（いちばん下の出典の行は除く）", () => {
+  it("載せない欄・列の言葉は表に出ない（いちばん下の出典の行は除く）", () => {
     const all = sheet.rows
       .slice(0, -1)
       .flatMap((r) => r.map((c) => c?.v ?? ""))
       .join("\n");
-    for (const w of ["緯度・経度", "隣地の地番", "データの時点", "建築基準法39条", "敷地と道路", "ハザードマップ", "販売図面", "周辺環境", "コンビニ", "https://", "包蔵地ではない"]) expect(all).not.toContain(w);
+    for (const w of ["緯度・経度", "隣地の地番", "データの時点", "建築基準法39条", "敷地と道路", "ハザードマップ", "販売図面", "周辺環境", "コンビニ", "https://", "包蔵地ではない", "確認済み", "確認先", "公図から推定した位置", "東京都水道局で確認"]) expect(all).not.toContain(w);
   });
 });
 
 describe("ファイルの名前と物件の名前", () => {
   it("地番があれば地番、無ければ住所。ファイル名に使えない記号と空白を外す", () => {
-    expect(overviewName(SECTIONS)).toBe("丸の内一丁目 1番1");
+    expect(overviewName(SECTIONS)).toBe("丸の内一丁目 1番1（推定）");
     expect(overviewName([{ title: "物件の表示", rows: [{ label: "所在（住所）", value: "大阪市北区梅田1" }, { label: "所在（地番）", value: "要確認" }] }])).toBe("大阪市北区梅田1");
     expect(overviewFileName("丸の内一丁目 1番1", new Date(2026, 10, 2))).toBe("物件概要書_丸の内一丁目1番1_20261102.xlsx");
     expect(overviewFileName('a/b:c*?"<>|', new Date(2026, 0, 9))).toBe("物件概要書_abc_20260109.xlsx");

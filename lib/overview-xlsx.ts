@@ -1,7 +1,7 @@
 // 物件概要書（Excel）。重説・物件概要の下書き（lib/draft.ts の buildDraft。MICHILU にある情報だけ）から物件概要書に載せる欄を選び、
 // A4 縦 1 枚（PDF にして送る）の、編集できる .xlsx にする（lib/xlsx.ts。端末の中で作り、どこにも送らない）。
 // 載せる欄（持ち主の指示 2026-11-22）：物件の表示（所在と、土地・建物。面積は登記事項証明書を見て書き込む欄）・都市計画法と建築基準法の制限・
-// その他の法令（国のデータで区域に入るものだけ）・飲用水・ガス・排水施設・現地で確かめたこと、いちばん下に写真を貼る枠。
+// その他の法令（国のデータで区域に入るものだけ）・飲用水・ガス・排水施設・現地で確かめたこと、いちばん下に写真を貼る枠。列は項目と内容の 2 つ。
 // 載せない欄：緯度経度・隣地・地番の参考図・データの時点・建築基準法39条（区域に入るときは載せる）・敷地と道路との関係・ハザードマップ・
 // 災害リスク・販売図面向け・周辺環境・出典の欄・URL だけの欄。出典は、載せた欄のデータの分だけ、いちばん下に小さな字で残す（利用規約で決まっている）。
 // 法令上の判断（建てられるか・接道を満たすか）はしない。データで分からない欄は「要確認」と確かめる先。
@@ -9,11 +9,10 @@ import { DRAFT_NOTE, ksjCredits, LAW_CREDITS, type DraftRow, type DraftSection, 
 import { XLSX_STYLE as S, xlsxBytes, type XlsxCell, type XlsxSheet, type XlsxStyle } from "./xlsx";
 
 /**
- * 表の列：項目・内容・確認（要確認／確認済み）・確認先・備考（幅は文字数。合わせて A4 縦の幅に収まる）。
- * 写真の枠を左右同じ幅にするため、項目＋内容と、確認＋確認先を同じ幅にする
+ * 表の列：項目・内容の 2 つ（幅は文字数。合わせて A4 縦の幅に収まる）。確認（要確認・確認済み）と確認先・備考の列は付けない
+ * （持ち主の指示 2026-11-22。確かめる先はアプリの下書きにある）
  */
-export const OVERVIEW_COLS = [15, 28, 7.5, 35.5];
-export const OVERVIEW_HEAD = ["項目", "内容", "確認", "確認先・備考"] as const;
+export const OVERVIEW_COLS = [22, 64];
 /** 登記事項証明書（謄本）を見て書き込む面積の欄 */
 export const AREA_ROWS = { land: "地積（登記簿）", building: "床面積（登記簿）" } as const;
 
@@ -39,7 +38,11 @@ export function overviewParts(sections: DraftSection[]): { parts: OverviewPart[]
 
   const place = rowsOf(/^物件の表示/).filter((r) => !/^(緯度・経度|隣地の地番|地番の参考図)$/.test(r.label));
   const address = place.filter((r) => r.label === "所在（住所）");
-  const land = place.filter((r) => r.label !== "所在（住所）");
+  // 地番が住所の地点の筆（参考。住居表示と地番は別のもの）のときは、確認先の列が無いので、内容に「（参考）」を添える
+  // （推定・地番参考図の筆は、もう「（推定）」などの印が付いている）
+  const land = place
+    .filter((r) => r.label !== "所在（住所）")
+    .map((r) => (r.src === "parcel" && r.check && !/）$/.test(r.value) ? { ...r, value: `${r.value}（参考）` } : r));
   parts.push({
     title: "物件の表示",
     items: [...address.map((row) => ({ row })), { sub: "土地" }, ...land.map((row) => ({ row })), { area: AREA_ROWS.land }, { sub: "建物" }, { area: AREA_ROWS.building }],
@@ -99,62 +102,55 @@ export function textLines(s: string, widthPx: number, pt: number): number {
 /** 1 行の高さ（pt。游ゴシックは字の大きさの約 1.7 倍。11pt で 18.75pt） */
 const lineHeight = (pt: number) => pt * 1.7;
 
-/** 写真の枠の高さ（pt）：1 ページの残り。小さすぎず（はみ出すときは Excel が 1 ページに縮める）、大きすぎず（4:3 の写真くらい） */
-export const PHOTO_HEIGHT = { min: 150, max: 220 } as const;
+/** 写真の枠の高さ（pt）：1 ページの残り。小さすぎず（はみ出すときは Excel が 1 ページに縮める）、大きすぎず（4:3 の写真を 2 枚並べる大きさくらい） */
+export const PHOTO_HEIGHT = { min: 170, max: 280 } as const;
 
 /**
  * 物件概要書の表（A4 縦 1 枚）。name：物件の名前（地番。無ければ住所）。
- * 1 行目：表題、2 行目：作成日と注意、3 行目：列の見出し、そのあと欄ごとに欄の見出しの行と項目の行。物件の表示は土地・建物の小見出しで分け、
- * 地積・床面積は空けておく（数を入れると「123.45㎡」と出る）。最後に写真を貼る枠（左右 2 つ）と、注意・出典（小さな字）
+ * 1 行目：表題、2 行目：作成日と注意、そのあと欄ごとに欄の見出しの行と、項目・内容の行。物件の表示は土地・建物の小見出しで分け、
+ * 地積・床面積は空けておく（数を入れると「123.45㎡」と出る）。最後に写真を貼る枠（横いっぱい）と、注意・出典（小さな字）
  */
 export function overviewSheet(sections: DraftSection[], name: string, at: Date): XlsxSheet {
   const { parts, credits } = overviewParts(sections);
   const rows: XlsxCell[][] = [];
   const merges: string[] = [];
   const heights: Record<number, number> = {};
-  const [wA, wB, , wD] = OVERVIEW_COLS.map(colPx);
-  const wAll = OVERVIEW_COLS.reduce((n, w) => n + colPx(w), 0);
+  const [wA, wB] = OVERVIEW_COLS.map(colPx);
+  const wAll = wA + wB;
   let total = 0;
-  /** 4 列をつないだ 1 行（高さを決める。つないだセルは Excel が高さを合わせない） */
+  /** 2 列をつないだ 1 行（高さを決める。つないだセルは Excel が高さを合わせない） */
   const full = (v: string, s: XlsxStyle, h: number) => {
-    rows.push([{ v, s }, { v: "", s }, { v: "", s }, { v: "", s }]);
-    merges.push(`A${rows.length}:D${rows.length}`);
+    rows.push([{ v, s }, { v: "", s }]);
+    merges.push(`A${rows.length}:B${rows.length}`);
     heights[rows.length] = h;
     total += h;
   };
   /** 項目の行（高さは Excel が中身に合わせる。ここでは写真の枠の大きさを決めるために見積もるだけ） */
-  const line = (cells: XlsxCell[], label: string, value: string, note: string) => {
-    rows.push(cells);
-    total += Math.max(textLines(label, wA, 9) * lineHeight(9), textLines(value, wB, 9.5) * lineHeight(9.5), textLines(note, wD, 8.5) * lineHeight(8.5)) + 1;
+  const line = (label: string, value: XlsxCell) => {
+    rows.push([{ v: label, s: S.label }, value]);
+    total += Math.max(textLines(label, wA, 9) * lineHeight(9), textLines(value?.v ?? "", wB, 9.5) * lineHeight(9.5)) + 1;
   };
 
   const title = `物件概要書（下書き）　${name}`;
   full(title, S.title, Math.max(26, textLines(title, wAll, 14) * lineHeight(14) + 2));
   full(`作成 ${dateText(at)}・MICHILU（国・市のデータによる参考。法令上の判断はしていません）`, S.small, 15);
-  rows.push(OVERVIEW_HEAD.map((v) => ({ v, s: S.head })));
-  heights[rows.length] = 18;
-  total += 18;
   for (const part of parts) {
     full(part.title, S.section, 18);
     for (const it of part.items) {
       if ("sub" in it) full(it.sub, S.sub, 16);
-      else if ("area" in it) line([{ v: it.area, s: S.label }, { v: "", s: S.area }, { v: "", s: S.value }, { v: "", s: S.note }], it.area, "", "");
-      else {
-        const r = it.row;
-        const mark = r.confirmed ? { v: "確認済み", s: S.done } : r.check ? { v: "要確認", s: S.check } : { v: "", s: S.value };
-        line([{ v: r.label, s: S.label }, { v: r.value, s: S.value }, mark, { v: r.note ?? "", s: S.note }], r.label, r.value, r.note ?? "");
-      }
+      else if ("area" in it) line(it.area, { v: "", s: S.area });
+      else line(it.row.label, { v: it.row.value, s: S.value });
     }
   }
 
   // いちばん下の注意と出典（小さな字。つないだセルなので、高さは多めに見積もる）
   const foot = [DRAFT_NOTE, credits.join("　")].filter(Boolean).join("\n");
   const footHeight = Math.ceil((textLines(foot, wAll, 7.5) + 0.5) * lineHeight(7.5));
-  // 写真を貼る枠（左：項目＋内容、右：確認＋確認先。同じ幅）。高さは 1 ページの残り
+  // 写真を貼る枠（横いっぱい。2 枚並べて貼れる）。高さは 1 ページの残り
   full("写真", S.section, 18);
   const photo = Math.round(Math.min(PHOTO_HEIGHT.max, Math.max(PHOTO_HEIGHT.min, PAGE_HEIGHT - total - 4 - footHeight - 6)));
-  rows.push([{ v: "", s: S.photo }, { v: "", s: S.photo }, { v: "", s: S.photo }, { v: "", s: S.photo }]);
-  merges.push(`A${rows.length}:B${rows.length}`, `C${rows.length}:D${rows.length}`);
+  rows.push([{ v: "", s: S.photo }, { v: "", s: S.photo }]);
+  merges.push(`A${rows.length}:B${rows.length}`);
   heights[rows.length] = photo;
   rows.push([]);
   heights[rows.length] = 4;
