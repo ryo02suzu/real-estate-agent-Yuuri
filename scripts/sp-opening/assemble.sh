@@ -33,7 +33,7 @@ mkdir -p "$OUT"
 IN="$SRC/%04d.png"
 ONLY="${ONLY:-}"
 if [ -z "$ONLY" ] || [ "$ONLY" = av1 ]; then
-  ffmpeg -y -loglevel error -framerate 30 -i "$IN" -c:v libsvtav1 -preset 4 -crf 36 -svtav1-params "tune=0:enable-qm=1" -pix_fmt yuv420p10le -g 60 "$OUT/opening-av1.webm"
+  ffmpeg -y -loglevel error -framerate 30 -i "$IN" -c:v libsvtav1 -preset 4 -crf 32 -svtav1-params "tune=0:enable-qm=1" -pix_fmt yuv420p10le -g 60 "$OUT/opening-av1.webm"
 fi
 if [ -z "$ONLY" ] || [ "$ONLY" = hevc ]; then
   ffmpeg -y -loglevel error -framerate 30 -i "$IN" -c:v libx265 -preset slow -crf 29 -pix_fmt yuv420p10le -tag:v hvc1 -g 60 -x265-params log-level=error -movflags +faststart "$OUT/opening-hevc.mp4"
