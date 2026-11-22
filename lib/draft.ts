@@ -27,8 +27,14 @@ import { zoningRows, type Zoning, type ZoningStatus } from "./roadmap/zoning";
 import { ZONING_CREDIT } from "./roadmap/zoning-data";
 import type { ConfirmedItem } from "./app/confirmed";
 
-/** 下書きの1行。check：役所・法務局・現地で確かめる必要がある（データが無い・参考にとどまる）。confirmed：あなたが確かめた結果（確認の記録から） */
-export type DraftRow = { label: string; value: string; note?: string; check?: boolean; confirmed?: boolean };
+/** 何のデータの欄か（出典の欄と、法令の区域・土砂災害の欄）。物件概要書の Excel（lib/overview-xlsx.ts）が、載せた欄の出典だけを残すのに使う */
+export type DraftSrc = "parcel" | "zoning" | "hazard" | "building" | "ksj" | "poi" | "notes" | "morido" | "hourei" | "tochi";
+
+/**
+ * 下書きの1行。check：役所・法務局・現地で確かめる必要がある（データが無い・参考にとどまる）。confirmed：あなたが確かめた結果（確認の記録から）。
+ * area：国のデータで区域に入る（in）・入らない（out）。分からない欄・確かめる先の欄には付けない。src：何のデータの欄か（画面には出さない）
+ */
+export type DraftRow = { label: string; value: string; note?: string; check?: boolean; confirmed?: boolean; area?: "in" | "out"; src?: DraftSrc };
 export type DraftSection = { title: string; rows: DraftRow[] };
 
 export type DraftInput = {
@@ -82,6 +88,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
           ? `${found.undetermined ? "登記所の地図では筆界未定地。" : ""}${SANKO_NOTE}`
           : undefined,
       check: !!(found.estimated || found.sanko),
+      src: "parcel",
     });
   else if (parcels?.target)
     place.push({
@@ -93,6 +100,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
           ? "住所の地点にある筆（参考）。住居表示と地番は別のもの"
           : undefined,
       check: true,
+      src: "parcel",
     });
   else place.push({ label: "所在（地番）", value: CHECK, note: "登記・公図で確認", check: true });
   // 住所の地点の筆が道路などの可能性があるときは、その筆の隣地（道沿いの筆）を物件の隣地として書かない
@@ -110,12 +118,12 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     for (const r of zoningRows(zoning.zoning, zoning.st)) {
       if (r.label === "建ぺい率・容積率") {
         const [bcr, far] = r.value.split(" ・ ");
-        law.push({ label: "建ぺい率", value: r.value === "データなし" ? CHECK : `${bcr}（指定）`, check: r.value === "データなし" });
-        law.push({ label: "容積率", value: r.value === "データなし" ? CHECK : `${far}（指定）`, note: "前面道路の幅による制限・角地の緩和は含まない", check: r.value === "データなし" });
+        law.push({ label: "建ぺい率", value: r.value === "データなし" ? CHECK : `${bcr}（指定）`, check: r.value === "データなし", src: "zoning" });
+        law.push({ label: "容積率", value: r.value === "データなし" ? CHECK : `${far}（指定）`, note: "前面道路の幅による制限・角地の緩和は含まない", check: r.value === "データなし", src: "zoning" });
         continue;
       }
       const missing = r.value === "データなし";
-      law.push({ label: r.label === "区域" ? "区域区分" : r.label, value: missing ? CHECK : r.value, note: missing ? "市の都市計画図で確認" : r.sub, check: missing || r.warn });
+      law.push({ label: r.label === "区域" ? "区域区分" : r.label, value: missing ? CHECK : r.value, note: missing ? "市の都市計画図で確認" : r.sub, check: missing || r.warn, src: "zoning" });
     }
     if (zoning.st?.asOf) law.push({ label: "データの時点", value: `${zoning.st.city}：${zoning.st.asOf}` });
   } else law.push({ label: "用途地域など", value: CHECK, note: "都市計画のデータを読み込めませんでした。市の都市計画図で確認", check: true });
@@ -123,14 +131,14 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   const hr = zoning?.hourei;
   const houreiRow = (kind: HoureiKind): DraftRow => {
     const label = `${HOUREI_LAWS[kind].law}（${kind}）`;
-    if (!hr) return { label, value: CHECK, note: "区域を指定した都道府県・市で確認", check: true };
+    if (!hr) return { label, value: CHECK, note: "区域を指定した都道府県・市で確認", check: true, src: "hourei" };
     const pref = PREF_NAMES[hr.pref];
     const office = houreiOffice(kind, kind === "災害危険区域" ? `${pref}・${m.name}` : pref);
-    if (hr.missing.includes(kind)) return { label, value: CHECK, note: `${pref}の${kind}は国のデータに無い。${office}で確認`, check: true };
+    if (hr.missing.includes(kind)) return { label, value: CHECK, note: `${pref}の${kind}は国のデータに無い。${office}で確認`, check: true, src: "hourei" };
     // 都県が求める特記事項は、出典の欄にまとめて書く
     const hits = hr.hits.filter((h) => h.kind === kind);
-    if (hits.length) return { label, value: "区域内（国のデータ・参考）", note: `${houreiGroups(hits)[0].text}。${houreiCaution(hits[0])}`, check: true };
-    return { label, value: "区域外（国のデータ・参考）", note: `${houreiAsOf(kind, hr.pref)}の国のデータでは区域外。概略の区域で、重要事項説明には${office}で確認`, check: true };
+    if (hits.length) return { label, value: "区域内（国のデータ・参考）", note: `${houreiGroups(hits)[0].text}。${houreiCaution(hits[0])}`, check: true, area: "in", src: "hourei" };
+    return { label, value: "区域外（国のデータ・参考）", note: `${houreiAsOf(kind, hr.pref)}の国のデータでは区域外。概略の区域で、重要事項説明には${office}で確認`, check: true, area: "out", src: "hourei" };
   };
   law.push(houreiRow("災害危険区域"));
   sections.push({ title: "都市計画法・建築基準法に基づく制限（参考）", rows: law });
@@ -140,7 +148,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   // 盛土規制法の区域（国のデータ。重要事項説明の根拠には使えないので、指定した都県・市の資料で確かめる）
   const md = zoning?.morido;
   if (md) {
-    other.push({ label: "宅地造成及び特定盛土等規制法", value: `${moridoValue(md)}（国のデータ・参考）`, note: `${moridoDetail(md)}。${moridoCaution(md.authority)}`, check: true });
+    other.push({ label: "宅地造成及び特定盛土等規制法", value: `${moridoValue(md)}（国のデータ・参考）`, note: `${moridoDetail(md)}。${moridoCaution(md.authority)}`, check: true, area: md.area ? "in" : "out", src: "morido" });
     if (md.link) other.push({ label: "盛土規制法の確認先", value: md.link.label, note: md.link.url });
   } else other.push({ label: "宅地造成及び特定盛土等規制法", value: CHECK, note: "区域を指定した都道府県・市（盛土規制法の担当課）で確認", check: true });
   // 区域外の種類が2つ以上なら1つの欄にまとめる（スマホの1画面に収める。区域内の種類は1つずつ）
@@ -154,6 +162,8 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
       value: "区域外（国のデータ・参考）",
       note: `${asOf}の国のデータではどれも区域外。概略の区域で、重要事項説明には${houreiOfficeAll([...outside], PREF_NAMES[hr.pref])}で確認`,
       check: true,
+      area: "out",
+      src: "hourei",
     });
   }
   // 自然公園法・農業振興地域の整備に関する法律・森林法（国のデータは2015年度・縮尺約1/5万の概略。区域外の法令が2つ以上なら1つの欄）
@@ -175,7 +185,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     const note = `${tc.year}年度・縮尺約1/5万の国のデータ。${tochiCheck(tc, m.name)}`;
     laws
       .filter((l) => l.inside)
-      .forEach((l, i) => other.push({ label: l.law, value: `${l.text}（国のデータ・参考）`, note: i === 0 ? note : undefined, check: true }));
+      .forEach((l, i) => other.push({ label: l.law, value: `${l.text}（国のデータ・参考）`, note: i === 0 ? note : undefined, check: true, area: "in", src: "tochi" }));
     const out = laws.filter((l) => !l.inside);
     if (out.length >= 2)
       other.push({
@@ -183,8 +193,10 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
         value: "区域外（国のデータ・参考）",
         note: `${tc.year}年度の国のデータ（縮尺約1/5万の概略）では${out.map((l) => l.area).join("・")}の外`,
         check: true,
+        area: "out",
+        src: "tochi",
       });
-    else if (out.length) other.push({ label: out[0].law, value: `${out[0].text}（国のデータ・参考）`, check: true });
+    else if (out.length) other.push({ label: out[0].law, value: `${out[0].text}（国のデータ・参考）`, check: true, area: "out", src: "tochi" });
   }
   // 文化財保護法：周知の埋蔵文化財包蔵地（遺跡）に入るかは教育委員会で確かめる。遺跡地図は概要を示すもので、証明にはならない
   const ik = isekiFor(m, result.lat, result.lng);
@@ -252,12 +264,18 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
     if (!groups.length) maps.push({ label: "ハザードマップ", value: `${m.name}（わがまちハザードマップ）`, note: wagamachiUrl(hazard.muniCd) });
   } else maps.push({ label: "ハザードマップ", value: CHECK, note: "市区町村のハザードマップで確認", check: true });
   sections.push({ title: "ハザードマップ（重要事項説明で所在地を示す市区町村の地図）", rows: maps });
-  // 大規模盛土造成地・液状化の発生傾向は読み取らず、国の重ねるハザードマップを物件の場所で開く URL を添える
+  // 大規模盛土造成地・液状化の発生傾向は読み取らず、国の重ねるハザードマップを物件の場所で開く URL を添える。
+  // 土砂災害警戒区域等は区域に入るか（area）を付ける（区域に入るときは色がある。物件概要書の Excel が、その他の法令の欄に載せる）
   if (hazard)
     sections.push({
       title: "災害リスク（国のデータ・参考）",
       rows: [
-        ...hazardRows(hazard.report, hazard.elevation).map((r) => ({ label: r.label, value: r.value, check: r.warn })),
+        ...hazardRows(hazard.report, hazard.elevation).map((r): DraftRow => ({
+          label: r.label,
+          value: r.value,
+          check: r.warn,
+          ...(r.kind === "dosha" && (r.color || r.value === "区域外") ? { area: r.color ? ("in" as const) : ("out" as const), src: "hazard" as const } : {}),
+        })),
         ...groundMaps(result.lat, result.lng).map((g) => ({ label: g.label, value: "国の重ねるハザードマップで確認", note: g.url })),
       ],
     });
@@ -296,28 +314,28 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
       rows: [...pois.map((w) => ({ label: w.label, value: `${w.name} ${poiWalkText(w)}` })), { label: "注意", value: POI_NOTE, check: true }],
     });
 
-  // 出典（それぞれの出典の文のまま。見出しは付けない。国土数値情報のデータは1つの文にまとめる）
+  // 出典（それぞれの出典の文のまま。見出しは付けない。国土数値情報のデータは1つの文にまとめる）。src は何の出典か（画面には出さない）
   const credits: DraftRow[] = [];
-  const credit = (value: string) => credits.push({ label: "", value });
+  const credit = (value: string, src: DraftSrc) => credits.push({ label: "", value, src });
   // 筆の出典（登記所備付地図データ）と、公図から推定した筆の注意は1つの文に
   // 市町村の地番参考図の筆の出典（市町村ごと）も同じ文に
-  if (p || parcels) credit(parcelCreditLine(!!(p?.estimated || parcels?.estimated), p?.sanko ?? parcels?.sanko));
-  if (zoning) credit(`都市計画の${ZONING_CREDIT}`);
-  if (hazard) credit(`災害リスクの${HAZARD_CREDIT}`);
-  if (hit) credit(`建物の${BUILDING_CREDIT}`);
+  if (p || parcels) credit(parcelCreditLine(!!(p?.estimated || parcels?.estimated), p?.sanko ?? parcels?.sanko), "parcel");
+  if (zoning) credit(`都市計画の${ZONING_CREDIT}`, "zoning");
+  if (hazard) credit(`災害リスクの${HAZARD_CREDIT}`, "hazard");
+  if (hit) credit(`建物の${BUILDING_CREDIT}`, "building");
   const ksj: [string, string][] = [];
-  if (md) ksj.push(["盛土規制法", MORIDO_CREDIT]);
-  if (hr) ksj.push(["砂防指定地など", HOUREI_CREDIT]);
+  if (md) ksj.push(LAW_CREDITS.morido);
+  if (hr) ksj.push(LAW_CREDITS.hourei);
   if (near) ksj.push(["地価", LAND_PRICE_CREDIT]);
   if (schools?.elementary || schools?.junior) ksj.push(["学区", schoolCredit(schools)]);
   if (stations?.length) ksj.push(["駅", STATION_CREDIT]);
-  if (zoning?.tochi) ksj.push(["自然公園・農振・森林", TOCHI_CREDIT]);
-  ksjCredits(ksj).forEach(credit);
+  if (zoning?.tochi) ksj.push(LAW_CREDITS.tochi);
+  ksjCredits(ksj).forEach((c) => credit(c, "ksj"));
   // 周辺施設（OpenStreetMap）。道のりの出典は駅の出典にあれば繰り返さない
-  if (pois?.length) credit(poiCredit(!stations?.length));
+  if (pois?.length) credit(poiCredit(!stations?.length), "poi");
   // 都県が利用条件で求める特記事項（砂防指定地などの区域のデータ）
   const notes = hr && houreiNotesLine(hr.pref);
-  if (notes) credit(notes);
+  if (notes) credit(notes, "notes");
   if (confirmed?.length) applyConfirmed(sections, confirmed);
   if (credits.length) sections.push({ title: "出典", rows: credits });
   return sections;
@@ -366,7 +384,8 @@ function applyConfirmed(sections: DraftSection[], items: ConfirmedItem[]): void 
     const i = sec.rows.findIndex((r) => re.test(r.label) && (!onlyCheck || r.value === CHECK));
     if (i < 0) return false;
     const old = sec.rows[i];
-    sec.rows[i] = { ...row, label: old.label, note: old.value === CHECK ? row.note : `${row.note}。データ：${old.value}` };
+    // データの値を注に残すので、何のデータの欄か（src）は残す。区域に入るか（area）は、確かめた結果が代わりになる
+    sec.rows[i] = { ...row, label: old.label, note: old.value === CHECK ? row.note : `${row.note}。データ：${old.value}`, ...(old.src && old.value !== CHECK ? { src: old.src } : {}) };
     return true;
   };
   for (const c of items) {
@@ -395,13 +414,20 @@ function applyConfirmed(sections: DraftSection[], items: ConfirmedItem[]): void 
   }
 }
 
+/** 法令の区域の国のデータ（国土数値情報）の出典：何の区域か・出典の文（盛土規制法・砂防指定地など・自然公園など） */
+export const LAW_CREDITS: Record<"morido" | "hourei" | "tochi", [what: string, credit: string]> = {
+  morido: ["盛土規制法", MORIDO_CREDIT],
+  hourei: ["砂防指定地など", HOUREI_CREDIT],
+  tochi: ["自然公園・農振・森林", TOCHI_CREDIT],
+};
+
 const KSJ = /^出典：「国土数値情報（(.+?)）」（国土交通省、https:\/\/nlftp\.mlit\.go\.jp\/ksj\/）を加工して作成(.*)$/;
 
 /**
  * 国土数値情報の出典を1つの文にする（「出典：「国土数値情報」（国土交通省、…）を加工して作成（盛土規制法の区域：…データ（時点）／駅：鉄道データ（2024年））。道のりは…」）。
  * 形の違う出典はそのまま
  */
-function ksjCredits(items: [what: string, credit: string][]): string[] {
+export function ksjCredits(items: [what: string, credit: string][]): string[] {
   const parts: string[] = [];
   const after: string[] = [];
   const others: string[] = [];

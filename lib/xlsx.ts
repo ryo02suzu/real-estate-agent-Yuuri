@@ -3,7 +3,7 @@
 // LibreOffice・Google スプレッドシートが開ける）。文字は文字列として入れる（式・数の書式は使わない）。
 // 物件の情報は端末の中で作るだけで、どこにも送らない。
 
-/** セルの見た目（styles.xml の並びと同じ番号） */
+/** セルの見た目（styles.xml の並びと同じ番号）。字の大きさは、A4 縦 1 枚に収める表に合わせた（表題 14pt・内容 9.5pt・確認先 8.5pt） */
 export const XLSX_STYLE = {
   plain: 0,
   /** 表題（太字・大きめ） */
@@ -26,6 +26,12 @@ export const XLSX_STYLE = {
   note: 9,
   /** 出典・注意（小さめの灰色の字・折り返し） */
   fine: 10,
+  /** 欄の中の小見出し（土地・建物。紺の太字・薄い色の地・枠） */
+  sub: 11,
+  /** 面積を書き込む欄（数を入れると「123.45㎡」と出る。左寄せ・枠） */
+  area: 12,
+  /** 写真を貼る枠（枠だけ） */
+  photo: 13,
 } as const;
 export type XlsxStyle = (typeof XLSX_STYLE)[keyof typeof XLSX_STYLE];
 
@@ -44,6 +50,10 @@ export type XlsxSheet = {
   freezeBelow?: number;
   /** 印刷のたびに上に付ける行（1 から数える） */
   printTitleRow?: number;
+  /** 印刷（A4 縦）：width は横を 1 ページの幅に合わせる（縦は何ページでも）、page は 1 ページに収める（横の真ん中に置き、余白を少し狭く） */
+  print?: "width" | "page";
+  /** 画面の枠線（セルの境の薄い線）を出さない（書類の見た目にする。印刷には元から出ない） */
+  hideGrid?: boolean;
 };
 export type XlsxBook = { sheets: XlsxSheet[]; title?: string; creator?: string; created?: Date };
 
@@ -80,55 +90,69 @@ export function sheetName(s: string): string {
 }
 
 const FONT_JA = '<name val="游ゴシック"/><family val="3"/><charset val="128"/><scheme val="minor"/>';
+const BORDER = '<color rgb="FFC9D3E0"/>';
+/** 面積の欄の数の書き方（123.45 と入れると「123.45㎡」） */
+export const AREA_FORMAT = '#,##0.00"㎡"';
+// 字の大きさ：0 は標準の字（列の幅の目盛りになる。11pt のまま）。表は A4 縦 1 枚に収まる大きさ（内容 9.5pt・確認先 8.5pt）
 const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<fonts count="8">
+<numFmts count="1"><numFmt numFmtId="164" formatCode="${xmlText(AREA_FORMAT)}"/></numFmts>
+<fonts count="11">
 <font><sz val="11"/><color theme="1"/>${FONT_JA}</font>
-<font><b/><sz val="15"/><color rgb="FF133664"/>${FONT_JA}</font>
-<font><sz val="9"/><color rgb="FF5F6B7A"/>${FONT_JA}</font>
-<font><b/><sz val="10.5"/><color rgb="FF22314A"/>${FONT_JA}</font>
-<font><b/><sz val="11"/><color rgb="FFFFFFFF"/>${FONT_JA}</font>
-<font><b/><sz val="10.5"/><color rgb="FF8A5A00"/>${FONT_JA}</font>
-<font><b/><sz val="10.5"/><color rgb="FF1F8F5A"/>${FONT_JA}</font>
-<font><sz val="10"/><color rgb="FF3D4A5C"/>${FONT_JA}</font>
+<font><b/><sz val="14"/><color rgb="FF133664"/>${FONT_JA}</font>
+<font><sz val="8"/><color rgb="FF5F6B7A"/>${FONT_JA}</font>
+<font><b/><sz val="9"/><color rgb="FF22314A"/>${FONT_JA}</font>
+<font><b/><sz val="10"/><color rgb="FFFFFFFF"/>${FONT_JA}</font>
+<font><b/><sz val="9"/><color rgb="FF8A5A00"/>${FONT_JA}</font>
+<font><b/><sz val="9"/><color rgb="FF1F8F5A"/>${FONT_JA}</font>
+<font><sz val="8.5"/><color rgb="FF3D4A5C"/>${FONT_JA}</font>
+<font><sz val="9.5"/><color theme="1"/>${FONT_JA}</font>
+<font><b/><sz val="9.5"/><color rgb="FF133664"/>${FONT_JA}</font>
+<font><sz val="7.5"/><color rgb="FF5F6B7A"/>${FONT_JA}</font>
 </fonts>
-<fills count="5">
+<fills count="6">
 <fill><patternFill patternType="none"/></fill>
 <fill><patternFill patternType="gray125"/></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFE3EBF6"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FF133664"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFF4F7FB"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFEAF0F8"/><bgColor indexed="64"/></patternFill></fill>
 </fills>
 <borders count="2">
 <border><left/><right/><top/><bottom/><diagonal/></border>
-<border><left style="thin"><color rgb="FFC9D3E0"/></left><right style="thin"><color rgb="FFC9D3E0"/></right><top style="thin"><color rgb="FFC9D3E0"/></top><bottom style="thin"><color rgb="FFC9D3E0"/></bottom><diagonal/></border>
+<border><left style="thin">${BORDER}</left><right style="thin">${BORDER}</right><top style="thin">${BORDER}</top><bottom style="thin">${BORDER}</bottom><diagonal/></border>
 </borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="11">
+<cellXfs count="14">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
-<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
 <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf>
 <xf numFmtId="0" fontId="3" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
 <xf numFmtId="0" fontId="4" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
 <xf numFmtId="0" fontId="3" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
-<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="8" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
 <xf numFmtId="0" fontId="5" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf>
 <xf numFmtId="0" fontId="6" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf>
 <xf numFmtId="0" fontId="7" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
-<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="9" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>
+<xf numFmtId="164" fontId="8" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf>
 </cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
 
 function sheetXml(sh: XlsxSheet): string {
   const out: string[] = [];
+  const page = sh.print === "page";
   out.push('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
   out.push('<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">');
   out.push('<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>');
+  const grid = sh.hideGrid ? ' showGridLines="0"' : "";
   if (sh.freezeBelow) {
     const top = `A${sh.freezeBelow + 1}`;
-    out.push(`<sheetViews><sheetView workbookViewId="0" zoomScale="100"><pane ySplit="${sh.freezeBelow}" topLeftCell="${top}" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="${top}" sqref="${top}"/></sheetView></sheetViews>`);
-  } else out.push('<sheetViews><sheetView workbookViewId="0"/></sheetViews>');
+    out.push(`<sheetViews><sheetView${grid} workbookViewId="0" zoomScale="100"><pane ySplit="${sh.freezeBelow}" topLeftCell="${top}" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="${top}" sqref="${top}"/></sheetView></sheetViews>`);
+  } else out.push(`<sheetViews><sheetView${grid} workbookViewId="0"/></sheetViews>`);
   out.push('<sheetFormatPr defaultRowHeight="18.75"/>');
   out.push(`<cols>${sh.cols.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join("")}</cols>`);
   out.push("<sheetData>");
@@ -148,8 +172,10 @@ function sheetXml(sh: XlsxSheet): string {
   });
   out.push("</sheetData>");
   if (sh.merges?.length) out.push(`<mergeCells count="${sh.merges.length}">${sh.merges.map((m) => `<mergeCell ref="${m}"/>`).join("")}</mergeCells>`);
-  out.push('<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/>');
-  out.push('<pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>');
+  // 1 ページに収めるときは、横の真ん中に置き、余白を少し狭くする（インチ。左右 1cm・上下 1.1cm ほど）
+  if (page) out.push('<printOptions horizontalCentered="1"/>');
+  out.push(page ? '<pageMargins left="0.4" right="0.4" top="0.45" bottom="0.45" header="0.2" footer="0.2"/>' : '<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/>');
+  out.push(`<pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="${page ? 1 : 0}"/>`);
   out.push("</worksheet>");
   return out.join("");
 }
