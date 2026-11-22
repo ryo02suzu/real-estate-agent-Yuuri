@@ -303,6 +303,11 @@ html[data-launch="full"] {
 html[data-launch="quick"] {
   --launch: 90ms;
 }
+/* スマホのオープニング（film）の間は、ホームの中身を待たせる（lib/app/opening-sp.ts の holdMs と同じ。終わったら
+   components/app/film-intro.tsx が「今から」へ直し、中身が順に現れる。飛ばしたときは html.launch-skip ですぐ終わりの形に） */
+html[data-launch="film"] {
+  --launch: 600s;
+}
 .launch {
   display: none;
 }
@@ -458,8 +463,28 @@ html.launch-skip {
     opacity: 0;
     transition-duration: 0.36s;
   }
+  /* ホームへのつなぎ：映像・帯・出典は溶け、ロゴだけが左上の定位置へ移りながら小さくなって薄くなる（動かす量は部品が決める） */
   .film[data-leaving="end"] {
+    background-color: transparent;
+    transition: background-color 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .film[data-leaving="end"] > :not(.film-logo),
+  .film[data-started][data-leaving="end"] .film-video {
     opacity: 0;
+    transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .film[data-leaving="end"] .film-logo {
+    opacity: 0;
+  }
+  /* 映像の間、ホームの写真と下のメニューも待たせ、つなぎで写真は奥から落ち着き、メニューは下から現れる */
+  html[data-launch="film"] .home-cam-first {
+    transform-origin: 62% 58%;
+    animation: launch-photo 1.6s cubic-bezier(0.22, 0.7, 0.18, 1) backwards;
+    animation-delay: var(--launch);
+  }
+  html[data-launch="film"] [data-app-nav] {
+    animation: launch-nav 0.7s var(--m-out) backwards;
+    animation-delay: calc(var(--launch) + 0.2s);
   }
   .film-video {
     position: absolute;
@@ -502,6 +527,13 @@ html.launch-skip {
   .film-backdrop {
     position: absolute;
     pointer-events: none;
+  }
+  /* 移る動き（ホームへのつなぎ）は、いつも付けておく（動かす量を入れたときに、なめらかに動き始めるように） */
+  .film-logo {
+    transform-origin: 50% 50%;
+    transition:
+      transform 0.8s cubic-bezier(0.62, 0, 0.18, 1),
+      opacity 0.32s linear 0.48s;
   }
   .film-logo img {
     position: absolute;

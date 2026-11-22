@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import logo from "./opening-logo.json";
-import { SP_OPENING, spBars, spCover, spLogoBox, spLogoFrame, spPoint, spRise } from "./opening-sp";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { SP_OPENING, spBars, spCover, spLogoBox, spLogoFly, spLogoFrame, spPoint, spRise } from "./opening-sp";
 
 /** スマホの画面（CSS の画素）と、上のカメラ部分・時刻の帯の高さ（safe-area-inset-top のおおよそ） */
 const PHONES: [string, number, number, number][] = [
@@ -95,5 +97,26 @@ describe("ロゴの出し方（PC と同じ。縦の画面用に速く）", () =
       expect(f.mountain).toBeGreaterThan(logo.mountain[1]);
       expect(f.glint.opacity).toBe(0);
     }
+  });
+});
+
+describe("ホームへのつなぎ", () => {
+  it("映像のロゴを、ホームの左上のロゴの真ん中へ、幅をそろえて移す", () => {
+    const from = { left: 40, top: 200, width: 300, height: 109 };
+    const to = { left: 20, top: 60, width: 151, height: 30 };
+    const f = spLogoFly(from, to);
+    expect(from.left + from.width / 2 + f.dx).toBeCloseTo(to.left + to.width / 2, 6);
+    expect(from.top + from.height / 2 + f.dy).toBeCloseTo(to.top + to.height / 2, 6);
+    expect(from.width * f.scale).toBeCloseTo(to.width, 6);
+  });
+  it("映像の間ホームの中身を待たせる長さは、CSS（html[data-launch=\"film\"] の --launch）と同じ", () => {
+    const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
+    const m = css.match(/html\[data-launch="film"\]\s*\{\s*--launch:\s*(\d+)s;/);
+    expect(m).not.toBeNull();
+    expect(Number(m![1]) * 1000).toBe(SP_OPENING.holdMs);
+  });
+  it("ロゴが移りきる前に映像は溶けきらない（ロゴだけが空に残って見えないように、同じくらいの長さ）", () => {
+    expect(Math.abs(SP_OPENING.handoff.fly - SP_OPENING.fadeOut)).toBeLessThan(0.2);
+    expect(SP_OPENING.handoff.content).toBeLessThan(SP_OPENING.handoff.logo);
   });
 });

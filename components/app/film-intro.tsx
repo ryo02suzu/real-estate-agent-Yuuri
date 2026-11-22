@@ -7,11 +7,41 @@
 // 流れない）ときは待たせず、すぐホームを出す。React が動く前は、app/globals.css の紺の幕が覆っている（data-film で外す）
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { arcMask, glintMask, sweepMask, type LogoFrame } from "@/lib/app/opening";
-import { SP_OPENING, SP_OPENING_CREDIT, spBars, spLogoBox, spLogoFrame, spPoint, spRise } from "@/lib/app/opening-sp";
+import { SP_OPENING, SP_OPENING_CREDIT, spBars, spLogoBox, spLogoFly, spLogoFrame, spPoint, spRise } from "@/lib/app/opening-sp";
 
 const LETTERS = ["l0", "l1", "l2", "l3", "l4", "l5", "l6"] as const;
 const PARTS = ["star", "arc", "mountain", "wave", ...LETTERS, "gold"] as const;
 type Part = (typeof PARTS)[number];
+
+/**
+ * 映像の間は待たせていたホームの中身（app/globals.css の html[data-launch="film"] の --launch）を、「今から」動かし始める。
+ * 中身それぞれの遅れ（上から順に現れるずれ）は残す。ホームのロゴだけ、映像のロゴが着くころに現れるよう少し遅らせる
+ */
+function releaseHome(contentAfter: number, logoAfter: number) {
+  if (typeof document.getAnimations !== "function") return;
+  for (const a of document.getAnimations()) {
+    const eff = a.effect;
+    if (!(eff instanceof KeyframeEffect)) continue;
+    const delay = eff.getTiming().delay;
+    if (typeof delay !== "number" || delay < SP_OPENING.holdMs - 10_000) continue;
+    const own = delay - SP_OPENING.holdMs;
+    const now = typeof a.currentTime === "number" ? a.currentTime : 0;
+    const isLogo = eff.target instanceof Element && eff.target.classList.contains("home-logo-in");
+    eff.updateTiming({ delay: now + (isLogo ? logoAfter : contentAfter) * 1000 + own });
+  }
+}
+
+/** ホームの左上のロゴの、動きの途中のずれ（下から浮き上がる前の 12px など）を除いた場所 */
+function homeLogoRect(): DOMRect | null {
+  const el = document.querySelector<HTMLElement>(".home-logo-in");
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  if (r.width <= 0) return null;
+  const t = getComputedStyle(el).transform;
+  const m = t && t !== "none" ? new DOMMatrixReadOnly(t) : null;
+  const zoom = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--app-zoom")) || 1;
+  return new DOMRect(r.left - (m ? m.m41 * zoom : 0), r.top - (m ? m.m42 * zoom : 0), r.width, r.height);
+}
 
 function mask(el: HTMLElement | null, m: string) {
   if (!el) return;
@@ -44,16 +74,32 @@ function Film() {
   const leave = useCallback((how: "skip" | "end") => {
     if (left.current) return;
     left.current = true;
+    const html = document.documentElement;
+    const { fly, content, logo: logoAt } = SP_OPENING.handoff;
+    if (how === "end") {
+      // ホームへのつなぎ：映像のロゴが左上の定位置へ移りながら小さくなり、着くころにホームのロゴが現れる。映像は溶けて、
+      // 街の写真が奥から落ち着き、ひとこと・検索欄・下のメニューが上から順に現れる
+      const to = homeLogoRect();
+      const el = box.current;
+      if (el && to) {
+        const f = spLogoFly(el.getBoundingClientRect(), to);
+        el.style.transform = `translate(${f.dx.toFixed(1)}px, ${f.dy.toFixed(1)}px) scale(${f.scale.toFixed(4)})`;
+      }
+      releaseHome(content, logoAt);
+    } else {
+      // 飛ばした・流れない：待たせていた中身は、すぐ終わりの形に（app/globals.css の html.launch-skip）
+      html.classList.add("launch-skip");
+    }
     setLeaving(how);
     // 消えていく間も、触れた指は幕が受け止める（見えていないボタンを押さない）
     window.setTimeout(
       () => {
-        const html = document.documentElement;
         html.setAttribute("data-launch", "done");
         html.removeAttribute("data-film");
+        html.classList.remove("launch-skip");
         setGone(true);
       },
-      how === "end" ? SP_OPENING.fadeOut * 1000 : 380,
+      how === "end" ? Math.max(fly, SP_OPENING.fadeOut) * 1000 + 120 : 380,
     );
   }, []);
 

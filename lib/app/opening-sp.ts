@@ -24,6 +24,13 @@ export const SP_OPENING = {
   logoSpeed: 1.6,
   /** 映像の終わりから、ロゴと映像がホームへ溶けて消えるまで（秒） */
   fadeOut: 0.7,
+  /**
+   * 映像の間、ホームの中身（ロゴ・ひとこと・検索欄・下のメニュー・写真）を出さずに待たせる長さ（ミリ秒。app/globals.css の
+   * html[data-launch="film"] の --launch と同じ）。映像が終わったら film-intro.tsx が「今から」へ直し、中身が順に現れる
+   */
+  holdMs: 600_000,
+  /** ホームへのつなぎ（秒）：ロゴが左上の定位置へ移る長さ・中身が現れ始める秒・ホームのロゴが現れ始める秒（つなぎの始まりから） */
+  handoff: { fly: 0.8, content: 0.25, logo: 0.4 },
   /** 読み込みが遅く、この秒数たっても流れ始めないときは流さない（ホームを待たせない） */
   startTimeout: 2.5,
   /** 上から順に、再生できる最初のもの（AV1 → AV1 を再生できない iPhone は HEVC → ほかは H.264）。?v= は作り直したら変える */
@@ -93,4 +100,19 @@ export function spLogoFrame(t: number): LogoFrame {
   // logoFrame は PC の映像の秒で動くので、PC の光の点の秒へずらして渡す（PC の白い雲へ溶ける所の手前で止める）
   const pc = OPENING.logoStart + (t - SP_OPENING.logoStart) * SP_OPENING.logoSpeed;
   return { ...logoFrame(Math.min(pc, OPENING.logoOut[0])), all: 1 };
+}
+
+/** 画面の四角（左・上・幅・高さ。getBoundingClientRect と同じ形） */
+export type Rect = { left: number; top: number; width: number; height: number };
+
+/**
+ * 映像の上のロゴ（from）を、ホームの左上のロゴ（to）へ移すときの、動かす量と縮める割合（真ん中どうしを合わせ、幅をそろえる）。
+ * 形の違うロゴ（映像は縦に重ねた形・ホームは横長）なので、移りながら薄くなり、着く所でホームのロゴが現れる
+ */
+export function spLogoFly(from: Rect, to: Rect): { dx: number; dy: number; scale: number } {
+  return {
+    dx: to.left + to.width / 2 - (from.left + from.width / 2),
+    dy: to.top + to.height / 2 - (from.top + from.height / 2),
+    scale: to.width / from.width,
+  };
 }
