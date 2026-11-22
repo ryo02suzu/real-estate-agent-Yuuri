@@ -1,0 +1,38 @@
+# Runpod（GPU の機械を借りる所）の鍵が GitHub の Secrets に入っていて、使えるかを確かめる。機械は借りないので、お金はかからない。
+# 鍵は リポジトリの Settings → Secrets and variables → Actions の RUNPOD_API_KEY（Runpod の Credentials → API Keys で作ったもの）。
+# 鍵の中身はログに出さない。オープニングの映像を GPU で描く仕組み（Blender）は、この確認が通ってから作る。
+name: Runpod の鍵の確認
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/runpod-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+    steps:
+      - name: 鍵で機械の一覧を読む（借りない）
+        run: |
+          if [ -z "$RUNPOD_API_KEY" ]; then
+            echo "::warning::RUNPOD_API_KEY が GitHub の Secrets にまだありません（入れたら、もう一度動かす）"
+            echo "Runpod の鍵：まだ入っていません" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          code=$(curl -s -o pods.json -w '%{http_code}' --max-time 30 https://api.runpod.io/v2/pods -H "Authorization: Bearer $RUNPOD_API_KEY")
+          echo "HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Runpod が鍵を受け付けませんでした（HTTP $code。401 は鍵の間違い、403 は権限の不足）"
+            exit 1
+          fi
+          {
+            echo "Runpod の鍵：使えます（HTTP 200）"
+            jq -r '"借りている機械: \((.pods // []) | length) 台", ((.pods // [])[] | "- \(.name // "-")：\(.status // "-")（\(.gpu.id // "GPU なし")）")' pods.json
+          } | tee -a "$GITHUB_STEP_SUMMARY"
