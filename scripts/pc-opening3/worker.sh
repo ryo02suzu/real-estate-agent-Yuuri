@@ -5,7 +5,8 @@
 #
 #   bash scripts/pc-opening3/worker.sh <コマ（例 0-14）> [解像度 2560x1440] [spp 32]
 #
-# - 5 コマずつ描き、描けた分をすぐ frames3/<4けたのコマ番号>.webp（品質 96）にしてコミット・push する
+# - 5 コマずつ描き、描けた分をすぐ frames3b/<4けたのコマ番号>.webp（品質 96）にしてコミット・push する
+#   （frames3b：木・草・石の姿を描く組によらず固定した scene3.py で描いたもの。前の frames3/ とは混ぜない）
 #   （作業場が途中で止まっても、描けた分は残る。もう一度動かすと、ある分は飛ばして続きから描く）
 # - 地形・土地の種類・素材・飛び方は、このリポジトリの道具で作る（GitHub Actions の prep と同じ。同じものができる）
 # - 最後に「WORKER DONE <コマ>」と出す
@@ -15,7 +16,7 @@ RES="${2:-2560x1440}"
 SPP="${3:-32}"
 ROOT=$(git rev-parse --show-toplevel)
 HERE="$ROOT/scripts/pc-opening3"
-OUT="$ROOT/frames3"
+OUT="$ROOT/frames3b"
 BL="${BL:-/tmp/blv/bin/python}"
 # コマは、手伝いの作業場それぞれのブランチにだけ入れる（main と、本体の作業ブランチには入れない）
 BR=$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)
@@ -70,7 +71,7 @@ push() {
   # 数える変数は local に（前は下の組の番号 i を書き換えてしまい、2 組目の最初の 1 コマを飛ばしていた）
   local k
   cd "$ROOT"
-  git add frames3
+  git add frames3b
   if ! git diff --cached --quiet; then
     git commit -q -m "オープニング第3版のコマ（$1。worker.sh で描いたもの）"
     for k in 1 2 3 4; do git push -q -u origin HEAD && break; sleep $((k * 5)); done
@@ -83,11 +84,11 @@ while [ $i -lt ${#todo[@]} ]; do
   batch=("${todo[@]:$i:5}")
   spec=$(IFS=,; echo "${batch[*]}")
   # 描いた EXR は消さない（仕上げで止まっても、もう一度動かすと描き直さずに仕上げから続く。scene3.py は EXR のあるコマを飛ばす）
-  "$BL" scene3.py -- --frames "$spec" --res "$RES" --spp "$SPP" --out work/exr_w
-  python3 post3.py --frames work/exr_w work/png_w
+  "$BL" scene3.py -- --frames "$spec" --res "$RES" --spp "$SPP" --out work/exr_b
+  python3 post3.py --frames work/exr_b work/png_b
   for f in "${batch[@]}"; do
     n=$(printf %04d "$f")
-    p="work/png_w/$n.png"
+    p="work/png_b/$n.png"
     python3 -c "import sys; from PIL import Image; Image.open(sys.argv[1]).save(sys.argv[2], quality=96, method=4)" "$p" "$OUT/$n.webp"
   done
   push "$spec"

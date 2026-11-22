@@ -1,10 +1,10 @@
 {
- "frames": "240-506",
- "jobs": 20,
+ "frames": "338-379",
+ "jobs": 5,
  "res": "2560x1440",
  "spp": 32,
  "prev_run": "",
- "note": "描く設定。書き換えて push すると .github/workflows/opening3-render.yml が動く。3回目（全力版）は、コマ 0-239 を手伝いの作業場（worker.sh）、240-506 をここで描き、手元で合わせて動画にする（encode: false）。足りないコマだけ描き直すときは frames にそのコマ、prev_run に前の回の番号。仕上げだけ直すときは repost_run に EXR を残した回の番号",
- "pass": 3,
- "encode": false
+ "encode": false,
+ "pass": 4,
+ "note": "描く設定。書き換えて push すると .github/workflows/opening3-render.yml が動く。4回目（木・草・石の姿を描く組によらず固定した scene3.py で、全部を描き直す）。ここは上昇場面の後半（338-379）。0-239 は手伝いの作業場（worker.sh）、240-337・380-506 は 1〜3 本目の流れ。手元で合わせて動画にする（encode: false）"
 }

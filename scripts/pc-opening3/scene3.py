@@ -970,16 +970,20 @@ def far_material(core: bpy.types.Material) -> bpy.types.Material:
     mx = next(n for n in nt.nodes if n.type == "MIX")
     mx.inputs[6].default_value = (0.018, 0.042, 0.022, 1.0)
     mx.inputs[7].default_value = (0.21, 0.115, 0.026, 1.0)
-    # 木ごとの色むら（明るさ 0.72〜1.28・色合い少し・鮮やかさ）：同じ色の木が並ぶと作り物に見える
-    oi = nt.nodes.new("ShaderNodeObjectInfo")
+    # 木ごとの色むら（明るさ 0.72〜1.28・色合い少し・鮮やかさ）：同じ色の木が並ぶと作り物に見える。
+    # 値は木ごとに固定（plant_forest の rnd）。Object Info の Random は、描く組ごとに植える木の並びが変わると値も変わり、
+    # 組の境目で森の色むらが入れ替わってちらついた
+    oi = nt.nodes.new("ShaderNodeAttribute")
+    oi.attribute_type = "INSTANCER"
+    oi.attribute_name = "rnd"
     hue = nt.nodes.new("ShaderNodeMath")
     hue.operation = "MULTIPLY_ADD"
-    nt.links.new(oi.outputs["Random"], hue.inputs[0])
+    nt.links.new(oi.outputs["Fac"], hue.inputs[0])
     hue.inputs[1].default_value = 0.06
     hue.inputs[2].default_value = 0.47
     r2 = nt.nodes.new("ShaderNodeMath")
     r2.operation = "MULTIPLY"
-    nt.links.new(oi.outputs["Random"], r2.inputs[0])
+    nt.links.new(oi.outputs["Fac"], r2.inputs[0])
     r2.inputs[1].default_value = 7.31
     fr = nt.nodes.new("ShaderNodeMath")
     fr.operation = "FRACT"
@@ -1065,11 +1069,19 @@ def larch_twig(mat: bpy.types.Material) -> None:
         nt.links.new(pick.outputs[2], t)
 
 
-def plant_forest(objs: dict, near, nm, valley, vm, cam_xy: np.ndarray, view: tuple[float, float] | None = None) -> None:
+def plant_forest(objs: dict, near, nm, valley, vm, cam_xy: np.ndarray, view: tuple[float, float] | None = None,
+                 lod_xy: np.ndarray | None = None) -> None:
     """木を植える：landcover.py の木の位置（work/landcover/trees.npz：x, y, 種, 大きさ）。カメラに近いほど細かい形。
-    view（カメラの方位°, 見える角の半分°）があれば、その向きの木と、カメラのまわり 250m の木（影・映り込み）だけ"""
+    view（カメラの方位°, 見える角の半分°）があれば、その向きの木と、カメラのまわり 250m の木（影・映り込み）だけ。
+    lod_xy（細かさを決めるカメラの位置。動画では飛ぶ道筋の全部）が無ければ cam_xy から。
+    木ごとの形の種類・向き・黄葉・色むらは、全部の木について先に決める（手分けして描く組のどれでも、同じ木は同じ姿）"""
     d = np.load(os.path.join(WORK, "landcover", "trees.npz"))
     x, y, kind, size = d["x"], d["y"], d["kind"], d["size"]
+    rng = np.random.default_rng(7)
+    var = rng.integers(0, 3, len(x))
+    rot = rng.uniform(0, 2 * math.pi, len(x))
+    ylw = rng.uniform(0, 1, len(x))
+    rnd = rng.uniform(0, 1, len(x))
     if view is not None:
         azs = np.atleast_1d(view[0])
         sel = np.zeros(len(x), bool)
@@ -1083,17 +1095,14 @@ def plant_forest(objs: dict, near, nm, valley, vm, cam_xy: np.ndarray, view: tup
             hit = np.zeros(len(x), bool)
             hit[box] = (np.abs(ang) < view[1] + 15.0) | (r[box] < 250)
             sel |= hit
-        x, y, kind, size = x[sel], y[sel], kind[sel], size[sel]
+        x, y, kind, size, var, rot, ylw, rnd = (v[sel] for v in (x, y, kind, size, var, rot, ylw, rnd))
     z = ground_height(x, y, near, nm, valley, vm)
-    # カメラ（の道筋）からの距離で細かさを選ぶ
+    # カメラの道筋からの距離で細かさを選ぶ（道筋の全部から。描く組のカメラだけから選ぶと、組の境目で細かさが入れ替わった）
     dist = np.full(len(x), np.inf)
-    for cx, cy in cam_xy:
+    for cx, cy in (cam_xy if lod_xy is None else lod_xy):
         dist = np.minimum(dist, np.hypot(x - cx, y - cy))
     # 細かい形は道筋から 110m（2560×1440 で、100m 先の木は高さ約 250 画素）、中くらいの形は 800m まで
     lod = np.select([dist < LOD_NEAR, dist < LOD_MID], [0, 1], 2)
-    rng = np.random.default_rng(7)
-    var = rng.integers(0, 3, len(x))
-    rot = rng.uniform(0, 2 * math.pi, len(x))
     # 道具の木の一覧（インスタンスの番号）：モミ 3本 × 3段、若木 3本 × 3段（カラマツは同じ形で、属性 larch で色だけ替える）
     order = [f"{a}_{v}_LOD{l}" for a in ("fir_tree_01", "fir_sapling_medium") for v in "abc" for l in (0, 1, 2)]
     var = np.where((lod == 0) & (kind != 2) & (var == 0), 1, var)  # fir a の細かい形（210 万面）は重いので、近くでは b に
@@ -1116,8 +1125,10 @@ def plant_forest(objs: dict, near, nm, valley, vm, cam_xy: np.ndarray, view: tup
     a = me.attributes.new("rot", "FLOAT", "POINT")
     a.data.foreach_set("value", rot.astype(np.float32))
     a = me.attributes.new("larch", "FLOAT", "POINT")  # 点の属性は木（インスタンス）に引き継がれ、材料が読む
-    yellow = (kind == 1) | ((kind == 2) & (rng.uniform(0, 1, len(x)) < 0.3))
+    yellow = (kind == 1) | ((kind == 2) & (ylw < 0.3))
     a.data.foreach_set("value", yellow.astype(np.float32))
+    a = me.attributes.new("rnd", "FLOAT", "POINT")  # 木ごとの色むら（far_material が読む）
+    a.data.foreach_set("value", rnd.astype(np.float32))
     ob = bpy.data.objects.new("forest", me)
     bpy.context.scene.collection.objects.link(ob)
     ng = bpy.data.node_groups.new("forest", "GeometryNodeTree")
@@ -1181,6 +1192,7 @@ def plant_plants(near, nm, valley, vm, cam_xy: np.ndarray, radius: float = 320.0
         return
     d = np.load(f)
     x, y, kind, size = d["x"], d["y"], d["kind"], d["size"]
+    rot = np.random.default_rng(13).uniform(0, 2 * math.pi, len(x))  # 向きは全部の株について先に（組ごとに変わらないように）
     dist = np.full(len(x), np.inf)
     for cx, cy in cam_xy:
         dist = np.minimum(dist, np.hypot(x - cx, y - cy))
@@ -1194,7 +1206,7 @@ def plant_plants(near, nm, valley, vm, cam_xy: np.ndarray, radius: float = 320.0
             ang = (np.degrees(np.arctan2(x - cx, y - cy)) - azs[k] + 180.0) % 360.0 - 180.0
             vis |= (np.abs(ang) < view[1] + 20.0) | (np.hypot(x - cx, y - cy) < 40.0)
         sel &= vis
-    x, y, kind, size = x[sel], y[sel], kind[sel], size[sel]
+    x, y, kind, size, rot = x[sel], y[sel], kind[sel], size[sel], rot[sel]
     names = []
     for asset, want in (("fern_02", [f"fern_02_{v}" for v in "abcd"]), ("grass_medium_02", [f"grass_medium_02_{v}" for v in "abcde"])):
         p = os.path.join(ASSETS, "models", asset, f"{asset}.blend")
@@ -1211,11 +1223,10 @@ def plant_plants(near, nm, valley, vm, cam_xy: np.ndarray, radius: float = 320.0
         ob.name = f"{i:02d}_{nme}"
         col.objects.link(ob)
     z = ground_height(x, y, near, nm, valley, vm) - 0.05
-    rng = np.random.default_rng(13)
     me = bpy.data.meshes.new("plant_points")
     me.vertices.add(len(x))
     me.vertices.foreach_set("co", np.stack([x, y, z], -1).astype(np.float32).ravel())
-    for nme, typ, val in (("inst", "INT", kind.astype(np.int32)), ("scl", "FLOAT", size.astype(np.float32)), ("rot", "FLOAT", rng.uniform(0, 2 * math.pi, len(x)).astype(np.float32))):
+    for nme, typ, val in (("inst", "INT", kind.astype(np.int32)), ("scl", "FLOAT", size.astype(np.float32)), ("rot", "FLOAT", rot.astype(np.float32))):
         a = me.attributes.new(nme, typ, "POINT")
         a.data.foreach_set("value", val)
     ob = bpy.data.objects.new("plants", me)
@@ -1235,11 +1246,12 @@ def plant_rocks(near, nm, valley, vm, cam_xy: np.ndarray, radius: float = 700.0)
         return
     d = np.load(f)
     x, y, kind, size = d["x"], d["y"], d["kind"], d["size"]
+    rot = np.random.default_rng(11).uniform(0, 2 * math.pi, len(x))  # 向きは全部について先に（組ごとに変わらないように）
     dist = np.full(len(x), np.inf)
     for cx, cy in cam_xy:
         dist = np.minimum(dist, np.hypot(x - cx, y - cy))
     sel = dist < radius
-    x, y, kind, size = x[sel], y[sel], kind[sel], size[sel]
+    x, y, kind, size, rot = x[sel], y[sel], kind[sel], size[sel], rot[sel]
     names = []
     for asset, want in (("rock_moss_set_01", [f"rock_moss_set_01_rock{i:02d}" for i in range(1, 7)]),
                         ("rock_moss_set_02", [f"rock_moss_set_02_rock{i:02d}" for i in range(7, 14)]),
@@ -1263,11 +1275,10 @@ def plant_rocks(near, nm, valley, vm, cam_xy: np.ndarray, radius: float = 700.0)
             for m in ob.data.materials:
                 clean_rock(m)
     z = ground_height(x, y, near, nm, valley, vm) - 0.18 * size
-    rng = np.random.default_rng(11)
     me = bpy.data.meshes.new("rock_points")
     me.vertices.add(len(x))
     me.vertices.foreach_set("co", np.stack([x, y, z], -1).astype(np.float32).ravel())
-    for nme, typ, val in (("inst", "INT", kind.astype(np.int32)), ("scl", "FLOAT", size.astype(np.float32)), ("rot", "FLOAT", rng.uniform(0, 2 * math.pi, len(x)).astype(np.float32))):
+    for nme, typ, val in (("inst", "INT", kind.astype(np.int32)), ("scl", "FLOAT", size.astype(np.float32)), ("rot", "FLOAT", rot.astype(np.float32))):
         a = me.attributes.new(nme, typ, "POINT")
         a.data.foreach_set("value", val)
     ob = bpy.data.objects.new("rocks", me)
@@ -1440,7 +1451,8 @@ def run_anim(a) -> None:
     cams, az, lens = anim_trees(frames, todo)
     objs = append_trees()
     half = float(math.degrees(math.atan(18.0 / lens.min())))
-    plant_forest(objs, near, nm, valley, vm, cams, view=(az, half))
+    path_xy = np.array([fr["pos"][:2] for fr in frames])
+    plant_forest(objs, near, nm, valley, vm, cams, view=(az, half), lod_xy=path_xy)
     plant_rocks(near, nm, valley, vm, cams)
     plant_plants(near, nm, valley, vm, cams, view=(az, half))
     W, H = (int(v) for v in a.res.split("x"))

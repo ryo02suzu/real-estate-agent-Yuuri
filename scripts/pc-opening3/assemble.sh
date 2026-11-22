@@ -1,6 +1,6 @@
 #!/bin/bash
 # オープニング第3版のコマを集めて、動画（AV1・HEVC・H.264）にする。手伝いの作業場（worker.sh）が描いたコマ
-# （作業場それぞれのブランチの frames3/*.webp）と、GitHub Actions の回が描いたコマ（frames-* の成果物を広げた PNG）を合わせる。
+# （作業場それぞれのブランチの frames3b/*.webp）と、GitHub Actions の回が描いたコマ（frames-* の成果物を広げた PNG）を合わせる。
 #
 #   bash scripts/pc-opening3/assemble.sh <作業の場所> <Actions のコマの場所> <ブランチ> [<ブランチ> ...]
 #
@@ -10,7 +10,7 @@
 # - 動画は public/opening3/ に（24 コマ/秒・507 コマ）：
 #     opening-av1.webm（AV1・2560×1440。大きい画面・細かい画面）・opening-av1-1080.webm（AV1・1920×1080。ふつうの画面）
 #     opening-hevc.mp4（HEVC・2560×1440。AV1 を再生できない Apple の機器）・opening.mp4（H.264・1920×1080。ほかの古い機器）
-# - ブランチは git fetch して frames3/ だけを取り出す（作業の場所の外は変えない）
+# - ブランチは git fetch して frames3b/ だけを取り出す（作業の場所の外は変えない）
 # - ONLY=<av1|av1-1080|hevc|avc> で 1 つだけ作る（試すとき）
 set -euo pipefail
 WORK="$1"
@@ -22,7 +22,7 @@ mkdir -p "$WORK/w" "$WORK/all"
 for b in "$@"; do
   echo "ブランチ $b"
   git -C "$ROOT" fetch -q origin "$b"
-  git -C "$ROOT" archive FETCH_HEAD frames3 | tar -x -C "$WORK/w"
+  git -C "$ROOT" archive FETCH_HEAD frames3b | tar -x -C "$WORK/w"
 done
 
 python3 - "$WORK" "$ACT" <<'EOF'
@@ -31,7 +31,7 @@ from PIL import Image
 work, act = sys.argv[1], sys.argv[2]
 src = {}
 # 先に Actions の PNG（劣化なし）、無いコマだけ作業場の WebP（品質 96）
-for d, ext in ((act, ".png"), (os.path.join(work, "w", "frames3"), ".webp")):
+for d, ext in ((act, ".png"), (os.path.join(work, "w", "frames3b"), ".webp")):
     if not os.path.isdir(d):
         continue
     for f in os.listdir(d):
