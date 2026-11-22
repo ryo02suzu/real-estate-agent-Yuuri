@@ -1,3 +1,4 @@
 {
+ "chubu": {"codes":["15","16","17","18","19"],"accuracy":{"file":"chubu-20261121-2255.pmtiles","date":"2026-11-23","method":"地価公示・地価調査の地点（land-price-2026-2026.pmtiles）のうち推定の筆の中にある地点で、筆の地番を所在の地番と比べた（scripts/kozu-tiles/check_accuracy.mjs）","high":{"points":165,"exact":128,"within30":161,"elsewhere":3}}},
  "kinki2": {"codes":["25","26","28","29","30"],"accuracy":{"file":"kinki2-20261121-1619.pmtiles","date":"2026-11-21","method":"地価公示・地価調査の地点（land-price-2026-2026.pmtiles）のうち推定の筆の中にある地点で、筆の地番を所在の地番と比べた（scripts/kozu-tiles/check_accuracy.mjs）","high":{"points":249,"exact":206,"within30":242,"elsewhere":6}}}
 }
