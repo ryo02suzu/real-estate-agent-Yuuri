@@ -76,7 +76,7 @@ jobs:
           # 仕事に渡す設定（run.sh の前に読む）
           : > work/job/_env
           for kv in $ENV_IN; do
-            [[ "$kv" =~ ^[A-Z_][A-Z0-9_]*=[A-Za-z0-9._,:x/-]*$ ]] || { echo "::error::設定の書き方が違います: $kv"; exit 1; }
+            [[ "$kv" =~ ^[A-Z_][A-Z0-9_]*=[A-Za-z0-9._,:x/=-]*$ ]] || { echo "::error::設定の書き方が違います: $kv"; exit 1; }
             echo "export $kv" >> work/job/_env
           done
           python3 - <<'PY'
