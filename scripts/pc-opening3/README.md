@@ -33,8 +33,8 @@
 | `path3.py` | カメラの飛び方（コマごとの位置・向き・機体の傾き・揺れ） |
 | `post3.py` | 仕上げ：空気のかすみ・川の朝もや（指数の高さの霧を光線ごとに積分。風で流れる）・光のにじみ・AgX・金色の光と藍の影・周辺の暗さ・粒・最後の白 |
 | `.github/workflows/opening3-render.yml` | GitHub Actions で 20 台に分けて描き、動画にしてブランチに入れる（`render.json` を書き換えて push すると動く） |
-| `.github/workflows/opening3-render-extra.yml`・`opening3-render-extra2.yml` | 足りないコマを、本体の回を止めずに空いた台で描く（`render-extra.json`・`render-extra2.json` を書き換えて push すると動く。動画にはしない） |
-| `worker.sh` | 手伝いのクラウドの作業場（Claude Code のセッション）で決めたコマを描き、そのセッションのブランチに `frames3/*.webp` で入れる |
+| `.github/workflows/opening3-render-extra.yml`・`opening3-render-extra2.yml`・`opening3-render-extra3.yml` | 足りないコマを、本体の回を止めずに空いた台で描く（`render-extra.json`・`render-extra2.json`・`render-extra3.json` を書き換えて push すると動く。動画にはしない） |
+| `worker.sh` | 手伝いのクラウドの作業場（Claude Code のセッション）で決めたコマを描き、そのセッションのブランチに `frames3b/*.webp`（品質 96）で入れる。5 コマ描くごとに push するので、途中で止まっても描けた分は残る |
 | `grade3.py` | 最後の色の仕上げ（集めた 507 コマ全部に同じだけ）：持ち上がった黒を締め、明るい雲は肩を丸めて白く飛ばさず、ごく弱い S 字と彩度を少し。最後の白い雲ではかけない（最後のコマはアプリの白 #f3f1ec のまま） |
 | `assemble.sh` | 手分けして描いたコマ（作業場のブランチと Actions の PNG）を集め、`grade3.py` をかけて動画（AV1 2 つ・HEVC・H.264）にする |
 
