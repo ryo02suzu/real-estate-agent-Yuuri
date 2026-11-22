@@ -6,6 +6,7 @@
 #
 # - <作業の場所>/all/0000.png〜0506.png にそろえ、足りないコマがあれば番号を出して止まる
 #   （同じコマが両方にあれば、劣化の無い Actions の PNG を使う。PNG はコピーせずリンクにする）
+# - そろえたコマに、最後の色の仕上げ（grade3.py）をかけて <作業の場所>/graded/ に置き、それを動画にする
 # - 動画は public/opening3/ に（24 コマ/秒・507 コマ）：
 #     opening-av1.webm（AV1・2560×1440。大きい画面・細かい画面）・opening-av1-1080.webm（AV1・1920×1080。ふつうの画面）
 #     opening-hevc.mp4（HEVC・2560×1440。AV1 を再生できない Apple の機器）・opening.mp4（H.264・1920×1080。ほかの古い機器）
@@ -58,9 +59,12 @@ for i in range(507):
 print("そろった：", size)
 EOF
 
+# 最後の色の仕上げ（黒を締める・白い雲の肩を丸める・彩度を少し。最後の白い雲ではかけない。grade3.py）
+python3 "$ROOT/scripts/pc-opening3/grade3.py" "$WORK/all" "$WORK/graded"
+
 OUT="$ROOT/public/opening3"
 mkdir -p "$OUT"
-IN="$WORK/all/%04d.png"
+IN="$WORK/graded/%04d.png"
 ONLY="${ONLY:-}"
 # AV1：見た目の細かさを優先する設定（tune=0）と量子化の行列。森の細かい動きで 1 秒あたり 9〜12Mbps ほど
 AV1P="tune=0:enable-qm=1"

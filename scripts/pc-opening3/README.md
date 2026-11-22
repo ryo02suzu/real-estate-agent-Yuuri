@@ -35,7 +35,8 @@
 | `.github/workflows/opening3-render.yml` | GitHub Actions で 20 台に分けて描き、動画にしてブランチに入れる（`render.json` を書き換えて push すると動く） |
 | `.github/workflows/opening3-render-extra.yml`・`opening3-render-extra2.yml` | 足りないコマを、本体の回を止めずに空いた台で描く（`render-extra.json`・`render-extra2.json` を書き換えて push すると動く。動画にはしない） |
 | `worker.sh` | 手伝いのクラウドの作業場（Claude Code のセッション）で決めたコマを描き、そのセッションのブランチに `frames3/*.webp` で入れる |
-| `assemble.sh` | 手分けして描いたコマ（作業場のブランチと Actions の PNG）を集め、動画（AV1 2 つ・HEVC・H.264）にする |
+| `grade3.py` | 最後の色の仕上げ（集めた 507 コマ全部に同じだけ）：持ち上がった黒を締め、明るい雲は肩を丸めて白く飛ばさず、ごく弱い S 字と彩度を少し。最後の白い雲ではかけない（最後のコマはアプリの白 #f3f1ec のまま） |
+| `assemble.sh` | 手分けして描いたコマ（作業場のブランチと Actions の PNG）を集め、`grade3.py` をかけて動画（AV1 2 つ・HEVC・H.264）にする |
 
 ```bash
 python3 data.py && python3 landcover.py && python3 assets.py && python3 path3.py
