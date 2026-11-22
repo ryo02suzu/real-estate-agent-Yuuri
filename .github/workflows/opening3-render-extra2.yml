@@ -1,0 +1,244 @@
+# PC のオープニング第3版の「足りないコマを足す」流れの2本目（opening3-render-extra.yml の写し）。render-extra2.json を書き換えて push すると動く。
+# 1本目（render-extra.json）と同時に動けるよう、同時に動かす組を分けた（1本目と本体の回を止めない）。
+# 本体の回（render.json）と同時に動けるよう、同時に動かす組を分けた（本体の回を止めない）。コマを描いて渡すだけで、動画にはしない。
+# もとの説明：PC のオープニング第3版（scripts/pc-opening3）を、GitHub Actions の何台かで描く
+# （公開リポジトリなので GitHub Actions の分は無料）。手元の 4 コアでは 1 コマ約 12 分・全部で約 100 時間かかるので、分けて描く。
+#   prep:   地形と写真（国土地理院）・土地の種類と木の位置・素材（Poly Haven、CC0）・カメラの飛び方を作り、ひとまとめにして渡す
+#   render: コマを分けて描く（Blender 5.3 の bpy・Cycles）→ 仕上げ（post3.py：かすみ・朝もや・色）→ PNG
+#   encode: 全部のコマを集めて動画（H.264・AV1）にし、public/opening3/ に入れて、このブランチに push する
+# scripts/pc-opening3/render-extra2.json（描く設定）を書き換えて push すると動く（main に無いワークフローは、手で動かせないため）。
+name: オープニング第3版の足りないコマを描く（2）
+
+on:
+  push:
+    branches: ["claude/**"]
+    paths: ["scripts/pc-opening3/render-extra2.json"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: opening3-render-extra2
+  cancel-in-progress: true
+
+jobs:
+  config:
+    runs-on: ubuntu-latest
+    outputs:
+      repost_run: ${{ steps.c.outputs.repost_run }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: c
+        run: echo "repost_run=$(python3 -c "import json;print(json.load(open('scripts/pc-opening3/render-extra2.json')).get('repost_run',''))")" >> "$GITHUB_OUTPUT"
+
+  # 仕上げだけ直す回（render.json の repost_run に、EXR を残した回の番号）：描き直さず、残した EXR から仕上げ直す
+  repost:
+    needs: config
+    if: needs.config.outputs.repost_run != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install numpy scipy pillow OpenEXR
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: exr-*
+          path: exr
+          merge-multiple: true
+          run-id: ${{ needs.config.outputs.repost_run }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: 仕上げ
+        working-directory: scripts/pc-opening3
+        run: python post3.py --frames "$GITHUB_WORKSPACE/exr" "$GITHUB_WORKSPACE/png"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frames-repost
+          path: png/*.png
+          retention-days: 7
+          compression-level: 0
+
+  prep:
+    needs: config
+    if: needs.config.outputs.repost_run == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    outputs:
+      chunks: ${{ steps.plan.outputs.chunks }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install numpy scipy pillow OpenEXR
+      - name: 地形・写真・土地の種類・素材・飛び方
+        working-directory: scripts/pc-opening3
+        run: |
+          python data.py
+          python landcover.py
+          python assets.py
+          python path3.py
+      - id: plan
+        name: コマの分け方
+        working-directory: scripts/pc-opening3
+        run: |
+          python - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json
+          r = json.load(open("render-extra2.json"))
+          want = []
+          for part in r["frames"].split(","):
+              if "-" in part:
+                  a, b = (int(v) for v in part.split("-"))
+                  want += list(range(a, b + 1))
+              elif part.strip():
+                  want.append(int(part))
+          want = sorted(set(want))
+          n = max(1, min(int(r.get("jobs", 20)), len(want)))
+          size = -(-len(want) // n)
+          chunks = []
+          for k in range(0, len(want), size):
+              part = want[k:k + size]
+              # 続いた番号は「a-b」にまとめる
+              runs, s0 = [], part[0]
+              for x, y in zip(part, part[1:] + [None]):
+                  if y != x + 1:
+                      runs.append(f"{s0}-{x}" if x != s0 else f"{x}")
+                      s0 = y
+              chunks.append(",".join(runs))
+          print("chunks=" + json.dumps(chunks))
+          EOF
+      - name: 渡すもの（地形・土地の種類・素材・飛び方）
+        run: |
+          mkdir -p bundle
+          cd scripts/pc-opening3/work
+          tar -cf ../../../bundle/scene.tar terrain landcover assets path3.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scene
+          path: bundle/scene.tar
+          retention-days: 3
+          compression-level: 0
+
+  render:
+    needs: prep
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        chunk: ${{ fromJson(needs.prep.outputs.chunks) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Blender（bpy）が使う画面まわりの部品
+        run: sudo apt-get update && sudo apt-get install -y libxi6 libxxf86vm1 libxfixes3 libxrender1 libgl1 libegl1 libxkbcommon0 libsm6 libice6
+      - run: pip install bpy==5.3.0 numpy scipy pillow OpenEXR
+      - uses: actions/download-artifact@v4
+        with:
+          name: scene
+          path: bundle
+      - name: 描く
+        working-directory: scripts/pc-opening3
+        run: |
+          mkdir -p work && tar -xf ../../bundle/scene.tar -C work
+          RES=$(python -c "import json;print(json.load(open('render-extra2.json'))['res'])")
+          SPP=$(python -c "import json;print(json.load(open('render-extra2.json'))['spp'])")
+          # 時間切れの前に止め、描けたコマは仕上げて渡す（足りないコマは、次の回で frames に入れて描き直す）
+          timeout --signal=INT 315m python scene3.py --frames "${{ matrix.chunk }}" --res "$RES" --spp "$SPP" --out "$GITHUB_WORKSPACE/exr"
+      - name: 仕上げ
+        if: always()
+        working-directory: scripts/pc-opening3
+        run: python post3.py --frames "$GITHUB_WORKSPACE/exr" "$GITHUB_WORKSPACE/png"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          # 光の量そのまま（EXR）も残す：仕上げ（post3.py）だけを直すときは、描き直さずに使える
+          name: exr-${{ strategy.job-index }}
+          path: exr/*
+          retention-days: 7
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frames-${{ strategy.job-index }}
+          path: png/*.png
+          retention-days: 7
+          compression-level: 0
+
+  encode:
+    needs: [render, repost]
+    if: always() && (needs.render.result == 'success' || needs.render.result == 'failure' || needs.repost.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: frames-*
+          path: png
+          merge-multiple: true
+      - name: 前の回のコマ（render.json の prev_run。描き直した分と合わせる）
+        id: prev
+        run: echo "run=$(python3 -c "import json;print(json.load(open('scripts/pc-opening3/render-extra2.json')).get('prev_run',''))")" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        if: steps.prev.outputs.run != ''
+        with:
+          pattern: frames-*
+          path: png_prev
+          merge-multiple: true
+          run-id: ${{ steps.prev.outputs.run }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: コマがそろっているか
+        id: check
+        run: |
+          mkdir -p png png_prev
+          cp -n png_prev/*.png png/ 2>/dev/null || true
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, os, sys
+          r = json.load(open("scripts/pc-opening3/render-extra2.json"))
+          have = {int(f[:4]) for f in os.listdir("png") if f.endswith(".png")}
+          want = set(range(0, 507))
+          miss = sorted(want - have)
+          print(f"コマ {len(have)} / {len(want)}", file=sys.stderr)
+          if r.get("encode", True) is False:
+              # 手伝いの作業場（worker.sh）と手分けして描いた回：コマは手元で集めて動画にする
+              print("動画にしない回（render.json の encode が false）", file=sys.stderr)
+              print("ok=0")
+          elif miss:
+              print("足りないコマ:", miss, file=sys.stderr)
+              sys.exit(1)
+          else:
+              print("ok=1")
+          EOF
+      - name: 動画にする
+        if: steps.check.outputs.ok == '1'
+        run: |
+          command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+          ls png | wc -l
+          mkdir -p public/opening3
+          ffmpeg -version | head -1
+          ffmpeg -y -framerate 24 -i png/%04d.png -c:v libx264 -preset slow -crf 17 -profile:v high -level 4.1 -pix_fmt yuv420p -g 48 -movflags +faststart public/opening3/opening.mp4
+          if ffmpeg -hide_banner -encoders | grep -q libsvtav1; then
+            ffmpeg -y -framerate 24 -i png/%04d.png -c:v libsvtav1 -preset 4 -crf 28 -pix_fmt yuv420p10le -g 48 public/opening3/opening-av1.webm
+          fi
+          # Apple の機器（AV1 を再生できないもの）向け：HEVC（H.264 より軽い）
+          if ffmpeg -hide_banner -encoders | grep -q libx265; then
+            ffmpeg -y -framerate 24 -i png/%04d.png -c:v libx265 -preset slow -crf 22 -pix_fmt yuv420p10le -tag:v hvc1 -g 48 -movflags +faststart public/opening3/opening-hevc.mp4
+          fi
+          ls -la public/opening3
+      - name: ブランチに入れる
+        if: steps.check.outputs.ok == '1'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/opening3
+          git commit -m "オープニング第3版の動画（自動で描いたもの）" || exit 0
+          for i in 1 2 3 4; do
+            git pull --rebase -X theirs && git push && break
+            sleep $((i * 5))
+          done
