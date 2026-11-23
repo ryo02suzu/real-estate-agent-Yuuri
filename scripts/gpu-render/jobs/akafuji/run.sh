@@ -16,7 +16,7 @@ n=$(ls "$OUT/frames"/*.png 2>/dev/null | wc -l)
 echo "描いたコマ：$n"
 [ "$n" -gt 0 ] || exit 1
 if [ "$n" -gt 1 ]; then
-  first=$(ls "$OUT/frames"/*.png | head -1 | xargs basename .png)
+  first=$(basename "$(ls "$OUT/frames"/*.png | head -1)" .png)
   ffmpeg -loglevel error -y -framerate 30 -start_number "$((10#$first))" -i "$OUT/frames/%04d.png" -c:v libx264 -pix_fmt yuv420p -crf 16 "$OUT/preview.mp4"
   echo "動画：$(du -h "$OUT/preview.mp4" | cut -f1)"
 fi

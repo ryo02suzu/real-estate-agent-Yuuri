@@ -37,6 +37,7 @@ GitHub の Actions →「GPU で描く（Runpod）」→ Run workflow（`.github
 |---|---|
 | `runpod_job.py` | Runpod の API（借りる・待つ・送る・動かす・待つ・消す・古い機械を消す・GPU の値段） |
 | `pod-wrap.sh` | 機械の中で動く：Blender を入れ、`run.sh` を動かし、できたものを送る。状態は `/root/state`、記録は `/root/log.txt` |
+| `collect.sh` | 何台かに分けて描いた動画のコマを R2 から集め、抜けが無いか確かめて、確かめ用の動画（preview.mp4）にする |
 | `jobs/smoke/` | 動作確認：朝日の空と立体の雲を 1 枚描き、使った装置（OptiX・CUDA）とかかった時間を `report.txt` に書く |
 | `jobs/akafuji/` | 試し撮り「赤富士」：夏の日の出すぐ、雲海の上で朝日に赤く染まる富士山を北東の上空から見る（3 秒・ゆっくり前へ） |
 
