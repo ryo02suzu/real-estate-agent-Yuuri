@@ -7,7 +7,8 @@
 #         cone_stride=1（山の部分の 5m の標高の間引き）・base_stride=2（広い範囲の 10m の標高の間引き。山の部分が無いときは stride）
 #         exposure=-0.8・look=Medium_High_Contrast（AgX の見え方。Punchy など）・sky=0.5（空と太陽の強さ）
 #         disc=1（空のモデルの太陽で照らす）・sun=0（ランプで照らす強さ。使うときは disc=0）・aerosol=1.6・haze=0.000005（かすみ）
-#         clouds=4（雲海の作り方の版）・cloud_density=0.12・cloud_lift=40（雲の上面を上げる m）・cloud_texel=8・vol_bounces=8
+#         clouds=4（雲海の作り方の版）・cloud_density=0.12・cloud_lift=170（雲の上面を上げる m）・cloud_texel=8・vol_bounces=8
+#         veg_dark=0.5（森の明るさ。航空写真の森は明るすぎる）・cloud_shell=128（雲の入れ物の格子 m）
 #         cloud_edge=8・cloud_wisp=40・cloud_wisp_scale=40・cloud_wisp_detail=5（雲の表面の細かな凹凸）・denoise=1・border=（一部だけ描く）
 #         lens=70・aim=2900（見る高さ）・cam_lat / cam_lon / cam_h（カメラの場所）
 import json
@@ -40,9 +41,11 @@ MY = 110574.0  # 緯度 1 度の m
 # 太陽：8 月はじめの日の出すぐ（富士山の北東の空、高さ約 2 度）。空のモデルの向きは北から右回りの方位（確かめ済み）
 SUN_AZ, SUN_EL = math.radians(66.0), math.radians(2.0)
 SUN_DIR = Vector((math.sin(SUN_AZ) * math.cos(SUN_EL), math.cos(SUN_AZ) * math.cos(SUN_EL), math.sin(SUN_EL)))
-# カメラ：富士吉田の上空（山頂の北 15km）、高さ 2,350m から、山頂の少し下を見て、3 秒で 180m 前へ。
-# 朝日（北東）が左から当たり、東の面が赤く、西の面が影になる（正面から当てると山肌の起伏が平らに見える）
-CAM0 = (float(opt.get("cam_lat", "35.4950")), float(opt.get("cam_lon", "138.7600")), float(opt.get("cam_h", "2350")))
+# カメラ：山中湖の北西の上空（山頂の北東 約 14km・方位 36 度）、高さ 2,600m から、山頂の少し下を見て、3 秒で 180m 前へ。
+# 朝日（方位 66 度）をほぼ背にして、山の正面全体が赤く染まる（赤富士の写真の定番の向き）。少し北に寄せて、右の斜面に
+# 浅い陰を残す（立体感）。北から横向きに当てる構図（cam_lat=35.4950・cam_lon=138.7600）は、低い朝日の雲の頭の長い影が
+# この見る角度ではほぼ水平の直線に並び、雲海が平らに切られたように見えた（GPU の 5 回目）
+CAM0 = (float(opt.get("cam_lat", "35.4620")), float(opt.get("cam_lon", "138.8180")), float(opt.get("cam_h", "2600")))
 CAM_PUSH = 180.0
 CLOUD_TOP = 2050.0  # 雲海の上面（だいたい）
 CLOUD_BOTTOM = 1250.0
@@ -83,6 +86,9 @@ print("使う装置:", device, flush=True)
 scene.cycles.samples = SAMPLES
 scene.cycles.use_denoising = opt.get("denoise", "1") == "1"
 scene.cycles.max_bounces = 12
+# 雲の入れ物（雲の上面に沿った凸凹の形）の境目は「透明な面」として数えられ、低い朝日へ向かう影の光線は何度も出入りする。
+# 既定の 8 回を超えると、そこで光が止められて雲が平らに切られたように見える（GPU の 5 回目で見えた）ので、十分に多く
+scene.cycles.transparent_max_bounces = int(opt.get("transparent_bounces", "256"))
 # 雲の中で光が何回まで散るか。薄い層（3 版）なら 8 回で上から見た明るさはほぼ出る（vol_bounces=）
 scene.cycles.volume_bounces = 2 if PREVIEW else int(opt.get("vol_bounces", "8"))
 scene.cycles.volume_step_rate = 4.0 if PREVIEW else 1.0
@@ -241,7 +247,26 @@ def ground_material(name, layers):
     hsv.inputs["Saturation"].default_value = 1.05
     hsv.inputs["Value"].default_value = 0.78
     nt.links.new(col, hsv.inputs["Color"])
-    nt.links.new(hsv.outputs["Color"], bsdf.inputs["Base Color"])
+    # 森（緑が赤より強い所）は暗く：航空写真は明るさをそろえてあり、森が砂礫の斜面と同じくらい明るく写るが、
+    # 本物の針葉樹の森の反射は 1 割前後で、赤い砂礫の斜面より暗い（朝日では黒っぽく沈み、赤い山肌が浮く）
+    sepc = nt.nodes.new("ShaderNodeSeparateColor")
+    nt.links.new(col, sepc.inputs[0])
+    gr = nt.nodes.new("ShaderNodeMath")
+    gr.operation = "SUBTRACT"
+    nt.links.new(sepc.outputs[1], gr.inputs[0])
+    nt.links.new(sepc.outputs[0], gr.inputs[1])
+    veg = nt.nodes.new("ShaderNodeMapRange")
+    veg.interpolation_type = "SMOOTHSTEP"
+    veg.inputs["From Min"].default_value = -0.005
+    veg.inputs["From Max"].default_value = 0.03
+    veg.inputs["To Min"].default_value = 1.0
+    veg.inputs["To Max"].default_value = float(opt.get("veg_dark", "0.5"))
+    nt.links.new(gr.outputs[0], veg.inputs["Value"])
+    darkv = nt.nodes.new("ShaderNodeVectorMath")
+    darkv.operation = "SCALE"
+    nt.links.new(hsv.outputs["Color"], darkv.inputs[0])
+    nt.links.new(veg.outputs["Result"], darkv.inputs["Scale"])
+    nt.links.new(darkv.outputs["Vector"], bsdf.inputs["Base Color"])
     bsdf.inputs["Roughness"].default_value = 0.92
     # 写真の明るさの細かい模様を、でこぼこにも使う（岩・沢の陰影）
     bump = nt.nodes.new("ShaderNodeBump")
@@ -569,8 +594,9 @@ else:
     ampm = np.clip((fbm(X, Y, 2500.0, 2, 41) - 0.35) / 0.3, 0.0, 1.0) * 0.7 + 0.45
     bumps = domes(wx, wy, 480.0, 53) * 140.0 + domes(wx, wy, 140.0, 67) * 50.0
     fine = fbm(wx, wy, 38.0, 5, 79, 0.55)
-    top = (CLOUD_TOP - 280.0 + float(opt.get("cloud_lift", "40"))) + und * 300.0 + bumps * ampm + (fine - 0.5) * 30.0
-    CAP = CLOUD_TOP + 130.0  # 2,180m より上は半分の高さに（いちばん高い頭でもカメラより 60m 以上下）
+    LIFT = float(opt.get("cloud_lift", "170"))  # 平均の上面がだいたい 2,050 − 130 + LIFT m（既定で約 2,160m）
+    top = (CLOUD_TOP - 280.0 + LIFT) + und * 300.0 + bumps * ampm + (fine - 0.5) * 30.0
+    CAP = CLOUD_TOP + 90.0 + LIFT  # これより上は半分の高さに（いちばん高い頭でもカメラ（2,600m）より 150m 以上下）
     top = np.where(top > CAP, CAP + (top - CAP) * 0.5, top).astype(np.float32)
     if opt.get("cloud_preview") == "1":  # 確かめ用：上から見た雲の高さ（明るいほど高い。北が上）
         from PIL import Image as _PIL
@@ -587,8 +613,8 @@ else:
     rgba[..., 3] = 1.0
     img.pixels.foreach_set(rgba.reshape(-1))
     del rgba
-    # 入れ物（雲の上面に沿った、閉じた形）。64m ごとの格子で、上は上面の最大＋30m、下は最小−LAYER
-    B = max(1, int(round(64.0 / TEX)))
+    # 入れ物（雲の上面に沿った、閉じた形）。128m ごとの格子（cloud_shell=）で、上は上面の最大＋余白、下は最小−LAYER
+    B = max(1, int(round(float(opt.get("cloud_shell", "128")) / TEX)))
     by, bx = NY // B, NX // B
     tb = top[: by * B, : bx * B].reshape(by, B, bx, B)
     tmax, tmin = tb.max(axis=(1, 3)), tb.min(axis=(1, 3))
