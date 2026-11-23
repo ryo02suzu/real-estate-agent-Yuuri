@@ -32,7 +32,7 @@
  },
  "wind": -10.0,
  "render": {
-  "spp": 16,
-  "scale": 0.5
+  "spp": 48,
+  "scale": 1.0
  }
 }

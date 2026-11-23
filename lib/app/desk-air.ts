@@ -11,10 +11,10 @@ import { HOME_IMAGE_OF, type HomeImageKey } from "./desk-home";
 import air from "./desk-air.json";
 
 /**
- * 空気の層を出すか。雲の絵を作り直している間は false（層を作らず、雲の絵も読まない。ホーム・オープニングのあと・検索して
- * 降りるときの見た目は今までどおり）。本番の雲の絵が入ったら true にする
+ * 空気の層を出すか。false にすると層を作らず、雲の絵も読まない（ホーム・オープニングのあと・検索して降りるときの見た目は
+ * 雲の無いもの）。2026-11-23 に、宇宙から見た本物の雲の形（2 版。scripts/pc-opening/air_clouds.py）の本番の絵を入れて出した
  */
-export const AIR_READY: boolean = false;
+export const AIR_READY: boolean = true;
 
 /** その地図に空気の層を出すか（PC の地図＝skin "desk" で、AIR_READY のときだけ） */
 export function airLayerOn(skin: string | undefined): boolean {
