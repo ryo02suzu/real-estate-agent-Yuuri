@@ -123,9 +123,10 @@ def create(a) -> None:
                 return
             last = (gpu, code, res)
             print(f"::warning::{gpu} は借りられませんでした（HTTP {code}）: {str(res)[:300]}")
-            capacity = code in (409, 429, 500, 502, 503) or (code == 400 and "instances available" in str(res))
-            if not capacity:
-                break  # 在庫切れ以外（鍵・残高・頼み方の誤りなど）は待っても変わらない
+            if code in (401, 402, 403):
+                break  # 鍵・残高・権限の問題は、待っても種類を変えても変わらない
+            # それ以外（在庫切れ：「instances available」「does not have the resources ... try a different machine」など）は、
+            # 次の種類を試し、全部だめなら待って試し直す
         else:
             if time.time() + 60 < deadline:
                 print("どの GPU も今は借りられない（在庫切れ）。1 分待って試し直す", flush=True)
