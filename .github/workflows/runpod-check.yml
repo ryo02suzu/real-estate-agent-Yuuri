@@ -32,7 +32,9 @@ jobs:
             echo "::error::Runpod が鍵を受け付けませんでした（HTTP $code。401 は鍵の間違い、403 は権限の不足）"
             exit 1
           fi
+          bal=$(curl -s --max-time 30 https://api.runpod.io/v2/billing/balance -H "Authorization: Bearer $RUNPOD_API_KEY" | jq -r '.balanceAmount // empty')
           {
             echo "Runpod の鍵：使えます（HTTP 200）"
+            [ -n "$bal" ] && printf "残高：%.2f ドル\n" "$bal"
             jq -r '"借りている機械: \((.pods // []) | length) 台", ((.pods // [])[] | "- \(.name // "-")：\(.status // "-")（\(.gpu.id // "GPU なし")）")' pods.json
           } | tee -a "$GITHUB_STEP_SUMMARY"

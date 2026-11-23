@@ -74,6 +74,15 @@ def stock(cloud: str) -> dict[str, str]:
     return {g.get("id"): g.get("availability") or "?" for g in res.get("gpus", [])}
 
 
+def balance(_a) -> None:
+    """前払いの残高（ドル）。Runpod の API の説明書（GET /v2/billing/balance）：残高が尽きると新しい機械は借りられない"""
+    code, res = call("GET", "/billing/balance")
+    if code == 200 and isinstance(res, dict) and res.get("balanceAmount") is not None:
+        print(f"Runpod の残高：{float(res['balanceAmount']):.2f} ドル")
+    else:
+        print(f"::warning::残高を読めませんでした（HTTP {code}）")
+
+
 def catalog(a) -> None:
     code, res = call("GET", "/catalog/gpus")
     if code != 200:
@@ -333,6 +342,7 @@ def cleanup(a) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("balance")
     g = sub.add_parser("catalog")
     g.add_argument("--cloud", default="SECURE", choices=["SECURE", "COMMUNITY"])
     c = sub.add_parser("create")
@@ -366,7 +376,7 @@ def main() -> None:
     a = ap.parse_args()
     if a.cmd == "exec" and a.command and a.command[0] == "--":
         a.command = a.command[1:]
-    {"catalog": catalog, "create": create, "wait": wait, "push": push, "exec": exec_cmd, "follow": follow, "terminate": terminate, "cleanup": cleanup}[a.cmd](a)
+    {"balance": balance, "catalog": catalog, "create": create, "wait": wait, "push": push, "exec": exec_cmd, "follow": follow, "terminate": terminate, "cleanup": cleanup}[a.cmd](a)
 
 
 if __name__ == "__main__":

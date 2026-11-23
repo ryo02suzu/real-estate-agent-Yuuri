@@ -75,6 +75,7 @@ jobs:
           [[ "$JOB" =~ ^[a-z0-9-]+$ ]] && [ -d "scripts/gpu-render/jobs/$JOB" ] || { echo "::error::仕事 $JOB がありません"; exit 1; }
           [[ "$MINUTES" =~ ^[0-9]+$ ]] || { echo "::error::minutes は数で"; exit 1; }
           python3 scripts/gpu-render/runpod_job.py cleanup --prefix michilu-render- --hours 3
+          python3 scripts/gpu-render/runpod_job.py balance | tee -a "$GITHUB_STEP_SUMMARY"
           python3 scripts/gpu-render/runpod_job.py catalog --cloud "$CLOUD" | head -n 40
       - name: 仕事のファイルを作る（できたものを送る先の、期限付きの URL も入れる）
         run: |
