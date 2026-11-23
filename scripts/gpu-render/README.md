@@ -15,6 +15,7 @@ GitHub の Actions →「GPU で描く（Runpod）」→ Run workflow（`.github
 | cloud | SECURE（安定）か COMMUNITY（安い） |
 | minutes | 仕事を待つ上限（分）。過ぎたら止めて機械を消す |
 | env | 仕事に渡す設定（`SAMPLES=1024 RES=1920x1080` のように空白で区切る） |
+| lane | 列（1〜4）。違う列の回は同時に動く（動画のコマを何台かに分けて描くとき）。同じ列で続けて頼むと、GitHub は待っている前の回を取り消すので、同時に頼むときは列を分ける |
 
 流れ：前の回の止め忘れ（`michilu-render-` で始まる 3 時間より古い機械）を消す → GPU を借りる → 動き始めるまで待つ →
 仕事のファイルと、できたものを送る先（R2 の期限付きの URL）を機械に送る → 機械の中で `pod-wrap.sh` が Blender（既定 5.3.0）を入れて

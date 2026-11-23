@@ -28,6 +28,11 @@ on:
       env:
         description: 仕事に渡す設定（「SAMPLES=1024 RES=1920x1080」のように、空白で区切る）
         default: ""
+      lane:
+        description: 列（1〜4）。違う列の回は同時に動く（動画のコマを何台かに分けて描くとき。同じ列は前の回が終わるまで待つ）
+        type: choice
+        options: ["1", "2", "3", "4"]
+        default: "1"
   # この流れを GitHub に覚えさせるためだけの push（何も借りない。下の if で止める）
   push:
     paths:
@@ -36,8 +41,10 @@ on:
 permissions:
   contents: read
 
+# 同じ列（lane）の回は順に動く（GitHub は 1 つの列で待つ回を 1 つしか持たず、新しく頼むと前の待ちを取り消すので、
+# 同時に頼むときは列を分ける）
 concurrency:
-  group: gpu-render
+  group: gpu-render-${{ inputs.lane || '1' }}
   cancel-in-progress: false
 
 jobs:
