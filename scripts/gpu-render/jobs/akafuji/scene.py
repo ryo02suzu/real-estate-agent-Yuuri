@@ -7,7 +7,8 @@
 #         cone_stride=1（山の部分の 5m の標高の間引き）・base_stride=2（広い範囲の 10m の標高の間引き。山の部分が無いときは stride）
 #         exposure=-0.8・look=Medium_High_Contrast（AgX の見え方。Punchy など）・sky=0.5（空と太陽の強さ）
 #         disc=1（空のモデルの太陽で照らす）・sun=0（ランプで照らす強さ。使うときは disc=0）・aerosol=1.6・haze=0.000005（かすみ）
-#         clouds=4（雲海の作り方の版）・cloud_density=0.05・cloud_lift=40（雲の上面を上げる m）・cloud_texel=8・vol_bounces=8
+#         clouds=4（雲海の作り方の版）・cloud_density=0.12・cloud_lift=40（雲の上面を上げる m）・cloud_texel=8・vol_bounces=8
+#         cloud_edge=8・cloud_wisp=40・cloud_wisp_scale=40・cloud_wisp_detail=5（雲の表面の細かな凹凸）・denoise=1・border=（一部だけ描く）
 #         lens=70・aim=2900（見る高さ）・cam_lat / cam_lon / cam_h（カメラの場所）
 import json
 import math
@@ -80,7 +81,7 @@ if not PREVIEW:
 scene.cycles.device = "GPU" if device != "CPU" else "CPU"
 print("使う装置:", device, flush=True)
 scene.cycles.samples = SAMPLES
-scene.cycles.use_denoising = True
+scene.cycles.use_denoising = opt.get("denoise", "1") == "1"
 scene.cycles.max_bounces = 12
 # 雲の中で光が何回まで散るか。薄い層（3 版）なら 8 回で上から見た明るさはほぼ出る（vol_bounces=）
 scene.cycles.volume_bounces = 2 if PREVIEW else int(opt.get("vol_bounces", "8"))
@@ -88,6 +89,11 @@ scene.cycles.volume_step_rate = 4.0 if PREVIEW else 1.0
 scene.cycles.use_adaptive_sampling = True
 scene.render.resolution_x, scene.render.resolution_y = W, H
 scene.render.resolution_percentage = 100
+if "border" in opt:  # 確かめ用：画面の一部だけ描く（border=左,下,右,上。0〜1）
+    bx0, by0, bx1, by1 = (float(v) for v in opt["border"].split(":"))
+    scene.render.use_border = True
+    scene.render.use_crop_to_border = True
+    scene.render.border_min_x, scene.render.border_min_y, scene.render.border_max_x, scene.render.border_max_y = bx0, by0, bx1, by1
 scene.render.fps = FPS
 scene.render.use_motion_blur = not PREVIEW
 scene.render.use_persistent_data = True  # 2 コマ目からは、地形（約 900 万点）や画像を作り直さない
@@ -566,9 +572,18 @@ else:
     top = (CLOUD_TOP - 280.0 + float(opt.get("cloud_lift", "40"))) + und * 300.0 + bumps * ampm + (fine - 0.5) * 30.0
     CAP = CLOUD_TOP + 130.0  # 2,180m より上は半分の高さに（いちばん高い頭でもカメラより 60m 以上下）
     top = np.where(top > CAP, CAP + (top - CAP) * 0.5, top).astype(np.float32)
+    if opt.get("cloud_preview") == "1":  # 確かめ用：上から見た雲の高さ（明るいほど高い。北が上）
+        from PIL import Image as _PIL
+        q = top[::-4, ::4]
+        q = ((q - q.min()) / max(1e-6, float(q.max() - q.min())) * 255).astype(np.uint8)
+        _PIL.fromarray(q).save(os.path.join(OUT, "cloudtop.png"))
     img = bpy.data.images.new("cloudtop", NX, NY, alpha=False, float_buffer=True, is_data=True)
+    # 16 ビットの浮動小数（Blender の既定）だと、2,000m 前後の高さが 1〜2m 刻みの段になり、低い角度から見ると横縞になる
+    # （GPU の 4 回目で見えた）。32 ビットで持ち、値も基準（CLOUD_TOP）からの差にする
+    if hasattr(img, "use_half_precision"):
+        img.use_half_precision = False
     rgba = np.zeros((NY, NX, 4), dtype=np.float32)
-    rgba[..., :3] = top[..., None]  # 色→数の変換（重みの和が 1）で高さがそのまま出るよう、R・G・B に同じ値
+    rgba[..., :3] = (top - CLOUD_TOP)[..., None]  # 色→数の変換（重みの和が 1）で値がそのまま出るよう、R・G・B に同じ値
     rgba[..., 3] = 1.0
     img.pixels.foreach_set(rgba.reshape(-1))
     del rgba
@@ -580,7 +595,7 @@ else:
     # 頂点は、まわりの 4 つの格子の最大・最小（端は 1 つ外へ広げる）
     pad_max = np.pad(tmax, 1, mode="edge")
     pad_min = np.pad(tmin, 1, mode="edge")
-    vmax = np.maximum.reduce([pad_max[:-1, :-1], pad_max[1:, :-1], pad_max[:-1, 1:], pad_max[1:, 1:]]) + 30.0
+    vmax = np.maximum.reduce([pad_max[:-1, :-1], pad_max[1:, :-1], pad_max[:-1, 1:], pad_max[1:, 1:]]) + 8.0 + float(opt.get("cloud_wisp", "40")) / 2
     vmin = np.minimum.reduce([pad_min[:-1, :-1], pad_min[1:, :-1], pad_min[:-1, 1:], pad_min[1:, 1:]]) - LAYER
     vy_, vx_ = vmax.shape
     vxs = xmin + np.arange(vx_) * (B * TEX)
@@ -622,14 +637,23 @@ else:
     uvy = math_("MULTIPLY_ADD", sepw.outputs["Y"], 1.0 / (NY * TEX), -ymin / (NY * TEX))
     uvv = node("ShaderNodeCombineXYZ", X=uvx, Y=uvy)
     timg = node("ShaderNodeTexImage", _image=img, _interpolation="Linear", _extension="EXTEND", Vector=uvv.outputs[0])
-    below = math_("SUBTRACT", timg.outputs["Color"], sepw.outputs["Z"])  # 上面からの深さ（m）
-    edge = node("ShaderNodeMapRange", _interpolation_type="SMOOTHSTEP", Value=below, **{"From Min": -4.0, "From Max": 30.0})
+    # 手前の雲はカメラから約 3km（1 画素 0.75m）。焼いた高さ（8m ごと）より細かい凹凸を、立体のノイズで表面に足す
+    # （約 25m から 1.5m まで、±12m）。同じノイズで、上の縁を綿のようにほつれさせる
+    # 手元で 1080p の手前の雲を描き比べて決めた（濃さ 0.05・縁 16m・凹凸 24m では表面が 20〜40m ぼけて霧のよう）
+    WISP = float(opt.get("cloud_wisp", "40"))  # 細かな凹凸の幅（m）
+    EDGE = float(opt.get("cloud_edge", "8"))  # 上面から中の濃さになるまで（m）
+    # 凹凸の細かさ：約 40m から、5 段で 1.25m まで（4K では cloud_wisp_detail=6 で 0.6m まで）
+    wisp = node("ShaderNodeTexNoise", Scale=1 / float(opt.get("cloud_wisp_scale", "40")), Detail=float(opt.get("cloud_wisp_detail", "5")), Roughness=0.6, Vector=P)
+    hz_ = math_("ADD", timg.outputs["Color"], CLOUD_TOP)
+    hz_ = math_("MULTIPLY_ADD", wisp.outputs["Fac"], WISP, math_("SUBTRACT", hz_, WISP / 2))
+    below = math_("SUBTRACT", hz_, sepw.outputs["Z"])  # 上面からの深さ（m）
+    edge = node("ShaderNodeMapRange", _interpolation_type="SMOOTHSTEP", Value=below, **{"From Min": -2.0, "From Max": EDGE})
     deep = node("ShaderNodeMapRange", Value=below, **{"From Min": LAYER - 60.0, "From Max": LAYER, "To Min": 1.0, "To Max": 0.0})
-    wisp = node("ShaderNodeTexNoise", Scale=1 / 25.0, Detail=3.0, Roughness=0.6, Vector=P)
     wm = node("ShaderNodeMapRange", Value=wisp.outputs["Fac"], **{"From Min": 0.38, "From Max": 0.62})
-    near_top = node("ShaderNodeMapRange", Value=below, **{"From Min": 0.0, "From Max": 45.0, "To Min": 1.0, "To Max": 0.0})
+    near_top = node("ShaderNodeMapRange", Value=below, **{"From Min": 0.0, "From Max": 30.0, "To Min": 1.0, "To Max": 0.0})
     shred = math_("SUBTRACT", 1.0, math_("MULTIPLY", near_top.outputs["Result"], math_("SUBTRACT", 1.0, wm.outputs["Result"])))
-    density = math_("MULTIPLY", math_("MULTIPLY", edge.outputs["Result"], deep.outputs["Result"]), math_("MULTIPLY", shred, float(opt.get("cloud_density", "0.05"))))
+    # 濃さ 0.12/m（雲の中で光がまっすぐ進めるのは平均 8m。層積雲の上の方の濃さ）
+    density = math_("MULTIPLY", math_("MULTIPLY", edge.outputs["Result"], deep.outputs["Result"]), math_("MULTIPLY", shred, float(opt.get("cloud_density", "0.12"))))
     print(f"雲海（4 版）：高さの画像 {NX}x{NY}（{TEX:.0f}m）・入れ物 {vx_}x{vy_}・上面 {top.min():.0f}〜{top.max():.0f}m（平均 {top.mean():.0f}m）（{time.time() - t1:.1f} 秒）", flush=True)
     del X, Y, wx, wy, und, ampm, bumps, fine
 if CLOUDS in ("0", "1", "2", "3"):
