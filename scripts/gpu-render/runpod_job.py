@@ -65,18 +65,28 @@ def out(name: str, value: str) -> None:
             f.write(f"{name}={value}\n")
 
 
-def catalog(_a) -> None:
+def stock(cloud: str) -> dict[str, str]:
+    """今の在庫（GPU の種類 → NONE・LOW・MEDIUM・HIGH）。Runpod の API の説明書（GET /v2/catalog/gpus）：
+    include=AVAILABILITY と product=POD を付けたときだけ availability が入る。読めなければ空"""
+    code, res = call("GET", f"/catalog/gpus?include=AVAILABILITY&product=POD&cloud={cloud}")
+    if code != 200 or not isinstance(res, dict):
+        return {}
+    return {g.get("id"): g.get("availability") or "?" for g in res.get("gpus", [])}
+
+
+def catalog(a) -> None:
     code, res = call("GET", "/catalog/gpus")
     if code != 200:
         sys.exit(f"::error::GPU の一覧を読めません（HTTP {code}）: {res}")
+    have = stock(a.cloud)
     rows = []
     for g in res.get("gpus", []):
         price = g.get("price") or {}
         sec = price.get("secure") if isinstance(price, dict) else None
         com = price.get("community") if isinstance(price, dict) else None
-        rows.append((g.get("memory") or 0, g.get("id"), sec, com, g.get("availability")))
+        rows.append((g.get("memory") or 0, g.get("id"), sec, com, have.get(g.get("id"), "?")))
     for mem, gid, sec, com, avail in sorted(rows, key=lambda r: (-(r[0] or 0), str(r[1]))):
-        print(f"{gid}\t{mem}GB\tsecure={sec}\tcommunity={com}\t{avail}")
+        print(f"{gid}\t{mem}GB\tsecure={sec}\tcommunity={com}\t在庫（{a.cloud}）={avail}")
 
 
 CONN = "work/conn.json"  # 機械へのつなぎ方（wait が書く。exec か ssh）
@@ -90,19 +100,38 @@ def create(a) -> None:
         # SSH の鍵（この回だけの使い捨て）。Runpod の公式の像は PUBLIC_KEY から SSH を始める（exec が使えない機械の代わりの道）
         env["PUBLIC_KEY"] = open(a.pubkey).read().strip()
         ports = ["22/tcp"]
+    want = [g.strip() for g in a.gpu.split(",") if g.strip()]
     last = None
-    for gpu in [g.strip() for g in a.gpu.split(",") if g.strip()]:
-        body = {"name": a.name, "image": a.image, "disk": a.disk, "env": env, "cloud": a.cloud, "gpu": {"id": gpu, "count": 1}}
-        if ports:
-            body["ports"] = ports
-        code, res = call("POST", "/pods", body)
-        if code in (200, 201) and isinstance(res, dict) and res.get("id"):
-            print(f"借りた機械: {res['id']}（{gpu}・{a.cloud}・{res.get('cost', '?')} ドル/時）")
-            out("id", res["id"])
-            out("gpu", gpu)
-            return
-        last = (gpu, code, res)
-        print(f"::warning::{gpu} は借りられませんでした（HTTP {code}）: {str(res)[:300]}")
+    deadline = time.time() + a.retry_minutes * 60
+    rnd = 0
+    while True:
+        rnd += 1
+        # 在庫のあるものを先に（並びは頼んだ順のまま。在庫が読めないときは頼んだ順）
+        have = stock(a.cloud)
+        order = [g for g in want if have.get(g, "?") not in ("NONE",)] + [g for g in want if have.get(g, "?") == "NONE"]
+        print(f"{rnd} 回目：在庫 " + "・".join(f"{g.replace('NVIDIA ', '')}={have.get(g, '?')}" for g in want), flush=True)
+        for gpu in order:
+            body = {"name": a.name, "image": a.image, "disk": a.disk, "env": env, "cloud": a.cloud, "gpu": {"id": gpu, "count": 1}}
+            # 22 番（SSH の代わりの道）を開けると、外から入れる IP のある機械に限られる。2 回目からは開けない（exec だけ）
+            if ports and rnd == 1:
+                body["ports"] = ports
+            code, res = call("POST", "/pods", body)
+            if code in (200, 201) and isinstance(res, dict) and res.get("id"):
+                print(f"借りた機械: {res['id']}（{gpu}・{a.cloud}・{res.get('cost', '?')} ドル/時）")
+                out("id", res["id"])
+                out("gpu", gpu)
+                return
+            last = (gpu, code, res)
+            print(f"::warning::{gpu} は借りられませんでした（HTTP {code}）: {str(res)[:300]}")
+            capacity = code in (409, 429, 500, 502, 503) or (code == 400 and "instances available" in str(res))
+            if not capacity:
+                break  # 在庫切れ以外（鍵・残高・頼み方の誤りなど）は待っても変わらない
+        else:
+            if time.time() + 60 < deadline:
+                print("どの GPU も今は借りられない（在庫切れ）。1 分待って試し直す", flush=True)
+                time.sleep(60)
+                continue
+        break
     sys.exit(f"::error::どの GPU も借りられませんでした: {str(last)[:500]}")
 
 
@@ -303,7 +332,8 @@ def cleanup(a) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("catalog")
+    g = sub.add_parser("catalog")
+    g.add_argument("--cloud", default="SECURE", choices=["SECURE", "COMMUNITY"])
     c = sub.add_parser("create")
     c.add_argument("--name", required=True)
     c.add_argument("--gpu", required=True, help="GPU の種類（カンマ区切り。前から順に試す）")
@@ -311,6 +341,7 @@ def main() -> None:
     c.add_argument("--image", default="runpod/base:1.0.2-ubuntu2204")
     c.add_argument("--pubkey", default="", help="SSH の公開鍵のファイル（この回だけの使い捨て）")
     c.add_argument("--disk", type=int, default=40)
+    c.add_argument("--retry-minutes", type=float, default=30, help="どれも在庫切れのとき、試し直す時間（分）")
     w = sub.add_parser("wait")
     w.add_argument("--id", required=True)
     w.add_argument("--minutes", type=float, default=15)

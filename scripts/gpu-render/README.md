@@ -11,7 +11,7 @@ GitHub の Actions →「GPU で描く（Runpod）」→ Run workflow（`.github
 | 入力 | 意味 |
 |---|---|
 | job | 描く仕事（`scripts/gpu-render/jobs/<job>/`。中の `run.sh` が動く） |
-| gpu | GPU の種類（カンマ区切り。前から順に、借りられるものを使う） |
+| gpu | GPU の種類（カンマ区切り。今の在庫があるものを先に、前から順に試す。どれも在庫切れなら 1 分ごとに 30 分まで試し直す） |
 | cloud | SECURE（安定）か COMMUNITY（安い） |
 | minutes | 仕事を待つ上限（分）。過ぎたら止めて機械を消す |
 | env | 仕事に渡す設定（`SAMPLES=1024 RES=1920x1080` のように空白で区切る） |
