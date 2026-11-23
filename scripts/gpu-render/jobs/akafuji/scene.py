@@ -6,7 +6,8 @@
 #   設定：frames=1-90（描くコマ）・res=1920x1080・samples=1024・fps=30・preview=0（1 で CPU 向けに軽く。かすみ無し）
 #         cone_stride=1（山の部分の 5m の標高の間引き）・base_stride=2（広い範囲の 10m の標高の間引き。山の部分が無いときは stride）
 #         exposure=-0.8・look=Medium_High_Contrast（AgX の見え方。Punchy など）・sky=0.5（空と太陽の強さ）
-#         disc=1（空のモデルの太陽で照らす）・sun=0（ランプで照らす強さ。使うときは disc=0）・aerosol=1.6・haze=0.000016（かすみ）
+#         disc=1（空のモデルの太陽で照らす）・sun=0（ランプで照らす強さ。使うときは disc=0）・aerosol=1.6・haze=0.000005（かすみ）
+#         clouds=4（雲海の作り方の版）・cloud_density=0.05・cloud_lift=40（雲の上面を上げる m）・cloud_texel=8・vol_bounces=8
 #         lens=70・aim=2900（見る高さ）・cam_lat / cam_lon / cam_h（カメラの場所）
 import json
 import math
@@ -81,13 +82,15 @@ print("使う装置:", device, flush=True)
 scene.cycles.samples = SAMPLES
 scene.cycles.use_denoising = True
 scene.cycles.max_bounces = 12
-scene.cycles.volume_bounces = 2 if PREVIEW else 12
+# 雲の中で光が何回まで散るか。薄い層（3 版）なら 8 回で上から見た明るさはほぼ出る（vol_bounces=）
+scene.cycles.volume_bounces = 2 if PREVIEW else int(opt.get("vol_bounces", "8"))
 scene.cycles.volume_step_rate = 4.0 if PREVIEW else 1.0
 scene.cycles.use_adaptive_sampling = True
 scene.render.resolution_x, scene.render.resolution_y = W, H
 scene.render.resolution_percentage = 100
 scene.render.fps = FPS
 scene.render.use_motion_blur = not PREVIEW
+scene.render.use_persistent_data = True  # 2 コマ目からは、地形（約 900 万点）や画像を作り直さない
 scene.render.motion_blur_shutter = 0.5
 scene.render.image_settings.file_format = "PNG"
 scene.render.image_settings.color_depth = "16"
@@ -322,38 +325,24 @@ if hasattr(sky, "sun_disc"):
     sky.sun_disc = USE_DISC
 # 空気のかすみ（遠くほど青白く、朝日の方は明るく。前に強く散らす）。世界全体に体積を置くと、無限に遠い空と太陽の光が
 # すべて吸われて真っ黒になる（GPU の 1 回目で確かめた）ので、景色を包む箱（東西南北 70km・高さ 0〜9km）に入れる。
-# 雲海の上は空気が澄むので、高さとともに薄く（1.8km ごとに 1/e）。濃さは haze=（カメラの高さでの 1m あたり。既定 0.000016）
-HAZE = float(opt.get("haze", "0.000016"))
+# 濃さは haze=（1m あたり。既定 0.000005：15km 先で約 7% かすむ）
+HAZE = float(opt.get("haze", "0.000005"))
 if HAZE > 0 and not PREVIEW:
-    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 0.0, 4500.0))
+    # 濃さが一様な体積は、光の通り方を式で一度に計算できる（細かく調べながら進まない）ので、ほとんど重くならない。
+    # 雲海の上の澄んだ空気の層（1.8〜6km）だけに置く（雲海の中・下は見えない）
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0.0, 0.0, 3900.0))
     hz = bpy.context.active_object
     hz.name = "haze"
-    hz.scale = (70000.0, 70000.0, 9000.0)
+    hz.scale = (70000.0, 70000.0, 4200.0)
     hm = bpy.data.materials.new("haze")
     hm.use_nodes = True
     hn = hm.node_tree
     for n in list(hn.nodes):
         hn.nodes.remove(n)
-    hgeo = hn.nodes.new("ShaderNodeNewGeometry")
-    hsep = hn.nodes.new("ShaderNodeSeparateXYZ")
-    hn.links.new(hgeo.outputs["Position"], hsep.inputs[0])
-    hsub = hn.nodes.new("ShaderNodeMath")
-    hsub.operation = "MULTIPLY_ADD"  # (z × (-1/1800)) + 2350/1800
-    hsub.inputs[1].default_value = -1.0 / 1800.0
-    hsub.inputs[2].default_value = CAM0[2] / 1800.0
-    hn.links.new(hsep.outputs["Z"], hsub.inputs[0])
-    hexp = hn.nodes.new("ShaderNodeMath")
-    hexp.operation = "EXPONENT"
-    hn.links.new(hsub.outputs[0], hexp.inputs[0])
-    hden = hn.nodes.new("ShaderNodeMath")
-    hden.operation = "MULTIPLY"
-    hden.inputs[1].default_value = HAZE
-    hden.use_clamp = False
-    hn.links.new(hexp.outputs[0], hden.inputs[0])
     hvol = hn.nodes.new("ShaderNodeVolumePrincipled")
     hvol.inputs["Anisotropy"].default_value = 0.65
     hvol.inputs["Color"].default_value = (0.75, 0.84, 1.0, 1.0)
-    hn.links.new(hden.outputs[0], hvol.inputs["Density"])
+    hvol.inputs["Density"].default_value = HAZE
     hout = hn.nodes.new("ShaderNodeOutputMaterial")
     hn.links.new(hvol.outputs[0], hout.inputs["Volume"])
     hz.data.materials.append(hm)
@@ -369,57 +358,291 @@ if SUN_LAMP > 0:
     scene.collection.objects.link(sun)
 
 # ---------------------------------------------------------------- 雲海（立体の雲）
-cx, cy = local(35.40, 138.80)
-bpy.ops.mesh.primitive_cube_add(size=1.0, location=(cx, cy, (CLOUD_TOP + 250 + CLOUD_BOTTOM) / 2))
-cloud = bpy.context.active_object
-cloud.name = "cloudsea"
-cloud.scale = (36000.0, 30000.0, CLOUD_TOP + 250 - CLOUD_BOTTOM)
+# 雲海（層積雲）の上面は、ゆるいうねりの上に、もくもくとした丸い頭（数百 m と百 m 前後）が並び、縁ははっきりしている。
+# 上面の高さ＝うねり（約 4km・±180m）＋ 大きな頭（約 450m・最大 150m）＋ 小さな頭（約 130m・最大 50m）＋ 細かな乱れ。
+# 頭の形はボロノイ（点のまわりの距離）で作り、ノイズで位置をゆがめて不ぞろいにする。上面から 40m で雲の中の濃さになる。
+# clouds=1 で前の版（ノイズだけ・縁がやわらかい）・clouds=2 で立体のボロノイの版（重い）・clouds=3 でその場で形を計算する版
+CLOUDS = opt.get("clouds", "4")
 cm = bpy.data.materials.new("cloudsea")
 cm.use_nodes = True
 cn = cm.node_tree
 for n in list(cn.nodes):
     cn.nodes.remove(n)
-tc = cn.nodes.new("ShaderNodeTexCoord")
-sep = cn.nodes.new("ShaderNodeSeparateXYZ")
-cn.links.new(tc.outputs["Object"], sep.inputs[0])
-# 大きなうねり（約 3km）と細かな粒（約 300m）。世界の座標で揃える（箱の大きさに引っぱられない）
-big = cn.nodes.new("ShaderNodeTexNoise")
-big.inputs["Scale"].default_value = 1 / 3000.0
-big.inputs["Detail"].default_value = 6.0
-big.inputs["Roughness"].default_value = 0.55
-small = cn.nodes.new("ShaderNodeTexNoise")
-small.inputs["Scale"].default_value = 1 / 320.0
-small.inputs["Detail"].default_value = 10.0
-small.inputs["Roughness"].default_value = 0.6
 geo = cn.nodes.new("ShaderNodeNewGeometry")
-cn.links.new(geo.outputs["Position"], big.inputs["Vector"])
-cn.links.new(geo.outputs["Position"], small.inputs["Vector"])
-mix = cn.nodes.new("ShaderNodeMath")
-mix.operation = "MULTIPLY_ADD"
-mix.inputs[1].default_value = 0.35
-cn.links.new(small.outputs["Fac"], mix.inputs[0])
-cn.links.new(big.outputs["Fac"], mix.inputs[2])
-# 高さ（0 が下、1 が上）。上面の高さを、うねりで上下させる
-zn = cn.nodes.new("ShaderNodeMapRange")
-zn.inputs["From Min"].default_value = -0.5
-zn.inputs["From Max"].default_value = 0.5
-cn.links.new(sep.outputs["Z"], zn.inputs["Value"])
-top = cn.nodes.new("ShaderNodeMath")
-top.operation = "SUBTRACT"
-cn.links.new(mix.outputs[0], top.inputs[0])
-cn.links.new(zn.outputs["Result"], top.inputs[1])
-edge = cn.nodes.new("ShaderNodeMapRange")
-edge.inputs["From Min"].default_value = -0.18
-edge.inputs["From Max"].default_value = 0.05
-cn.links.new(top.outputs[0], edge.inputs["Value"])
-dens = cn.nodes.new("ShaderNodeMath")
-dens.operation = "MULTIPLY"
-dens.inputs[1].default_value = 0.045
-cn.links.new(edge.outputs["Result"], dens.inputs[0])
+
+
+def node(kind, **inputs):
+    nd = cn.nodes.new(kind)
+    for k, v in inputs.items():
+        if k.startswith("_"):
+            setattr(nd, k[1:], v)
+        elif isinstance(v, bpy.types.NodeSocket):
+            cn.links.new(v, nd.inputs[k] if not isinstance(k, int) else nd.inputs[k])
+        else:
+            nd.inputs[k].default_value = v
+    return nd
+
+
+def math_(op, a, b=None, c=None):
+    nd = cn.nodes.new("ShaderNodeMath")
+    nd.operation = op
+    for i, v in enumerate((a, b, c)):
+        if v is None:
+            continue
+        if isinstance(v, bpy.types.NodeSocket):
+            cn.links.new(v, nd.inputs[i])
+        else:
+            nd.inputs[i].default_value = v
+    return nd.outputs[0]
+
+
+if CLOUDS == "1":
+    box_bottom, box_top = CLOUD_BOTTOM, CLOUD_TOP + 250
+    cx, cy = local(35.40, 138.80)
+    box = (36000.0, 30000.0)
+    tc = cn.nodes.new("ShaderNodeTexCoord")
+    sep = cn.nodes.new("ShaderNodeSeparateXYZ")
+    cn.links.new(tc.outputs["Object"], sep.inputs[0])
+    big = node("ShaderNodeTexNoise", Scale=1 / 3000.0, Detail=6.0, Roughness=0.55, Vector=geo.outputs["Position"])
+    small = node("ShaderNodeTexNoise", Scale=1 / 320.0, Detail=10.0, Roughness=0.6, Vector=geo.outputs["Position"])
+    mixv = math_("MULTIPLY_ADD", small.outputs["Fac"], 0.35, big.outputs["Fac"])
+    zn = node("ShaderNodeMapRange", Value=sep.outputs["Z"], **{"From Min": -0.5, "From Max": 0.5})
+    top = math_("SUBTRACT", mixv, zn.outputs["Result"])
+    edge = node("ShaderNodeMapRange", Value=top, **{"From Min": -0.18, "From Max": 0.05})
+    density = math_("MULTIPLY", edge.outputs["Result"], 0.045)
+elif CLOUDS == "2":
+    box_bottom, box_top = CLOUD_BOTTOM, CLOUD_TOP + 250  # 箱の上はカメラ（2,350m）より下に
+    cx, cy = local(35.40, 138.76)
+    box = (60000.0, 50000.0)
+    P = geo.outputs["Position"]
+    sepw = node("ShaderNodeSeparateXYZ", Vector=P)
+    # 位置のゆがみ（約 600m のノイズで ±160m）
+    warp = node("ShaderNodeTexNoise", Scale=1 / 600.0, Detail=3.0, Roughness=0.5, Vector=P)
+    wv = node("ShaderNodeVectorMath", _operation="MULTIPLY_ADD")
+    cn.links.new(warp.outputs["Color"], wv.inputs[0])
+    wv.inputs[1].default_value = (320.0, 320.0, 160.0)
+    wv.inputs[2].default_value = (-160.0, -160.0, -80.0)
+    Pw = node("ShaderNodeVectorMath", _operation="ADD")
+    cn.links.new(P, Pw.inputs[0])
+    cn.links.new(wv.outputs[0], Pw.inputs[1])
+    Pw = Pw.outputs[0]
+    # 頭は少し平たく（高さ方向を 1.5 倍に引きのばして距離を測る）
+    flat = node("ShaderNodeVectorMath", _operation="MULTIPLY")
+    cn.links.new(Pw, flat.inputs[0])
+    flat.inputs[1].default_value = (1.0, 1.0, 1.5)
+    flat = flat.outputs[0]
+    und = node("ShaderNodeTexNoise", Scale=1 / 4000.0, Detail=4.0, Roughness=0.5, Vector=P)
+    v1 = node("ShaderNodeTexVoronoi", _voronoi_dimensions="3D", _feature="SMOOTH_F1", Scale=1 / 450.0, Randomness=1.0, Smoothness=0.25, Vector=flat)
+    v2 = node("ShaderNodeTexVoronoi", _voronoi_dimensions="3D", _feature="SMOOTH_F1", Scale=1 / 130.0, Randomness=1.0, Smoothness=0.25, Vector=flat)
+    fine = node("ShaderNodeTexNoise", Scale=1 / 45.0, Detail=4.0, Roughness=0.55, Vector=Pw)
+    # うねり ±180m。平均の上面がだいたい 2,000m（CLOUD_TOP − 50m）、いちばん高い頭で 2,250m くらい
+    h = math_("MULTIPLY_ADD", und.outputs["Fac"], 360.0, CLOUD_TOP - 280.0)
+    d1 = math_("SUBTRACT", 1.0, v1.outputs["Distance"])  # 点の近くで 1
+    h = math_("MULTIPLY_ADD", math_("POWER", math_("MAXIMUM", d1, 0.0), 1.6), 150.0, h)
+    d2 = math_("SUBTRACT", 1.0, v2.outputs["Distance"])
+    h = math_("MULTIPLY_ADD", math_("POWER", math_("MAXIMUM", d2, 0.0), 1.6), 50.0, h)
+    h = math_("MULTIPLY_ADD", fine.outputs["Fac"], 26.0, math_("SUBTRACT", h, 13.0))
+    below = math_("SUBTRACT", h, sepw.outputs["Z"])  # 上面からの深さ（m）
+    edge = node("ShaderNodeMapRange", _interpolation_type="SMOOTHSTEP", Value=below, **{"From Min": 0.0, "From Max": 40.0})
+    # 下の端（箱の底）は 150m かけて消す
+    bot = node("ShaderNodeMapRange", _interpolation_type="SMOOTHSTEP", Value=sepw.outputs["Z"], **{"From Min": box_bottom, "From Max": box_bottom + 150.0})
+    # 中の濃さのむら（0.7〜1.0）
+    var = node("ShaderNodeTexNoise", Scale=1 / 250.0, Detail=2.0, Vector=P)
+    varm = math_("MULTIPLY_ADD", var.outputs["Fac"], 0.6, 0.7)
+    density = math_("MULTIPLY", math_("MULTIPLY", edge.outputs["Result"], bot.outputs["Result"]), math_("MULTIPLY", varm, float(opt.get("cloud_density", "0.05"))))
+elif CLOUDS in ("0", "3"):
+    # 3 版：上面の高さを平面（x, y）だけの関数にして計算を軽くし、雲は上面から 260m の薄い層だけにする
+    # （中まで深く入った光は上から見てもほとんど届かない。斜めの朝日の影の計算が、厚い雲の中を長く通らずにすむ）。
+    # カメラから見える範囲（北は手前 1km、南は富士山の向こう、東西は画面の外まで）だけに置く
+    LAYER = 260.0
+    xmin, ymin = local(35.25, 138.60)
+    xmax, ymax = local(35.505, 138.93)
+    cx, cy = (xmin + xmax) / 2, (ymin + ymax) / 2
+    box = (xmax - xmin, ymax - ymin)
+    box_bottom, box_top = CLOUD_TOP - 280.0 - LAYER, CLOUD_TOP + 250.0
+    P = geo.outputs["Position"]
+    sepw = node("ShaderNodeSeparateXYZ", Vector=P)
+    # 平面の座標（z を 0 に）
+    P2 = node("ShaderNodeCombineXYZ", X=sepw.outputs["X"], Y=sepw.outputs["Y"])
+    P2 = P2.outputs[0]
+    # 位置のゆがみ（約 700m のノイズで ±180m）。頭の並びを不ぞろいにする
+    warp = node("ShaderNodeTexNoise", _noise_dimensions="2D", Scale=1 / 700.0, Detail=2.0, Roughness=0.5, Vector=P2)
+    wv = node("ShaderNodeVectorMath", _operation="MULTIPLY_ADD")
+    cn.links.new(warp.outputs["Color"], wv.inputs[0])
+    wv.inputs[1].default_value = (360.0, 360.0, 0.0)
+    wv.inputs[2].default_value = (-180.0, -180.0, 0.0)
+    Pw = node("ShaderNodeVectorMath", _operation="ADD")
+    cn.links.new(P2, Pw.inputs[0])
+    cn.links.new(wv.outputs[0], Pw.inputs[1])
+    Pw = Pw.outputs[0]
+    und = node("ShaderNodeTexNoise", _noise_dimensions="2D", Scale=1 / 4000.0, Detail=3.0, Roughness=0.5, Vector=P2)
+    # 頭の大きさの場所ごとのむら（頭の目立つ所と、なだらかな所）
+    amp = node("ShaderNodeTexNoise", _noise_dimensions="2D", Scale=1 / 2500.0, Detail=1.0, Vector=P2)
+    ampm = node("ShaderNodeMapRange", Value=amp.outputs["Fac"], **{"From Min": 0.35, "From Max": 0.65, "To Min": 0.45, "To Max": 1.25})
+    v1 = node("ShaderNodeTexVoronoi", _voronoi_dimensions="2D", _feature="SMOOTH_F1", Scale=1 / 480.0, Randomness=1.0, Smoothness=0.35, Vector=Pw)
+    v2 = node("ShaderNodeTexVoronoi", _voronoi_dimensions="2D", _feature="SMOOTH_F1", Scale=1 / 140.0, Randomness=1.0, Smoothness=0.35, Vector=Pw)
+    fine = node("ShaderNodeTexNoise", _noise_dimensions="2D", Scale=1 / 38.0, Detail=5.0, Roughness=0.55, Vector=Pw)
+    h = math_("MULTIPLY_ADD", und.outputs["Fac"], 360.0, CLOUD_TOP - 280.0)  # うねり ±180m
+    d1 = math_("POWER", math_("MAXIMUM", math_("SUBTRACT", 1.0, v1.outputs["Distance"]), 0.0), 1.5)
+    d2 = math_("POWER", math_("MAXIMUM", math_("SUBTRACT", 1.0, v2.outputs["Distance"]), 0.0), 1.5)
+    bumps = math_("MULTIPLY_ADD", d2, 55.0, math_("MULTIPLY", d1, 160.0))
+    h = math_("MULTIPLY_ADD", bumps, ampm.outputs["Result"], h)
+    h = math_("MULTIPLY_ADD", fine.outputs["Fac"], 30.0, math_("SUBTRACT", h, 15.0))
+    below = math_("SUBTRACT", h, sepw.outputs["Z"])  # 上面からの深さ（m）
+    # 上の縁：外は 0、上面から 30m で中の濃さ。下は LAYER の深さで消す（雲の底は見えない）
+    edge = node("ShaderNodeMapRange", _interpolation_type="SMOOTHSTEP", Value=below, **{"From Min": -4.0, "From Max": 30.0})
+    deep = node("ShaderNodeMapRange", Value=below, **{"From Min": LAYER - 60.0, "From Max": LAYER, "To Min": 1.0, "To Max": 0.0})
+    # 縁の近くだけ、細かな立体のノイズで綿のようにほつれさせる（約 25m）
+    wisp = node("ShaderNodeTexNoise", Scale=1 / 25.0, Detail=3.0, Roughness=0.6, Vector=P)
+    wm = node("ShaderNodeMapRange", Value=wisp.outputs["Fac"], **{"From Min": 0.38, "From Max": 0.62})
+    near_top = node("ShaderNodeMapRange", Value=below, **{"From Min": 0.0, "From Max": 45.0, "To Min": 1.0, "To Max": 0.0})
+    shred = math_("SUBTRACT", 1.0, math_("MULTIPLY", near_top.outputs["Result"], math_("SUBTRACT", 1.0, wm.outputs["Result"])))
+    density = math_("MULTIPLY", math_("MULTIPLY", edge.outputs["Result"], deep.outputs["Result"]), math_("MULTIPLY", shred, float(opt.get("cloud_density", "0.05"))))
+else:
+    # 4 版（既定）：上面の高さ（3 版と同じ考え方）を numpy で前もって 1 枚の高さの画像に焼き、雲の材質はそれを読むだけにする。
+    # 雲を入れる入れ物も、箱ではなく雲の上面に沿った形（64m ごとの格子。上は上面の最大＋30m、下は上面の最小−260m）にして、
+    # 雲の上の空っぽの所を光が細かく調べながら長く通らないようにする（3 版の重さの大半はこれと、その場での形の計算）
+    t1 = time.time()
+    LAYER = 260.0
+    xmin, ymin = local(35.25, 138.60)
+    xmax, ymax = local(35.505, 138.93)
+    TEX = float(opt.get("cloud_texel", "8"))  # 高さの画像の 1 画素（m）
+    NX, NY = int((xmax - xmin) / TEX), int((ymax - ymin) / TEX)
+    gx = (xmin + (np.arange(NX, dtype=np.float32) + 0.5) * TEX)[None, :]
+    gy = (ymin + (np.arange(NY, dtype=np.float32) + 0.5) * TEX)[:, None]
+
+    def hash01(ix, iy, seed):
+        hh = (ix.astype(np.uint64) * np.uint64(374761393) + iy.astype(np.uint64) * np.uint64(668265263) + np.uint64(seed * 2654435761 % 2**32)) & np.uint64(0xFFFFFFFF)
+        hh = ((hh ^ (hh >> np.uint64(13))) * np.uint64(1274126177)) & np.uint64(0xFFFFFFFF)
+        hh = hh ^ (hh >> np.uint64(16))
+        return (hh & np.uint64(0xFFFFFF)).astype(np.float32) / np.float32(0x1000000)
+
+    def perlin(x, y, seed):
+        x0, y0 = np.floor(x), np.floor(y)
+        fx, fy = (x - x0).astype(np.float32), (y - y0).astype(np.float32)
+        ix, iy = x0.astype(np.int64) + 1_000_000, y0.astype(np.int64) + 1_000_000
+        def g(i, j, dx, dy):
+            a = hash01(i, j, seed) * np.float32(2 * math.pi)
+            return np.cos(a) * dx + np.sin(a) * dy
+        u = fx * fx * fx * (fx * (fx * 6 - 15) + 10)
+        v = fy * fy * fy * (fy * (fy * 6 - 15) + 10)
+        n0 = g(ix, iy, fx, fy) * (1 - u) + g(ix + 1, iy, fx - 1, fy) * u
+        n1 = g(ix, iy + 1, fx, fy - 1) * (1 - u) + g(ix + 1, iy + 1, fx - 1, fy - 1) * u
+        return n0 * (1 - v) + n1 * v  # だいたい −0.7〜0.7
+
+    def fbm(x, y, scale, octaves, seed, rough=0.5):
+        tot, amp, norm = 0.0, 1.0, 0.0
+        for o in range(octaves):
+            f = 2.0**o / scale
+            tot = tot + amp * perlin(x * f, y * f, seed + o * 17)
+            norm += amp
+            amp *= rough
+        return 0.5 + 0.75 * tot / norm  # だいたい 0〜1（中心 0.5）
+
+    def domes(x, y, cell, seed, smooth=0.35):
+        """点のまわりの丸い頭（0〜1）。ボロノイの距離のなめらかな最小（隣り合う頭がなだらかにつながる）"""
+        cx_, cy_ = x / cell, y / cell
+        ix, iy = np.floor(cx_).astype(np.int64) + 1_000_000, np.floor(cy_).astype(np.int64) + 1_000_000
+        acc = np.zeros(np.broadcast(cx_, cy_).shape, dtype=np.float32)
+        for di in (-1, 0, 1):
+            for dj in (-1, 0, 1):
+                jx, jy = ix + di, iy + dj
+                px = (jx - 1_000_000).astype(np.float32) + hash01(jx, jy, seed)
+                py = (jy - 1_000_000).astype(np.float32) + hash01(jx, jy, seed + 7)
+                d = np.sqrt((px - cx_) ** 2 + (py - cy_) ** 2)
+                acc += np.exp(-d / smooth * 4.0)
+        f1 = -np.log(np.maximum(acc, 1e-12)) * smooth / 4.0
+        return np.clip(1.0 - f1, 0.0, 1.0) ** 1.5
+
+    X = np.broadcast_to(gx, (NY, NX))
+    Y = np.broadcast_to(gy, (NY, NX))
+    # 位置のゆがみ（約 700m で ±180m）
+    wx = X + (fbm(X, Y, 700.0, 2, 11) - 0.5) * 360.0
+    wy = Y + (fbm(X, Y, 700.0, 2, 23) - 0.5) * 360.0
+    und = fbm(X, Y, 4000.0, 3, 31)
+    ampm = np.clip((fbm(X, Y, 2500.0, 2, 41) - 0.35) / 0.3, 0.0, 1.0) * 0.7 + 0.45
+    bumps = domes(wx, wy, 480.0, 53) * 140.0 + domes(wx, wy, 140.0, 67) * 50.0
+    fine = fbm(wx, wy, 38.0, 5, 79, 0.55)
+    top = (CLOUD_TOP - 280.0 + float(opt.get("cloud_lift", "40"))) + und * 300.0 + bumps * ampm + (fine - 0.5) * 30.0
+    CAP = CLOUD_TOP + 130.0  # 2,180m より上は半分の高さに（いちばん高い頭でもカメラより 60m 以上下）
+    top = np.where(top > CAP, CAP + (top - CAP) * 0.5, top).astype(np.float32)
+    img = bpy.data.images.new("cloudtop", NX, NY, alpha=False, float_buffer=True, is_data=True)
+    rgba = np.zeros((NY, NX, 4), dtype=np.float32)
+    rgba[..., :3] = top[..., None]  # 色→数の変換（重みの和が 1）で高さがそのまま出るよう、R・G・B に同じ値
+    rgba[..., 3] = 1.0
+    img.pixels.foreach_set(rgba.reshape(-1))
+    del rgba
+    # 入れ物（雲の上面に沿った、閉じた形）。64m ごとの格子で、上は上面の最大＋30m、下は最小−LAYER
+    B = max(1, int(round(64.0 / TEX)))
+    by, bx = NY // B, NX // B
+    tb = top[: by * B, : bx * B].reshape(by, B, bx, B)
+    tmax, tmin = tb.max(axis=(1, 3)), tb.min(axis=(1, 3))
+    # 頂点は、まわりの 4 つの格子の最大・最小（端は 1 つ外へ広げる）
+    pad_max = np.pad(tmax, 1, mode="edge")
+    pad_min = np.pad(tmin, 1, mode="edge")
+    vmax = np.maximum.reduce([pad_max[:-1, :-1], pad_max[1:, :-1], pad_max[:-1, 1:], pad_max[1:, 1:]]) + 30.0
+    vmin = np.minimum.reduce([pad_min[:-1, :-1], pad_min[1:, :-1], pad_min[:-1, 1:], pad_min[1:, 1:]]) - LAYER
+    vy_, vx_ = vmax.shape
+    vxs = xmin + np.arange(vx_) * (B * TEX)
+    vys = ymin + np.arange(vy_) * (B * TEX)
+    nv = vx_ * vy_
+    co = np.zeros((2, vy_, vx_, 3), dtype=np.float32)
+    co[:, :, :, 0] = vxs[None, None, :]
+    co[:, :, :, 1] = vys[None, :, None]
+    co[0, :, :, 2] = vmax
+    co[1, :, :, 2] = vmin
+    idx = np.arange(2 * nv).reshape(2, vy_, vx_)
+    T, Bo = idx[0], idx[1]
+    faces = []
+    # 上（外向き＝上）・下（外向き＝下）
+    faces.append(np.stack([T[:-1, :-1], T[:-1, 1:], T[1:, 1:], T[1:, :-1]], -1).reshape(-1, 4))
+    faces.append(np.stack([Bo[:-1, :-1], Bo[1:, :-1], Bo[1:, 1:], Bo[:-1, 1:]], -1).reshape(-1, 4))
+    # 横の 4 面（外向き）
+    faces.append(np.stack([T[0, :-1], Bo[0, :-1], Bo[0, 1:], T[0, 1:]], -1))          # 南（y 最小）
+    faces.append(np.stack([T[-1, 1:], Bo[-1, 1:], Bo[-1, :-1], T[-1, :-1]], -1))      # 北
+    faces.append(np.stack([T[1:, 0], Bo[1:, 0], Bo[:-1, 0], T[:-1, 0]], -1))          # 西（x 最小）
+    faces.append(np.stack([T[:-1, -1], Bo[:-1, -1], Bo[1:, -1], T[1:, -1]], -1))      # 東
+    faces = np.concatenate(faces).astype(np.int32)
+    me = bpy.data.meshes.new("cloudsea")
+    me.vertices.add(2 * nv)
+    me.vertices.foreach_set("co", co.reshape(-1))
+    me.loops.add(faces.size)
+    me.loops.foreach_set("vertex_index", faces.reshape(-1))
+    me.polygons.add(len(faces))
+    me.polygons.foreach_set("loop_start", (np.arange(len(faces)) * 4).astype(np.int32))
+    me.polygons.foreach_set("loop_total", np.full(len(faces), 4, dtype=np.int32))
+    me.update(calc_edges=True)
+    me.validate()
+    cloud = bpy.data.objects.new("cloudsea", me)
+    scene.collection.objects.link(cloud)
+    # 材質：高さの画像を読み、上面からの深さで濃さを決める
+    P = geo.outputs["Position"]
+    sepw = node("ShaderNodeSeparateXYZ", Vector=P)
+    uvx = math_("MULTIPLY_ADD", sepw.outputs["X"], 1.0 / (NX * TEX), -xmin / (NX * TEX))
+    uvy = math_("MULTIPLY_ADD", sepw.outputs["Y"], 1.0 / (NY * TEX), -ymin / (NY * TEX))
+    uvv = node("ShaderNodeCombineXYZ", X=uvx, Y=uvy)
+    timg = node("ShaderNodeTexImage", _image=img, _interpolation="Linear", _extension="EXTEND", Vector=uvv.outputs[0])
+    below = math_("SUBTRACT", timg.outputs["Color"], sepw.outputs["Z"])  # 上面からの深さ（m）
+    edge = node("ShaderNodeMapRange", _interpolation_type="SMOOTHSTEP", Value=below, **{"From Min": -4.0, "From Max": 30.0})
+    deep = node("ShaderNodeMapRange", Value=below, **{"From Min": LAYER - 60.0, "From Max": LAYER, "To Min": 1.0, "To Max": 0.0})
+    wisp = node("ShaderNodeTexNoise", Scale=1 / 25.0, Detail=3.0, Roughness=0.6, Vector=P)
+    wm = node("ShaderNodeMapRange", Value=wisp.outputs["Fac"], **{"From Min": 0.38, "From Max": 0.62})
+    near_top = node("ShaderNodeMapRange", Value=below, **{"From Min": 0.0, "From Max": 45.0, "To Min": 1.0, "To Max": 0.0})
+    shred = math_("SUBTRACT", 1.0, math_("MULTIPLY", near_top.outputs["Result"], math_("SUBTRACT", 1.0, wm.outputs["Result"])))
+    density = math_("MULTIPLY", math_("MULTIPLY", edge.outputs["Result"], deep.outputs["Result"]), math_("MULTIPLY", shred, float(opt.get("cloud_density", "0.05"))))
+    print(f"雲海（4 版）：高さの画像 {NX}x{NY}（{TEX:.0f}m）・入れ物 {vx_}x{vy_}・上面 {top.min():.0f}〜{top.max():.0f}m（平均 {top.mean():.0f}m）（{time.time() - t1:.1f} 秒）", flush=True)
+    del X, Y, wx, wy, und, ampm, bumps, fine
+if CLOUDS in ("0", "1", "2", "3"):
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(cx, cy, (box_top + box_bottom) / 2))
+    cloud = bpy.context.active_object
+    cloud.scale = (box[0], box[1], box_top - box_bottom)
+    if CLOUDS == "0":  # 雲なし（重さを測るとき）
+        cloud.hide_render = True
+cloud.name = "cloudsea"
 vol = cn.nodes.new("ShaderNodeVolumePrincipled")
 vol.inputs["Color"].default_value = (1.0, 1.0, 1.0, 1.0)
 vol.inputs["Anisotropy"].default_value = 0.55
-cn.links.new(dens.outputs[0], vol.inputs["Density"])
+cn.links.new(density, vol.inputs["Density"])
 mo = cn.nodes.new("ShaderNodeOutputMaterial")
 cn.links.new(vol.outputs[0], mo.inputs["Volume"])
 cloud.data.materials.append(cm)
