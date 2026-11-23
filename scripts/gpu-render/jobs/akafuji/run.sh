@@ -4,6 +4,7 @@
 # それ以外の scene.py の設定は EXTRA にカンマ区切りで（EXTRA=lens=70,exposure=-0.8,sun=9）
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
+EXTRA="${EXTRA:-}"  # 無いときは空（set -u で止まらないように）
 apt-get install -y -qq --no-install-recommends python3-numpy python3-pil ffmpeg >/dev/null
 DATA=/root/data
 python3 "$JOB/fetch.py" "$DATA"
