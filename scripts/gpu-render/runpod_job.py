@@ -212,14 +212,38 @@ def push(a) -> None:
     print(f"送った: {len(data)} 文字（{(len(data) + step - 1) // step} 回）")
 
 
+def uploaded() -> bool:
+    """できたもの（out.tar）が R2 に届いたか。機械の中の仕事は、最後に out.tar を送ってから終わりの印を書くので、
+    届いていれば仕事は終わっている（exec が答えなくなったときの代わりの確かめ。公開の URL に HEAD を送るだけ）"""
+    base, key = os.environ.get("R2_PUBLIC_URL", ""), os.environ.get("KEY", "")
+    if not base or not key:
+        return False
+    try:
+        # r2.dev は Python の既定の User-Agent を断る（403）ので、一般的な名前を付ける
+        req = urllib.request.Request(base.rstrip("/") + "/" + key, method="HEAD", headers={"User-Agent": "Mozilla/5.0 (compatible; render-check/1.0)"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
 def follow(a) -> None:
     deadline = time.time() + a.minutes * 60
     seen = 0
+    fails = 0
+    up_since = 0.0
     while time.time() < deadline:
         try:
             res = run(a.id, ["sh", "-c", "cat /root/state 2>/dev/null; echo; wc -l < /root/log.txt 2>/dev/null"], quiet=True)
+            fails = 0
         except RuntimeError as e:
+            fails += 1
             print(f"::warning::{e}")
+            # exec が続けて答えないときは、できたものが R2 に届いているかで終わりを確かめる（2026-11-23：仕事が終わって
+            # out.tar が届いたあと、exec が答えなくなり、機械が 10 分以上むだに動き続けた）
+            if fails >= 3 and uploaded():
+                print("exec が答えないが、できたものは R2 に届いている。仕事は終わったとみなす")
+                sys.exit(0)
             time.sleep(20)
             continue
         lines = res.get("stdout", "").strip().splitlines()
@@ -234,6 +258,12 @@ def follow(a) -> None:
             code = state.split()[-1] if len(state.split()) > 1 else "0"
             print(f"仕事が終わった（終了コード {code}）")
             sys.exit(0 if code == "0" else 1)
+        # 終わりの印が書かれないまま、できたものが R2 に届いて 90 秒たったら、終わったとみなす
+        if uploaded():
+            up_since = up_since or time.time()
+            if time.time() - up_since > 90:
+                print("できたものは R2 に届いている（終わりの印はまだ）。仕事は終わったとみなす")
+                sys.exit(0)
         time.sleep(a.every)
     sys.exit("::error::決めた時間内に終わりませんでした")
 
