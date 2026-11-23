@@ -8,7 +8,7 @@
 #         exposure=-0.8・look=Medium_High_Contrast（AgX の見え方。Punchy など）・sky=0.5（空と太陽の強さ）
 #         disc=1（空のモデルの太陽で照らす）・sun=0（ランプで照らす強さ。使うときは disc=0）・aerosol=1.6・haze=0.000005（かすみ）
 #         clouds=4（雲海の作り方の版）・cloud_density=0.12・cloud_lift=170（雲の上面を上げる m）・cloud_texel=8・vol_bounces=8
-#         veg_dark=0.5（森の明るさ。航空写真の森は明るすぎる）・cloud_shell=128（雲の入れ物の格子 m）
+#         veg_dark=0.5（森の明るさ。航空写真の森は明るすぎる）・cloud_shell=128（雲の入れ物の格子 m）・cloud_tile=1200（入れ物のタイル m）
 #         cloud_edge=8・cloud_wisp=40・cloud_wisp_scale=40・cloud_wisp_detail=5（雲の表面の細かな凹凸）・denoise=1・border=（一部だけ描く）
 #         lens=70・aim=2900（見る高さ）・cam_lat / cam_lon / cam_h（カメラの場所）
 import json
@@ -626,36 +626,57 @@ else:
     vy_, vx_ = vmax.shape
     vxs = xmin + np.arange(vx_) * (B * TEX)
     vys = ymin + np.arange(vy_) * (B * TEX)
-    nv = vx_ * vy_
-    co = np.zeros((2, vy_, vx_, 3), dtype=np.float32)
-    co[:, :, :, 0] = vxs[None, None, :]
-    co[:, :, :, 1] = vys[None, :, None]
-    co[0, :, :, 2] = vmax
-    co[1, :, :, 2] = vmin
-    idx = np.arange(2 * nv).reshape(2, vy_, vx_)
-    T, Bo = idx[0], idx[1]
-    faces = []
-    # 上（外向き＝上）・下（外向き＝下）
-    faces.append(np.stack([T[:-1, :-1], T[:-1, 1:], T[1:, 1:], T[1:, :-1]], -1).reshape(-1, 4))
-    faces.append(np.stack([Bo[:-1, :-1], Bo[1:, :-1], Bo[1:, 1:], Bo[:-1, 1:]], -1).reshape(-1, 4))
-    # 横の 4 面（外向き）
-    faces.append(np.stack([T[0, :-1], Bo[0, :-1], Bo[0, 1:], T[0, 1:]], -1))          # 南（y 最小）
-    faces.append(np.stack([T[-1, 1:], Bo[-1, 1:], Bo[-1, :-1], T[-1, :-1]], -1))      # 北
-    faces.append(np.stack([T[1:, 0], Bo[1:, 0], Bo[:-1, 0], T[:-1, 0]], -1))          # 西（x 最小）
-    faces.append(np.stack([T[:-1, -1], Bo[:-1, -1], Bo[1:, -1], T[1:, -1]], -1))      # 東
-    faces = np.concatenate(faces).astype(np.int32)
-    me = bpy.data.meshes.new("cloudsea")
-    me.vertices.add(2 * nv)
-    me.vertices.foreach_set("co", co.reshape(-1))
-    me.loops.add(faces.size)
-    me.loops.foreach_set("vertex_index", faces.reshape(-1))
-    me.polygons.add(len(faces))
-    me.polygons.foreach_set("loop_start", (np.arange(len(faces)) * 4).astype(np.int32))
-    me.polygons.foreach_set("loop_total", np.full(len(faces), 4, dtype=np.int32))
-    me.update(calc_edges=True)
-    me.validate()
-    cloud = bpy.data.objects.new("cloudsea", me)
-    scene.collection.objects.link(cloud)
+    # 入れ物を約 1.2km 四方のタイルに分ける。Cycles（5.x）は形をその場で計算する体積の濃さの上限を、入れ物の外枠を
+    # 128×128×128 に割った升目ごとに、ランダムな 16 点で見積もる（Blender 5.0 のソースの bvh/octree.cpp・kernel/bake/bake.h
+    # で確かめた）。30km 四方の 1 つの入れ物だと升目が横 230m になり、もくもくを見落とした升目で雲が欠け、升目の境目が
+    # 低い角度から横線に見えた（GPU の 4〜6 回目）。1.2km なら升目は横 9m。隣のタイルとは 0.5m 重ねて、すき間を作らない
+    TILE_CELLS = max(1, int(round(float(opt.get("cloud_tile", "1200")) / (B * TEX))))
+    OVER = 0.25
+    clouds_objs = []
+    for r0 in range(0, vy_ - 1, TILE_CELLS):
+        r1 = min(r0 + TILE_CELLS, vy_ - 1)
+        for c0 in range(0, vx_ - 1, TILE_CELLS):
+            c1 = min(c0 + TILE_CELLS, vx_ - 1)
+            ty_, tx_ = r1 - r0 + 1, c1 - c0 + 1
+            xs = vxs[c0 : c1 + 1].astype(np.float64).copy()
+            ys = vys[r0 : r1 + 1].astype(np.float64).copy()
+            xs[0] -= OVER
+            xs[-1] += OVER
+            ys[0] -= OVER
+            ys[-1] += OVER
+            ntv = ty_ * tx_
+            co = np.zeros((2, ty_, tx_, 3), dtype=np.float32)
+            co[:, :, :, 0] = xs[None, None, :]
+            co[:, :, :, 1] = ys[None, :, None]
+            co[0, :, :, 2] = vmax[r0 : r1 + 1, c0 : c1 + 1]
+            co[1, :, :, 2] = vmin[r0 : r1 + 1, c0 : c1 + 1]
+            idx = np.arange(2 * ntv).reshape(2, ty_, tx_)
+            T, Bo = idx[0], idx[1]
+            faces = [
+                # 上（外向き＝上）・下（外向き＝下）
+                np.stack([T[:-1, :-1], T[:-1, 1:], T[1:, 1:], T[1:, :-1]], -1).reshape(-1, 4),
+                np.stack([Bo[:-1, :-1], Bo[1:, :-1], Bo[1:, 1:], Bo[:-1, 1:]], -1).reshape(-1, 4),
+                # 横の 4 面（外向き）：南・北・西・東
+                np.stack([T[0, :-1], Bo[0, :-1], Bo[0, 1:], T[0, 1:]], -1),
+                np.stack([T[-1, 1:], Bo[-1, 1:], Bo[-1, :-1], T[-1, :-1]], -1),
+                np.stack([T[1:, 0], Bo[1:, 0], Bo[:-1, 0], T[:-1, 0]], -1),
+                np.stack([T[:-1, -1], Bo[:-1, -1], Bo[1:, -1], T[1:, -1]], -1),
+            ]
+            faces = np.concatenate(faces).astype(np.int32)
+            me = bpy.data.meshes.new(f"cloudsea_{r0}_{c0}")
+            me.vertices.add(2 * ntv)
+            me.vertices.foreach_set("co", co.reshape(-1))
+            me.loops.add(faces.size)
+            me.loops.foreach_set("vertex_index", faces.reshape(-1))
+            me.polygons.add(len(faces))
+            me.polygons.foreach_set("loop_start", (np.arange(len(faces)) * 4).astype(np.int32))
+            me.polygons.foreach_set("loop_total", np.full(len(faces), 4, dtype=np.int32))
+            me.update(calc_edges=True)
+            me.validate()
+            ob = bpy.data.objects.new(f"cloudsea_{r0}_{c0}", me)
+            scene.collection.objects.link(ob)
+            clouds_objs.append(ob)
+    cloud = clouds_objs[0]
     # 材質：高さの画像を読み、上面からの深さで濃さを決める
     P = geo.outputs["Position"]
     sepw = node("ShaderNodeSeparateXYZ", Vector=P)
@@ -680,7 +701,7 @@ else:
     shred = math_("SUBTRACT", 1.0, math_("MULTIPLY", near_top.outputs["Result"], math_("SUBTRACT", 1.0, wm.outputs["Result"])))
     # 濃さ 0.12/m（雲の中で光がまっすぐ進めるのは平均 8m。層積雲の上の方の濃さ）
     density = math_("MULTIPLY", math_("MULTIPLY", edge.outputs["Result"], deep.outputs["Result"]), math_("MULTIPLY", shred, float(opt.get("cloud_density", "0.12"))))
-    print(f"雲海（4 版）：高さの画像 {NX}x{NY}（{TEX:.0f}m）・入れ物 {vx_}x{vy_}・上面 {top.min():.0f}〜{top.max():.0f}m（平均 {top.mean():.0f}m）（{time.time() - t1:.1f} 秒）", flush=True)
+    print(f"雲海（4 版）：高さの画像 {NX}x{NY}（{TEX:.0f}m）・入れ物 {len(clouds_objs)} 個（{TILE_CELLS * B * TEX:.0f}m 四方）・上面 {top.min():.0f}〜{top.max():.0f}m（平均 {top.mean():.0f}m）（{time.time() - t1:.1f} 秒）", flush=True)
     del X, Y, wx, wy, und, ampm, bumps, fine
 if CLOUDS in ("0", "1", "2", "3"):
     bpy.ops.mesh.primitive_cube_add(size=1.0, location=(cx, cy, (box_top + box_bottom) / 2))
@@ -688,14 +709,27 @@ if CLOUDS in ("0", "1", "2", "3"):
     cloud.scale = (box[0], box[1], box_top - box_bottom)
     if CLOUDS == "0":  # 雲なし（重さを測るとき）
         cloud.hide_render = True
-cloud.name = "cloudsea"
+if CLOUDS in ("0", "1", "2", "3"):
+    cloud.name = "cloudsea"
+    clouds_objs = [cloud]
 vol = cn.nodes.new("ShaderNodeVolumePrincipled")
 vol.inputs["Color"].default_value = (1.0, 1.0, 1.0, 1.0)
 vol.inputs["Anisotropy"].default_value = 0.55
 cn.links.new(density, vol.inputs["Density"])
 mo = cn.nodes.new("ShaderNodeOutputMaterial")
 cn.links.new(vol.outputs[0], mo.inputs["Volume"])
-cloud.data.materials.append(cm)
+for ob in clouds_objs:
+    ob.data.materials.append(cm)
+# 確かめ用：体積の計算を「少しずつ進んで調べる」方式（ray marching）にする。vol_step は雲の材質の刻みの倍率
+# （Cycles は形をその場で計算する体積の刻みを、入れ物の大きさの 1/10 から決めるので、小さな倍率で m 単位にする）
+if "vol_step" in opt and opt.get("vol_biased", "0") != "1":
+    cm.cycles.volume_step_rate = float(opt["vol_step"])
+    print("雲の材質の刻みの倍率", cm.cycles.volume_step_rate, flush=True)
+if opt.get("vol_biased", "0") == "1":
+    scene.cycles.volume_biased = True
+    scene.cycles.volume_max_steps = int(opt.get("vol_max_steps", "2048"))
+    cm.cycles.volume_step_rate = float(opt.get("vol_step", "0.0002"))
+    print("体積：ray marching（刻みの倍率", cm.cycles.volume_step_rate, "）", flush=True)
 
 # ---------------------------------------------------------------- カメラ（山頂の少し下を見て、まっすぐ前へ）
 cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
