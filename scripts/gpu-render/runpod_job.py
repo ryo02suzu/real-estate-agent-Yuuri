@@ -20,6 +20,8 @@ import base64
 import datetime
 import json
 import os
+import shlex
+import subprocess
 import sys
 import time
 import urllib.error
@@ -77,20 +79,22 @@ def catalog(_a) -> None:
         print(f"{gid}\t{mem}GB\tsecure={sec}\tcommunity={com}\t{avail}")
 
 
+CONN = "work/conn.json"  # 機械へのつなぎ方（wait が書く。exec か ssh）
+
+
 def create(a) -> None:
-    # OptiX（GPU の光の計算）には、機械の GPU の部品を全部見せる（all）。CUDA の版の確かめは、ふつうの Ubuntu の像では不要
+    # OptiX（GPU の光の計算）には、機械の GPU の部品を全部見せる（all）。CUDA の版の確かめはしない（Blender は自分で持っている）
     env = {"NVIDIA_DRIVER_CAPABILITIES": "all", "NVIDIA_DISABLE_REQUIRE": "1"}
+    ports = []
+    if a.pubkey:
+        # SSH の鍵（この回だけの使い捨て）。Runpod の公式の像は PUBLIC_KEY から SSH を始める（exec が使えない機械の代わりの道）
+        env["PUBLIC_KEY"] = open(a.pubkey).read().strip()
+        ports = ["22/tcp"]
     last = None
     for gpu in [g.strip() for g in a.gpu.split(",") if g.strip()]:
-        body = {
-            "name": a.name,
-            "image": a.image,
-            "cmd": ["sleep", "infinity"],
-            "disk": a.disk,
-            "env": env,
-            "cloud": a.cloud,
-            "gpu": {"id": gpu, "count": 1},
-        }
+        body = {"name": a.name, "image": a.image, "disk": a.disk, "env": env, "cloud": a.cloud, "gpu": {"id": gpu, "count": 1}}
+        if ports:
+            body["ports"] = ports
         code, res = call("POST", "/pods", body)
         if code in (200, 201) and isinstance(res, dict) and res.get("id"):
             print(f"借りた機械: {res['id']}（{gpu}・{a.cloud}・{res.get('cost', '?')} ドル/時）")
@@ -102,31 +106,70 @@ def create(a) -> None:
     sys.exit(f"::error::どの GPU も借りられませんでした: {str(last)[:500]}")
 
 
+def ssh_args(conn: dict) -> list[str]:
+    return ["ssh", "-i", conn["key"], "-p", str(conn["port"]), "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+            "-o", "LogLevel=ERROR", "-o", "ConnectTimeout=15", "-o", "ServerAliveInterval=15", f"root@{conn['host']}"]
+
+
+def ssh_endpoint(res: dict) -> tuple[str, int] | None:
+    """22 番（SSH）の外から入る IP と番号（動いているときだけ）"""
+    for p in ((res.get("runtime") or {}).get("ports") or []):
+        if p.get("private") == 22 and p.get("public") and p.get("ip"):
+            return p["ip"], int(p["public"])
+    direct = (res.get("ssh") or {}).get("direct") if isinstance(res.get("ssh"), dict) else None
+    if direct and direct.get("host") and direct.get("port"):
+        return direct["host"], int(direct["port"])
+    return None
+
+
 def wait(a) -> None:
     deadline = time.time() + a.minutes * 60
+    tries = 0
     while time.time() < deadline:
         code, res = call("GET", f"/pods/{a.id}")
         status = res.get("status") if isinstance(res, dict) else None
-        print(f"機械の状態: {status}（HTTP {code}）")
-        if status == "RUNNING":
-            # 動き始めても、コマンドを受け付けるまで少しかかる
-            for _ in range(20):
-                c, r = call("POST", f"/pods/{a.id}/exec", {"command": ["true"], "timeoutSeconds": 10})
-                if c == 200 and isinstance(r, dict) and r.get("exitCode") == 0:
-                    print("コマンドを受け付けた")
-                    return
-                time.sleep(10)
-            sys.exit("::error::動いているのに、コマンドを受け付けません")
         if status in ("ERROR", "TERMINATED", "EXITED"):
             sys.exit(f"::error::機械が止まりました: {status}")
+        if status == "RUNNING":
+            # 1) Runpod の API の exec（SSH 無しで機械の中のコマンドを動かす）
+            c, r = call("POST", f"/pods/{a.id}/exec", {"command": ["true"], "timeoutSeconds": 10})
+            if c == 200 and isinstance(r, dict) and r.get("exitCode") == 0:
+                print("exec でコマンドを受け付けた")
+                json.dump({"mode": "exec", "pod": a.id}, open(CONN, "w"))
+                return
+            tries += 1
+            print(f"exec はまだ（{tries} 回目・HTTP {c}）: {str(r)[:240]}")
+            # 2) SSH（使い捨ての鍵。exec が使えない機械の代わり）
+            ep = ssh_endpoint(res) if isinstance(res, dict) else None
+            if ep and a.key and os.path.exists(a.key):
+                conn = {"mode": "ssh", "pod": a.id, "host": ep[0], "port": ep[1], "key": a.key}
+                t = subprocess.run(ssh_args(conn) + ["true"], capture_output=True, text=True, timeout=60)
+                if t.returncode == 0:
+                    print(f"SSH でつながった（{ep[0]}:{ep[1]}）。exec の代わりに SSH で動かす")
+                    json.dump(conn, open(CONN, "w"))
+                    return
+                print(f"SSH はまだ（{ep[0]}:{ep[1]}）: {t.stderr.strip()[:200]}")
+            elif tries == 1:
+                print(f"SSH の入口はまだ無い（ports: {((res.get('runtime') or {}).get('ports') if isinstance(res, dict) else None)}）")
+            time.sleep(15)
+            continue
+        print(f"機械の状態: {status}（HTTP {code}）")
         time.sleep(15)
-    sys.exit("::error::時間内に動き始めませんでした")
+    sys.exit("::error::時間内に動き始めませんでした（exec も SSH もつながらない）")
 
 
 def run(pod: str, command: list[str], timeout: int = 25, quiet: bool = False) -> dict:
-    code, res = call("POST", f"/pods/{pod}/exec", {"command": command, "timeoutSeconds": timeout})
-    if code != 200 or not isinstance(res, dict):
-        raise RuntimeError(f"exec に失敗（HTTP {code}）: {str(res)[:300]}")
+    conn = json.load(open(CONN)) if os.path.exists(CONN) else {"mode": "exec"}
+    if conn.get("mode") == "ssh":
+        try:
+            t = subprocess.run(ssh_args(conn) + [shlex.join(command)], capture_output=True, text=True, timeout=timeout + 60)
+            res = {"stdout": t.stdout, "stderr": t.stderr, "exitCode": t.returncode, "timedOut": False}
+        except subprocess.TimeoutExpired:
+            res = {"stdout": "", "stderr": "", "exitCode": None, "timedOut": True}
+    else:
+        code, res = call("POST", f"/pods/{pod}/exec", {"command": command, "timeoutSeconds": timeout})
+        if code != 200 or not isinstance(res, dict):
+            raise RuntimeError(f"exec に失敗（HTTP {code}）: {str(res)[:300]}")
     if not quiet:
         if res.get("stdout"):
             sys.stdout.write(res["stdout"])
@@ -145,6 +188,17 @@ def exec_cmd(a) -> None:
 
 def push(a) -> None:
     """小さなファイル（仕事の台本など）を、base64 にして分けて送り、機械の中で戻す"""
+    conn = json.load(open(CONN)) if os.path.exists(CONN) else {"mode": "exec"}
+    if conn.get("mode") == "ssh":
+        scp = ["scp", "-i", conn["key"], "-P", str(conn["port"]), "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR",
+               a.tar, f"root@{conn['host']}:/root/job.tgz"]
+        if subprocess.run(scp).returncode != 0:
+            sys.exit("::error::SSH で送れませんでした")
+        res = run(a.id, ["sh", "-c", "mkdir -p /root/job && tar -xzf /root/job.tgz -C /root/job && ls -la /root/job"])
+        if res.get("exitCode") != 0:
+            sys.exit("::error::機械の中で戻せませんでした")
+        print("SSH で送った")
+        return
     data = base64.b64encode(open(a.tar, "rb").read()).decode()
     run(a.id, ["sh", "-c", "rm -f /root/job.b64 && mkdir -p /root/job"], quiet=True)
     step = 3800
@@ -224,11 +278,13 @@ def main() -> None:
     c.add_argument("--name", required=True)
     c.add_argument("--gpu", required=True, help="GPU の種類（カンマ区切り。前から順に試す）")
     c.add_argument("--cloud", default="SECURE", choices=["SECURE", "COMMUNITY"])
-    c.add_argument("--image", default="ubuntu:24.04")
+    c.add_argument("--image", default="runpod/base:1.0.2-ubuntu2204")
+    c.add_argument("--pubkey", default="", help="SSH の公開鍵のファイル（この回だけの使い捨て）")
     c.add_argument("--disk", type=int, default=40)
     w = sub.add_parser("wait")
     w.add_argument("--id", required=True)
     w.add_argument("--minutes", type=float, default=15)
+    w.add_argument("--key", default="", help="SSH の秘密鍵のファイル（exec が使えないときに使う）")
     p = sub.add_parser("push")
     p.add_argument("--id", required=True)
     p.add_argument("--tar", required=True)

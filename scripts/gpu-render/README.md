@@ -21,7 +21,8 @@ GitHub の Actions →「GPU で描く（Runpod）」→ Run workflow（`.github
 `run.sh` を動かし、`/root/out` を tar にして送る → 終わるまで記録を出しながら待つ → R2 から受け取り、Actions の成果物にする →
 **成功しても失敗しても、取り消しても、機械を消す**。
 
-- 機械の中のコマンドは Runpod の API（`POST /v2/pods/{id}/exec`）で動かす。SSH・公開のポートは使わない。
+- 機械の中のコマンドは Runpod の API（`POST /v2/pods/{id}/exec`）で動かす。exec が使えない機械に当たったときは、この回だけの
+  使い捨ての SSH の鍵（機械には `PUBLIC_KEY` で渡す。像は Runpod の公式の `runpod/base`）で、GitHub の機械から SSH でつなぐ。
 - 鍵：`RUNPOD_API_KEY`（Runpod の Credentials → API Keys で作ったもの）と `R2_*` は GitHub の Secrets。中身はログに出さない。
   機械には R2 の鍵を渡さず、1 つのファイルだけ置ける 6 時間の期限付き URL を渡す。
 - お金：Runpod は前払いの残高から、機械が動いている間だけ引かれる（RTX 4090 で 1 時間 0.34〜0.69 ドルほど。2026-11 の Runpod の料金のページ）。

@@ -88,9 +88,12 @@ jobs:
           tar -czf work/job.tgz -C work/job . && ls -la work/job.tgz
       - name: GPU を借りる
         id: pod
-        run: python3 scripts/gpu-render/runpod_job.py create --name "michilu-render-${{ github.run_id }}" --gpu "$GPU" --cloud "$CLOUD"
+        run: |
+          # この回だけの使い捨ての SSH の鍵（Runpod の API の exec が使えない機械に当たったときの代わりの道）
+          ssh-keygen -q -t ed25519 -N "" -C "michilu-render-${{ github.run_id }}" -f work/key
+          python3 scripts/gpu-render/runpod_job.py create --name "michilu-render-${{ github.run_id }}" --gpu "$GPU" --cloud "$CLOUD" --pubkey work/key.pub
       - name: 動き始めるまで待つ
-        run: python3 scripts/gpu-render/runpod_job.py wait --id "${{ steps.pod.outputs.id }}" --minutes 20
+        run: python3 scripts/gpu-render/runpod_job.py wait --id "${{ steps.pod.outputs.id }}" --minutes 20 --key work/key
       - name: 仕事を送って動かす
         run: |
           python3 scripts/gpu-render/runpod_job.py push --id "${{ steps.pod.outputs.id }}" --tar work/job.tgz
