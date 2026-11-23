@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 Runpod（GPU の機械を借りる所）で、Blender の描く仕事を動かす（GitHub Actions の .github/workflows/gpu-render.yml から使う）。
-Runpod の REST API v2（https://api.runpod.io/v2。鍵は環境変数 RUNPOD_API_KEY を Authorization: Bearer で送る）だけを使い、
-SSH は使わない（機械の中のコマンドは /v2/pods/{id}/exec で動かす。1 回の呼び出しは 25 秒まで待つ）。
+Runpod の REST API v2（https://api.runpod.io/v2。鍵は環境変数 RUNPOD_API_KEY を Authorization: Bearer で送る）で機械を借りて消す。
+機械の中のコマンドは /v2/pods/{id}/exec で動かす（1 回の呼び出しは 25 秒まで待つ）。鍵に exec の権限が無いときは、
+この回だけの使い捨ての鍵の SSH で動かす（wait が決めて work/conn.json に書く）。
 
   python3 runpod_job.py catalog                               # 借りられる GPU と値段（1 時間・1 枚）
   python3 runpod_job.py create --name michilu-render-123 --gpu "NVIDIA GeForce RTX 4090,NVIDIA L40S"
@@ -121,8 +122,9 @@ def create(a) -> None:
         print(f"{rnd} 回目：在庫 " + "・".join(f"{g.replace('NVIDIA ', '')}={have.get(g, '?')}" for g in want), flush=True)
         for gpu in order:
             body = {"name": a.name, "image": a.image, "disk": a.disk, "env": env, "cloud": a.cloud, "gpu": {"id": gpu, "count": 1}}
-            # 22 番（SSH の代わりの道）を開けると、外から入れる IP のある機械に限られる。2 回目からは開けない（exec だけ）
-            if ports and rnd == 1:
+            # 22 番（SSH）は毎回開ける。今の鍵には exec の権限が無く（HTTP 403「This API key cannot run commands on pods」）、
+            # 22 番の無い機械では仕事を動かせないまま待つことになる（外から入れる IP のある機械に限られるが、それでよい）
+            if ports:
                 body["ports"] = ports
             code, res = call("POST", "/pods", body)
             if code in (200, 201) and isinstance(res, dict) and res.get("id"):
@@ -202,9 +204,13 @@ def run(pod: str, command: list[str], timeout: int = 25, quiet: bool = False) ->
     if conn.get("mode") == "ssh":
         try:
             t = subprocess.run(ssh_args(conn) + [shlex.join(command)], capture_output=True, text=True, timeout=timeout + 60)
-            res = {"stdout": t.stdout, "stderr": t.stderr, "exitCode": t.returncode, "timedOut": False}
         except subprocess.TimeoutExpired:
-            res = {"stdout": "", "stderr": "", "exitCode": None, "timedOut": True}
+            raise RuntimeError(f"SSH が {timeout + 60} 秒答えない（{conn['host']}:{conn['port']}）")
+        # 255 は ssh 自身の失敗（つながらない・切れた）。前はこれを「答えが空」として扱い、機械の様子が分からないまま
+        # 決めた時間まで待ち続けた（2026-11-23：1〜30 コマ目の回が 11:43 から 3 時間、何も出ないまま待って時間切れ）
+        if t.returncode == 255:
+            raise RuntimeError(f"SSH でつながらない（{conn['host']}:{conn['port']}）: {t.stderr.strip()[:200]}")
+        res = {"stdout": t.stdout, "stderr": t.stderr, "exitCode": t.returncode, "timedOut": False}
     else:
         code, res = call("POST", f"/pods/{pod}/exec", {"command": command, "timeoutSeconds": timeout})
         if code != 200 or not isinstance(res, dict):
@@ -218,7 +224,10 @@ def run(pod: str, command: list[str], timeout: int = 25, quiet: bool = False) ->
 
 
 def exec_cmd(a) -> None:
-    res = run(a.id, a.command, a.timeout)
+    try:
+        res = run(a.id, a.command, a.timeout)
+    except RuntimeError as e:
+        sys.exit(f"::error::{e}")
     if res.get("timedOut"):
         print("（25 秒で待つのをやめた。コマンドは機械の中で続いている）")
         return
@@ -233,7 +242,10 @@ def push(a) -> None:
                a.tar, f"root@{conn['host']}:/root/job.tgz"]
         if subprocess.run(scp).returncode != 0:
             sys.exit("::error::SSH で送れませんでした")
-        res = run(a.id, ["sh", "-c", "mkdir -p /root/job && tar -xzf /root/job.tgz -C /root/job && ls -la /root/job"])
+        try:
+            res = run(a.id, ["sh", "-c", "mkdir -p /root/job && tar -xzf /root/job.tgz -C /root/job && ls -la /root/job"])
+        except RuntimeError as e:
+            sys.exit(f"::error::{e}")
         if res.get("exitCode") != 0:
             sys.exit("::error::機械の中で戻せませんでした")
         print("SSH で送った")
@@ -266,37 +278,96 @@ def uploaded() -> bool:
         return False
 
 
+def pod_info(pod: str) -> dict:
+    """Runpod の API で見た機械の様子（status・runtime。runtime は 1 台を ID で読んだときだけ入る）。読めなければ空"""
+    code, res = call("GET", f"/pods/{pod}", timeout=30)
+    return res if code == 200 and isinstance(res, dict) else {}
+
+
+def gpu_busy(info: dict) -> bool | None:
+    """API の runtime.gpus[].util（%）で見て、GPU が動いているか。分からなければ None"""
+    gpus = (info.get("runtime") or {}).get("gpus") or []
+    utils = [g.get("util") for g in gpus if isinstance(g, dict) and isinstance(g.get("util"), (int, float))]
+    return (max(utils) >= 5) if utils else None
+
+
+def _num(s: str) -> int:
+    s = (s or "").strip()
+    return int(s) if s.isdigit() else 0
+
+
+# 機械の中の様子を 1 回で読む：仕事の印・記録の行数・描けたコマの数・GPU の使われ方（%）
+PROBE = ("printf 'state=%s\\nlog=%s\\nframes=%s\\ngpu=%s\\n' \"$(cat /root/state 2>/dev/null)\" \"$(wc -l < /root/log.txt 2>/dev/null)\" "
+         "\"$(ls /root/out/frames 2>/dev/null | wc -l)\" \"$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null | head -n 1)\"")
+
+
 def follow(a) -> None:
-    deadline = time.time() + a.minutes * 60
-    seen = 0
-    fails = 0
-    up_since = 0.0
+    """仕事が終わるまで、記録を出しながら待つ。止まった機械に払い続けないよう、次のときは早めに見切る（あとの手順が機械を消す）：
+    - 機械に答えてもらえず（SSH・exec）、Runpod の API で見ても機械が止まった・起動し直した（中の仕事は消える）
+    - 機械に答えてもらえないまま --lost 分たち、API で見た GPU も 15 分以上止まっている
+    - 答えはあるが、仕事の印（/root/state）が消えた（起動し直した）
+    - 答えはあるが、記録もコマも --stall 分増えず、GPU も 15 分以上止まっている（描いている間は GPU が動くので、1 コマが長くても止めない）"""
+    start = time.time()
+    deadline = start + a.minutes * 60
+    seen = frames = 0
+    fails = no_state = 0
+    fail_since = up_since = 0.0
+    moved_at = busy_at = start
+    had_state = False
     while time.time() < deadline:
+        now = time.time()
         try:
-            res = run(a.id, ["sh", "-c", "cat /root/state 2>/dev/null; echo; wc -l < /root/log.txt 2>/dev/null"], quiet=True)
-            fails = 0
+            res = run(a.id, ["sh", "-c", PROBE], quiet=True)
+            kv = dict(line.split("=", 1) for line in res.get("stdout", "").splitlines() if "=" in line)
+            state, total, nframes, gpu = kv.get("state", "").strip(), _num(kv.get("log", "")), _num(kv.get("frames", "")), kv.get("gpu", "").strip()
+            if total > seen:
+                r = run(a.id, ["sh", "-c", f"sed -n '{seen + 1},{total}p' /root/log.txt | tail -n 40"], quiet=True)
+                sys.stdout.write(r.get("stdout", ""))
+                sys.stdout.flush()
         except RuntimeError as e:
             fails += 1
-            print(f"::warning::{e}")
-            # exec が続けて答えないときは、できたものが R2 に届いているかで終わりを確かめる（2026-11-23：仕事が終わって
-            # out.tar が届いたあと、exec が答えなくなり、機械が 10 分以上むだに動き続けた）
+            fail_since = fail_since or now
+            if fails == 1 or fails % 10 == 0:
+                print(f"::warning::{e}（{fails} 回目）", flush=True)
+            # 終わってから答えなくなることもある（2026-11-23：out.tar が届いたあと exec が答えず、10 分以上むだに動いた）
             if fails >= 3 and uploaded():
-                print("exec が答えないが、できたものは R2 に届いている。仕事は終わったとみなす")
+                print("機械に答えてもらえないが、できたものは R2 に届いている。仕事は終わったとみなす")
                 sys.exit(0)
+            info = pod_info(a.id)
+            st = info.get("status")
+            if st and st != "RUNNING":
+                sys.exit(f"::error::機械が止まった（{st}）")
+            up = (info.get("runtime") or {}).get("uptime")
+            if isinstance(up, (int, float)) and up < (now - start) - 180:
+                sys.exit(f"::error::機械が途中で起動し直した（動き始めて {int(up)} 秒）。中の仕事は消えたとみて終える")
+            if gpu_busy(info) is not False:
+                busy_at = now  # 動いている（または分からない）
+            if now - fail_since > a.lost * 60 and now - busy_at > 15 * 60:
+                sys.exit(f"::error::{a.lost} 分のあいだ機械に答えてもらえず、GPU も止まっている（機械の様子：{st or '読めない'}）。終える")
             time.sleep(20)
             continue
-        lines = res.get("stdout", "").strip().splitlines()
-        state = lines[0].strip() if lines else ""
-        total = int(lines[-1]) if lines and lines[-1].strip().isdigit() else 0
-        if total > seen:
-            r = run(a.id, ["sh", "-c", f"sed -n '{seen + 1},{total}p' /root/log.txt | tail -n 40"], quiet=True)
-            sys.stdout.write(r.get("stdout", ""))
-            sys.stdout.flush()
-            seen = total
+        if fails:
+            print(f"機械にまたつながった（{fails} 回失敗したあと）", flush=True)
+        fails, fail_since = 0, 0.0
+        if total > seen or nframes > frames:
+            moved_at = now
+        if nframes > frames and total <= seen:
+            print(f"描けたコマ：{nframes}", flush=True)
+        seen, frames = max(seen, total), max(frames, nframes)
+        if not gpu.isdigit() or int(gpu) >= 5:
+            busy_at = now  # 動いている（または分からない）
         if state.startswith("done"):
             code = state.split()[-1] if len(state.split()) > 1 else "0"
             print(f"仕事が終わった（終了コード {code}）")
             sys.exit(0 if code == "0" else 1)
+        if state:
+            had_state, no_state = True, 0
+        elif had_state:
+            no_state += 1
+            if no_state >= 3:
+                sys.exit("::error::機械の中の仕事の印（/root/state）が消えた。機械が起動し直して、仕事が消えたとみて終える")
+        if a.stall > 0 and now - moved_at > a.stall * 60 and now - busy_at > 15 * 60:
+            sys.exit(f"::error::{a.stall} 分のあいだ記録もコマも増えず、GPU も 15 分以上止まっている。止まったとみて終える")
         # 終わりの印が書かれないまま、できたものが R2 に届いて 90 秒たったら、終わったとみなす
         if uploaded():
             up_since = up_since or time.time()
@@ -368,6 +439,8 @@ def main() -> None:
     f.add_argument("--id", required=True)
     f.add_argument("--minutes", type=float, default=60)
     f.add_argument("--every", type=float, default=30)
+    f.add_argument("--stall", type=float, default=45, help="記録もコマも増えず GPU も止まっているとき、見切るまでの分（0 で見切らない）")
+    f.add_argument("--lost", type=float, default=20, help="機械に答えてもらえず GPU も止まっているとき、見切るまでの分")
     t = sub.add_parser("terminate")
     t.add_argument("--id", default="")
     k = sub.add_parser("cleanup")

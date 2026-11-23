@@ -1,8 +1,8 @@
 # GPU の機械（Runpod）を借りて Blender で描き、できたものを受け取って、必ず機械を消す（オープニングの映像など。持ち主 2026-11-22）。
-#  1. 前の回の止め忘れ（michilu-render- で始まる、3 時間より古い機械）を消す
+#  1. 前の回の止め忘れ（michilu-render- で始まる、6 時間より古い機械）を消す
 #  2. GPU を借りる（前から順に試す）→ 動き始めるまで待つ
 #  3. 仕事（scripts/gpu-render/jobs/<job>）と、できたものを送る先（R2 の期限付き URL）を機械に送り、scripts/gpu-render/pod-wrap.sh を動かす
-#     （Blender を入れて run.sh を動かし、/root/out を tar にして送る。SSH は使わず、Runpod の API の exec で動かす）
+#     （Blender を入れて run.sh を動かし、/root/out を tar にして送る。Runpod の API の exec で動かし、使えない機械では使い捨ての鍵の SSH で動かす）
 #  4. 終わるまで記録を出しながら待つ → R2 から受け取り、Actions の成果物（artifact）にする
 #  5. 成功しても失敗しても、取り消しても、機械を消す
 # 鍵：RUNPOD_API_KEY（Runpod）・R2_*（できたものの置き場）は GitHub の Secrets。中身はログに出さない。
@@ -74,7 +74,8 @@ jobs:
         run: |
           [[ "$JOB" =~ ^[a-z0-9-]+$ ]] && [ -d "scripts/gpu-render/jobs/$JOB" ] || { echo "::error::仕事 $JOB がありません"; exit 1; }
           [[ "$MINUTES" =~ ^[0-9]+$ ]] || { echo "::error::minutes は数で"; exit 1; }
-          python3 scripts/gpu-render/runpod_job.py cleanup --prefix michilu-render- --hours 3
+          # 止め忘れの安全網。動いている別の列の回の機械を消さないよう、1 回の上限（330 分）より長い 6 時間にする
+          python3 scripts/gpu-render/runpod_job.py cleanup --prefix michilu-render- --hours 6
           python3 scripts/gpu-render/runpod_job.py balance | tee -a "$GITHUB_STEP_SUMMARY"
           python3 scripts/gpu-render/runpod_job.py catalog --cloud "$CLOUD" | head -n 40
       - name: 仕事のファイルを作る（できたものを送る先の、期限付きの URL も入れる）

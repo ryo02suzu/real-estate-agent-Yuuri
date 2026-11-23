@@ -11,7 +11,7 @@ DATA=/root/data
 FETCH="${FETCH:-dem,photo,dem5,photo16}"
 python3 "$JOB/fetch.py" "$DATA" ${FETCH//,/ }
 "$BLENDER" -b --factory-startup --python "$JOB/scene.py" -- "$DATA" "$OUT" \
-  "frames=${FRAMES:-1-90}" "res=${RES:-1920x1080}" "samples=${SAMPLES:-512}" "stride=${STRIDE:-1}" ${EXTRA//,/ } 2>&1 | grep -vE "^Fra:|DeprecationWarning|use_nodes" || true
+  "frames=${FRAMES:-1-90}" "res=${RES:-1920x1080}" "samples=${SAMPLES:-512}" "stride=${STRIDE:-1}" ${EXTRA//,/ } 2>&1 | grep --line-buffered -vE "^Fra:|DeprecationWarning|use_nodes" || true
 n=$(ls "$OUT/frames"/*.png 2>/dev/null | wc -l)
 echo "描いたコマ：$n"
 [ "$n" -gt 0 ] || exit 1
