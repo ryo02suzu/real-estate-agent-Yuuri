@@ -5,15 +5,16 @@
   python air_render.py --tod all        # Blender で描く → work/air/render/（air_render.py の説明）
   python3 air_clouds.py webp            # 描いた絵 → public/home/air/*.webp と lib/app/desk-air.json
 
-- 形はどれも、上下・左右につなぎ目なくくり返せる（タイル）。雲は、周期のある面に小さな「ふくらみ」（ぼかした点）を
-  たくさん置いて作り、ぼかしはフーリエ（周期のある波の足し合わせ）で計算するので、端と端が必ずつながる。
-- 1 画素 = ズーム 5 の地図の 1 画素（PC のホームの地図とほぼ同じ縮尺。アプリは地図に合わせて拡大・縮小し、ゆっくり流す）。
-- 積雲：1 つの雲は、真ん中の大きなふくらみ・まわりのもくもく（雲の頭）・ふちの小さなふくらみでできる。雲の大きさは
-  小さいものほど多く（べき乗）、群れのある所ほど雲が多く大きい。返すのは、雲の濃さ（0〜1）と雲の頭の高さ（画素）。
-  雲の頭には、細かいもくもくの凹凸を足す。光は当てない（Blender が体積として描く）。
-- 巻雲：風の向き（西から東。少し北東へ）に長く細いふくらみを帯のように置いた、薄いベール。
-- 厚い雲（deck-a・deck-b）：オープニングの白い雲から「雲が晴れて日本が見えてくる」ところに使う、同じ積雲に雲を足した
-  厚い雲。deck-b の雲の真ん中は、ふだんの積雲と同じ所にある。
+- 形はどれも、上下・左右につなぎ目なくくり返せる（タイル）。模様は周期のある波の足し合わせ（フーリエ）で作るので、
+  端と端が必ずつながる。1 画素 = ズーム 5 の地図の 1 画素（約 2km。アプリは地図に合わせて拡大・縮小し、ゆっくり流す）。
+- 積雲（2 版。2026-11-23）：宇宙から見た雲の作りをまねて、細かさの違う模様を足してしきい値で切る。大きな群れの中にだけ
+  雲があり（大部分は晴れ）、群れの中は小さな積雲のつぶが並び、真ん中ほどつながって大きな雲になる。ふちはつぶがまばらに
+  なってほつれ、まわりに薄いもやが少し残る。ところどころに風の向きの筋（雲の列）と、中の抜けた輪（開いたセル）が出る。
+  1 版（丸いふくらみを置いて作った、綿のかたまりのような雲）は作り物っぽかったのでやめた。
+  返すのは、雲の濃さ（0〜1）と雲の頭の高さ（単位）。光は当てない（Blender が体積として描く）。
+- 巻雲（2 版）：上空の風の向きに長い、薄いベールと、その上にまばらに並ぶくっきりした筋。
+- 厚い雲（deck-a・deck-b）：オープニングの白い雲から「雲が晴れて日本が見えてくる」ところに使う。同じ模様のしきい値を
+  下げただけなので、ふだんの雲を必ず含み、晴れていくと同じ雲がやせていく。
 """
 
 from __future__ import annotations
@@ -81,42 +82,12 @@ def spectral(n: int, beta: float, seed: int, kmin: float = 1.0, kmax: float | No
     return ((f - f.mean()) / f.std()).astype(F32)
 
 
-def gauss_conv(img: np.ndarray, s_along: float, s_across: float, angle: float = 0.0) -> np.ndarray:
-    """周期でつないだ、細長くできるぼかし（angle の向きに s_along、直角に s_across）。1 つの点は高さ 1 のふくらみになる"""
-    n = img.shape[0]
-    fy, fx = _freq(n)
-    a = math.radians(angle)
-    fu = fx * math.cos(a) + fy * math.sin(a)
-    fv = -fx * math.sin(a) + fy * math.cos(a)
-    g = np.exp(-2.0 * math.pi**2 * ((s_along * fu) ** 2 + (s_across * fv) ** 2))
-    out = np.fft.irfft2(np.fft.rfft2(img) * g, s=(n, n)) * (2.0 * math.pi * s_along * s_across)
-    return out.astype(F32)
 
 
-def sample(f: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-    """模様の (x, y) の値（周期でつなぐ。直線で補う）"""
-    return ndimage.map_coordinates(f, [y, x], order=1, mode="grid-wrap")
 
 
-def splat(n: int, x: np.ndarray, y: np.ndarray, w: np.ndarray) -> np.ndarray:
-    """点（重み w）を、周期でつないだ面に置く（となりの 4 画素に分ける）"""
-    img = np.zeros((n, n), np.float64)
-    x0 = np.floor(x).astype(np.int64)
-    y0 = np.floor(y).astype(np.int64)
-    fx, fy = x - x0, y - y0
-    for dx, dy, k in ((0, 0, (1 - fx) * (1 - fy)), (1, 0, fx * (1 - fy)), (0, 1, (1 - fx) * fy), (1, 1, fx * fy)):
-        np.add.at(img, ((y0 + dy) % n, (x0 + dx) % n), w * k)
-    return img
 
 
-def scatter(n: int, rng: np.random.Generator, count: int, accept: np.ndarray, min_p: float = 0.0) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """accept（0〜1 の面）に比例した濃さで、点を count 個ほど置く。返す：x・y・その所の accept"""
-    xs = rng.random(count * 12) * n
-    ys = rng.random(count * 12) * n
-    p = sample(accept, xs, ys)
-    keep = rng.random(len(xs)) < np.maximum(p, min_p)
-    xs, ys, p = xs[keep][:count], ys[keep][:count], p[keep][:count]
-    return xs, ys, p
 
 
 def warp(f: np.ndarray, dx: np.ndarray, dy: np.ndarray) -> np.ndarray:
@@ -126,8 +97,6 @@ def warp(f: np.ndarray, dx: np.ndarray, dy: np.ndarray) -> np.ndarray:
     return ndimage.map_coordinates(f, [y + dy, x + dx], order=1, mode="grid-wrap").astype(F32)
 
 
-def blur(f: np.ndarray, s: float) -> np.ndarray:
-    return ndimage.gaussian_filter(f, s, mode="wrap") if s > 0 else f
 
 
 def smoothstep(a: float, b: float, x):
@@ -135,132 +104,97 @@ def smoothstep(a: float, b: float, x):
     return t * t * (3.0 - 2.0 * t)
 
 
-# ---------------------------------------------------------------- 積雲
+# ---------------------------------------------------------------- 積雲（2 版：宇宙から見た本物の雲の作り）
+#
+# 1 版は、1 つの雲を丸いふくらみの集まりで作ったので、同じくらいの大きさの綿のかたまりが並び、ふちもぼやけて作り物っぽかった
+# （2026-11-21）。2 版は、宇宙から見た雲の作りをまねる（ふくらみを置かず、細かさの違う模様を足してしきい値で切る）：
+#  - 群れ：大きな広がり（数百 km）の中にだけ雲があり、大部分は晴れ
+#  - 群れの中：小さな積雲のつぶ（数 km）が並び、群れの真ん中ほどつぶがつながって大きな雲になる。ふちに行くほどつぶがまばらに
+#    なり、ふちはほつれる（細かい模様の山だけがしきい値を超えるので、ふちがフラクタルになる）
+#  - ところどころに、風の向きにならぶ筋（雲の列）と、中の抜けた輪（開いたセル）が出る
+#  - 厚い雲（オープニングから晴れていくところ）は、同じ模様のしきい値を下げただけのもの（ふだんの雲を必ず含み、晴れていくと
+#    同じ雲がやせていく）
 
-# ふくらみの太さの段（ぼかしの幅 σ・画素）。ふくらみは近い段にまとめてぼかす
-SIGMAS = np.array([0.8, 1.15, 1.65, 2.4, 3.4, 4.8, 6.8, 9.6, 13.5])
-
-
-def cumulus_field(n: int, seed: int, more: float = 1.0) -> dict[str, np.ndarray]:
-    """積雲を置く。1 つの雲は、真ん中の大きなふくらみ・まわりのもくもく（雲の頭）・ふちの小さなふくらみでできる。
-    雲の大きさは小さいものほど多い（べき乗）。群れのある所ほど雲が多く大きい。
-    more：雲の数の倍率（オープニングの厚い雲は多くする。同じ種なので、ふだんの雲はそのまま同じ所にある）。
-    返す：D（ふくらみの重なり。濃さのもと）、H（高さ・画素）、region（群れの強さ）"""
-    rng = np.random.default_rng(seed + 100)
-    # 群れのある所：大小の広がり（大きい群れ・小さい群れ・ぽつんと離れた雲）。流れの向きに少し伸ばす
-    region = spectral(n, 2.7, seed + 1, kmin=2, kmax=34, stretch=1.8, angle=WIND)
-    acc = smoothstep(0.35, 1.75, region)
-    base_count, most = 2000, 4
-    xs, ys, p = scatter(n, rng, base_count * most, acc)
-    # 雲の大きさ（半径・画素）：べき乗（小さい雲ほど多い）。群れの強い所ほど大きい
-    u = rng.random(len(xs))
-    R = np.minimum(1.6 * (1 - u) ** (-1 / 1.5), 15.0) * (0.6 + 0.7 * p)
-    # ふだんの雲は最初の base_count 個。厚い雲（more > 1）は続きの雲を足す（雲ごとに別の種を使うので、ふだんの雲は同じ形のまま）
-    k = min(len(xs), int(base_count * more))
-    xs, ys, p, R = xs[:k], ys[:k], p[:k], R[:k]
-    a = math.radians(WIND)
-    ca, sa = math.cos(a), math.sin(a)
-    px, py, ps, pw, ph = [], [], [], [], []
-
-    def add(x, y, s, w, h):
-        px.append(x)
-        py.append(y)
-        ps.append(s)
-        pw.append(w)
-        ph.append(h)
-
-    for i, (x0, y0, r) in enumerate(zip(xs, ys, R)):
-        rng = np.random.default_rng((seed, 7, i))
-        # 小さい雲ほど薄い（背が低く、光が透ける）
-        th = min(1.0, 0.3 + r / 9.0)
-        # 真ん中の大きなふくらみ
-        add(np.array([x0]), np.array([y0]), np.array([0.5 * r]), np.array([th]), np.array([0.7 * r]))
-        # まわりのもくもく（雲の頭）：風の向きに少し長い楕円の中
-        m = int(4 + 0.9 * r)
-        du = rng.normal(0, 0.42 * r, m) * 1.25
-        dv = rng.normal(0, 0.42 * r, m)
-        s = r * rng.uniform(0.16, 0.34, m)
-        add(x0 + du * ca - dv * sa, y0 + du * sa + dv * ca, s, th * rng.uniform(0.7, 1.15, m), s * rng.uniform(0.7, 1.2, m))
-        # ふちの小さなふくらみ（カリフラワーのふち）
-        m2 = int(3 + 1.6 * r)
-        ang = rng.random(m2) * 2 * math.pi
-        rad = r * rng.uniform(0.55, 1.05, m2)
-        s2 = np.maximum(r * rng.uniform(0.07, 0.15, m2), 0.8)
-        add(x0 + np.cos(ang) * rad * 1.2, y0 + np.sin(ang) * rad, s2, th * rng.uniform(0.45, 0.85, m2), s2 * 0.9)
-    px, py, ps, pw, ph = (np.concatenate(v) for v in (px, py, ps, pw, ph))
-    # 太さの段ごとに置いてぼかす
-    D = np.zeros((n, n), F32)
-    H = np.zeros((n, n), F32)
-    lvl = np.abs(np.log(ps[:, None]) - np.log(SIGMAS[None, :])).argmin(1)
-    for i, s in enumerate(SIGMAS):
-        sel = lvl == i
-        if not sel.any():
-            continue
-        img = splat(n, px[sel] % n, py[sel] % n, pw[sel])
-        # 高さ：ふくらみの頂の高さ（重みで割り戻す）
-        imh = splat(n, px[sel] % n, py[sel] % n, pw[sel] * ph[sel])
-        D += gauss_conv(img, s * 1.08, s, WIND)
-        H += gauss_conv(imh, s * 1.08, s, WIND)
-    # 丸いふくらみのままだと綿の玉に見えるので、中くらいの細かさのゆがみで形を崩す（ふちが不ぞろいになる）
-    wx = spectral(n, 2.6, seed + 41, kmin=8, kmax=110) * 2.6 + spectral(n, 3.4, seed + 43, kmin=2, kmax=30) * 9
-    wy = spectral(n, 2.6, seed + 42, kmin=8, kmax=110) * 2.6 + spectral(n, 3.4, seed + 44, kmin=2, kmax=30) * 7
-    D = warp(D, wx, wy)
-    H = warp(H, wx, wy)
-    return {"D": D, "H": H, "region": region}
+SHAPE_VERSION = 4  # 雲の形の作り方の版（work/air/fields.npz の作り直しの目印）
 
 
-def cumulus_density(fld: dict[str, np.ndarray], coverage: float, seed: int) -> np.ndarray:
-    """雲の濃さ（0〜1）。coverage：雲のある所の割合（濃さ 0.1 より上）。ふちは細かい模様で少しほつれさせる"""
-    D = fld["D"]
-    n = D.shape[0]
-    fray = 0.5 + 0.5 * np.tanh(spectral(n, 1.4, seed + 31, kmin=90, kmax=700) * 0.9)
+def worley2(n: int, cells: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
+    """周期のある格子のセル模様：いちばん近い点・2 番目に近い点までの距離（セルの幅で割る）。cells は n を割り切る数"""
+    rng = np.random.default_rng(seed)
+    jit = rng.random((cells, cells, 2)).astype(F32)
+    cs = n / cells
+    y, x = np.mgrid[0:n, 0:n].astype(F32) + 0.5
+    cx = (x // cs).astype(np.int32)
+    cy = (y // cs).astype(np.int32)
+    f1 = np.full((n, n), np.inf, F32)
+    f2 = np.full((n, n), np.inf, F32)
+    for oy in (-1, 0, 1):
+        for ox in (-1, 0, 1):
+            nx = (cx + ox) % cells
+            ny = (cy + oy) % cells
+            d = np.hypot((cx + ox + jit[ny, nx, 0]) * cs - x, (cy + oy + jit[ny, nx, 1]) * cs - y)
+            f2 = np.where(d < f1, f1, np.minimum(f2, d))
+            f1 = np.minimum(f1, d)
+    return f1 / cs, f2 / cs
 
-    def dens(k: float, sub=(slice(None), slice(None))) -> np.ndarray:
-        d = 1.0 - np.exp(-k * D[sub])
-        d = np.clip(d * (1.0 - 0.45 * (1.0 - d) * fray[sub]), 0, 1)
-        return d
 
-    lo, hi = 0.01, 50.0
-    sub = (slice(None, None, 4), slice(None, None, 4))
-    for _ in range(40):
-        mid = math.sqrt(lo * hi)
-        if (dens(mid, sub) > 0.1).mean() > coverage:
-            hi = mid
-        else:
+def cumulus_q(n: int, seed: int) -> dict[str, np.ndarray]:
+    """雲のでき方の強さ q（大きいほど雲になる）と、群れの強さ region。しきい値で切って雲にする（cloud_maps）"""
+    region = spectral(n, 3.2, seed + 1, kmin=2, kmax=26, stretch=1.5, angle=WIND)
+    mid = spectral(n, 2.2, seed + 5, kmin=20, kmax=220)
+    fine = spectral(n, 1.5, seed + 4, kmin=110, kmax=800)
+    # 風の向きにならぶ筋（雲の列）と、中の抜けた輪（開いたセル。セルの境目に雲）。どちらが出るかは場所で変わる
+    streets = spectral(n, 2.0, seed + 2, kmin=50, kmax=300, stretch=5.0, angle=WIND)
+    f1, f2 = worley2(n, 64, seed + 3)
+    rings = 1.0 - smoothstep(0.0, 0.22, f2 - f1)
+    org = spectral(n, 3.0, seed + 6, kmin=2, kmax=20)
+    q = region + 0.30 * mid + 0.42 * fine + 0.35 * smoothstep(0.2, 1.2, org) * streets + 0.55 * smoothstep(0.2, 1.2, -org) * (rings - 0.5)
+    # ほつれ：中くらいの細かさのゆがみで、筋や輪の線もまっすぐにしない
+    wx = spectral(n, 2.4, seed + 41, kmin=6, kmax=120) * 3.0
+    wy = spectral(n, 2.4, seed + 42, kmin=6, kmax=120) * 3.0
+    return {"q": warp(q.astype(F32), wx, wy), "region": region}
+
+
+def _density(x: np.ndarray) -> np.ndarray:
+    """しきい値を超えた分 x から雲の濃さ（0〜1）。超えたばかりのふちは薄く（光が透ける）、奥ほど濃い。しきい値の少し下にも、
+    うすいもや（画素より小さな雲のつぶの集まり。宇宙から見ると群れのまわりが白っぽくかすむ）を少しだけ残す"""
+    core = 1.0 - np.exp(-np.maximum(x, 0) / 0.6)
+    haze = 0.10 * smoothstep(-0.5, 0.0, x)
+    return np.where(x > 0, np.maximum(core, haze), haze).astype(F32)
+
+
+def threshold_for(q: np.ndarray, coverage: float) -> float:
+    """雲のある所（濃さ 0.1 より上）が coverage になるしきい値"""
+    sub = q[::4, ::4]
+    lo, hi = float(sub.min()), float(sub.max())
+    for _ in range(50):
+        mid = 0.5 * (lo + hi)
+        if (_density(sub - mid) > 0.1).mean() > coverage:
             lo = mid
-    return dens(math.sqrt(lo * hi)).astype(F32)
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
 
 
-def surface(fld: dict[str, np.ndarray], cap: float = 13.0) -> np.ndarray:
-    """雲の頭の高さ（画素）：真ん中の丸い頭に、まわりのもくもく（雲の頭）が積み重なる（足し合わせ）。重なりすぎる所は、
-    なめらかに頭打ちにする（cap）"""
-    H = fld["H"]
-    return (cap * (1.0 - np.exp(-H / cap))).astype(F32)
-
-
-# ---------------------------------------------------------------- 巻雲
+# ---------------------------------------------------------------- 巻雲（2 版）
 
 
 def cirrus_density(n: int, seed: int) -> np.ndarray:
-    """巻雲：風の向きに長く細いふくらみ（筋）を帯のように置いた、薄いベール"""
-    band = spectral(n, 3.6, seed + 21, kmin=1, kmax=11, stretch=4.0, angle=WIND)
-    # 帯をところどころで切る（長いベールが画面を横切り続けないように）
-    cut = spectral(n, 3.0, seed + 25, kmin=2, kmax=20, stretch=2.0, angle=WIND)
-    acc = smoothstep(1.0, 2.3, band) * smoothstep(-0.3, 0.9, cut)
-    D = np.zeros((n, n), F32)
-    # (長さ σ, 幅 σ, 数, 重み)：ベールの体・筋・細い毛
-    for i, (sa, sc, count, wt) in enumerate(((80.0, 12.0, 320, 0.4), (50.0, 3.6, 1000, 0.22), (26.0, 1.8, 1800, 0.1))):
-        rng = np.random.default_rng(seed + 200 + i)
-        xs, ys, p = scatter(n, rng, count, acc)
-        w = wt * p * rng.exponential(1.0, len(xs))
-        # 筋の向きは、帯の中で少しずつ違う
-        P = gauss_conv(splat(n, xs, ys, w), sa, sc, WIND)
-        D += P
-    # ゆるい曲がり
-    wx = spectral(n, 3.6, seed + 22, kmin=1, kmax=10) * 20
-    wy = spectral(n, 3.6, seed + 23, kmin=1, kmax=10) * 26
-    D = warp(D, wx, wy)
-    return (1.0 - np.exp(-1.0 * D)).astype(F32)
+    """巻雲：上空の風（積雲の風より少し北寄り）に長く伸びた、毛の束のような薄いベール。帯のところどころに出る"""
+    ang = WIND - 12.0
+    band = spectral(n, 3.4, seed + 21, kmin=1, kmax=12, stretch=3.0, angle=ang)
+    cut = spectral(n, 3.0, seed + 25, kmin=2, kmax=24, stretch=1.5, angle=ang)
+    acc = smoothstep(0.9, 2.2, band) * smoothstep(-0.4, 0.8, cut)
+    # 薄いベールの上に、くっきりした筋（数 km 幅・数十〜数百 km の長さ）がまばらに並ぶ。筋は模様の山だけを使うので、
+    # 一様なはけ目にならない。筋はベールより少し外まで伸びる
+    wide = smoothstep(0.6, 1.8, band) * smoothstep(-0.8, 0.6, cut)
+    strands = smoothstep(0.7, 2.0, spectral(n, 2.6, seed + 26, kmin=8, kmax=200, stretch=10.0, angle=ang))
+    fibers = spectral(n, 1.6, seed + 27, kmin=60, kmax=900, stretch=16.0, angle=ang)
+    d = 0.22 * acc + 0.8 * wide * strands * np.clip(0.75 + 0.3 * fibers, 0.0, 1.0)
+    # ゆるい曲がり（上空の風のゆらぎ）
+    wx = spectral(n, 3.6, seed + 22, kmin=1, kmax=10) * 18
+    wy = spectral(n, 3.6, seed + 23, kmin=1, kmax=10) * 24
+    return (np.clip(0.85 * warp(d.astype(F32), wx, wy), 0.0, 1.0) ** 1.15).astype(F32)
 
 
 # ---------------------------------------------------------------- Blender に渡す形
@@ -270,54 +204,41 @@ WORK = os.environ.get("PC_OPENING_WORK", os.path.join(HERE, "work"))
 AIR_WORK = os.path.join(WORK, "air")
 FIELDS = os.path.join(AIR_WORK, "fields.npz")
 COVERAGE = 0.065  # ふだんの積雲が覆う割合（濃さ 0.1 より上）。日本が主役なので少なめ
-DECKS = {"deck-a": (4.0, 0.86), "deck-b": (2.2, 0.36)}  # 厚い雲：雲の数の倍率・覆う割合
+DECKS = {"deck-a": 0.86, "deck-b": 0.36}  # 厚い雲（オープニングから晴れていくところ）が覆う割合
 
 
 def billows(n: int, seed: int) -> np.ndarray:
     """雲の頭の細かいもくもく（0〜1。小さいセルを逆さにしたもの。周期でつながる）"""
-    return (0.62 * (1 - worley(n, 256, seed + 51)) + 0.38 * (1 - worley(n, 512, seed + 52))).astype(F32)
+    a, _ = worley2(n, 512, seed + 51)
+    b, _ = worley2(n, 1024, seed + 52)
+    return (0.62 * (1 - a) + 0.38 * (1 - b)).astype(F32)
 
 
-def worley(n: int, cells: int, seed: int) -> np.ndarray:
-    """周期のある格子のセル模様（いちばん近い点までの距離。セルの幅で割る）。cells は n を割り切る数"""
-    rng = np.random.default_rng(seed)
-    jit = rng.random((cells, cells, 2)).astype(F32)
-    cs = n / cells
-    y, x = np.mgrid[0:n, 0:n].astype(F32) + 0.5
-    cx = (x // cs).astype(np.int32)
-    cy = (y // cs).astype(np.int32)
-    d = np.full((n, n), np.inf, F32)
-    for oy in (-1, 0, 1):
-        for ox in (-1, 0, 1):
-            nx = (cx + ox) % cells
-            ny = (cy + oy) % cells
-            px = (cx + ox + jit[ny, nx, 0]) * cs
-            py = (cy + oy + jit[ny, nx, 1]) * cs
-            d = np.minimum(d, np.hypot(px - x, py - y))
-    return d / cs
-
-
-def cloud_maps(fld: dict[str, np.ndarray], coverage: float, seed: int, bumps: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """雲の濃さ（0〜1）と、雲の頭の高さ（画素。細かいもくもくの凹凸を、厚い所ほど足す）"""
-    d = cumulus_density(fld, coverage, seed)
-    h = surface(fld) + 1.1 * bumps * smoothstep(0.12, 0.7, d)
-    return d, (h * (d > 0.002)).astype(F32)
+def cloud_maps(c: dict[str, np.ndarray], t: float, bumps: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """しきい値 t で切った雲の濃さ（0〜1）と、雲の頭の高さ（単位＝ズーム 5 の地図の 1 画素。air_render.py が底からの高さにする）。
+    しきい値を大きく超える所（つぶがつながった群れの真ん中）ほど背が高く、細かいもくもくの凹凸は厚い所ほど足す"""
+    x = c["q"] - t
+    d = _density(x)
+    h = 5.0 * (1.0 - np.exp(-np.maximum(x, 0) / 0.9)) * (0.55 + 0.45 * smoothstep(0.5, 2.0, c["region"]))
+    h = h + 0.4 * bumps * smoothstep(0.1, 0.6, d)
+    return d, (h * (x > 0)).astype(F32)
 
 
 def fields(n: int = 2048, seed: int = SEED) -> dict[str, np.ndarray]:
     """Blender に渡す形（どれも n×n、行 0 が北）。cu_d・cu_h：積雲の濃さと頭の高さ、ci_d：巻雲の濃さ、
-    deck-a・deck-b の濃さと高さ。作った形は work/air/fields.npz に置き、2回目からは読む"""
+    deck_a・deck_b の濃さと高さ（同じ模様のしきい値を下げたもの）。作った形は work/air/fields.npz に置き、2回目からは読む"""
     if os.path.exists(FIELDS):
         z = np.load(FIELDS)
-        if int(z["n"]) == n and int(z["seed"]) == seed:
+        if int(z["n"]) == n and int(z["seed"]) == seed and "ver" in z.files and int(z["ver"]) == SHAPE_VERSION:
             return {k: z[k] for k in z.files}
     bumps = billows(n, seed)
-    out: dict[str, np.ndarray] = {"n": np.array(n), "seed": np.array(seed)}
-    out["cu_d"], out["cu_h"] = cloud_maps(cumulus_field(n, seed), COVERAGE, seed, bumps)
+    c = cumulus_q(n, seed)
+    out: dict[str, np.ndarray] = {"n": np.array(n), "seed": np.array(seed), "ver": np.array(SHAPE_VERSION)}
+    out["cu_d"], out["cu_h"] = cloud_maps(c, threshold_for(c["q"], COVERAGE), bumps)
     out["ci_d"] = cirrus_density(n, seed)
-    for name, (more, cov) in DECKS.items():
+    for name, cov in DECKS.items():
         k = name.replace("-", "_")
-        out[f"{k}_d"], out[f"{k}_h"] = cloud_maps(cumulus_field(n, seed, more), cov, seed, bumps)
+        out[f"{k}_d"], out[f"{k}_h"] = cloud_maps(c, threshold_for(c["q"], cov), bumps)
     os.makedirs(AIR_WORK, exist_ok=True)
     np.savez_compressed(FIELDS, **out)
     return out
