@@ -25,7 +25,10 @@ GitHub の Actions →「GPU で描く（Runpod）」→ Run workflow（`.github
   使い捨ての SSH の鍵（機械には `PUBLIC_KEY` で渡す。像は Runpod の公式の `runpod/base`）で、GitHub の機械から SSH でつなぐ。
 - 鍵：`RUNPOD_API_KEY`（Runpod の Credentials → API Keys で作ったもの）と `R2_*` は GitHub の Secrets。中身はログに出さない。
   機械には R2 の鍵を渡さず、1 つのファイルだけ置ける 6 時間の期限付き URL を渡す。
-- お金：Runpod は前払いの残高から、機械が動いている間だけ引かれる（RTX 4090 で 1 時間 0.34〜0.69 ドルほど。2026-11 の Runpod の料金のページ）。
+- お金：Runpod は前払いの残高から、機械が動いている間だけ引かれる（RTX 4090 で 1 時間 SECURE 0.89 ドル・COMMUNITY 0.34 ドル。
+  2026-11-23 に Runpod の API の GPU の一覧で見た値段）。
+- 速さの目安（2026-11-23 の動作確認）：RTX 4090・OptiX で、1920×1080・光の計算 1,024 回の 1 枚（空と立体の雲）が 7.9 秒。
+  機械を借りてから消すまで 2 分半。
 
 ## 道具
 
