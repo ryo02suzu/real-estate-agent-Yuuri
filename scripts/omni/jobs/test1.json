@@ -1,0 +1,28 @@
+{
+ "note": "PC のオープニングの試し 1（720p）。持ち主の構成：日本列島が出現 → ズーム → 鷹の視点で大自然を駆け抜ける → 奥にロゴ → ホーム。場面ごとに、AI の本物らしさと動きを見る",
+ "defaults": {"resolution": "720p", "aspect_ratio": "16:9"},
+ "takes": [
+  {
+   "name": "s1-rise-frames",
+   "duration": 8,
+   "first": "scripts/omni/frames/s1-first-sea.jpg",
+   "last": "scripts/omni/frames/s1-last-japan.jpg",
+   "prompt": "Photorealistic cinematic footage filmed from a spacecraft high above the Pacific Ocean at dawn, looking toward the curved horizon of the Earth. The Japanese archipelago rises out of the ocean: mountain ranges break through the surface, colossal waterfalls of seawater cascade off the emerging coastlines, white spray and mist roll outward over the sea, and the first golden sunlight grazes the new land. Real ocean texture with long swells and sun glint. The camera drifts slowly and steadily. IMAX nature documentary look. No text, no people, no music, no dialogue."
+  },
+  {
+   "name": "s1-rise-text",
+   "duration": 8,
+   "prompt": "Photorealistic aerial footage at sunrise, seen from very high altitude over a calm deep-blue Pacific Ocean. The sea slowly bulges and a long mountainous island chain shaped like the Japanese archipelago rises from the water, enormous curtains of seawater pouring off its ridges, mist and spray glowing in the low golden sunlight, coastlines emerging one after another. Slow, steady, majestic camera move. IMAX nature documentary look, real ocean, real light. No text, no people, no music, no dialogue."
+  },
+  {
+   "name": "s2-hawk",
+   "duration": 10,
+   "prompt": "First-person view of a hawk gliding at high speed, photorealistic IMAX nature documentary footage. It dives out of the clouds toward the jagged granite ridgelines of the Japanese Alps at sunrise, skims just above a knife-edge ridge, banks smoothly down into a deep forested gorge with autumn maples and tall Japanese cedars, and races low over a clear turquoise mountain river winding through the valley, morning mist between the trees. Every tree is different and natural. Smooth inertia, no sudden turns, one continuous shot. No text, no people, no buildings, no music, no dialogue."
+  },
+  {
+   "name": "s3-vista",
+   "duration": 6,
+   "prompt": "Photorealistic cinematic aerial shot: the camera flies out of a narrow mountain gorge and the view suddenly opens onto a vast panorama of the Japanese Alps above a sea of clouds at sunrise, golden light on the snowy peaks, distant ranges fading into soft haze. The camera slows down and glides gently forward, calm and majestic, with open sky in the upper center of the frame. IMAX nature documentary look. No text, no people, no music, no dialogue."
+  }
+ ]
+}

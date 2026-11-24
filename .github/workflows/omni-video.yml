@@ -1,0 +1,66 @@
+# 動画を作る AI（Google の Gemini Omni Flash）で、オープニングの場面を作る（持ち主 2026-11-24「頼んだ。映画で使えるクオリティで」）。
+#  1. 仕事のファイル（scripts/omni/jobs/<job>.json）の場面と、かかる額の見込みを出す。上限（max_usd）を超えるなら作らない
+#  2. scripts/omni/omni.py で作る（音は外す）→ R2 の公開の置き場（omni/<実行の番号>/）に置く。Google 側の場面の番号（ids.json）も置き、
+#     次の回で続きを足せるようにする
+# 鍵：GEMINI_API_KEY（Google AI Studio で作った鍵。支払いの設定が要る）・R2_*（置き場）は GitHub の Secrets。中身はログに出さない。
+name: 動画を作る AI（Gemini Omni）
+
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 仕事のファイル（scripts/omni/jobs の下の名前。.json は付けない）
+        default: test1
+      max_usd:
+        description: この回で使ってよい上限（ドル。見込みが超えるなら作らない）
+        default: "3"
+  # この流れを GitHub に覚えさせるためだけの push（AI は呼ばない。下の if で止める）
+  push:
+    paths:
+      - .github/workflows/omni-video.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: omni-video
+  cancel-in-progress: false
+
+jobs:
+  make:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      R2_BUCKET: ${{ vars.R2_BUCKET || 'michilu-chiban' }}
+      R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+      JOB: ${{ inputs.job }}
+      MAX_USD: ${{ inputs.max_usd }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 作る場面と、かかる額の見込み
+        run: |
+          [[ "$JOB" =~ ^[a-z0-9-]+$ ]] && [ -f "scripts/omni/jobs/$JOB.json" ] || { echo "::error::仕事 $JOB がありません"; exit 1; }
+          [[ "$MAX_USD" =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "::error::max_usd は数で"; exit 1; }
+          [ -n "$GEMINI_API_KEY" ] || { echo "::error::GEMINI_API_KEY が GitHub の Secrets にまだありません"; exit 1; }
+          python3 scripts/omni/omni.py plan "scripts/omni/jobs/$JOB.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          command -v ffmpeg >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null; }
+      - name: 作る（動画を作る AI）
+        run: python3 scripts/omni/omni.py run "scripts/omni/jobs/$JOB.json" --out work/omni --max-usd "$MAX_USD"
+      - name: 置き場（R2）へ送る
+        if: always()
+        run: |
+          [ -d work/omni ] || exit 0
+          aws s3 cp work/omni "s3://$R2_BUCKET/omni/${{ github.run_id }}/" --recursive --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com" --only-show-errors
+          {
+            echo "置き場：${R2_PUBLIC_URL%/}/omni/${{ github.run_id }}/"
+            for f in work/omni/*.mp4; do [ -f "$f" ] && echo "- ${R2_PUBLIC_URL%/}/omni/${{ github.run_id }}/$(basename "$f")"; done
+            [ -f work/omni/report.json ] && python3 -c "import json;r=json.load(open('work/omni/report.json'));print('使った額 約',r['usd'],'ドル')"
+          } >> "$GITHUB_STEP_SUMMARY"

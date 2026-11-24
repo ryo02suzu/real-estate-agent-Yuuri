@@ -612,6 +612,7 @@ def main() -> None:
     ap.add_argument("--spp", type=int, default=12)
     ap.add_argument("--every", type=int, default=1)
     ap.add_argument("--out", default="")
+    ap.add_argument("--hide", default="", help="描かない物の名前（カンマ区切り。例：land,alps で陸の無い海だけの絵。動画を作る AI に渡す最初の 1 枚）")
     a = ap.parse_args()
     if a.scene == "sky":
         render_sky(a.which or "local", a.out or os.path.join(WORK, f"sky_{a.which or 'local'}.exr"))
@@ -644,6 +645,11 @@ def main() -> None:
     camera_object(a.scene, todo)
     if a.scene == "global":
         animate_global_sun(todo)
+    for name in filter(None, a.hide.split(",")):
+        ob = bpy.data.objects.get(name)
+        if ob is None:
+            raise SystemExit(f"隠す物が無い：{name}")
+        ob.hide_render = True
     print(f"場面を組んだ（{time.time() - t0:.1f} 秒）", flush=True)
     sc = bpy.context.scene
     for f in todo:
