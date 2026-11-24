@@ -510,16 +510,31 @@ def make_hero(name: str, phase0: float = 0.0, with_fuzz: bool = True) -> dict:
 # ---------------------------------------------------------------- 近くから 1 羽を見る
 
 
+def set_pose(sw: dict, phase: float) -> None:
+    """羽ばたきの位相（0〜1）の姿勢：となりの 2 つの姿勢を混ぜる（コマのあいだでなめらかに）"""
+    x = (phase % 1.0) * S.POSES
+    k0 = int(math.floor(x)) % S.POSES
+    w = x - math.floor(x)
+    for wg in sw["wings"]:
+        keys = wg.data.shape_keys.key_blocks[1:]
+        for i, key in enumerate(keys):
+            key.value = (1.0 - w) if i == k0 else w if i == (k0 + 1) % S.POSES else 0.0
+
+
 def look(a) -> None:
     bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
     sw = make_hero("hero", with_fuzz=a.fuzz)
-    # 羽ばたきの姿勢
-    k = int(round(a.phase * S.POSES)) % S.POSES
-    for w in sw["wings"]:
-        for i, key in enumerate(w.data.shape_keys.key_blocks[1:]):
-            key.value = 1.0 if i == k else 0.0
+    set_pose(sw, a.phase)
     sw["root"].rotation_euler = (math.radians(4), 0.0, math.radians(a.yaw))
+    stage(a, sc, np.array([0.0, 0.25, 0.05]))
+    sc.render.filepath = a.out
+    bpy.ops.render.render(write_still=True)
+    print("描いた：", a.out, flush=True)
+
+
+def stage(a, sc, tgt: np.ndarray) -> None:
+    """空（朝の空の計算と低い朝日）・カメラ（tgt を見る）・描き方"""
     # 空：朝の空（Blender の空の計算）と、低い朝日（白鳥の後ろ斜め上から：羽のふちが透けて光る）
     w = bpy.data.worlds.new("sky")
     sc.world = w
@@ -539,7 +554,6 @@ def look(a) -> None:
     cam.data.dof.focus_distance = a.dist
     cam.data.dof.aperture_fstop = a.fstop
     az = math.radians(a.cam_az)
-    tgt = np.array([0.0, 0.25, 0.05])
     pos = tgt + a.dist * np.array([math.sin(az) * math.cos(math.radians(a.cam_el)), -math.cos(az) * math.cos(math.radians(a.cam_el)), math.sin(math.radians(a.cam_el))])
     cam.location = tuple(pos)
     d = tgt - pos
@@ -557,14 +571,38 @@ def look(a) -> None:
     sc.render.threads_mode = "FIXED" if a.threads else "AUTO"
     if a.threads:
         sc.render.threads = a.threads
-    sc.render.filepath = a.out
-    bpy.ops.render.render(write_still=True)
-    print("描いた：", a.out, flush=True)
+
+
+def anim(a) -> None:
+    """引きの羽ばたきの試し：カメラは止めて、白鳥が画面を横切る（本物の約 0.7 倍の速さ・羽ばたき FLAP_HZ）。体は羽ばたきと逆に少し上下する"""
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    sc = bpy.context.scene
+    sw = make_hero("hero", with_fuzz=a.fuzz)
+    stage(a, sc, np.array([0.0, 0.0, 0.0]))
+    speed = 16.0 * 0.7  # m/秒（swans.py と同じゆっくり）
+    n = int(round(a.seconds * a.fps))
+    os.makedirs(a.out, exist_ok=True)
+    yaw = math.radians(a.yaw)
+    head = np.array([-math.sin(yaw), math.cos(yaw), 0.0])  # 白鳥の前（+y を yaw だけ回す）
+    for f in range(n):
+        t = f / a.fps - a.seconds / 2
+        ph = S.FLAP_HZ * t + a.phase
+        set_pose(sw, ph)
+        bob = -0.035 * math.cos(2 * math.pi * ph)  # 打ち下ろしで体が上がる
+        loc = head * speed * t + np.array([0.0, 0.0, bob])
+        sw["root"].location = tuple(loc)
+        sw["root"].rotation_euler = (math.radians(4), 0.0, yaw)
+        sc.render.filepath = os.path.join(a.out, f"{f:04d}.png")
+        bpy.ops.render.render(write_still=True)
+        print(f"コマ {f}", flush=True)
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--look", action="store_true")
+    ap.add_argument("--anim", action="store_true", help="引きの羽ばたきの試し（--out はコマを入れるフォルダ）")
+    ap.add_argument("--seconds", type=float, default=2.0)
+    ap.add_argument("--fps", type=float, default=24.0)
     ap.add_argument("--fuzz", action="store_true", help="体のふちの綿毛を付ける")
     ap.add_argument("--fstop", type=float, default=8.0)
     ap.add_argument("--res", default="1920x1080")
@@ -584,6 +622,8 @@ def main() -> None:
     a = ap.parse_args(argv)
     if a.look:
         look(a)
+    elif a.anim:
+        anim(a)
 
 
 if __name__ == "__main__":
