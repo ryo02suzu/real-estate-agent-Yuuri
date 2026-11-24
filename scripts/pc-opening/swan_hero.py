@@ -36,7 +36,7 @@ RNG_SEED = 20261124
 
 
 def feather_points(L: float, w_lead: float, w_trail: float, nu: int = 14, nv: int = 6, tip: float = 0.18,
-                   calamus: float = 0.07) -> tuple[np.ndarray, np.ndarray, list]:
+                   calamus: float = 0.07, sweep: float = 0.35, blunt: float = 2.0) -> tuple[np.ndarray, np.ndarray, list]:
     """羽 1 枚（羽の座標：x＝根元から先へ、y＝羽の幅（前 +）、z＝上）。点・UV（u：根元 0〜先 1、v：前のふち −1〜後ろのふち +1）・面。
     根元（calamus）は羽弁が無く細い。先は丸く（tip の割合で細る）。少し下へ反り、後ろの羽弁はわずかに下がる"""
     us = np.linspace(0.0, 1.0, nu + 1)
@@ -46,12 +46,13 @@ def feather_points(L: float, w_lead: float, w_trail: float, nu: int = 14, nv: in
         # 羽弁の幅の割合：根元は 0、すぐ広がり、先で丸くすぼむ
         grow = np.clip((u - calamus) / 0.16, 0.0, 1.0)
         grow = grow * grow * (3 - 2 * grow)
-        end = np.sqrt(np.clip(1.0 - ((u - (1 - tip)) / tip) ** 2, 0.0, 1.0)) if u > 1 - tip else 1.0
+        # 先の丸み：超楕円（blunt が大きいほど先が角ばらずに丸く広い。風切羽は先まで幅があり、最後に丸くすぼむ）
+        end = np.clip(1.0 - ((u - (1 - tip)) / tip) ** blunt, 0.0, 1.0) ** (1.0 / blunt) if u > 1 - tip else 1.0
         shape = grow * end
         for v in vs:
             w = (w_lead if v < 0 else w_trail) * shape
             y = -v * w  # 前（v<0）が +y
-            x = u * L - abs(v) * w * 0.35  # 羽弁のふちは少し根元側へ（羽枝が先へ斜めにのびる）
+            x = u * L - abs(v) * w * sweep  # 羽弁のふちは少し根元側へ（羽枝が先へ斜めにのびる）
             z = -0.06 * L * u * u - 0.012 * L * max(v, 0.0) * u  # 下への反り・後ろの羽弁の垂れ
             pts.append((x, y, z))
             uv.append((u, (v + 1.0) / 2.0))
@@ -102,7 +103,7 @@ def wing_feathers(rng: np.random.Generator) -> dict:
         x = 0.06 + 0.52 * k / 19
         y0, _ = trailing(x)
         L = 0.24 + 0.02 * math.sin(math.pi * k / 19) + rng.normal(0, 0.004)
-        pts, uv, faces = feather_points(L, 0.026, 0.062, tip=0.5)
+        pts, uv, faces = feather_points(L, 0.03, 0.06, tip=0.22, sweep=0.04, blunt=3.5)
         ang = math.radians(4 + 8 * k / 19 + rng.normal(0, 0.6))
         wp = place_feather(pts, np.array([x, y0 + 0.05, 0.004 - 0.0006 * k]), ang, roll=math.radians(-3), lift=0.0)
         add(wp, uv, faces, np.full(len(pts), x), 1)
@@ -122,8 +123,8 @@ def wing_feathers(rng: np.random.Generator) -> dict:
         y0, _ = trailing(x)
         L = 0.30 + 0.12 * q + rng.normal(0, 0.004)
         emarg = q > 0.6
-        pts, uv, faces = feather_points(L, 0.02 if emarg else 0.024, 0.048 if emarg else 0.058, tip=0.45 if emarg else 0.4)
-        ang = math.radians(14 + 46 * q ** 1.2 + rng.normal(0, 0.8))
+        pts, uv, faces = feather_points(L, 0.018 if emarg else 0.026, 0.05 if emarg else 0.058, tip=0.35 if emarg else 0.25, sweep=0.05, blunt=2.2 if emarg else 3.0)
+        ang = math.radians(12 + 34 * q ** 1.25 + rng.normal(0, 0.6))
         wp = place_feather(pts, np.array([x, y0 + 0.07 + 0.03 * q, 0.006 - 0.0015 * k]), ang, roll=math.radians(-4 - 4 * q))
         # 点ごとの骨の上の位置：手（手首より先）として動く
         add(wp, uv, faces, np.clip(wp[:, 0], 0.60, 1.15), 3)
@@ -133,10 +134,10 @@ def wing_feathers(rng: np.random.Generator) -> dict:
         for k in range(n):
             x = 0.02 + 0.72 * (k + rng.uniform(0.1, 0.9)) / n
             y0, yle = trailing(x)
-            yr = y0 + (yle - y0) * frac
-            pts, uv, faces = feather_points(Lr * rng.uniform(0.9, 1.1), wl, wt, nu=8, nv=4, tip=0.4)
-            ang = math.radians(6 + 22 * min(x / 0.74, 1.0) ** 2 + rng.normal(0, 2.0))
-            wp = place_feather(pts, np.array([x, yr, z]), ang, roll=math.radians(rng.normal(0, 3)))
+            yr = y0 + (yle - y0) * (frac + rng.normal(0, 0.035))
+            pts, uv, faces = feather_points(Lr * rng.uniform(0.82, 1.18), wl * rng.uniform(0.9, 1.1), wt * rng.uniform(0.9, 1.15), nu=8, nv=4, tip=0.5, sweep=0.12)
+            ang = math.radians(6 + 22 * min(x / 0.74, 1.0) ** 2 + rng.normal(0, 3.0))
+            wp = place_feather(pts, np.array([x, yr, z + rng.normal(0, 0.0015)]), ang, roll=math.radians(rng.normal(0, 4)))
             add(wp, uv, faces, np.full(len(pts), x), 4 + row)
     # 前のふちの小さな羽（小雨覆のさらに前。前のふちを包むように、上下に 2 列）
     for k in range(70):
