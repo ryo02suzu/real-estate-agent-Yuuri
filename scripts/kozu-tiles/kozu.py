@@ -951,12 +951,20 @@ def resolve(src: str, out: str, stats_out: str | None, high_only: bool = False) 
     # 前の回の結果も置き場に残っているので、そのまま読むと同じ切れ端が二重になり、互いに重なるものとして両方とも外れてしまう。
     # ①市区町村の全部を1つのジョブで調べたもの（名前が市区町村コードだけ）は、いちばん新しいジョブの結果だけにする。
     # ②図面を組に分けた市区町村（「12219-2of3」）は、切れ端ごとに、いちばん新しいジョブのものにする
+    # ③市区町村の全部を1つのジョブで調べたあと、あとの回で図面を組に分けて調べ直したとき（「20212」→「20212:1/2」）は、
+    # ①を使わず②にする（2026-11-24：①のままだと、前の回の全部のジョブも、あとの組のジョブも「いちばん新しいジョブ」でないとして
+    # 両方とも外れ、その市区町村の筆が 1 つも残らなかった。中部のやり直しの 15209・19364 など）
     stat_files = sorted(glob.glob(os.path.join(src, "stats-*.json")), key=job_key)
     whole: dict[str, tuple[int, int]] = {}
+    latest: dict[str, tuple[int, int]] = {}
     for p in stat_files:
+        k = job_key(p)
         for lab in json.load(open(p, encoding="utf-8")):
+            code = lab.split("-")[0]
+            latest[code] = max(latest.get(code, k), k)
             if "-" not in lab:
-                whole[lab] = job_key(p)
+                whole[lab] = k
+    whole = {c: k for c, k in whole.items() if latest.get(c) == k}
     frag_files = sorted(glob.glob(os.path.join(src, "frags-*.jsonl*")), key=job_key)
     newest: dict[str, tuple[int, int]] = {}
     for p in frag_files:
@@ -991,9 +999,30 @@ def resolve(src: str, out: str, stats_out: str | None, high_only: bool = False) 
                 fo.write(json.dumps(d, ensure_ascii=False, separators=(",", ":")) + "\n")
                 n += 1
     # 市区町村ごとの数（図面の組を足す）と、時間切れ・失敗したもの
+    # まとめの数も、上と同じ決まりで新しいジョブだけ（調べ直した市区町村の前のジョブを、時間切れとして数え続けない）。
+    # 組（「20202-1of2」＝図面の 0〜1/2）は、あとの回の組（「20202-1of6」〜「3of6」）がその範囲を全部覆っていれば、前のものを数えない
+    labels = [(job_key(p), lab, st) for p in stat_files for lab, st in json.load(open(p, encoding="utf-8")).items()]
+
+    def span(lab: str) -> tuple[float, float]:
+        m = re.search(r"-(\d+)of(\d+)$", lab)
+        return ((int(m.group(1)) - 1) / int(m.group(2)), int(m.group(1)) / int(m.group(2))) if m else (0.0, 1.0)
+
+    def covered(code: str, k: tuple[int, int], lo: float, hi: float) -> bool:
+        parts = sorted(span(lab2) for k2, lab2, _ in labels if k2 > k and lab2.split("-")[0] == code)
+        at = lo
+        for a0, a1 in parts:
+            if a0 <= at + 1e-9:
+                at = max(at, a1)
+        return at >= hi - 1e-9
+
     jobs = {}
-    for p in stat_files:
-        jobs.update(json.load(open(p, encoding="utf-8")))
+    for k, lab, st in labels:
+        code = lab.split("-")[0]
+        if "-" not in lab and whole.get(code) != k:
+            continue  # あとの回で、組に分けて調べ直した
+        if "-" in lab and (whole.get(code, (-1, -1)) > k or covered(code, k, *span(lab))):
+            continue  # あとの回で、全部を 1 つのジョブで、または同じ範囲を細かい組で調べ直した
+        jobs[lab] = st
     totals: dict[str, dict] = {}
     for lab, st in jobs.items():
         t = totals.setdefault(lab.split("-")[0], {})
