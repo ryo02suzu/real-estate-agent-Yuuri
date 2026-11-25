@@ -36,6 +36,12 @@ async def enlarge_text(page):
     # Restore ALL earlier overrides before measuring newly mounted children.
     # Otherwise descendants inheriting an enlarged font would become 400%.
     result = await page.evaluate("""async () => {
+      // Preserve the position the app has ALREADY chosen. The temporary 100%
+      // measurement can clamp scrollTop when enlarged content becomes shorter.
+      // App return behavior is asserted separately before this helper runs.
+      const scrolls = [...document.querySelectorAll('.mui-panel,.mui-list-in,[data-testid="panel-detail"]')]
+        .filter(el => el.getBoundingClientRect().height > 0)
+        .map(el => ({el, top:el.scrollTop, left:el.scrollLeft}));
       const saved = window.__qaOriginalFonts ||= new Map();
       for (const [el, old] of saved) {
         if (old.value) el.style.setProperty('font-size', old.value, old.priority);
@@ -54,6 +60,12 @@ async def enlarge_text(page):
       for (const [el, size] of sizes) el.style.setProperty('font-size', `${size * 2}px`, 'important');
       await new Promise(requestAnimationFrame);
       await new Promise(requestAnimationFrame);
+      const scrollAdjustments = scrolls.map(({el,top,left}) => {
+        const afterReset = el.scrollTop;
+        el.scrollTop = top;
+        el.scrollLeft = left;
+        return {class:el.className,before:top,after_font_reset:afterReset,restored:el.scrollTop};
+      });
       const measured = sizes.map(([el,size]) => {
         const r = el.getBoundingClientRect();
         return {tag:el.tagName,class:el.className,baseline:size,
@@ -65,6 +77,7 @@ async def enlarge_text(page):
       const ratios = measured.filter(m => m.visible).map(m => m.actual / m.baseline);
       return {elements: sizes.length, visible_elements:ratios.length,
         min_ratio: Math.min(...ratios), max_ratio: Math.max(...ratios),
+        scroll_adjustments:scrollAdjustments,
         outliers: measured.filter(m => Math.abs(m.actual / m.baseline - 2) >= .01)};
     }""")
     assert result["elements"] > 20, "Too few HTML elements for the font simulation"
@@ -159,7 +172,9 @@ async def detail_check(page, name, record, key, label):
         assert abs(gap) <= 2, "Cannot reach the end of the detail content"
         await back.click(timeout=5000)
         await body.wait_for(state="hidden", timeout=5000)
-        await enlarge_text(page)
+        entry["scroll_after_app"] = await page.locator(".mui-list-in").evaluate("e => e.scrollTop")
+        assert abs(entry["scroll_after_app"] - entry["scroll_before"]) <= 2, "App return lost result-list scroll position before font measurement"
+        entry["return_fonts"] = await enlarge_text(page)
         entry["scroll_after"] = await page.locator(".mui-list-in").evaluate("e => e.scrollTop")
         assert abs(entry["scroll_after"] - entry["scroll_before"]) <= 2, "Returning lost result-list scroll position"
         assert page.url == record["result_url"], "Detail navigation changed selected property"

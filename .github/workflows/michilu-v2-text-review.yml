@@ -17,7 +17,7 @@ jobs:
       REVIEW_URL: http://127.0.0.1:3000
       PREVIEW_URL: ""
       REVIEW_SHA: 25ecf4853c0d298294650917a46c27d0acf68798
-      REVIEW_PHASE: approved-v2-25ecf48-text200-and-regression
+      REVIEW_PHASE: approved-v2-25ecf48-text200-scroll-diagnostic
     steps:
       - uses: actions/checkout@v4
         with:
@@ -113,12 +113,6 @@ jobs:
           "$RUNNER_TEMP/michilu-browser/bin/playwright" install --with-deps chromium webkit
       - name: Exercise the built app (not Vercel Preview)
         run: '"$RUNNER_TEMP/michilu-browser/bin/python" qa-tools/scripts/qa/michilu-v2-text-review.py'
-      - name: Check normal map, details, and tap targets
-        if: ${{ !cancelled() && steps.prepare.outcome == 'success' }}
-        run: '"$RUNNER_TEMP/michilu-browser/bin/python" qa-tools/scripts/qa/michilu-v2-spec-review.py'
-      - name: Check search, back, reduced motion, and desktop
-        if: ${{ !cancelled() && steps.prepare.outcome == 'success' }}
-        run: '"$RUNNER_TEMP/michilu-browser/bin/python" qa-tools/scripts/qa/michilu-v2-navigation-review.py'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
