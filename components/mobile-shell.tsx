@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { LookupResult } from "@/lib/roadmap";
 import type { HistoryItem } from "@/lib/history";
-import { SIDE_LEFT, SIDE_PANEL_TOP, SIDE_QUERY, SIDE_TOP, sidePanelWidth } from "@/lib/mobile-layout";
+import { SIDE_GAP_PX, SIDE_LEFT, SIDE_PANEL_TOP, SIDE_QUERY, SIDE_TOP, sidePanelWidth } from "@/lib/mobile-layout";
 import { PANEL_MS } from "@/lib/motion";
 import { down, DRAG_SLOP, dragHeight, nextVelocity, SNAP_HEIGHT, snapAfterRelease, snapForDetail, snapPx, up, type Snap, type SnapHeights } from "@/lib/panel-snap";
 import { nextCamera, type CameraTarget } from "@/lib/position-accuracy";
@@ -177,7 +177,21 @@ export function MobileShell({
   // （段階の切り替え・ドラッグの間は毎フレーム変わるので、React の再描画をしない）。
   // ホームは内容の高さで決まるので、地図の中心をずらす量にも使う（結果は段階の見込みを使うので、結果の間は React に渡さない）
   const shell = useRef<HTMLDivElement>(null);
+  const topBar = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLElement>(null);
+  // 文字拡大でロゴ・メニューの帯が高くなった分も、横向きのパネルを下げる。
+  // 通常の文字サイズでは従来の上端と同じ。キーボード表示中の入力優先は維持する。
+  const sidePanelTop = `var(--mui-header-bottom, ${SIDE_PANEL_TOP})`;
+  useLayoutEffect(() => {
+    const el = topBar.current;
+    const host = shell.current;
+    if (!el || !host) return;
+    const measure = () => host.style.setProperty("--mui-header-bottom", `${Math.ceil(el.getBoundingClientRect().height) + SIDE_GAP_PX}px`);
+    const ro = new ResizeObserver(measure);
+    measure();
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const [panelH, setPanelH] = useState(176);
   /** 横向き（左のパネル）のときの、パネルの右端(px)。地図のピン・日本全体をその右に見せる */
   const [sideRight, setSideRight] = useState(0);
@@ -413,6 +427,7 @@ export function MobileShell({
 
         {/* ロゴ・メニューの帯。縦向きは上の中央、横向きは左の列（パネルの上）。地図の側を空ける */}
         <div
+          ref={topBar}
           className={`pointer-events-none absolute top-0 pt-[max(8px,env(safe-area-inset-top))] ${side ? "" : "inset-x-0 px-3"}`}
           style={side ? { left: SIDE_LEFT, width: sideW } : undefined}
         >
@@ -424,15 +439,16 @@ export function MobileShell({
         <section
           ref={panel}
           aria-label={hasResult ? "調査結果" : "住所を調べる"}
+          data-home={hasResult ? undefined : "1"}
           style={
             side
               ? // 横向き：左の列。結果は列の高さいっぱい（中をスクロール）、ホームは内容の高さ（列の高さまで）。キーボードの分は下を上げる。
                 // 横向きのキーボードは高さの半分以上を覆うので、入力中はパネルをロゴの帯の上まで上げて、入力欄が隠れないようにする
                 {
                   left: SIDE_LEFT,
-                  top: kbd > 0 ? SIDE_TOP : SIDE_PANEL_TOP,
+                  top: kbd > 0 ? SIDE_TOP : sidePanelTop,
                   width: sideW,
-                  ...(hasResult ? { bottom: kbd + 8 } : { maxHeight: `calc(100% - ${kbd > 0 ? SIDE_TOP : SIDE_PANEL_TOP} - ${kbd}px - 8px)` }),
+                  ...(hasResult ? { bottom: kbd + 8 } : { maxHeight: `calc(100% - ${kbd > 0 ? SIDE_TOP : sidePanelTop} - ${kbd}px - 8px)` }),
                 }
               : { height: hasResult ? SNAP_HEIGHT[snap] : undefined, bottom: kbd, maxHeight: `calc(100% - ${kbd}px - 8px)` }
           }

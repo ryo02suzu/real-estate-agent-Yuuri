@@ -102,7 +102,7 @@ export function SearchCard({
         </button>
       </div>
       {!compact && (
-        <div className="mt-1.5 flex items-center justify-between gap-2 px-3 text-[11px] text-muted">
+        <div className={`mt-1.5 flex items-center justify-between gap-2 px-3 text-[11px] text-muted ${teal ? "mui-search-hints" : ""}`}>
           <span className="min-w-0">
             {pasteError
               ? "貼り付けできませんでした。入力欄を長押ししてください。"
