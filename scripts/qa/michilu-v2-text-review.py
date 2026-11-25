@@ -35,7 +35,7 @@ def clean_url(url):
 async def enlarge_text(page):
     # Restore ALL earlier overrides before measuring newly mounted children.
     # Otherwise descendants inheriting an enlarged font would become 400%.
-    result = await page.evaluate("""() => {
+    result = await page.evaluate("""async () => {
       const saved = window.__qaOriginalFonts ||= new Map();
       for (const [el, old] of saved) {
         if (old.value) el.style.setProperty('font-size', old.value, old.priority);
@@ -52,8 +52,20 @@ async def enlarge_text(page):
         return [el, parseFloat(getComputedStyle(el).fontSize)];
       }).filter(([, size]) => size > 0);
       for (const [el, size] of sizes) el.style.setProperty('font-size', `${size * 2}px`, 'important');
-      const ratios = sizes.map(([el,size]) => parseFloat(getComputedStyle(el).fontSize) / size);
-      return {elements: sizes.length, min_ratio: Math.min(...ratios), max_ratio: Math.max(...ratios)};
+      await new Promise(requestAnimationFrame);
+      await new Promise(requestAnimationFrame);
+      const measured = sizes.map(([el,size]) => {
+        const r = el.getBoundingClientRect();
+        return {tag:el.tagName,class:el.className,baseline:size,
+          actual:parseFloat(getComputedStyle(el).fontSize),
+          visible:r.width > 0 && r.height > 0};
+      });
+      // WebKit can retain cached computed sizes for display:none descendants.
+      // They are measured again after being shown; only rendered text is a gate.
+      const ratios = measured.filter(m => m.visible).map(m => m.actual / m.baseline);
+      return {elements: sizes.length, visible_elements:ratios.length,
+        min_ratio: Math.min(...ratios), max_ratio: Math.max(...ratios),
+        outliers: measured.filter(m => Math.abs(m.actual / m.baseline - 2) >= .01)};
     }""")
     assert result["elements"] > 20, "Too few HTML elements for the font simulation"
     assert abs(result["min_ratio"] - 2) < .01 and abs(result["max_ratio"] - 2) < .01, result
@@ -93,6 +105,24 @@ async def capture(page, name):
 def assert_layout(layout):
     assert not layout["page_overflow"], "Document overflows horizontally at 200% text"
     assert all(not p["horizontal_overflow"] for p in layout["panels"]), "Panel content overflows horizontally at 200% text"
+
+
+async def home_controls(page, name):
+    checks = []
+    for label in ["地図で選ぶ", "貼り付け", "使い方", "対応エリア"]:
+        button = page.get_by_role("button", name=label, exact=True)
+        await button.scroll_into_view_if_needed(timeout=5000)
+        checks.append(await button.evaluate("""el => {
+          const r = el.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2;
+          const hit = document.elementFromPoint(x, y);
+          return {label:el.textContent.trim(), box:r.toJSON(),
+            reachable:x >= 0 && x < innerWidth && y >= 0 && y < innerHeight
+              && !!hit && (hit === el || el.contains(hit))};
+        }"""))
+    await page.locator(".mui-panel").evaluate("e => e.scrollTop = e.scrollHeight")
+    await capture(page, name + "-home-bottom")
+    await page.locator("#address").scroll_into_view_if_needed()
+    return checks
 
 
 async def detail_check(page, name, record, key, label):
@@ -169,6 +199,9 @@ async def run():
                         assert_layout(record["home"])
                     except AssertionError as error:
                         record["layout_failures"].append("home: " + str(error))
+                    record["home_controls"] = await home_controls(page, name)
+                    if not all(c["reachable"] for c in record["home_controls"]):
+                        record["layout_failures"].append("Some enlarged home controls cannot be reached by scrolling")
                     await page.locator("#address").fill("東京都新宿区西新宿2丁目8番1号")
                     await page.get_by_role("button", name="検索", exact=True).first.click(timeout=5000)
                     record["stage"] = "result"

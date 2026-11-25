@@ -16,8 +16,8 @@ jobs:
     env:
       REVIEW_URL: http://127.0.0.1:3000
       PREVIEW_URL: ""
-      REVIEW_SHA: c74881c1f1060bda2940e4b88a77dbf33467df07
-      REVIEW_PHASE: approved-v2-c74881c-text200-mounted-details
+      REVIEW_SHA: 25ecf4853c0d298294650917a46c27d0acf68798
+      REVIEW_PHASE: approved-v2-25ecf48-text200-and-regression
     steps:
       - uses: actions/checkout@v4
         with:
@@ -106,17 +106,22 @@ jobs:
                   time.sleep(1)
           PY
       - name: Install isolated browser tools
+        id: prepare
         run: |
           python3 -m venv "$RUNNER_TEMP/michilu-browser"
           "$RUNNER_TEMP/michilu-browser/bin/pip" install playwright==1.62.0 Pillow==13.0.0
           "$RUNNER_TEMP/michilu-browser/bin/playwright" install --with-deps chromium webkit
       - name: Exercise the built app (not Vercel Preview)
         run: '"$RUNNER_TEMP/michilu-browser/bin/python" qa-tools/scripts/qa/michilu-v2-text-review.py'
+      - name: Check normal map, details, and tap targets
+        if: ${{ !cancelled() && steps.prepare.outcome == 'success' }}
+        run: '"$RUNNER_TEMP/michilu-browser/bin/python" qa-tools/scripts/qa/michilu-v2-spec-review.py'
+      - name: Check search, back, reduced motion, and desktop
+        if: ${{ !cancelled() && steps.prepare.outcome == 'success' }}
+        run: '"$RUNNER_TEMP/michilu-browser/bin/python" qa-tools/scripts/qa/michilu-v2-navigation-review.py'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: michilu-v2-text200-c74881c-${{ github.run_id }}
+          name: michilu-v2-text200-25ecf48-${{ github.run_id }}
           path: ui-review/
           retention-days: 14
-
-
