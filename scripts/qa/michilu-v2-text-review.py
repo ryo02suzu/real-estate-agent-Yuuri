@@ -89,8 +89,27 @@ async def enlarge_text(page):
 async def capture(page, name):
     await page.screenshot(path=str(OUT / (name + ".png")), full_page=True)
     (OUT / (name + ".txt")).write_text(await page.locator("body").inner_text(), encoding="utf-8")
-    return await page.evaluate("""() => ({
+    return await page.evaluate("""() => {
+      const header = document.querySelector('header');
+      const panel = document.querySelector('.mui-panel');
+      const band = header?.parentElement;
+      const wordmark = header?.querySelector('[aria-label="MICHILU"]');
+      const controls = header ? [...header.querySelectorAll('button')].map(el => {
+        const r = el.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2;
+        const hit = document.elementFromPoint(x, y);
+        return {label:el.getAttribute('aria-label'),box:r.toJSON(),
+          reachable:x >= 0 && x < innerWidth && y >= 0 && y < innerHeight
+            && !!hit && (hit === el || el.contains(hit))};
+      }) : [];
+      return {
       viewport: {width: innerWidth, height: innerHeight},
+      header: {
+        side:!!document.querySelector('[data-side="1"]'),
+        band:band?.getBoundingClientRect().toJSON(),
+        wordmark:wordmark?.getBoundingClientRect().toJSON(),
+        gap:band && panel ? panel.getBoundingClientRect().top - band.getBoundingClientRect().bottom : null,
+        controls
+      },
       page_overflow: document.documentElement.scrollWidth > innerWidth + 1,
       panels: [...document.querySelectorAll('.mui-panel,.mui-list-in,[data-testid="panel-detail"]')]
         .filter(e => e.getBoundingClientRect().height > 0).map(e => ({
@@ -112,12 +131,18 @@ async def capture(page, name):
           && ['hidden','clip'].includes(getComputedStyle(e).overflowX))
         .map(e => ({tag: e.tagName, text: e.textContent.slice(0,160),
           font: getComputedStyle(e).fontSize, box: e.getBoundingClientRect().toJSON()}))
-    })""")
+    }}""")
 
 
 def assert_layout(layout):
     assert not layout["page_overflow"], "Document overflows horizontally at 200% text"
     assert all(not p["horizontal_overflow"] for p in layout["panels"]), "Panel content overflows horizontally at 200% text"
+    header = layout["header"]
+    if header["side"]:
+        assert header["gap"] is not None and header["gap"] >= 5, "Landscape panel overlaps enlarged header"
+        assert len(header["controls"]) == 2 and all(c["reachable"] for c in header["controls"]), "Enlarged header controls are covered"
+        assert header["wordmark"] and header["band"], "Missing enlarged wordmark"
+        assert header["wordmark"]["right"] <= header["band"]["right"] and header["wordmark"]["left"] >= header["band"]["left"], "Enlarged wordmark overflows header"
 
 
 async def home_controls(page, name):
