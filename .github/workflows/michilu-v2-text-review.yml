@@ -17,7 +17,7 @@ jobs:
       REVIEW_URL: http://127.0.0.1:3000
       PREVIEW_URL: ""
       REVIEW_SHA: 25ecf4853c0d298294650917a46c27d0acf68798
-      REVIEW_PHASE: approved-v2-25ecf48-text200-scroll-diagnostic
+      REVIEW_PHASE: approved-v2-25ecf48-text200-click-position-diagnostic
     steps:
       - uses: actions/checkout@v4
         with:

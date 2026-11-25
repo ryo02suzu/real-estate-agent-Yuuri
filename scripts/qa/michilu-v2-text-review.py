@@ -148,7 +148,24 @@ async def detail_check(page, name, record, key, label):
         row = page.get_by_role("button", name=re.compile(label)).first
         await row.scroll_into_view_if_needed()
         entry["scroll_before"] = await page.locator(".mui-list-in").evaluate("e => e.scrollTop")
+        # click() may scroll an oversized row again after the explicit scroll.
+        # Capture the real user-event position before React opens the detail;
+        # that is the position the app must restore, not a pre-click estimate.
+        await row.evaluate("""el => {
+          window.__qaListClick = null;
+          el.addEventListener('click', () => {
+            const list = el.closest('.mui-list-in');
+            window.__qaListClick = list ? {
+              scrollTop:list.scrollTop,
+              row:el.getBoundingClientRect().toJSON(),
+              list:list.getBoundingClientRect().toJSON()
+            } : null;
+          }, {once:true,capture:true});
+        }""")
         await row.click(timeout=5000)
+        entry["at_click"] = await page.evaluate("window.__qaListClick")
+        assert entry["at_click"] is not None, "Missing actual result-row click position"
+        entry["automation_scroll_delta"] = entry["at_click"]["scrollTop"] - entry["scroll_before"]
         await body.wait_for(state="visible", timeout=5000)
         await page.wait_for_timeout(1000)
         entry["fonts"] = await enlarge_text(page)
@@ -173,10 +190,10 @@ async def detail_check(page, name, record, key, label):
         await back.click(timeout=5000)
         await body.wait_for(state="hidden", timeout=5000)
         entry["scroll_after_app"] = await page.locator(".mui-list-in").evaluate("e => e.scrollTop")
-        assert abs(entry["scroll_after_app"] - entry["scroll_before"]) <= 2, "App return lost result-list scroll position before font measurement"
+        assert abs(entry["scroll_after_app"] - entry["at_click"]["scrollTop"]) <= 2, "App return lost actual click-time result-list scroll position before font measurement"
         entry["return_fonts"] = await enlarge_text(page)
         entry["scroll_after"] = await page.locator(".mui-list-in").evaluate("e => e.scrollTop")
-        assert abs(entry["scroll_after"] - entry["scroll_before"]) <= 2, "Returning lost result-list scroll position"
+        assert abs(entry["scroll_after"] - entry["at_click"]["scrollTop"]) <= 2, "Returning lost actual click-time result-list scroll position"
         assert page.url == record["result_url"], "Detail navigation changed selected property"
         entry["status"] = "passed"
     except Exception as error:
