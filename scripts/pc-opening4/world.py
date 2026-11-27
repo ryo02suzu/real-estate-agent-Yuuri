@@ -46,8 +46,8 @@ SAMPLES = int(opt.get("samples", "64"))
 THREADS = int(opt.get("threads", "2"))
 CLOUDS = opt.get("clouds", "surface")
 HAZE = opt.get("haze", "0") == "1"
-GLARE = opt.get("glare", "0") == "1"
 EXR = opt.get("exr", "0") == "1"
+GLARE = opt.get("glare", "0") == "1" and not EXR      # exr=1 は太陽をそのまま（グレアは後の合成で）
 FAR = float(opt.get("far", "150000"))
 CLOUD_TOP = float(opt.get("cloud_top", "1650"))
 CLOUD_DENSITY = float(opt.get("cloud_density", "0.12"))
@@ -73,10 +73,11 @@ CAM = json.load(open(os.path.join(HERE, "cameras.json")))["frames"][str(FRAME)]
 CE, CN = CAM["pos"][0], CAM["pos"][1]
 CAM_Z_TRUE = CAM["pos"][2]
 HEADING = CAM["heading_deg"]
-LENS = CAM["lens_mm"]
+LENS = float(opt.get("lens", CAM["lens_mm"]))   # lens= で焦点距離を変えられる（比べる用）
 HFOV = 2 * math.degrees(math.atan(18.0 / LENS))
 HALF_ANG = HFOV / 2 + 20.0                      # 地形・雲を置く向きの範囲（視野の半分＋余白。上下に振れる分も含む）
-SUN_AZ, SUN_EL = math.radians(config.SUN_AZ), math.radians(config.SUN_EL)
+FAR_ANG = HFOV / 2 + float(opt.get("cone_margin", "8"))   # 遠い輪（16km より外）の範囲。細かい輪のぶん余白を小さく
+SUN_AZ, SUN_EL = math.radians(config.SUN_AZ), math.radians(float(opt.get("sun_el", config.SUN_EL)))
 SUN_DIR = np.array([math.sin(SUN_AZ) * math.cos(SUN_EL), math.cos(SUN_AZ) * math.cos(SUN_EL), math.sin(SUN_EL)])
 
 
@@ -148,7 +149,8 @@ def build_rings(name, sizes, half_cells, far, hfun, rmin=0.0, snow=False, materi
         dist = np.hypot(dx, dy)
         diff = np.abs((np.degrees(np.arctan2(dx, dy)) - HEADING + 180.0) % 360.0 - 180.0)
         tol = np.degrees(np.arctan2(s * 0.71, dist + 1.0))
-        keep = ((diff <= HALF_ANG + tol) | (dist < max(3 * s, 200.0))) & (dist <= far) & (dist >= rmin)
+        ha = HALF_ANG if hole <= 9000.0 else FAR_ANG        # 16km より外の輪は視野の向きを絞る
+        keep = ((diff <= ha + tol) | (dist < max(3 * s, 200.0))) & (dist <= far) & (dist >= rmin)
         keep &= ~((np.abs(dx) < hole) & (np.abs(dy) < hole))
         del dist, diff, tol
         if not keep.any():
@@ -167,7 +169,7 @@ def build_rings(name, sizes, half_cells, far, hfun, rmin=0.0, snow=False, materi
         hv = hfun(E, Nn).astype(np.float32)
         Hg = np.full(used.shape, np.nan, dtype=np.float32)
         Hg[rr, cc] = hv
-        if not last:
+        if not last and sizes[k + 1] > s:
             # 外の輪（2 倍の粗さ）の辺に合わせる。外周の奇数の頂点は両隣の平均
             for sl_fix in ((0, slice(None)), (2 * Nh, slice(None)), (slice(None), 0), (slice(None), 2 * Nh)):
                 line = Hg[sl_fix]
@@ -262,7 +264,9 @@ scene.cycles.use_adaptive_sampling = True
 scene.cycles.use_denoising = opt.get("denoise", "1") == "1"
 scene.cycles.max_bounces = int(opt.get("bounces", "6"))
 scene.cycles.transparent_max_bounces = int(opt.get("transparent_bounces", "256" if CLOUDS == "volume" else "16"))
-scene.cycles.volume_bounces = int(opt.get("vol_bounces", "6"))
+scene.cycles.volume_bounces = int(opt.get("vol_bounces", "8"))
+scene.cycles.seed = int(opt.get("render_seed", "7"))            # 固定（コマごとに変えない。ちらつき確かめ用）
+scene.cycles.use_animated_seed = False
 scene.cycles.volume_step_rate = float(opt.get("vol_step", "1.0"))
 scene.render.resolution_x, scene.render.resolution_y = W, H
 scene.render.resolution_percentage = 100
@@ -275,7 +279,7 @@ try:
     scene.view_settings.look = "AgX - " + opt.get("look", "Medium_High_Contrast").replace("_", " ")
 except TypeError:
     pass
-scene.view_settings.exposure = float(opt.get("exposure", "-1.4"))
+scene.view_settings.exposure = float(opt.get("exposure", "-0.6"))
 if "border" in opt:
     bx0, by0, bx1, by1 = (float(v) for v in opt["border"].split(","))
     scene.render.use_border = True
@@ -297,6 +301,30 @@ mw = Matrix([[M[0, 0], M[0, 1], M[0, 2], CAM["pos_world"][0]], [M[1, 0], M[1, 1]
 cam.matrix_world = mw
 scene.camera = cam
 CAM_W = np.array(CAM["pos_world"])
+# 時間：シーンのコマ番号を映画のコマ（FRAME）にする（追加の部品が動きをつけられるように）。mblur=1 は前後 1 コマのカメラを置いて半コマ分ぼかす
+ALLF = json.load(open(os.path.join(HERE, "cameras.json")))["frames"]
+_fk = sorted(int(k) for k in ALLF)
+scene.frame_start, scene.frame_end = max(FRAME - 1, _fk[0]), min(FRAME + 1, _fk[-1])
+if opt.get("mblur", "0") == "1":
+    cam.rotation_mode = "QUATERNION"
+    _prev = None
+    for f_ in sorted({min(max(FRAME + d, _fk[0]), _fk[-1]) for d in (-1, 0, 1)}):
+        c_ = ALLF[str(f_)]
+        M_ = np.array(c_["matrix"])
+        cam.matrix_world = Matrix([[M_[0, 0], M_[0, 1], M_[0, 2], c_["pos_world"][0]], [M_[1, 0], M_[1, 1], M_[1, 2], c_["pos_world"][1]],
+                                   [M_[2, 0], M_[2, 1], M_[2, 2], c_["pos_world"][2]], [0, 0, 0, 1]])
+        if _prev is not None and cam.rotation_quaternion.dot(_prev) < 0:
+            cam.rotation_quaternion = -cam.rotation_quaternion
+        _prev = cam.rotation_quaternion.copy()
+        cam.keyframe_insert("location", frame=f_)
+        cam.keyframe_insert("rotation_quaternion", frame=f_)
+    for fc in (cam.animation_data.action.fcurves if hasattr(cam.animation_data.action, "fcurves") else []):
+        for kp in fc.keyframe_points:
+            kp.interpolation = "LINEAR"
+    scene.render.use_motion_blur = True
+    scene.render.motion_blur_shutter = 0.5
+    scene.cycles.motion_blur_position = "CENTER"
+scene.frame_set(FRAME)
 
 
 # ---------------------------------------------------------------- 節の部品（材質を作る道具）
@@ -368,7 +396,7 @@ def mapping_for(z, meta):
 
 
 def terrain_material():
-    m = bpy.data.materials.new("ground")
+    m = bpy.data.materials.new("terrain")
     m.use_nodes = True
     nt = m.node_tree
     nd = Nodes(nt)
@@ -447,7 +475,11 @@ def terrain_material():
     cvr = nd.math("ADD", at.outputs["Fac"], nd.math("MULTIPLY", nd.math("SUBTRACT", nn, 0.5), 0.7))
     snow = nd.rng(cvr, 0.38, 0.56, 0.0, 1.0, True)
     final = nd.mix(snow, gcol if not isinstance(gcol, tuple) else (0.3, 0.3, 0.3, 1.0), (0.70, 0.74, 0.82, 1.0))
-    nt.links.new(final, bsdf.inputs["Base Color"])
+    ro = nt.nodes.new("NodeReroute")                       # 追加の部品（木の色合わせなど）が色を差し込む所
+    ro.name = "base_out"
+    ro.label = "base_out"
+    nt.links.new(final, ro.inputs[0])
+    nt.links.new(ro.outputs[0], bsdf.inputs["Base Color"])
     bsdf.inputs["Roughness"].default_value = 0.92
     bump = nd.new("ShaderNodeBump", Strength=0.25, Distance=2.0)
     nt.links.new(final, bump.inputs["Height"])
@@ -464,7 +496,8 @@ def terrain_material():
 t0 = time.time()
 log("地形を作る…")
 mat_ground = terrain_material()
-TERRAIN_SIZES = [4.0, 8.0, 16.0, 32.0, 64.0, 128.0]
+_fc = float(opt.get("far_cell", "64"))
+TERRAIN_SIZES = [4.0, 8.0, 16.0, 32.0, 64.0, _fc]
 terrain_objs, TV, TF = build_rings("terrain", TERRAIN_SIZES, 512, FAR, ground, snow=True, material=mat_ground)
 STATS.update(terrain_vertices=TV, terrain_faces=TF, terrain_seconds=round(time.time() - t0, 1))
 log(f"地形 頂点 {TV:,}・{time.time() - t0:.1f} 秒")
@@ -520,27 +553,57 @@ def domes(x, y, cell, seed, smooth_=0.35):
     return np.clip(1.0 - f1, 0.0, 1.0) ** 1.5
 
 
-WIND = math.radians(115.0)           # うねりの伸びる向き（日の出の方）
+# ---- 雲海の形：長いうねり（2〜5km・筋が視線を横切る）＋0.6〜1.2km の帯＋平たい大きなこぶ（150〜250m）＋うすい細かな乱れ。
+# 上面の高さ（本当の標高 m）は「位置と映画の時刻」だけで決まる（ゆっくりの流れ DRIFT のみ時刻に依る。距離で細かい模様の量を絞るのは見えない所の手間の節約）
+CLOUD_STRETCH = float(opt.get("cloud_stretch", "2.5"))          # 筋の長さ：幅の何倍か
+DRIFT_V = float(opt.get("drift", "2.0"))                        # 雲の流れる速さ m/s（3 以下）
+_da = math.radians((HEADING + 180.0) % 360.0)                   # 筋に直角（カメラから遠ざかる向きの逆）へ
+DRIFT = (math.sin(_da) * DRIFT_V * FRAME / 24.0, math.cos(_da) * DRIFT_V * FRAME / 24.0)
+_STD = {}
+
+
+def nf(x, y, scale, octaves, seed, rough=0.5):
+    """fbm を平均 0・標準偏差 1 にしたもの（標準偏差は最初に一度だけ測る）"""
+    key = (octaves, rough)
+    if key not in _STD:
+        rs = np.random.RandomState(5)
+        v = fbm(rs.uniform(0, 400, 60000).astype(np.float32), rs.uniform(0, 400, 60000).astype(np.float32), 1.0, octaves, 777, rough)
+        _STD[key] = (float(v.mean()), float(v.std()))
+    m, sd = _STD[key]
+    return (fbm(x, y, scale, octaves, seed, rough) - m) / sd
+
+
+_rs = np.random.RandomState(9)
+DOME_MEAN = float(domes(_rs.uniform(0, 3000, 40000).astype(np.float32), _rs.uniform(0, 3000, 40000).astype(np.float32), 180.0, 5).mean())
+CREST_A = math.radians((HEADING + 90.0) % 360.0)                # 筋の伸びる向き（視線に直角）
 
 
 def cloud_top_raw(X, Y):
-    """雲の上面（本当の高さ m）。ゆるいうねり（1〜4km・±50m を風の向きへ引き伸ばす）＋もくもく（150〜400m）＋細かな乱れ。
-    場所ごとに「海のようになめらかな所」と「こぶの多い所」を分ける（calm）。シードは固定"""
-    X = X.astype(np.float32)
-    Y = Y.astype(np.float32)
+    """雲の上面（本当の高さ m）"""
+    X0 = np.asarray(X, dtype=np.float64)
+    Y0 = np.asarray(Y, dtype=np.float64)
+    r = np.hypot(X0 - CE, Y0 - CN)
+    x = (X0 - DRIFT[0]).astype(np.float32)
+    y = (Y0 - DRIFT[1]).astype(np.float32)
     s0 = SEED * 101
-    wx = X + (fbm(X, Y, 900.0, 2, s0 + 11) - 0.5) * 420.0
-    wy = Y + (fbm(X, Y, 900.0, 2, s0 + 23) - 0.5) * 420.0
-    cw, sw = math.cos(WIND), math.sin(WIND)
-    u = (wx * sw + wy * cw) / 2.4             # 風の向き（東寄り）に長い
-    v = (-wx * cw + wy * sw)
-    swell = (fbm(u, v, 3200.0, 3, s0 + 31) - 0.5) * 120.0 + (fbm(X, Y, 14000.0, 2, s0 + 37) - 0.5) * 60.0
-    lump = np.clip((fbm(X, Y, 8000.0, 2, s0 + 41) - 0.38) / 0.28, 0.0, 1.0)
-    lump = 0.12 + 0.88 * lump                  # 0.12 = なめらか、1 = こぶが多い
-    streak = np.clip((fbm(u * 1.6, v * 0.5, 700.0, 2, s0 + 43) - 0.5) * 5.0, -1, 1)  # 風向きの筋（層のような段）
-    bil = domes(wx, wy, 330.0, s0 + 53) * 62.0 + domes(wx, wy, 150.0, s0 + 67) * 22.0 + domes(wx, wy, 780.0, s0 + 71) * 30.0
-    fine = (fbm(wx, wy, 38.0, 4, s0 + 79, 0.55) - 0.5) * 16.0
-    return CLOUD_TOP - 25.0 + swell + bil * lump + streak * 8.0 + fine * (0.4 + 0.6 * lump)
+    al = x * np.float32(math.sin(CREST_A)) + y * np.float32(math.cos(CREST_A))      # 筋に沿う向き
+    ac = x * np.float32(math.cos(CREST_A)) - y * np.float32(math.sin(CREST_A))      # 筋を横切る向き（遠近の向き）
+    u = al / np.float32(CLOUD_STRETCH)
+    v = ac
+    wu = u + np.float32(150.0) * nf(u, v, 1800.0, 2, s0 + 11)
+    wv = v + np.float32(150.0) * nf(u, v, 1800.0, 2, s0 + 23)
+    swell = np.float32(float(opt.get("swell", "38"))) * nf(wu, wv, 3400.0, 3, s0 + 31, 0.45)           # 2〜5km
+    ph = wv / np.float32(2900.0) + np.float32(0.5) * nf(u, v, 7000.0, 2, s0 + 47)
+    env = np.float32(0.4) + np.float32(0.6) * np.clip(0.5 + 0.5 * nf(u, v, 9000.0, 2, s0 + 53), 0.0, 1.0)
+    wave = np.float32(float(opt.get("wave", "30"))) * np.sin(np.float32(2 * math.pi) * ph) * env          # 平行な筋
+    band = np.float32(float(opt.get("band", "13"))) * nf(wu, wv, 900.0, 3, s0 + 61, 0.5)                # 0.6〜1.2km
+    big = np.float32(14.0) * nf(u, v, 16000.0, 2, s0 + 37)
+    lump = np.clip((fbm(x, y, 8000.0, 2, s0 + 41) - 0.38) / 0.28, 0.0, 1.0)
+    lump = np.float32(0.3) + np.float32(0.7) * lump
+    wc = (1.0 - smooth(r, 5000.0, 13000.0)).astype(np.float32)               # 細かい模様は近くだけ
+    cells = np.float32(float(opt.get("cells", "16"))) * (domes(al / 1.5, ac, 190.0, s0 + 53) - np.float32(DOME_MEAN))   # 150〜250m の平たいこぶ
+    wisp = np.float32(3.0) * nf(al / 2.0, ac, 45.0, 3, s0 + 79, 0.55)                                        # 30〜60m のうすい乱れ
+    return (CLOUD_TOP + swell + wave + band + big + wc * lump * (cells + wisp)).astype(np.float32)
 
 
 def kamikochi_mask(E, N):
@@ -551,8 +614,25 @@ def kamikochi_mask(E, N):
     return (mx * my).astype(np.float32)
 
 
-def cloud_field(E, N, chunk=600_000, ground_fn=None):
-    """(上面の高さ（本当の標高）, 濃さの重み)。山の斜面でやわらかく薄くなる（岸）。上高地は雲なし"""
+def cloud_surface(e, n, gr):
+    """(上面の高さ（本当の標高）, 濃さの重み, 霧の舌) 山の斜面でやわらかく・不ぞろいに薄くなる（岸）。斜面ぎわに霧の舌。上高地は雲なし"""
+    t = cloud_top_raw(e, n)
+    thick = t - gr
+    km = kamikochi_mask(e, n)
+    x = (np.asarray(e) - DRIFT[0]).astype(np.float32)
+    y = (np.asarray(n) - DRIFT[1]).astype(np.float32)
+    nz = fbm(x, y, 170.0, 3, SEED * 101 + 97)                          # 0〜1
+    reach = np.float32(230.0) * (np.float32(0.55) + np.float32(0.9) * nz)
+    low = 70.0 * (1.0 - smooth(thick, 0.0, reach))
+    tn = np.clip((nf(x, y, 120.0, 3, SEED * 101 + 101) + 0.1) * 1.5, 0.0, 1.0)
+    zone = smooth(thick, 12.0, 70.0) * (1.0 - smooth(thick, 110.0, 260.0))
+    tongue = (tn * zone * (1.0 - km)).astype(np.float32)
+    top = t - low + float(opt.get("tongue", "60")) * tongue - 450.0 * km
+    wgt = smooth(thick, 8.0, 150.0) * (1.0 - km)
+    return top.astype(np.float32), wgt.astype(np.float32), tongue
+
+
+def cloud_field(E, N, chunk=600_000):
     shape = np.shape(E)
     e = np.ravel(E)
     n = np.ravel(N)
@@ -560,15 +640,175 @@ def cloud_field(E, N, chunk=600_000, ground_fn=None):
     wgt = np.empty(len(e), dtype=np.float32)
     for i in range(0, len(e), chunk):
         sl = slice(i, i + chunk)
-        t = cloud_top_raw(e[sl], n[sl])
-        g = (ground_fn or ground)(e[sl], n[sl])
-        thick = t - g
-        km = kamikochi_mask(e[sl], n[sl])
-        top[sl] = t - 70.0 * (1.0 - smooth(thick, 0.0, 220.0)) - 450.0 * km
-        wgt[sl] = smooth(thick, 8.0, 150.0) * (1.0 - km)
+        top[sl], wgt[sl], _ = cloud_surface(e[sl], n[sl], ground(e[sl], n[sl]))
     return top.reshape(shape), wgt.reshape(shape)
 
 
+# ---------------------------------------------------------------- 雲の光の応え方（どの輪も同じ材質の値）
+D0 = float(opt.get("cloud_density", "0.06"))        # 雲の中の濃さ（1/m）
+CLOUD_COLOR = (0.985, 0.985, 0.99, 1.0)
+PHASE = opt.get("phase", "hg2")
+
+
+def cloud_scatter(nt, density, color=CLOUD_COLOR):
+    """雲の散乱（吸収なし）。hg2＝前向きの強い山（g 0.86）と等方に近い山（g 0.1）の 2 つ。mie＝Blender の水滴の位相関数"""
+    def dens(k):
+        if isinstance(density, bpy.types.NodeSocket):
+            nd_ = nt.nodes.new("ShaderNodeMath")
+            nd_.operation = "MULTIPLY"
+            nt.links.new(density, nd_.inputs[0])
+            nd_.inputs[1].default_value = k
+            return nd_.outputs[0]
+        return density * k
+
+    def node(g, k, phase="HENYEY_GREENSTEIN"):
+        n_ = nt.nodes.new("ShaderNodeVolumeScatter")
+        n_.phase = phase
+        n_.inputs["Color"].default_value = color
+        n_.inputs["Anisotropy"].default_value = g
+        d_ = dens(k)
+        if isinstance(d_, bpy.types.NodeSocket):
+            nt.links.new(d_, n_.inputs["Density"])
+        else:
+            n_.inputs["Density"].default_value = d_
+        return n_
+
+    if PHASE == "mie":
+        n_ = node(0.0, 1.0, "MIE")
+        n_.inputs["Diameter"].default_value = float(opt.get("droplet", "15"))
+        return n_.outputs[0]
+    gf, gb = float(opt.get("g_fwd", "0.86")), float(opt.get("g_body", "0.1"))
+    wf = float(opt.get("w_fwd", "0.6"))
+    a = node(gf, wf)
+    b = node(gb, 1.0 - wf)
+    ad = nt.nodes.new("ShaderNodeAddShader")
+    nt.links.new(a.outputs[0], ad.inputs[0])
+    nt.links.new(b.outputs[0], ad.inputs[1])
+    return ad.outputs[0]
+
+
+# ---------------------------------------------------------------- 閉じた板（均一な雲・かすみ）
+def closed_slab(name, vx, vy, ztop, zbot, keep, material):
+    """vx, vy：格子の線（東・北）、ztop・zbot：格子の頂点の高さ（行 = 北、列 = 東）、keep：升目（行 = 北、列 = 東。1 つ小さい）が真の所だけ。
+    上面・下面・まわりの壁で閉じた形。体積の材質用"""
+    ny, nx = ztop.shape
+    used = np.zeros((ny, nx), dtype=bool)
+    used[:-1, :-1] |= keep
+    used[:-1, 1:] |= keep
+    used[1:, :-1] |= keep
+    used[1:, 1:] |= keep
+    rr, cc = np.nonzero(used)
+    nv = len(rr)
+    if nv == 0:
+        return None
+    ids = np.full((ny, nx), -1, dtype=np.int64)
+    ids[rr, cc] = np.arange(nv)
+    co = np.zeros((2 * nv, 3), dtype=np.float32)
+    co[:nv, 0] = vx[cc]
+    co[:nv, 1] = vy[rr]
+    co[:nv, 2] = ztop[rr, cc]
+    co[nv:, 0] = co[:nv, 0]
+    co[nv:, 1] = co[:nv, 1]
+    co[nv:, 2] = zbot[rr, cc]
+    kr, kc = np.nonzero(keep)
+    a, b, c, d = ids[kr, kc], ids[kr, kc + 1], ids[kr + 1, kc + 1], ids[kr + 1, kc]
+    faces = [np.stack([a, b, c, d], 1), np.stack([d + nv, c + nv, b + nv, a + nv], 1)]
+    kp = np.pad(keep, 1, constant_values=False)
+    for dr, dc, order in ((-1, 0, "S"), (1, 0, "N"), (0, -1, "W"), (0, 1, "E")):
+        open_ = ~kp[1 + kr + dr, 1 + kc + dc]
+        r_, c_ = kr[open_], kc[open_]
+        if len(r_) == 0:
+            continue
+        a, b, c, d = ids[r_, c_], ids[r_, c_ + 1], ids[r_ + 1, c_ + 1], ids[r_ + 1, c_]      # 南西・南東・北東・北西
+        if order == "S":
+            q = np.stack([a, a + nv, b + nv, b], 1)
+        elif order == "N":
+            q = np.stack([c, c + nv, d + nv, d], 1)
+        elif order == "W":
+            q = np.stack([d, d + nv, a + nv, a], 1)
+        else:
+            q = np.stack([b, b + nv, c + nv, c], 1)
+        faces.append(q)
+    faces = np.concatenate(faces).astype(np.int32)
+    me = bpy.data.meshes.new(name)
+    me.vertices.add(2 * nv)
+    me.vertices.foreach_set("co", co.reshape(-1))
+    me.loops.add(faces.size)
+    me.loops.foreach_set("vertex_index", faces.reshape(-1))
+    me.polygons.add(len(faces))
+    me.polygons.foreach_set("loop_start", (np.arange(len(faces)) * 4).astype(np.int32))
+    me.polygons.foreach_set("loop_total", np.full(len(faces), 4, dtype=np.int32))
+    me.update(calc_edges=False)
+    me.materials.append(material)
+    ob = bpy.data.objects.new(name, me)
+    scene.collection.objects.link(ob)
+    return ob, 2 * nv, len(faces)
+
+
+def cone_keep(vx, vy, rmin, rmax, ang):
+    """格子の升目（中心の距離が rmin〜rmax・視野の向きの中）の真偽"""
+    dx = ((vx[:-1] + vx[1:]) / 2 - CE).astype(np.float32)[None, :]
+    dy = ((vy[:-1] + vy[1:]) / 2 - CN).astype(np.float32)[:, None]
+    dist = np.hypot(dx, dy)
+    s = float(vx[1] - vx[0])
+    diff = np.abs((np.degrees(np.arctan2(dx, dy)) - HEADING + 180.0) % 360.0 - 180.0)
+    tol = np.degrees(np.arctan2(s * 0.71, dist + 1.0))
+    return ((diff <= ang + tol) | (dist < 3 * s)) & (dist >= rmin) & (dist < rmax)
+
+
+def build_cloud_slab(name, s, rmin, rmax, ang, material, thick=260.0):
+    """均一な雲の板。上面は雲の高さの場（丸みで下げる）、下面は thick m 下"""
+    Nh = int(math.ceil(rmax / s)) + 2
+    c0x, c0y = round(CE / s), round(CN / s)
+    vx = (c0x + np.arange(-Nh, Nh + 1)) * s
+    vy = (c0y + np.arange(-Nh, Nh + 1)) * s
+    keep = cone_keep(vx, vy, rmin, rmax, ang)
+    used = np.zeros((2 * Nh + 1, 2 * Nh + 1), dtype=bool)
+    used[:-1, :-1] |= keep
+    used[:-1, 1:] |= keep
+    used[1:, :-1] |= keep
+    used[1:, 1:] |= keep
+    rr, cc = np.nonzero(used)
+    E = vx[cc].astype(np.float64)
+    Nn = vy[rr].astype(np.float64)
+    top, wgt = cloud_field(E, Nn)
+    zt = np.full(used.shape, np.nan, dtype=np.float32)
+    wg = np.zeros(used.shape, dtype=np.float32)
+    zt[rr, cc] = top - geo4.curvature_drop(E, Nn).astype(np.float32)
+    wg[rr, cc] = wgt
+    wq = np.maximum.reduce([wg[:-1, :-1], wg[:-1, 1:], wg[1:, :-1], wg[1:, 1:]])
+    keep &= wq > 0.03
+    zt = np.nan_to_num(zt, nan=0.0)
+    return closed_slab(name, vx, vy, zt, zt - thick, keep, material)
+
+
+def curved_slab(name, z0, z1, rmax, cell, material):
+    """地球の丸みに沿う板（かすみの層）。原点（河童橋）から rmax の四角。カメラの中を含む。z0〜z1 は真の標高"""
+    n = int(math.ceil(rmax / cell))
+    vx = np.arange(-n, n + 1) * cell
+    vy = np.arange(-n, n + 1) * cell
+    X, Y = np.meshgrid(vx, vy)
+    drop = geo4.curvature_drop(X, Y).astype(np.float32)
+    keep = np.ones((2 * n, 2 * n), dtype=bool)
+    return closed_slab(name, vx, vy, (z1 - drop).astype(np.float32), (z0 - drop).astype(np.float32), keep, material)
+
+
+def haze_material(name, density, color, g):
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    for n_ in list(nt.nodes):
+        nt.nodes.remove(n_)
+    v = nt.nodes.new("ShaderNodeVolumeScatter")
+    v.inputs["Color"].default_value = color
+    v.inputs["Density"].default_value = density
+    v.inputs["Anisotropy"].default_value = g
+    mo = nt.nodes.new("ShaderNodeOutputMaterial")
+    nt.links.new(v.outputs[0], mo.inputs["Volume"])
+    return m
+
+
+# ---------------------------------------------------------------- 雲の面（clouds=surface。下書き用の白い面）
 def make_cloud_surface_material():
     m = bpy.data.materials.new("cloudsurf")
     m.use_nodes = True
@@ -592,22 +832,21 @@ def cloud_hfun(E, N):
 
 
 cloud_objs = []
-if CLOUDS in ("surface", "volume"):
+if CLOUDS == "surface":
     t0 = time.time()
-    log("雲の面を作る…")
-    rmin = VOL_RANGE - 800.0 if CLOUDS == "volume" else 0.0
-    cm_surf = make_cloud_surface_material()
-    # 雲の面は雲の中の立体の少し下（立体の上面と重ならない）
-    sizes = [16.0, 32.0, 64.0, 128.0] if CLOUDS == "surface" else [128.0, 256.0]
-    objs, cv, cf = build_rings("cloudsurf", sizes, 256 if CLOUDS == "surface" else 256, FAR, cloud_hfun, rmin=rmin, material=cm_surf,
-                               drop_extra=0.0 if CLOUDS == "surface" else 6.0)
+    log("雲の面（下書き）を作る…")
+    objs, cv, cf = build_rings("cloudsurf", [16.0, 32.0, 64.0, 128.0], 256, FAR, cloud_hfun, material=make_cloud_surface_material())
     cloud_objs += objs
     STATS.update(cloud_surface_vertices=cv, cloud_surface_seconds=round(time.time() - t0, 1))
     log(f"雲の面 頂点 {cv:,}・{time.time() - t0:.1f} 秒")
 
 
-# ---------------------------------------------------------------- 立体の雲（近く）
-def cloud_volume_material(name, img, ox, oy, span_x, span_y, wisp_scale, wisp_detail, edge_m, wisp_m):
+# ---------------------------------------------------------------- 立体の雲（近く：不均一）
+R_A = float(opt.get("ring_a", "5800"))      # ここから近くの細かい雲が均一な板へ移り始める
+R_B = float(opt.get("ring_b", "9000"))      # ここで完全に板になる（移りの幅 3km 強）
+
+
+def cloud_volume_material(name, img, ox, oy, span, wisp_scale, wisp_detail, edge_m, wisp_m):
     cm = bpy.data.materials.new(name)
     cm.use_nodes = True
     cn = cm.node_tree
@@ -617,36 +856,63 @@ def cloud_volume_material(name, img, ox, oy, span_x, span_y, wisp_scale, wisp_de
     geo = nd.new("ShaderNodeNewGeometry")
     P = geo.outputs["Position"]
     sepw = nd.new("ShaderNodeSeparateXYZ", Vector=P)
-    uvx = nd.math("MULTIPLY_ADD", sepw.outputs["X"], 1.0 / span_x, -ox / span_x)
-    uvy = nd.math("MULTIPLY_ADD", sepw.outputs["Y"], 1.0 / span_y, -oy / span_y)
+    flat = nd.new("ShaderNodeCombineXYZ", X=sepw.outputs["X"], Y=sepw.outputs["Y"])
+    rr = nd.vmath("DISTANCE", flat.outputs[0], (CE, CN, 0.0)).outputs["Value"]
+    PD = nd.vmath("SUBTRACT", P, (DRIFT[0], DRIFT[1], 0.0)).outputs["Vector"]      # 流れに乗った位置（雲の模様用）
+    uvx = nd.math("MULTIPLY_ADD", sepw.outputs["X"], 1.0 / span, -ox / span)
+    uvy = nd.math("MULTIPLY_ADD", sepw.outputs["Y"], 1.0 / span, -oy / span)
     uvv = nd.new("ShaderNodeCombineXYZ", X=uvx, Y=uvy)
     timg = nd.new("ShaderNodeTexImage", Vector=uvv.outputs[0])
     timg.image = img
     timg.interpolation = "Linear"
     timg.extension = "EXTEND"
     rg = nd.new("ShaderNodeSeparateColor", Color=timg.outputs["Color"])
-    wisp = nd.new("ShaderNodeTexNoise", Vector=P, Scale=1.0 / wisp_scale, Detail=wisp_detail, Roughness=0.6)
+    wisp = nd.new("ShaderNodeTexNoise", Vector=PD, Scale=1.0 / wisp_scale, Detail=wisp_detail, Roughness=0.6)
     hz_ = nd.math("ADD", rg.outputs[0], CLOUD_TOP)
     hz_ = nd.math("MULTIPLY_ADD", wisp.outputs["Fac"], wisp_m, nd.math("SUBTRACT", hz_, wisp_m / 2))
     below = nd.math("SUBTRACT", hz_, sepw.outputs["Z"])
-    edge = nd.rng(below, -2.0, edge_m, 0.0, 1.0, True)
+    edge = nd.rng(below, -2.0, edge_m, 0.0, 1.0, True)                  # 上面から edge_m かけて濃くなる（やわらかい頂）
     LAYER = 260.0
     deep = nd.rng(below, LAYER - 60.0, LAYER, 1.0, 0.0)
     wm = nd.rng(wisp.outputs["Fac"], 0.38, 0.62)
     near_top = nd.rng(below, 0.0, 30.0, 1.0, 0.0)
     shred = nd.math("SUBTRACT", 1.0, nd.math("MULTIPLY", near_top, nd.math("SUBTRACT", 1.0, wm)))
-    gn = nd.new("ShaderNodeTexNoise", Vector=P, Scale=1.0 / 90.0, Detail=3.0).outputs["Fac"]
+    gn = nd.new("ShaderNodeTexNoise", Vector=PD, Scale=1.0 / 90.0, Detail=3.0).outputs["Fac"]
     shore = nd.rng(nd.math("MULTIPLY", rg.outputs[1], nd.math("MULTIPLY_ADD", gn, 0.8, 0.6)), 0.15, 0.7, 0.0, 1.0, True)
-    dens = nd.math("MULTIPLY", nd.math("MULTIPLY", nd.math("MULTIPLY", edge, deep), nd.math("MULTIPLY", shred, shore)), CLOUD_DENSITY)
-    vol = nd.new("ShaderNodeVolumePrincipled", Color=(1.0, 1.0, 1.0, 1.0), Anisotropy=0.55)
-    cn.links.new(dens, vol.inputs["Density"])
+    tongue = nd.math("SUBTRACT", 1.0, nd.math("MULTIPLY", rg.outputs[2], 0.65))      # 霧の舌は薄い（濃さの 35%）
+    s0 = nd.math("MULTIPLY", nd.math("MULTIPLY", nd.math("MULTIPLY", edge, deep), nd.math("MULTIPLY", shred, shore)), tongue)
+    f = nd.rng(rr, R_A, R_B, 0.0, 1.0, True)                            # 近くの細かい雲 → 均一な板へ
+    dens = nd.math("MULTIPLY", nd.math("MULTIPLY", s0, nd.math("SUBTRACT", 1.0, f)), D0)
+    sh = cloud_scatter(cn, dens)
     mo = nd.new("ShaderNodeOutputMaterial")
-    cn.links.new(vol.outputs[0], mo.inputs["Volume"])
+    cn.links.new(sh, mo.inputs["Volume"])
+    return cm
+
+
+def cloud_slab_material(name, ramp):
+    """均一な板の材質。ramp=True は近くの細かい雲から移る所（距離で濃くなる）。False は定数（Cycles が解析的に扱える）"""
+    cm = bpy.data.materials.new(name)
+    cm.use_nodes = True
+    cn = cm.node_tree
+    for n in list(cn.nodes):
+        cn.nodes.remove(n)
+    nd = Nodes(cn)
+    if ramp:
+        geo = nd.new("ShaderNodeNewGeometry")
+        sepw = nd.new("ShaderNodeSeparateXYZ", Vector=geo.outputs["Position"])
+        flat = nd.new("ShaderNodeCombineXYZ", X=sepw.outputs["X"], Y=sepw.outputs["Y"])
+        rr = nd.vmath("DISTANCE", flat.outputs[0], (CE, CN, 0.0)).outputs["Value"]
+        dens = nd.math("MULTIPLY", nd.rng(rr, R_A, R_B, 0.0, 1.0, True), D0)
+    else:
+        dens = D0
+    sh = cloud_scatter(cn, dens)
+    mo = nd.new("ShaderNodeOutputMaterial")
+    cn.links.new(sh, mo.inputs["Volume"])
     return cm
 
 
 def bake_cloud_image(name, ox, oy, nx, ny, texel):
-    """上面の高さの画像：R = 上面 − 丸みの分 − CLOUD_TOP（32 ビット浮動小数。16 ビットだと 1〜2m の段が縞になる）、G = 濃さの重み"""
+    """上面の高さの画像：R = 上面 − 丸みの分 − CLOUD_TOP（32 ビット浮動小数。16 ビットだと 1〜2m の段が縞になる）、G = 濃さの重み、B = 霧の舌"""
     t1 = time.time()
     g = 4
     gxs = ox + (np.arange((nx - 1) // g + 2)) * texel * g
@@ -672,24 +938,22 @@ def bake_cloud_image(name, ox, oy, nx, ny, texel):
     YB = np.broadcast_to(Y, (ny, nx))
     top = np.empty((ny, nx), dtype=np.float32)
     wgt = np.empty((ny, nx), dtype=np.float32)
+    tng = np.empty((ny, nx), dtype=np.float32)
     rows = max(1, 400_000 // nx)
     for r0 in range(0, ny, rows):
         sl = slice(r0, r0 + rows)
         e, n = XB[sl], YB[sl]
-        gr = gfull[sl]
-        t = cloud_top_raw(e, n)
-        thick = t - gr
-        km = kamikochi_mask(e, n)
-        top[sl] = t - 70.0 * (1.0 - smooth(thick, 0.0, 220.0)) - 450.0 * km
-        wgt[sl] = smooth(thick, 8.0, 150.0) * (1.0 - km)
-        top[sl] = top[sl] - geo4.curvature_drop(e, n).astype(np.float32) - CLOUD_TOP
+        t_, w_, g_ = cloud_surface(e, n, gfull[sl])
+        top[sl] = t_ - geo4.curvature_drop(e, n).astype(np.float32) - CLOUD_TOP
+        wgt[sl] = w_
+        tng[sl] = g_
     img = bpy.data.images.new(name, nx, ny, alpha=False, float_buffer=True, is_data=True)
     if hasattr(img, "use_half_precision"):
         img.use_half_precision = False
     rgba = np.empty((ny, nx, 4), dtype=np.float32)
     rgba[..., 0] = top
     rgba[..., 1] = wgt
-    rgba[..., 2] = 0.0
+    rgba[..., 2] = tng
     rgba[..., 3] = 1.0
     img.pixels.foreach_set(rgba.reshape(-1))
     log(f"  雲の高さの画像 {name}: {nx}x{ny}（{texel:g}m）{time.time() - t1:.1f} 秒")
@@ -768,14 +1032,11 @@ VOL_TILES = 0
 if CLOUDS == "volume":
     t0 = time.time()
     log("立体の雲を作る…")
-    TILE_NEAR, TILE_MID = 1280.0, 2560.0
+    TILE_NEAR = 1280.0
     ox = round((CE - 10240.0) / TILE_NEAR) * TILE_NEAR
     oy = round((CN - 10240.0) / TILE_NEAR) * TILE_NEAR
-    # 近い画像：10m・約 20km 四方。遠い画像：40m・約 77km 四方（近い画像の範囲もふくむ。近い範囲は近い画像のタイルだけを置く）
     img_n, top_n, wgt_n = bake_cloud_image("cloudtop_near", ox, oy, 2048, 2048, 10.0)
-    mox, moy = ox - 11 * TILE_MID, oy - 11 * TILE_MID
-    mat_n = cloud_volume_material("cloud_near", img_n, ox, oy, 2048 * 10.0, 2048 * 10.0, float(opt.get("cloud_wisp_scale", "40")), 5.0, 8.0, 40.0)
-    near_half = 10240.0
+    mat_n = cloud_volume_material("cloud_near", img_n, ox, oy, 2048 * 10.0, float(opt.get("cloud_wisp_scale", "40")), 5.0, 45.0, 8.0)
 
     def in_cone(ce, cn, margin=0.0):
         d = math.hypot(ce - CE, cn - CN)
@@ -785,33 +1046,34 @@ if CLOUDS == "volume":
         return abs((a - HEADING + 180.0) % 360.0 - 180.0) <= HALF_ANG + math.degrees(math.atan2(900.0, d)) + margin
 
     def acc_near(ce, cn):
-        return math.hypot(ce - CE, cn - CN) <= min(VOL_RANGE, 14500.0) and in_cone(ce, cn)
+        return math.hypot(ce - CE, cn - CN) <= R_B + 700.0 and in_cone(ce, cn)
 
     objs = make_volume_tiles("cn", top_n, wgt_n, ox, oy, 10.0, 8, TILE_NEAR, mat_n, acc_near)
-    for ob in objs:
-        pass
     cloud_objs += objs
     VOL_TILES += len(objs)
     del top_n, wgt_n
-    if VOL_RANGE > 10240.0:
-        img_m, top_m, wgt_m = bake_cloud_image("cloudtop_mid", mox, moy, 1920, 1920, 40.0)
-        mat_m = cloud_volume_material("cloud_mid", img_m, mox, moy, 1920 * 40.0, 1920 * 40.0, 80.0, 4.0, 14.0, 60.0)
-
-        def acc_mid(ce, cn):
-            # 近い画像のタイル（近い画像の範囲の中の、近い範囲）と重ならない所だけ
-            inside_near = (ox - 1.0 <= ce - TILE_MID / 2) and (ce + TILE_MID / 2 <= ox + 2048 * 10.0 + 1.0) and (oy - 1.0 <= cn - TILE_MID / 2) and (cn + TILE_MID / 2 <= oy + 2048 * 10.0 + 1.0)
-            if inside_near and math.hypot(ce - CE, cn - CN) <= min(VOL_RANGE, 14500.0):
-                return False
-            if inside_near and False:
-                return False
-            return math.hypot(ce - CE, cn - CN) <= VOL_RANGE and in_cone(ce, cn)
-
-        objs = make_volume_tiles("cm", top_m, wgt_m, mox, moy, 40.0, 8, TILE_MID, mat_m, acc_mid)
-        cloud_objs += objs
-        VOL_TILES += len(objs)
-        del top_m, wgt_m
     STATS.update(volume_tiles=VOL_TILES, volume_seconds=round(time.time() - t0, 1))
-    log(f"立体の雲 タイル {VOL_TILES}・{time.time() - t0:.1f} 秒")
+    log(f"近くの雲 タイル {VOL_TILES}・{time.time() - t0:.1f} 秒")
+    # 均一な板（移り→中間→遠く。地平線まで同じ雲）。上面は同じ高さの場
+    t0 = time.time()
+    k = float(opt.get("slab_coarse", "1.0"))
+    mat_ramp = cloud_slab_material("cloud_ramp", True)
+    mat_flat = cloud_slab_material("cloud_slab", False)
+    CLOUD_RANGE = float(opt.get("cloud_range", "115000"))
+    parts = [("cs_ramp", 32.0 * k, R_A - 80.0, R_B + 400.0, HALF_ANG, mat_ramp),
+             ("cs_a", 32.0 * k, R_B + 200.0, 24000.0, HALF_ANG, mat_flat),
+             ("cs_b", 64.0 * k, 23800.0, 52000.0, FAR_ANG, mat_flat),
+             ("cs_c", 160.0 * k, 51800.0, CLOUD_RANGE, FAR_ANG, mat_flat)]
+    SV = SF = 0
+    for nm, s_, r0_, r1_, ang_, mt_ in parts:
+        res = build_cloud_slab(nm, s_, r0_, r1_, ang_, mt_)
+        if res:
+            cloud_objs.append(res[0])
+            SV += res[1]
+            SF += res[2]
+            log(f"  {nm}: 格子 {s_:g}m・頂点 {res[1]:,}・面 {res[2]:,}")
+    STATS.update(slab_vertices=SV, slab_faces=SF, slab_seconds=round(time.time() - t0, 1))
+    log(f"雲の板 頂点 {SV:,}・{time.time() - t0:.1f} 秒")
 
 # ---------------------------------------------------------------- 空・太陽
 world = bpy.data.worlds.new("sky")
@@ -829,37 +1091,36 @@ for t in ("MULTIPLE_SCATTERING", "NISHITA"):
         continue
 sky.sun_elevation = SUN_EL
 sky.sun_rotation = SUN_AZ
-AEROSOL = float(opt.get("aerosol", "1.2"))
+AEROSOL = float(opt.get("aerosol", "0.3"))
 for attr, val in (("altitude", min(max(CAM_Z_TRUE, 0.0), 59000.0)), ("air_density", 1.0), ("aerosol_density", AEROSOL), ("dust_density", AEROSOL),
-                  ("ozone_density", 1.0), ("ground_albedo", 0.6)):
+                  ("ozone_density", 1.0), ("ground_albedo", float(opt.get("ground_albedo", "0.5")))):
     if hasattr(sky, attr):
         setattr(sky, attr, val)
 if hasattr(sky, "sun_disc"):
     sky.sun_disc = True
 bg = wn.nodes.new("ShaderNodeBackground")
-bg.inputs["Strength"].default_value = float(opt.get("sky", "0.5"))
+bg.inputs["Strength"].default_value = float(opt.get("sky", "1.0"))
 wo = wn.nodes.new("ShaderNodeOutputWorld")
 wn.links.new(sky.outputs[0], bg.inputs[0])
 wn.links.new(bg.outputs[0], wo.inputs["Surface"])
 
-# ---------------------------------------------------------------- かすみ（有限の箱。世界の体積は空と太陽を吸って真っ黒になるので使わない）
+# ---------------------------------------------------------------- 空気（2 つの均一な層。どちらも地球の丸みに沿う板で、定数の体積なので軽い）
+# ① きれいな空気：雲の上〜高さ 6km。青みのある散乱（赤ほど薄い）。② しめった層：雲の上面から 400m。下 200m が濃く、上 200m は半分
+HAZE_N = []
 if HAZE:
-    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(CE, CN, 4400.0))
-    hz = bpy.context.active_object
-    hz.name = "haze"
-    hz.scale = (2.0 * FAR + 20000.0, 2.0 * FAR + 20000.0, 9800.0)
-    hm = bpy.data.materials.new("haze")
-    hm.use_nodes = True
-    hn = hm.node_tree
-    for n in list(hn.nodes):
-        hn.nodes.remove(n)
-    hvol = hn.nodes.new("ShaderNodeVolumePrincipled")
-    hvol.inputs["Anisotropy"].default_value = 0.65
-    hvol.inputs["Color"].default_value = (0.75, 0.84, 1.0, 1.0)
-    hvol.inputs["Density"].default_value = float(opt.get("haze_density", "0.000004"))
-    hout = hn.nodes.new("ShaderNodeOutputMaterial")
-    hn.links.new(hvol.outputs[0], hout.inputs["Volume"])
-    hz.data.materials.append(hm)
+    t0 = time.time()
+    hr = float(opt.get("haze_range", "170000"))
+    cell_h = float(opt.get("haze_cell", "8000"))
+    d1 = float(opt.get("haze_clear", "1.15e-5"))                 # 1/m（= 0.0115 /km）
+    d2 = float(opt.get("haze_moist", "3.0e-5"))                  # 下 200m（0.03 /km）
+    hc = (0.6, 0.78, 1.0, 1.0)
+    mc = (1.0, 0.93, 0.82, 1.0)                                  # しめった層は中立〜やや暖かい
+    for nm, z0, z1, dd, col, gg in (("haze_clear", -800.0, 6000.0, d1, hc, 0.35),
+                                    ("haze_moist1", -800.0, CLOUD_TOP + 200.0, d2, mc, 0.8),
+                                    ("haze_moist2", CLOUD_TOP + 200.0, CLOUD_TOP + 400.0, d2 * 0.5, mc, 0.8)):
+        r_ = curved_slab(nm, z0, z1, hr, cell_h, haze_material(nm, dd, col, gg))
+        HAZE_N.append(nm)
+    STATS["haze_seconds"] = round(time.time() - t0, 1)
 
 # ---------------------------------------------------------------- グレア（コンポジター）
 if GLARE:
