@@ -454,18 +454,133 @@ def build_detail(data, raw):
     json.dump(meta, open(data + "/meta.json", "w"), indent=1)
     print("細かい 2 段 できた")
 
+# ======================================================================================
+# 第 2 版（r2）の材料: 実写の暮らし（2025-11-30 の雲・夜の灯り・標高から作る雪と影）
+#   W2 = 世界の中くらい（0.01°）、J = 日本まわり（0.0025°≒280 m）、C2 = 中部（0.001°≒110 m）
+#   どれも「材料そのもの」を保存する（雪・雲の濃さ・灯りの強さは描くときに物理で作る）:
+#     <tag>_rgb.jpg（陸=地理院の写真/海=Blue Marble の反射率）・<tag>_land.png・<tag>_lights.png（Black Marble の 8bit そのまま）
+#     <tag>_cloud.png（16bit: 雲の見かけの反射率 a。地面の色を引いたもの）・<tag>_dem.npy（m）・<tag>_hz.png（太陽の方位 115° の地平線の高さ角 ×10）
+# ======================================================================================
+R2_CLOUD_DATE = "2025-11-30"
+R2 = {
+    "W2": dict(bbox=(85.0, 0.0, 185.0, 65.0), step=0.01, dem=None, photo=None),
+    "J": dict(bbox=(124.0, 30.0, 148.0, 46.0), step=0.0025, dem=9, photo=9),
+    "C2": dict(bbox=(135.5, 34.0, 140.5, 38.5), step=0.001, dem=11, photo=11),
+}
+
+def wms_big(raw, layer, bbox, step, date, tag, src_step=None, piece=3200):
+    """WMS を piece 画素四方ごとに取って 1 枚に貼る。src_step を指定すると、元の細かさで取って bicubic で step に拡大する。"""
+    lon0, lat0, lon1, lat1 = bbox
+    W = int(round((lon1 - lon0) / step)); H = int(round((lat1 - lat0) / step))
+    ss = src_step or step
+    out = np.zeros((H, W, 3), np.uint8)
+    pw = int(piece * step / ss)
+    nx = -(-W // piece); ny = -(-H // piece)
+    for j in range(ny):
+        for i in range(nx):
+            x0 = i * piece; x1 = min(W, x0 + piece); y0 = j * piece; y1 = min(H, y0 + piece)
+            bb = (lon0 + x0 * step, lat1 - y1 * step, lon0 + x1 * step, lat1 - y0 * step)
+            w = max(8, int(round((x1 - x0) * step / ss))); h = max(8, int(round((y1 - y0) * step / ss)))
+            im = wms(raw, layer, bb, w, h, date, tag=f"{tag}_{i}_{j}")
+            if (w, h) != (x1 - x0, y1 - y0):
+                im = np.asarray(Image.fromarray(im).resize((x1 - x0, y1 - y0), Image.BICUBIC))
+            out[y0:y1, x0:x1] = im
+    return out
+
+def horizon_big(hg, bbox, step, dmax=160.0, az=SUN_AZ, chunk=800):
+    """horizon_local() を行ごとの塊で（メモリを抑える）。塊の上下に余白をつけて計算する。"""
+    H, W = hg.shape
+    out = np.zeros((H, W), np.float32)
+    pad = int(dmax / (111.32 * step)) + 4
+    lon0, lat0, lon1, lat1 = bbox
+    for r0 in range(0, H, chunk):
+        r1 = min(H, r0 + chunk); a0 = max(0, r0 - pad); a1 = min(H, r1 + pad)
+        sub_bbox = (lon0, lat1 - a1 * step, lon1, lat1 - a0 * step)
+        hz = horizon_local(hg[a0:a1], sub_bbox, step, dmax, az)
+        out[r0:r1] = hz[r0 - a0:r1 - a0]
+    return out
+
+def r2_product(tag, raw, data):
+    cfg = R2[tag]; bbox, step = cfg["bbox"], cfg["step"]
+    lon0, lat0, lon1, lat1 = bbox
+    W = int(round((lon1 - lon0) / step)); H = int(round((lat1 - lat0) / step))
+    print(tag, "格子", W, H, flush=True)
+    os.makedirs(data + "/r2", exist_ok=True)
+    o = f"{data}/r2/{tag}"
+    land = land_mask(raw, bbox, step, ss=2 if step >= 0.002 else 3)
+    save_gray(land, o + "_land.png")
+    # 色: 陸は地理院の写真、海・外国は Blue Marble（500 m。bicubic で拡大）
+    bm = wms_big(raw, "BlueMarble_NextGeneration", bbox, step, None, tag + "bm", src_step=max(step, 0.0045))
+    if cfg["photo"]:
+        mos, tx0, ty0, have = mosaic(raw, "seamlessphoto", "jpg", cfg["photo"], bbox, None)
+        gsi = to_latlon(mos, tx0, ty0, cfg["photo"], bbox, step); del mos
+        vv = to_latlon(np.kron(have, np.ones((256, 256), np.float32)), tx0, ty0, cfg["photo"], bbox, step)   # 写真のある所
+        lm = ((land > 0.5) & (vv > 0.97)).astype(np.float32)
+        gsi = fill_from(gsi, lm)
+        # 写真の無い陸（朝鮮半島など）と海は Blue Marble。陸の写真との境は 1 画素ぶんなだらかに
+        wph = blur_box(lm, 1) * (land > 0.3)
+        rgb = gsi * wph[..., None] + bm.astype(np.float32) * (1 - wph[..., None]); del gsi, vv, wph
+    else:
+        rgb = bm.astype(np.float32)
+    save_rgb(rgb, o + "_rgb.jpg", q=94)
+    base_min = rgb.min(-1) / 255.0; del rgb
+    # 雲: VIIRS の真色（2025-11-30）。見かけの反射率 = min(R,G,B) から、地面の min を引いて残りで割る（しきい値は使わない）
+    ob = wms_big(raw, CLOUD_LAYER, bbox, step, R2_CLOUD_DATE, tag + "cl", src_step=max(step, 0.0022))
+    m = ob.min(-1).astype(np.float32) / 255.0; blank = ob.max(-1) < 6; del ob
+    gb = np.clip(base_min * 1.05 + 0.02, 0.03, 0.42)
+    a = np.clip((m - gb) / np.maximum(0.97 - gb, 0.2), 0, 1); a[blank] = 0
+    Image.fromarray((a * 65535 + 0.5).astype(np.uint16)).save(o + "_cloud.png")
+    del m, gb, a, blank, base_min
+    # 夜の灯り（Black Marble の 8bit。0.0045° が元の細かさ）
+    lt = wms_big(raw, "VIIRS_Black_Marble", bbox, step, None, tag + "lt", src_step=max(step, 0.0045)).max(-1)
+    Image.fromarray(lt).save(o + "_lights.png"); del lt
+    if cfg["dem"]:
+        hg, vg = dem_grid(raw, cfg["dem"], bbox, step)
+        np.save(o + "_dem.npy", hg.astype(np.float16))
+        hz = horizon_big(hg, bbox, step)
+        save_gray(hz / 25.5, o + "_hz.png")
+    json.dump({"bbox": list(bbox), "step": step, "size": [W, H]}, open(o + ".json", "w"))
+
+def r2_global(raw, data):
+    """G = 世界全体（0.044°）。色は Blue Marble、灯りは Black Marble の 8bit そのまま、陸の印は Natural Earth。"""
+    o = f"{data}/r2/G"
+    gb = (-180.0, -90.0, 180.0, 90.0)
+    bm = wms(raw, "BlueMarble_NextGeneration", gb, 8192, 4096, None, tag="g")
+    Image.fromarray(bm).save(o + "_rgb.jpg", quality=94); del bm
+    lt = wms(raw, "VIIRS_Black_Marble", gb, 8192, 4096, None, tag="g").max(-1)
+    Image.fromarray(lt).save(o + "_lights.png"); del lt
+    save_gray(land_mask(raw, gb, 360.0 / 8192), o + "_land.png")
+    json.dump({"bbox": list(gb), "step": 360.0 / 8192, "size": [8192, 4096]}, open(o + ".json", "w"))
+
+def build_r2(data, raw, only=None):
+    os.makedirs(data + "/r2", exist_ok=True)
+    if not os.path.exists(f"{data}/r2/G.json"):
+        r2_global(raw, data)
+    for tag in (only or ["W2", "J", "C2"]):
+        if not os.path.exists(f"{data}/r2/{tag}.json"):
+            r2_product(tag, raw, data)
+    meta = {"cloud_date": R2_CLOUD_DATE, "cloud_layer": CLOUD_LAYER, "sun_az": SUN_AZ}
+    for tag in ["G"] + list(R2):
+        if os.path.exists(f"{data}/r2/{tag}.json"):
+            meta[tag] = json.load(open(f"{data}/r2/{tag}.json"))
+    json.dump(meta, open(data + "/r2/meta.json", "w"), indent=1)
+    print("r2 できた")
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True)
     ap.add_argument("--scan", action="store_true")
     ap.add_argument("--rgb-only", action="store_true", help="細かい 2 段の色だけ作り直す（色あわせの調整用）")
     ap.add_argument("--detail", action="store_true", help="手順 2: 北アルプスの細かい 2 段（z12・z14）を足す")
+    ap.add_argument("--r2", nargs="*", help="第 2 版の材料（W2 J C2 のうち指定したものだけ。空なら全部）")
     ap.add_argument("--only-lights", action="store_true", help="灯りだけ作り直す（調整用）")
     a = ap.parse_args()
     data = os.path.abspath(a.data); raw = data + "/raw"
     os.makedirs(raw, exist_ok=True)
     if a.scan:
         scan(raw); return
+    if a.r2 is not None:
+        build_r2(data, raw, a.r2 or None); return
     if a.only_lights:
         for tag, bb, w, h in (("G", (-180.0, -90.0, 180.0, 90.0), 8192, 4096), ("R", REG, 5333, 4667), ("C", PATCH, 3571, 3214)):
             lt = wms(raw, "VIIRS_Black_Marble", bb, w, h, None, tag=tag.lower() if tag == "G" else tag).max(-1)

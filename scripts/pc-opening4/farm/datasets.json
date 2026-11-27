@@ -22,6 +22,15 @@
     "lane": "parallel",
     "timeout_min": 240
   },
+  "globe-r2": {
+    "path": "work/globe/r2",
+    "cmds": ["python globe_fetch.py --data work/globe --r2"],
+    "keyfiles": ["globe_fetch.py"],
+    "pip": "numpy scipy pillow",
+    "apt": false,
+    "lane": "parallel",
+    "timeout_min": 240
+  },
   "trees": {
     "path": "work/trees/library.blend",
     "cmds": ["python -m trees.library"],
