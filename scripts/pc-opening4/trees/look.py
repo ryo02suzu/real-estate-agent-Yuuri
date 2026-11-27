@@ -66,7 +66,7 @@ def fresh(w, h, samples, sun_elev, sun_rot, sky_strength=1.0, exposure=None, tra
     sky.altitude = 1800.0
     sky.sun_disc = True
     sky.sun_size = math.radians(1.2)
-    sky.aerosol_density = 2.5          # 太陽のまわりのぼんやりした光
+    sky.aerosol_density = 1.6          # 太陽のまわりのぼんやりした光
     bg = nt.nodes.new("ShaderNodeBackground")
     bg.inputs[1].default_value = sky_strength
     out = nt.nodes.new("ShaderNodeOutputWorld")
@@ -180,9 +180,12 @@ def _mat(name, color, rough=0.9, extra=None):
     return m
 
 
-def terrain_z(x, y, slope_deg=10.0):
+SLOPE = [10.0]      # 斜面の角度（度）。正＝+Y に上り、負＝下り。5〜15 度
+
+
+def terrain_z(x, y, slope_deg=None):
     """斜面（のぼり +Y）＋ ±0.6m のうねり。"""
-    t = math.tan(math.radians(slope_deg))
+    t = math.tan(math.radians(SLOPE[0] if slope_deg is None else slope_deg))
     und = 0.35 * np.sin(x * 0.071 + 1.0) * np.cos(y * 0.052) + 0.2 * np.sin(x * 0.19 + y * 0.13) + 0.15 * np.sin(y * 0.31 - x * 0.07)
     return y * t + und
 
@@ -211,21 +214,21 @@ def terrain(sc):
     n1.inputs["Scale"].default_value = 0.6
     n1.inputs["Detail"].default_value = 8
     n2 = nt.nodes.new("ShaderNodeTexNoise")
-    n2.inputs["Scale"].default_value = 0.07
+    n2.inputs["Scale"].default_value = 0.35
     nt.links.new(co.outputs["Object"], n1.inputs["Vector"])
     nt.links.new(co.outputs["Object"], n2.inputs["Vector"])
     mix = nt.nodes.new("ShaderNodeMix")
     mix.data_type = "RGBA"
-    mix.inputs[6].default_value = (0.045, 0.028, 0.016, 1)      # 暗い土・古い落ち葉
-    mix.inputs[7].default_value = (0.140, 0.080, 0.035, 1)      # 新しい落ち葉（橙褐色）
+    mix.inputs[6].default_value = (0.028, 0.018, 0.011, 1)      # 暗い土・古い落ち葉
+    mix.inputs[7].default_value = (0.090, 0.052, 0.024, 1)      # 新しい落ち葉（橙褐色）
     nt.links.new(n1.outputs["Fac"], mix.inputs[0])
     mix2 = nt.nodes.new("ShaderNodeMix")
     mix2.data_type = "RGBA"
-    mix2.inputs[7].default_value = (0.045, 0.075, 0.020, 1)     # 苔・笹の下の緑
+    mix2.inputs[7].default_value = (0.030, 0.045, 0.014, 1)     # 苔・笹の下の緑
     nt.links.new(mix.outputs[2], mix2.inputs[6])
     ramp = nt.nodes.new("ShaderNodeMapRange")
-    ramp.inputs["From Min"].default_value = 0.47
-    ramp.inputs["From Max"].default_value = 0.57
+    ramp.inputs["From Min"].default_value = 0.52
+    ramp.inputs["From Max"].default_value = 0.66
     nt.links.new(n2.outputs["Fac"], ramp.inputs["Value"])
     nt.links.new(ramp.outputs[0], mix2.inputs[0])
     nt.links.new(mix2.outputs[2], b.inputs["Base Color"])
@@ -282,8 +285,8 @@ def sasa(sc, rg, box, n=9000):
     att.attribute_name = "dry"
     mx = nt.nodes.new("ShaderNodeMix")
     mx.data_type = "RGBA"
-    mx.inputs[6].default_value = (0.040, 0.085, 0.018, 1)
-    mx.inputs[7].default_value = (0.22, 0.14, 0.04, 1)
+    mx.inputs[6].default_value = (0.022, 0.046, 0.010, 1)
+    mx.inputs[7].default_value = (0.075, 0.046, 0.018, 1)
     nt.links.new(att.outputs["Fac"], mx.inputs[0])
     nt.links.new(mx.outputs[2], bs.inputs["Base Color"])
     tr = nt.nodes.new("ShaderNodeBsdfTranslucent")
@@ -392,7 +395,7 @@ def rocks_and_logs(sc, rg, box, nr=30, nl=18):
         ob.data.materials.append(_mat("log", (0.07, 0.05, 0.04), 0.95))
 
 
-def haze(sc, y0, y1):
+def haze(sc, y0, y1, density=0.0018):
     """朝もや：奥の木ほど淡く（100m で約 30% のコントラスト低下）。"""
     bpy.ops.mesh.primitive_cube_add(size=1.0)
     ob = bpy.context.active_object
@@ -403,7 +406,7 @@ def haze(sc, y0, y1):
     nt = m.node_tree
     nt.nodes.clear()
     sc_ = nt.nodes.new("ShaderNodeVolumeScatter")
-    sc_.inputs["Density"].default_value = 0.0035
+    sc_.inputs["Density"].default_value = density
     sc_.inputs["Anisotropy"].default_value = 0.5
     sc_.inputs["Color"].default_value = (0.95, 0.93, 0.88, 1)
     out = nt.nodes.new("ShaderNodeOutputMaterial")
@@ -446,40 +449,55 @@ def stats(path, sky_row=0.02):
 
 
 # ---------------------------------------------------------------- 森の場面
-def build_forest(back=False, nvar=40, n_lod0=8, seed=4242):
-    """斜面（10 度）に奥行き 155m（逆光は 320m）の林。カラマツ（若木も）＋濃い緑の針葉樹＋シラカバ。下草・岩・倒木・朝もや。"""
-    rg = np.random.default_rng((seed, 1 if back else 0))
-    elev = 7 if back else 18
-    sun_rot = math.pi if back else math.radians(150)
-    sc = fresh(1280, 720, 48, elev, sun_rot, exposure=EXPOSURE_BACK if back else EXPOSURE)
-    terrain(sc)
-    y_lo, y_hi = (-120.0, 200.0) if back else (45.0, 200.0)
-    if back:
-        cam_loc = np.array([0.0, 250.0, 0.0])
-    else:
-        cam_loc = np.array([0.0, -30.0, 0.0])
-    cam_loc[2] = terrain_z(cam_loc[0], cam_loc[1]) + 10.0
-    # 木の位置：ゆらしたマス目＋塊とすき間（クランプ）。最小の間隔 2.8m
-    gx, gy = np.meshgrid(np.arange(-70, 70.1, 4.0), np.arange(y_lo, y_hi + 0.1, 4.0))
-    P = np.stack([gx.ravel(), gy.ravel()], 1) + rg.uniform(-1.7, 1.7, (gx.size, 2))
-    dens = 0.62 + 0.3 * np.sin(P[:, 0] * 0.045 + 1) * np.cos(P[:, 1] * 0.035) + 0.2 * np.sin(P[:, 0] * 0.13 - P[:, 1] * 0.09)
-    P = P[rg.random(len(P)) < dens]
+STAND_VARIANTS = 48       # 森の試しで使う型の数（40〜60）
+
+
+def build_forest(mode="front", nvar=STAND_VARIANTS, seed=4242, w=1024, h=576, samples=128, lod0_dist=190.0):
+    """斜面（10 度）に奥行き 約 110m（遠くはさらに奥まで）・数百本のカラマツ林。
+    mode：front（太陽 15 度・背中から）／back（太陽 6 度・正面から＝逆光。下り斜面）／shade（太陽なし・空の光だけ）／skim（梢の 12m 上を 44m/s で等高線ぞいに）。
+    近い木（カメラから lod0_dist 以内）は LOD0、遠くは LOD1、400m より先は LOD2。同じ型のオブジェクトはメッシュを共有（実体化しない）。"""
     from scipy.spatial import cKDTree
+    rg = np.random.default_rng((seed, ["front", "back", "shade", "skim"].index(mode)))
+    SLOPE[0] = -8.0 if mode == "back" else 10.0
+    elev = {"front": 15, "back": 6, "shade": 20, "skim": 12}[mode]
+    sun_rot = {"front": math.radians(150), "back": math.radians(6), "shade": math.radians(150), "skim": math.radians(150)}[mode]
+    exp = {"front": EXPOSURE, "back": EXPOSURE_BACK, "shade": EXPOSURE + 1.9, "skim": EXPOSURE}[mode]
+    sc = fresh(w, h, samples, elev, sun_rot, exposure=exp)
+    if mode == "shade":
+        for nd in sc.world.node_tree.nodes:
+            if nd.bl_idname == "ShaderNodeTexSky":
+                nd.sun_disc = False
+                nd.sun_intensity = 0.0           # 直射の太陽なし。空（青い影）の光だけ
+    terrain(sc)
+    # 林の範囲：y 方向に奥行き 110m（手前の縁から）、さらに奥は遠景（LOD1・2）。x は視野に合わせて広げる
+    if mode == "skim":
+        y_lo, y_hi, x_ext = 20.0, 300.0, 330.0
+        cam_loc = np.array([-120.0, 95.0, 0.0])
+    else:
+        y_lo, y_hi, x_ext = 120.0, 330.0, 200.0
+        cam_loc = np.array([0.0, 0.0, 0.0])
+    cam_loc[2] = terrain_z(cam_loc[0], cam_loc[1]) + (14.0 if mode != "skim" else 37.0)
+    gx, gy = np.meshgrid(np.arange(-x_ext, x_ext + 0.1, 4.6), np.arange(y_lo, y_hi + 0.1, 4.6))
+    P = np.stack([gx.ravel(), gy.ravel()], 1) + rg.uniform(-2.0, 2.0, (gx.size, 2))
+    # 視野の外は間引く（手前の縁から遠いほど広く見える）
+    if mode != "skim":
+        P = P[np.abs(P[:, 0] - cam_loc[0]) < 0.65 * (P[:, 1] - cam_loc[1]) + 20]
+    else:
+        P = P[(P[:, 0] > cam_loc[0] - 30) & (np.abs(P[:, 1] - cam_loc[1]) < 150)]
+    dens = 0.78 + 0.22 * np.sin(P[:, 0] * 0.045 + 1) * np.cos(P[:, 1] * 0.035) + 0.12 * np.sin(P[:, 0] * 0.13 - P[:, 1] * 0.09)
+    P = P[rg.random(len(P)) < dens]
     kt = cKDTree(P)
     drop = set()
-    for i, j in sorted(kt.query_pairs(2.8)):
+    for i, j in sorted(kt.query_pairs(3.4)):
         if i not in drop and j not in drop:
             drop.add(j)
     P = P[[i for i in range(len(P)) if i not in drop]]
     n = len(P)
-    kind = rg.choice(4, n, p=[0.74, 0.06, 0.06, 0.14])      # 0=カラマツ 1=針葉樹 2=シラカバ 3=若木のカラマツ
+    kind = rg.choice(4, n, p=[0.80, 0.03, 0.05, 0.12])      # 0=カラマツ 1=針葉樹 2=シラカバ 3=若木のカラマツ
     dist = np.hypot(P[:, 0] - cam_loc[0], P[:, 1] - cam_loc[1])
-    kind = np.where((kind == 1) & (dist < 120), 0, kind)      # 手前には濃い緑の木を置かない
+    kind = np.where((kind == 1) & (dist < 240), 0, kind)      # 濃い緑の針葉樹は遠く（240m より先）だけ。近くには置かない（作りが粗く見えるため）
     t = time.time()
-    # カラマツの型：0〜2＝若木、3〜39＝壮年・老木（12 以上は別の木）。15m 以内に同じ型を置かない
-    pool = list(range(nvar))
-    lod1 = {v: library.build_tree("larch", v, 1, link=False) for v in pool}
-    TIMES["forest-build-lod1-x%d" % nvar] = round(time.time() - t, 1)
+    # カラマツの型：0〜2＝若木、3 以上＝壮年・老木（12 以上は別の木）。15m 以内に同じ型を置かない
     kt2 = cKDTree(P)
     var = np.full(n, -1)
     for i in np.argsort(dist):
@@ -488,18 +506,15 @@ def build_forest(back=False, nvar=40, n_lod0=8, seed=4242):
         near = [var[j] for j in kt2.query_ball_point(P[i], 15.0) if var[j] >= 0]
         cand = [v for v in (range(0, 3) if kind[i] == 3 else range(3, nvar)) if v not in near]
         edge = [v for v in cand if v >= 12 and v % 7 == 0]
-        if kind[i] == 0 and dist[i] < 120 and edge and rg.random() < 0.3:      # 手前のふち：樹冠の低い木
+        if kind[i] == 0 and dist[i] < 160 and edge and rg.random() < 0.25:      # 手前のふち：樹冠の低い木
             cand = edge
         var[i] = int(rg.choice(cand if cand else list(range(nvar))))
-    # 近い木は LOD0
-    order = [i for i in np.argsort(dist) if var[i] >= 0 and dist[i] < 100][:n_lod0]
-    t = time.time()
-    lod0 = {}
-    for i in order:
-        if var[i] not in lod0:
-            lod0[var[i]] = library.build_tree("larch", int(var[i]), 0, link=False)
-    TIMES["forest-build-lod0-x%d" % len(lod0)] = round(time.time() - t, 1)
-    lod0_set = set(order)
+    lodof = np.where(dist < lod0_dist, 0, np.where(dist < 400, 1, 2))
+    meshes = {}
+    for i in range(n):
+        if var[i] >= 0 and (int(var[i]), int(lodof[i])) not in meshes:
+            meshes[(int(var[i]), int(lodof[i]))] = library.build_tree("larch", int(var[i]), int(lodof[i]), link=False)
+    TIMES[f"{mode}-build-trees-x{len(meshes)}"] = round(time.time() - t, 1)
     eg = [bpy.data.objects.new(f"eg{k}", evergreen_mesh(np.random.default_rng((77, k)), 22 + 3 * k)) for k in range(4)]
     bark = birch_bark()
     bi = [birch_object(np.random.default_rng((88, k)), 11 + 2 * k, bark) for k in range(3)]
@@ -517,65 +532,90 @@ def build_forest(back=False, nvar=40, n_lod0=8, seed=4242):
             ob = bpy.data.objects.new("b", src.data)
             H = 13.0
         else:
-            v = int(var[i])
-            src = lod0[v] if i in lod0_set else lod1[v]
+            src = meshes[(int(var[i]), int(lodof[i]))]
             ob = bpy.data.objects.new(src.name + ".i", src.data)
             H = float(src["height"])
         place(ob, sc, (x, y, z), yaw=yaw, scale=size, mirror=bool(rg.random() < 0.5))
-        info.append((ob, H * size, int(var[i]) if kind[i] in (0, 3) else -1, i in lod0_set, dist[i]))
-    sasa_tris = sasa(sc, rg, (-45, 45, 30 if not back else 100, 130 if not back else 205), 26000)
-    rocks_and_logs(sc, rg, (-50, 50, y_lo, y_hi), 30, 18)
-    haze(sc, min(cam_loc[1], y_lo) - 30, max(cam_loc[1], y_hi) + 30)
-    # カメラ：手前の木の梢の線（稜線）が画面の高さの 70〜90% に来るように上下の向きを決める（空を 10% 以上入れる）
-    lens = 40.0
+        info.append((ob, H * size, int(var[i]) if kind[i] in (0, 3) else -1, int(lodof[i]) == 0, dist[i]))
+    near_box = (cam_loc[0] - 100, cam_loc[0] + 100, y_lo - 10, y_lo + 130) if mode != "skim" else (cam_loc[0], cam_loc[0] + 160, 40, 150)
+    sasa_tris = sasa(sc, rg, near_box, 90000)
+    if mode != "skim":
+        sasa_tris += sasa(sc, rg, (cam_loc[0] - 110, cam_loc[0] + 110, 15.0, y_lo - 10), 30000)      # 手前の斜面にも下草（地面がむき出しに見えない）
+    rocks_and_logs(sc, rg, (-120, 120, y_lo, y_lo + 150), 40, 24)
+    haze(sc, -60, y_hi + 400, {"front": 0.0011, "back": 0.00018, "shade": 0.0011, "skim": 0.0007}[mode])
+    lens = 50.0 if mode != "skim" else 28.0
     vfov = 2 * math.atan(10.125 / lens)
-    el = [math.atan2(q[0].location.z + q[1] - cam_loc[2], q[4]) for q in info if abs(q[0].location.x) < 35 and q[4] < 130]
-    a_near = max(el)
-    pitch = a_near - (0.2 if back else 0.4) * vfov
-    d = np.array([0.0, -1.0 if back else 1.0, 0.0])
-    tgt = cam_loc + np.array([0, d[1] * 100.0, math.tan(pitch) * 100.0])
-    cam = camera(sc, cam_loc, tgt, lens)
-    TIMES["forest-trees"] = n
-    TIMES["forest-lod0"] = len(order)
+    if mode == "skim":
+        # 等高線ぞいに +X へ。少し下を向く（前方・やや下）。1 コマで 1.83m 進む（44m/s ÷ 24fps）。シャッター 180 度
+        d = np.array([1.0, 0.0, 0.0])
+        pitch = math.radians(-4.0)
+        tgt = cam_loc + np.array([100.0, 0.0, 100.0 * math.tan(pitch)])
+        cam = camera(sc, cam_loc, tgt, lens)
+        bpy.context.preferences.edit.keyframe_new_interpolation_type = "LINEAR"
+        step = 44.0 / 24.0
+        sc.frame_start, sc.frame_end, sc.frame_current = 1, 2, 1
+        cam.keyframe_insert("location", frame=1)
+        cam.location = (cam_loc[0] + step, cam_loc[1], terrain_z(cam_loc[0] + step, cam_loc[1]) + 37.0)
+        cam.keyframe_insert("location", frame=2)
+        sc.frame_current = 1
+        for fc in cam.animation_data.action.fcurves if hasattr(cam.animation_data.action, "fcurves") else []:
+            for kp in fc.keyframe_points:
+                kp.interpolation = "LINEAR"
+        sc.render.use_motion_blur = True
+        try:
+            sc.render.motion_blur_position = "START"      # 1 コマの頭から 1 コマぶん×0.5 の間（シャッター 180 度）
+        except Exception:
+            pass
+        sc.render.motion_blur_shutter = 0.5
+    else:
+        sel = [q for q in info if abs(q[0].location.x - cam_loc[0]) < 0.4 * (q[0].location.y - cam_loc[1]) and q[4] < 260]
+        el = [math.atan2(q[0].location.z + q[1] - cam_loc[2], q[4]) for q in sel]
+        # 梢の線（いちばん高く見える所）が画面の高さの 75% に来る → 上 25% は空
+        pitch = max(el) - 0.28 * vfov
+        d = np.array([0.0, 1.0, 0.0])
+        tgt = cam_loc + np.array([0, 100.0, math.tan(pitch) * 100.0])
+        cam = camera(sc, cam_loc, tgt, lens)
+    TIMES[f"{mode}-trees"] = n
+    TIMES[f"{mode}-lod0"] = int(sum(1 for q in info if q[3]))
     TIMES["sasa-tris"] = sasa_tris
     return sc, cam, info
 
 
-def do_forest(back=False, crops=False):
-    sc, cam, info = build_forest(back)
-    name = "forest-larch-backlit" if back else "forest-larch"
+def do_forest(mode="front", crops=False):
+    sc, cam, info = build_forest(mode)
+    name = {"front": "forest-larch", "back": "forest-larch-backlit", "shade": "forest-larch-shade", "skim": "skim-larch"}[mode]
     p = render_to(sc, name + "-raw")
-    save_jpeg(Image.open(p), name, maxkb=500)
+    save_jpeg(Image.open(p), name, maxkb=340)
     TIMES[name + "-stats"] = stats(os.path.join(OUT, name + ".jpg"))
     if crops:
         from bpy_extras.object_utils import world_to_camera_view
         sc.render.resolution_x, sc.render.resolution_y = 3840, 2160
-        sc.cycles.samples = 128
+        sc.cycles.samples = 160
         sc.render.use_border = True
         sc.render.use_crop_to_border = True
         sc.render.image_settings.quality = 100
         tr_ = sorted([q for q in info if q[3]], key=lambda q: q[4])
-        far_tree = sorted([q for q in info if not q[3] and q[2] >= 0 and 120 < q[4] < 160 and abs(q[0].location.x) < 40], key=lambda q: q[4])[0]
-        targets = [("edge", None, far_tree),
-                   ("interior", None, tr_[0]), ("trunk", None, tr_[min(2, len(tr_) - 1)])]
+        edge_c = sorted([q for q in info if q[3] and q[2] >= 0 and q[4] > 125 and abs(q[0].location.x) < 40], key=lambda q: -(q[0].location.z + q[1]))
+        far_tree = edge_c[0] if edge_c else tr_[-1]
+        targets = [("edge", far_tree), ("interior", tr_[len(tr_) // 3]), ("trunk", tr_[len(tr_) // 2])]
         ims = []
-        for nm, _, q in targets:
+        for nm, q in targets:
             ob, H = q[0], q[1]
             loc = np.array(ob.location)
-            pt = {"edge": loc + np.array([0, 0, H * 0.88]), "interior": loc + np.array([0, 0, H * 0.62]), "trunk": loc + np.array([0, 0, 1.6])}[nm]
+            pt = {"edge": loc + np.array([0, 0, H * 0.9]), "interior": loc + np.array([0, 0, H * 0.62]), "trunk": loc + np.array([0, 0, 1.4])}[nm]
             c = world_to_camera_view(sc, cam, Vector(pt))
-            w, h = 640 / 3840, 400 / 2160
-            x0 = float(np.clip(c.x - w / 2, 0, 1 - w))
-            y0 = float(np.clip(c.y - h / 2, 0, 1 - h))
-            sc.render.border_min_x, sc.render.border_max_x = x0, x0 + w
-            sc.render.border_min_y, sc.render.border_max_y = y0, y0 + h
+            wd, ht = 420 / 3840, 400 / 2160
+            x0 = float(np.clip(c.x - wd / 2, 0, 1 - wd))
+            y0 = float(np.clip(c.y - ht / 2, 0, 1 - ht))
+            sc.render.border_min_x, sc.render.border_max_x = x0, x0 + wd
+            sc.render.border_min_y, sc.render.border_max_y = y0, y0 + ht
             pp = render_to(sc, f"crop-{nm}")
             im = Image.open(pp).convert("RGB")
-            im.save(os.path.join(OUT, f"crop-larch-{nm}.jpg"), quality=95)
+            im.save(os.path.join(TMP, f"crop-larch-{nm}.png"))
             ims.append(im)
-        sheet = Image.new("RGB", (640 * 3, 400))
+        sheet = Image.new("RGB", (420 * 3, 400))
         for k, im in enumerate(ims):
-            sheet.paste(im.crop((0, 0, 640, 400)), (640 * k, 0))
+            sheet.paste(im.crop((0, 0, 420, 400)), (420 * k, 0))
         sheet.save(os.path.join(OUT, "crops-larch.jpg"), quality=92)
 
 
@@ -592,17 +632,17 @@ def do_sheet():
         bpy.ops.mesh.primitive_plane_add(size=400)
         pl = bpy.context.active_object
         pl.data.materials.append(terrain_flat)
-        span = 13.0
+        span = 12.2
         for c in range(6):
             i = row * 6 + c
             ob = library.build_tree("larch", i, 0, link=False)
             sc.collection.objects.link(ob)
-            ob.location = ((c - 2.5) * span, 0, 0)
+            ob.location = ((c - 2.5) * span + 5.0, 0, 0)
             TIMES["sheet-tris"][ob.name] = ob["tris"]
         # 1.7m の人形と 10m の目盛り
-        bpy.ops.mesh.primitive_cylinder_add(radius=0.2, depth=1.7, location=(-3.0 * span + 1.0, -2, 0.85))
+        bpy.ops.mesh.primitive_cylinder_add(radius=0.2, depth=1.7, location=(-37.5, -2, 0.85))
         bpy.context.active_object.data.materials.append(_mat("mk", (0.8, 0.03, 0.03), 0.6))
-        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(-3.0 * span + 6.0 + 5.0, -2, 0.1))
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(-33.0, -2, 0.1))
         sb = bpy.context.active_object
         sb.scale = (10.0, 0.1, 0.2)
         sb.data.materials.append(_mat("sb", (0.9, 0.9, 0.9), 0.6))
@@ -611,9 +651,9 @@ def do_sheet():
         im = Image.open(render_to(sc, f"sheet{row}")).convert("RGB")
         d = ImageDraw.Draw(im)
         for c in range(6):
-            px = 640 + (c - 2.5) * span / ortho * 1280
+            px = 640 + ((c - 2.5) * span + 5.0) / ortho * 1280
             d.text((px - 6, 618), f"{row * 6 + c}", fill=(255, 255, 255))
-        d.text((6, 618), "scale bar 10 m / figure 1.7 m", fill=(255, 255, 255))
+        d.text((6, 600), "scale bar 10 m / figure 1.7 m", fill=(255, 255, 255))
         panels.append(im)
     TIMES["sheet-build"] = round(time.time() - t, 1)
     sheet = Image.new("RGB", (1280, 1280))
@@ -672,66 +712,71 @@ def do_close():
 
 
 # ---------------------------------------------------------------- 段の見た目合わせ
-def do_lod(variant=4):
-    """同じ木・同じカメラ（正射影）・同じ光で、3 つの大きさ（4K で 1200・500・150px の高さ＝ここでは 1/3 の 400・167・50px）×
-    LOD0・1・2 を並べ、差の絵と数字（輪郭の重なり・α の面積・樹冠の明るさと色相の差）を出す。"""
+def do_lod(variant=4, size_list=(700, 230)):
+    """同じ木・同じカメラ（正射影）・同じ光・同じ露出で、2 つの大きさ（4K で 約 1200 px と 約 400 px 高さに相当する見え方を、
+    ここでは 700 px と 230 px で）× LOD0・LOD1 を並べ、差の絵と数字（輪郭の重なり・α の面積・樹冠の明るさと色相の差）を出す。"""
     from PIL import ImageDraw
-    sc = fresh(400, 500, 64, 15, math.radians(150), transparent=True)
+    PW, PH = 400, 760
+    sc = fresh(PW, PH, 96, 15, math.radians(150), transparent=True)
     objs = []
-    for lod in (0, 1, 2):
+    for lod in (0, 1):
         ob = library.build_tree("larch", variant, lod, link=True)
         objs.append(ob)
         TIMES[f"lod{lod}-tris"] = ob["tris"]
     H = objs[0]["height"]
     cam = camera(sc, (0, -100, 0), (0, 0, 0), 50, ortho=1.0)
-    rows = []
-    metrics = {}
-    for size in (400, 167, 50):
-        ortho = H * 500 / size
+    rows, metrics = [], {}
+    luma = lambda im_: (im_[..., :3] @ np.array([0.2126, 0.7152, 0.0722], np.float32))
+    for size in size_list:
+        ortho = H * PH / size
         cam.data.ortho_scale = ortho
         cam.data.sensor_fit = "VERTICAL"
         cam.location.y = -100.0
-        # 木の下端が画面下から 20px に来るように
-        cam.location.z = ortho * 0.5 - ortho * 20 / 500
+        cam.location.z = ortho * 0.5 - ortho * 30 / PH
         ims = []
         for lod, ob in enumerate(objs):
             for o in objs:
                 o.hide_render = o is not ob
             ims.append(np.asarray(Image.open(render_to(sc, f"lod{lod}-{size}")).convert("RGBA"), np.float32) / 255)
         rows.append(ims)
-        a0, a1, a2 = [i[..., 3] for i in ims]
-        m = {}
-        for nm, a in (("lod1", a1), ("lod2", a2)):
-            s0, s1 = a0 > 0.5, a > 0.5
-            m[nm + "_iou"] = round(float((s0 & s1).sum() / max(1, (s0 | s1).sum())), 3)
-            m[nm + "_alpha_ratio"] = round(float(a.sum() / max(1.0, a0.sum())), 3)
-        luma = lambda im_: (im_[..., :3] @ np.array([0.2126, 0.7152, 0.0722], np.float32))
+        a0, a1 = ims[0][..., 3], ims[1][..., 3]
+        s0, s1 = a0 > 0.5, a1 > 0.5
+        m = dict(iou=round(float((s0 & s1).sum() / max(1, (s0 | s1).sum())), 3), alpha_ratio=round(float(a1.sum() / max(1.0, a0.sum())), 3))
         def crown(im_):
             s_ = im_[..., 3] > 0.5
             hsv = np.asarray(Image.fromarray((im_[..., :3] * 255).astype(np.uint8)).convert("HSV"), np.float32)
             fol = s_ & (hsv[..., 1] > 80)
             return float(luma(im_)[s_].mean()) if s_.any() else 0.0, float(np.median(hsv[..., 0][fol]) * 360 / 255) if fol.any() else 0.0
-        c0 = crown(ims[0])
-        for lod in (1, 2):
-            c = crown(ims[lod])
-            m[f"lod{lod}_luma_diff_pct"] = round(100 * (c[0] - c0[0]) / max(c0[0], 1e-6), 1)
-            m[f"lod{lod}_hue_diff_deg"] = round(c[1] - c0[1], 1)
+        c0, c1 = crown(ims[0]), crown(ims[1])
+        m["luma_diff_pct"] = round(100 * (c1[0] - c0[0]) / max(c0[0], 1e-6), 1)
+        m["hue_diff_deg"] = round(c1[1] - c0[1], 1)
         metrics[f"{size}px"] = m
     TIMES["lod-metrics"] = metrics
-    sheet = Image.new("RGB", (400 * 4, 500 * 3), (120, 150, 190))
-    for r, ims in enumerate(rows):
-        for k, im in enumerate(ims):
-            bg = Image.new("RGB", (400, 500), (150, 175, 205))
-            bg.paste(Image.fromarray((im * 255).astype(np.uint8), "RGBA"), mask=Image.fromarray((im[..., 3] * 255).astype(np.uint8)))
-            sheet.paste(bg, (400 * k, 500 * r))
-        d = np.abs(ims[0][..., :4] - ims[1][..., :4]).max(-1)
-        dd = Image.fromarray((np.clip(d * 2, 0, 1) * 255).astype(np.uint8)).convert("RGB")
-        sheet.paste(dd, (1200, 500 * r))
-    dr = ImageDraw.Draw(sheet)
-    for k, t_ in enumerate(("LOD0", "LOD1", "LOD2", "|LOD0 - LOD1| x2")):
-        dr.text((400 * k + 6, 6), t_, fill=(255, 255, 255))
-    save_jpeg(sheet, "lod-larch", maxkb=450)
-    TIMES["lod-fol-stats-400px"] = stats(os.path.join(OUT, "lod-larch.jpg"))
+    sheet = Image.new("RGB", (PW * 3, PH), (150, 175, 205))
+    # 大きい方（700px）は 1 段目に 3 列、小さい方（230px）は同じ列の下半分に縮尺どおり（切り出して）並べる
+    for k, im in enumerate(rows[0]):
+        bg = Image.new("RGB", (PW, PH), (150, 175, 205))
+        bg.paste(Image.fromarray((im * 255).astype(np.uint8), "RGBA"), mask=Image.fromarray((im[..., 3] * 255).astype(np.uint8)))
+        sheet.paste(bg, (PW * k, 0))
+    d = np.abs(rows[0][0][..., :4] - rows[0][1][..., :4]).max(-1)
+    sheet.paste(Image.fromarray((np.clip(d * 2, 0, 1) * 255).astype(np.uint8)).convert("RGB"), (PW * 2, 0))
+    # 小さい方：下に切り出し（木の高さ 230px ぶん）を、同じ並びで重ねる
+    small = Image.new("RGB", (PW * 3, 270), (150, 175, 205))
+    for k, im in enumerate(rows[1]):
+        bg = Image.new("RGB", (PW, PH), (150, 175, 205))
+        bg.paste(Image.fromarray((im * 255).astype(np.uint8), "RGBA"), mask=Image.fromarray((im[..., 3] * 255).astype(np.uint8)))
+        small.paste(bg.crop((0, PH - 270, PW, PH)), (PW * k, 0))
+    d2 = np.abs(rows[1][0][..., :4] - rows[1][1][..., :4]).max(-1)
+    small.paste(Image.fromarray((np.clip(d2 * 2, 0, 1) * 255).astype(np.uint8)).convert("RGB").crop((0, PH - 270, PW, PH)), (PW * 2, 0))
+    full = Image.new("RGB", (PW * 3, PH + 270))
+    full.paste(sheet, (0, 0))
+    full.paste(small, (0, PH))
+    dr = ImageDraw.Draw(full)
+    for k, t_ in enumerate((f"LOD0 ({objs[0]['tris']//1000}k tri)", f"LOD1 ({objs[1]['tris']//1000}k tri)", "|LOD0 - LOD1| x2")):
+        dr.text((PW * k + 6, 6), t_, fill=(255, 255, 255))
+        dr.text((PW * k + 6, PH + 6), t_ + " / 230 px", fill=(255, 255, 255))
+    save_jpeg(full, "lod-larch", maxkb=340)
+    TIMES["lod-fol-stats-700px"] = stats(os.path.join(OUT, "lod-larch.jpg"))
 
 
 if __name__ == "__main__":
@@ -739,8 +784,8 @@ if __name__ == "__main__":
     which = sys.argv[1:] or ["sheet", "close", "forest", "backlit", "lod"]
     for w in which:
         t = time.time()
-        {"sheet": do_sheet, "close": do_close, "forest": lambda: do_forest(False), "forestcrops": lambda: do_forest(False, True),
-         "backlit": lambda: do_forest(True), "lod": do_lod}[w]()
+        {"sheet": do_sheet, "close": do_close, "forest": lambda: do_forest("front"), "forestcrops": lambda: do_forest("front", True),
+         "backlit": lambda: do_forest("back"), "shade": lambda: do_forest("shade"), "skim": lambda: do_forest("skim"), "lod": do_lod}[w]()
         TIMES["total-" + w] = round(time.time() - t, 1)
         print(w, TIMES, flush=True)
         json.dump(TIMES, open(os.path.join(TMP, "times.json"), "w"), default=str)

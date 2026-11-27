@@ -15,11 +15,19 @@ ATLAS = os.path.join(HERE, "atlas", "larch-cards.png")
 
 # tone の色の段（線形色）：緑がかった金 → 金黄 → 深い金 → 橙がかった金 → さび色
 TONE_STOPS = [
-    (0.00, (0.60, 0.58, 0.022)),    # 黄緑（色相 約 58 度）
-    (0.25, (0.75, 0.51, 0.026)),    # 明るい金（46 度）
-    (0.50, (0.75, 0.40, 0.026)),    # 金（41 度）。日なたの針の中心 sRGB 約 (225,170,45)
-    (0.75, (0.73, 0.30, 0.026)),    # こがね〜だいだい（36 度）
-    (1.00, (0.58, 0.19, 0.020)),    # さび色（30 度）
+    (0.00, (0.55, 0.55, 0.024)),    # 黄緑（色相 約 60 度）
+    (0.25, (0.73, 0.56, 0.030)),    # 明るい金（52 度）
+    (0.50, (0.75, 0.47, 0.028)),    # 金（45 度）。日なたの針の中心 sRGB 約 (225,185,48)。低い太陽の橙色の光と AgX で橙寄りに見えるぶん、黄色寄りに置く
+    (0.75, (0.72, 0.36, 0.026)),    # こがね〜だいだい（38 度）
+    (1.00, (0.58, 0.21, 0.020)),    # さび色（32 度）
+]
+# カード絵（atlas/larch-cards.png）を焼いたときの色の段。カードは「いまの色 ÷ 焼いた色」で寄せるので、段を変えても絵は焼き直さなくてよい
+BAKED_STOPS = [
+    (0.00, (0.60, 0.58, 0.022)),
+    (0.25, (0.75, 0.51, 0.026)),
+    (0.50, (0.75, 0.40, 0.026)),
+    (0.75, (0.73, 0.30, 0.026)),
+    (1.00, (0.58, 0.19, 0.020)),
 ]
 BAKE_TONE = 0.5      # カードの絵を焼いたときの tone（材質側でこの色との比で寄せる）
 
@@ -86,13 +94,13 @@ def bark_material():
     warp.inputs["Detail"].default_value = 3.0
     nt.links.new(uv.outputs["UV"], warp.inputs["Vector"])
     wsc = _new(nt, "ShaderNodeVectorMath", (-1200, 150), operation="SCALE")
-    wsc.inputs["Scale"].default_value = 0.16
+    wsc.inputs["Scale"].default_value = 0.06
     nt.links.new(warp.outputs["Color"], wsc.inputs[0])
     add = _new(nt, "ShaderNodeVectorMath", (-1000, 0), operation="ADD")
     nt.links.new(uv.outputs["UV"], add.inputs[0])
     nt.links.new(wsc.outputs[0], add.inputs[1])
     sc = _new(nt, "ShaderNodeMapping", (-800, 0))
-    sc.inputs["Scale"].default_value = (10.0, 2.4, 1.0)           # 板 幅 5cm × 長さ 21cm
+    sc.inputs["Scale"].default_value = (7.0, 1.5, 1.0)            # 板 幅 7cm × 長さ 33cm（細長いうろこ板）
     nt.links.new(add.outputs[0], sc.inputs["Vector"])
     vor = _new(nt, "ShaderNodeTexVoronoi", (-550, 150), voronoi_dimensions="3D", feature="DISTANCE_TO_EDGE")
     nt.links.new(sc.outputs[0], vor.inputs["Vector"])
@@ -163,15 +171,15 @@ def bark_material():
     val2 = _math(nt, "ADD", val, 0.85, (50, -1250))
     # 色：板=灰褐色、割れ目=暗い赤褐色、はがれ跡=赤褐色
     plate_col = _new(nt, "ShaderNodeMix", (300, 300), data_type="RGBA", blend_type="MIX")
-    plate_col.inputs[6].default_value = (0.020, 0.013, 0.010, 1.0)    # 割れ目の奥
-    plate_col.inputs[7].default_value = (0.092, 0.079, 0.068, 1.0)    # 板（灰褐色）
+    plate_col.inputs[6].default_value = (0.014, 0.009, 0.007, 1.0)    # 割れ目の奥
+    plate_col.inputs[7].default_value = (0.060, 0.051, 0.044, 1.0)    # 板（灰褐色）
     pv = _math(nt, "MULTIPLY", big, 0.5, (150, 450))
     pv2 = _math(nt, "ADD", plate, None, (300, 450), clamp=True)
     nt.links.new(pv.outputs[0], pv2.inputs[1])
     pv3 = _math(nt, "SUBTRACT", pv2, 0.2, (450, 450), clamp=True)
     nt.links.new(pv3.outputs[0], plate_col.inputs[0])
     red = _new(nt, "ShaderNodeMix", (550, 300), data_type="RGBA")
-    red.inputs[7].default_value = (0.075, 0.036, 0.026, 1.0)          # 赤褐色（割れ目の中・はがれ跡）
+    red.inputs[7].default_value = (0.052, 0.025, 0.018, 1.0)          # 赤褐色（割れ目の中・はがれ跡）
     inv = _math(nt, "SUBTRACT", 1.0, plate, (400, 100), clamp=True)
     invs = _math(nt, "MULTIPLY", inv, 0.3, (450, 100))
     redf = _math(nt, "ADD", invs, scar, (550, 100), clamp=True)
@@ -229,7 +237,7 @@ def bark_material():
     nt.links.new(lich.outputs[2], moss.inputs[6])
     # 遠くでは平均色へ
     far = _new(nt, "ShaderNodeMix", (1350, 300), data_type="RGBA")
-    far.inputs[6].default_value = (0.062, 0.046, 0.038, 1.0)
+    far.inputs[6].default_value = (0.041, 0.031, 0.026, 1.0)
     nt.links.new(fade.outputs[0], far.inputs[0])
     nt.links.new(moss.outputs[2], far.inputs[7])
     # 細い枝はなめらかな小枝色（赤褐色〜黄褐色）
@@ -239,7 +247,7 @@ def bark_material():
     nt.links.new(far.outputs[2], twig.inputs[7])
     # 枯れ枝は灰褐色
     gr = _new(nt, "ShaderNodeMix", (1750, 300), data_type="RGBA")
-    gr.inputs[7].default_value = (0.065, 0.056, 0.049, 1.0)
+    gr.inputs[7].default_value = (0.038, 0.032, 0.028, 1.0)
     nt.links.new(dead.outputs["Fac"], gr.inputs[0])
     nt.links.new(twig.outputs[2], gr.inputs[6])
     nt.links.new(gr.outputs[2], bsdf.inputs["Base Color"])
@@ -299,7 +307,7 @@ def _finish_foliage(nt, color_socket, out, alpha=None):
     pr = _new(nt, "ShaderNodeBsdfPrincipled", (500, 100))
     pr.inputs["Roughness"].default_value = 0.6
     if "Specular IOR Level" in pr.inputs:
-        pr.inputs["Specular IOR Level"].default_value = 0.15
+        pr.inputs["Specular IOR Level"].default_value = 0.08
     tr = _new(nt, "ShaderNodeBsdfTranslucent", (500, -150))
     boost = _new(nt, "ShaderNodeMix", (300, -250), data_type="RGBA", blend_type="MULTIPLY")
     boost.inputs[0].default_value = 1.0
@@ -346,7 +354,7 @@ def card_material(atlas_path=None):
     nt.links.new(uv.outputs["UV"], tex.inputs["Vector"])
     tone = _attr(nt, "tone", (-900, -100))
     cur = _tone_color(nt, tone.outputs["Fac"], (-600, -100))
-    ref = _ramp(nt, TONE_STOPS, (-600, -400))
+    ref = _ramp(nt, BAKED_STOPS, (-600, -400))
     ref.inputs["Fac"].default_value = BAKE_TONE
     # 色 = 絵 × (いまの tone の色 ÷ 焼いたときの色)
     dv = _new(nt, "ShaderNodeMix", (-300, -200), data_type="RGBA", blend_type="DIVIDE")

@@ -1,15 +1,17 @@
-"""山の場面（コマ 131〜599）のカメラの道すじ。numpy だけ（図を描くときだけ Pillow）。
+"""山の場面（コマ 131〜719）のカメラの道すじ。numpy だけ（図を描くときだけ Pillow）。計画 PLAN.md の 2・4 章（30.0 秒版）。
 
 使い方
-    python3 route.py          # 表（0.5 秒ごと）と、決まりを破っている所を出す。WORK/route.json も書く
+    python3 route.py          # 表（1 秒ごと）と、決まりを破っている所を出す。WORK/route.json も書く
     python3 route.py --plot   # review/route/route-map.jpg・route-profile.jpg を書く
 
-道すじは 3 本（つなぎ目①②で切れる。つなぎ目の前後 4 コマはもやの中で、位置は飛んでよい）。
-  seg0: コマ 131〜229   涸沢の上 → 吊尾根 → 岳沢の上
-  seg1: コマ 230〜371   梓川の森 → 梢すれすれ → 川すれすれ
-  seg2: コマ 372〜599   東の尾根の森 → 尾根越え → 朝日と雲海へ漂う
-位置は 時間の三次スプライン（速さ・加速が途切れない）。水平は「曲線 × 道のり s(t)」、高さは
-「足元の面（地面＋木・水）を先読みしてなめらかにしたもの ＋ 指定した高さ」。
+道すじは 3 本（つなぎ目①②で切れる。つなぎ目の前後 4 コマはもやの中で、位置・向きは飛んでよい）。
+  seg0: コマ 131〜303   涸沢の上 → 吊尾根 → 岳沢の上（L0〜L3）
+  seg1: コマ 304〜461   梓川の森 → 梢すれすれ → 川すれすれ → 上流（L4〜L7）
+  seg2: コマ 462〜719   東の尾根の森 → 尾根越え → 朝日と雲海へ漂う（L8〜L10）
+水平は「点を通る曲線 × 道のり s(t)」。s(t) は区間ごとに決めた速さの形（SPEED）を足して、点の時刻にぴったり合わせる。
+高さは「足元の面（地面＋木・水）を先読みしてなめらかにしたもの ＋ 指定した高さ」。
+向きは手で決めた向きの表、上下は「地平線（尾根の線）の見える位置」から決め、回る速さは決まりの上限で刻んで抑える。
+最後に、ごく弱い決まった揺れ（0.05〜0.1°・2〜6Hz）を足す。
 座標は東・北・上（m）。上は本当の標高（地球の丸みは引かない。場面を組む側で curvature_drop を引く）。
 """
 from __future__ import annotations
@@ -28,17 +30,13 @@ DT = 1.0 / 96.0          # 細かい時間の刻み（コマの 4 分の 1）
 PRE, POST = 48, 96       # 道すじの前後に足す細かいコマ数（先読み・なめらかにする用）
 
 # ---------------------------------------------------------------------------
-# 道すじの表（ここを直す）
-#   名前, seg, 時刻(秒), 位置, 高さの決め方, 値
-#   高さの決め方: 'abs' 標高(m) / 'rock' 地面の上(m) / 'tree' 梢の上(m) / 'water' 水面の上(m)
-#   位置: ll(緯度, 経度) / between(A, B, 割合) / ext(A, B, 倍) / fwd(A, 方位, m)
-#   時刻と位置の間隔で速さが決まる（s(t) の三次スプライン）。L0〜L10 は計画の点。縮めた時間割は config.py
+# 道すじの表（ここを直す）。L0〜L10 は計画 2 章の点（緯度, 経度）。時刻・高さも計画のとおり
 # ---------------------------------------------------------------------------
-PLAN = {  # 計画 2 章の点（緯度, 経度）
+PLAN = {
     "L0": (36.2948, 137.6561), "L1": (36.2927, 137.6552), "L2": (36.2868, 137.6525),
     "L3": (36.2851, 137.6517), "L4": (36.2542, 137.6485), "L5": (36.2537, 137.6495),
     "L6": (36.2533, 137.6509), "L7": (36.2530, 137.6522), "L8": (36.2432, 137.6873),
-    "L9": (36.2423, 137.6894), "OKUHO": (36.2892, 137.6483),
+    "L9": (36.2423, 137.6894), "L10a": (36.2421, 137.6901), "L10": (36.2418, 137.6908),
 }
 
 
@@ -48,101 +46,66 @@ def ll(lat, lon):
 
 
 PT = {k: ll(*v) for k, v in PLAN.items()}
-
-
-def between(a, b, f):
-    return (PT[a][0] + (PT[b][0] - PT[a][0]) * f, PT[a][1] + (PT[b][1] - PT[a][1]) * f)
-
-
-def ext(a, b, k):
-    """A から B へ向かう線を k 倍にした先（A + k (B - A)）"""
-    return between(a, b, k)
-
-
-def fwd(a, heading, m):
-    h = math.radians(heading)
-    return (PT[a][0] + m * math.sin(h), PT[a][1] + m * math.cos(h))
-
-
-def _p(name, pos):
-    PT[name] = pos
-    return pos
-
-
-F = lambda f: f / 24.0  # コマ番号 → 秒
 C1, C2 = config.SEAM_FRAMES
-HEAD = 118.0
+HALF = config.SEAM_HALF
 
-# L9 の先は方位 118° の直線。L8 は尾根の手前 106 m（つなぎ目②の出口なので、どこでもよい）
-L9T = 16.9
-_p("L8x", ext("L9", "L8", 0.375))     # 尾根の手前 80 m（つなぎ目②の出口。どこでもよい）
-_p("L4x", ext("L5", "L4", 1.45))      # つなぎ目①の出口（L5 の手前 152 m）
-_p("L3x", fwd("L2", 200.9, 128.0))
-_p("L2a", between("L2", "L3x", 0.42))
-_p("L7x", between("L6", "L7", 0.68))   # つなぎ目②の入口
-_p("L6a", between("L6", "L7x", 0.45))
-_p("L5a", between("L5", "L6", 0.5))
-_p("L5b", between("L5a", "L6", 0.51))
-_p("L4a", between("L4x", "L5", 0.625))
-_p("L8a", between("L8x", "L9", 0.55))
-_p("L1a", between("L1", "L2", 0.443))
-_p("L1b", between("L1", "L2", 0.761))
-_p("L1c", between("L1", "L2", 0.934))
-_p("L0x", ext("L1", "L0", 0.77))
-_p("L9b", fwd("L9", HEAD, 20.0))
-_p("L9c", fwd("L9", HEAD, 29.0))
-_p("L9e", fwd("L9", HEAD, 68.4))
+# seg, 名前, 時刻(秒)。水平の位置はこの点を通る（計画の時刻）
+PINS = {
+    0: [("L0", 5.45), ("L1", 5.90), ("L2", 10.0), ("L3", 12.5)],
+    1: [("L4", 12.8), ("L5", 14.0), ("L6", 17.4), ("L7", 19.1)],
+    2: [("L8", 19.4), ("L9", 22.4), ("L10", 30.0)],
+}
+# 区間ごとの速さの形 (時刻, m/秒)。点の時刻・位置から出る本当の速さに合うよう、区間ごとに全体を少し伸ばす（route.py の出力 k）
+SPEED = {
+    0: [(5.45, 560), (5.9, 545), (6.4, 350), (7.0, 205), (7.6, 125), (8.2, 82), (9.1, 62), (10.0, 55),
+        (11.0, 60), (11.8, 85), (12.5, 140)],
+    1: [(12.8, 150), (13.2, 100), (13.6, 65), (14.0, 44), (15.0, 41), (16.2, 38), (17.4, 36), (18.2, 62), (19.1, 105)],
+    2: [(19.4, 100), (20.4, 82), (21.4, 66), (22.4, 52), (23.2, 38), (24.0, 22), (24.4, 17), (24.9, 14), (30.0, 12.5)],
+}
+# 高さの決め方: 'abs' 標高(m) / 'rock' 地面の上(m) / 'tree' 梢の上(m) / 'water' 水面の上(m) / 'l9' 尾根越え(L9)の高さからの差(m)
+HEIGHTS = {
+    0: [(5.45, "abs", 3000.0), (5.9, "abs", 2900.0), (6.5, "abs", 2930.0), (7.2, "abs", 2975.0), (7.8, "abs", 3012.0),
+        (8.2, "abs", 3025.0), (8.9, "abs", 3033.0), (9.3, "abs", 3041.0), (9.6, "abs", 3052.0), (10.0, "rock", 20.0), (10.6, "abs", 3062.0),
+        (11.2, "abs", 3050.0), (11.8, "abs", 3024.0), (12.5, "abs", 2995.0)],
+    1: [(12.8, "tree", 60.0), (13.2, "tree", 40.0), (13.6, "tree", 26.0), (13.8, "tree", 19.0), (14.0, "tree", 10.5), (14.8, "tree", 11.0),
+        (15.6, "tree", 10.0), (16.2, "water", 10.8), (16.8, "water", 9.9), (17.4, "water", 9.0), (18.0, "water", 22.0),
+        (18.6, "water", 38.5), (19.1, "water", 45.0)],
+    2: [(19.4, "tree", 30.0), (20.2, "tree", 26.0), (21.0, "tree", 22.0), (21.8, "tree", 18.0), (22.4, "tree", 15.0),
+        ],
+}
+# カメラの向き（方位。北から時計回り）の表
+HEAD = {
+    0: [(5.45, 200.0), (8.0, 203.0), (10.0, 201.0), (12.5, 201.0)],
+    1: [(12.8, 118.0), (14.0, 113.0), (15.7, 110.0), (17.4, 108.0), (19.1, 112.0)],
+    2: [(19.4, 112.0), (21.0, 114.0), (22.4, 115.0), (24.4, 119.0), (30.0, 119.0)],
+}
+# 傾き（右が正。左へ傾くのは負）に足す分
+ROLL_BIAS = {
+    0: [(5.0, 0), (9.9, 0), (10.5, -5), (11.2, -12), (12.5, -14), (13, -14)],
+    1: [(12.8, -11.5), (13.5, -7), (14.3, -1.5), (15.5, -2), (17.0, 0), (19.1, 0)],
+    2: [(19.4, 0), (30, 0)],
+}
+LENS = [(0, 28), (7.8, 28), (8.6, 24), (17.4, 24), (19.1, 28), (23.0, 28), (24.5, 35), (30, 35)]   # 計画: C2・D は 24、E は 28、F は 35
+SEGMENTS = [(0, 131, C1 - 1), (1, C1, C2 - 1), (2, C2, config.FRAMES - 1)]
 
-WAYPOINTS = [
-    # ---- seg0 涸沢の上 → 吊尾根 → 岳沢の上 ----
-    ("L0", 0, F(131), PT["L0x"], "abs", 3000.0),
-    ("L1", 0, 5.80, PT["L1"], "abs", 2900.0),
-    ("L1a", 0, 6.5, PT["L1a"], "rock", 250.0),
-    ("L1b", 0, 7.2, PT["L1b"], "rock", 150.0),
-    ("L1c", 0, 7.8, PT["L1c"], "rock", 80.0),
-    ("L2", 0, 8.3, PT["L2"], "rock", 26.0),
-    ("L2a", 0, 8.95, PT["L2a"], "rock", 80.0),
-    ("L3", 0, F(C1 - 1), PT["L3x"], "abs", 3060.0),
-    # ---- seg1 梓川の森 → 梢すれすれ → 川すれすれ ----
-    ("L4", 1, F(C1), PT["L4x"], "tree", 75.0),
-    ("L4a", 1, 10.34, PT["L4a"], "tree", 42.0),
-    ("L5", 1, 11.1, PT["L5"], "tree", 13.2),
-    ("L5a", 1, 12.5, PT["L5a"], "tree", 13.0),
-    ("L5b", 1, 13.3, PT["L5b"], "water", 14.5),
-    ("L6", 1, 14.1, PT["L6"], "water", 8.0),
-    ("L6a", 1, 14.9, PT["L6a"], "water", 20.0),
-    ("L7", 1, F(C2 - 1), PT["L7x"], "water", 27.0),
-    # ---- seg2 東の尾根の森 → 尾根越え → 漂う（方位 118° の直線） ----
-    ("L8", 2, F(C2), PT["L8x"], "tree", 24.0),
-    ("L8a", 2, 16.2, PT["L8a"], "tree", 19.0),
-    ("L9", 2, L9T, PT["L9"], "tree", 15.0),
-    ("L9b", 2, 17.6, PT["L9b"], "abs", 2245.0),
-    ("L9c", 2, 18.4, PT["L9c"], "abs", 2256.0),
-    ("L10", 2, F(599), PT["L9e"], "abs", 2318.0),
-]
-
-# 区間: (seg, 最初のコマ, 最後のコマ, 始めの速さ m/秒, 終わりの速さ m/秒)  つなぎ目の前後で速さを ±20% にそろえる
-SEGMENTS = [(0, 131, C1 - 1, 540.0, 140.0), (1, C1, C2 - 1, 150.0, 84.0), (2, C2, 599, 70.0, 6.0)]
-
-# 見せ場の窓（秒）。この中は flow 4.5 まで、外は 3 まで
-HERO = {"H1 吊尾根": (7.3, 9.6), "H2 梢と川": (10.2, 15.3), "H3 尾根越え": (15.4, 17.5)}
-RIVER = (ll(36.2533, 137.6509), ll(36.2530, 137.6522))  # L6-L7 の川筋（水）
-RIVER_R = 60.0
+# 見せ場の窓（秒）。この中は flow 4.5・曲がる速さ 10°/秒まで、外は 3・20°/秒まで
+HERO = {"C2 吊尾根": (8.2, 11.2), "D2 梢と川": (13.65, 18.0), "E 尾根越え": (19.4, 23.4)}
 TREE_H = 25.0
+# 川筋（L6→L7 の直線）。川の手前は岸の木がだんだん低くなる「すき間」（左右の木は高いまま）
+RIVER_HALF = 45.0
+GAP0, GAP1 = -110.0, -40.0     # 川筋の方向の距離（L6 から。m）。-110 から木が低くなり始め、-40 から水面
+_d6 = np.array(PT["L7"]) - np.array(PT["L6"])
+RIVER_DIR = _d6 / np.hypot(*_d6)
 
-# 向きを寄せる先: 名前, 時刻と重み。C1 は穂高の岸壁（奥穂高岳あたり）、L9 の先は方位 118°・地平線 55%
-WALL_W = [(F(131), 0.6), (6.5, 0.5), (8.3, 0.0)]
-EAST_W = [(L9T - 0.4, 0.0), (L9T + 0.6, 1.0)]
-WALL_ALT = 3040.0
-PITCH_FOLLOW = 0.45   # 上下は進む向きの 6 割だけ追う（急な上り下りでも画面が暴れない）
-EAST_PITCH = 2.0   # 地平線をコマの高さの 55%（上から測る）に置くための上向き（28mm・縦 20.25mm）
-TILT_T0, TILT_DEG = 24.0, 12.0
+PITCH0 = -1.5            # コマ 131 の上下（宇宙の場面とのつなぎ）
+C1_SKY_FRAC = 0.22       # C1: 尾根の線を、画面の真ん中から上へ 画面の高さの 22%（上から 28%）に置く
+E_SKY_FRAC = 0.10        # E: 尾根の線を上から 40%
+DRIFT_RISE = 0.8         # 尾根越えの後に上がる速さ m/秒
+POST_CREST_PITCH = -2.0
+TILT_T0, TILT_DEG = 29.0, 12.0
 LOOK_AHEAD = 0.6
-ROLL_BIAS = [(0, 0), (7.5, 0), (8.2, -4), (8.7, -4), (9.2, -10), (F(C1 - 1), -16), (F(C1), -16), (10.2, -8), (11.0, 0), (30, 0)]
-LENS = [(0, 28), (6.6, 28), (7.4, 24), (13.9, 24), (14.8, 28), (18.0, 28), (19.2, 35), (30, 35)]
-DRIFT_T = 18.4
-MAX_TURN, MAX_ROLL = 35.0, 35.0
-
+MAX_ROLL = 35.0
+SHAKE = [(2.3, 0.045), (3.7, 0.030), (5.4, 0.020)]   # 揺れ (Hz, 度)。合わせて 0.095°。決まった位相
 
 # ---------------------------------------------------------------------------
 # 数値の道具（numpy だけ）
@@ -251,15 +214,15 @@ _dem = None
 def dem():
     global _dem
     if _dem is None:
-        _dem = geo4.Dem()
+        _dem = geo4.Dem(wide=True)
     return _dem
 
 
-def river_dist(e, n):
-    (ax, ay), (bx, by) = RIVER
-    dx, dy = bx - ax, by - ay
-    u = np.clip(((e - ax) * dx + (n - ay) * dy) / (dx * dx + dy * dy), 0, 1)
-    return np.hypot(e - (ax + u * dx), n - (ay + u * dy))
+def river_coords(e, n):
+    """L6 を原点に、川筋の方向の距離 ax と横の距離 lat（m）"""
+    x = np.asarray(e) - PT["L6"][0]
+    y = np.asarray(n) - PT["L6"][1]
+    return x * RIVER_DIR[0] + y * RIVER_DIR[1], -x * RIVER_DIR[1] + y * RIVER_DIR[0]
 
 
 def surface(e, n):
@@ -267,61 +230,97 @@ def surface(e, n):
     d = dem()
     g = d.height(e, n)
     sl = d.slope_deg(e, n)
-    water = river_dist(e, n) < RIVER_R
-    tree = np.where((g < 2400.0) & (sl < 35.0) & ~water, TREE_H, 0.0)
+    ax, lat = river_coords(e, n)
+    corridor = (np.abs(lat) < RIVER_HALF) & (ax > GAP0 - 20.0)
+    gap = 1.0 - smooth01((ax - GAP0) / (GAP1 - GAP0))      # 川の手前で 1 → 0（木が低くなる）
+    tree = np.where((g < 2400.0) & (sl < 35.0), TREE_H, 0.0)
+    tree = np.where(corridor, tree * gap, tree)
+    water = corridor & (ax > GAP1)
     return g, g + tree, water, sl
+
+
+def skyline_deg(e, n, z, hdg):
+    """カメラから向き hdg（度）の方向に見える、尾根の線（いちばん高く見える所）の上下の角（度）。木も含む"""
+    dist = 15.0 * 1.06 ** np.arange(120)
+    h = np.radians(np.asarray(hdg, float))
+    EE = e[:, None] + np.sin(h)[:, None] * dist[None, :]
+    NN = n[:, None] + np.cos(h)[:, None] * dist[None, :]
+    S = surface(EE.ravel(), NN.ravel())[1].reshape(EE.shape)
+    return np.degrees(np.max(np.arctan2(S - z[:, None] - dist[None, :] ** 2 / (2 * geo4.R_EARTH), dist[None, :]), axis=1))
+
+
+def z9():
+    """尾根越え（L9）の高さ"""
+    return float(surface(np.array([PT["L9"][0]]), np.array([PT["L9"][1]]))[1][0]) + 15.0
 
 
 # ---------------------------------------------------------------------------
 # 1 本の道すじをつくる
 # ---------------------------------------------------------------------------
-def build_segment(seg, f0, f1, v0, v1):  # noqa: C901
-    wps = [w for w in WAYPOINTS if w[1] == seg]
-    tw = np.array([w[2] for w in wps])
-    pos = np.array([w[3] for w in wps])
-    # 水平の曲線（弦の長さで媒介変数。自然スプライン。両端は直線で延長）
+def build_segment(seg, f0, f1):  # noqa: C901
+    pins = PINS[seg]
+    tw = np.array([p[1] for p in pins])
+    pos = np.array([PT[p[0]] for p in pins])
     u = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(pos, axis=0).T))])
     ce, cn = CSpline(u, pos[:, 0]), CSpline(u, pos[:, 1])
     ug = np.arange(-800.0, u[-1] + 1200.0, 0.25)
     pe, pn = ce(ug), cn(ug)
     sg = np.concatenate([[0.0], np.cumsum(np.hypot(np.diff(pe), np.diff(pn)))])
-    sg -= np.interp(0.0, ug, sg)            # u=0 で s=0
+    sg -= np.interp(0.0, ug, sg)
     s_w = np.interp(u, ug, sg)
-    st = CSpline(tw, s_w, v0, v1)           # 道のり s(t)
     t = (f0 * 4 + np.arange(-PRE, (f1 - f0) * 4 + POST + 1)) / 96.0
-    s = st(t)
+    # 速さの形を足して道のり S(t)。点と点の間で、点の道のりに合うよう伸ばす
+    kt = np.array([a for a, _ in SPEED[seg]])
+    kv = np.log(np.array([b for _, b in SPEED[seg]], float))
+    v = np.exp(pchip(kt, kv)(t))
+    S = np.concatenate([[0.0], np.cumsum(0.5 * (v[1:] + v[:-1]) * DT)])
+    Sp = np.interp(tw, t, S)
+    ks = np.diff(s_w) / np.diff(Sp)
+    s = np.empty_like(t)
+    for i, tt in enumerate(t):
+        j = int(np.clip(np.searchsorted(tw, tt) - 1, 0, len(tw) - 2))
+        s[i] = s_w[j] + (S[i] - Sp[j]) * ks[j]
+    s = gsm(s, 3)
     uu = np.interp(s, sg, ug)
     e, n = ce(uu), cn(uu)
-    g, S, water, sl = surface(e, n)
+    g, Sf, water, sl = surface(e, n)
     # 指定の高さ → 足元の面からの高さ c(t)
-    ws = [w for w in wps]
-    sf = lookahead_surface(S)
-    cw, tz = [], []
-    for w in ws:
-        ew, nw = w[3]
-        gw, Sw, _, _ = surface(np.array([ew]), np.array([nw]))
-        base = {"abs": 0.0, "rock": gw[0], "tree": Sw[0], "water": gw[0]}[w[4]]
-        zw = w[5] + base
-        iw = int(round((w[2] * 96.0 - (f0 * 4 - PRE))))
-        cw.append(zw - sf[min(max(iw, 0), len(sf) - 1)])
-        tz.append(zw)
-    cfun = pchip(tw, np.array(cw))
-    c = cfun(t)
+    keys = HEIGHTS[seg]
+    thw = np.array([k[0] for k in keys])
+    ew, nw = np.interp(thw, t, e), np.interp(thw, t, n)
+    gw, Sw, _, _ = surface(ew, nw)
+    zl9 = None
+    zw = []
+    for i, (_, mode, val) in enumerate(keys):
+        if mode == "abs":
+            zw.append(val)
+        elif mode == "rock" or mode == "water":
+            zw.append(gw[i] + val)
+        elif mode == "tree":
+            zw.append(Sw[i] + val)
+        else:
+            zw.append(z9() + val)
+    zw = np.array(zw)
+    sf = lookahead_surface(Sf)
+    cw = zw - np.interp(thw, t, sf)
+    c = pchip(thw, cw)(t)
     z = sf + c
-    # 両端の外（先読み・なめらかにする用の足し分）は、端の傾きでそのまま延ばす（つなぎ目の降りる角度が端の地形に引かれない）
-    for sel, ref in ((t > tw[-1], (t <= tw[-1]) & (t > tw[-1] - 0.3)), (t < tw[0], (t >= tw[0]) & (t < tw[0] + 0.3))):
+    for sel, ref in ((t > thw[-1], (t <= thw[-1]) & (t > thw[-1] - 0.3)), (t < thw[0], (t >= thw[0]) & (t < thw[0] + 0.3))):
         a1, b1 = np.polyfit(t[ref], z[ref], 1)
         z[sel] = a1 * t[sel] + b1
-    zfun = pchip(tw, np.array(tz))
-    m = 0.78 * c
-    for _ in range(10):                      # 面の下に入らないように持ち上げて、なめらかに（最後は必ず面の上）
+    m = np.maximum(0.78 * c, 8.0)
+    for _ in range(10):
         z = gsm(z, 6)
-        z = z + np.maximum(S + m - z, 0.0)
+        z = z + np.maximum(Sf + m - z, 0.0)
     z = gsm(z, 6)
-    z = z + np.maximum(1.5 * gsm(np.maximum(S + m - z, 0.0), 10), 0.0)   # 最後の持ち上げは段差にならないようゆるやかに
-    # 速さ・向き
-    z[:] = z
-    return dict(seg=seg, f0=f0, f1=f1, t=t, e=e, n=n, z=z, g=g, S=S, water=water, sl=sl, s=s, tw=tw)
+    z = z + np.maximum(1.5 * gsm(np.maximum(Sf + m - z, 0.0), 10), 0.0)
+    if seg == 2:
+        # 尾根越えの前後は、ずっと同じ高さにならないよう一定の上がり方にする（越える前 1.6 m/秒・越えた後 0.8 m/秒）
+        lin = z9() + np.where(t < 22.4, 1.6, DRIFT_RISE) * (t - 22.4)
+        lin = gsm(lin, 8)
+        w = smooth01((t - 21.0) / 0.8)
+        z = (1 - w) * z + w * lin
+    return dict(seg=seg, f0=f0, f1=f1, t=t, e=e, n=n, z=z, g=g, S=Sf, water=water, sl=sl, s=s, tw=tw, k=ks, pins=pins)
 
 
 def lookahead_surface(S):
@@ -332,39 +331,72 @@ def lookahead_surface(S):
     return gsm(win.max(axis=1), 26)
 
 
-def orient(sg):
+def slew(x, r, anchor=True):
+    """変わる速さ r（度/秒。要素ごと）を超えないように刻む。前から・後ろからの 2 通りの平均（遅れが片寄らない）"""
+    n = len(x)
+    y = x.copy()
+    for i in range(1, n):
+        m = r[i] * DT
+        y[i] = y[i - 1] + min(max(x[i] - y[i - 1], -m), m)
+    w = x.copy()
+    for i in range(n - 2, -1, -1):
+        m = r[i] * DT
+        w[i] = w[i + 1] + min(max(x[i] - w[i + 1], -m), m)
+    b = smooth01((np.arange(n) * DT - 1.6) / 2.0) if anchor else np.ones(n)      # 始めは前から刻んだ値（宇宙の場面・前の区間と合わせた値から動かさない）
+    return (1 - b) * y + b * 0.5 * (y + w)
+
+
+def shake(t, axis):
+    """決まった揺れ（度）。位相は固定の乱数"""
+    rng = np.random.default_rng((config.SEED, 4101, axis))
+    ph = rng.uniform(0, 2 * np.pi, len(SHAKE))
+    sc = 0.6 if axis == 2 else 1.0
+    return sc * sum(a * np.sin(2 * np.pi * f * t + p) for (f, a), p in zip(SHAKE, ph))
+
+
+def orient(sg):  # noqa: C901
     """向き（方位・上下・傾き・レンズ）を細かい刻みで"""
-    t, e, n, z = sg["t"], sg["e"], sg["n"], sg["z"]
-    k = int(round(LOOK_AHEAD * 96))
-    pe, pn, pz = (np.pad(a, (0, k), mode="edge")[k:] for a in (e, n, z))
-    # 先読みの方向（道すじの方向）
-    de, dn, dz = pe - e, pn - n, pz - z
-    h_a = np.degrees(np.arctan2(de, dn))
-    p_a = np.degrees(np.arctan2(dz, np.hypot(de, dn)))
-    # C1: 岸壁へ
-    wall = np.array([*PT["OKUHO"]])
-    h_w = np.degrees(np.arctan2(wall[0] - e, wall[1] - n))
-    p_w = np.degrees(np.arctan2(WALL_ALT - z, np.hypot(wall[0] - e, wall[1] - n)))
-    w1 = knots(t, WALL_W)
-    h = h_a + w1 * wrap(h_w - h_a)
-    p = PITCH_FOLLOW * p_a + w1 * (p_w - PITCH_FOLLOW * p_a)
-    # L9 の先: 方位 118°・地平線 55%
-    w2 = knots(t, EAST_W)
-    h = h + w2 * wrap(HEAD - h)
-    p = p + w2 * (EAST_PITCH - p)
-    p = p + TILT_DEG * smooth01((t - TILT_T0) / (config.DURATION - TILT_T0))
-    h = np.degrees(np.unwrap(np.radians(h)))
-    h = gsm(h, 22)
-    p = gsm(p, 32)
+    seg, t, e, n, z = sg["seg"], sg["t"], sg["e"], sg["n"], sg["z"]
+    hk = knots(t, HEAD[seg])
+    lens = knots(t, LENS)
+    vfov = 2 * np.degrees(np.arctan(10.125 / lens))
+    v3 = np.sqrt(np.gradient(e, DT) ** 2 + np.gradient(n, DT) ** 2 + np.gradient(z, DT) ** 2)
+    if seg == 0:
+        sky = skyline_deg(e, n, z, hk)
+        p_sky = np.minimum(sky - C1_SKY_FRAC * vfov, 18.0)
+        w = smooth01((t - 5.9) / 2.6)
+        pa = (1 - w) * PITCH0 + w * p_sky
+        pk = knots(t, [(8.0, 0.0), (9.2, -4.0), (10.0, -10.0), (10.7, -15.0), (11.6, -22.0), (12.5, -25.0), (13.0, -25.0)])
+        wk = smooth01((t - 7.9) / 0.5)
+        p = (1 - wk) * pa + wk * pk
+    elif seg == 1:
+        p = knots(t, [(12.0, -12.0), (12.8, -12.0), (14.0, -6.0), (15.0, -6.0), (16.0, -4.0), (17.0, -3.0), (17.4, -3.0), (18.2, 0.0), (19.1, 3.0), (19.5, 3.0)])
+        sky = skyline_deg(e, n, z, hk)
+    else:
+        sky = skyline_deg(e, n, z, hk)
+        p_sky = sky - E_SKY_FRAC * vfov
+        w = smooth01((t - 22.0) / 0.9)
+        p = (1 - w) * p_sky + w * POST_CREST_PITCH
+    h = np.degrees(np.unwrap(np.radians(hk)))
+    # 回る速さの上限: 見せ場 10°/秒・ほか 20°/秒、かつ 速さ × 回る速さ ≤ 20 m/秒²
+    cap = np.where(np.array([in_hero(x, 0.0) for x in t]), 10.0, 20.0)
+    L = np.minimum(cap, np.degrees(20.0 / v3)) * 0.92
+    p = gsm(slew(p, L * 0.92), 6)
+    p = gsm(slew(p, L * 0.88, False), 4)
+    pr = np.abs(np.gradient(p, DT))
+    rh = np.sqrt(np.maximum(L ** 2 - pr ** 2, (0.2 * L) ** 2)) / np.maximum(np.cos(np.radians(p)), 0.3) * 0.9
+    h = gsm(slew(h, rh), 6)
+    h = gsm(slew(h, rh * 0.95, False), 4)
+    p_base = p + TILT_DEG * smooth01((t - TILT_T0) / (config.DURATION - TILT_T0)) if seg == 2 else p
     # 傾き: 道すじの横の加速度から ＋ 手で足す傾き
     vh = np.hypot(np.gradient(e, DT), np.gradient(n, DT))
     psi = gsm(np.unwrap(np.arctan2(np.gradient(e), np.gradient(n))), 9)
     a_lat = vh * np.gradient(psi, DT)
-    roll = np.degrees(np.arctan(a_lat / (8 * G))) + knots(t, ROLL_BIAS)
-    roll = np.clip(gsm(roll, 14), -MAX_ROLL, MAX_ROLL)
-    lens = knots(t, LENS)
-    flight = np.degrees(np.arctan2(np.gradient(z), np.hypot(np.gradient(e), np.gradient(n))))
-    sg.update(head=h, pitch=p, roll=roll, lens=lens, flight=flight)
+    roll = np.clip(np.degrees(np.arctan(a_lat / (8 * G))), -3.0, 3.0) + knots(t, ROLL_BIAS[seg])
+    roll0 = np.clip(gsm(roll, 14), -MAX_ROLL, MAX_ROLL)
+    flight = np.degrees(np.arctan2(np.gradient(gsm(z, 3)), np.hypot(np.gradient(gsm(e, 3)), np.gradient(gsm(n, 3)))))
+    sg.update(head0=h, pitch0=p_base, roll0=roll0, lens=lens, flight=flight, sky=sky if seg != 0 else sky,
+              head=h + shake(t, 0), pitch=p_base + shake(t, 1), roll=roll0 + shake(t, 2), vfov=vfov)
     return sg
 
 
@@ -377,28 +409,26 @@ def build():
     for sg in segs:
         for f in range(sg["f0"], sg["f1"] + 1):
             k = (f - sg["f0"]) * 4 + PRE
-            sl = slice(k - 1, k + 2)
             v3 = np.array([sg["e"][k + 1] - sg["e"][k - 1], sg["n"][k + 1] - sg["n"][k - 1], sg["z"][k + 1] - sg["z"][k - 1]]) / (2 * DT)
             speed = float(np.linalg.norm(v3))
-            kk = slice(k - 2, k + 3, 4)
-            hr = (sg["head"][k + 2] - sg["head"][k - 2]) / (4 * DT)
-            pr = (sg["pitch"][k + 2] - sg["pitch"][k - 2]) / (4 * DT)
-            turn = math.hypot(hr * math.cos(math.radians(sg["pitch"][k])), pr)
+            hr = (sg["head0"][k + 2] - sg["head0"][k - 2]) / (4 * DT)
+            pr = (sg["pitch0"][k + 2] - sg["pitch0"][k - 2]) / (4 * DT)
+            turn = math.hypot(hr * math.cos(math.radians(sg["pitch0"][k])), pr)
             clear = float(sg["z"][k] - sg["S"][k])
             recs[f] = dict(f=f, t=f / 24.0, seg=sg["seg"], e=float(sg["e"][k]), n=float(sg["n"][k]), z=float(sg["z"][k]),
                            heading_deg=float(sg["head"][k] % 360.0), pitch_deg=float(sg["pitch"][k]), roll_deg=float(sg["roll"][k]),
                            lens_mm=float(sg["lens"][k]), ground=float(sg["g"][k]), clearance=clear, speed=speed,
                            flow=speed / max(clear, 1.0), turn=turn, flight=float(sg["flight"][k]), vz=float(v3[2]),
-                           water=bool(sg["water"][k]), head_raw=float(sg["head"][k]), seam=False)
-    # つなぎ目: 前後 4 コマの向き・傾き・レンズは、前の出口から後ろの入口へなめらかにつなぐ
+                           water=bool(sg["water"][k]), head_raw=float(sg["head"][k]), sky=float(sg["sky"][k]), seam=False)
+    # つなぎ目: 前後 4 コマの向き・傾き・レンズは、前の出口から後ろの入口へなめらかにつなぐ（位置は飛んでよい）
     for c in config.SEAM_FRAMES:
-        a, b = recs[c - config.SEAM_HALF - 1], recs[c + config.SEAM_HALF]
-        for f in range(c - config.SEAM_HALF, c + config.SEAM_HALF):
-            s = float(smooth01((f - (c - config.SEAM_HALF - 1)) / (2 * config.SEAM_HALF + 1)))
+        a, b = recs[c - HALF - 1], recs[c + HALF]
+        for f in range(c - HALF, c + HALF):
+            s = float(smooth01((f - (c - HALF - 1)) / (2 * HALF + 1)))
             r = recs[f]
             r["seam"] = True
-            r["heading_raw"] = a["head_raw"] + wrap(b["head_raw"] - a["head_raw"]) * s
-            r["heading_deg"] = r["heading_raw"] % 360.0
+            r["head_raw"] = a["head_raw"] + wrap(b["head_raw"] - a["head_raw"]) * s
+            r["heading_deg"] = r["head_raw"] % 360.0
             for key in ("pitch_deg", "roll_deg", "lens_mm"):
                 r[key] = a[key] + (b[key] - a[key]) * s
     out = []
@@ -446,6 +476,8 @@ def all_positions():
 # 検査と表
 # ---------------------------------------------------------------------------
 def beat_of(t):
+    if t >= 29.0:
+        return "H"
     for name, a, b in reversed(config.BEATS):
         if a <= t < b and name[0] in "CDE":
             return name.split()[0]
@@ -455,11 +487,19 @@ def beat_of(t):
     return "-"
 
 
-def in_hero(t):
-    return any(a <= t <= b for a, b in HERO.values())
+def in_hero(t, margin=0.0):
+    return any(a - margin <= t <= b + margin for a, b in HERO.values())
 
 
-def check(out):
+def sun_visible_from(segs):
+    """E で太陽（方位 115°・高さ 5°）が尾根・木の線から出る最初の時刻（秒）。出ないなら None"""
+    sg = segs[2]
+    sk = skyline_deg(sg["e"], sg["n"], sg["z"], np.full(len(sg["t"]), config.SUN_AZ))
+    ok = (sg["t"] >= 19.4) & (sk < config.SUN_EL - 0.27)
+    return float(sg["t"][ok][0]) if ok.any() else None
+
+
+def check(out, segs=None):  # noqa: C901
     v = []
     byf = {r["f"]: r for r in out}
 
@@ -477,63 +517,73 @@ def check(out):
     rng([r["f"] for r in ok if r["flow"] > 4.5], "flow が 4.5 を超える")
     rng([r["f"] for r in ok if r["flow"] > 3.0 and not in_hero(r["t"])], "見せ場の外で flow が 3 を超える")
     rng([r["f"] for r in ok if r["clearance"] < 6.0], "高さが 6m 未満")
-    rng([r["f"] for r in ok if r["turn"] > MAX_TURN], "向きの回る速さが 35°/秒を超える")
+    rng([r["f"] for r in ok if r["turn"] > (10.0 if in_hero(r["t"]) else 20.0) + 0.05], "曲がる速さが上限（見せ場 10・ほか 20 °/秒）を超える")
+    rng([r["f"] for r in ok if math.radians(r["turn"]) * r["speed"] > 20.0 + 0.2], "速さ × 曲がる速さが 20 m/秒² を超える")
     rng([r["f"] for r in out if abs(r["roll_deg"]) > MAX_ROLL + 0.01], "傾きが 35° を超える")
-    rng([r["f"] for r in ok if r["t"] < DRIFT_T and r["speed"] < 3.0], "18.4 秒より前に止まりかけ（3 m/秒未満）")
-    rng([r["f"] for r in ok if r["t"] >= DRIFT_T and not (10.0 <= r["speed"] <= 15.0)], "18.4 秒より後の漂う速さが 10〜15 m/秒の外")
-    # 吊尾根
-    a, b = HERO["H1 吊尾根"]
-    w = [r for r in ok if a <= r["t"] <= b]
-    mc = min(r["clearance"] for r in w)
-    if not 15.0 <= mc <= 30.0:
-        v.append(f"吊尾根の最小の高さ {mc:.1f}m が 15〜30m の外")
-    r2 = [r for r in ok if abs(r["t"] - 8.3) < 0.05]
-    rng([r["f"] for r in r2 if not 15.0 <= r["clearance"] <= 30.0], "L2 の前後 0.05 秒で岩の上 15〜30m の外")
-    # 梢と川
-    t5, t6 = 11.1, 14.1
-    tree = [r for r in ok if t5 <= r["t"] <= t6 and not r["water"]]
-    zone_in = min([r["t"] for r in ok if t5 <= r["t"] <= t6 and r["water"]] or [t6])
-    rng([r["f"] for r in tree if r["t"] < zone_in and not 8.0 <= r["clearance"] <= 15.0], "梢の上 8〜15m の外（川の手前）")
-    rng([r["f"] for r in ok if -0.3 <= r["t"] - t6 <= 0.15 and r["water"] and not 6.0 <= r["clearance"] <= 10.0], "L6 の前 0.3 秒〜後 0.15 秒で水面の上 6〜10m の外")
-    # 尾根越え
-    rng([r["f"] for r in ok if -0.3 <= r["t"] - L9T <= 0.15 and not 12.0 <= r["clearance"] <= 20.0], "L9 の前後 0.3 秒で梢の上 12〜20m の外")
+    rng([r["f"] for r in ok if r["speed"] < 10.0], "速さが 10 m/秒未満（止まりかけ）")
+    # 高さがずっと同じにならない（1.2 秒の間に 0.8m 以上は上下する）
+    for seg in (0, 1, 2):
+        fr = [r for r in ok if r["seg"] == seg]
+        zz = np.array([r["z"] for r in fr])
+        bad = [fr[i]["f"] for i in range(len(fr) - 28) if np.ptp(zz[i:i + 29]) < 0.8]
+        rng(bad, "1.2 秒間、高さがほぼ変わらない")
+    # 吊尾根・梢と川・尾根越え
+    r2 = [r for r in ok if abs(r["t"] - 10.0) < 0.05]
+    rng([r["f"] for r in r2 if not 15.0 <= r["clearance"] <= 30.0], "L2（10.0 秒）の前後 0.05 秒で岩の上 15〜30m の外")
+    rng([r["f"] for r in ok if 14.0 <= r["t"] <= 15.0 and not 9.0 <= r["clearance"] <= 14.5], "D2 の初め（14〜15 秒）で梢の上 9〜14.5m の外")
+    rng([r["f"] for r in ok if 16.9 <= r["t"] <= 17.4 and not 7.8 <= r["clearance"] <= 10.5], "D2 の終わり（16.9〜17.5 秒）で水面の上 7.8〜10.5m の外")
+    rng([r["f"] for r in ok if -0.3 <= r["t"] - 22.4 <= 0.15 and not 12.0 <= r["clearance"] <= 20.0], "L9（22.4 秒）の前後で梢の上 12〜20m の外")
+    rng([r["f"] for r in ok if r["t"] >= 24.9 and not 10.0 <= r["speed"] <= 16.0], "24.9 秒より後の漂う速さが 10〜16 m/秒の外")
+    rng([r["f"] for r in ok if r["t"] >= 24.9 and not 0.3 <= r["vz"] <= 1.4], "24.9 秒より後の上がる速さが 0.3〜1.4 m/秒の外")
+    # C2 の向き（上下）
+    r3 = [r for r in ok if abs(r["t"] - 10.0) < 0.1]
+    rng([r["f"] for r in r3 if not -12.5 <= r["pitch_deg"] <= -7.5], "L2 で上下が -8〜-12° の外")
+    rng([r["f"] for r in ok if 11.9 <= r["t"] <= 12.45 and not -28.0 <= r["pitch_deg"] <= -21.0], "D1 の終わりで上下が -25° 前後の外")
+    rng([r["f"] for r in ok if 11.9 <= r["t"] <= 12.45 and not -16.0 <= r["roll_deg"] <= -9.5], "D1 の終わりで左へ 10〜15° の外")
+    rng([r["f"] for r in ok if 24.0 <= r["t"] <= 28.5 and not -3.5 <= r["pitch_deg"] <= -0.5], "尾根越えの後（〜28.5 秒）で上下が -2° 前後の外")
+    rng([r["f"] for r in ok if r["t"] >= 29.99 and not 8.0 <= r["pitch_deg"] <= 11.0], "最後に 12° 上を向く")
     # つなぎ目
     for c in config.SEAM_FRAMES:
-        a, b = byf[c - 1], byf[c]
+        a, b = byf[c - HALF - 1], byf[c + HALF]
         if abs(b["speed"] / a["speed"] - 1) > 0.2:
             v.append(f"つなぎ目 {c}: 速さ {a['speed']:.0f}→{b['speed']:.0f} m/秒（±20% の外）")
         if abs(b["flight"] - a["flight"]) > 2.0:
             v.append(f"つなぎ目 {c}: 降りる角度 {a['flight']:.1f}→{b['flight']:.1f}°（±2° の外）")
         if abs(b["roll_deg"] - a["roll_deg"]) > 2.0:
             v.append(f"つなぎ目 {c}: 傾き {a['roll_deg']:.1f}→{b['roll_deg']:.1f}°（±2° の外）")
-    a, b = byf[C2 - 1], byf[C2]
-    if abs(wrap(b["head_raw"] - a["head_raw"])) > 3.0 + 40:
-        pass  # つなぎ目②の向きは、もやの中でそろえる（下で見る）
-    # 速さが 1 コマで 25% 以上変わる所（高さのカクつき）
-    rng([f for f in range(config.FIRST_MOUNTAIN_FRAME + 1, config.FRAMES)
-         if not (byf[f]["seam"] or byf[f - 1]["seam"] or f in config.SEAM_FRAMES)
-         and abs(byf[f]["speed"] - byf[f - 1]["speed"]) > 0.25 * byf[f - 1]["speed"] + 2.0], "速さが 1 コマで急に変わる")
-    # 加速の連続・位置の飛び（つなぎ目以外）
-    for f in range(config.FIRST_MOUNTAIN_FRAME + 1, config.FRAMES):
-        if byf[f]["seam"] or byf[f - 1]["seam"] or f in config.SEAM_FRAMES:
-            continue
+    a, b = byf[C2 - HALF - 1], byf[C2 + HALF]
+    if abs(wrap(b["head_raw"] - a["head_raw"])) > 3.0:
+        v.append(f"つなぎ目 {C2}: 向き {a['heading_deg']:.1f}→{b['heading_deg']:.1f}°（±3° の外）")
+    # 速さ・加速のなめらかさ・位置の飛び（つなぎ目以外）
+    pair = [f for f in range(config.FIRST_MOUNTAIN_FRAME + 1, config.FRAMES)
+            if not (byf[f]["seam"] or byf[f - 1]["seam"]) and f not in config.SEAM_FRAMES]
+    rng([f for f in pair if abs(byf[f]["speed"] - byf[f - 1]["speed"]) > 0.08 * byf[f - 1]["speed"] + 0.5], "速さが 1 コマで急に変わる")
+    for f in pair:
         d = math.dist((byf[f]["e"], byf[f]["n"], byf[f]["z"]), (byf[f - 1]["e"], byf[f - 1]["n"], byf[f - 1]["z"]))
         if d > 1.3 * max(byf[f]["speed"], byf[f - 1]["speed"]) / 24 + 0.5:
             v.append(f"コマ {f}: 位置が飛ぶ（{d:.1f}m）")
+    # 点を通っているか（計画の時刻・位置）
+    if segs is not None:
+        for sg in segs:
+            for name, tp in sg["pins"]:
+                i = int(np.argmin(np.abs(sg["t"] - tp)))
+                dd = math.hypot(sg["e"][i] - PT[name][0], sg["n"][i] - PT[name][1])
+                if dd > 4.0:
+                    v.append(f"{name}（{tp} 秒）から {dd:.1f}m ずれている")
+        tv = sun_visible_from(segs)
     return v
 
 
-def table(out, step=0.5):
-    print(f"{'t':>5} {'beat':>4} {'lat':>9} {'lon':>9} {'alt':>6} {'ground':>6} {'clear':>5} {'speed':>5} {'flow':>4} {'head':>5} {'pitch':>5} {'roll':>5} {'lens':>4}")
+def table(out, step=1.0, segs=None):
+    print(f"{'t':>5} {'beat':>4} {'alt':>6} {'clear':>6} {'speed':>5} {'flow':>4} {'head':>5} {'pitch':>6} {'roll':>5} {'lens':>4}")
     byf = {r["f"]: r for r in out}
-    t = 5.5
-    while t < 25.0:
+    ts = [config.FIRST_MOUNTAIN_FRAME / 24.0] + [float(x) for x in np.arange(6.0, 30.0, step)] + [(config.FRAMES - 1) / 24.0]
+    for t in ts:
         f = int(round(t * 24))
         if f in byf:
             r = byf[f]
-            print(f"{r['t']:5.2f} {beat_of(r['t']):>4} {r['lat']:9.5f} {r['lon']:9.5f} {r['z']:6.0f} {r['ground']:6.0f} {r['clearance']:5.1f} {r['speed']:5.0f} {r['flow']:4.1f} {r['heading_deg']:5.0f} {r['pitch_deg']:5.1f} {r['roll_deg']:5.1f} {r['lens_mm']:4.0f}"
+            print(f"{r['t']:5.2f} {beat_of(r['t']):>4} {r['z']:6.0f} {r['clearance']:6.1f} {r['speed']:5.0f} {r['flow']:4.1f} {r['heading_deg']:5.0f} {r['pitch_deg']:6.1f} {r['roll_deg']:5.1f} {r['lens_mm']:4.0f}"
                   + ("  もや" if r["seam"] else ""))
-        t += step
 
 
 # ---------------------------------------------------------------------------
@@ -585,12 +635,9 @@ def plot(out, segs):
             x, y = P(r["e"], r["n"])
             dr.ellipse([x - 3, y - 3, x + 3, y + 3], fill=(255, 255, 255), outline=(0, 0, 0))
             dr.text((x + 5, y - 5), f"{r['t']:.0f}s", fill=(255, 255, 255), font=font)
-    for w in WAYPOINTS:
-        if w[0] in ("L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10"):
-            x, y = P(*w[3])
-            dr.text((x - 22, y + 4), w[0], fill=(255, 40, 40), font=font)
-    sx, sy = P(*PT["OKUHO"])
-    dr.text((sx, sy), "Okuhotaka", fill=(0, 0, 0), font=font)
+    for name, pos in PT.items():
+        x, y = P(*pos)
+        dr.text((x - 22, y + 4), name, fill=(255, 40, 40), font=font)
     ex, ey = P(0, 0)
     dr.text((ex, ey), "Kappabashi", fill=(0, 0, 0), font=font)
     dr.text((8, 8), "route map  orange=seg0  cyan=seg1  yellow=seg2  dashed=seam jump", fill=(255, 255, 255), font=font)
@@ -599,7 +646,7 @@ def plot(out, segs):
     W2, H2 = 1280, 900
     img = Image.new("RGB", (W2, H2), (250, 250, 247))
     dr = ImageDraw.Draw(img)
-    T0, T1 = 5.4, 25.0
+    T0, T1 = 5.4, 30.0
     X = lambda t: 70 + (t - T0) / (T1 - T0) * (W2 - 100)
     panels = [(30, 340, "altitude (m): camera, ground, surface (tree top)", 1400, 3200, False),
               (400, 590, "speed (m/s, log)", 5, 700, True), (650, 860, "flow = speed / clearance (1/s)", 0, 6, False)]
@@ -616,7 +663,7 @@ def plot(out, segs):
             dr.rectangle([X(a), ya, X(b), yb], fill=(255, 240, 215))
         for c in config.SEAM_FRAMES:
             dr.rectangle([X((c - 4) / 24), ya, X((c + 4) / 24), yb], fill=(215, 225, 240))
-        for tt in range(6, 26):
+        for tt in range(6, 31):
             dr.line([(X(tt), yb), (X(tt), yb + 4)], fill=(0, 0, 0))
             if yb == 860 or yb == 340 and tt % 2 == 0:
                 dr.text((X(tt) - 6, yb + 6), str(tt), fill=(0, 0, 0), font=font)
@@ -658,8 +705,15 @@ def plot(out, segs):
 def main():
     out, segs = build()
     write_json(out)
-    table(out)
-    v = check(out)
+    table(out, segs=segs)
+    for sg in segs:
+        print("区間", sg["seg"], "道のりの伸ばし k:", " ".join(f"{k:.2f}" for k in sg["k"]))
+    print("太陽が木・尾根の線から出る最初の時刻:", sun_visible_from(segs))
+    byf = {r["f"]: r for r in out}
+    for c in config.SEAM_FRAMES:
+        a, b = byf[c - HALF - 1], byf[c + HALF]
+        print(f"つなぎ目 {c}: 速さ {a['speed']:.0f}→{b['speed']:.0f}  降りる角度 {a['flight']:.1f}→{b['flight']:.1f}  傾き {a['roll_deg']:.1f}→{b['roll_deg']:.1f}  向き {a['heading_deg']:.1f}→{b['heading_deg']:.1f}")
+    v = check(out, segs)
     print(f"\n決まり破り {len(v)} 件")
     for m in v:
         print(" -", m)

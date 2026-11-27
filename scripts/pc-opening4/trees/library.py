@@ -18,9 +18,10 @@ from . import materials as _mat
 
 LOD_FOLIAGE = {
     # card_size：カード 1 枚の大きさ（絵 0.70m 幅に対する倍率）。LOD1 は最大 0.4m のふさ
-    0: dict(twig_tris=300_000, card_cell=0.16, card_size=0.5, max_tris=390_000, keep=1.0, extra_step=0.12),
-    1: dict(twig_tris=0, card_cell=0.13, card_size=0.57, max_tris=39_000, keep=0.7, extra_step=0.1),
-    2: dict(twig_tris=0, card_cell=0.4, card_size=0.8, max_tris=8_000, keep=0.75, extra_step=0.2),
+    # planes：1 枚のカードを何枚の板の十字にするか。card_size：絵 0.30m 幅に対する倍率（LOD0 で幅 約 0.2m のふさ）
+    0: dict(twig_tris=190_000, card_cell=0.10, card_size=0.85, max_tris=395_000, keep=1.0, extra_step=0.08, planes=2),
+    1: dict(twig_tris=0, card_cell=0.12, card_size=1.05, max_tris=39_000, keep=0.95, extra_step=0.08, planes=1),
+    2: dict(twig_tris=0, card_cell=0.4, card_size=2.4, max_tris=8_000, keep=0.75, extra_step=0.2, planes=1),
 }
 CARD_KIND_P = np.array([0.42, 0.30, 0.18, 0.10])   # gold, thin, rust, cone
 _twig_cache = {}
@@ -165,7 +166,8 @@ def foliage_cards(sk, P, cfg, skip, rg, tris_left):
     keep = rg.random(len(pick)) < pk
     pick = pick[keep]
     shell = shell[keep]
-    maxc = max(0, int(tris_left // 4))
+    npl = cfg.get("planes", 2)
+    maxc = max(0, int(tris_left // (2 * npl)))
     if len(pick) > maxc:
         sel = np.argsort(-A["shell"][pick])[:maxc]
         pick, shell = pick[sel], shell[sel]
@@ -183,8 +185,8 @@ def foliage_cards(sk, P, cfg, skip, rg, tris_left):
     y0, y1 = -ch / 2, ch / 2
     corners = np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]])
     V = []
-    roll0 = np.deg2rad(rg.uniform(-60, 60, m))           # カードの向きを枝のまわりでばらす（どれも正面を向かない）
-    for q in range(2):
+    roll0 = np.deg2rad(rg.uniform(-60, 60, m) if npl == 2 else rg.uniform(-90, 90, m))           # カードの向きを枝のまわりでばらす（どれも正面を向かない）
+    for q in range(npl):
         roll = roll0 if q == 0 else roll0 + np.deg2rad(rg.uniform(50, 85, m)) * np.where(rg.random(m) < 0.5, 1, -1)
         cr, sr = np.cos(roll), np.sin(roll)
         for c in corners:
@@ -200,17 +202,20 @@ def foliage_cards(sk, P, cfg, skip, rg, tris_left):
     v0 = 1.0 - (cy + 1) / nrow
     cu = np.array([0, 1, 1, 0]) / ncol
     cv = np.array([0, 0, 1, 1]) / nrow
-    uv = np.stack([np.stack([u0 + cu[i], v0 + cv[i]], 1) for i in range(4)] * 2, 1)
+    uv = np.stack([np.stack([u0 + cu[i], v0 + cv[i]], 1) for i in range(4)] * npl, 1)
     eps = 0.0015
     uv[:, :, 0] = np.clip(uv[:, :, 0], (u0 + eps)[:, None], (u0 + 1.0 / ncol - eps)[:, None])
     uv[:, :, 1] = np.clip(uv[:, :, 1], (v0 + eps)[:, None], (v0 + 1.0 / nrow - eps)[:, None])
-    b = np.arange(m) * 8
-    faces = np.stack([b + 0, b + 1, b + 2, b + 0, b + 2, b + 3, b + 4, b + 5, b + 6, b + 4, b + 6, b + 7], 1).reshape(-1, 3)
+    b = np.arange(m) * (4 * npl)
+    fl = [b + 0, b + 1, b + 2, b + 0, b + 2, b + 3]
+    if npl == 2:
+        fl += [b + 4, b + 5, b + 6, b + 4, b + 6, b + 7]
+    faces = np.stack(fl, 1).reshape(-1, 3)
     # 木の中の色ずれ：外側・上は橙寄り（+5 度）、内側・下は緑寄り（-8〜-15 度）。1 枚ごとに ±4 度
     zrel = A["pos"][pick, 2] / max(H, 1.0)
     off = np.interp(shell, [0.2, 0.75, 1.0], [-0.4, 0.0, 0.17]) + 0.2 * (zrel - 0.5) + rg.normal(0, 0.12, m)
     tone = np.clip(P["tone"] + off, 0, 1)
-    return dict(verts=V.reshape(-1, 3), faces=faces, uv=uv.reshape(-1, 2), tone=np.repeat(tone, 8))
+    return dict(verts=V.reshape(-1, 3), faces=faces, uv=uv.reshape(-1, 2), tone=np.repeat(tone, 4 * npl))
 
 
 def build_tree(species="larch", variant=0, lod=0, link=True, timing=None):

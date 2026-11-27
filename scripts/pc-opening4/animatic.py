@@ -1,14 +1,16 @@
-"""山の場面（コマ 131〜599）の速い下書き。飛び方を見るためのもので、見た目の仕上げではない。
+"""山の場面（コマ 131〜719。30.0 秒版）の速い下書き。飛び方を見るためのもので、見た目の仕上げではない。
 
 使い方（Blender の Python と、ふつうの python3 で分ける）
     PY=<scratchpad>/bl/bin/python
-    $PY animatic.py render      # 640x360・8 回・ノイズ取り・2 スレッド。4 コマごと（131〜599 の 118 コマ）。続きから再開できる
-    python3 animatic.py assemble  # review/route/animatic.mp4（6 コマ/秒・H.264）と review/route/sheet.jpg（30 コマ・6x5）
+    $PY animatic.py render      # 640x360・8 回・ノイズ取り・2 スレッド。4 コマごと（131〜719 の 148 コマ）。続きから再開できる
+    python3 animatic.py assemble  # review/route/animatic.mp4（6 コマ/秒・H.264）と review/route/sheet.jpg（36 コマ・6x6）
     $PY animatic.py render 131 247   # コマを指定して描く（確かめ用）
 
 絵は WORK/animatic/ に置く。つなぎ目（もやの 8 コマ）は白い絵にする（描かない）。
-地形は 10m 標高を約 30m に間引いたもの（谷の全域）＋ 広い範囲の標高（東・南東 80km まで）。地球の丸みを引く。
-色は標高と傾きだけの簡単な分け方（雪・岩・森・金色のカラマツ・谷底）。雲海は標高 1,700m の平らな面（東経 137.695 より東）。
+地形は 10m 標高を約 30m に間引いたもの（谷の全域）＋ far（約 185m 間隔）＋ mid（国土地理院 z11 を約 370m 間隔。東経 136.9〜139.1・北緯 35.25〜37.0。
+八ヶ岳・富士山まで届く）。地球の丸みを引く。遠いほど青白く霞ませる（色に焼きこみ）。
+色は標高と傾きだけの簡単な分け方（雪・岩・森・金色のカラマツ・谷底）。雲海は標高 1,700m の平らな面（東経 137.695 より東。富士山の方まで広げた）。
+太陽の円盤（方位 115°・高さ 5°。見た目は実物の約 4 倍）は、カメラにだけ見える発光の球を、コマごとにカメラから 250km の先に置いて描く。
 """
 from __future__ import annotations
 
@@ -31,6 +33,15 @@ SUN_DIR = np.array([math.sin(math.radians(config.SUN_AZ)) * math.cos(math.radian
                     math.sin(math.radians(config.SUN_EL))])  # 太陽のある向き
 CLOUD_Z = 1700.0
 CLOUD_LON = 137.695
+SUN_DIST = 250000.0
+SUN_RADIUS_DEG = 1.0     # 見やすいように実物（0.27°）の約 4 倍
+HAZE_RGB = np.array([0.58, 0.64, 0.78], np.float32)
+
+
+def haze(col, E, N, scale=45000.0):
+    """遠いほど青白く（距離は原点から）"""
+    f = (1.0 - np.exp(-np.hypot(E, N) / scale)).astype(np.float32)[..., None]
+    return col * (1 - 0.85 * f) + HAZE_RGB * 0.85 * f
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +67,7 @@ def colors(h, slope, rng_seed):
     col[snow] = (0.92, 0.93, 0.95)                                      # 新雪
     floor = (h < 1560) & (slope < 10)
     col[floor] = (0.55, 0.47, 0.27)                                     # 谷底
+    col[h < 5.0] = (0.10, 0.18, 0.28)                                   # 海
     return col
 
 
@@ -117,11 +129,24 @@ def build_scene(bpy):
     ce = 0.5 * (Ef[:-1] + Ef[1:])[None, :]
     cn = 0.5 * (Nf[:-1] + Nf[1:])[:, None]
     inside = (ce > En.min() + 60) & (ce < En.max() - 60) & (cn > Nn.min() + 60) & (cn < Nn.max() - 60)
-    far = make_object(bpy, "far", Ef, Nf, Zf - 6.0, colors(Zf, slf, 2), mask=~inside)
+    EEf, NNf = np.meshgrid(Ef, Nf)
+    far = make_object(bpy, "far", Ef, Nf, Zf - 6.0, haze(colors(Zf, slf, 2), EEf, NNf), mask=~inside)
+    # ---- もっと遠い地形（mid。far の外。約 370m 間隔）。八ヶ岳・富士山
+    m = d.mid
+    st3 = 6
+    Zm = m.arr[::st3, ::st3]
+    slm = slope_of(m.arr, 61.7)[::st3, ::st3]
+    Em, Nm = m.xs[::st3], m.ys[::st3]
+    cem = 0.5 * (Em[:-1] + Em[1:])[None, :]
+    cnm = 0.5 * (Nm[:-1] + Nm[1:])[:, None]
+    fe0, fe1, fn0, fn1 = f.xs.min() + 400, f.xs.max() - 400, f.ys.min() + 400, f.ys.max() - 400
+    inside_m = (cem > fe0) & (cem < fe1) & (cnm > fn0) & (cnm < fn1)
+    EEm, NNm = np.meshgrid(Em, Nm)
+    midm = make_object(bpy, "mid", Em, Nm, Zm - 25.0, haze(colors(Zm, slm, 3), EEm, NNm), mask=~inside_m)
     # ---- 雲海（標高 1,700m の平らな面。東経 137.695 より東）
     e0 = float(geo4.to_local(CLOUD_LON, config.ORIGIN_LAT)[0])
-    ee = e0 + 120.0 * np.expm1(np.linspace(0, math.log1p((90000.0 - e0) / 120.0), 110))
-    nn = -700.0 + 300.0 * np.sinh(np.linspace(-math.asinh(70000 / 300.0), math.asinh(50000 / 300.0), 130))
+    ee = e0 + 120.0 * np.expm1(np.linspace(0, math.log1p((260000.0 - e0) / 120.0), 150))
+    nn = -700.0 + 300.0 * np.sinh(np.linspace(-math.asinh(260000 / 300.0), math.asinh(150000 / 300.0), 180))
     cloud = make_object(bpy, "cloud", ee, nn[::-1], np.full((len(nn), len(ee)), CLOUD_Z, np.float32), None)
     # ---- 材質
     def mat_vertex():
@@ -138,6 +163,7 @@ def build_scene(bpy):
     mt = mat_vertex()
     near.data.materials.append(mt)
     far.data.materials.append(mt)
+    midm.data.materials.append(mt)
     mc = bpy.data.materials.new("cloud")
     mc.use_nodes = True
     mc.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.93, 0.94, 0.96, 1)
@@ -165,6 +191,24 @@ def build_scene(bpy):
     sc.collection.objects.link(so)
     q = Vector((-SUN_DIR[0], -SUN_DIR[1], -SUN_DIR[2])).to_track_quat("-Z", "Y")
     so.rotation_euler = q.to_euler()
+    # ---- 太陽の円盤（カメラにだけ見える発光の球。照らす光は上の SUN ライト）
+    R = SUN_DIST * math.tan(math.radians(SUN_RADIUS_DEG))
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=R, segments=24, ring_count=12, location=(0, 0, 0))
+    disc = bpy.context.active_object
+    disc.name = "sun_disc"
+    for k in ("visible_diffuse", "visible_glossy", "visible_transmission", "visible_volume_scatter", "visible_shadow"):
+        setattr(disc, k, False)
+    md = bpy.data.materials.new("sun_disc")
+    md.use_nodes = True
+    nd = md.node_tree
+    for n_ in list(nd.nodes):
+        nd.nodes.remove(n_)
+    em = nd.nodes.new("ShaderNodeEmission")
+    em.inputs["Color"].default_value = (1.0, 0.86, 0.62, 1)
+    em.inputs["Strength"].default_value = 60.0
+    outn = nd.nodes.new("ShaderNodeOutputMaterial")
+    nd.links.new(em.outputs["Emission"], outn.inputs["Surface"])
+    disc.data.materials.append(md)
     # ---- カメラ・描画
     cam = bpy.data.cameras.new("cam")
     cam.sensor_width = 36.0
@@ -189,11 +233,14 @@ def build_scene(bpy):
     sc.render.image_settings.file_format = "PNG"
     sc.view_settings.view_transform = "AgX"
     sc.view_settings.look = "None"
+    tris = sum(len(o.data.polygons) for o in bpy.data.objects if o.type == "MESH" and o.name != "sun_disc") * 2
+    print(f"三角形 {tris}", flush=True)
     return co
 
 
 def place(co, r):
     """コマの記録からカメラを置く（Blender は Z が上・東が X・北が Y）"""
+    import bpy
     from mathutils import Matrix, Vector
 
     h, p, ro = (math.radians(r[k]) for k in ("heading_deg", "pitch_deg", "roll_deg"))
@@ -207,6 +254,9 @@ def place(co, r):
     m.translation = Vector((r["e"], r["n"], z))
     co.matrix_world = m
     co.data.lens = r["lens_mm"]
+    d_ = bpy.data.objects.get("sun_disc")
+    if d_ is not None:
+        d_.location = m.translation + Vector(tuple(SUN_DIR * SUN_DIST))
 
 
 def render(frames):
@@ -268,10 +318,10 @@ def assemble():
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", "6", "-i", str(tmp / "v%04d.png"), "-c:v", "libx264",
                     "-pix_fmt", "yuv420p", "-crf", "30", "-preset", "slow", "-movflags", "+faststart", str(mp4)], check=True)
     print("動画", mp4, mp4.stat().st_size // 1024, "KB")
-    # 一覧: 30 コマを 6x5
-    pick = [FRAMES[int(round(k * (len(FRAMES) - 1) / 29))] for k in range(30)]
+    # 一覧: 36 コマを 6x6
+    pick = [FRAMES[int(round(k * (len(FRAMES) - 1) / 35))] for k in range(36)]
     tw, th = 266, 150
-    sheet = Image.new("RGB", (tw * 6, th * 5), (0, 0, 0))
+    sheet = Image.new("RGB", (tw * 6, th * 6), (0, 0, 0))
     fnt2 = _font(16)
     for k, f in enumerate(pick):
         im = frame_image(f).resize((tw, th), Image.LANCZOS)

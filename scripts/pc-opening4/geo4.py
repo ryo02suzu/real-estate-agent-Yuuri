@@ -47,8 +47,8 @@ def curvature_drop(e, n):
 class Grid:
     """タイルをつないだ標高の格子"""
 
-    def __init__(self, name: str):
-        d = config.TERRAIN_DIR
+    def __init__(self, name: str, directory=None):
+        d = directory or config.TERRAIN_DIR
         self.arr = np.load(d / f"{name}.npy").astype(np.float32)
         self.meta = json.loads((d / f"{name}.json").read_text())
         self.n = 2.0 ** self.meta["z"]
@@ -89,15 +89,19 @@ class Grid:
 class Dem:
     """標高（m。本当の高さ・双線形）。谷の格子の外は広い格子"""
 
-    def __init__(self):
+    def __init__(self, wide: bool = False):
         self.valley = Grid("valley")
         self.far = Grid("far")
+        # 広い格子（東経 136.9〜139.1・北緯 35.25〜37.0）。far の外で使う（八ヶ岳・富士山まで届く）
+        self.mid = Grid("mid", config.WIDE_DIR) if wide else None
 
     def height(self, e, n):
         e = np.asarray(e, dtype=np.float64)
         n = np.asarray(n, dtype=np.float64)
         hv = self.valley.sample(e, n)
         hf = self.far.sample(e, n)
+        if self.mid is not None:
+            hf = np.where(self.far.inside(e, n), hf, self.mid.sample(e, n))
         return np.where(self.valley.inside(e, n), hv, hf).astype(np.float64)
 
     def slope_deg(self, e, n, d=15.0):

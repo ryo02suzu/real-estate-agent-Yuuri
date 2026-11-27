@@ -191,38 +191,36 @@ def twig_variants(n=8, thin=0.15, tint0=0.3, cones=0.25, species_seed=0):
 
 # ---------------------------------------------------------------- 束（カード用の見本）
 CLUSTER_KINDS = {
-    "gold": dict(thin=0.05, tint0=0.45, cones=0.03, ntw=20),
-    "thin": dict(thin=0.40, tint0=0.5, cones=0.05, ntw=16),
-    "rust": dict(thin=0.22, tint0=0.72, cones=0.03, ntw=18),
-    "cone": dict(thin=0.45, tint0=0.5, cones=0.5, ntw=16),
+    "gold": dict(thin=0.05, tint0=0.45, cones=0.03, ntw=6),
+    "thin": dict(thin=0.40, tint0=0.5, cones=0.05, ntw=5),
+    "rust": dict(thin=0.22, tint0=0.72, cones=0.03, ntw=6),
+    "cone": dict(thin=0.45, tint0=0.5, cones=0.5, ntw=5),
 }
 
 
 def build_cluster(kind, seed=0):
-    """小枝を 7〜9 本ならべた枝先（約 0.6×0.4m）。XY 平面に広げる（上から撮る）。"""
+    """カード用の小さな葉のふさ（約 0.3×0.22m）。短い軸に、短い小枝を 3 次元にばらして 5〜7 本。
+    （前の版は 0.7m の櫛のような平らな枝先で、シダの葉に見えた。実物は短枝の束が枝にぽつぽつつく）"""
     c = CLUSTER_KINDS[kind]
     rg = np.random.default_rng((8801, seed, sum(map(ord, kind))))
-    parts_w, parts_n = [], []
-    # 主軸
-    L = 0.38
-    ax = np.stack([np.linspace(0, L, 10), 0.02 * np.sin(np.linspace(0, 3, 10)), -0.01 * np.linspace(0, 1, 10) ** 2], 1)
-    v, f, uv, rr = tube(ax, np.linspace(0.0035, 0.0015, 10), 6, 0.5, cap="apex")
+    L = 0.17
+    ax = np.stack([np.linspace(0, L, 8), 0.012 * np.sin(np.linspace(0, 3, 8) + seed), -0.012 * np.linspace(0, 1, 8) ** 2], 1)
+    v, f, uv, rr = tube(ax, np.linspace(0.0024, 0.0012, 8), 6, 0.5, cap="apex")
     wood = [(v, f, uv, rr, 0.0)]
     needles = []
-    for i in range(c["ntw"]):
-        sv = (0.08 + 0.85 * (i + rg.uniform(-0.3, 0.3)) / c["ntw"]) * L
-        sv = float(np.clip(sv, 0.03, L))
+    n = c["ntw"]
+    for i in range(n):
+        sv = float(np.clip((0.12 + 0.8 * (i + rg.uniform(-0.3, 0.3)) / n) * L, 0.02, L))
         side = 1 if i % 2 == 0 else -1
-        yaw = side * np.deg2rad(rg.uniform(28, 62))
+        yaw = side * np.deg2rad(rg.uniform(25, 62))
         tw = build_twig((9901, seed, i * 7 + sum(map(ord, kind))), thin=c["thin"], tint0=c["tint0"], cones=c["cones"],
-                        scale=rg.uniform(0.55, 0.8))
-        R = _rot_z(yaw) @ _rot_x(rg.uniform(-0.5, 0.5)) @ _rot_y(rg.uniform(-0.1, 0.25))
-        p = np.array([np.interp(sv, np.linspace(0, L, 10), ax[:, k]) for k in range(3)])
+                        scale=rg.uniform(0.26, 0.42))
+        R = _rot_z(yaw) @ _rot_x(rg.uniform(-1.3, 1.3)) @ _rot_y(rg.uniform(-0.2, 0.3))
+        p = np.array([np.interp(sv, np.linspace(0, L, 8), ax[:, k]) for k in range(3)])
         wood.append((transform(tw["wood"], R, p, 1.0), tw["wood"]["faces"], tw["wood"]["uv"], tw["wood"]["radius"], tw["wood"]["dead"]))
         needles.append((transform(tw["needles"], R, p, 1.0), tw["needles"]["faces"], tw["needles"]["uv"], tw["needles"]["tint"]))
-    # 先の小枝（主軸の延長）
-    tw = build_twig((9902, seed, sum(map(ord, kind))), thin=c["thin"], tint0=c["tint0"], cones=c["cones"], scale=1.0)
-    R = _rot_z(rg.uniform(-0.15, 0.15))
+    tw = build_twig((9902, seed, sum(map(ord, kind))), thin=c["thin"], tint0=c["tint0"], cones=c["cones"], scale=rg.uniform(0.4, 0.55))
+    R = _rot_z(rg.uniform(-0.2, 0.2)) @ _rot_x(rg.uniform(-1.0, 1.0))
     wood.append((transform(tw["wood"], R, ax[-1], 1.0), tw["wood"]["faces"], tw["wood"]["uv"], tw["wood"]["radius"], tw["wood"]["dead"]))
     needles.append((transform(tw["needles"], R, ax[-1], 1.0), tw["needles"]["faces"], tw["needles"]["uv"], tw["needles"]["tint"]))
     return wood, needles
@@ -246,9 +244,9 @@ def cluster_to_arrays(wood, needles):
 
 
 # ---------------------------------------------------------------- カード（焼き込み）
-CELL_W, CELL_H = 768, 480
+CELL_W, CELL_H = 768, 576
 ATLAS_COLS, ATLAS_ROWS = 4, 3          # 4 種 × 3 通りの見本 = 12 種
-CLUSTER_W, CLUSTER_H = 0.70, 0.44      # 1 マスが写す大きさ(m)
+CLUSTER_W, CLUSTER_H = 0.30, 0.225      # 1 マスが写す大きさ(m)
 
 
 def dilate_color(arr, alpha_min=3):
