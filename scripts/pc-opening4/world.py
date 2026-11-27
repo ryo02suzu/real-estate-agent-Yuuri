@@ -279,7 +279,8 @@ try:
     scene.view_settings.look = "AgX - " + opt.get("look", "Punchy").replace("_", " ")
 except TypeError:
     pass
-scene.view_settings.exposure = float(opt.get("exposure", "-3.6"))
+C2 = FRAME < 400                                  # c2（コマ 240：谷を見下ろす）は影を持ち上げ・谷にかすみ
+scene.view_settings.exposure = float(opt.get("exposure", "-2.8" if C2 else "-3.1"))
 if "border" in opt:
     bx0, by0, bx1, by1 = (float(v) for v in opt["border"].split(","))
     scene.render.use_border = True
@@ -490,6 +491,11 @@ def terrain_material():
         cal = nd.vmath("SCALE", gcol, None)
         nt.links.new(nd.math("MULTIPLY", ratio, float(opt.get("albedo", "0.5"))), cal.inputs["Scale"])
         gcol = cal.outputs["Vector"]
+        # 11 月：標高 2,300m 以上の明るい緑は藁色（黄土）へ。暗いハイマツの緑はそのまま
+        lc = nd.new("ShaderNodeRGBToBW", Color=gcol).outputs[0]
+        straw = nd.new("ShaderNodeCombineColor", Red=nd.math("MULTIPLY", lc, 1.35), Green=lc, Blue=nd.math("MULTIPLY", lc, 0.62)).outputs[0]
+        wst = nd.math("MULTIPLY", nd.math("MULTIPLY", nd.rng(sepp.outputs["Z"], 2300.0, 2650.0, 0.0, 1.0, True), nd.rng(lc, 0.03, 0.09, 0.0, 1.0, True)), float(opt.get("season", "0.6")))
+        gcol = nd.mix(wst, gcol, straw)
     else:
         gcol = (0.3, 0.3, 0.3)
     # 急な面（45° より急）は写真をやめて岩（3 次元のノイズ＝三面に貼ったのと同じ）へ
@@ -678,12 +684,14 @@ def cloud_field(E, N, chunk=600_000):
     wgt = np.empty(len(e), dtype=np.float32)
     for i in range(0, len(e), chunk):
         sl = slice(i, i + chunk)
-        top[sl], wgt[sl], _ = cloud_surface(e[sl], n[sl], ground(e[sl], n[sl]))
+        g_ = ground(e[sl], n[sl])
+        top[sl], wgt[sl], _ = cloud_surface(e[sl], n[sl], g_)
+        wgt[sl] = top[sl] - g_                       # 返すのは「上面が地面より何 m 上か」（板の升目を残すかの判定に使う）
     return top.reshape(shape), wgt.reshape(shape)
 
 
 # ---------------------------------------------------------------- 雲の光の応え方（どの輪も同じ材質の値）
-D0 = float(opt.get("cloud_density", "0.06"))        # 雲の中の濃さ（1/m）
+D0 = float(opt.get("cloud_density", "0.07"))        # 雲の中の濃さ（1/m）
 CLOUD_COLOR = (0.985, 0.985, 0.99, 1.0)
 PHASE = opt.get("phase", "hg2")
 
@@ -819,11 +827,11 @@ def build_cloud_slab(name, s, rmin, rmax, ang, material, thick=260.0, top_off=0.
     Nn = vy[rr].astype(np.float64)
     top, wgt = cloud_field(E, Nn)
     zt = np.full(used.shape, np.nan, dtype=np.float32)
-    wg = np.zeros(used.shape, dtype=np.float32)
+    wg = np.full(used.shape, -9999.0, dtype=np.float32)
     zt[rr, cc] = top - geo4.curvature_drop(E, Nn).astype(np.float32) + top_off
     wg[rr, cc] = wgt
     wq = np.maximum.reduce([wg[:-1, :-1], wg[:-1, 1:], wg[1:, :-1], wg[1:, 1:]])
-    keep &= wq > 0.03
+    keep &= wq > -12.0                               # 上面が地面より少し下まで残す＝雲と地面は形の交わりで接する（階段の壁を作らない）
     zt = np.nan_to_num(zt, nan=0.0)
     return closed_slab(name, vx, vy, zt, zt - thick, keep, material)
 
@@ -1177,14 +1185,15 @@ if HAZE:
     t0 = time.time()
     hr = float(opt.get("haze_range", "170000"))
     cell_h = float(opt.get("haze_cell", "8000"))
-    d1 = float(opt.get("haze_clear", "0.4e-5"))                 # 1/m（= 0.0115 /km）
-    d2 = float(opt.get("haze_moist", "0.8e-5"))                  # 下 200m（0.03 /km）
+    d1 = float(opt.get("haze_clear", "0.8e-5"))                 # 1/m（= 0.0115 /km）
+    d2 = float(opt.get("haze_moist", "1.2e-5"))                  # 下 200m（0.03 /km）
     HG_M = float(opt.get("haze_g", "0.75"))
     hc = (0.6, 0.78, 1.0, 1.0)
     mc = (0.97, 0.96, 1.0, 1.0)                                  # しめった層は中立（暖かさは太陽の光から）
-    for nm, z0, z1, dd, col, gg in (("haze_clear", -800.0, float(opt.get("clear_top", "3600")), d1, hc, 0.35),
+    VM = float(opt.get("valley_mist", "2.5e-5" if C2 else "0"))      # 谷の朝のうすい青いもや（標高 2,400m まで）
+    for nm, z0, z1, dd, col, gg in (([("haze_valley", -800.0, 2400.0, VM, (0.72, 0.84, 1.0, 1.0), 0.5)] if VM > 0 else []) + [("haze_clear", -800.0, float(opt.get("clear_top", "3600")), d1, hc, 0.35),
                                     ("haze_moist1", -800.0, CLOUD_TOP + 200.0, d2, mc, HG_M),
-                                    ("haze_moist2", CLOUD_TOP + 200.0, CLOUD_TOP + 400.0, d2 * 0.5, mc, HG_M)):
+                                    ("haze_moist2", CLOUD_TOP + 200.0, CLOUD_TOP + 400.0, d2 * 0.5, mc, HG_M)]):
         r_ = curved_slab(nm, z0, z1, hr, cell_h, haze_material(nm, dd, col, gg))
         HAZE_N.append(nm)
     STATS["haze_seconds"] = round(time.time() - t0, 1)
