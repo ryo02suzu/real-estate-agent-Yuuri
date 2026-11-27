@@ -19,3 +19,13 @@
   - 面の材質（2k）：rock_face_04・quarry_wall・dark_rock_02・gray_rocks（https://polyhaven.com/a/<名前>）
   - 置く岩（1k・立体）：boulder_01・rock_07・rock_09・moon_rock_01/03/05/07・namaqualand_cliff_02・namaqualand_boulder_03/04/06・rock_face_01/02・mountainside・stone_01
   - 取り方：https://api.polyhaven.com/files/<名前> → 作者・ライセンスは work/ground4/{tex,models}/<名前>/info.json に残す。
+
+## 実写の世界（world_fetch.py・world.py。2026-11-27）
+- 国土地理院 標高タイル（dem_png＝DEM10B ズーム 12・13・14、dem5a_png ズーム 15、dem1a_png ズーム 17）と、全国最新写真（シームレス）（seamlessphoto ズーム 12〜17）。
+  - 出所: https://cyberjapandata.gsi.go.jp/xyz/{dem_png|dem5a_png|dem1a_png|seamlessphoto}/{z}/{x}/{y}.{png|jpg}（取ったタイルは work/world/tiles。GPU の機械では <データのフォルダ>/tiles）
+  - 規約（原本 https://maps.gsi.go.jp/development/ichiran.html を 2026-11-27 に再確認）：「地理院タイルは、国土地理院コンテンツ利用規約に従って利用できます」。
+    「ウェブサイトやソフトウェア、アプリケーション上でリアルタイムに読み込んで利用する場合、地理院タイルは出典の明示のみで申請不要」。映像に焼き込む使い方はこの文のとおりではないので、
+    国土地理院コンテンツ利用規約（基本測量成果）の本文で配る前に確かめる（上の「地形」の項と同じ宿題）。出典の例：「地理院タイル（標高タイル・全国最新写真（シームレス））を加工して作成」。
+  - 気づき：一覧の seamlessphoto の項は「ズームレベル 14〜18」と書いてある。ズーム 12・13 も同じ場所から返ってきたが、一覧には載っていない。気になるなら、遠景も 14 にする（枚数が約 4 倍）。
+  - 取り方：1 秒に 4 枚まで・一般的な User-Agent・つなぎっぱなし 3 本・タイルは取り直さない。reveal 約 2,100 枚・約 157 MB、c2 約 1,940 枚・約 129 MB（重なりは共有して実際の取得は 1,574 枚）。
+  - 写真は夏の昼の航空写真で、森が青緑（色相 0.45 前後）に写っている。world.py の材質で、11 月の朝の色（赤茶・黄金・暗い緑・雪）に仕立てる。
