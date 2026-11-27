@@ -276,7 +276,7 @@ scene.render.image_settings.color_depth = "8"
 scene.render.image_settings.color_mode = "RGB"
 try:
     scene.view_settings.view_transform = "AgX"
-    scene.view_settings.look = "AgX - " + opt.get("look", "Medium_High_Contrast").replace("_", " ")
+    scene.view_settings.look = "AgX - " + opt.get("look", "Punchy").replace("_", " ")
 except TypeError:
     pass
 scene.view_settings.exposure = float(opt.get("exposure", "-3.6"))
@@ -488,7 +488,7 @@ def terrain_material():
         cm_.update()
         ratio = nd.math("DIVIDE", fc.outputs[0], nd.math("MAXIMUM", gl, 1e-4))
         cal = nd.vmath("SCALE", gcol, None)
-        nt.links.new(nd.math("MULTIPLY", ratio, float(opt.get("albedo", "0.7"))), cal.inputs["Scale"])
+        nt.links.new(nd.math("MULTIPLY", ratio, float(opt.get("albedo", "0.5"))), cal.inputs["Scale"])
         gcol = cal.outputs["Vector"]
     else:
         gcol = (0.3, 0.3, 0.3)
@@ -630,11 +630,11 @@ def cloud_top_raw(X, Y):
     v = ac
     wu = u + np.float32(150.0) * nf(u, v, 1800.0, 2, s0 + 11)
     wv = v + np.float32(150.0) * nf(u, v, 1800.0, 2, s0 + 23)
-    swell = np.float32(float(opt.get("swell", "38"))) * nf(wu, wv, 3400.0, 3, s0 + 31, 0.45)           # 2〜5km
+    swell = np.float32(float(opt.get("swell", "50"))) * nf(wu, wv, 3400.0, 3, s0 + 31, 0.45)           # 2〜5km
     ph = wv / np.float32(2900.0) + np.float32(0.5) * nf(u, v, 7000.0, 2, s0 + 47)
     env = np.float32(0.4) + np.float32(0.6) * np.clip(0.5 + 0.5 * nf(u, v, 9000.0, 2, s0 + 53), 0.0, 1.0)
-    wave = np.float32(float(opt.get("wave", "30"))) * np.sin(np.float32(2 * math.pi) * ph) * env          # 平行な筋
-    band = np.float32(float(opt.get("band", "13"))) * nf(wu, wv, 900.0, 3, s0 + 61, 0.5)                # 0.6〜1.2km
+    wave = np.float32(float(opt.get("wave", "40"))) * np.sin(np.float32(2 * math.pi) * ph) * env          # 平行な筋
+    band = np.float32(float(opt.get("band", "16"))) * nf(wu, wv, 900.0, 3, s0 + 61, 0.5)                # 0.6〜1.2km
     big = np.float32(14.0) * nf(u, v, 16000.0, 2, s0 + 37)
     lump = np.clip((fbm(x, y, 8000.0, 2, s0 + 41) - 0.38) / 0.28, 0.0, 1.0)
     lump = np.float32(0.3) + np.float32(0.7) * lump
@@ -703,7 +703,8 @@ def cloud_scatter(nt, density, color=CLOUD_COLOR):
         n_ = nt.nodes.new("ShaderNodeVolumeScatter")
         n_.phase = phase
         n_.inputs["Color"].default_value = color
-        n_.inputs["Anisotropy"].default_value = g
+        if phase == "HENYEY_GREENSTEIN":
+            n_.inputs["Anisotropy"].default_value = g
         d_ = dens(k)
         if isinstance(d_, bpy.types.NodeSocket):
             nt.links.new(d_, n_.inputs["Density"])
@@ -1106,8 +1107,8 @@ if CLOUDS == "volume":
     # 均一な板（移り→中間→遠く。地平線まで同じ雲）。上面は同じ高さの場
     t0 = time.time()
     k = float(opt.get("slab_coarse", "1.0"))
-    VEIL = float(opt.get("veil", "30"))               # 上面の薄い層（やわらかい頂）。体積の中の濃さ 30%
-    VD = float(opt.get("veil_density", "0.3"))
+    VEIL = float(opt.get("veil", "20"))               # 上面の薄い層（やわらかい頂）。体積の中の濃さ 30%
+    VD = float(opt.get("veil_density", "0.2"))
     mat_ramp = cloud_slab_material("cloud_ramp", True)
     mat_flat = cloud_slab_material("cloud_slab", False)
     mat_vramp = cloud_slab_material("cloud_vramp", True, VD)
@@ -1176,13 +1177,14 @@ if HAZE:
     t0 = time.time()
     hr = float(opt.get("haze_range", "170000"))
     cell_h = float(opt.get("haze_cell", "8000"))
-    d1 = float(opt.get("haze_clear", "1.0e-5"))                 # 1/m（= 0.0115 /km）
-    d2 = float(opt.get("haze_moist", "2.0e-5"))                  # 下 200m（0.03 /km）
+    d1 = float(opt.get("haze_clear", "0.4e-5"))                 # 1/m（= 0.0115 /km）
+    d2 = float(opt.get("haze_moist", "0.8e-5"))                  # 下 200m（0.03 /km）
+    HG_M = float(opt.get("haze_g", "0.75"))
     hc = (0.6, 0.78, 1.0, 1.0)
     mc = (0.97, 0.96, 1.0, 1.0)                                  # しめった層は中立（暖かさは太陽の光から）
     for nm, z0, z1, dd, col, gg in (("haze_clear", -800.0, float(opt.get("clear_top", "3600")), d1, hc, 0.35),
-                                    ("haze_moist1", -800.0, CLOUD_TOP + 200.0, d2, mc, 0.75),
-                                    ("haze_moist2", CLOUD_TOP + 200.0, CLOUD_TOP + 400.0, d2 * 0.5, mc, 0.75)):
+                                    ("haze_moist1", -800.0, CLOUD_TOP + 200.0, d2, mc, HG_M),
+                                    ("haze_moist2", CLOUD_TOP + 200.0, CLOUD_TOP + 400.0, d2 * 0.5, mc, HG_M)):
         r_ = curved_slab(nm, z0, z1, hr, cell_h, haze_material(nm, dd, col, gg))
         HAZE_N.append(nm)
     STATS["haze_seconds"] = round(time.time() - t0, 1)

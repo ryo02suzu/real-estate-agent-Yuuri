@@ -1,0 +1,58 @@
+{
+ "data": [
+  "world-reveal"
+ ],
+ "max_parallel": 20,
+ "jobs": [
+  {
+   "name": "w1-s2-h40",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s2-h25",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 haze_clear=0.25e-5 haze_moist=0.5e-5",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s2-h60",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 haze_clear=0.6e-5 haze_moist=1.2e-5",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s2-h40g6",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 haze_g=0.6",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s2-mie",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 phase=mie",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s2-d09",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 cloud_density=0.09",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s2-sun35",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 sun_el=3.5",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s2-l50",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 lens=50",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s2-e33",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 exposure=-3.3",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s2-g05",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 g_body=0.0 g_fwd=0.8",
+   "timeout_min": 60
+  }
+ ]
+}
