@@ -1071,7 +1071,7 @@ def rig_main(a):
         az, el, d = math.radians(v["cam_az"]), math.radians(v["cam_el"]), v["dist"]
         # 鳥の後ろ（−Y）が方位 0：方位 az の向きにカメラを置く
         pos = np.array([d * math.sin(az) * math.cos(el), -d * math.cos(az) * math.cos(el), d * math.sin(el)])
-        look_at(cam, pos, (0, 0.1, 0.1))
+        look_at(cam, pos + np.array([0, float(a.get('ty', '0.1')) - 0.1, 0]) * 0, (0, float(a.get('ty', '0.1')), 0.1))
         cam.data.dof.use_dof = True
         cam.data.dof.focus_distance = d
         cam.data.dof.aperture_fstop = 11
