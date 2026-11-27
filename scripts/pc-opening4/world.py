@@ -323,7 +323,8 @@ if opt.get("mblur", "0") == "1":
             kp.interpolation = "LINEAR"
     scene.render.use_motion_blur = True
     scene.render.motion_blur_shutter = 0.5
-    scene.cycles.motion_blur_position = "CENTER"
+    if hasattr(scene.render, "motion_blur_position"):
+        scene.render.motion_blur_position = "CENTER"
 scene.frame_set(FRAME)
 
 
@@ -1256,15 +1257,41 @@ for _name in [x for x in opt.get("extras", "").split("+") if x]:
 STATS["build_seconds"] = round(time.time() - T_START, 1)
 STATS["peak_mb_before_render"] = round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0)
 log(f"組み立て {STATS['build_seconds']} 秒・メモリ {STATS['peak_mb_before_render']} MB")
+# EXR：32 ビット線形（太陽はそのまま）＋奥行き＋物の番号（地形 1・雲 2・追加の部品 3）＋体積の光。空の合いは奥行き＝無限
+if EXR:
+    vl_ = bpy.context.view_layer
+    vl_.use_pass_z = True
+    vl_.use_pass_object_index = True
+    vl_.cycles.use_pass_volume_direct = True
+    vl_.cycles.use_pass_volume_indirect = True
+    for o_ in bpy.data.objects:
+        if o_.name.startswith("terrain"):
+            o_.pass_index = 1
+        elif o_.name.startswith("cs_") or o_.name.startswith("cn_"):
+            o_.pass_index = 2
+        elif o_.name not in ("cam",) and not o_.name.startswith("haze"):
+            o_.pass_index = 3
 t0 = time.time()
-bpy.ops.render.render()
+if EXR:
+    try:
+        scene.render.image_settings.media_type = "MULTI_LAYER_IMAGE"
+        scene.render.image_settings.file_format = "OPEN_EXR_MULTILAYER"
+        scene.render.image_settings.color_depth = "32"
+        scene.render.image_settings.exr_codec = "ZIP"
+        scene.render.filepath = os.path.join(OUT, f"frame_{FRAME:04d}")
+        bpy.ops.render.render(write_still=True)
+        STATS["exr_format"] = "OPEN_EXR multilayer"
+    except Exception as ex:  # noqa: BLE001
+        log("多層 EXR が書けない:", str(ex)[:150])
+        bpy.ops.render.render()
+    scene.render.image_settings.media_type = "IMAGE"
+    scene.render.image_settings.file_format = "PNG"
+    scene.render.image_settings.color_depth = "8"
+else:
+    bpy.ops.render.render()
 STATS["render_seconds"] = round(time.time() - t0, 1)
 png = os.path.join(OUT, f"frame_{FRAME:04d}.png")
 bpy.data.images["Render Result"].save_render(png)
-if EXR:
-    scene.render.image_settings.file_format = "OPEN_EXR"
-    scene.render.image_settings.color_depth = "32"
-    bpy.data.images["Render Result"].save_render(os.path.join(OUT, f"frame_{FRAME:04d}.exr"))
 STATS["peak_mb"] = round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0)
 if opt.get("marks", "0") == "1":
     mk = marks()
