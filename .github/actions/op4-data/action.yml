@@ -1,0 +1,71 @@
+name: op4 data set
+description: データセット 1 つを cache から出すか、無ければ作って cache に置き、artifact（farmdata-<名前>）にする
+inputs:
+  ds: {required: true}
+  key: {required: true}
+  tar: {required: true}
+  name: {required: true}
+  tiles_path: {default: ""}
+  tiles_prefix: {default: ""}
+  pip: {default: ""}
+  apt: {default: "false"}
+runs:
+  using: composite
+  steps:
+    - id: c
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ inputs.tar }}
+        key: ${{ inputs.key }}
+    - uses: actions/setup-python@v5
+      if: steps.c.outputs.cache-hit != 'true'
+      with:
+        python-version: "3.13"
+    - name: 部品
+      if: steps.c.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        PIP: ${{ inputs.pip }}
+        APT: ${{ inputs.apt }}
+      run: |
+        if [ "$APT" = "true" ]; then sudo apt-get update -qq && sudo apt-get install -y -qq libxi6 libxxf86vm1 libxfixes3 libxrender1 libgl1 libegl1 libxkbcommon0 libsm6 libice6; fi
+        # shellcheck disable=SC2086
+        pip install -q $PIP
+    - id: t
+      if: steps.c.outputs.cache-hit != 'true' && inputs.tiles_path != ''
+      uses: actions/cache/restore@v4
+      with:
+        path: scripts/pc-opening4/${{ inputs.tiles_path }}
+        key: ${{ inputs.tiles_prefix }}-${{ github.run_id }}-${{ inputs.name }}
+        restore-keys: ${{ inputs.tiles_prefix }}-
+    - name: 作る
+      if: steps.c.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        DS_JSON: ${{ inputs.ds }}
+      run: python3 scripts/pc-opening4/farm/data_build.py
+    - name: 取ったタイルを残す
+      if: steps.c.outputs.cache-hit != 'true' && inputs.tiles_path != ''
+      uses: actions/cache/save@v4
+      with:
+        path: scripts/pc-opening4/${{ inputs.tiles_path }}
+        key: ${{ inputs.tiles_prefix }}-${{ github.run_id }}-${{ inputs.name }}
+    - name: データセットを cache に置く
+      if: steps.c.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ inputs.tar }}
+        key: ${{ inputs.key }}
+    - shell: bash
+      env:
+        NAME: ${{ inputs.name }}
+        HIT: ${{ steps.c.outputs.cache-hit }}
+      run: |
+        ls -la data
+        echo "- データ $NAME: cache ${HIT:-miss}（$(du -m data/$NAME.tar | cut -f1) MB）" >> "$GITHUB_STEP_SUMMARY"
+    - uses: actions/upload-artifact@v4
+      with:
+        name: farmdata-${{ inputs.name }}
+        path: ${{ inputs.tar }}
+        retention-days: 1
+        compression-level: 0

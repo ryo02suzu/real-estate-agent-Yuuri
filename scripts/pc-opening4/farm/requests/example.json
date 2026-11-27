@@ -1,0 +1,7 @@
+{
+  "data": ["world-reveal"],
+  "max_parallel": 20,
+  "jobs": [
+    {"name": "example-full", "run": "world.py -- data=work/world/reveal out={out} frame=600 res=640x360 samples=24 clouds=surface haze=1 threads=4", "timeout_min": 60}
+  ]
+}

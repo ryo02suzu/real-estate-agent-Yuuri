@@ -1,0 +1,168 @@
+# オープニング第4版の描画農場（無料の GitHub の機械で、依頼ファイルの仕事を同時に 20 台まで動かす）。使い方は scripts/pc-opening4/notes/farm.md
+#   plan:  依頼ファイル（scripts/pc-opening4/farm/requests/<名前>.json）を確かめて表にする
+#   data:  データセット（世界の地形と写真・地球・木の素材集）を、版ごとに 1 回だけ作って actions/cache に置く（あれば作らない）
+#   render: 仕事を 1 つずつ 1 台で動かし、できたものを R2（公開 URL）と artifact に置く
+# main に無いワークフローは手で動かせないので、このファイルの push で GitHub に覚えさせてから dispatch する（下の push は何もしない）。
+name: オープニング第4版の農場
+
+on:
+  workflow_dispatch:
+    inputs:
+      request:
+        description: 依頼ファイルの場所（リポジトリの根から。scripts/pc-opening4/farm/requests/<名前>.json）
+        required: true
+      sha:
+        description: 使う commit（空ならこのブランチの先頭）
+        default: ""
+  push:
+    paths:
+      - .github/workflows/op4-farm.yml
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.p.outputs.sha }}
+      jobs: ${{ steps.p.outputs.jobs }}
+      max_parallel: ${{ steps.p.outputs.max_parallel }}
+      serial: ${{ steps.p.outputs.serial }}
+      parallel: ${{ steps.p.outputs.parallel }}
+      has_data: ${{ steps.p.outputs.has_data }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+      - id: p
+        env:
+          REQUEST: ${{ inputs.request }}
+        run: python3 scripts/pc-opening4/farm/plan.py
+
+  # 取得先（タイル）を共有するデータセットは 1 つずつ順に作る
+  data_serial:
+    needs: plan
+    if: needs.plan.outputs.serial != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        ds: ${{ fromJson(needs.plan.outputs.serial) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - uses: ./.github/actions/op4-data
+        with:
+          ds: ${{ toJson(matrix.ds) }}
+          key: ${{ matrix.ds.key }}
+          tar: ${{ matrix.ds.tar }}
+          name: ${{ matrix.ds.name }}
+          tiles_path: ${{ matrix.ds.tiles_path }}
+          tiles_prefix: ${{ matrix.ds.tiles_prefix }}
+          pip: ${{ matrix.ds.pip }}
+          apt: ${{ matrix.ds.apt }}
+
+  data_parallel:
+    needs: plan
+    if: needs.plan.outputs.parallel != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        ds: ${{ fromJson(needs.plan.outputs.parallel) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - uses: ./.github/actions/op4-data
+        with:
+          ds: ${{ toJson(matrix.ds) }}
+          key: ${{ matrix.ds.key }}
+          tar: ${{ matrix.ds.tar }}
+          name: ${{ matrix.ds.name }}
+          tiles_path: ${{ matrix.ds.tiles_path }}
+          tiles_prefix: ${{ matrix.ds.tiles_prefix }}
+          pip: ${{ matrix.ds.pip }}
+          apt: ${{ matrix.ds.apt }}
+
+  render:
+    needs: [plan, data_serial, data_parallel]
+    if: always() && needs.plan.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJson(needs.plan.outputs.max_parallel) }}
+      matrix:
+        job: ${{ fromJson(needs.plan.outputs.jobs) }}
+    env:
+      R2_BUCKET: ${{ vars.R2_BUCKET || 'michilu-chiban' }}
+      R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL || 'https://pub-2be6c197b42d4c0f9c3c7f1915ec5cff.r2.dev' }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+      JOB_NAME: ${{ matrix.job.name }}
+      JOB_RUN: ${{ matrix.job.run }}
+      JOB_TIMEOUT: ${{ matrix.job.timeout_min }}
+      OUT_ROOT: ${{ github.workspace }}/farm-work
+      RESULT_DIR: ${{ github.workspace }}/farm-result
+      HAS_DATA: ${{ needs.plan.outputs.has_data }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Blender（bpy）が使う画面まわりの部品
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libxi6 libxxf86vm1 libxfixes3 libxrender1 libgl1 libegl1 libxkbcommon0 libsm6 libice6
+      - run: pip install -q bpy==5.3.0 numpy scipy pillow OpenEXR
+      - uses: actions/download-artifact@v4
+        if: needs.plan.outputs.has_data == 'true'
+        with:
+          pattern: farmdata-*
+          path: farm-data
+          merge-multiple: true
+      - name: データを scripts/pc-opening4/ の下に広げる
+        if: needs.plan.outputs.has_data == 'true'
+        run: |
+          for t in farm-data/*.tar; do echo "$t"; tar -xf "$t" -C scripts/pc-opening4; done
+          du -sh scripts/pc-opening4/work/* 2>/dev/null || true
+      - name: 描く
+        run: python3 scripts/pc-opening4/farm/run_job.py
+      - name: 結果をまとめる
+        id: pack
+        if: always()
+        run: python3 scripts/pc-opening4/farm/pack.py
+      - name: R2 に置く（300 MB 以下だけ）
+        if: always() && steps.pack.outputs.upload == '1'
+        run: |
+          if [ -z "$R2_ACCOUNT_ID" ] || [ -z "$AWS_ACCESS_KEY_ID" ]; then echo "::warning::R2 の鍵がありません。artifact だけ"; exit 0; fi
+          aws s3 cp "$RESULT_DIR/$JOB_NAME.tar" "s3://$R2_BUCKET/farm/${{ github.run_id }}/$JOB_NAME.tar" \
+            --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com" --only-show-errors
+          echo "  $R2_PUBLIC_URL/farm/${{ github.run_id }}/$JOB_NAME.tar" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ matrix.job.name }}
+          path: farm-result/${{ matrix.job.name }}.tar
+          if-no-files-found: ignore
+          retention-days: 7
+          compression-level: 0
+      - name: 仕事の終了コードを、この仕事の成否にする
+        if: always()
+        env:
+          CODE: ${{ steps.pack.outputs.exit_code }}
+        run: |
+          echo "exit_code=$CODE"
+          [ "$CODE" = "0" ]

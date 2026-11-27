@@ -1,0 +1,23 @@
+{
+ "data": [
+  "world-reveal"
+ ],
+ "max_parallel": 20,
+ "jobs": [
+  {
+   "name": "smoke-full",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=320x180 samples=8 clouds=surface threads=4",
+   "timeout_min": 60
+  },
+  {
+   "name": "smoke-c0-r0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=640x360 samples=8 clouds=surface threads=4 border=0.000000,0.000000,0.550000,1.000000",
+   "timeout_min": 60
+  },
+  {
+   "name": "smoke-c1-r0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=640x360 samples=8 clouds=surface threads=4 border=0.450000,0.000000,1.000000,1.000000",
+   "timeout_min": 60
+  }
+ ]
+}
