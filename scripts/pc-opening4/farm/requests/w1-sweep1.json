@@ -1,0 +1,68 @@
+{
+ "data": [
+  "world-reveal"
+ ],
+ "max_parallel": 20,
+ "jobs": [
+  {
+   "name": "w1-s1-base",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s1-clear06",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 haze_clear=0.6e-5",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s1-nohaze",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 haze=0",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s1-alb05",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 albedo=0.45",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s1-d003",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 cloud_density=0.03",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s1-d012",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 cloud_density=0.12",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s1-mie",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 phase=mie",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s1-g09",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 g_fwd=0.9 w_fwd=0.7",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s1-swell2",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 swell=60 wave=50 band=20",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s1-punchy",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 look=Punchy",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s1-exp33",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 exposure=-3.3",
+   "timeout_min": 60
+  },
+  {
+   "name": "w1-s1-veil0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 res=960x540 samples=48 clouds=volume haze=1 glare=1 marks=1 threads=4 veil=0",
+   "timeout_min": 60
+  }
+ ]
+}

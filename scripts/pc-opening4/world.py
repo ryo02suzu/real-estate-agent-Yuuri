@@ -431,6 +431,17 @@ def terrain_material():
         if "box" not in meta:                              # 距離の段：rmax の 75% から rmax にかけて、細かい写真から粗い写真へ
             w = nd.math("MULTIPLY", w, nd.rng(rr, 0.75 * meta["rmax"], meta["rmax"], 1.0, 0.0, True))
         col = nd.mix(w, col, c)
+    # ---- 光を抜く：写真は夏の昼の太陽（南・高さ 57°）の陰影を含む。同じ向きで地形の陰影を作り、±1 段の範囲で割る。
+    #      暗い所（影・色むら）は色を 60% 中立へ（青かぶり・紺のしみの元）
+    if not isinstance(col, tuple) and opt.get("delight", "1") == "1":
+        sph = (0.0, -math.cos(math.radians(57.0)), math.sin(math.radians(57.0)))
+        dp = nd.vmath("DOT_PRODUCT", geo.outputs["Normal"], sph).outputs["Value"]
+        fsh = nd.math("MAXIMUM", nd.math("MULTIPLY_ADD", nd.math("MAXIMUM", dp, 0.0), 0.7 / sph[2], 0.3), 0.5)
+        dl = nd.vmath("SCALE", col, None)
+        nt.links.new(nd.math("DIVIDE", 1.0, fsh), dl.inputs["Scale"])
+        lum = nd.new("ShaderNodeRGBToBW", Color=dl.outputs["Vector"]).outputs[0]
+        grey = nd.new("ShaderNodeCombineColor", Red=lum, Green=lum, Blue=lum).outputs[0]
+        col = nd.mix(nd.math("MULTIPLY", nd.rng(lum, 0.02, 0.05, 1.0, 0.0, True), 0.6), dl.outputs["Vector"], grey)
     # ---- 色の仕立て（航空写真は夏の昼。11 月はじめの日の出の半時間後の山に）
     if isinstance(col, tuple):
         disp = col
@@ -463,25 +474,51 @@ def terrain_material():
         graded = nd.vmath("SCALE", lin.outputs["Color"], None)
         graded.inputs["Scale"].default_value = 0.8
         gcol = graded.outputs["Vector"]
+        # 反射率の合わせ：森 0.03〜0.06・乾いた草 0.12〜0.20・岩とガレ 0.15〜0.30（輝度の曲線）
+        gl = nd.new("ShaderNodeRGBToBW", Color=gcol).outputs[0]
+        fc = nd.new("ShaderNodeFloatCurve", Value=gl)
+        cm_ = fc.mapping
+        cm_.clip_max_y = 1.0
+        pts = [(0.0, 0.0), (0.03, 0.022), (0.08, 0.05), (0.16, 0.10), (0.3, 0.19), (0.6, 0.4), (1.0, 0.7)]
+        while len(cm_.curves[0].points) < len(pts):
+            cm_.curves[0].points.new(0.5, 0.5)
+        for p_, (x_, y_) in zip(cm_.curves[0].points, pts):
+            p_.location = (x_, y_)
+        cm_.update()
+        ratio = nd.math("DIVIDE", fc.outputs[0], nd.math("MAXIMUM", gl, 1e-4))
+        cal = nd.vmath("SCALE", gcol, None)
+        nt.links.new(nd.math("MULTIPLY", ratio, float(opt.get("albedo", "0.7"))), cal.inputs["Scale"])
+        gcol = cal.outputs["Vector"]
     else:
         gcol = (0.3, 0.3, 0.3)
+    # 急な面（45° より急）は写真をやめて岩（3 次元のノイズ＝三面に貼ったのと同じ）へ
+    nz_ = nd.math("ARCCOSINE", nd.math("MINIMUM", nd.math("MAXIMUM", nd.new("ShaderNodeSeparateXYZ", Vector=geo.outputs["Normal"]).outputs["Z"], -1.0), 1.0))
+    rk1 = nd.new("ShaderNodeTexNoise", Vector=pos, Scale=1.0 / 22.0, Detail=6.0, Roughness=0.6).outputs["Fac"]
+    rk2 = nd.new("ShaderNodeTexNoise", Vector=pos, Scale=1.0 / 3.5, Detail=4.0, Roughness=0.6).outputs["Fac"]
+    rkf = nd.math("ADD", nd.math("MULTIPLY", rk1, 0.65), nd.math("MULTIPLY", rk2, 0.35))
+    rock = nd.mix(nd.rng(rkf, 0.3, 0.7, 0.0, 1.0, True), (0.065, 0.055, 0.047, 1.0), (0.20, 0.175, 0.15, 1.0))
+    steep = nd.rng(nz_, math.radians(40.0), math.radians(55.0), 0.0, 1.0, True)
+    if not isinstance(gcol, tuple):
+        gcol = nd.mix(nd.math("MULTIPLY", steep, float(opt.get("rock", "1.0"))), gcol, rock)
     # 雪
     at = nd.new("ShaderNodeAttribute")
     at.attribute_type = "GEOMETRY"
     at.attribute_name = "snow"
-    n1 = nd.new("ShaderNodeTexNoise", Vector=pos, Scale=1.0 / 90.0, Detail=5.0, Roughness=0.6).outputs["Fac"]
+    n1 = nd.math("MULTIPLY_ADD", nd.new("ShaderNodeTexNoise", Vector=pos, Scale=1.0 / 90.0, Detail=5.0, Roughness=0.6).outputs["Fac"],
+                 nd.rng(rr, 8000.0, 25000.0, 1.0, 0.0, True), nd.math("MULTIPLY", nd.rng(rr, 8000.0, 25000.0, 0.0, 1.0, True), 0.5))   # 遠くは細かい雪のつぶを消して、やわらかい色に
     n2 = nd.new("ShaderNodeTexNoise", Vector=pos, Scale=1.0 / 700.0, Detail=3.0).outputs["Fac"]
     nn = nd.math("ADD", nd.math("MULTIPLY", n1, 0.6), nd.math("MULTIPLY", n2, 0.4))
     cvr = nd.math("ADD", at.outputs["Fac"], nd.math("MULTIPLY", nd.math("SUBTRACT", nn, 0.5), 0.7))
     snow = nd.rng(cvr, 0.38, 0.56, 0.0, 1.0, True)
-    final = nd.mix(snow, gcol if not isinstance(gcol, tuple) else (0.3, 0.3, 0.3, 1.0), (0.70, 0.74, 0.82, 1.0))
+    final = nd.mix(snow, gcol if not isinstance(gcol, tuple) else (0.3, 0.3, 0.3, 1.0), (0.80, 0.84, 0.90, 1.0))
     ro = nt.nodes.new("NodeReroute")                       # 追加の部品（木の色合わせなど）が色を差し込む所
     ro.name = "base_out"
     ro.label = "base_out"
     nt.links.new(final, ro.inputs[0])
     nt.links.new(ro.outputs[0], bsdf.inputs["Base Color"])
     bsdf.inputs["Roughness"].default_value = 0.92
-    bump = nd.new("ShaderNodeBump", Strength=0.25, Distance=2.0)
+    bump = nd.new("ShaderNodeBump", Distance=2.0)
+    nt.links.new(nd.math("MULTIPLY", nd.rng(rr, 2500.0, 8000.0, 1.0, 0.0, True), 0.25), bump.inputs["Strength"])
     nt.links.new(final, bump.inputs["Height"])
     nt.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
     if opt.get("emit", "0") == "1":                        # 確かめ用：照明なしで、仕立てた色だけを見る
@@ -1142,7 +1179,7 @@ if HAZE:
     d2 = float(opt.get("haze_moist", "2.0e-5"))                  # 下 200m（0.03 /km）
     hc = (0.6, 0.78, 1.0, 1.0)
     mc = (0.97, 0.96, 1.0, 1.0)                                  # しめった層は中立（暖かさは太陽の光から）
-    for nm, z0, z1, dd, col, gg in (("haze_clear", -800.0, 6000.0, d1, hc, 0.35),
+    for nm, z0, z1, dd, col, gg in (("haze_clear", -800.0, float(opt.get("clear_top", "3600")), d1, hc, 0.35),
                                     ("haze_moist1", -800.0, CLOUD_TOP + 200.0, d2, mc, 0.75),
                                     ("haze_moist2", CLOUD_TOP + 200.0, CLOUD_TOP + 400.0, d2 * 0.5, mc, 0.75)):
         r_ = curved_slab(nm, z0, z1, hr, cell_h, haze_material(nm, dd, col, gg))
