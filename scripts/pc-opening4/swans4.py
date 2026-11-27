@@ -154,7 +154,7 @@ def build_wing_feathers(rng, lod):
     wt = np.where(emarg, 0.026, 0.034)
     fan0 = np.radians(8 + 70 * q ** 1.15 + rng.normal(0, 0.5, n))
     ks = np.radians(2 + 11 * q)
-    add_group(res_big, n, 2, root, fan0, ks, 0.17 + 0 * q, Lp, wl, wt, np.where(emarg, 0.33, 0.24), np.full(n, 0.05), np.where(emarg, 2.3, 3.0), roll=np.radians(-4 - 4 * q))
+    add_group(res_big, n, 2, root, fan0, ks, 0.10 + 0 * q, Lp, wl, wt, np.where(emarg, 0.33, 0.24), np.full(n, 0.05), np.where(emarg, 2.3, 3.0), roll=np.radians(-4 - 4 * q))
     # 背側の雨覆（大・中・小）と前縁。前腕・手の上に、うろこのように重ねる。付け根は風切羽の付け根の少し前
     def coverts(bone, Lbone, rows, ventral):
         for (ny, yfrac, Lr, wl_, wt_, nn, z, bk, ksc) in rows:
@@ -208,9 +208,9 @@ def wing_params(phi, bank_asym=0.0):
     par = dict(
         th=th, s=s, c=c,
         a_h=rad(ah), psi_h=rad(14 + 5 * up),
-        a_u=rad(ah + 4 * s + 10 * flexE), psi_u=rad(-8 + 70 * flexE),
-        a_m=rad(ah + 13 * s + 6 * flexW), psi_m=rad(14 + 62 * flexW),
-        tau_h=rad(0), tau_u=rad(-6 * s), tau_m=rad(-20 * s + 6 * up),
+        a_u=rad(ah + 2 * s + 10 * flexE), psi_u=rad(-8 + 70 * flexE),
+        a_m=rad(ah + 7 * s + 6 * flexW), psi_m=rad(14 + 62 * flexW),
+        tau_h=rad(0), tau_u=rad(-6 * s), tau_m=rad(-12 * s + 6 * up),
         spread=0.30 + 0.70 * flexW ** 0.7,
         bend=s,      # 打ち下ろしで先が上へ、打ち上げで下へ
         heave=-0.022 * c,
@@ -322,9 +322,9 @@ def body_profile(y):
     # 頭：0.84 から頬が少しふくらみ、0.95 のくちばしの付け根へ向けて細くなる（前が平らな額から、くちばしへなだらかに続く）
     th = np.clip((y - 0.835) / 0.12, 0, 1)
     cheek = 0.009 * np.sin(np.pi * np.clip(th * 1.1, 0, 1)) ** 0.8 * (y > 0.83)
-    taper = 1 - 0.30 * smoothstep(0.88, 0.958, y)
+    taper = 1 - 0.40 * smoothstep(0.865, 0.945, y) ** 0.9
     rx = (rx + cheek) * taper
-    rz = (rz + 0.8 * cheek) * (1 - 0.40 * smoothstep(0.88, 0.958, y))
+    rz = (rz + 0.8 * cheek) * (1 - 0.48 * smoothstep(0.865, 0.945, y) ** 0.9)
     return cz, rx, rz
 
 
@@ -683,7 +683,7 @@ class Bird:
         obs = []
         # 先端へ向かって細くなる、やや平らな断面。基部 y=0.945（頭）〜 先 1.058。黄は鼻孔（y≈0.99）より先（≈1.03）まで、上のふち寄りは黒
         n, nseg = 28, 14
-        ys = np.linspace(0.935, 1.058, n)
+        ys = np.linspace(0.930, 1.062, n)
         t = (ys - ys[0]) / (ys[-1] - ys[0])
         rx = 0.0185 * (1 - 0.30 * t) * (1 - 0.30 * t ** 3) + 0.003
         rz = 0.0150 * (1 - 0.60 * t) + 0.0035
@@ -697,8 +697,8 @@ class Bird:
                 h = math.sin(a)                      # 上 +1、下 −1
                 side = abs(math.cos(a))
                 # 黄のくさび：側面の真ん中で最も前（t≈0.80）、上端・下端へ向かって後退（0.45）。ごく上の背筋は黒の細い線
-                front = 0.46 + 0.36 * (1 - abs(h) ** 1.6)
-                y_ = float(smoothstep(front + 0.06, front - 0.03, t[i]))
+                front = 0.26 + 0.44 * (1 - abs(h) ** 1.3)
+                y_ = float(smoothstep(front + 0.02, front - 0.05, t[i]))
                 if h > 0.93:
                     y_ *= 0.35
                 yel.append(y_ * (0.4 + 0.6 * side))
@@ -846,7 +846,7 @@ N_BIRDS = 7
 def flock_layout(n):
     """V 字：先頭（0）と左右の対。群れの座標（前 u・右 v・上 w）m。縦の間は翼幅の約 1.6 倍・横は約 1.15 倍（V 字・斜め列の観察値。notes/swans.md）。
     先頭の右に 3 羽・左に 3 羽。ずれ・高さの差は固定の乱数（コマによらない）"""
-    sl, sw = 1.6 * SPAN * 0.85, 1.15 * SPAN * 0.85
+    sl, sw = 1.6 * SPAN * 0.85 * flock_param["ls"], 1.15 * SPAN * 0.85 * flock_param["vs"]
     rng = np.random.default_rng(77)
     pos = [(0.0, 0.0, 0.0)]
     for k in range(1, 4):
@@ -885,8 +885,8 @@ def flock_state(frames_json, f, n=N_BIRDS, seed=1):
         # 区間 t0..：v(t) = 6.0 + 3.0*smooth((t-t0)/1.6) − 1.5*smooth((t-t0-2.6)/3.5)
         # 積分は数値（細かい刻み）
         ts = np.linspace(T0, max(tt, T0), 400)
-        v = 6.0 + 3.0 * np.array([smoothstep1(0, 1.6, x - T0) for x in ts]) - 1.5 * np.array([smoothstep1(0, 3.5, x - T0 - 2.6) for x in ts])
-        return float(np.trapz(v, ts)) if len(ts) > 1 else 0.0
+        v = flock_param["v0"] + (flock_param["v1"] - flock_param["v0"]) * np.array([smoothstep1(0, 2.2, x - T0) for x in ts]) - flock_param["vend"] * np.array([smoothstep1(0, 3.5, x - T0 - 2.6) for x in ts])
+        return float(np.trapezoid(v, ts)) if len(ts) > 1 else 0.0
     F0 = flock_param["F0"]
     for i in range(n):
         rng = np.random.default_rng(1000 * seed + i)
@@ -906,7 +906,7 @@ def flock_state(frames_json, f, n=N_BIRDS, seed=1):
     return out
 
 
-flock_param = dict(F0=-6.0, V0=17.5, dV=1.2, W0=-1.0)
+flock_param = dict(ls=0.7, vs=0.55, F0=29.0, V0=13.0, dV=1.2, W0=0.5, v0=8.5, v1=7.5, vend=0.0)
 
 
 def world_state(frames_json, f_render, f, n=N_BIRDS, seed=1):
@@ -959,7 +959,7 @@ def add(world):
     per = []
     for i, st in enumerate(states_now):
         dist = float(np.linalg.norm(st["rel"]))
-        lod = int(opt.get("swans_lod", lod_for(dist, world.LENS, world.W)))
+        lod = int(opt.get("swans_lod", lod_for(dist, world.LENS, 3840)))
         bird = Bird(f"swan{i}", 7000 + 31 * i + seed, mats, lod=lod, hz=st["hz"])
         if mblur:
             sts = [(f, world_state(frames_json, F, f, n, seed)[i]) for f in (F - 1, F, F + 1)]
@@ -1102,10 +1102,124 @@ def rig_main(a):
                 print("cycle", view, k, flush=True)
 
 
-if __name__ == "__main__" or "bpy" in sys.modules and __name__ == "__main__":
+def project_main(a):
+    """描かずに、コマごとに 7 羽の距離・画面の位置・幅（px）・ロゴの場所（595 コマから、横の中央 3 分の 1 × 上の 3 分の 1）・太陽の円盤との重なりを調べる"""
+    sys.path.insert(0, HERE)
+    import config
+    fj = json.load(open(os.path.join(HERE, "cameras.json")))["frames"]
+    W, H = 3840, 2160
+    az, el = math.radians(config.SUN_AZ), math.radians(config.SUN_EL)
+    sun = np.array([math.sin(az) * math.cos(el), math.cos(az) * math.cos(el), math.sin(el)])
+    for k in flock_param:
+        if k in a:
+            flock_param[k] = float(a[k])
+    n = int(a.get("n", "7"))
+    step = int(a.get("step", "6"))
+    bad = []
+    mind, maxd = 1e9, 0
+    for f in range(557, 720):
+        st = world_state(fj, f, f, n, 1)
+        pos0 = np.array(fj[str(f)]["pos_world"])
+        sx, sy, _ = project(fj, f, W, H, pos0 + sun * 1e5)
+        focal = fj[str(f)]["lens_mm"] / 36.0 * W
+        row = []
+        for i, b in enumerate(st):
+            d = float(np.linalg.norm(b["rel"]))
+            yaw = math.radians(b["yaw"])
+            rt = np.array([math.cos(yaw), -math.sin(yaw), 0.0])
+            x, y, dep = project(fj, f, W, H, b["pos"])
+            xa, ya, _ = project(fj, f, W, H, b["pos"] + rt * 1.2)
+            xb, yb, _ = project(fj, f, W, H, b["pos"] - rt * 1.2)
+            wpx = abs(xa - xb)
+            half = max(wpx / 2, 0.3 * focal / dep)
+            inlogo = (f >= LOGO_FRAME) and (W / 3 - half < x < 2 * W / 3 + half) and (y - 0.3 * focal / dep < H / 3)
+            insun = math.hypot(x - sx, y - sy) < half * 0.6 + 0.0047 * focal
+            inframe = (-half < x < W + half) and (-half < y < H + half)
+            row.append((i, round(d, 1), int(x), int(y), int(wpx), inlogo, insun, inframe))
+            if inlogo:
+                bad.append((f, i, "logo", int(x), int(y)))
+            if insun:
+                bad.append((f, i, "sun", int(x), int(y)))
+            if not inframe:
+                bad.append((f, i, "out", int(x), int(y)))
+            mind, maxd = min(mind, d), max(maxd, d)
+        if (f - 557) % step == 0:
+            print(f, "sun", int(sx), int(sy), "lens", round(fj[str(f)]["lens_mm"], 1), " ".join(f"[{r[0]} {r[1]}m {r[2]},{r[3]} {r[4]}px]" for r in row))
+    print("distance range m", round(mind, 1), round(maxd, 1))
+    from collections import Counter
+    print(Counter((b[1]) for b in bad), "frames with logo/sun/out:", sorted(set((b[0], b[2]) for b in bad))[:60])
+
+
+class _Shim:
+    """動きの確かめ用：world.py の代わりに add() へ渡す入れもの"""
+    def __init__(self, scene, opt, frame, lens, w):
+        self.scene, self.opt, self.FRAME, self.LENS, self.W = scene, opt, frame, lens, w
+        self.STATS = {}
+    def log(self, *a):
+        print(*a, flush=True)
+
+
+def flight_main(a):
+    """コマ f0〜f1 を、簡単な空と雲の面の上に描く（光の回数を少なく）。ロゴの場所を 595 コマから薄い四角で描く"""
+    import bpy
+    from mathutils import Matrix
+    sys.path.insert(0, HERE)
+    import config
+    from PIL import Image, ImageDraw
+    fj = json.load(open(os.path.join(HERE, "cameras.json")))["frames"]
+    f0, f1 = (int(v) for v in a.get("frames", "557-719").split("-"))
+    step = int(a.get("step", "1"))
+    out = a.get("out", os.path.join(HERE, "review", "swans", "flightframes"))
+    os.makedirs(out, exist_ok=True)
+    res = tuple(int(v) for v in a.get("res", "640x360").split("x"))
+    for f in range(f0, f1 + 1, step):
+        png = os.path.join(out, f"{f:04d}.png")
+        if os.path.exists(png) and a.get("redo", "0") != "1":
+            continue
+        t0 = time.time()
+        c = fj[str(f)]
+        sc = rig_scene(a, res, int(a.get("samples", "8")), sun_el=config.SUN_EL, sun_az=config.SUN_AZ, ev=-1.4, deck=False)
+        # 雲の面：高さ 1650m（丸みで少し下げる）の大きな板。世界の座標
+        bpy.ops.mesh.primitive_plane_add(size=60000, location=(c["pos_world"][0], c["pos_world"][1], 1650.0))
+        pl = bpy.context.active_object
+        m = bpy.data.materials.new("deck")
+        m.use_nodes = True
+        b = m.node_tree.nodes["Principled BSDF"]
+        b.inputs["Base Color"].default_value = (0.80, 0.82, 0.86, 1.0)
+        b.inputs["Roughness"].default_value = 1.0
+        pl.data.materials.append(m)
+        cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
+        sc.collection.objects.link(cam)
+        cam.data.lens = c["lens_mm"]
+        cam.data.sensor_width = 36.0
+        cam.data.sensor_fit = "HORIZONTAL"
+        cam.data.clip_start = 1.0
+        cam.data.clip_end = 600000.0
+        M = np.array(c["matrix"])
+        cam.matrix_world = Matrix([[M[0, 0], M[0, 1], M[0, 2], c["pos_world"][0]], [M[1, 0], M[1, 1], M[1, 2], c["pos_world"][1]],
+                                   [M[2, 0], M[2, 1], M[2, 2], c["pos_world"][2]], [0, 0, 0, 1]])
+        sc.camera = cam
+        opt = dict(mblur=a.get("mblur", "1"), swans_n=a.get("n", "7"), swans_seed=a.get("seed", "1"))
+        add(_Shim(sc, opt, f, c["lens_mm"], res[0]))
+        sc.render.filepath = png
+        bpy.ops.render.render(write_still=True)
+        if f >= LOGO_FRAME:
+            im = Image.open(png).convert("RGB")
+            ov = Image.new("RGBA", im.size, (0, 0, 0, 0))
+            d = ImageDraw.Draw(ov)
+            sx = res[0] / 3840.0
+            d.rectangle([1280 * sx, 0, 2560 * sx, 720 * sx], outline=(255, 90, 60, 150), width=1, fill=(255, 90, 60, 28))
+            im = Image.alpha_composite(im.convert("RGBA"), ov).convert("RGB")
+            im.save(png)
+        print(f"コマ {f}：{time.time() - t0:.1f} 秒", flush=True)
+
+
+if __name__ == "__main__":
     a = parse_args()
     if a.get("rig"):
         if a["rig"] == "project":
-            pass
+            project_main(a)
+        elif a["rig"] == "flight":
+            flight_main(a)
         else:
             rig_main(a)
