@@ -24,6 +24,20 @@ git -C "$CODE" fetch -q --depth 1 origin "$SHA" 2>/dev/null || git -C "$CODE" fe
 git -C "$CODE" checkout -q "$SHA"
 P4="$CODE/scripts/pc-opening4"
 DATA=/root/data
+# 先に GPU が本当に使えるか確かめる（使えない機械で CPU に落ちて何十分も待たないように）
+nvidia-smi -L 2>&1 | head -3 || true
+"$BLENDER" -b --factory-startup --python-expr "
+import bpy,sys
+p=bpy.context.preferences.addons['cycles'].preferences
+ok=False
+for k in ('OPTIX','CUDA'):
+    try:
+        p.compute_device_type=k; p.refresh_devices()
+        if any(d.type==k for d in p.devices): ok=True; print('GPU 使える',k); break
+    except Exception as e: print(k,e)
+sys.exit(0 if ok else 3)" 2>&1 | grep -E "GPU|OPTIX|CUDA|Error"
+[ "${PIPESTATUS[0]}" = 0 ] || { echo "GPU が使えない機械です。やめます"; exit 1; }
+
 python3 "$P4/world_fetch.py" "$DATA" --shot "$SHOT" 2>&1 | tail -n 15
 # 使う装置と空きの記録
 { echo "GPU: $(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null | head -1)"; echo "commit: $SHA"; } > "$OUT/report.txt"

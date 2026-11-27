@@ -45,3 +45,11 @@
 - `scripts/gpu-render/jobs/world/run.sh`：公開リポジトリを SHA のコミットで浅く clone（scripts/pc-opening4 だけ）→ world_fetch.py（機械の中で約 2,100 枚）→ world.py を device=gpu で、先に 960x540・32 回の確かめ、続けて本番（RES・SAMPLES）。既定は clouds=volume haze=1 glare=1 exr=1。結果は OUT/small・OUT/full（png・exr・stats）と OUT/report.txt（GPU 名・使った装置・秒・最大メモリ）。
 - この機械での確かめ：bash -n・clone（sparse＋SHA の fetch）・world_fetch.py（キャッシュ使用）・world.py を device=gpu 指定で 320x180（GPU が無いので CPU に落ちることも確認）。
 - 直したバグ：world.py の exr=1 が Blender 5.3 に無い形式名 OPEN_EXR_MULTILAYER で落ちていた → OPEN_EXR（32 ビット）に。
+
+### GPU の 1 回目（実行 46042253541・COMMUNITY）：失敗（絵は出ず）
+- 借りた機械は CUDA が初期化できず（記録に「cycles | ERROR CUDA cuInit: Unknown error」）、world.py は CPU に落ちた（組み立て 11 秒までは進んだ）。
+  確かめ用の小さい絵（960x540・32 回）を CPU で描いたまま 40 分の上限（18:16）で止められ、機械は「機械を消す（必ず）」の手順で消えた（HTTP 204）。
+  借りるまで 5 分（17:29:57〜17:35:18）・動かして待った 40 分。out.tar は出来ず（R2 に無し）。
+- 直したこと：jobs/world/run.sh の最初（材料を取る前）に、Blender で OPTIX/CUDA が見えるか確かめ、使えなければ exit 1（CPU で何十分も待たない）。
+- お金の決まり（1 回＋描く前の失敗のみ再試行）により、描き始めた後の失敗なので 2 回目は頼んでいない。次は持ち主の許しを得て、
+  SECURE（機械の質が安定）か、COMMUNITY をもう一度（この確認で GPU が無い機械は 1 分で止まる）。
