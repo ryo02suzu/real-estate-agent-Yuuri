@@ -692,7 +692,7 @@ def render_strip(world, cs, frame, W, H, y0, y1, x0, x1, opts):
     lights_out[idx] = light_rgb
     return L.reshape(h, w, 3), hit.reshape(h, w), lights_out.reshape(h, w, 3), (d, t_hit, hit)
 
-def cloud_march(world, cs, frame, W, H, y0, y1, x0, x1, hit_info, opts, nslice=22):
+def cloud_march(world, cs, frame, W, H, y0, y1, x0, x1, hit_info, opts, nslice=30):
     """雲の層を視線ぞいに、高さの層ごとに前から奥へたどる。戻り: 雲の光 Lc（h,w,3）、雲を通る間の見え方 Tg（h,w,1）= 地面・灯りに掛ける。"""
     d, t_hit, hit = hit_info
     N = len(d); h, w = y1 - y0, x1 - x0

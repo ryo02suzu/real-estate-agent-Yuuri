@@ -1,0 +1,258 @@
+{
+ "data": [
+  "globe-r2"
+ ],
+ "max_parallel": 20,
+ "jobs": [
+  {
+   "name": "s12-c0-r0",
+   "run": "globe.py data=work/globe/r2 out={out} frame=12 res=3840x2160 procs=4 border=0.000000,0.644444,0.262500,1.000000",
+   "timeout_min": 90
+  },
+  {
+   "name": "s12-c1-r0",
+   "run": "globe.py data=work/globe/r2 out={out} frame=12 res=3840x2160 procs=4 border=0.237500,0.644444,0.512500,1.000000",
+   "timeout_min": 90
+  },
+  {
+   "name": "s12-c2-r0",
+   "run": "globe.py data=work/globe/r2 out={out} frame=12 res=3840x2160 procs=4 border=0.487500,0.644444,0.762500,1.000000",
+   "timeout_min": 90
+  },
+  {
+   "name": "s12-c3-r0",
+   "run": "globe.py data=work/globe/r2 out={out} frame=12 res=3840x2160 procs=4 border=0.737500,0.644444,1.000000,1.000000",
+   "timeout_min": 90
+  },
+  {
+   "name": "s12-c0-r1",
+   "run": "globe.py data=work/globe/r2 out={out} frame=12 res=3840x2160 procs=4 border=0.000000,0.311111,0.262500,0.688889",
+   "timeout_min": 90
+  },
+  {
+   "name": "s12-c1-r1",
+   "run": "globe.py data=work/globe/r2 out={out} frame=12 res=3840x2160 procs=4 border=0.237500,0.311111,0.512500,0.688889",
+   "timeout_min": 90
+  },
+  {
+   "name": "s12-c2-r1",
+   "run": "globe.py data=work/globe/r2 out={out} frame=12 res=3840x2160 procs=4 border=0.487500,0.311111,0.762500,0.688889",
+   "timeout_min": 90
+  },
+  {
+   "name": "s12-c3-r1",
+   "run": "globe.py data=work/globe/r2 out={out} frame=12 res=3840x2160 procs=4 border=0.737500,0.311111,1.000000,0.688889",
+   "timeout_min": 90
+  },
+  {
+   "name": "s12-c0-r2",
+   "run": "globe.py data=work/globe/r2 out={out} frame=12 res=3840x2160 procs=4 border=0.000000,0.000000,0.262500,0.355556",
+   "timeout_min": 90
+  },
+  {
+   "name": "s12-c1-r2",
+   "run": "globe.py data=work/globe/r2 out={out} frame=12 res=3840x2160 procs=4 border=0.237500,0.000000,0.512500,0.355556",
+   "timeout_min": 90
+  },
+  {
+   "name": "s12-c2-r2",
+   "run": "globe.py data=work/globe/r2 out={out} frame=12 res=3840x2160 procs=4 border=0.487500,0.000000,0.762500,0.355556",
+   "timeout_min": 90
+  },
+  {
+   "name": "s12-c3-r2",
+   "run": "globe.py data=work/globe/r2 out={out} frame=12 res=3840x2160 procs=4 border=0.737500,0.000000,1.000000,0.355556",
+   "timeout_min": 90
+  },
+  {
+   "name": "s48-c0-r0",
+   "run": "globe.py data=work/globe/r2 out={out} frame=48 res=3840x2160 procs=4 border=0.000000,0.644444,0.262500,1.000000",
+   "timeout_min": 90
+  },
+  {
+   "name": "s48-c1-r0",
+   "run": "globe.py data=work/globe/r2 out={out} frame=48 res=3840x2160 procs=4 border=0.237500,0.644444,0.512500,1.000000",
+   "timeout_min": 90
+  },
+  {
+   "name": "s48-c2-r0",
+   "run": "globe.py data=work/globe/r2 out={out} frame=48 res=3840x2160 procs=4 border=0.487500,0.644444,0.762500,1.000000",
+   "timeout_min": 90
+  },
+  {
+   "name": "s48-c3-r0",
+   "run": "globe.py data=work/globe/r2 out={out} frame=48 res=3840x2160 procs=4 border=0.737500,0.644444,1.000000,1.000000",
+   "timeout_min": 90
+  },
+  {
+   "name": "s48-c0-r1",
+   "run": "globe.py data=work/globe/r2 out={out} frame=48 res=3840x2160 procs=4 border=0.000000,0.311111,0.262500,0.688889",
+   "timeout_min": 90
+  },
+  {
+   "name": "s48-c1-r1",
+   "run": "globe.py data=work/globe/r2 out={out} frame=48 res=3840x2160 procs=4 border=0.237500,0.311111,0.512500,0.688889",
+   "timeout_min": 90
+  },
+  {
+   "name": "s48-c2-r1",
+   "run": "globe.py data=work/globe/r2 out={out} frame=48 res=3840x2160 procs=4 border=0.487500,0.311111,0.762500,0.688889",
+   "timeout_min": 90
+  },
+  {
+   "name": "s48-c3-r1",
+   "run": "globe.py data=work/globe/r2 out={out} frame=48 res=3840x2160 procs=4 border=0.737500,0.311111,1.000000,0.688889",
+   "timeout_min": 90
+  },
+  {
+   "name": "s48-c0-r2",
+   "run": "globe.py data=work/globe/r2 out={out} frame=48 res=3840x2160 procs=4 border=0.000000,0.000000,0.262500,0.355556",
+   "timeout_min": 90
+  },
+  {
+   "name": "s48-c1-r2",
+   "run": "globe.py data=work/globe/r2 out={out} frame=48 res=3840x2160 procs=4 border=0.237500,0.000000,0.512500,0.355556",
+   "timeout_min": 90
+  },
+  {
+   "name": "s48-c2-r2",
+   "run": "globe.py data=work/globe/r2 out={out} frame=48 res=3840x2160 procs=4 border=0.487500,0.000000,0.762500,0.355556",
+   "timeout_min": 90
+  },
+  {
+   "name": "s48-c3-r2",
+   "run": "globe.py data=work/globe/r2 out={out} frame=48 res=3840x2160 procs=4 border=0.737500,0.000000,1.000000,0.355556",
+   "timeout_min": 90
+  },
+  {
+   "name": "s77-c0-r0",
+   "run": "globe.py data=work/globe/r2 out={out} frame=77 res=3840x2160 procs=4 border=0.000000,0.644444,0.262500,1.000000",
+   "timeout_min": 90
+  },
+  {
+   "name": "s77-c1-r0",
+   "run": "globe.py data=work/globe/r2 out={out} frame=77 res=3840x2160 procs=4 border=0.237500,0.644444,0.512500,1.000000",
+   "timeout_min": 90
+  },
+  {
+   "name": "s77-c2-r0",
+   "run": "globe.py data=work/globe/r2 out={out} frame=77 res=3840x2160 procs=4 border=0.487500,0.644444,0.762500,1.000000",
+   "timeout_min": 90
+  },
+  {
+   "name": "s77-c3-r0",
+   "run": "globe.py data=work/globe/r2 out={out} frame=77 res=3840x2160 procs=4 border=0.737500,0.644444,1.000000,1.000000",
+   "timeout_min": 90
+  },
+  {
+   "name": "s77-c0-r1",
+   "run": "globe.py data=work/globe/r2 out={out} frame=77 res=3840x2160 procs=4 border=0.000000,0.311111,0.262500,0.688889",
+   "timeout_min": 90
+  },
+  {
+   "name": "s77-c1-r1",
+   "run": "globe.py data=work/globe/r2 out={out} frame=77 res=3840x2160 procs=4 border=0.237500,0.311111,0.512500,0.688889",
+   "timeout_min": 90
+  },
+  {
+   "name": "s77-c2-r1",
+   "run": "globe.py data=work/globe/r2 out={out} frame=77 res=3840x2160 procs=4 border=0.487500,0.311111,0.762500,0.688889",
+   "timeout_min": 90
+  },
+  {
+   "name": "s77-c3-r1",
+   "run": "globe.py data=work/globe/r2 out={out} frame=77 res=3840x2160 procs=4 border=0.737500,0.311111,1.000000,0.688889",
+   "timeout_min": 90
+  },
+  {
+   "name": "s77-c0-r2",
+   "run": "globe.py data=work/globe/r2 out={out} frame=77 res=3840x2160 procs=4 border=0.000000,0.000000,0.262500,0.355556",
+   "timeout_min": 90
+  },
+  {
+   "name": "s77-c1-r2",
+   "run": "globe.py data=work/globe/r2 out={out} frame=77 res=3840x2160 procs=4 border=0.237500,0.000000,0.512500,0.355556",
+   "timeout_min": 90
+  },
+  {
+   "name": "s77-c2-r2",
+   "run": "globe.py data=work/globe/r2 out={out} frame=77 res=3840x2160 procs=4 border=0.487500,0.000000,0.762500,0.355556",
+   "timeout_min": 90
+  },
+  {
+   "name": "s77-c3-r2",
+   "run": "globe.py data=work/globe/r2 out={out} frame=77 res=3840x2160 procs=4 border=0.737500,0.000000,1.000000,0.355556",
+   "timeout_min": 90
+  },
+  {
+   "name": "an-00",
+   "run": "globe.py data=work/globe/r2 out={out} frame=0-5 res=960x540 procs=4",
+   "timeout_min": 60
+  },
+  {
+   "name": "an-06",
+   "run": "globe.py data=work/globe/r2 out={out} frame=6-11 res=960x540 procs=4",
+   "timeout_min": 60
+  },
+  {
+   "name": "an-12",
+   "run": "globe.py data=work/globe/r2 out={out} frame=12-17 res=960x540 procs=4",
+   "timeout_min": 60
+  },
+  {
+   "name": "an-18",
+   "run": "globe.py data=work/globe/r2 out={out} frame=18-23 res=960x540 procs=4",
+   "timeout_min": 60
+  },
+  {
+   "name": "an-24",
+   "run": "globe.py data=work/globe/r2 out={out} frame=24-29 res=960x540 procs=4",
+   "timeout_min": 60
+  },
+  {
+   "name": "an-30",
+   "run": "globe.py data=work/globe/r2 out={out} frame=30-35 res=960x540 procs=4",
+   "timeout_min": 60
+  },
+  {
+   "name": "an-36",
+   "run": "globe.py data=work/globe/r2 out={out} frame=36-41 res=960x540 procs=4",
+   "timeout_min": 60
+  },
+  {
+   "name": "an-42",
+   "run": "globe.py data=work/globe/r2 out={out} frame=42-47 res=960x540 procs=4",
+   "timeout_min": 60
+  },
+  {
+   "name": "an-48",
+   "run": "globe.py data=work/globe/r2 out={out} frame=48-53 res=960x540 procs=4",
+   "timeout_min": 60
+  },
+  {
+   "name": "an-54",
+   "run": "globe.py data=work/globe/r2 out={out} frame=54-59 res=960x540 procs=4",
+   "timeout_min": 60
+  },
+  {
+   "name": "an-60",
+   "run": "globe.py data=work/globe/r2 out={out} frame=60-65 res=960x540 procs=4",
+   "timeout_min": 60
+  },
+  {
+   "name": "an-66",
+   "run": "globe.py data=work/globe/r2 out={out} frame=66-71 res=960x540 procs=4",
+   "timeout_min": 60
+  },
+  {
+   "name": "an-72",
+   "run": "globe.py data=work/globe/r2 out={out} frame=72-77 res=960x540 procs=4",
+   "timeout_min": 60
+  },
+  {
+   "name": "an-78",
+   "run": "globe.py data=work/globe/r2 out={out} frame=78-81 res=960x540 procs=4",
+   "timeout_min": 60
+  }
+ ]
+}
