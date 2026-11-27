@@ -1,0 +1,364 @@
+{
+ "data": [
+  "world-reveal",
+  "world-c2"
+ ],
+ "max_parallel": 20,
+ "jobs": [
+  {
+   "name": "w1-full1080-c0-r0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=1920x1080 samples=128 border=0.000000,0.622222,0.275000,1.000000",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-full1080-c1-r0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=1920x1080 samples=128 border=0.225000,0.622222,0.525000,1.000000",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-full1080-c2-r0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=1920x1080 samples=128 border=0.475000,0.622222,0.775000,1.000000",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-full1080-c3-r0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=1920x1080 samples=128 border=0.725000,0.622222,1.000000,1.000000",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-full1080-c0-r1",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=1920x1080 samples=128 border=0.000000,0.288889,0.275000,0.711111",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-full1080-c1-r1",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=1920x1080 samples=128 border=0.225000,0.288889,0.525000,0.711111",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-full1080-c2-r1",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=1920x1080 samples=128 border=0.475000,0.288889,0.775000,0.711111",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-full1080-c3-r1",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=1920x1080 samples=128 border=0.725000,0.288889,1.000000,0.711111",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-full1080-c0-r2",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=1920x1080 samples=128 border=0.000000,0.000000,0.275000,0.377778",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-full1080-c1-r2",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=1920x1080 samples=128 border=0.225000,0.000000,0.525000,0.377778",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-full1080-c2-r2",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=1920x1080 samples=128 border=0.475000,0.000000,0.775000,0.377778",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-full1080-c3-r2",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=1920x1080 samples=128 border=0.725000,0.000000,1.000000,0.377778",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c0-r0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.000000,0.727778,0.212500,1.000000",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c1-r0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.187500,0.727778,0.412500,1.000000",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c2-r0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.387500,0.727778,0.612500,1.000000",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c3-r0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.587500,0.727778,0.812500,1.000000",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c4-r0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.787500,0.727778,1.000000,1.000000",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c0-r1",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.000000,0.477778,0.212500,0.772222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c1-r1",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.187500,0.477778,0.412500,0.772222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c2-r1",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.387500,0.477778,0.612500,0.772222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c3-r1",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.587500,0.477778,0.812500,0.772222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c4-r1",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.787500,0.477778,1.000000,0.772222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c0-r2",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.000000,0.227778,0.212500,0.522222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c1-r2",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.187500,0.227778,0.412500,0.522222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c2-r2",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.387500,0.227778,0.612500,0.522222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c3-r2",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.587500,0.227778,0.812500,0.522222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c4-r2",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.787500,0.227778,1.000000,0.522222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c0-r3",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.000000,0.000000,0.212500,0.272222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c1-r3",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.187500,0.000000,0.412500,0.272222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c2-r3",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.387500,0.000000,0.612500,0.272222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c3-r3",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.587500,0.000000,0.812500,0.272222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-c4-r3",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.787500,0.000000,1.000000,0.272222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c0-r0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.000000,0.727778,0.212500,1.000000",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c1-r0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.187500,0.727778,0.412500,1.000000",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c2-r0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.387500,0.727778,0.612500,1.000000",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c3-r0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.587500,0.727778,0.812500,1.000000",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c4-r0",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.787500,0.727778,1.000000,1.000000",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c0-r1",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.000000,0.477778,0.212500,0.772222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c1-r1",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.187500,0.477778,0.412500,0.772222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c2-r1",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.387500,0.477778,0.612500,0.772222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c3-r1",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.587500,0.477778,0.812500,0.772222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c4-r1",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.787500,0.477778,1.000000,0.772222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c0-r2",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.000000,0.227778,0.212500,0.522222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c1-r2",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.187500,0.227778,0.412500,0.522222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c2-r2",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.387500,0.227778,0.612500,0.522222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c3-r2",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.587500,0.227778,0.812500,0.522222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c4-r2",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.787500,0.227778,1.000000,0.522222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c0-r3",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.000000,0.000000,0.212500,0.272222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c1-r3",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.187500,0.000000,0.412500,0.272222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c2-r3",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.387500,0.000000,0.612500,0.272222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c3-r3",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.587500,0.000000,0.812500,0.272222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-t4k-nocl-c4-r3",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=none haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.787500,0.000000,1.000000,0.272222",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-crop-a",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.33,0.46,0.54,0.67",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-crop-b",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.76,0.14,0.97,0.35",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-crop-c",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=3840x2160 samples=128 border=0.55,0.42,0.76,0.63",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-r50",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=1280x720 samples=96 lens=50",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-rsun35",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=1280x720 samples=96 sun_el=3.5",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-rexr",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=960x540 samples=48 exr=1 mblur=1",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-c2",
+   "run": "world.py -- data=work/world/c2 out={out} frame=240 res=1280x720 samples=96 clouds=volume haze=1 glare=1 marks=1 threads=4",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-fl-594",
+   "run": "world.py -- data=work/world/reveal out={out} frame=594 clouds=volume haze=1 glare=1 marks=1 threads=4 res=640x360 samples=32 mblur=1 render_seed=7",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-fl-595",
+   "run": "world.py -- data=work/world/reveal out={out} frame=595 clouds=volume haze=1 glare=1 marks=1 threads=4 res=640x360 samples=32 mblur=1 render_seed=7",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-fl-596",
+   "run": "world.py -- data=work/world/reveal out={out} frame=596 clouds=volume haze=1 glare=1 marks=1 threads=4 res=640x360 samples=32 mblur=1 render_seed=7",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-fl-597",
+   "run": "world.py -- data=work/world/reveal out={out} frame=597 clouds=volume haze=1 glare=1 marks=1 threads=4 res=640x360 samples=32 mblur=1 render_seed=7",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-fl-598",
+   "run": "world.py -- data=work/world/reveal out={out} frame=598 clouds=volume haze=1 glare=1 marks=1 threads=4 res=640x360 samples=32 mblur=1 render_seed=7",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-fl-599",
+   "run": "world.py -- data=work/world/reveal out={out} frame=599 clouds=volume haze=1 glare=1 marks=1 threads=4 res=640x360 samples=32 mblur=1 render_seed=7",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-fl-600",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=volume haze=1 glare=1 marks=1 threads=4 res=640x360 samples=32 mblur=1 render_seed=7",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-fl-601",
+   "run": "world.py -- data=work/world/reveal out={out} frame=601 clouds=volume haze=1 glare=1 marks=1 threads=4 res=640x360 samples=32 mblur=1 render_seed=7",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-fl-602",
+   "run": "world.py -- data=work/world/reveal out={out} frame=602 clouds=volume haze=1 glare=1 marks=1 threads=4 res=640x360 samples=32 mblur=1 render_seed=7",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-fl-603",
+   "run": "world.py -- data=work/world/reveal out={out} frame=603 clouds=volume haze=1 glare=1 marks=1 threads=4 res=640x360 samples=32 mblur=1 render_seed=7",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-fl-604",
+   "run": "world.py -- data=work/world/reveal out={out} frame=604 clouds=volume haze=1 glare=1 marks=1 threads=4 res=640x360 samples=32 mblur=1 render_seed=7",
+   "timeout_min": 120
+  },
+  {
+   "name": "w1-fl-605",
+   "run": "world.py -- data=work/world/reveal out={out} frame=605 clouds=volume haze=1 glare=1 marks=1 threads=4 res=640x360 samples=32 mblur=1 render_seed=7",
+   "timeout_min": 120
+  }
+ ]
+}
