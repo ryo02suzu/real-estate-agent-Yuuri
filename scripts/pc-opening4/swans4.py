@@ -137,13 +137,13 @@ def build_wing_feathers(rng, lod):
     root = np.stack([s * L_ULN, np.full(n, -0.030), 0.004 - 0.0006 * np.arange(n)], axis=1)
     L = 0.292 - 0.016 * s + 0.008 * np.sin(np.pi * s) + rng.normal(0, 0.003, n)
     fan0 = np.radians(-6 + 14 * s + rng.normal(0, 0.5, n))
-    add_group(res_big, n, 1, root, fan0, np.radians(0.0 + 0 * s), 0.045 + 0 * s, L, np.full(n, 0.027), np.full(n, 0.034), np.full(n, 0.20), np.full(n, 0.03), np.full(n, 3.4), roll=np.radians(-3))
+    add_group(res_big, n, 1, root, fan0, np.radians(0.0 + 0 * s), 0.045 + 0 * s, L, np.full(n, 0.027), np.full(n, 0.036), np.full(n, 0.36), np.full(n, 0.03), np.full(n, 2.0), roll=np.radians(-3))
     # 三列風切（上腕に 5 枚）。体のほうへ向く
     n = 5
     s = (np.arange(n) + 0.5) / n
     root = np.stack([s * L_HUM, np.full(n, -0.030), 0.012 - 0.001 * np.arange(n)], axis=1)
     L = 0.270 - 0.022 * s + rng.normal(0, 0.003, n)
-    add_group(res_big, n, 0, root, np.radians(-16 - 8 * s), np.zeros(n), 0.03 + 0 * s, L, np.full(n, 0.028), np.full(n, 0.036), np.full(n, 0.28), np.full(n, 0.03), np.full(n, 3.0))
+    add_group(res_big, n, 0, root, np.radians(-16 - 8 * s), np.zeros(n), 0.03 + 0 * s, L, np.full(n, 0.028), np.full(n, 0.036), np.full(n, 0.34), np.full(n, 0.03), np.full(n, 2.0))
     # 初列風切 10 枚（手）。P1（内）〜P10（外）。外の 5 枚は先がせまく切れこむ。開き（ks）は外ほど大きい。P8・P9 が最長
     n = 10
     q = np.arange(n) / 9.0
@@ -152,9 +152,9 @@ def build_wing_feathers(rng, lod):
     emarg = q > 0.45
     wl = np.where(emarg, 0.016, 0.022)
     wt = np.where(emarg, 0.026, 0.034)
-    fan0 = np.radians(8 + 70 * q ** 1.15 + rng.normal(0, 0.5, n))
-    ks = np.radians(2 + 11 * q)
-    add_group(res_big, n, 2, root, fan0, ks, 0.10 + 0 * q, Lp, wl, wt, np.where(emarg, 0.33, 0.24), np.full(n, 0.05), np.where(emarg, 2.3, 3.0), roll=np.radians(-4 - 4 * q))
+    fan0 = np.radians(26 + 43 * q ** 1.1 + rng.normal(0, 0.5, n))
+    ks = np.radians(2 + 8 * q)
+    add_group(res_big, n, 2, root, fan0, ks, 0.10 + 0 * q, Lp, wl, wt, np.where(emarg, 0.33, 0.30), np.full(n, 0.05), np.where(emarg, 2.0, 2.2), roll=np.radians(-4 - 4 * q))
     # 背側の雨覆（大・中・小）と前縁。前腕・手の上に、うろこのように重ねる。付け根は風切羽の付け根の少し前
     def coverts(bone, Lbone, rows, ventral):
         for (ny, yfrac, Lr, wl_, wt_, nn, z, bk, ksc) in rows:
@@ -385,16 +385,16 @@ def build_materials():
         barb = mth("ADD", barb, mth("MULTIPLY", rnd, 37.0))
         stripe = mth("MULTIPLY", mth("ADD", mth("SINE", mth("MULTIPLY", barb, 2 * math.pi)), 1.0), 0.5)
         noi = nt.nodes.new("ShaderNodeTexNoise")
-        noi.inputs["Scale"].default_value = 3.0
-        noi.inputs["Detail"].default_value = 4.0
+        noi.inputs["Scale"].default_value = 1.0
+        noi.inputs["Detail"].default_value = 3.0
         comb = nt.nodes.new("ShaderNodeCombineXYZ")
-        nt.links.new(mth("MULTIPLY", mth("MULTIPLY", barb, 0.02), 6.0), comb.inputs[0])
-        nt.links.new(mth("MULTIPLY", dv, 1.5), comb.inputs[1])
+        nt.links.new(mth("MULTIPLY", mth("MULTIPLY", u, ln), 22.0), comb.inputs[0])      # 約 4.5cm ごとに 1 区画（羽軸の向き）
+        nt.links.new(mth("MULTIPLY", dv, 2.2), comb.inputs[1])
         nt.links.new(mth("MULTIPLY", rnd, 50.0), comb.inputs[2])
         nt.links.new(comb.outputs[0], noi.inputs["Vector"])
-        # 羽枝の分かれ（すき間）：先とふちに近いほど多い
-        near_tip = mth("MULTIPLY", mth("SUBTRACT", u, 0.6, clamp=False), 0.2)
-        split = mth("MULTIPLY", mth("SUBTRACT", noi.outputs["Fac"], mth("SUBTRACT", split_base, mth("ADD", mth("MULTIPLY", dv, 0.16), mth("MAXIMUM", near_tip, 0.0)))), 18.0, clamp=True)
+        # 羽枝の分かれ（すき間）：先とふちの近くだけ、細く
+        near_tip = mth("MULTIPLY", mth("SUBTRACT", u, 0.6, clamp=False), 0.25)
+        split = mth("MULTIPLY", mth("SUBTRACT", noi.outputs["Fac"], mth("SUBTRACT", split_base, mth("ADD", mth("MULTIPLY", dv, 0.10), mth("MAXIMUM", near_tip, 0.0)))), 14.0, clamp=True)
         noi2 = nt.nodes.new("ShaderNodeTexNoise")
         noi2.inputs["Scale"].default_value = 40.0
         nt.links.new(comb.outputs[0], noi2.inputs["Vector"])
@@ -418,7 +418,7 @@ def build_materials():
         tr = nt.nodes.new("ShaderNodeBsdfTranslucent")
         tcol = nt.nodes.new("ShaderNodeMix")
         tcol.data_type = "RGBA"
-        sock(tcol.inputs, "A", "RGBA").default_value = (0.95, 0.90, 0.80, 1.0)       # 羽の透け色：やや暖かい白
+        sock(tcol.inputs, "A", "RGBA").default_value = (0.97, 0.93, 0.86, 1.0)       # 羽の透け色：やや暖かい白
         sock(tcol.inputs, "B", "RGBA").default_value = (0.62, 0.50, 0.36, 1.0)      # 羽軸のまわりは濃い
         nt.links.new(mth("MULTIPLY", shaft, 0.9, clamp=True), sock(tcol.inputs, "Factor", "VALUE"))
         nt.links.new(sock(tcol.outputs, "Result", "RGBA"), tr.inputs["Color"])
@@ -853,7 +853,7 @@ def flock_layout(n):
         for sgn in (1, -1):
             if len(pos) >= n:
                 break
-            pos.append((-k * sl + rng.normal(0, 0.45), sgn * k * sw + rng.normal(0, 0.35), rng.normal(0, 0.35) + 0.25 * sgn * k * 0.0))
+            pos.append((-k * sl + rng.normal(0, 0.45), sgn * k * sw + rng.normal(0, 0.35), rng.normal(0, 0.45) + 0.55 * k - 0.4))
     return np.array(pos[:n])
 
 
@@ -906,7 +906,7 @@ def flock_state(frames_json, f, n=N_BIRDS, seed=1):
     return out
 
 
-flock_param = dict(ls=0.7, vs=0.55, F0=29.0, V0=13.0, dV=1.2, W0=0.5, v0=8.5, v1=7.5, vend=0.0)
+flock_param = dict(ls=0.9, vs=0.9, F0=33.0, V0=11.0, dV=1.0, W0=0.5, v0=8.5, v1=7.5, vend=0.0)
 
 
 def world_state(frames_json, f_render, f, n=N_BIRDS, seed=1):
@@ -947,6 +947,8 @@ def add(world):
     n = int(opt.get("swans_n", str(N_BIRDS)))
     seed = int(opt.get("swans_seed", "1"))
     debug = opt.get("swans_debug", "0") == "1"
+    global FLAP_HZ
+    FLAP_HZ = float(opt.get("swans_hz", str(FLAP_HZ)))
     if F < 557 or F > 719:
         world.log(f"swans4：コマ {F} は白鳥の出る範囲（557〜719）の外。何も置かない")
         return
@@ -1090,12 +1092,12 @@ def rig_main(a):
                 bird.pose([(1, dict(pos=np.array([0, 0, 0.0]), yaw=0.0, pitch=0.0, roll=0.0, phase=ph))])
                 cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
                 sc.collection.objects.link(cam)
-                cam.data.lens = 50
+                cam.data.lens = 45
                 cam.data.clip_end = 50000
                 if view == "side":
-                    look_at(cam, (7.0, 0.1, 0.4), (0, 0.1, 0.1))
+                    look_at(cam, (5.2, 0.1, 0.3), (0, 0.1, 0.1))
                 else:
-                    look_at(cam, (0.0, 7.5, 0.5), (0, 0.0, 0.1))
+                    look_at(cam, (0.0, 5.4, 0.6), (0, 0.0, 0.1))
                 sc.camera = cam
                 sc.render.filepath = os.path.join(out, f"_cycle-{view}-{k}.png")
                 bpy.ops.render.render(write_still=True)
