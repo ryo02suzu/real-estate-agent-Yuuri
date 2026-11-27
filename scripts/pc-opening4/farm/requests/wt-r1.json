@@ -1,0 +1,45 @@
+{
+ "data": [
+  "world-reveal",
+  "world-c2",
+  "trees"
+ ],
+ "max_parallel": 20,
+ "jobs": [
+  {
+   "name": "wt-reveal-notrees",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=surface threads=4 res=1280x720 samples=64",
+   "timeout_min": 60
+  },
+  {
+   "name": "wt-reveal-trees",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=surface threads=4 res=1280x720 samples=64 extras=world_trees",
+   "timeout_min": 90
+  },
+  {
+   "name": "wt-crop-a",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=surface threads=4 res=3840x2160 samples=128 extras=world_trees border=0.1771,0.3843,0.3438,0.5509",
+   "timeout_min": 150
+  },
+  {
+   "name": "wt-crop-b",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=surface threads=4 res=3840x2160 samples=128 extras=world_trees border=0.7760,0.3981,0.9427,0.5648",
+   "timeout_min": 150
+  },
+  {
+   "name": "wt-crop-c",
+   "run": "world.py -- data=work/world/reveal out={out} frame=600 clouds=surface threads=4 res=3840x2160 samples=128 extras=world_trees border=0.4896,0.4537,0.6562,0.6204",
+   "timeout_min": 150
+  },
+  {
+   "name": "wt-c2-trees",
+   "run": "world.py -- data=work/world/c2 out={out} frame=240 res=1280x720 samples=64 clouds=none threads=4 extras=world_trees",
+   "timeout_min": 120
+  },
+  {
+   "name": "wt-c2-notrees",
+   "run": "world.py -- data=work/world/c2 out={out} frame=240 res=1280x720 samples=64 clouds=none threads=4",
+   "timeout_min": 60
+  }
+ ]
+}
