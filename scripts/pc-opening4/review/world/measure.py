@@ -107,8 +107,9 @@ if sel:
     blk = im[sel[0]: sel[-1] + 1, int(W * 0.2): int(W * 0.8)].reshape(-1, 3)
     bl = blk @ np.array([0.2126, 0.7152, 0.0722])
     # keep cloud-like pixels (not near ridges, which are much darker than any cloud in shade): shaded cloud is B > R
-    cloudy = blk[(bl > 60)]
-    cl = bl[(bl > 60)]
+    isc = (bl > 50) & (blk[:, 2] >= 0.65 * blk[:, 0])          # cloud-like: not a warm/dark ridge pixel (B/R >= 0.65)
+    cloudy = blk[isc]
+    cl = bl[isc]
     if len(cloudy) > 50:
         hi = cloudy[cl >= np.percentile(cl, 90)].mean(0)
         lo = cloudy[cl <= np.percentile(cl, 10)].mean(0)
@@ -122,10 +123,12 @@ if band_rows:
     add("deck under the sun vs frame edges", "%.0f vs %.0f" % (under, edges), "under > edges", under > edges)
 # --- near ridges: dark pixels in the lower half
 low = luma[int(H * 0.55):]
-dark = low[low < 70]
+lowrgb = im[int(H * 0.55):]
+terr = (lowrgb[..., 2] < 0.62 * lowrgb[..., 0]) | (low < 40)     # ridge-like pixels (warm ground or very dark)
+dark = low[terr & (low < 90)]
 if dark.size > 100:
     add("near ridges mean (pixels < 70 in lower 45%)", "%.1f" % dark.mean(), "18-32", 18 <= dark.mean() <= 32, "%.1f%% of those rows" % (100.0 * dark.size / low.size))
-    add("near ridges darkest 1%", "%.1f" % np.percentile(low, 1), "6-12", 6 <= np.percentile(low, 1) <= 12)
+    add("near ridges darkest 1%", "%.1f" % np.percentile(dark, 1), "6-12", 6 <= np.percentile(dark, 1) <= 12)
 else:
     add("near ridges", "no dark pixels", "18-32", False)
 
@@ -138,8 +141,8 @@ def contrast_at(m):
     sc = H / 360.0
     a, b = int(max(0, y - 18 * sc)), int(max(1, y - 9 * sc))
     sky = np.median(luma[a:b, x - 3: x + 4])
-    c, d = int(y + 8 * sc), int(y + 18 * sc)
-    rng = np.median(luma[c:d, x - 3: x + 4])
+    c, d = int(y - 4 * sc), int(y + 16 * sc)
+    rng = np.percentile(luma[c:d, max(0, x - 8): x + 9], 8)          # the darkest part of the range body below the summit (marks are within a few px)
     return sky, rng
 
 
