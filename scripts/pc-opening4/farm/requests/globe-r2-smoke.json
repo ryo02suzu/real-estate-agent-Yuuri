@@ -1,0 +1,7 @@
+{
+ "data": ["globe-r2"],
+ "max_parallel": 20,
+ "jobs": [
+  {"name": "g2-smoke", "run": "globe.py data=work/globe/r2 out={out} frame=77 res=640x360 procs=4", "timeout_min": 60}
+ ]
+}
