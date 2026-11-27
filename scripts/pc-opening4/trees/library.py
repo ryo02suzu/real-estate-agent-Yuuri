@@ -15,6 +15,7 @@ from . import species as _sp
 from .treegen import grow_tree, wood_mesh, make_rng, _unit
 from . import twigs as _tw
 from . import materials as _mat
+from . import firtwigs as _ft
 
 LOD_FOLIAGE = {
     # card_size：カード 1 枚の大きさ（絵 0.70m 幅に対する倍率）。LOD1 は最大 0.4m のふさ
@@ -22,6 +23,11 @@ LOD_FOLIAGE = {
     0: dict(twig_tris=190_000, card_cell=0.10, card_size=0.85, max_tris=395_000, keep=1.0, extra_step=0.08, planes=2),
     1: dict(twig_tris=0, card_cell=0.12, card_size=1.05, max_tris=39_000, keep=0.95, extra_step=0.08, planes=1),
     2: dict(twig_tris=0, card_cell=0.4, card_size=2.4, max_tris=8_000, keep=0.75, extra_step=0.2, planes=1),
+}
+LOD_FOLIAGE_FIR = {
+    # 細いモミの樹冠は密。lod0 は「近くの 25m 以遠でも立つ」ことが目標なので、本物の小枝は 7 万に抑え、カードで密にする
+    0: dict(twig_tris=70_000, card_cell=0.065, card_size=1.1, max_tris=330_000, keep=1.0, extra_step=0.06, planes=2),
+    1: dict(twig_tris=0, card_cell=0.10, card_size=1.25, max_tris=39_000, keep=1.0, extra_step=0.07, planes=1),
 }
 CARD_KIND_P = np.array([0.42, 0.30, 0.18, 0.10])   # gold, thin, rust, cone
 _twig_cache = {}
@@ -33,7 +39,7 @@ def mesh_from_arrays(name, wood, needles, cards, mats, tone=None):
     for mi, part in ((0, wood), (1, needles), (2, cards)):
         if part is not None and len(part["faces"]):
             parts.append((mi, part))
-    V, F, UV, MI, rad, dead, tint, tn = [], [], [], [], [], [], [], []
+    V, F, UV, MI, rad, dead, tint, tn, gn = [], [], [], [], [], [], [], [], []
     off = 0
     for mi, p in parts:
         n = len(p["verts"])
@@ -43,6 +49,7 @@ def mesh_from_arrays(name, wood, needles, cards, mats, tone=None):
         dead.append(p.get("dead", np.zeros(n)))
         tint.append(p.get("tint", np.full(n, 0.5)))
         tn.append(p["tone"] if "tone" in p else np.full(n, 0.0 if tone is None else tone))
+        gn.append(p.get("gain", np.ones((n, 4))))
         off += n
     V = np.vstack(V).astype(np.float32)
     F = np.vstack(F).astype(np.int32)
@@ -56,6 +63,8 @@ def mesh_from_arrays(name, wood, needles, cards, mats, tone=None):
     for an, arr in (("radius", rad), ("dead", dead), ("tint", tint), ("tone", tn)):
         at = me.attributes.new(an, "FLOAT", "POINT")
         at.data.foreach_set("value", np.concatenate(arr).astype(np.float32))
+    ga = me.attributes.new("gain", "FLOAT_COLOR", "POINT")
+    ga.data.foreach_set("color", np.vstack(gn).astype(np.float32).ravel())
     for m in mats:
         me.materials.append(m)
     me.update()
@@ -65,7 +74,10 @@ def mesh_from_arrays(name, wood, needles, cards, mats, tone=None):
 def _twigs_for(species, thin, tint0):
     key = (species, round(thin, 2), round(tint0, 2))
     if key not in _twig_cache:
-        _twig_cache[key] = _tw.twig_variants(10, thin=thin, tint0=tint0, cones=0.25)
+        if species == "fir":
+            _twig_cache[key] = _ft.twig_variants(10, tint0=0.5)
+        else:
+            _twig_cache[key] = _tw.twig_variants(10, thin=thin, tint0=tint0, cones=0.25)
     return _twig_cache[key]
 
 
@@ -143,7 +155,7 @@ def _merge_extra(sk, rg, step):
     return dict(pos=pos, dir=dr, up=up, scale=scl, shell=shell)
 
 
-def foliage_cards(sk, P, cfg, skip, rg, tris_left):
+def foliage_cards(sk, P, cfg, skip, rg, tris_left, species="larch"):
     """アンカーから、細かい格子ごとに 1 枚（外側ほど優先）、2 枚を十字に組んだカードを作る。"""
     A = _merge_extra(sk, rg, cfg["extra_step"])
     n = len(A["pos"])
@@ -162,7 +174,7 @@ def foliage_cards(sk, P, cfg, skip, rg, tris_left):
     shell = np.clip(A["shell"][pick], 0, 1.1)
     rho = np.hypot(A["pos"][pick, 0], A["pos"][pick, 1])
     # 落ちて葉がない所・内側の葉（幹が透けて見えるように、幹のまわりと内側をうすく）
-    pk = cfg["keep"] * (1 - P["bare"] * 0.8) * np.clip(0.35 + 0.9 * shell, 0.2, 1.0) * np.clip(0.3 + rho / 1.2, 0.3, 1.0)
+    pk = cfg["keep"] * (1 - P["bare"] * 0.8) * np.clip(0.35 + 0.9 * shell, 0.2, 1.0) * np.clip(0.3 + rho / P.get("rho_k", 1.2), 0.3, 1.0)
     keep = rg.random(len(pick)) < pk
     pick = pick[keep]
     shell = shell[keep]
@@ -176,9 +188,9 @@ def foliage_cards(sk, P, cfg, skip, rg, tris_left):
         return None
     R = _basis(A["dir"][pick], A["up"][pick])
     sc = A["scale"][pick] * cfg["card_size"] * rg.uniform(0.7, 1.2, m)
-    kind = rg.choice(4, m, p=CARD_KIND_P)
-    # 色が高い（さび色）木は、さび色の束が多い
-    kind = np.where((rg.random(m) < P["tone"] * 0.35) & (kind == 0), 2, kind)
+    kind = rg.choice(4, m, p=_ft.CARD_KIND_P if species == "fir" else CARD_KIND_P)
+    if species != "fir":      # 色が高い（さび色）木は、さび色の束が多い
+        kind = np.where((rg.random(m) < P["tone"] * 0.35) & (kind == 0), 2, kind)
     variant_row = rg.integers(0, _tw.ATLAS_ROWS, m)
     cw, ch = _tw.CLUSTER_W, _tw.CLUSTER_H
     x0, x1 = -0.03, cw - 0.03
@@ -219,36 +231,38 @@ def foliage_cards(sk, P, cfg, skip, rg, tris_left):
 
 
 def build_tree(species="larch", variant=0, lod=0, link=True, timing=None):
-    if lod >= 3:
-        raise NotImplementedError("lod 3（その木の絵を貼った板）は場面を組む側が lod 1 から焼く。フック：_bake_billboard")
     t0 = time.time()
     P = _sp.get_params(species, variant)
     sk = grow_tree(P, species, variant)
-    cfg = LOD_FOLIAGE[lod]
-    wood = wood_mesh(sk, lod, species, variant)
-    rg = make_rng(species, variant, 5 + lod)
-    tris = len(wood["faces"])
-    tw_w = tw_n = None
-    skip = np.zeros(len(sk.anchors["pos"]), bool)
-    if cfg["twig_tris"] > 0 and not P.get("standing_dead"):
-        tb = min(cfg["twig_tris"], cfg["max_tris"] - tris - 40_000)
-        tw_w, tw_n, skip = real_twigs(sk, P, species, variant, tb, rg)
-        if tw_w is not None:
-            # 小枝の木部を幹の木部にまとめる
-            off = len(wood["verts"])
-            wood = dict(verts=np.vstack([wood["verts"], tw_w["verts"]]), faces=np.vstack([wood["faces"], tw_w["faces"] + off]),
-                        uv=np.vstack([wood["uv"], tw_w["uv"]]), radius=np.concatenate([wood["radius"], tw_w["radius"]]),
-                        dead=np.concatenate([wood["dead"], tw_w["dead"]]))
-            tris = len(wood["faces"]) + len(tw_n["faces"])
-    if P.get("standing_dead"):
-        cards = None
+    fir = species == "fir"
+    if lod >= 2:
+        ob = _lods.build_lod_object(sk, P, species, variant, lod)
     else:
-        cards = foliage_cards(sk, P, cfg, skip, rg, cfg["max_tris"] - tris)
-    mats = [_mat.bark_material(), _mat.needle_material(), _mat.card_material()]
-    ob = mesh_from_arrays(f"{species}-{variant}-lod{lod}", wood, tw_n, cards, mats, tone=P["tone"])
-    if tw_n is not None:
-        # 針と小枝にも木ごとの色
-        pass
+        cfg = (LOD_FOLIAGE_FIR if fir else LOD_FOLIAGE)[lod]
+        tune = _lods.lod1_tune(species) if lod == 1 else dict(size=1.0, gain=1.0)
+        cfg = dict(cfg, card_size=cfg["card_size"] * tune["size"])
+        wood = wood_mesh(sk, lod, species, variant)
+        rg = make_rng(species, variant, 5 + lod)
+        tris = len(wood["faces"])
+        tw_w = tw_n = None
+        skip = np.zeros(len(sk.anchors["pos"]), bool)
+        if cfg["twig_tris"] > 0 and not P.get("standing_dead"):
+            tb = min(cfg["twig_tris"], cfg["max_tris"] - tris - 40_000)
+            tw_w, tw_n, skip = real_twigs(sk, P, species, variant, tb, rg)
+            if tw_w is not None:
+                off = len(wood["verts"])
+                wood = dict(verts=np.vstack([wood["verts"], tw_w["verts"]]), faces=np.vstack([wood["faces"], tw_w["faces"] + off]),
+                            uv=np.vstack([wood["uv"], tw_w["uv"]]), radius=np.concatenate([wood["radius"], tw_w["radius"]]),
+                            dead=np.concatenate([wood["dead"], tw_w["dead"]]))
+                tris = len(wood["faces"]) + len(tw_n["faces"])
+        cards = None if P.get("standing_dead") else foliage_cards(sk, P, cfg, skip, rg, cfg["max_tris"] - tris, species)
+        if cards is not None:
+            cards["gain"] = np.tile(np.array([tune["gain"]] * 3 + [1.0]), (len(cards["verts"]), 1))
+        if fir:
+            mats = [_mat.bark_material(), _mat.fir_needle_material(), _mat.fir_card_material()]
+        else:
+            mats = [_mat.bark_material(), _mat.needle_material(), _mat.card_material()]
+        ob = mesh_from_arrays(f"{species}-{variant}-lod{lod}", wood, tw_n, cards, mats, tone=P["tone"])
     ob["species"], ob["variant"], ob["lod"] = species, int(variant), int(lod)
     ob["height"] = float(sk.info["height"])
     ob["tone"] = float(P["tone"])
@@ -273,3 +287,78 @@ def build_library(species=None, variants=None, lods=(0, 1), link=True):
                 ob = build_tree(sp, v, l, link=link)
                 out[ob.name] = ob
     return out
+
+
+from . import lods as _lods  # noqa: E402（lods は mesh_from_arrays を使うので最後に読む）
+
+
+# ---------------------------------------------------------------------------
+# 保存した木の素材集（.blend）。描画する機械は作り直さず、これを読む。
+# 中身は固定の乱数だけで決まるので、作り直しても同じ結果になる（test_trees.py で確かめる）。
+# ---------------------------------------------------------------------------
+import os  # noqa: E402
+
+WORK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "work")
+LIB_PATH = os.path.join(WORK, "trees", "library.blend")
+N_VARIANTS = 48          # 種類ごとの変種の数（0〜47）。手で決めた型は larch 12・fir 24、残りは連続的にばらつく木
+N_LOD0 = 12              # lod 0 を保存する変種の数（0〜11）。lod 0 は 1 本 20〜30 万三角形で重いので 12 本まで
+LIB_COLLECTION = "MICHILU_treelib"
+
+
+def obj_name(species, variant, lod):
+    return f"{species}-{int(variant)}-lod{int(lod)}"
+
+
+def is_dead(species, variant):
+    return bool(_sp.get_params(species, variant).get("standing_dead"))
+
+
+def lod0_variants(species):
+    return list(range(N_LOD0))
+
+
+def save_library(path=LIB_PATH, species=("larch", "fir"), n_variants=N_VARIANTS, n_lod0=N_LOD0, log=None):
+    """全変種の lod 1〜3 と、先頭 n_lod0 変種の lod 0 を 1 つの .blend に保存する。シーンには出さない（読むときに選ぶ）。
+    戻り値：dict(seconds, bytes, n_objects, tris={lod: 合計三角形})"""
+    t0 = time.time()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    coll = bpy.data.collections.new(LIB_COLLECTION)
+    coll.use_fake_user = True
+    tris = {0: 0, 1: 0, 2: 0, 3: 0}
+    n = 0
+    for sp in species:
+        for v in range(n_variants):
+            for lod in (0, 1, 2, 3):
+                if lod == 0 and v >= n_lod0:
+                    continue
+                ob = build_tree(sp, v, lod, link=False)
+                coll.objects.link(ob)
+                tris[lod] += ob["tris"]
+                n += 1
+            if log:
+                log(f"{sp} {v} done {time.time() - t0:.0f}s")
+    bpy.ops.file.pack_all()
+    bpy.ops.wm.save_as_mainfile(filepath=path, compress=True)
+    return dict(seconds=time.time() - t0, bytes=os.path.getsize(path), n_objects=n, tris=tris)
+
+
+def load_library(path=LIB_PATH, only=None):
+    """保存した .blend から木の物を読む（シーンには出さない）。only＝名前の集合（None なら全部）。
+    すでに読み込んである物は読み直さない。戻り値：dict 名前 → 物。"""
+    have = {o.name for o in bpy.data.objects}
+    with bpy.data.libraries.load(path, link=False) as (src, dst):
+        want = [nm for nm in src.objects if (only is None or nm in only) and nm not in have]
+        dst.objects = want
+    out = {}
+    for nm in (only if only is not None else [o.name for o in bpy.data.objects]):
+        ob = bpy.data.objects.get(nm)
+        if ob is not None and "species" in ob.keys():
+            out[nm] = ob
+    return out
+
+
+if __name__ == "__main__":
+    import sys
+    r = save_library(sys.argv[1] if len(sys.argv) > 1 else LIB_PATH, log=lambda s: print(s, flush=True))
+    print("RESULT", r)

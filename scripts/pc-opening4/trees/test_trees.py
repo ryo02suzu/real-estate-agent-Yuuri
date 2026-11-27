@@ -97,6 +97,39 @@ def test_library_budgets_if_bpy():
         assert len(o0.data.materials) <= 3
 
 
+def test_fir_variants_and_dead_share():
+    hs, dead = set(), 0
+    for v in range(48):
+        P = get_params("fir", v)
+        sk = grow_tree(P, "fir", v)
+        hs.add(_h(wood_mesh(sk, 0, "fir", v)["verts"]))
+        dead += bool(P["standing_dead"])
+        assert 2.0 <= P["height"] <= 25.0
+    assert len(hs) == 48
+    assert 2 <= dead <= 7          # 約 8%（48 本中 4 本前後）
+
+
+def test_fir_needles_are_dark_and_15_to_25mm():
+    from trees import firtwigs
+    t = firtwigs.build_fir_twig((1, 2, 3), "full")
+    v = t["needles"]["verts"].reshape(-1, 3, 3)
+    L = np.linalg.norm(v[:, 2] - 0.5 * (v[:, 0] + v[:, 1]), axis=1)
+    assert 0.014 < np.median(L) < 0.027
+    assert len(v) > 400
+
+
+def test_lod_budgets_if_bpy():
+    try:
+        import bpy  # noqa
+    except Exception:
+        return
+    from trees import library
+    for sp, vs in (("fir", (0, 9, 11, 17)), ("larch", (4, 8))):
+        for v in vs:
+            assert library.build_tree(sp, v, 2, link=False)["tris"] <= 4000
+            assert 150 <= library.build_tree(sp, v, 3, link=False)["tris"] <= 300
+
+
 if __name__ == "__main__":
     for n, f in list(globals().items()):
         if n.startswith("test_"):

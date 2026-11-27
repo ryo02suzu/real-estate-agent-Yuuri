@@ -28,8 +28,11 @@ DEFAULTS = dict(
     o2_droop=0.55, o2_tipup=0.45, o2_wig=0.12, o2_min=0.14,
     twig_gap=0.07, twig_ratio_min=0.0,
     asym=((0.25, 0.0),), wind_az=0.0, wind=0.0,   # 偏り（振幅, 向き）・風下へ曲がる量
-    dead_keep=0.55, dead_len=(0.1, 0.9), dead_low=0.25,
+    dead_keep=0.55, dead_len=(0.3, 2.3), dead_low=0.25,
     age=0.5,
+    prof_floor=0.0,                 # 樹冠の底でも枝がこの割合は出る（枝が地面近くまで残る木用）
+    o2_roll=(-30.0, 55.0),          # 小枝が枝のまわりに出る角度（度）。小さいほど平ら
+    rho_k=1.2,                      # 幹のまわりをうすくする距離(m)。細い木は小さく
 )
 
 
@@ -147,7 +150,8 @@ def grow_tree(params, species="larch", variant=0):
         a, b = P["peak_a"], P["peak_b"]
         xm = a / (a + b)
         m = xm ** a * (1 - xm) ** b
-        return np.clip((np.clip(x, 0, 1) ** a) * ((1 - np.clip(x, 0, 1)) ** b) / m, 0, 1.15)
+        xc = np.clip(x, 0, 1)
+        return np.maximum(np.clip((xc ** a) * ((1 - xc) ** b) / m, 0, 1.15), P["prof_floor"] * (1 - xc))
 
     # ---- 幹
     base_r = P["r0"]
@@ -228,7 +232,7 @@ def grow_tree(params, species="larch", variant=0):
                     if rg.random() > P["dead_keep"] * (0.35 + 0.65 * z / max(hc, 1e-6)) * (0.5 + age):
                         continue
                     # 枯れ枝：長さ 0.3〜2.3m、根元が太く（直径 8〜30mm）、先は折れて、すこしたれる
-                    Lb = float(rg.uniform(0.3, 2.3)) * (0.45 + 0.55 * z / max(hc, 1e-6))
+                    Lb = float(rg.uniform(*P["dead_len"])) * (0.45 + 0.55 * z / max(hc, 1e-6))
                     dead = True
                 if Lb < 0.25 and not dead:
                     continue
@@ -300,7 +304,7 @@ def grow_tree(params, species="larch", variant=0):
             zz = np.array([0, 0, 1.0])
             side = _unit(np.cross(T, zz)) if abs(T[2]) < 0.95 else _perp(T)[0]
             up_n = np.cross(side, T)
-            roll = np.deg2rad(rg.uniform(-30, 55))   # 下向きに寄る
+            roll = np.deg2rad(rg.uniform(*P["o2_roll"]))   # 下向きに寄る
             sdir = np.cos(roll) * side * flip - np.sin(roll) * up_n * 0.8
             ang = np.deg2rad(rg.uniform(*P["o2_ang"]))
             d0 = _unit(np.cos(ang) * T + np.sin(ang) * sdir)
@@ -415,7 +419,9 @@ def tube(pts, rad, sides, tile, rg=None, lobes=None, cap="apex", bury=0.0):
 LOD_WOOD = {
     0: dict(sides={0: 40, 1: 8, 2: 5}, gap={0: 0.25, 1: 0.2, 2: 0.2}, orders=(0, 1, 2), min_r2=0.0),
     1: dict(sides={0: 10, 1: 5, 2: 3}, gap={0: 0.6, 1: 0.5, 2: 0.45}, orders=(0, 1), min_r2=0.0),
-    2: dict(sides={0: 6, 1: 4, 2: 3}, gap={0: 1.2, 1: 1.0, 2: 1.0}, orders=(0, 1), min_r2=0.0),
+    2: dict(sides={0: 6}, gap={0: 1.6}, orders=(0,), min_r2=0.0),           # 幹だけ（葉のかたまりは lods.py）
+    3: dict(sides={0: 5}, gap={0: 4.0}, orders=(0,), min_r2=0.0),
+    "2dead": dict(sides={0: 6, 1: 3}, gap={0: 1.6, 1: 1.5}, orders=(0, 1), min_r2=0.0),   # 立ち枯れ：幹と枝のこぶ
 }
 
 
@@ -432,14 +438,15 @@ def _decimate(pts, rad, gap):
     return pts[keep], rad[keep]
 
 
-def wood_mesh(sk, lod=0, species="larch", variant=0, tile=0.5):
-    cfg = LOD_WOOD[min(lod, 2)]
+def wood_mesh(sk, lod=0, species="larch", variant=0, tile=0.5, cfg=None):
+    cfg = cfg or LOD_WOOD[min(lod, 3)]
     rg = make_rng(species, variant, 2)
     Vs, Fs, Us, Rs, Ds, Os = [], [], [], [], [], []
     off = 0
-    for b in sk.branches:
+    stride = cfg.get("stride", 1)
+    for bi, b in enumerate(sk.branches):
         o = b["order"]
-        if o not in cfg["orders"]:
+        if o not in cfg["orders"] or (o >= 1 and bi % stride):
             continue
         pts, rad = _decimate(b["pts"], b["rad"], cfg["gap"][o])
         if len(pts) < 2:

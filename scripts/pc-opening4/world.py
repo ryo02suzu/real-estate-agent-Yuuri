@@ -14,10 +14,12 @@
   border=x0,y0,x1,y1（画面の一部だけ描く。0〜1・y は下から。画面の大きさは変えない）  marks=1（山の位置を計算して marks.json と _geo.png）
   exposure=-1.4  sky=0.5  emit=1（照明なしで色だけ。確かめ用）  veg_dark=0.55  snow=1.0  far=150000  tex=1（0 で写真を使わず灰色。確かめ用）
   cloud_top=1650  cloud_density=0.12  seed=1
+  extras=world_trees+swans4（追加の部品。そのファイルの add(world) を、描く直前に順に呼ぶ）
 実行の最後に <out>/<コマ>_stats.json（頂点数・作る秒数・描く秒数・最大メモリ）を書く。
 """
 from __future__ import annotations
 
+import importlib
 import json
 import math
 import os
@@ -914,6 +916,16 @@ def marks():
                     "elev_deg": round(math.degrees(math.atan2(z - CAM_W[2], dh)), 2)})
     return res
 
+
+# ---------------------------------------------------------------- 追加の部品（木・白鳥など。別のファイルが持つ）
+# extras=world_trees+swans4 のように書くと、そのファイルの add(world) を順に呼ぶ。
+# world はこのファイルそのもの（ground・CE・CN・CAM・CAM_W・DATA・FRAME・W・H・SUN_DIR・opt・log・STATS・scene・cam などが使える）。
+# この呼び出しと、上の名前は変えない（world_trees.py・swans4.py が頼っている）。
+for _name in [x for x in opt.get("extras", "").split("+") if x]:
+    _t0 = time.time()
+    importlib.import_module(_name).add(sys.modules[__name__])
+    STATS[f"extra_{_name}_seconds"] = round(time.time() - _t0, 1)
+    log(f"追加の部品 {_name}・{time.time() - _t0:.1f} 秒")
 
 # ---------------------------------------------------------------- 描く
 STATS["build_seconds"] = round(time.time() - T_START, 1)

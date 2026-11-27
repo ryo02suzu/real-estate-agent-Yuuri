@@ -302,26 +302,40 @@ def needle_material(bake_tone=None):
     return m
 
 
-def _finish_foliage(nt, color_socket, out, alpha=None):
+def _finish_foliage(nt, color_socket, out, alpha=None, trans=0.55, boost_rgb=(1.15, 1.25, 1.0), em_strength=0.035, rough=0.6, under=None, use_gain=False):
     """針の仕上げ：薄い葉＝拡散 45% ＋ 透過 55%（金色）。ざらざら（つやなし）にして白い点を出さない。"""
+    if use_gain:      # lod1 の色の補正（属性 gain。既定は 1）
+        gn = _new(nt, "ShaderNodeAttribute", (-100, -700), attribute_type="GEOMETRY", attribute_name="gain")
+        gm = _new(nt, "ShaderNodeMix", (100, -700), data_type="RGBA", blend_type="MULTIPLY")
+        gm.inputs[0].default_value = 1.0
+        nt.links.new(color_socket, gm.inputs[6])
+        nt.links.new(gn.outputs["Color"], gm.inputs[7])
+        color_socket = gm.outputs[2]
+    if under is not None:      # 裏面（下から見た面）は淡い色（シラビソの裏は白い）
+        bf = _new(nt, "ShaderNodeNewGeometry", (-100, -500))
+        un = _new(nt, "ShaderNodeMix", (100, -500), data_type="RGBA", blend_type="MULTIPLY")
+        un.inputs[7].default_value = (*under, 1.0)
+        nt.links.new(bf.outputs["Backfacing"], un.inputs[0])
+        nt.links.new(color_socket, un.inputs[6])
+        color_socket = un.outputs[2]
     pr = _new(nt, "ShaderNodeBsdfPrincipled", (500, 100))
-    pr.inputs["Roughness"].default_value = 0.6
+    pr.inputs["Roughness"].default_value = rough
     if "Specular IOR Level" in pr.inputs:
         pr.inputs["Specular IOR Level"].default_value = 0.08
     tr = _new(nt, "ShaderNodeBsdfTranslucent", (500, -150))
     boost = _new(nt, "ShaderNodeMix", (300, -250), data_type="RGBA", blend_type="MULTIPLY")
     boost.inputs[0].default_value = 1.0
-    boost.inputs[7].default_value = (1.15, 1.25, 1.0, 1.0)      # 透過色＝彩度の高い金色（線形 約 0.85, 0.50, 0.03）
+    boost.inputs[7].default_value = (*boost_rgb, 1.0)      # 透過色＝彩度の高い金色（線形 約 0.85, 0.50, 0.03）
     nt.links.new(color_socket, boost.inputs[6])
     nt.links.new(color_socket, pr.inputs["Base Color"])
     nt.links.new(boost.outputs[2], tr.inputs["Color"])
     mix = _new(nt, "ShaderNodeMixShader", (800, 0))
-    mix.inputs[0].default_value = 0.55
+    mix.inputs[0].default_value = trans
     nt.links.new(pr.outputs[0], mix.inputs[1])
     nt.links.new(tr.outputs[0], mix.inputs[2])
     # 内側が真っ黒にならないよう、ごく弱い暖色の底上げ（まわりの葉からの照り返しの代わり）
     em = _new(nt, "ShaderNodeEmission", (800, 200))
-    em.inputs["Strength"].default_value = 0.035
+    em.inputs["Strength"].default_value = em_strength
     nt.links.new(color_socket, em.inputs["Color"])
     add = _new(nt, "ShaderNodeAddShader", (950, 0))
     nt.links.new(mix.outputs[0], add.inputs[0])
@@ -365,5 +379,105 @@ def card_material(atlas_path=None):
     mu.inputs[0].default_value = 1.0
     nt.links.new(tex.outputs["Color"], mu.inputs[6])
     nt.links.new(dv.outputs[2], mu.inputs[7])
-    _finish_foliage(nt, mu.outputs[2], out, alpha=tex.outputs["Alpha"])
+    _finish_foliage(nt, mu.outputs[2], out, alpha=tex.outputs["Alpha"], use_gain=True)
+    return m
+
+
+# ---------------------------------------------------------------- 常緑針葉樹（fir）と遠景の段（lod 2・3）
+ATLAS_FIR = os.path.join(HERE, "atlas", "fir-cards.png")
+# 針の表の反射率（線形）：とても暗い青緑（0.03〜0.06）。tone 0＝やや黄緑、0.5＝青緑、1＝青みがかる
+FIR_STOPS = [
+    (0.00, (0.034, 0.058, 0.020)),
+    (0.50, (0.022, 0.046, 0.030)),
+    (1.00, (0.015, 0.038, 0.040)),
+]
+FIR_UNDER = (2.4, 2.6, 2.7)       # 裏面は表の約 2.5 倍（淡い灰青緑）
+FIR_FOLIAGE = dict(trans=0.2, boost_rgb=(1.1, 1.5, 0.7), em_strength=0.02, rough=0.55, under=FIR_UNDER)
+
+
+def fir_needle_material(bake=False):
+    """針の材質。bake=True はカード絵の焼き込み用（tone 0.5 固定）。通常は属性 tone（木ごと）と tint（針ごと）で色。"""
+    name = "fir_needle_bake" if bake else "fir_needle"
+    if name in bpy.data.materials:
+        return bpy.data.materials[name]
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = _new(nt, "ShaderNodeOutputMaterial", (1200, 0))
+    tint = _attr(nt, "tint", (-900, -100))
+    sh = _math(nt, "SUBTRACT", tint, 0.5, (-700, -100))
+    sh2 = _math(nt, "MULTIPLY", sh, 0.4, (-550, -100))
+    if bake:
+        f = _math(nt, "ADD", 0.5, None, (-400, 0), clamp=True)
+    else:
+        tone = _attr(nt, "tone", (-900, 100))
+        f = _math(nt, "ADD", tone, None, (-400, 0), clamp=True)
+    nt.links.new(sh2.outputs[0], f.inputs[1])
+    col = _ramp(nt, FIR_STOPS, (-200, 0))
+    nt.links.new(f.outputs[0], col.inputs["Fac"])
+    _finish_foliage(nt, col.outputs[0], out, alpha=None, **FIR_FOLIAGE)
+    return m
+
+
+def fir_card_material(atlas_path=None):
+    name = "fir_card"
+    if name in bpy.data.materials:
+        return bpy.data.materials[name]
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = _new(nt, "ShaderNodeOutputMaterial", (1500, 0))
+    img = bpy.data.images.load(atlas_path or ATLAS_FIR, check_existing=True)
+    img.alpha_mode = "STRAIGHT"
+    tex = _new(nt, "ShaderNodeTexImage", (-600, 200), image=img, interpolation="Linear", extension="EXTEND")
+    uv = _new(nt, "ShaderNodeTexCoord", (-900, 200))
+    nt.links.new(uv.outputs["UV"], tex.inputs["Vector"])
+    tone = _attr(nt, "tone", (-900, -100))
+    cur = _ramp(nt, FIR_STOPS, (-600, -100))
+    nt.links.new(tone.outputs["Fac"], cur.inputs["Fac"])
+    ref = _ramp(nt, FIR_STOPS, (-600, -400))
+    ref.inputs["Fac"].default_value = 0.5
+    dv = _new(nt, "ShaderNodeMix", (-300, -200), data_type="RGBA", blend_type="DIVIDE")
+    dv.inputs[0].default_value = 1.0
+    nt.links.new(cur.outputs[0], dv.inputs[6])
+    nt.links.new(ref.outputs[0], dv.inputs[7])
+    mu = _new(nt, "ShaderNodeMix", (0, 100), data_type="RGBA", blend_type="MULTIPLY")
+    mu.inputs[0].default_value = 1.0
+    nt.links.new(tex.outputs["Color"], mu.inputs[6])
+    nt.links.new(dv.outputs[2], mu.inputs[7])
+    _finish_foliage(nt, mu.outputs[2], out, alpha=tex.outputs["Alpha"], use_gain=True, **FIR_FOLIAGE)
+    return m
+
+
+def lod_foliage_material(species):
+    """lod 2・3 の葉のかたまり（不透明）。色は tone の色 × gain（属性。lod1 と明るさ・色をそろえる補正）。"""
+    name = f"{species}_lodfoliage"
+    if name in bpy.data.materials:
+        return bpy.data.materials[name]
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = _new(nt, "ShaderNodeOutputMaterial", (1200, 0))
+    tone = _attr(nt, "tone", (-900, 100))
+    tint = _attr(nt, "tint", (-900, -100))
+    sh = _math(nt, "SUBTRACT", tint, 0.5, (-700, -100))
+    sh2 = _math(nt, "MULTIPLY", sh, 0.3, (-550, -100))
+    f = _math(nt, "ADD", tone, None, (-400, 0), clamp=True)
+    nt.links.new(sh2.outputs[0], f.inputs[1])
+    col = _ramp(nt, FIR_STOPS if species == "fir" else TONE_STOPS, (-200, 0))
+    nt.links.new(f.outputs[0], col.inputs["Fac"])
+    ga = _new(nt, "ShaderNodeAttribute", (-200, -250))
+    ga.attribute_type = "GEOMETRY"
+    ga.attribute_name = "gain"
+    mu = _new(nt, "ShaderNodeMix", (100, 0), data_type="RGBA", blend_type="MULTIPLY")
+    mu.inputs[0].default_value = 1.0
+    nt.links.new(col.outputs[0], mu.inputs[6])
+    nt.links.new(ga.outputs["Color"], mu.inputs[7])
+    kw = FIR_FOLIAGE if species == "fir" else {}
+    kw = dict(kw)
+    kw.pop("under", None)
+    _finish_foliage(nt, mu.outputs[2], out, alpha=None, **kw)
     return m
