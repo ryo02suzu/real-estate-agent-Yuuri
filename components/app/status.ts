@@ -3,9 +3,11 @@
 // （全部の確認事項が済むまで「確認済み」にはならない）。次にやることの案内は、確認の手順と公式資料への入口だけ（判定はしない）
 import { hazardTotal } from "@/lib/app/hazard-level";
 import { RECORD_ITEMS, topicProgress, type PropertyRecords, type RecordTopic } from "@/lib/records";
+import { chibanLabel, isLotChiban } from "@/lib/roadmap/parcel";
 import { roadShort } from "@/lib/roadmap/road-read";
 import { noCityPlanning } from "@/lib/roadmap/municipalities";
 import { noneLabel, zoningArea } from "@/lib/roadmap/zoning";
+import { addressOffLot, registryNeighbors, type ParcelInfo } from "../parcel-card";
 import type { StatusKey } from "./tokens";
 import type { Ok, PropertyData } from "./use-property";
 
@@ -123,12 +125,31 @@ export function topicStatuses(result: Ok, data: PropertyData, records: PropertyR
     const hint = "法務局の公図・登記で地番と面積を確認";
     if (parcels.status === "loading") push("parcel", { status: "loading", chip: "確認中", value: "登記所の地図データを読んでいます", hint });
     else if (parcels.status === "error") push("parcel", { status: "failed", chip: "読み込めず", value: "地番の地図データを読めませんでした", hint: "再試行、または公図で確認" });
-    else if (parcels.status === "ok") {
-      const kind = parcels.kind === "chiban" ? "地番で探した筆" : parcels.kind === "picked" ? "地図で選んだ地点の筆" : "住所の地点の筆（参考）";
-      push("parcel", { status: "auto", chip: "取得済み", value: `${parcels.parcel.chibanRaw}（${kind}）`, hint: parcels.kind === "address" ? "住所と地番は別物。公図で物件の筆を確認" : hint });
-    } else push("parcel", { status: "unconfirmed", chip: "未確認", value: parcels.approximate ? "場所を直すと筆が出ます" : "この地点の筆が地図データにありません", hint });
+    else if (parcels.status === "ok") push("parcel", parcelStatus(parcels));
+    else push("parcel", { status: "unconfirmed", chip: "未確認", value: parcels.approximate ? "場所を直すと筆が出ます" : "この地点の筆が地図データにありません", hint });
   }
   return out;
+}
+
+const PARCEL_KIND = { chiban: "地番で探した筆", picked: "地図で選んだ地点の筆", address: "住所の地点の筆" } as const;
+
+/**
+ * 「地番・土地」の行（筆が読めたとき）。「取得済み」と言うのは、物件の筆（地番で探した筆・地図で選んだ地点の筆）の地番が出たときだけ。
+ * 住所の地点の筆は参考（住居表示と地番は別のもの）なので「参考・要確認」、道路・水路の上や、隣地のとても多い筆（道路など物件の外の
+ * 土地の可能性）は「未確認」で、場所の直し方を案内する。地番は登記の地番で書く（地図データの印の付いた「51-3W2」は出さない）
+ */
+export function parcelStatus(parcels: Extract<ParcelInfo, { status: "ok" }>): Pick<TopicStatus, "status" | "chip" | "value" | "hint"> {
+  const raw = parcels.parcel.chibanRaw;
+  const kind = PARCEL_KIND[parcels.kind];
+  const label = chibanLabel(raw);
+  const fix = "「場所を直す」で建物の位置を選ぶと、物件の筆が出ます";
+  const hint = "法務局の公図・登記で地番と面積を確認";
+  // 地番の無い土地（道路・水路・筆界未定地など）：物件の地番は出ていない
+  if (!isLotChiban(raw)) return { status: "unconfirmed", chip: "未確認", value: `${kind}は${label}`, hint: /道路|水路/.test(label) ? fix : hint };
+  if (addressOffLot(parcels) === "large")
+    return { status: "unconfirmed", chip: "未確認", value: `${kind}は${label}。隣地が${registryNeighbors(parcels).length}筆あり、道路など物件の外の土地の可能性`, hint: `${fix}（公図でも確認）` };
+  if (parcels.kind === "address") return { status: "unconfirmed", chip: "参考・要確認", value: `${label}（${kind}・参考）`, hint: "住所と地番は別物。公図で物件の筆を確認" };
+  return { status: "auto", chip: "取得済み", value: `${label}（${kind}）`, hint };
 }
 
 /** 「確認済み 2・一部 1・未確認 3」のような要約 */

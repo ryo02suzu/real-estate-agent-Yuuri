@@ -162,7 +162,7 @@ describe("次にやること", () => {
     expect(road.how).toContain("電話・FAX・メールでは答えてもらえない");
     expect(road.links?.length).toBeGreaterThan(0);
     const touki = t.actions.find((a) => a.id === "touki")!;
-    expect(touki.what[0]).toBe("登記事項証明書（土地）：渋谷区神南１丁目 51-3。所有者・地目・地積・抵当権");
+    expect(touki.what[0]).toBe("登記事項証明書（土地）：渋谷区神南1丁目 51-3。所有者・地目・地積・抵当権");
     expect(touki.what.at(-1)).toContain("隣地の地番");
     // 住所の地点が水路の筆なら、その隣は物件の隣地ではないので並べない
     const water = triageOf(loaded({ parcels: { status: "ok", parcel: { ...parcel, chibanRaw: "水-5", chiban: "水-5" }, kind: "address", neighbors: ["渋谷区神南１丁目 1"] } }));

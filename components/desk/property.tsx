@@ -32,7 +32,7 @@ import { roadShort } from "@/lib/roadmap/road-read";
 import { youtoShort } from "@/lib/roadmap/zoning";
 import { addressOffLot, pickKey, registryNeighbors, type ParcelPick } from "../parcel-card";
 import { PrintSheet } from "../print-sheet";
-import { loaded } from "../result-view";
+import { copyHasLot, copyText as addressCopyText, loaded } from "../result-view";
 import { useChecklist } from "../triage-sheet";
 import { NeighborPlanSkeleton, NeighborPlanView, useNeighborPlan } from "../app/neighbor-plan";
 import type { SceneTab } from "../app/property-3d";
@@ -248,8 +248,10 @@ export function DeskProperty(props: Props) {
   const copyResult = async () => {
     if (await copyText(summaryText())) toast("結果をコピーしました（メール・チャットに貼れます）");
   };
+  // 地番で探した筆は地番まで、ほかは住所だけ（スマホと同じ文。数字は見出しと同じ半角）。ボタンの名前は写すものに合わせる
+  const copyAddressName = copyHasLot(result) ? "住所と地番をコピー" : "住所をコピー";
   const copyAddress = async () => {
-    const t = lotNumber && !result.picked ? `${result.matchedAddress}${lotNumber}` : result.matchedAddress;
+    const t = addressCopyText(result);
     if (await copyText(t)) toast(`「${t}」をコピーしました`);
   };
 
@@ -423,7 +425,7 @@ export function DeskProperty(props: Props) {
               <h2 className="addr">{`${where}${placeSuffix(result, query)}`}</h2>
             )}
             <span className="acts">
-              <button type="button" className="btn ghost icon" onClick={copyAddress} aria-label="住所と地番をコピー" title="住所と地番をコピー（地図の住所検索に貼る）">
+              <button type="button" className="btn ghost icon" onClick={copyAddress} aria-label={copyAddressName} title={`${copyAddressName}（地図の住所検索に貼る）`}>
                 <Copy size={17} />
               </button>
               <button type="button" className="btn ghost icon" aria-pressed={props.favorite} onClick={() => props.onFavorite(itemOf(query, result))} aria-label={props.favorite ? "お気に入りから外す" : "お気に入りに保存"} title={props.favorite ? "お気に入りから外す" : "お気に入りに保存"}>

@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { half } from "@/lib/app/doc";
 import { showHazardOnMap, showLandPriceOnMap } from "@/lib/map-style";
 import type { LookupResult, Municipality, ResolvedLink } from "@/lib/roadmap";
 import { chibanzuFor } from "@/lib/roadmap/chibanzu";
@@ -369,10 +370,18 @@ function useFit(ref: React.RefObject<HTMLDivElement | null>) {
   });
 }
 
-/** 「住所コピー」で写す文字。地番で探した筆は地番まで（地図システムの住所検索に貼る） */
+/** 「住所コピー」に地番まで入るか（地番で探した筆だけ）。ボタンの名前と「コピーしました」の文を、写すものに合わせるのに使う */
+export function copyHasLot(result: Extract<LookupResult, { status: "ok" }>): boolean {
+  return !!result.parcel && !result.picked && isLotChiban(result.parcel.chibanRaw);
+}
+
+/**
+ * 「住所コピー」で写す文字。地番で探した筆は地番まで（地図システムの住所検索に貼る）。
+ * 数字は見出しと同じ半角にする（国土地理院の住所は「１９番１１号」と全角で返る。見出しは「19番11号」）
+ */
 export function copyText(result: Extract<LookupResult, { status: "ok" }>): string {
   const p = result.parcel;
-  return p && !result.picked && isLotChiban(p.chibanRaw) ? `${result.matchedAddress}${registryChiban(p.chibanRaw)}` : result.matchedAddress;
+  return half(p && copyHasLot(result) ? `${result.matchedAddress}${registryChiban(p.chibanRaw)}` : result.matchedAddress);
 }
 
 /** 見出し（「検索地点」など）と住所の2行 */

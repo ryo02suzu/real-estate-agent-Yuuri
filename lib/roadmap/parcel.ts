@@ -2,6 +2,7 @@
 // 法務省の登記所備付地図データをベクトルタイル（PMTiles、レイヤ fude、z16 で全件）にしたものを、
 // 国土地理院で調べた町・大字の代表点のまわりから近い順に読み、地番区域と地番が一致する筆を探す。
 // タイルの読み込みは ParcelSource に任せる（実物は parcel-tiles.ts、テストでは作り物を渡す）。
+import { half } from "../app/doc";
 import { kozuMisplaced, type KozuMisplaced, type KozuSet } from "./kozu-data";
 import { SANKO_MARK } from "./sanko-data";
 import { subCompatible, subNorm, subParse, type AddressSub } from "./parcel-sub";
@@ -978,15 +979,18 @@ export function estimatedLegend(sets?: Record<string, KozuSet>): string {
   return `点線は、公図（任意座標）の形を道路の縁に合わせて置いた推定の位置です。数m（${hi}薄い点線は5m前後${lo}）ずれることがあります。`;
 }
 
-/** 地番区域を「熊谷市下奈良」「川口市青木２丁目」のように読める形に */
+/**
+ * 地番区域を「熊谷市下奈良」「川口市青木2丁目」のように読める形に。法務省の地図データの全角の数字（「２丁目」「第１１地割」）は
+ * 半角にする：同じ物件の所在が、画面では「１丁目」・コピーした文では「1丁目」と違って見えていた（地番の文字はどこでも半角の数字）
+ */
 export function kuikiLabel(kuiki: string): string {
-  return kuiki.split("_").filter(Boolean).join("");
+  return half(kuiki.split("_").filter(Boolean).join(""));
 }
 
-/** 地番区域の名前。基準の地番区域と同じ市区町村なら、市区町村を外す（「青木２丁目」）。違う市区町村なら市区町村から */
+/** 地番区域の名前。基準の地番区域と同じ市区町村なら、市区町村を外す（「青木2丁目」）。違う市区町村なら市区町村から */
 export function kuikiLabelFrom(kuiki: string, base: string): string {
   const [city, ...rest] = kuiki.split("_");
-  return city === base.split("_")[0] && rest.some(Boolean) ? rest.filter(Boolean).join("") : kuikiLabel(kuiki);
+  return city === base.split("_")[0] && rest.some(Boolean) ? half(rest.filter(Boolean).join("")) : kuikiLabel(kuiki);
 }
 
 /**

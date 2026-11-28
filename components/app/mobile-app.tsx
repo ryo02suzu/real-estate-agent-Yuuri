@@ -90,7 +90,7 @@ import {
   type ParcelPick,
 } from "../parcel-card";
 import { PrintSheet } from "../print-sheet";
-import { copyText, loaded } from "../result-view";
+import { copyHasLot, copyText, loaded } from "../result-view";
 import { useChecklist } from "../triage-sheet";
 import { useCopy } from "../use-copy";
 import { ActionBar, type BarAction } from "./action-bar";
@@ -2137,6 +2137,8 @@ function PropertyView({
   const lotArea = lotParcel && lotIsProperty ? parcelAreaM2(lotParcel) : undefined;
   // 書類に入れる面積の目安（推定の位置・参考図の筆は丸める）
   const lotRough = !!(lotParcel?.estimated || lotParcel?.sanko);
+  // 上の帯と見出しの「コピー」の名前：地番で調べた筆は地番まで写すので「住所と地番」（写すものと名前を合わせる）
+  const copyName = copyHasLot(result) ? "住所と地番" : "住所";
   const lotAreaText = lotArea ? `約${areaLabel(lotArea, lotRough)}㎡（約${lotRough ? Math.round(lotArea / TSUBO_M2) : (lotArea / TSUBO_M2).toFixed(1)}坪）` : undefined;
   const eyebrow = result.picked
     ? "地図で選んだ地点"
@@ -2260,7 +2262,7 @@ function PropertyView({
           </button>
           <button
             onClick={() => addr.copy(copyText(result))}
-            aria-label="住所をコピー"
+            aria-label={`${copyName}をコピー`}
             className="min-w-0 flex-1 text-left"
           >
             <span
@@ -2289,7 +2291,7 @@ function PropertyView({
               }}
             >
               {addr.done
-                ? "住所をコピーしました"
+                ? `${copyName}をコピーしました`
                 : `${lotNumber ? `${where}・` : ""}${longTab}`}
             </span>
           </button>
@@ -2333,6 +2335,7 @@ function PropertyView({
           lot={lotNumber}
           title={where}
           address={copyText(result).normalize("NFKC")}
+          copyName={copyName}
           onCopy={() => addr.copy(copyText(result))}
           copied={addr.done}
           chips={chips}

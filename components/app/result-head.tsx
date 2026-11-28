@@ -63,6 +63,7 @@ export function PropertyHero({
   lot,
   title,
   address,
+  copyName = "住所",
   onCopy,
   copied,
   chips,
@@ -84,6 +85,8 @@ export function PropertyHero({
   title: string;
   /** 住所の行（押すとコピー） */
   address: string;
+  /** コピーするものの名前（地番で調べた筆は地番まで写すので「住所と地番」）。ボタンの名前と「コピーしました」に使う */
+  copyName?: string;
   onCopy: () => void;
   copied: boolean;
   chips?: ReactNode;
@@ -136,8 +139,8 @@ export function PropertyHero({
         )}
         {note}
         {/* 地番の見出しのときは住所の行、住所が見出しのときは同じ住所を繰り返さず「住所をコピー」だけ */}
-        <button onClick={onCopy} aria-label="住所をコピー" className="pv-rise mt-[8px] flex max-w-full items-center gap-[6px] text-left leading-[1.3]" style={{ fontSize: 14, color: copied ? "#a6f0c6" : "rgba(255,255,255,0.92)", minHeight: `calc(${HIT} + 2px)` }}>
-          <span className="truncate font-medium">{copied ? "住所をコピーしました" : lot ? address : "住所をコピー"}</span>
+        <button onClick={onCopy} aria-label={`${copyName}をコピー`} className="pv-rise mt-[8px] flex max-w-full items-center gap-[6px] text-left leading-[1.3]" style={{ fontSize: 14, color: copied ? "#a6f0c6" : "rgba(255,255,255,0.92)", minHeight: `calc(${HIT} + 2px)` }}>
+          <span className="truncate font-medium">{copied ? `${copyName}をコピーしました` : lot ? address : "住所をコピー"}</span>
           {copied ? <Check size={14} strokeWidth={2.4} absoluteStrokeWidth className="shrink-0" /> : <Copy size={13} strokeWidth={1.9} absoluteStrokeWidth className="shrink-0 opacity-80" />}
         </button>
         {chips && <div className="pv-rise mt-[8px] flex flex-wrap gap-[6px]">{chips}</div>}
