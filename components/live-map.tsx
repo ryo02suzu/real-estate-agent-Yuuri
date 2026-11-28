@@ -53,7 +53,7 @@ import { pmtilesBuildingSource } from "@/lib/roadmap/building-tiles";
 import { HAZARD_KINDS, HAZARD_LAYERS, hazardAt, hazardPointLabel, HAZARDS, type HazardKind } from "@/lib/roadmap/hazard";
 import { browserTileFetcher } from "@/lib/roadmap/hazard-tiles";
 import { LAND_USAGE_COLORS, landPriceSummary, usageFromCode } from "@/lib/roadmap/land-price";
-import { chibanLabel, estimatedLegend, isLotChiban, kuikiLabel, registryChiban } from "@/lib/roadmap/parcel";
+import { chibanLabel, estimatedLegend, isLotChiban, KOZU_PLAIN, kuikiLabel, registryChiban } from "@/lib/roadmap/parcel";
 import { readRoadShapes, type RoadRead } from "@/lib/roadmap/road-read";
 import { sheetName, type SheetHit } from "@/lib/roadmap/sheets";
 import { YOUTO_COLORS, youtoShort } from "@/lib/roadmap/zoning";
@@ -104,8 +104,8 @@ const OVERLAYS = {
     none: [
       "この辺りはデータがありません",
       hasSanko() || hasKozu()
-        ? `公図（任意座標）の地域は、${[hasSanko() && "市町村の地番参考図がある所", hasKozu() && "推定の位置に置けた所"].filter(Boolean).join("と、")}だけ出ます`
-        : "公図（任意座標）の地域は載っていません",
+        ? `${KOZU_PLAIN}の地域は、${[hasSanko() && "市町村の地番参考図がある所", hasKozu() && "推定の位置に置けた所"].filter(Boolean).join("と、")}だけ出ます`
+        : `${KOZU_PLAIN}の地域は載っていません`,
     ],
   },
   zoning: {
@@ -441,7 +441,7 @@ export default function LiveMap({
       const f = map.queryRenderedFeatures([pt.x, pt.y], { layers: PARCEL_PICK_LAYERS })[0];
       const p = f?.properties as { 地番?: string; 地番区域?: string } | undefined;
       const est =
-        f?.layer.id === "kozu-fill" ? (Number(f.properties?.q) === 2 ? "・公図から推定・確度低" : "・公図から推定") : f?.layer.id === "sanko-fill" ? "・地番参考図" : "";
+        f?.layer.id === "kozu-fill" ? (Number(f.properties?.q) === 2 ? "・公図から推定・ずれ大きめ" : "・公図から推定") : f?.layer.id === "sanko-fill" ? "・地番参考図" : "";
       return p?.地番 ? `${chibanLabel(String(p.地番))}（${kuikiLabel(String(p.地番区域 ?? ""))}${est}）` : undefined;
     };
     /** 画面上の点の用途地域「第１種低層住居専用地域 50/100」（用途地域を表示しているときだけ） */
@@ -1049,7 +1049,7 @@ export default function LiveMap({
           ...(hasKozu()
             ? [
                 { label: "公図から推定した位置", short: "公図（推定）", color: KOZU_COLORS.high, kind: "dash" as const },
-                { label: "推定（確度低）", short: "推定・確度低", color: KOZU_COLORS.low, kind: "dash" as const },
+                { label: "公図から推定（ずれ大きめ）", short: "推定・ずれ大きめ", color: KOZU_COLORS.low, kind: "dash" as const },
               ]
             : []),
         ]}

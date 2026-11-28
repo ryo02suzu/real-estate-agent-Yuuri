@@ -12,7 +12,7 @@ import { ratioHint, refLandPoint } from "@/lib/app/ratio-hint";
 import type { Triage } from "@/lib/app/triage";
 import { usageShort } from "@/lib/roadmap/building";
 import { bySide, sideText } from "@/lib/app/neighbor-plan";
-import { chibanLabel, isLotChiban, kuikiLabelFrom, parcelMark, pickedChibanText, type Neighbor } from "@/lib/roadmap/parcel";
+import { chibanLabel, isLotChiban, kuikiLabelFrom, parcelHint, pickedChibanText, type Neighbor } from "@/lib/roadmap/parcel";
 import { schoolGaps, schoolGapShort, schoolLabel } from "@/lib/roadmap/school";
 import { noCityPlanning } from "@/lib/roadmap/municipalities";
 import { noneLabel, YOUTO_COLORS, youtoShort, zoningArea } from "@/lib/roadmap/zoning";
@@ -64,6 +64,10 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
     ? `${parcels.status === "ok" && parcels.kind === "chiban" ? "地番で探した筆" : offLot ? `${parcels.status === "ok" && parcels.kind === "picked" ? "選んだ地点" : "住所の地点"}の筆（道路などの可能性）` : parcels.status === "ok" && parcels.kind === "picked" ? "地図で選んだ地点の筆" : "住所の地点の筆（参考）"}${result.parcelOthers ? `・同じ地番がほかに${result.parcelOthers}件` : ""}`
     : undefined;
 
+  // 公図から推定した位置の筆・地番参考図の筆は、気を付けることを地番の下の行に書く（地番の横に並べると、マスの幅で切れて読めなかった）。
+  // 道路らしい筆のときは、そちらの注意が先
+  const lotHint = parcel && !offLot ? parcelHint(parcel) : undefined;
+
   return (
     <div className="flex flex-col gap-[10px]">
       {!has3d && (
@@ -108,15 +112,12 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
               parcels.status === "loading" ? (
                 <GFaint />
               ) : parcel ? (
-                <span style={NUM}>
-                  {chibanLabel(parcel.chibanRaw).replace(/^地番 /, "")}
-                  {parcelMark(parcel) && <span style={{ color: G.warn }}>{parcelMark(parcel)}</span>}
-                </span>
+                <span style={NUM}>{chibanLabel(parcel.chibanRaw).replace(/^地番 /, "")}</span>
               ) : (
                 <GFaint>{parcels.status === "error" ? "読み込めず" : townCenter ? "場所を直すと出ます" : "地図データなし"}</GFaint>
               )
             }
-            sub={parcelSub ?? (parcels.status === "ok" ? "" : "謄本・公図はここから")}
+            sub={(lotHint ? <span style={{ color: G.warn }}>{lotHint}</span> : parcelSub) ?? (parcels.status === "ok" ? "" : "謄本・公図はここから")}
             warn={offLot}
             onClick={() => open("parcel")}
           />

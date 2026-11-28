@@ -63,7 +63,7 @@ import {
   isLotChiban,
   chibanLabel,
   chibanQueryOf,
-  estimatedSentence,
+  estimatedBanner,
   pointName,
   registryChiban,
   type Neighbor,
@@ -2170,7 +2170,7 @@ function PropertyView({
           onClick={() => setAbout((v) => !v)}
           icon={<CircleHelp size={13} strokeWidth={2} absoluteStrokeWidth />}
         >
-          {lotParcel.sanko ? "市の地番参考図" : "推定の位置"}
+          {lotParcel.sanko ? "市の地番参考図" : lotParcel.estimated === "low" ? "公図から推定（ずれ大きめ）" : "公図から推定した位置"}
         </HeroChip>
       )}
       {!!result.parcelOthers && (
@@ -2364,7 +2364,7 @@ function PropertyView({
                   >
                     {lotParcel.sanko
                       ? "この筆の形は、市町村の地番参考図から作ったものです。登記所の地図とは違うことがあります。公図・地積測量図で確かめてください。"
-                      : `この筆の位置は、公図（任意座標）を道路の縁に合わせて推定したものです（確かさ：${lotParcel.estimated === "high" ? "高め" : "低め"}）。${estimatedSentence(lotParcel.estimated ?? "high")}公図・地積測量図で確かめてください。`}
+                      : estimatedBanner(lotParcel.estimated ?? "high", result.municipality.codes)}
                   </p>
                 </div>
               </Expand>

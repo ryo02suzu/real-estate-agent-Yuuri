@@ -12,7 +12,7 @@ import { HOUREI_LAWS, houreiGroups, houreiOffice, houreiOfficeAll, PREF_NAMES, t
 import { isekiFor } from "../roadmap/iseki";
 import type { Liquefaction } from "../roadmap/liquefaction";
 import { moridoAuthority, type Morido } from "../roadmap/morido";
-import { chibanLabel, estimatedMisplacedText, hasPieceMark, isLotChiban, kuikiLabel, kuikiLabelFrom, neighborList, pointName, registryChiban, roadLikeLot, type Parcel } from "../roadmap/parcel";
+import { chibanLabel, estimatedMisplacedText, hasPieceMark, isLotChiban, KOZU_PLAIN, kuikiLabel, kuikiLabelFrom, neighborList, pointName, registryChiban, roadLikeLot, type Parcel } from "../roadmap/parcel";
 import { PARCEL_DATA } from "../roadmap/parcel-data";
 import { awayNote, elsewhereNote } from "../roadmap/parcel-sub";
 import type { RirekiRecord } from "../roadmap/rireki";
@@ -338,9 +338,9 @@ function placeIssues(input: TriageInput): Issue[] {
     else if (picked) out.push({ id: "picked-parcel", level: "check", topic: "place", title: `地図で選んだ地点の筆は${chibanLabel(raw)}`, detail: "地図で選んだ地点にある筆です。選んだ地点が隣の筆に乗っていることもあるので、地番と筆の形は公図・登記で確かめます。", confirm: "法務局の公図・登記で" });
     if (p.estimated) {
       // 30m 以上の取り違えの割合は、その地域の推定の筆のまとまりで国の地価の地点を使って測った結果（lib/roadmap/kozu-data.ts）
-      const far = estimatedMisplacedText(p.estimated, m.codes, p.estimated === "low" ? "確度の低い推定の" : "");
+      const far = estimatedMisplacedText(p.estimated, m.codes, p.estimated === "low" ? "ずれが大きめの推定の" : "");
       const shift = p.estimated === "low" ? "5m前後" : "数m";
-      out.push({ id: "estimated", level: "check", topic: "place", title: `筆の位置は公図から推定${p.estimated === "low" ? "（確度低）" : ""}`, detail: `この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、${shift}ずれて隣の筆の地番になることがあ${far ? `り、${far}（国の地価の地点で確かめた結果）` : "ります"}。`, confirm: "法務局の公図で" });
+      out.push({ id: "estimated", level: "check", topic: "place", title: `筆の位置は公図から推定${p.estimated === "low" ? "（ずれ大きめ）" : ""}`, detail: `この辺りの登記所の地図は、${KOZU_PLAIN}です。公図の形を道路の縁に合わせて置いた推定の位置なので、${shift}ずれて隣の筆の地番になることがあ${far ? `り、${far}（国の地価の地点で確かめた結果）` : "ります"}。`, confirm: "法務局の公図で" });
     }
     if (p.sanko) out.push({ id: "sanko", level: "check", topic: "place", title: "市町村の地番参考図の筆", detail: `${p.undetermined ? "登記所の地図では筆界未定地です。" : ""}参考図は登記の地番・筆の形と違うことがあります。`, confirm: "法務局の公図・登記で" });
     if (/^筆界未定/.test(p.chibanRaw)) out.push({ id: "undetermined", level: "warn", topic: "place", title: "筆界未定地", detail: "隣の筆との境界が決まっていない土地です。境界の確定（筆界特定・測量）が要ることがあり、融資や売買に効きます。", confirm: "法務局の公図・登記で" });

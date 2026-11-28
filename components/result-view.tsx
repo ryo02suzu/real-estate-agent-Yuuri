@@ -459,7 +459,7 @@ function Place({
           found ? (
             <b className="text-[15px] font-semibold">
               {chibanLabel(found.chibanRaw)}
-              {found.estimated && <span className="text-[11px] font-normal text-[#8a4f3a]">（公図から推定{found.estimated === "low" ? "・確度低" : ""}）</span>}
+              {found.estimated && <span className="text-[11px] font-normal text-[#8a4f3a]">（公図から推定{found.estimated === "low" ? "・ずれ大きめ" : ""}）</span>}
               {found.sanko && <span className="text-[11px] font-normal text-[#8a4f3a]">{parcelMark(found)}</span>}
             </b>
           ) : (

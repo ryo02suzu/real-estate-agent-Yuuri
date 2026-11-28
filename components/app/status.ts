@@ -148,8 +148,10 @@ export function parcelStatus(parcels: Extract<ParcelInfo, { status: "ok" }>): Pi
   if (!isLotChiban(raw)) return { status: "unconfirmed", chip: "未確認", value: `${kind}は${label}`, hint: /道路|水路/.test(label) ? fix : hint };
   if (pointOffLot(parcels) === "large")
     return { status: "unconfirmed", chip: "未確認", value: `${kind}は${label}。隣地が${registryNeighbors(parcels).length}筆あり、道路など物件の外の土地の可能性`, hint: `${fix}（公図でも確認）` };
-  if (parcels.kind === "address") return { status: "unconfirmed", chip: "参考・要確認", value: `${label}（${kind}・参考）`, hint: "住所と地番は別物。公図で物件の筆を確認" };
-  return { status: "auto", chip: "取得済み", value: `${label}（${kind}）`, hint };
+  // 公図から推定した位置の筆・地番参考図の筆は、そのことも添える（筆のカード・見出しの札と同じ言葉）
+  const src = parcels.parcel.sanko ? "・地番参考図" : parcels.parcel.estimated ? "・公図から推定" : "";
+  if (parcels.kind === "address") return { status: "unconfirmed", chip: "参考・要確認", value: `${label}（${kind}・参考${src}）`, hint: "住所と地番は別物。公図で物件の筆を確認" };
+  return { status: "auto", chip: "取得済み", value: `${label}（${kind}${src}）`, hint };
 }
 
 /** 「確認済み 2・一部 1・未確認 3」のような要約 */

@@ -12,7 +12,7 @@ import { withRetry } from "@/lib/retry";
 import type { LookupResult } from "@/lib/roadmap";
 import type { ChibanzuLink, ChibanzuOpens } from "@/lib/roadmap/chibanzu";
 import { KOZU_DATA } from "@/lib/roadmap/kozu-data";
-import { adjacentParcels, chibanLabel, estimatedCardNote, hasPieceMark, isLotChiban, kuikiLabel, kuikiLabelFrom, parcelAt, parcelMark, pickedChibanText, registryChiban, roadLikeLot, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
+import { adjacentParcels, chibanLabel, estimatedCardNote, hasPieceMark, isLotChiban, KOZU_PLAIN, kuikiLabel, kuikiLabelFrom, parcelAt, parcelMark, pickedChibanText, registryChiban, roadLikeLot, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
 import { SANKO_CITIES, sankoSource } from "@/lib/roadmap/sanko-data";
@@ -309,7 +309,7 @@ export function ParcelDetail({ info, chibanzu, pick }: { info: Extract<ParcelInf
     <div>
       <p className="text-[12px] text-muted">
         {KIND_LABEL[kind]}
-        {parcel.estimated && `・公図から推定した位置${parcel.estimated === "low" ? "（確度低）" : ""}`}
+        {parcel.estimated && `・公図から推定した位置${parcel.estimated === "low" ? "（ずれ大きめ）" : ""}`}
         {parcel.sanko && `・${SANKO_CITIES[parcel.sanko]?.name ?? "市町村"}の地番参考図`}
       </p>
       <Row kuiki={parcel.kuiki} chiban={parcel.chibanRaw} strong />
@@ -334,7 +334,7 @@ export function ParcelDetail({ info, chibanzu, pick }: { info: Extract<ParcelInf
       )}
       {parcel.sanko && (
         <p className="mt-0.5 text-[12px] leading-[1.55] text-[#8a4f3a] dense:leading-[1.45] denser:text-[11.5px]">
-          {parcel.undetermined ? "登記所の地図では、この辺りは筆界未定地です。" : "この辺りの登記所の地図は公図（任意座標）です。"}
+          {parcel.undetermined ? "登記所の地図では、この辺りは筆界未定地です。" : `この辺りの登記所の地図は、${KOZU_PLAIN}です。`}
           市町村が公開している課税用の地番参考図の筆で、登記の地番・筆の形と違うことがあります。謄本・公図で確かめてください。
         </p>
       )}

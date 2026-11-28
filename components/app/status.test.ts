@@ -28,6 +28,13 @@ describe("調査の状況の「地番・土地」の行（2026-11-28）", () => 
     expect(ref.hint).toContain("公図で物件の筆を確認");
   });
 
+  it("公図から推定した位置の筆・地番参考図の筆は、そのことも添える（「確度」とは書かない）", () => {
+    const est = (kind: OkParcel["kind"], more: Partial<Parcel>): OkParcel => ({ ...info("1-1", kind), parcel: parcel("1-1", more) });
+    expect(parcelStatus(est("chiban", { estimated: "low" })).value).toBe("地番 1-1（地番で探した筆・公図から推定）");
+    expect(parcelStatus(est("address", { estimated: "high" })).value).toBe("地番 1-1（住所の地点の筆・参考・公図から推定）");
+    expect(parcelStatus(est("address", { sanko: "11201" })).value).toBe("地番 1-1（住所の地点の筆・参考・地番参考図）");
+  });
+
   it("隣地のとても多い筆（道路など物件の外の土地の可能性）は「未確認」で、場所の直し方を案内する", () => {
     const s = parcelStatus(info("51-3W2", "address", 166));
     expect(s).toMatchObject({ status: "unconfirmed", chip: "未確認" });

@@ -930,9 +930,23 @@ export function neighborList(neighbors: string[], max = NEIGHBOR_LIST_MAX): stri
   return `${neighbors.slice(0, max).join("、")}、ほか${neighbors.length - max}筆（公図で確認）`;
 }
 
-/** 公図から推定した位置の筆に添える印 */
+/**
+ * 公図から推定した位置の筆に添える印。確かさの低い推定は「ずれ大きめ」と書く（「確度低」「任意座標」は作る側の言葉。
+ * 営業の方に要るのは、どのくらいずれるか・隣の筆の地番かもしれないこと・どう確かめるか。2026-11-28）
+ */
 export function estimatedMark(p: { estimated?: Estimated }): string {
-  return p.estimated === "low" ? "（推定・確度低）" : p.estimated ? "（推定）" : "";
+  return p.estimated === "low" ? "（推定・ずれ大きめ）" : p.estimated ? "（推定）" : "";
+}
+
+/** 画面の文での公図の呼び方（登記所の地図に位置の情報が無い地域。「公図（任意座標）」とは書かない） */
+export const KOZU_PLAIN = "位置の情報が無い公図";
+
+/**
+ * 地番のすぐ下に添える短い一言（スマホの要点のマス。1 行に収まる長さ）：公図から推定した位置の筆・地番参考図の筆で、何に気を付けるか。
+ * 地番の横に「（推定・ずれ大きめ）」と並べると、マスの幅で切れて読めなかった
+ */
+export function parcelHint(p: { estimated?: Estimated; sanko?: string }): string | undefined {
+  return p.sanko ? "地番参考図の筆・要確認" : p.estimated === "low" ? "公図から推定・隣の筆かも" : p.estimated ? "公図から推定・要確認" : undefined;
 }
 
 /** 筆に添える印（公図から推定した位置の筆、市町村の地番参考図の筆。法務省の地図データの筆には付けない） */
@@ -954,7 +968,7 @@ function misplacedHead(e: Estimated, m: KozuMisplaced, subject: string, area: bo
  * 公図から推定した筆が、30m 以上離れた別の場所に置かれていた割合を言う句（国の地価の地点で測った結果。lib/roadmap/kozu-data.ts の kozuMisplaced）。
  * 「1割弱は30m以上離れた別の場所に置かれています」「この地域（近畿）では約3%が30m以上離れた別の場所に置かれています」。1% に満たなければ undefined。
  * codes：筆（物件）の市区町村コード（政令市は区のコード。いくつか渡してもよい）。無ければ、測った地域のうち一番多い割合で言う。
- * subject：割合の前に置く言葉（「確度の低い推定の」）
+ * subject：割合の前に置く言葉（「ずれが大きめの推定の」）
  */
 export function estimatedMisplacedText(e: Estimated, codes?: string | readonly string[], subject = "", sets?: Record<string, KozuSet>): string | undefined {
   const m = kozuMisplaced(e, codes, sets);
@@ -962,7 +976,7 @@ export function estimatedMisplacedText(e: Estimated, codes?: string | readonly s
 }
 
 /**
- * 公図から推定した位置の筆の、ずれの目安（見出しや注記に添える短い言い方）。「数mずれることあり」「確度が低く、5m前後（1割弱は30m以上）ずれることあり」。
+ * 公図から推定した位置の筆の、ずれの目安（見出しや注記に添える短い言い方）。「数mずれることあり」、確度の低い推定は「5m前後（1割弱は30m以上）ずれることあり」。
  * 30m 以上の取り違えは、国の地価公示・地価調査の地点で測った割合（筆のまとまりごと。kozu-source.json の accuracy）で書く。
  * 2026-11-21 に測ると、関東の確度の高い推定（1,871地点）は 0.4%・確度の低い推定（718地点）は 7.5%、大阪府（確度の高い推定だけ・136地点）は 0。
  * codes：筆（物件）の市区町村コード。無ければ、測った地域のうち一番多い割合で言う
@@ -970,7 +984,7 @@ export function estimatedMisplacedText(e: Estimated, codes?: string | readonly s
 export function estimatedNote(e: Estimated, codes?: string | readonly string[], sets?: Record<string, KozuSet>): string {
   const m = kozuMisplaced(e, codes, sets);
   const far = m ? `（${misplacedHead(e, m, "", false)}30m以上）` : "";
-  return e === "low" ? `確度が低く、5m前後${far}ずれることあり` : `数m${far}ずれることあり`;
+  return e === "low" ? `5m前後${far}ずれることあり` : `数m${far}ずれることあり`;
 }
 
 /** 画面の案内の文（物件の上の帯）。30m 以上の取り違えは、国の地価の地点で測った結果（estimatedNote と同じ）のとおりに書く */
@@ -981,6 +995,14 @@ export function estimatedSentence(e: Estimated, codes?: string | readonly string
 }
 
 /**
+ * 物件の上の帯の文（スマホ・PC）：何から推定した位置か・どのくらいずれるか（estimatedSentence）・どうするか。
+ * 「確かさ：高め」とは書かない（確かめなくてよいように読める）
+ */
+export function estimatedBanner(e: Estimated, codes?: string | readonly string[], sets?: Record<string, KozuSet>): string {
+  return `この筆の位置は、${KOZU_PLAIN}を、道路の縁に合わせて推定したものです。${estimatedSentence(e, codes, sets)}${e === "low" ? "隣の筆も候補にして、" : "隣の筆の地番になっていることがあるので、"}謄本・公図で確かめてください。`;
+}
+
+/**
  * 筆のカード（PC・スマホの「謄本・公図用の地番」）の注意の文。「…数mずれて隣の筆の地番になることがあります。」、
  * 取り違えが 1% 以上の地域・確度の低い推定は「…ことがあり、1割弱は30m以上離れた別の場所に置かれています（国の地価の地点で確かめた結果）。」
  */
@@ -988,8 +1010,8 @@ export function estimatedCardNote(e: Estimated, codes?: string | readonly string
   const far = estimatedMisplacedText(e, codes, "", sets);
   const tail = far ? `り、${far}（国の地価の地点で確かめた結果）` : "ります";
   return e === "low"
-    ? `この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置で、合わせ方の確かさが低いため、5m前後ずれて隣の筆の地番になっていることがあ${tail}。隣の筆も候補にして、謄本・公図で確かめてください。`
-    : `この辺りの登記所の地図は公図（任意座標）です。公図の形を道路の縁に合わせて置いた推定の位置なので、数mずれて隣の筆の地番になることがあ${tail}。謄本・公図で確かめてください。`;
+    ? `この辺りの登記所の地図は、${KOZU_PLAIN}です。公図の形を道路の縁に合わせて置いた推定の位置ですが、うまく合っていない所なので、5m前後ずれて隣の筆の地番になっていることがあ${tail}。隣の筆も候補にして、謄本・公図で確かめてください。`
+    : `この辺りの登記所の地図は、${KOZU_PLAIN}です。公図の形を道路の縁に合わせて置いた推定の位置なので、数mずれて隣の筆の地番になることがあ${tail}。謄本・公図で確かめてください。`;
 }
 
 /** 地図の筆界の凡例の文（どの地域の筆か決めない。測った地域のうち一番多い割合で言う） */
@@ -998,7 +1020,7 @@ export function estimatedLegend(sets?: Record<string, KozuSet>): string {
   const low = kozuMisplaced("low", undefined, sets);
   const hi = high ? `${high.varies ? `地域によっては${high.share}が` : `${high.share}は`}30m以上。` : "";
   const lo = low ? `。${low.varies ? `地域によってはその${low.share}が` : `その${low.share}は`}30m以上` : "";
-  return `点線は、公図（任意座標）の形を道路の縁に合わせて置いた推定の位置です。数m（${hi}薄い点線は5m前後${lo}）ずれることがあります。`;
+  return `点線は、${KOZU_PLAIN}の形を、道路の縁に合わせて置いた推定の位置です。数m（${hi}薄い点線は5m前後${lo}）ずれることがあります。`;
 }
 
 /**
