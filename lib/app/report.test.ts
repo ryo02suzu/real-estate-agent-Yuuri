@@ -147,6 +147,11 @@ describe("結果の文面（要点・詳しく）", () => {
     expect(picked).toContain("・隣の筆：省略（この筆に接する筆は3筆。公図で物件の筆を確かめてから）");
     expect(picked).not.toContain("・物件の筆：");
     expect(picked).not.toContain("・面積：");
+    // ふつうの筆を地図で選んだとき：「住所の地点にある筆」と書かない（2026-11-28）
+    const lot = docText(buildReport({ ...result, parcel: undefined, picked: true }, input, { detail: "full", date: day }));
+    expect(lot).toContain("・地番：千代田区三番町 2-1（参考）【要確認】\n　※地図で選んだ地点の筆。公図で地番と形を確認");
+    expect(lot).not.toContain("住所の地点にある筆");
+    expect(lot).toContain("・物件の筆：千代田区三番町 2-1");
     const address = docText(buildReport({ ...result, parcel: undefined }, { ...off, parcels: { ...off.parcels, reference: true } }, { detail: "full", date: day }));
     expect(address).toContain("　※住所の地点にある筆。道路など物件の外の土地の可能性があるので公図で確認");
     expect(address).toContain("・住所の地点の筆：千代田区三番町 2-1（参考）【要確認】");

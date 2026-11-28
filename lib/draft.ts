@@ -10,7 +10,7 @@ import { rosenkaLinks } from "./roadmap/rosenka";
 import { SANKO_NOTE } from "./roadmap/sanko-data";
 import { distanceText, kindText, priceText, type LandPriceHit } from "./roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
-import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark, pointName, type Estimated } from "./roadmap/parcel";
+import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark, PICKED_LOT_NOTE, pointName, type Estimated } from "./roadmap/parcel";
 import { placeSuffix } from "./roadmap/geocode";
 import type { NearbyRoad } from "./roadmap/road-read";
 import { schoolCredit, schoolGaps, schoolGapShort, schoolLine, type Schools } from "./roadmap/school";
@@ -105,7 +105,9 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
         ? `${origin}にある筆（参考）。隣地がとても多く、道路など物件の外の土地の可能性があるので、公図で確認`
         : parcels.reference
           ? "住所の地点にある筆（参考）。住居表示と地番は別のもの"
-          : undefined,
+          : result.picked
+            ? PICKED_LOT_NOTE
+            : undefined,
       check: true,
       src: "parcel",
       lot: parcels.offLot ? "off" : parcels.reference ? "address" : "picked",

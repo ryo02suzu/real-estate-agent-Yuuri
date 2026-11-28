@@ -334,6 +334,8 @@ function placeIssues(input: TriageInput): Issue[] {
     else if (off && picked) out.push({ id: "on-road", level: "check", topic: "place", title: `地図で選んだ地点が${off}の筆の上`, detail: `選んだ地点は、地図データでは${off}の筆の上です。物件の土地の地番は、建物の上を選び直すと出ます。`, confirm: "場所を直す（建物の上を選ぶ）" });
     else if (off) out.push({ id: "on-road", level: "check", topic: "place", title: `住所の地点が${off}の上`, detail: "住所の点が、建物ではなく道路・水路の上にあります（住所の点の置き方によることがあります）。物件の土地の地番は、地番で探すか、地図で建物の位置を選ぶと出ます。", confirm: "地番で探し直す・場所を直す" });
     else if (parcels.kind === "address") out.push({ id: "address-parcel", level: "check", topic: "place", title: `住所の地点の筆は${chibanLabel(raw)}（参考）`, detail: "住居表示の住所と地番は別のものです。物件の土地がこの筆かどうかは、公図・登記で確かめます。", confirm: "法務局の公図・登記で" });
+    // 地図で選んだ地点の筆：結果の文面・下書きでは「要確認」と書いているので、画面の要確認にも 1 行出す（画面と文を合わせる）
+    else if (picked) out.push({ id: "picked-parcel", level: "check", topic: "place", title: `地図で選んだ地点の筆は${chibanLabel(raw)}`, detail: "地図で選んだ地点にある筆です。選んだ地点が隣の筆に乗っていることもあるので、地番と筆の形は公図・登記で確かめます。", confirm: "法務局の公図・登記で" });
     if (p.estimated) {
       // 30m 以上の取り違えの割合は、その地域の推定の筆のまとまりで国の地価の地点を使って測った結果（lib/roadmap/kozu-data.ts）
       const far = estimatedMisplacedText(p.estimated, m.codes, p.estimated === "low" ? "確度の低い推定の" : "");

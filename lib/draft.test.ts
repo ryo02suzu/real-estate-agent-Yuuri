@@ -220,6 +220,8 @@ describe("住所の地点の筆", () => {
     expect(rows[0].rows.find((r) => r.label === "所在（地番）")?.lot).toBe("off");
     expect(buildDraft(picked, { parcels: { target: "渋谷区神南1丁目 39-7", neighbors: [], reference: false } })[0].rows.find((r) => r.label === "所在（地番）")?.lot).toBe("picked");
     expect(buildDraft(base, { parcels: { target: "渋谷区神南1丁目 39-7", neighbors: [], reference: true } })[0].rows.find((r) => r.label === "所在（地番）")?.lot).toBe("address");
+    // ふつうの筆を選んだとき：要確認のわけを書く（住所の地点の筆とは書かない）
+    expect(draftText(buildDraft(picked, { parcels: { target: "渋谷区神南1丁目 39-7", neighbors: [], reference: false } }))).toContain("所在（地番）：渋谷区神南1丁目 39-7（地図で選んだ地点の筆。公図で地番と形を確認）【要確認】");
     // 道路（地番なし）の筆の上：地番は要確認、隣地は省略
     const road = draftText(buildDraft(picked, { parcels: { neighbors: neighbors.slice(0, 4), reference: false, offLot: true } }));
     expect(road).toContain("所在（地番）：要確認");

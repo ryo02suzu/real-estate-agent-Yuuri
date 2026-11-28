@@ -14,7 +14,7 @@ import { KOZU_CREDIT } from "../roadmap/kozu-data";
 import { asOfText, changeText, distanceText, kindText, priceText, type LandPriceHit } from "../roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "../roadmap/land-price-data";
 import { MORIDO_CREDIT, moridoLine, type Morido } from "../roadmap/morido";
-import { chibanLabel, estimatedNote, kuikiLabel, parcelMark, pointName, type Estimated } from "../roadmap/parcel";
+import { chibanLabel, estimatedNote, kuikiLabel, parcelMark, PICKED_LOT_NOTE, pointName, type Estimated } from "../roadmap/parcel";
 import { placeSuffix } from "../roadmap/geocode";
 import { PARCEL_CREDIT } from "../roadmap/parcel-data";
 import { POI_SOURCES, poiLine, type PoiWalk } from "../roadmap/poi";
@@ -133,7 +133,7 @@ export function buildReport(result: Ok, input: ReportInput, opts: ReportOptions)
   // 物件の概要（重説・図面で最初に見る所）
   const outline: DocItem[] = [];
   if (found) outline.push({ label: "地番", text: `${half(kuikiLabel(found.kuiki))} ${chibanLabel(found.chibanRaw).replace(/^地番 /, "")}${parcelMark(found)}`, note: found.estimated ? `公図から推定した位置・${estimatedNote(found.estimated, m.codes)}` : found.sanko ? SANKO_NOTE : undefined });
-  else if (parcels?.target) outline.push({ label: "地番", text: `${half(parcels.target)}（参考）`, note: parcels.offLot ? `${pointName(result.picked)}にある筆。道路など物件の外の土地の可能性があるので公図で確認` : "住所の地点にある筆。住居表示と地番は別なので公図で確認", tone: "check" });
+  else if (parcels?.target) outline.push({ label: "地番", text: `${half(parcels.target)}（参考）`, note: parcels.offLot ? `${pointName(result.picked)}にある筆。道路など物件の外の土地の可能性があるので公図で確認` : result.picked ? PICKED_LOT_NOTE : "住所の地点にある筆。住居表示と地番は別なので公図で確認", tone: "check" });
   if (opts.area) outline.push({ label: "面積", text: opts.area, note: "地図上の目安。登記の地積で確認" });
   const zr = zoning ? zoningRows(zoning.zoning, zoning.st) : [];
   const zv = (label: string) => zr.find((r) => r.label === label);

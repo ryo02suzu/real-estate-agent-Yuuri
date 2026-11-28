@@ -102,6 +102,10 @@ describe("要注意点（問題になりそうな所）", () => {
     expect(pick("道-5").issues.find((i) => i.id === "on-road")).toMatchObject({ title: "地図で選んだ地点が道路の筆の上" });
     expect(pick("52-2", 58, true).issues.some((i) => i.id === "off-lot")).toBe(false);
     expect(pick("39-7", 6).issues.some((i) => i.id === "off-lot" || i.id === "on-road")).toBe(false);
+    // ふつうの筆を選んだとき：結果の文面が「要確認」と書くので、画面の要確認にも 1 行（住所の地点の筆とは言わない）
+    expect(pick("39-7", 6).issues.find((i) => i.topic === "place")).toMatchObject({ id: "picked-parcel", level: "check", title: "地図で選んだ地点の筆は地番 39-7", confirm: "法務局の公図・登記で" });
+    expect(pick("52-2", 58, true).issues.some((i) => i.id === "picked-parcel")).toBe(true);
+    expect(pick("39-7", 6).issues.some((i) => i.id === "address-parcel")).toBe(false);
     // 次にやること（謄本・公図）：道路らしい筆は物件の筆と書かず、その隣地も並べない
     const touki = (t: ReturnType<typeof pick>) => t.actions.find((a) => a.id === "touki")!.what;
     expect(touki(big)[0]).toBe("登記事項証明書（土地）：地図で選んだ地点の筆 渋谷区神南1丁目 52-2（参考。物件の筆かを確認）。所有者・地目・地積・抵当権");

@@ -918,6 +918,9 @@ export function roadLikeLot(lot: { kind: "chiban" | "picked" | "address"; chiban
 /** 地点から決めた筆の、地点の呼び方（「住所の地点の筆」「地図で選んだ地点の筆」と書き分ける） */
 export const pointName = (picked: boolean | undefined): string => (picked ? "地図で選んだ地点" : "住所の地点");
 
+/** 地図で選んだ地点の筆に添える注（結果の文面・下書き。選んだ地点が隣の筆に乗ることがあるので、要確認のわけを書く） */
+export const PICKED_LOT_NOTE = "地図で選んだ地点の筆。公図で地番と形を確認";
+
 /** 下書き・コピー・印刷に並べる隣地の数（道路や大きな筆は、まわりの何十筆にも接する） */
 export const NEIGHBOR_LIST_MAX = 20;
 
