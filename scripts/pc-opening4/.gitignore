@@ -3,3 +3,5 @@ __pycache__/
 _world_snap*.py
 # 確かめの絵のフォルダの中の、下線で始まる試し描き（作業役の一時ファイル）
 review/**/_*
+# 白鳥の動きの確かめ動画（flight.mp4）のもとの連番。動画だけを残す
+review/swans/flightframes/
