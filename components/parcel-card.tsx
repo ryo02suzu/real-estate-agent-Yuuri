@@ -137,7 +137,8 @@ export function parcelLines(info: Extract<ParcelInfo, { status: "ok" }>): { targ
 
 /**
  * 都市計画の行の右に置く小さなボタン。スマホは押すと一覧が下から出る。
- * PC は onOpen（パネルの中の地番のカードまで動かす）を渡し、物件の筆の地番も出す（住所の地点の筆は参考なので出さない）
+ * PC は onOpen（パネルの中の地番のカードまで動かす）を渡し、物件の筆の地番も出す（住所の地点の筆は参考なので出さない。
+ * 地図で選んだ地点の筆が道路らしいときも出さない）
  */
 export function ParcelButton({
   info,
@@ -178,7 +179,7 @@ export function ParcelButton({
     );
   }
   const chiban =
-    onOpen && info.status === "ok" && info.kind !== "address" && isLotChiban(info.parcel.chibanRaw) ? `${chibanLabel(info.parcel.chibanRaw)}${parcelMark(info.parcel)}` : undefined;
+    onOpen && info.status === "ok" && info.kind !== "address" && isLotChiban(info.parcel.chibanRaw) && pointOffLot(info) === undefined ? `${chibanLabel(info.parcel.chibanRaw)}${parcelMark(info.parcel)}` : undefined;
   return (
     <>
       {tile ? (
