@@ -192,10 +192,45 @@ describe("下書き（buildDraft）からの通し", () => {
   const { parts, credits } = overviewParts(draft);
   const part = (re: RegExp) => parts.find((p) => re.test(p.title))!;
 
-  it("住所の地点の筆（参考）の地番は、内容に「（参考）」を添える（確認先の列が無いため）", () => {
+  /** 所在（地番）の欄の内容と、物件の名前（表題・ファイルの名前） */
+  const lotOf = (parcels: NonNullable<Parameters<typeof buildDraft>[1]>["parcels"], over: Partial<typeof base> = {}) => {
+    const d = buildDraft({ ...base, ...over }, { parcels });
+    const row = overviewParts(d).parts[0].items.find((it) => "row" in it && it.row.label === "所在（地番）");
+    return { value: row && "row" in row ? row.row.value : undefined, name: overviewName(d), sheet: overviewSheet(d, overviewName(d), new Date(2026, 10, 28)) };
+  };
+
+  it("地図で選んだ地点の筆の地番は、内容に「（参考）」を添える（確認先の列が無いため）。印があれば同じかっこの中に", () => {
     const chiban = part(/^物件の表示/).items.find((it) => "row" in it && it.row.label === "所在（地番）");
     expect(chiban && "row" in chiban && chiban.row.value).toBe("千代田区三番町 2-1（参考）");
     expect(overviewName(draft)).toBe("千代田区三番町 2-1");
+    expect(lotOf({ target: "千代田区三番町 2-1", neighbors: [], reference: false, estimated: "high" }).value).toBe("千代田区三番町 2-1（推定・参考）");
+  });
+
+  it("住所の地点の筆（参考）は、物件の地番のように書かない：内容は「要確認」が先、表題とファイルの名前は住所（2026-11-28）", () => {
+    const ref = lotOf({ target: "千代田区三番町 2-1", neighbors: ["千代田区三番町 2-2"], reference: true });
+    expect(ref.value).toBe("要確認（住所の地点の筆は 千代田区三番町 2-1・参考）");
+    expect(ref.name).toBe("東京都千代田区三番町");
+    expect(ref.sheet.rows[0][0]?.v).toBe("物件概要書（下書き）　東京都千代田区三番町");
+    // 地番参考図・推定の筆は、もう印が付いているので「参考」が抜けていた（川越市元町1丁目 3-1（地番参考図））
+    expect(lotOf({ target: "千代田区三番町 2-1", neighbors: [], reference: true, sanko: "11201" }).value).toBe("要確認（住所の地点の筆は 千代田区三番町 2-1・地番参考図・参考）");
+    expect(lotOf({ target: "千代田区三番町 2-1", neighbors: [], reference: true, estimated: "low" }).value).toBe("要確認（住所の地点の筆は 千代田区三番町 2-1・推定・参考）");
+  });
+
+  it("道路など物件の外の土地の可能性がある筆は、地番を書かない（内容・表題・ファイルの名前のどこにも）", () => {
+    const off = lotOf({ target: "千代田区三番町 51-3", neighbors: Array.from({ length: 40 }, (_, i) => `千代田区三番町 ${i + 1}`), reference: true, offLot: true });
+    expect(off.value).toBe("要確認（この地点の筆は道路など物件の外の土地の可能性。公図で確認）");
+    expect(off.name).toBe("東京都千代田区三番町");
+    expect(JSON.stringify(off.sheet.rows)).not.toContain("51-3");
+    expect(overviewFileName(off.name, new Date(2026, 10, 28))).toBe("物件概要書_東京都千代田区三番町_20261128.xlsx");
+  });
+
+  it("地番で探した筆は下書きのまま（「参考」「要確認」を足さない）。列は 2 つのまま", () => {
+    const parcel = { kuiki: "千代田区_三番町___", chiban: "2-1", chibanRaw: "2-1", pieces: [], point: { lat: 35.6895, lng: 139.7441 } };
+    const found = lotOf({ target: "千代田区三番町 2-1", neighbors: [], reference: false }, { parcel } as never);
+    expect(found.value).toBe("千代田区三番町 2-1");
+    expect(found.name).toBe("千代田区三番町 2-1");
+    expect(found.sheet.cols).toEqual(OVERVIEW_COLS);
+    expect(found.sheet.rows.every((r) => r.length <= 2)).toBe(true);
   });
 
   it("下書きの欄に付けた区域の印（area）と、何のデータか（src）で選ぶ", () => {

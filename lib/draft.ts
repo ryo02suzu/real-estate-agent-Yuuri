@@ -32,9 +32,11 @@ export type DraftSrc = "parcel" | "zoning" | "hazard" | "building" | "ksj" | "po
 
 /**
  * 下書きの1行。check：役所・法務局・現地で確かめる必要がある（データが無い・参考にとどまる）。confirmed：あなたが確かめた結果（確認の記録から）。
- * area：国のデータで区域に入る（in）・入らない（out）。分からない欄・確かめる先の欄には付けない。src：何のデータの欄か（画面には出さない）
+ * area：国のデータで区域に入る（in）・入らない（out）。分からない欄・確かめる先の欄には付けない。src：何のデータの欄か（画面には出さない）。
+ * lot：所在（地番）の欄の筆の決まり方（地番で探した筆には付けない）。address：住所の地点の筆（参考）、picked：地図で選んだ地点の筆、
+ * off：その筆が道路など物件の外の土地の可能性。画面には出さない（注の文に書いてある）。確認先の列の無い物件概要書の Excel が、内容を書き分けるのに使う
  */
-export type DraftRow = { label: string; value: string; note?: string; check?: boolean; confirmed?: boolean; area?: "in" | "out"; src?: DraftSrc };
+export type DraftRow = { label: string; value: string; note?: string; check?: boolean; confirmed?: boolean; area?: "in" | "out"; src?: DraftSrc; lot?: "address" | "picked" | "off" };
 export type DraftSection = { title: string; rows: DraftRow[] };
 
 export type DraftInput = {
@@ -101,6 +103,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
           : undefined,
       check: true,
       src: "parcel",
+      lot: parcels.offLot ? "off" : parcels.reference ? "address" : "picked",
     });
   else place.push({ label: "所在（地番）", value: CHECK, note: "登記・公図で確認", check: true });
   // 住所の地点の筆が道路などの可能性があるときは、その筆の隣地（道沿いの筆）を物件の隣地として書かない

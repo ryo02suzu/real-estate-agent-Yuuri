@@ -24,6 +24,23 @@ export type OverviewPart = { title: string; items: OverviewItem[] };
 const NOT_APPLICABLE = /^(区域外|該当なし|該当しない|当てはまらない|包蔵地ではない|対象外|指定なし|なし|無し|ない)/;
 const hasUrl = (s?: string) => !!s && /https?:\/\//.test(s);
 
+/** 「…（推定）」→「…（推定・参考）」、印が無ければ「…（参考）」（かっこを重ねない） */
+const withMark = (value: string, mark: string) => (/）$/.test(value) ? `${value.slice(0, -1)}・${mark}）` : `${value}（${mark}）`);
+
+/**
+ * 所在（地番）の欄の内容。確認先の列が無い（持ち主の指示 2026-11-22）ので、内容だけで「物件の地番と確かめたものではない」と分かるように書く
+ * （地番で探した筆は下書きのまま。2026-11-28：住所の地点の筆を物件の地番のように書いていた・地番参考図の筆には「参考」も付いていなかった）。
+ * - 道路など物件の外の土地の可能性がある筆（off）：地番は書かない（画面でも物件の筆として出していない）
+ * - 住所の地点の筆（address。住居表示と地番は別のもの）：「要確認」を先に書き、筆は参考として添える
+ * - 地図で選んだ地点の筆（picked）：地番に「参考」を添える
+ */
+function lotRow(r: DraftRow): DraftRow {
+  if (r.lot === "off") return { ...r, value: "要確認（この地点の筆は道路など物件の外の土地の可能性。公図で確認）" };
+  if (r.lot === "address") return { ...r, value: `要確認（住所の地点の筆は ${withMark(r.value, "参考").replace(/（([^（）]*)）$/, "・$1")}）` };
+  if (r.lot === "picked") return { ...r, value: withMark(r.value, "参考") };
+  return r;
+}
+
 /**
  * 物件概要書に載せる欄と、その出典（載せた欄のデータの分だけ）。
  * 物件の表示は「所在（住所）」のあとに土地（地番・あなたが確かめた登記の地番や境界・地積）と建物（床面積）の小見出しで分ける
@@ -38,11 +55,7 @@ export function overviewParts(sections: DraftSection[]): { parts: OverviewPart[]
 
   const place = rowsOf(/^物件の表示/).filter((r) => !/^(緯度・経度|隣地の地番|地番の参考図)$/.test(r.label));
   const address = place.filter((r) => r.label === "所在（住所）");
-  // 地番が住所の地点の筆（参考。住居表示と地番は別のもの）のときは、確認先の列が無いので、内容に「（参考）」を添える
-  // （推定・地番参考図の筆は、もう「（推定）」などの印が付いている）
-  const land = place
-    .filter((r) => r.label !== "所在（住所）")
-    .map((r) => (r.src === "parcel" && r.check && !/）$/.test(r.value) ? { ...r, value: `${r.value}（参考）` } : r));
+  const land = place.filter((r) => r.label !== "所在（住所）").map(lotRow);
   parts.push({
     title: "物件の表示",
     items: [...address.map((row) => ({ row })), { sub: "土地" }, ...land.map((row) => ({ row })), { area: AREA_ROWS.land }, { sub: "建物" }, { area: AREA_ROWS.building }],
@@ -173,10 +186,13 @@ export function overviewFileName(name: string, at: Date = new Date()): string {
   return `物件概要書_${safe || "物件"}_${ymd}.xlsx`;
 }
 
-/** 物件の名前（所在の地番。分からなければ住所） */
+/**
+ * 物件の名前（表題とファイルの名前）。所在の地番。分からなければ住所。
+ * 住所の地点の筆（参考）と、道路など物件の外の土地の可能性がある筆は、物件の地番と確かめたものではないので名前にしない（住所にする）
+ */
 export function overviewName(sections: DraftSection[]): string {
   const place = sections.find((s) => s.title === "物件の表示")?.rows ?? [];
-  const chiban = place.find((r) => r.label === "所在（地番）" && r.value !== "要確認")?.value;
+  const chiban = place.find((r) => r.label === "所在（地番）" && r.value !== "要確認" && r.lot !== "address" && r.lot !== "off")?.value;
   const address = place.find((r) => r.label === "所在（住所）")?.value;
   return (chiban || address || "物件").trim();
 }
