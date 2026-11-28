@@ -19,7 +19,7 @@ import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
 import { YOUTO_COLORS, youtoShort, ZONING_ZOOM } from "@/lib/roadmap/zoning";
 import { pmtilesZoningSource } from "@/lib/roadmap/zoning-tiles";
 import { toWorldPixel } from "@/lib/tiles";
-import { addressOffLot } from "../parcel-card";
+import { pointOffLot } from "../parcel-card";
 import { createPropertyScene, SHADE, SKY, type PropertyScene, type SceneLabel, type SceneLot, type ScenePart, type ScenePin, type SceneTab, type SceneZone } from "./property-3d";
 import { shortName } from "./r-around";
 import { KIND_STYLE, metersText } from "./shared";
@@ -362,7 +362,7 @@ export function PropertyBackdrop({ result, data, tab, motion, hold, neighbors, p
     const t = window.setTimeout(() => setWaited(true), 6000);
     return () => clearTimeout(t);
   }, []);
-  const parcel = parcels.status === "ok" && addressOffLot(parcels) === undefined ? parcels.parcel : undefined;
+  const parcel = parcels.status === "ok" && pointOffLot(parcels) === undefined ? parcels.parcel : undefined;
   const settled = parcels.status !== "loading" || waited;
   const parcelKey = parcel ? `${parcel.kuiki}|${parcel.chibanRaw}` : parcels.status;
   const [base, setBase] = useState<{ center: XZ; front: number[]; ring: XZ[] | null } | null>(null);

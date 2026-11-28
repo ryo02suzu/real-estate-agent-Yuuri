@@ -9,6 +9,7 @@ import { addHistory, clearHistory, loadHistory, removeHistory, restoreHistory, t
 import { propertyIdOf } from "@/lib/property-id";
 import { GeocoderUnavailable, lookup, lookupPoint, pastedAddress, type AddressFix, type LookupResult } from "@/lib/roadmap";
 import { buildHash, pageUrl, readUrlState } from "@/lib/app/url";
+import { clearLotOk } from "@/lib/app/lot-ok";
 import { clearPlaces, forgetPlace, needsPick, recallPlace, rememberPlace } from "@/lib/app/picked-places";
 
 /**
@@ -176,6 +177,7 @@ export default function Home() {
         onClearHistory={() => {
           clearHistory();
           clearPlaces(); // 調べた住所から覚えた場所も、履歴と一緒に消す
+          clearLotOk(); // 「この筆で進める」を押した筆も
           setHistory([]);
         }}
         onForgetPlace={forgetPicked}

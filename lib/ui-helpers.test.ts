@@ -376,8 +376,12 @@ describe("buildSummary の地番", () => {
     // 住所の全角の数字は半角にそろえる
     // 住所が号まで見つかっていれば「付近」は付けない（地番は下の「謄本・公図用の地番」に分けて書く）
     expect(off).toContain("【MICHILU の調査結果】東京都渋谷区神南一丁目19番11号\n");
-    expect(off).toContain("【謄本・公図用の地番（住所の地点の筆・参考。道路など物件の外の土地の可能性）】\n・物件：渋谷区神南１丁目 100\n・隣地：省略（この筆に接する筆は40筆。公図で物件の筆を確かめてから）");
+    // 道路など物件の外の土地らしい筆は「物件」と書かない
+    expect(off).toContain("【謄本・公図用の地番（住所の地点の筆・参考。道路など物件の外の土地の可能性）】\n・地点の筆：渋谷区神南１丁目 100\n・隣地：省略（この筆に接する筆は40筆。公図で物件の筆を確かめてから）");
     expect(off).not.toContain("神南１丁目 1、");
+    // 地図で選んだ地点の筆も同じ（2026-11-28。選んだ地点が前の道路の筆に乗ることがある）
+    const picked = buildSummary({ ...result, picked: true }, { parcels: { target: "渋谷区神南１丁目 100", neighbors, reference: false, offLot: true } });
+    expect(picked).toContain("【謄本・公図用の地番（地図で選んだ地点の筆・参考。道路など物件の外の土地の可能性）】\n・地点の筆：渋谷区神南１丁目 100\n・隣地：省略");
     const ref = buildSummary(result, { parcels: { target: "渋谷区神南１丁目 100", neighbors: neighbors.slice(0, 3), reference: true } });
     expect(ref).toContain("【謄本・公図用の地番（住所の地点の筆・参考）】\n・物件：渋谷区神南１丁目 100\n・隣地：渋谷区神南１丁目 1、渋谷区神南１丁目 2、渋谷区神南１丁目 3");
   });

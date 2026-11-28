@@ -899,6 +899,25 @@ export function registryChiban(chiban: string): string {
 /** 地図データの地番に、登記の地番には無い印（W・V・X）が付いているか */
 export const hasPieceMark = (chiban: string) => PIECE_MARK.test(chiban);
 
+/** 隣地がこれより多い筆は、道路など細長い土地か大きな土地とみなす（ふつうの宅地の隣地は多くても20筆ほど） */
+export const ROADLIKE_NEIGHBORS = 30;
+
+/**
+ * 地点から決めた筆（住所の地点の筆・地図で選んだ地点の筆）が、物件の土地ではなさそうか：道路・水路（地番なし）か、
+ * 隣地がとても多い筆（地番の付いた公道など）。住所の点は建物の入口や道路の側に置かれていることがあり、地図で選ぶときも
+ * 数mずれると前の道路の筆に乗る。地番で探した筆と、利用者が「この筆で進める」を押した筆（accepted。大きな筆のとき）は物件の筆として扱う。
+ * neighbors：隣の筆（登記の地番でまとめた数）
+ */
+export function roadLikeLot(lot: { kind: "chiban" | "picked" | "address"; chibanRaw: string; neighbors: number; accepted?: boolean }): "道路" | "水路" | "large" | undefined {
+  if (lot.kind === "chiban") return undefined;
+  if (/^道/.test(lot.chibanRaw)) return "道路";
+  if (/^水/.test(lot.chibanRaw)) return "水路";
+  return !lot.accepted && lot.neighbors >= ROADLIKE_NEIGHBORS ? "large" : undefined;
+}
+
+/** 地点から決めた筆の、地点の呼び方（「住所の地点の筆」「地図で選んだ地点の筆」と書き分ける） */
+export const pointName = (picked: boolean | undefined): string => (picked ? "地図で選んだ地点" : "住所の地点");
+
 /** 下書き・コピー・印刷に並べる隣地の数（道路や大きな筆は、まわりの何十筆にも接する） */
 export const NEIGHBOR_LIST_MAX = 20;
 

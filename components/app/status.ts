@@ -7,7 +7,7 @@ import { chibanLabel, isLotChiban } from "@/lib/roadmap/parcel";
 import { roadShort } from "@/lib/roadmap/road-read";
 import { noCityPlanning } from "@/lib/roadmap/municipalities";
 import { noneLabel, zoningArea } from "@/lib/roadmap/zoning";
-import { addressOffLot, registryNeighbors, type ParcelInfo } from "../parcel-card";
+import { pointOffLot, registryNeighbors, type ParcelInfo } from "../parcel-card";
 import type { StatusKey } from "./tokens";
 import type { Ok, PropertyData } from "./use-property";
 
@@ -146,7 +146,7 @@ export function parcelStatus(parcels: Extract<ParcelInfo, { status: "ok" }>): Pi
   const hint = "法務局の公図・登記で地番と面積を確認";
   // 地番の無い土地（道路・水路・筆界未定地など）：物件の地番は出ていない
   if (!isLotChiban(raw)) return { status: "unconfirmed", chip: "未確認", value: `${kind}は${label}`, hint: /道路|水路/.test(label) ? fix : hint };
-  if (addressOffLot(parcels) === "large")
+  if (pointOffLot(parcels) === "large")
     return { status: "unconfirmed", chip: "未確認", value: `${kind}は${label}。隣地が${registryNeighbors(parcels).length}筆あり、道路など物件の外の土地の可能性`, hint: `${fix}（公図でも確認）` };
   if (parcels.kind === "address") return { status: "unconfirmed", chip: "参考・要確認", value: `${label}（${kind}・参考）`, hint: "住所と地番は別物。公図で物件の筆を確認" };
   return { status: "auto", chip: "取得済み", value: `${label}（${kind}）`, hint };

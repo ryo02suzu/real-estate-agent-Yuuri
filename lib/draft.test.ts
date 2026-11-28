@@ -208,6 +208,24 @@ describe("住所の地点の筆", () => {
     expect(text).not.toContain("30-1");
   });
 
+  it("地図で選んだ地点の筆が道路らしいときも同じ（「地図で選んだ地点」と書く。2026-11-28）。地番の無い道路の筆の隣地も、物件の隣地として並べない", () => {
+    const neighbors = Array.from({ length: 58 }, (_, i) => `渋谷区神南1丁目 ${i + 30}-1`);
+    const picked = { ...base, picked: true as const };
+    const rows = buildDraft(picked, { parcels: { target: "渋谷区神南1丁目 52-2", neighbors, reference: false, offLot: true } });
+    const text = draftText(rows);
+    expect(text).toContain("所在（地番）：渋谷区神南1丁目 52-2（地図で選んだ地点にある筆（参考）。隣地がとても多く、道路など物件の外の土地の可能性があるので、公図で確認）【要確認】");
+    expect(text).toContain("隣地の地番：省略（この筆に接する筆は58筆）（地図で選んだ地点の筆が道路など物件の外の土地の可能性があるので、公図で物件の筆を確かめてから隣地を調べる）【要確認】");
+    expect(text).not.toContain("30-1");
+    // 物件概要書の Excel が書き分けるための印（画面とコピーの文には出ない）
+    expect(rows[0].rows.find((r) => r.label === "所在（地番）")?.lot).toBe("off");
+    expect(buildDraft(picked, { parcels: { target: "渋谷区神南1丁目 39-7", neighbors: [], reference: false } })[0].rows.find((r) => r.label === "所在（地番）")?.lot).toBe("picked");
+    expect(buildDraft(base, { parcels: { target: "渋谷区神南1丁目 39-7", neighbors: [], reference: true } })[0].rows.find((r) => r.label === "所在（地番）")?.lot).toBe("address");
+    // 道路（地番なし）の筆の上：地番は要確認、隣地は省略
+    const road = draftText(buildDraft(picked, { parcels: { neighbors: neighbors.slice(0, 4), reference: false, offLot: true } }));
+    expect(road).toContain("所在（地番）：要確認");
+    expect(road).toContain("隣地の地番：省略（この筆に接する筆は4筆）");
+  });
+
   it("ふつうの住所の地点の筆は、隣地を20筆まで並べる", () => {
     const neighbors = Array.from({ length: 25 }, (_, i) => `渋谷区神南１丁目 ${i + 30}-1`);
     const text = draftText(buildDraft(base, { parcels: { target: "渋谷区神南１丁目 51-3", neighbors, reference: true } }));

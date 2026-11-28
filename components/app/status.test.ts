@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildLinks, findMunicipality, resolveContact } from "@/lib/roadmap";
 import type { Neighbor, Parcel } from "@/lib/roadmap/parcel";
-import type { ParcelInfo } from "../parcel-card";
+import { pointOffLot, type ParcelInfo } from "../parcel-card";
 import { copyHasLot, copyText } from "../result-view";
 import { parcelStatus } from "./status";
 
@@ -43,6 +43,27 @@ describe("調査の状況の「地番・土地」の行（2026-11-28）", () => 
     const und = parcelStatus(info("筆界未定地-1", "picked"));
     expect(und).toMatchObject({ status: "unconfirmed", chip: "未確認", value: "地図で選んだ地点の筆は筆界未定地" });
     expect(und.hint).toContain("法務局の公図");
+  });
+});
+
+describe("地図で選んだ地点の筆が道路らしいとき（2026-11-28）", () => {
+  it("住所の地点の筆と同じ決まりで見分ける。「この筆で進める」を押した筆（accepted）は物件の筆", () => {
+    expect(pointOffLot(info("52-2", "picked", 58))).toBe("large");
+    expect(pointOffLot(info("道-5", "picked"))).toBe("道路");
+    expect(pointOffLot(info("39-7", "picked", 6))).toBeUndefined();
+    expect(pointOffLot({ ...info("52-2", "picked", 58), accepted: true })).toBeUndefined();
+    expect(pointOffLot(info("52-2", "chiban", 58))).toBeUndefined();
+    expect(pointOffLot({ status: "loading" })).toBeUndefined();
+    // 隣の筆は登記の地番でまとめて数える（地図データで分かれた区画「100-1W1」「100-1W2」は 1 筆）
+    const pieces: OkParcel = { status: "ok", parcel: parcel("52-2"), kind: "picked", neighbors: Array.from({ length: 40 }, (_, i) => ({ kuiki: K, chiban: `100-1W${i + 1}` })) };
+    expect(pointOffLot(pieces)).toBeUndefined();
+  });
+
+  it("調査の状況の行：道路らしい筆は「未確認」、進めると決めた筆は「取得済み」", () => {
+    const off = parcelStatus(info("52-2", "picked", 58));
+    expect(off).toMatchObject({ status: "unconfirmed", chip: "未確認", value: "地図で選んだ地点の筆は地番 52-2。隣地が58筆あり、道路など物件の外の土地の可能性" });
+    expect(off.hint).toContain("場所を直す");
+    expect(parcelStatus({ ...info("52-2", "picked", 58), accepted: true })).toMatchObject({ status: "auto", chip: "取得済み", value: "地番 52-2（地図で選んだ地点の筆）" });
   });
 });
 

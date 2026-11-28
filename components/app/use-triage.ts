@@ -35,7 +35,7 @@ export type TriageSources = {
 /** 筆の状態を、隣地の地番（登記の地番）の並びにして渡す */
 function parcelsOf(info: ParcelInfo): TriageInput["parcels"] {
   if (info.status !== "ok") return info;
-  return { status: "ok", parcel: info.parcel, kind: info.kind, neighbors: parcelLines(info).neighbors };
+  return { status: "ok", parcel: info.parcel, kind: info.kind, neighbors: parcelLines(info).neighbors, accepted: info.accepted };
 }
 
 export function triageFrom(result: Ok, s: TriageSources): Triage {

@@ -11,7 +11,7 @@ import { lotShape } from "@/lib/app/lot-shape";
 import { labelPoint } from "@/lib/app/scene-lots";
 import { localOf, type XZ } from "@/lib/app/town-model";
 import { isLotChiban, registryChiban, type Neighbor } from "@/lib/roadmap/parcel";
-import { addressOffLot } from "../parcel-card";
+import { pointOffLot } from "../parcel-card";
 import type { NeighborPlan } from "../app/neighbor-plan";
 import type { PropertyScene, SceneTab } from "../app/property-3d";
 import { PropertyBackdrop } from "../app/property-scene";
@@ -133,7 +133,7 @@ function GoogleStage({ result, data, layers, tod, sun, dist, frame, hidden, redu
 
   // 重ねるもの（MICHILU のデータ）：物件の筆の線と面、隣の筆の線
   const parcels = data.parcels;
-  const parcel = parcels.status === "ok" && addressOffLot(parcels) === undefined ? parcels.parcel : undefined;
+  const parcel = parcels.status === "ok" && pointOffLot(parcels) === undefined ? parcels.parcel : undefined;
   const shape = useMemo(() => (parcel ? lotShape(parcel, { lat: result.lat, lng: result.lng }) : null), [parcel, result.lat, result.lng]);
   const nbEdges = useMemo(() => (plan.status === "ok" ? plan.lots.filter((l) => l.kind === "neighbor").flatMap((l) => l.shape.edges) : []), [plan]);
   useEffect(() => {
@@ -353,6 +353,6 @@ export function modelCredit(view: SceneTab, parcel: boolean): string[] {
 /** 地番（登記の地番。地番の無い筆は undefined） */
 export function lotNumberOf(data: PropertyData): string | undefined {
   const p = data.parcels;
-  if (p.status !== "ok" || addressOffLot(p) !== undefined || !isLotChiban(p.parcel.chibanRaw)) return undefined;
+  if (p.status !== "ok" || pointOffLot(p) !== undefined || !isLotChiban(p.parcel.chibanRaw)) return undefined;
   return registryChiban(p.parcel.chibanRaw);
 }

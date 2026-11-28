@@ -39,7 +39,7 @@ import { LegendBlock, LegendButton } from "./legend";
 import { MapPreview } from "./map-preview";
 import { NearbyRoadsBlock, NearbyRoadsLine, useNearbyRoads, type RoadsState } from "./nearby-roads";
 import { SheetPreview } from "./sheet-preview";
-import { addressOffLot, parcelLines, ParcelButton, ParcelCard, registryNeighbors, useParcelInfo, type ParcelInfo } from "./parcel-card";
+import { pointOffLot, parcelLines, ParcelButton, ParcelCard, registryNeighbors, useParcelInfo, type ParcelInfo } from "./parcel-card";
 import { TriageSheet, useChecklist } from "./triage-sheet";
 import { useLiquefaction, useRireki, useZousei } from "./app/use-national";
 import { useTriage } from "./app/use-triage";
@@ -446,7 +446,7 @@ function Place({
   const town = approximate ? "町の中心を表示しています。" : "";
   // 住所で調べた地点が、道路・水路の筆か隣地のとても多い筆（地番の付いた公道など）の上。番地が地番の地域なら
   // （住居表示の「号」まで合った地点でなければ）地番で探し直せるようにする
-  const off = !picked && !parcel && !approximate && parcels ? addressOffLot(parcels) : undefined;
+  const off = !picked && !parcel && !approximate && parcels ? pointOffLot(parcels) : undefined;
   const chibanArea = !/号$/.test(address);
   const onRoad = !!off && (off === "large" || chibanArea);
   const asChiban = query && chibanArea ? chibanQueryOf(query, /丁目/.test(result.town)) : undefined;
@@ -633,7 +633,7 @@ export function loaded({
     zoning: zoning.status === "ok" ? zoning : undefined,
     parcels:
       parcels.status === "ok"
-        ? { ...parcelLines(parcels), reference: parcels.kind === "address", offLot: addressOffLot(parcels) === "large", estimated: parcels.parcel.estimated, sanko: parcels.parcel.sanko }
+        ? { ...parcelLines(parcels), reference: parcels.kind === "address", offLot: pointOffLot(parcels) !== undefined, estimated: parcels.parcel.estimated, sanko: parcels.parcel.sanko }
         : undefined,
     roads: roads.status === "ok" ? roads.roads : undefined,
     hazard: hazard.status === "ok" ? hazard : undefined,

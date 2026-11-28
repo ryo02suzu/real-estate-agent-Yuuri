@@ -64,6 +64,7 @@ import {
   chibanLabel,
   chibanQueryOf,
   estimatedSentence,
+  pointName,
   registryChiban,
   type Neighbor,
 } from "@/lib/roadmap/parcel";
@@ -72,6 +73,7 @@ import { altsNote, awayLabel, awayNote, elsewhereNote } from "@/lib/roadmap/parc
 import { buildReport, type ReportDetail } from "@/lib/app/report";
 import { docText } from "@/lib/app/doc";
 import { inquiryDeptOf, inquiryInputOf } from "@/lib/app/inquiry-template";
+import { lotOkKey, setLotOk } from "@/lib/app/lot-ok";
 import { parcelDoc } from "@/lib/app/parcel-doc";
 import { publishDocStatus } from "@/lib/app/doc-status";
 import { dataHints } from "@/lib/app/todo";
@@ -84,7 +86,7 @@ import { FullMap } from "../full-map";
 import { GuideMapSheet } from "../guide-map";
 import { LocationPicker } from "../location-picker";
 import {
-  addressOffLot,
+  pointOffLot,
   pickKey,
   registryNeighbors,
   type ParcelPick,
@@ -1635,7 +1637,7 @@ function PropertyView({
           : !pl?.target
             ? { text: "地番がわかりません", tone: "muted" }
             : pl.offLot
-              ? { text: "住所の地点の筆（参考）", tone: "warn" }
+              ? { text: `${pointName(result.picked)}の筆（参考）`, tone: "warn" }
               : { text: pl.neighbors.length ? `物件の筆＋隣地 ${pl.neighbors.length}筆` : "物件の筆", tone: pl.reference ? "warn" : "ok" },
       guide: { text: "詳細図と広域図を A4 に", tone: "ok" },
       memo: pending.length
@@ -2126,7 +2128,7 @@ function PropertyView({
   const lotParcel =
     shownParcel &&
     isLotChiban(shownParcel.chibanRaw) &&
-    addressOffLot(data.parcels) === undefined
+    pointOffLot(data.parcels) === undefined
       ? shownParcel
       : undefined;
   // 住所で調べたときの筆は「住所の地点にある筆」で、物件の筆とは限らない（住居表示と地番は別もの。地点が隣の筆に
@@ -2722,8 +2724,13 @@ function PlaceNote({
   // （住居表示の「号」まで合った地点でなければ）地番で探し直せるようにする
   const off =
     !picked && !parcel && !approximate
-      ? addressOffLot(data.parcels)
+      ? pointOffLot(data.parcels)
       : undefined;
+  // 地図で選んだ地点（動かしたピン）の筆が、道路・水路の筆か隣地のとても多い筆（数mずれると前の道路の筆に乗る）
+  const pickedLot = picked && data.parcels.status === "ok" ? data.parcels : undefined;
+  const pickedOff = pickedLot ? pointOffLot(pickedLot) : undefined;
+  // 帯の下に出すボタン：この筆で進める（true）・取り消す（false）
+  let lotOk: boolean | undefined;
   const chibanArea = !/号$/.test(result.matchedAddress);
   const onRoad = !!off && (off === "large" || chibanArea);
   const asChiban = chibanArea
@@ -2860,6 +2867,22 @@ function PlaceNote({
       short = `住所は「${matched}」までの一致です`;
       text = `入力した住所の最後の番号（号など）は国土地理院の住所のデータに無いため、「${matched}」の代表の地点を出しています。建物の位置と違うときは「場所を直す」で直してください。`;
     }
+  } else if (pickedLot && pickedOff) {
+    // 面積・隣地・地番の見出しは出していない（住所の地点の筆と同じ扱い）。本当に大きな土地のときは「この筆で進める」（この端末に覚える）
+    const label = chibanLabel(pickedLot.parcel.chibanRaw);
+    warn = true;
+    // 閉じた帯は 1 行で切れるので、言いたいことを先に書く
+    short = pickedOff === "large" ? `道路などの筆の可能性：選んだ地点の${label}` : `選んだ地点が${pickedOff}の筆の上です`;
+    text =
+      pickedOff === "large"
+        ? `選んだ地点の筆（${label}）は隣地が${registryNeighbors(pickedLot).length}筆あり、道路など物件の外の土地の可能性があります。面積・隣地は出していません。「場所を直す」で建物の上を選び直してください。大きな土地を調べているときは「この筆で進める」を押します。`
+        : `選んだ地点は、地図データでは${pickedOff}の筆の上です。「場所を直す」で建物の上を選び直すと、物件の土地の地番が出ます。`;
+    if (pickedOff === "large") lotOk = true;
+  } else if (pickedLot?.accepted) {
+    const label = chibanLabel(pickedLot.parcel.chibanRaw);
+    short = `この筆で進めています（${label}・隣地${registryNeighbors(pickedLot).length}筆）`;
+    text = `選んだ地点の筆（${label}）は隣地が${registryNeighbors(pickedLot).length}筆ありますが、物件の筆として進めています（この端末に覚えました）。`;
+    lotOk = false;
   } else if (picked && !parcel) {
     short = "地図で選んだ地点です（町名まで）";
     text = "地図で選んだ地点です（番地は分からないので町名まで）。";
@@ -2875,6 +2898,12 @@ function PlaceNote({
       {howto && (
         <div className="mx-[14px] mt-[6px] flex justify-end">
           <MiniButton onClick={onHowto}>地番の確かめ方</MiniButton>
+        </div>
+      )}
+      {/* 帯は開け閉めのボタンなので、その下に置く */}
+      {lotOk !== undefined && pickedLot && (
+        <div className="mx-[14px] mt-[6px] flex justify-end">
+          <MiniButton onClick={() => setLotOk(lotOkKey(pickedLot.parcel), lotOk)}>{lotOk ? "この筆で進める" : "取り消す"}</MiniButton>
         </div>
       )}
     </>

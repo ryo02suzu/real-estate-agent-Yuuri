@@ -13,7 +13,7 @@ import { ROAD_CREDIT, STATION_CREDIT, stationLine, type StationWalk } from "./ro
 import { KOZU_CREDIT } from "./roadmap/kozu-data";
 import { rosenkaLinks } from "./roadmap/rosenka";
 import { SANKO_NOTE, sankoCredit } from "./roadmap/sanko-data";
-import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark, type Estimated } from "./roadmap/parcel";
+import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark, pointName, type Estimated } from "./roadmap/parcel";
 import { placeSuffix } from "./roadmap/geocode";
 import { PARCEL_CREDIT } from "./roadmap/parcel-data";
 import type { NearbyRoad } from "./roadmap/road-read";
@@ -160,9 +160,9 @@ export function buildSummary(
   }
   const withParcels = !!parcels && (!!parcels.target || parcels.neighbors.length > 0);
   if (parcels && withParcels) {
-    lines.push(`【謄本・公図用の地番${parcels.offLot ? "（住所の地点の筆・参考。道路など物件の外の土地の可能性）" : parcels.reference ? "（住所の地点の筆・参考）" : ""}${parcels.estimated ? `（公図から推定した位置・${estimatedNote(parcels.estimated, m.codes)}）` : parcels.sanko ? `（地番参考図・${SANKO_NOTE}）` : ""}】`);
-    if (parcels.target) lines.push(`・物件：${parcels.target}`);
-    // 住所の地点の筆が道路などの可能性があるときは、その筆の隣地（道沿いの筆）を物件の隣地として書かない
+    lines.push(`【謄本・公図用の地番${parcels.offLot ? `（${pointName(result.picked)}の筆・参考。道路など物件の外の土地の可能性）` : parcels.reference ? "（住所の地点の筆・参考）" : ""}${parcels.estimated ? `（公図から推定した位置・${estimatedNote(parcels.estimated, m.codes)}）` : parcels.sanko ? `（地番参考図・${SANKO_NOTE}）` : ""}】`);
+    if (parcels.target) lines.push(`・${parcels.offLot ? "地点の筆" : "物件"}：${parcels.target}`);
+    // 地点の筆が道路などの可能性があるときは、その筆の隣地（道沿いの筆）を物件の隣地として書かない
     if (parcels.neighbors.length && parcels.offLot) lines.push(`・隣地：省略（この筆に接する筆は${parcels.neighbors.length}筆。公図で物件の筆を確かめてから）`);
     else if (parcels.neighbors.length) lines.push(`・隣地：${neighborList(parcels.neighbors)}`);
   }

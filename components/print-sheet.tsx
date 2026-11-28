@@ -17,7 +17,7 @@ import { schoolCredit, schoolGaps, schoolGapShort, schoolLine } from "@/lib/road
 import { POI_SOURCES, poiWalkText } from "@/lib/roadmap/poi";
 import { STATION_CREDIT, stationLine } from "@/lib/roadmap/walk";
 import { KOZU_CREDIT } from "@/lib/roadmap/kozu-data";
-import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark } from "@/lib/roadmap/parcel";
+import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark, pointName } from "@/lib/roadmap/parcel";
 import { placeSuffix } from "@/lib/roadmap/geocode";
 import { PARCEL_CREDIT } from "@/lib/roadmap/parcel-data";
 import { SANKO_NOTE, sankoCredit } from "@/lib/roadmap/sanko-data";
@@ -40,7 +40,7 @@ import type { Triage } from "@/lib/app/triage";
 import { checklistKey, loadDone } from "@/lib/checklist";
 import { RECORD_ITEMS, RECORD_TOPICS, type PropertyRecords } from "@/lib/records";
 import { senderShort, type Sender } from "@/lib/sender";
-import { addressOffLot, parcelLines, type ParcelInfo } from "./parcel-card";
+import { pointOffLot, parcelLines, type ParcelInfo } from "./parcel-card";
 import type { ZoningState } from "./zoning-card";
 
 type Ok = Extract<LookupResult, { status: "ok" }>;
@@ -397,16 +397,16 @@ function Memo({
           {parcels.status === "ok" && lines ? (
             <>
               <p className="text-[10px] text-[#7a6a55]">
-                {addressOffLot(parcels) === "large" ? "住所の地点にある筆（参考。隣地がとても多く、道路など物件の外の土地の可能性）" : parcels.kind === "address" ? "住所の地点にある筆（参考。住居表示と地番は別）" : "物件の筆"}
+                {pointOffLot(parcels) === "large" ? `${pointName(parcels.kind === "picked")}にある筆（参考。隣地がとても多く、道路など物件の外の土地の可能性）` : pointOffLot(parcels) ? `${pointName(parcels.kind === "picked")}にある筆（参考。道路・水路の筆）` : parcels.kind === "address" ? "住所の地点にある筆（参考。住居表示と地番は別）" : "物件の筆"}
                 {parcels.parcel.estimated && `・公図から推定した位置（${estimatedNote(parcels.parcel.estimated, m.codes)}）`}
                 {parcels.parcel.sanko && `・地番参考図（${SANKO_NOTE}）`}
               </p>
               <p className="font-semibold">{lines.target ?? `${kuikiLabel(parcels.parcel.kuiki)} ${chibanLabel(parcels.parcel.chibanRaw)}`}</p>
               <p className="mt-1 text-[10px] text-[#7a6a55]">境界が接している筆（{lines.neighbors.length}）</p>
-              {/* 住所の地点の筆が道路などの可能性があるときは、その筆の隣地（道沿いの筆）を物件の隣地として並べない */}
+              {/* 地点の筆が道路などの可能性があるときは、その筆の隣地（道沿いの筆）を物件の隣地として並べない */}
               <p className="text-[10.5px]">
-                {addressOffLot(parcels) === "large" && lines.neighbors.length
-                  ? "省略：住所の地点の筆が道路など物件の外の土地の可能性があるので、公図で物件の筆を確かめてから隣地を調べてください。"
+                {pointOffLot(parcels) && lines.neighbors.length
+                  ? `省略：${pointName(parcels.kind === "picked")}の筆が道路など物件の外の土地の可能性があるので、公図で物件の筆を確かめてから隣地を調べてください。`
                   : lines.neighbors.length
                     ? neighborList(lines.neighbors)
                     : "地図データの中には見つかりませんでした"}

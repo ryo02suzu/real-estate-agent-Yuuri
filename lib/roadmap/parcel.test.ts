@@ -29,6 +29,9 @@ import {
   lotHead,
   splitLotHead,
   registryChiban,
+  roadLikeLot,
+  ROADLIKE_NEIGHBORS,
+  pointName,
   chibanQueryOf,
   parcelAt,
   kuikiParts,
@@ -645,6 +648,28 @@ describe("地点の筆", () => {
     expect(away?.chibanRaw).toBe("筆界未定地(704+645-2)");
     expect(away?.undetermined).toBeUndefined();
     expect(chibanLabel("無地番-1")).toBe("無地番の土地");
+  });
+
+  it("地点から決めた筆が、道路など物件の外の土地らしいか（住所の地点の筆・地図で選んだ地点の筆。2026-11-28）", () => {
+    const lot = (kind: "chiban" | "picked" | "address", chibanRaw: string, neighbors: number, accepted?: boolean) => roadLikeLot({ kind, chibanRaw, neighbors, accepted });
+    // 道路・水路（地番なし）
+    expect(lot("address", "道-5", 3)).toBe("道路");
+    expect(lot("picked", "道-5", 3)).toBe("道路");
+    expect(lot("picked", "水-154", 3)).toBe("水路");
+    // 隣地がとても多い筆（地番の付いた公道など）：30筆から
+    expect(ROADLIKE_NEIGHBORS).toBe(30);
+    expect(lot("address", "51-3W2", 166)).toBe("large");
+    expect(lot("picked", "52-2", 58)).toBe("large");
+    expect(lot("picked", "52-2", 30)).toBe("large");
+    expect(lot("picked", "52-2", 29)).toBeUndefined();
+    expect(lot("picked", "39-7", 6)).toBeUndefined();
+    // 地番で探した筆は、隣地が多くても物件の筆
+    expect(lot("chiban", "52-2", 58)).toBeUndefined();
+    // 「この筆で進める」を押した筆は物件の筆として扱う。地番の無い道路・水路は、押しても物件の筆にならない
+    expect(lot("picked", "52-2", 58, true)).toBeUndefined();
+    expect(lot("picked", "道-5", 3, true)).toBe("道路");
+    expect(pointName(true)).toBe("地図で選んだ地点");
+    expect(pointName(undefined)).toBe("住所の地点");
   });
 
   it("地番の呼び方", () => {

@@ -6,12 +6,13 @@
 // 市町村が地番図を公開していれば、物件の場所（地図の場所を渡せない市は、市のページ・地図の入口）で開く入口も出す
 // （lib/roadmap/chibanzu.ts。筆が無い地点ではそれだけを出す）
 import { Check } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { lotOkIn, lotOkKey, lotOkSnapshot, subscribeLotOk } from "@/lib/app/lot-ok";
 import { withRetry } from "@/lib/retry";
 import type { LookupResult } from "@/lib/roadmap";
 import type { ChibanzuLink, ChibanzuOpens } from "@/lib/roadmap/chibanzu";
 import { KOZU_DATA } from "@/lib/roadmap/kozu-data";
-import { adjacentParcels, chibanLabel, estimatedCardNote, hasPieceMark, isLotChiban, kuikiLabel, kuikiLabelFrom, parcelAt, parcelMark, pickedChibanText, registryChiban, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
+import { adjacentParcels, chibanLabel, estimatedCardNote, hasPieceMark, isLotChiban, kuikiLabel, kuikiLabelFrom, parcelAt, parcelMark, pickedChibanText, registryChiban, roadLikeLot, type Neighbor, type Parcel } from "@/lib/roadmap/parcel";
 import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { pmtilesParcelSource } from "@/lib/roadmap/parcel-tiles";
 import { SANKO_CITIES, sankoSource } from "@/lib/roadmap/sanko-data";
@@ -38,8 +39,11 @@ export type ParcelInfo =
   | { status: "none"; approximate?: boolean }
   /** 地図データを読めなかった（通信の失敗など） */
   | { status: "error" }
-  /** codes：物件の市区町村コード（公図から推定した筆の確かさを、その地域で測った結果で言うのに使う） */
-  | { status: "ok"; parcel: Parcel; kind: ParcelKind; neighbors: Neighbor[]; codes?: readonly string[] };
+  /**
+   * codes：物件の市区町村コード（公図から推定した筆の確かさを、その地域で測った結果で言うのに使う）。
+   * accepted：地図で選んだ地点の筆で、利用者が「この筆で進める」を押した（隣地のとても多い筆でも物件の筆として扱う。lib/app/lot-ok.ts）
+   */
+  | { status: "ok"; parcel: Parcel; kind: ParcelKind; neighbors: Neighbor[]; codes?: readonly string[]; accepted?: boolean };
 
 /** 物件の筆と隣の筆を読む（筆が分かっていればそれを、無ければ地点の筆を探す） */
 export function useParcelInfo(result: Ok): ParcelInfo {
@@ -67,8 +71,12 @@ export function useParcelInfo(result: Ok): ParcelInfo {
     // key に地点と筆が入っている
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, townCenter]);
+  // 「この筆で進める」を押した筆（端末に覚えている）。押した・取り消したら、すぐ出し直す
+  const lotOk = useSyncExternalStore(subscribeLotOk, lotOkSnapshot, () => "[]");
+  const value = state?.key === key ? state.value : LOADING;
+  const info = useMemo(() => (value.status === "ok" && value.kind === "picked" && lotOkIn(lotOk, lotOkKey(value.parcel)) ? { ...value, accepted: true } : value), [value, lotOk]);
   if (townCenter) return TOWN_CENTER;
-  return state?.key === key ? state.value : LOADING;
+  return info;
 }
 
 /**
@@ -89,18 +97,13 @@ export function registryNeighbors(info: Extract<ParcelInfo, { status: "ok" }>): 
   return out;
 }
 
-/** 隣地がこれより多い筆は、道路など細長い土地か大きな土地とみなす（ふつうの宅地の隣地は多くても20筆ほど） */
-export const ROADLIKE_NEIGHBORS = 30;
-
 /**
- * 住所の地点の筆が、物件の土地ではなさそうか（住所の点は建物の入口や道路の側に置かれていることがある）：
- * 道路・水路（地番なし）か、隣地がとても多い筆（地番の付いた公道など）
+ * 地点から決めた筆（住所の地点の筆・地図で選んだ地点の筆）が、物件の土地ではなさそうか：道路・水路（地番なし）か、
+ * 隣地がとても多い筆（地番の付いた公道など）。決まりは lib/roadmap/parcel.ts の roadLikeLot（要注意点・書類と同じ）
  */
-export function addressOffLot(info: ParcelInfo): "道路" | "水路" | "large" | undefined {
-  if (info.status !== "ok" || info.kind !== "address") return undefined;
-  if (/^道/.test(info.parcel.chibanRaw)) return "道路";
-  if (/^水/.test(info.parcel.chibanRaw)) return "水路";
-  return registryNeighbors(info).length >= ROADLIKE_NEIGHBORS ? "large" : undefined;
+export function pointOffLot(info: ParcelInfo): "道路" | "水路" | "large" | undefined {
+  if (info.status !== "ok") return undefined;
+  return roadLikeLot({ kind: info.kind, chibanRaw: info.parcel.chibanRaw, neighbors: registryNeighbors(info).length, accepted: info.accepted });
 }
 
 /**
@@ -310,7 +313,7 @@ export function ParcelDetail({ info, chibanzu, pick }: { info: Extract<ParcelInf
         {parcel.sanko && `・${SANKO_CITIES[parcel.sanko]?.name ?? "市町村"}の地番参考図`}
       </p>
       <Row kuiki={parcel.kuiki} chiban={parcel.chibanRaw} strong />
-      {addressOffLot(info) === "large" && (
+      {pointOffLot(info) === "large" && (
         <p className="mt-0.5 text-[12px] leading-[1.55] text-[#8a4f3a] dense:leading-[1.45] denser:text-[11.5px]">
           隣地が{numbered.length}筆あり、道路など細長い土地か大きな土地の可能性があります。物件の土地かどうかは、公図で確かめてください。
         </p>

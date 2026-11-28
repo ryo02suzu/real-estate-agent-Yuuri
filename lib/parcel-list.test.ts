@@ -40,6 +40,25 @@ describe("謄本・公図を取るときの地番の一覧", () => {
     expect(off).toContain("※住所の地点にある筆（参考）。隣地がとても多く、道路など物件の外の土地の可能性があるので、公図で物件の筆を確かめてください");
     expect(off).toContain("■ 隣の筆：省略（この筆に接する筆は40筆。公図で物件の筆を確かめてから、隣地を調べてください）");
     expect(off).not.toContain("千代田区三番町 1\n");
+    // 道路など物件の外の土地らしい筆は「物件の筆」と書かない
+    expect(off).toContain("■ 住所の地点の筆（物件の筆かは未確認）\n千代田区三番町 100");
+    expect(off).not.toContain("■ 物件の筆");
+  });
+
+  it("地図で選んだ地点の筆が道路らしいときも同じ（どの地点の筆かを書き分ける。2026-11-28）", () => {
+    const picked = { ...result, picked: true as const };
+    const off = parcelListText(picked, { target: "千代田区三番町 100", neighbors: Array.from({ length: 40 }, (_, i) => `千代田区三番町 ${i + 1}`), reference: false, offLot: true });
+    expect(off).toContain("■ 地図で選んだ地点の筆（物件の筆かは未確認）\n千代田区三番町 100");
+    expect(off).toContain("※地図で選んだ地点にある筆（参考）。隣地がとても多く、道路など物件の外の土地の可能性があるので、公図で物件の筆を確かめてください");
+    expect(off).toContain("■ 隣の筆：省略（この筆に接する筆は40筆。");
+    // 地番の無い道路・水路の筆の上（隣の筆は、その道路に接する筆なので並べない）
+    const road = parcelListText(picked, { neighbors: ["千代田区三番町 1", "千代田区三番町 2"], reference: false, offLot: true });
+    expect(road).toContain("地番なし（道路・水路など）\n※地図で選んだ地点は、地図データでは道路・水路などの筆の上です。公図で物件の筆を確かめてください");
+    expect(road).toContain("■ 隣の筆：省略（この筆に接する筆は2筆。");
+    // ふつうの筆を選んだときは今までどおり
+    const ok = parcelListText(picked, { target: "千代田区三番町 2-1", neighbors: ["千代田区三番町 2-2"], reference: false });
+    expect(ok).toContain("■ 物件の筆\n千代田区三番町 2-1");
+    expect(ok).toContain("■ 隣の筆（境界が接している筆・1筆）\n千代田区三番町 2-2");
   });
 
   it("推定の位置・地番参考図の筆は、その印と注意を添える。筆が無ければ確かめる先を書く", () => {

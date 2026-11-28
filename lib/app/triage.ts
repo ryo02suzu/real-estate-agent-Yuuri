@@ -12,7 +12,7 @@ import { HOUREI_LAWS, houreiGroups, houreiOffice, houreiOfficeAll, PREF_NAMES, t
 import { isekiFor } from "../roadmap/iseki";
 import type { Liquefaction } from "../roadmap/liquefaction";
 import { moridoAuthority, type Morido } from "../roadmap/morido";
-import { chibanLabel, estimatedMisplacedText, hasPieceMark, isLotChiban, kuikiLabel, kuikiLabelFrom, neighborList, registryChiban, type Parcel } from "../roadmap/parcel";
+import { chibanLabel, estimatedMisplacedText, hasPieceMark, isLotChiban, kuikiLabel, kuikiLabelFrom, neighborList, pointName, registryChiban, roadLikeLot, type Parcel } from "../roadmap/parcel";
 import { PARCEL_DATA } from "../roadmap/parcel-data";
 import { awayNote, elsewhereNote } from "../roadmap/parcel-sub";
 import type { RirekiRecord } from "../roadmap/rireki";
@@ -32,8 +32,11 @@ export type State<T> = { status: "loading" } | { status: "error" } | { status: "
 export type TriageInput = {
   result: Ok;
   zoning: State<{ zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi }>;
-  /** kind：どうやって決めた筆か。neighbors：隣の筆の地番（登記の地番）。approximate：町の中心なので筆を探していない */
-  parcels: { status: "loading" } | { status: "error" } | { status: "none"; approximate?: boolean } | { status: "ok"; parcel: Parcel; kind: "chiban" | "picked" | "address"; neighbors: string[] };
+  /**
+   * kind：どうやって決めた筆か。neighbors：隣の筆の地番（登記の地番）。approximate：町の中心なので筆を探していない。
+   * accepted：地図で選んだ地点の筆で、利用者が「この筆で進める」を押した（隣地のとても多い筆でも物件の筆として扱う）
+   */
+  parcels: { status: "loading" } | { status: "error" } | { status: "none"; approximate?: boolean } | { status: "ok"; parcel: Parcel; kind: "chiban" | "picked" | "address"; neighbors: string[]; accepted?: boolean };
   roads: State<{ roads: NearbyRoad[] }>;
   hazard: State<{ report: HazardReport; maps: HazardMaps; muniCd: string }>;
   building: State<{ result: BuildingResult }>;
@@ -290,6 +293,11 @@ function zoningIssues(result: Ok, z: Zoning, st: ZoningStatus | undefined, morid
   return out;
 }
 
+/** 地点から決めた筆が、道路など物件の外の土地らしいか（画面と同じ決まり：lib/roadmap/parcel.ts の roadLikeLot） */
+function offLot(p: Extract<TriageInput["parcels"], { status: "ok" }>) {
+  return roadLikeLot({ kind: p.kind, chibanRaw: p.parcel.chibanRaw, neighbors: p.neighbors.length, accepted: p.accepted });
+}
+
 /** 場所の確かさ・筆（地番）の注意 */
 function placeIssues(input: TriageInput): Issue[] {
   const { result, parcels } = input;
@@ -318,12 +326,14 @@ function placeIssues(input: TriageInput): Issue[] {
   } else if (result.approximate) out.push({ id: "approximate", level: "check", topic: "place", title: "番地が見つからず、町の中心を表示", detail: "この地点のデータ（用途地域・ハザードなど）は物件の場所のものではないことがあります。地図で物件の場所を選び直してください。", confirm: "「場所を直す」で物件の位置を" });
   if (parcels.status === "ok") {
     const p = parcels.parcel;
-    if (parcels.kind === "address") {
-      const raw = p.chibanRaw;
-      if (/^(道|水)/.test(raw)) out.push({ id: "on-road", level: "check", topic: "place", title: `住所の地点が${/^水/.test(raw) ? "水路" : "道路"}の上`, detail: "住所の点が、建物ではなく道路・水路の上にあります（住所の点の置き方によることがあります）。物件の土地の地番は、地番で探すか、地図で建物の位置を選ぶと出ます。", confirm: "地番で探し直す・場所を直す" });
-      else if (parcels.neighbors.length >= 30) out.push({ id: "off-lot", level: "check", topic: "place", title: `住所の地点の筆（${chibanLabel(raw)}）は隣地が${parcels.neighbors.length}筆`, detail: "道路など物件の外の土地の可能性があります。この筆の面積・隣地は物件のものではないかもしれません。", confirm: "公図で物件の筆を" });
-      else out.push({ id: "address-parcel", level: "check", topic: "place", title: `住所の地点の筆は${chibanLabel(raw)}（参考）`, detail: "住居表示の住所と地番は別のものです。物件の土地がこの筆かどうかは、公図・登記で確かめます。", confirm: "法務局の公図・登記で" });
-    }
+    // 地点から決めた筆（住所の地点の筆・地図で選んだ地点の筆）が、道路など物件の外の土地らしいとき（地図で選ぶときも、数mずれると前の道路の筆に乗る）
+    const raw = p.chibanRaw;
+    const off = offLot(parcels);
+    const picked = parcels.kind === "picked";
+    if (off === "large") out.push({ id: "off-lot", level: "check", topic: "place", title: `${pointName(picked)}の筆（${chibanLabel(raw)}）は隣地が${parcels.neighbors.length}筆`, detail: "道路など物件の外の土地の可能性があります。この筆の面積・隣地は物件のものではないかもしれません。", confirm: picked ? "場所を直す（建物の上を選ぶ）・公図で物件の筆を" : "公図で物件の筆を" });
+    else if (off && picked) out.push({ id: "on-road", level: "check", topic: "place", title: `地図で選んだ地点が${off}の筆の上`, detail: `選んだ地点は、地図データでは${off}の筆の上です。物件の土地の地番は、建物の上を選び直すと出ます。`, confirm: "場所を直す（建物の上を選ぶ）" });
+    else if (off) out.push({ id: "on-road", level: "check", topic: "place", title: `住所の地点が${off}の上`, detail: "住所の点が、建物ではなく道路・水路の上にあります（住所の点の置き方によることがあります）。物件の土地の地番は、地番で探すか、地図で建物の位置を選ぶと出ます。", confirm: "地番で探し直す・場所を直す" });
+    else if (parcels.kind === "address") out.push({ id: "address-parcel", level: "check", topic: "place", title: `住所の地点の筆は${chibanLabel(raw)}（参考）`, detail: "住居表示の住所と地番は別のものです。物件の土地がこの筆かどうかは、公図・登記で確かめます。", confirm: "法務局の公図・登記で" });
     if (p.estimated) {
       // 30m 以上の取り違えの割合は、その地域の推定の筆のまとまりで国の地価の地点を使って測った結果（lib/roadmap/kozu-data.ts）
       const far = estimatedMisplacedText(p.estimated, m.codes, p.estimated === "low" ? "確度の低い推定の" : "");
@@ -438,12 +448,14 @@ function buildActions(input: TriageInput, issues: Issue[]): Action[] {
   {
     const p = input.parcels.status === "ok" ? input.parcels : undefined;
     const numbered = p && isLotChiban(p.parcel.chibanRaw) ? `${kuikiLabel(p.parcel.kuiki)} ${registryChiban(p.parcel.chibanRaw)}` : undefined;
+    // 住所の地点の筆と、道路など物件の外の土地らしい筆（地図で選んだ地点でも）は、物件の筆と決めずに「参考」で書く
+    const off = p ? offLot(p) : undefined;
     const what = [
-      numbered ? `登記事項証明書（土地）：${p?.kind === "address" ? `住所の地点の筆 ${numbered}（参考。物件の筆かを確認）` : numbered}。所有者・地目・地積・抵当権` : "登記事項証明書（土地・建物）：所有者・地目・地積・抵当権（地番は売主・公図で確認）",
+      numbered ? `登記事項証明書（土地）：${p && (p.kind === "address" || off) ? `${pointName(p.kind === "picked")}の筆 ${numbered}（参考。物件の筆かを確認）` : numbered}。所有者・地目・地積・抵当権` : "登記事項証明書（土地・建物）：所有者・地目・地積・抵当権（地番は売主・公図で確認）",
       "公図：筆の形・接道・隣地との位置関係。公図と地図のずれ",
       "地積測量図（あれば）：境界・面積の根拠",
       // 隣地は、物件の筆が分かっているときだけ（道路・水路の筆や、隣地のとても多い筆の隣は物件の隣地ではない）
-      ...(numbered && p && p.neighbors.length && !(p.kind === "address" && p.neighbors.length >= 30) ? [`隣地の地番（境界の確認・承諾の相手${p.kind === "address" ? "。住所の地点の筆の隣なので参考" : ""}）：${neighborList(p.neighbors, 10)}`] : []),
+      ...(numbered && p && p.neighbors.length && !off ? [`隣地の地番（境界の確認・承諾の相手${p.kind === "address" ? "。住所の地点の筆の隣なので参考" : ""}）：${neighborList(p.neighbors, 10)}`] : []),
     ];
     const chibanzu = chibanzuFor(m, result.lat, result.lng);
     out.push({

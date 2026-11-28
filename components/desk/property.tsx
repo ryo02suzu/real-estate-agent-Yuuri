@@ -22,6 +22,7 @@ import type { MapPlace } from "../live-map";
 import { propertyIdOf } from "@/lib/property-id";
 import { loadRecords, RECORDS_EVENT, type PropertyRecords, type RecordTopic } from "@/lib/records";
 import { branchUnmatched, partialMatch, placeSuffix } from "@/lib/roadmap/geocode";
+import { lotOkKey, setLotOk } from "@/lib/app/lot-ok";
 import { placeDate } from "@/lib/app/picked-places";
 import type { AddressFix } from "@/lib/roadmap";
 import { distanceText } from "@/lib/roadmap/land-price";
@@ -30,7 +31,7 @@ import { PARCEL_DATA } from "@/lib/roadmap/parcel-data";
 import { altsNote, awayLabel, awayNote, elsewhereNote } from "@/lib/roadmap/parcel-sub";
 import { roadShort } from "@/lib/roadmap/road-read";
 import { youtoShort } from "@/lib/roadmap/zoning";
-import { addressOffLot, pickKey, registryNeighbors, type ParcelPick } from "../parcel-card";
+import { pointOffLot, pickKey, registryNeighbors, type ParcelPick } from "../parcel-card";
 import { PrintSheet } from "../print-sheet";
 import { copyHasLot, copyText as addressCopyText, loaded } from "../result-view";
 import { useChecklist } from "../triage-sheet";
@@ -141,10 +142,10 @@ function useFrontRoads(result: Ok, parcel: ReturnType<typeof lotParcelOf>): Fron
   return state?.key === key ? state.roads : null;
 }
 
-/** 物件の土地として見てよい筆（地番の付いた筆で、住所の地点が道路などの大きな筆に乗っていない） */
+/** 物件の土地として見てよい筆（地番の付いた筆で、住所の地点・地図で選んだ地点が道路などの大きな筆に乗っていない） */
 function lotParcelOf(data: ReturnType<typeof useProperty>) {
   const p = data.parcels;
-  return p.status === "ok" && isLotChiban(p.parcel.chibanRaw) && addressOffLot(p) === undefined ? p.parcel : undefined;
+  return p.status === "ok" && isLotChiban(p.parcel.chibanRaw) && pointOffLot(p) === undefined ? p.parcel : undefined;
 }
 
 export function DeskProperty(props: Props) {
@@ -174,7 +175,7 @@ export function DeskProperty(props: Props) {
   const lotArea = lotParcel && lotIsProperty ? parcelAreaM2(lotParcel) : undefined;
   const rough = !!(lotParcel?.estimated || lotParcel?.sanko);
   const corners = lotParcel && lotIsProperty ? lotCorners(lotParcel) : undefined;
-  const neighbors = data.parcels.status === "ok" && addressOffLot(data.parcels) === undefined ? registryNeighbors(data.parcels).length : undefined;
+  const neighbors = data.parcels.status === "ok" && pointOffLot(data.parcels) === undefined ? registryNeighbors(data.parcels).length : undefined;
   const where = displayAddress(result.matchedAddress);
   const town = result.town || where;
   const areaText = lotArea ? (rough ? `約${Math.round(lotArea / 10) * 10}` : `約${lotArea.toFixed(0)}`) : undefined;
@@ -704,7 +705,10 @@ function placeNotes({ query, result, data, onPick, onPickPoint, onFix, onLiteral
         </>
       ),
     });
-  const off = !picked && !parcel && !approximate ? addressOffLot(data.parcels) : undefined;
+  const off = !picked && !parcel && !approximate ? pointOffLot(data.parcels) : undefined;
+  // 地図で選んだ地点（動かしたピン）の筆が、道路・水路の筆か隣地のとても多い筆（数mずれると前の道路の筆に乗る）
+  const pickedLot = picked && data.parcels.status === "ok" ? data.parcels : undefined;
+  const pickedOff = pickedLot ? pointOffLot(pickedLot) : undefined;
   const chibanArea = !/号$/.test(result.matchedAddress);
   const asChiban = chibanArea ? chibanQueryOf(query, /丁目/.test(result.town)) : undefined;
   if (parcel && result.jukyoAlt) {
@@ -754,6 +758,29 @@ function placeNotes({ query, result, data, onPick, onPickPoint, onFix, onLiteral
     if (branchUnmatched(query, result.matchedAddress))
       notes.push({ warn: true, body: <>入力の地番の枝番は国土地理院の住所のデータに無いため、「{displayAddress(result.matchedAddress)}」の代表の地点を出しています。同じ番地でも、枝番の違う土地は離れた所にあることがあります。公図などで場所を確かめてください。{mini("場所を直す", onFix)}</> });
     else notes.push({ body: <>入力の最後の番号（号など）は国土地理院の住所のデータに無いため、「{displayAddress(result.matchedAddress)}」の代表の地点を出しています。{mini("場所を直す", onFix)}</> });
+  } else if (pickedLot && pickedOff) {
+    // 面積・隣地・地番の見出しは出していない（住所の地点の筆と同じ扱い）。本当に大きな土地のときは「この筆で進める」（この端末に覚える）
+    notes.push({
+      warn: true,
+      body: (
+        <>
+          {pickedOff === "large"
+            ? `選んだ地点の筆（${chibanLabel(pickedLot.parcel.chibanRaw)}）は隣地が${registryNeighbors(pickedLot).length}筆あり、道路など物件の外の土地の可能性があります。面積・隣地は出していません。建物の上を選び直してください。`
+            : `選んだ地点は、地図データでは${pickedOff}の筆の上です。建物の上を選び直すと、物件の土地の地番が出ます。`}
+          {mini("場所を直す", onFix)}
+          {pickedOff === "large" && mini("この筆で進める", () => setLotOk(lotOkKey(pickedLot.parcel), true))}
+        </>
+      ),
+    });
+  } else if (pickedLot?.accepted) {
+    notes.push({
+      body: (
+        <>
+          選んだ地点の筆（{chibanLabel(pickedLot.parcel.chibanRaw)}）は隣地が{registryNeighbors(pickedLot).length}筆ありますが、物件の筆として進めています（この端末に覚えました）。
+          {mini("取り消す", () => setLotOk(lotOkKey(pickedLot.parcel), false))}
+        </>
+      ),
+    });
   } else if (picked && !parcel) {
     notes.push({ body: "地図で選んだ地点です（番地は分からないので町名まで）。" });
   }

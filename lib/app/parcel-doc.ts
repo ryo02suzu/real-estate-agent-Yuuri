@@ -3,9 +3,9 @@
 // 中身は lib/parcel-list.ts（PC と同じ地番の一覧）と同じデータ。法務局の証明ではない旨を添える。法的な判断はしない
 import type { LookupResult } from "../roadmap";
 import { parcelCreditLine } from "../roadmap/kozu-data";
-import { estimatedNote } from "../roadmap/parcel";
+import { estimatedNote, pointName } from "../roadmap/parcel";
 import { SANKO_NOTE } from "../roadmap/sanko-data";
-import type { ParcelListInput } from "../parcel-list";
+import { offLotNote, type ParcelListInput } from "../parcel-list";
 import { half, jaDate, type Doc, type DocItem } from "./doc";
 import { formalChiban } from "./inquiry-letter";
 import { chibanHowtoLines } from "./chiban-howto";
@@ -26,7 +26,7 @@ export function parcelDoc(result: Ok, parcels: ParcelListInput | undefined, date
     };
   const own: DocItem[] = [];
   const note = parcels.offLot
-    ? "住所の地点にある筆（参考）。隣地がとても多く、道路など物件の外の土地の可能性があるので、公図で物件の筆を確かめてください"
+    ? offLotNote(result, parcels)
     : parcels.reference
       ? "住所の地点にある筆（参考）。住居表示と地番は別のものなので、公図で物件の筆を確かめてください"
       : parcels.estimated
@@ -35,7 +35,8 @@ export function parcelDoc(result: Ok, parcels: ParcelListInput | undefined, date
           ? SANKO_NOTE
           : undefined;
   own.push(parcels.target ? { box: "todo", text: half(parcels.target), note, tone: parcels.reference || parcels.offLot ? "check" : undefined } : { text: "地番なし（道路・水路など）", note });
-  const sections: Doc["sections"] = [{ title: "物件の筆", items: own }];
+  // 道路など物件の外の土地らしい筆は「物件の筆」と書かない（どの地点の筆かを書く）
+  const sections: Doc["sections"] = [{ title: parcels.offLot ? `${pointName(result.picked)}の筆（物件の筆かは未確認）` : "物件の筆", items: own }];
   if (parcels.neighbors.length) {
     if (parcels.offLot) sections.push({ title: "隣の筆", items: [{ text: `省略（この筆に接する筆は${parcels.neighbors.length}筆）。公図で物件の筆を確かめてから、隣地を調べてください。` }] });
     else sections.push({ title: `隣の筆（境界が接している筆・${parcels.neighbors.length}筆）`, items: parcels.neighbors.map((n) => ({ box: "todo" as const, text: half(n) })) });

@@ -10,7 +10,7 @@ import { rosenkaLinks } from "./roadmap/rosenka";
 import { SANKO_NOTE } from "./roadmap/sanko-data";
 import { distanceText, kindText, priceText, type LandPriceHit } from "./roadmap/land-price";
 import { LAND_PRICE_CREDIT } from "./roadmap/land-price-data";
-import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark, type Estimated } from "./roadmap/parcel";
+import { chibanLabel, estimatedNote, kuikiLabel, neighborList, parcelMark, pointName, type Estimated } from "./roadmap/parcel";
 import { placeSuffix } from "./roadmap/geocode";
 import type { NearbyRoad } from "./roadmap/road-read";
 import { schoolCredit, schoolGaps, schoolGapShort, schoolLine, type Schools } from "./roadmap/school";
@@ -41,7 +41,10 @@ export type DraftSection = { title: string; rows: DraftRow[] };
 
 export type DraftInput = {
   zoning?: { zoning: Zoning; st?: ZoningStatus; morido?: Morido; hourei?: Hourei; tochi?: Tochi };
-  /** offLot：住所の地点の筆が、隣地のとても多い筆（地番の付いた公道など。物件の外の土地の可能性） */
+  /**
+   * offLot：地点から決めた筆（住所の地点の筆・地図で選んだ地点の筆）が、道路・水路（地番なし）か、隣地のとても多い筆
+   * （地番の付いた公道など。物件の外の土地の可能性。lib/roadmap/parcel.ts の roadLikeLot）
+   */
   parcels?: { target?: string; neighbors: string[]; reference: boolean; offLot?: boolean; estimated?: Estimated; sanko?: string };
   roads?: NearbyRoad[];
   hazard?: { report: HazardReport; elevation: Elevation | null; maps: HazardMaps; muniCd: string };
@@ -61,6 +64,8 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
   const m = result.municipality;
   const p = result.parcel;
   const found = p && !result.picked ? p : undefined;
+  // 地点から決めた筆の呼び方（「住所の地点」「地図で選んだ地点」）
+  const origin = pointName(result.picked);
   const sections: DraftSection[] = [];
 
   // 物件の表示
@@ -97,7 +102,7 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
       label: "所在（地番）",
       value: `${parcels.target}${parcels.estimated ? "（推定）" : parcels.sanko ? "（地番参考図）" : ""}`,
       note: parcels.offLot
-        ? "住所の地点にある筆（参考）。隣地がとても多く、道路など物件の外の土地の可能性があるので、公図で確認"
+        ? `${origin}にある筆（参考）。隣地がとても多く、道路など物件の外の土地の可能性があるので、公図で確認`
         : parcels.reference
           ? "住所の地点にある筆（参考）。住居表示と地番は別のもの"
           : undefined,
@@ -106,9 +111,9 @@ export function buildDraft(result: Extract<LookupResult, { status: "ok" }>, { zo
       lot: parcels.offLot ? "off" : parcels.reference ? "address" : "picked",
     });
   else place.push({ label: "所在（地番）", value: CHECK, note: "登記・公図で確認", check: true });
-  // 住所の地点の筆が道路などの可能性があるときは、その筆の隣地（道沿いの筆）を物件の隣地として書かない
+  // 地点の筆が道路などの可能性があるときは、その筆の隣地（道沿いの筆）を物件の隣地として書かない
   if (parcels?.neighbors.length && parcels.offLot)
-    place.push({ label: "隣地の地番", value: `省略（この筆に接する筆は${parcels.neighbors.length}筆）`, note: "住所の地点の筆が道路など物件の外の土地の可能性があるので、公図で物件の筆を確かめてから隣地を調べる", check: true });
+    place.push({ label: "隣地の地番", value: `省略（この筆に接する筆は${parcels.neighbors.length}筆）`, note: `${origin}の筆が道路など物件の外の土地の可能性があるので、公図で物件の筆を確かめてから隣地を調べる`, check: true });
   else if (parcels?.neighbors.length) place.push({ label: "隣地の地番", value: neighborList(parcels.neighbors), note: "境界が接している筆（地図データから）" });
   const chibanzu = chibanzuFor(m, result.lat, result.lng);
   if (chibanzu) place.push({ label: "地番の参考図", value: `${chibanzu.name}（${chibanzu.url}）`, note: CHIBANZU_NOTE });

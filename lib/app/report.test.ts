@@ -139,6 +139,18 @@ describe("結果の文面（要点・詳しく）", () => {
     expect(full).toContain("　・隣地の地番：千代田区三番町 2-2・3");
     expect(full.length).toBeGreaterThan(short.length);
   });
+  it("道路など物件の外の土地らしい筆は「物件の筆」と書かず、どの地点の筆かを書く。隣の筆は省く（2026-11-28）", () => {
+    const off = { ...input, parcels: { ...input.parcels, offLot: true } };
+    const picked = docText(buildReport({ ...result, parcel: undefined, picked: true }, off, { detail: "full", date: day }));
+    expect(picked).toContain("・地番：千代田区三番町 2-1（参考）【要確認】\n　※地図で選んだ地点にある筆。道路など物件の外の土地の可能性があるので公図で確認");
+    expect(picked).toContain("・地図で選んだ地点の筆：千代田区三番町 2-1（参考）【要確認】");
+    expect(picked).toContain("・隣の筆：省略（この筆に接する筆は3筆。公図で物件の筆を確かめてから）");
+    expect(picked).not.toContain("・物件の筆：");
+    expect(picked).not.toContain("・面積：");
+    const address = docText(buildReport({ ...result, parcel: undefined }, { ...off, parcels: { ...off.parcels, reference: true } }, { detail: "full", date: day }));
+    expect(address).toContain("　※住所の地点にある筆。道路など物件の外の土地の可能性があるので公図で確認");
+    expect(address).toContain("・住所の地点の筆：千代田区三番町 2-1（参考）【要確認】");
+  });
   it("章の間は必ず1行あく（文の塊にしない）", () => {
     for (const t of [short, full]) for (const m of t.matchAll(/\n■ /g)) expect(t[m.index! - 1]).toBe("\n");
   });
@@ -191,6 +203,17 @@ describe("謄本・公図用の地番", () => {
     expect(t).toContain("【要確認】");
     // 地番の形でない筆の名前なら、例の地番で書き方を見せる
     expect(docText(parcelDoc(result, { target: "千代田区三番町 9（参考）", neighbors: [], reference: true }, day))).toContain("「123-4」の形");
+    // 「物件の筆」とは書かない（どの地点の筆かを書く）
+    expect(t).toContain("■ 住所の地点の筆（物件の筆かは未確認）");
+    expect(t).not.toContain("■ 物件の筆");
+  });
+  it("地図で選んだ地点の筆が道路などの可能性があるときも、物件の筆と書かず、隣地を並べない（2026-11-28）", () => {
+    const t = docText(parcelDoc({ ...result, picked: true }, { target: "千代田区三番町 9", neighbors: ["a 1", "a 2"], reference: false, offLot: true }, day));
+    expect(t).toContain("■ 地図で選んだ地点の筆（物件の筆かは未確認）");
+    expect(t).toContain("地図で選んだ地点にある筆（参考）。隣地がとても多く、道路など物件の外の土地の可能性");
+    expect(t).toContain("省略（この筆に接する筆は2筆）");
+    expect(t).not.toContain("□ a 1");
+    expect(t).toContain("■ 地番の確かめ方");
   });
   it("筆が見つからないときは確かめる先を書く", () => {
     const t = docText(parcelDoc(result, undefined, day));

@@ -94,6 +94,22 @@ describe("要注意点（問題になりそうな所）", () => {
     expect(title("51-3")).toBe("住所の地点の筆は地番 51-3（参考）");
     expect(title("筆界未定地-1", 260)).toBe("住所の地点の筆（筆界未定地）は隣地が260筆");
     expect(title("筆界未定地-1")).toBe("住所の地点の筆は筆界未定地（参考）");
+    // 地図で選んだ地点の筆にも同じ決まり（2026-11-28。数mずれると前の道路の筆に乗る）。「この筆で進める」を押した筆（accepted）は物件の筆として扱う
+    const pick = (chibanRaw: string, n = 2, accepted = false) => triageOf(loaded({ parcels: { status: "ok", parcel: { ...parcel, chibanRaw }, kind: "picked", accepted, neighbors: Array.from({ length: n }, (_, i) => `渋谷区神南1丁目 ${i + 1}`) } }));
+    const big = pick("52-2", 58);
+    expect(big.issues.find((i) => i.id === "off-lot")).toMatchObject({ level: "check", title: "地図で選んだ地点の筆（地番 52-2）は隣地が58筆" });
+    expect(big.issues.find((i) => i.id === "off-lot")!.confirm).toContain("場所を直す");
+    expect(pick("道-5").issues.find((i) => i.id === "on-road")).toMatchObject({ title: "地図で選んだ地点が道路の筆の上" });
+    expect(pick("52-2", 58, true).issues.some((i) => i.id === "off-lot")).toBe(false);
+    expect(pick("39-7", 6).issues.some((i) => i.id === "off-lot" || i.id === "on-road")).toBe(false);
+    // 次にやること（謄本・公図）：道路らしい筆は物件の筆と書かず、その隣地も並べない
+    const touki = (t: ReturnType<typeof pick>) => t.actions.find((a) => a.id === "touki")!.what;
+    expect(touki(big)[0]).toBe("登記事項証明書（土地）：地図で選んだ地点の筆 渋谷区神南1丁目 52-2（参考。物件の筆かを確認）。所有者・地目・地積・抵当権");
+    expect(touki(big).some((w) => w.startsWith("隣地の地番"))).toBe(false);
+    expect(touki(pick("52-2", 58, true))[0]).toBe("登記事項証明書（土地）：渋谷区神南1丁目 52-2。所有者・地目・地積・抵当権");
+    expect(touki(pick("52-2", 58, true)).some((w) => w.startsWith("隣地の地番"))).toBe(true);
+    // 地番で探した筆は、隣地が多くても物件の筆
+    expect(triageOf(loaded({ parcels: { status: "ok", parcel, kind: "chiban", neighbors: Array.from({ length: 58 }, (_, i) => `渋谷区神南1丁目 ${i + 1}`) } })).issues.some((i) => i.id === "off-lot")).toBe(false);
     // 町の中心（筆を探していない）
     const town = triageOf(loaded({ result: { ...base, approximate: true }, parcels: { status: "none", approximate: true } }));
     expect(town.issues.map((i) => i.id)).toContain("approximate");

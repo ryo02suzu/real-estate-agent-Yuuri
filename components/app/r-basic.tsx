@@ -16,7 +16,7 @@ import { chibanLabel, isLotChiban, kuikiLabelFrom, parcelMark, pickedChibanText,
 import { schoolGaps, schoolGapShort, schoolLabel } from "@/lib/roadmap/school";
 import { noCityPlanning } from "@/lib/roadmap/municipalities";
 import { noneLabel, YOUTO_COLORS, youtoShort, zoningArea } from "@/lib/roadmap/zoning";
-import { addressOffLot, pickKey, registryNeighbors } from "../parcel-card";
+import { pointOffLot, pickKey, registryNeighbors } from "../parcel-card";
 import { useCopy } from "../use-copy";
 import { G, GCard, GCell, GFaint, GHead, GPill, NUM, TILE, TILE_GOLD, TILE_WARN } from "./g-ui";
 import { CoinStack } from "./icons";
@@ -38,8 +38,8 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
   const y = z?.youto[0];
   // 番地まで見つからず町の中心を出しているときは、地点の筆・建物は物件と関係ないので出さない
   const townCenter = parcels.status === "none" && parcels.approximate;
-  // 住所の地点の筆が、隣地のとても多い筆（地番の付いた公道など）なら、その面積は物件の土地のものではないので出さない
-  const offLot = addressOffLot(parcels) === "large";
+  // 地点の筆（住所の地点・地図で選んだ地点）が、隣地のとても多い筆（地番の付いた公道など）なら、その面積は物件の土地のものではないので出さない
+  const offLot = pointOffLot(parcels) === "large";
   const area = parcel && isLotChiban(parcel.chibanRaw) && !offLot ? parcelAreaM2(parcel) : undefined;
   // 公図から推定した筆・市の地番参考図の筆は、形から測った面積が地積と大きく違うことがあるので、10㎡単位の目安にする
   const roughArea = !!parcel && !!(parcel.estimated || parcel.sanko);
@@ -61,7 +61,7 @@ export function BasicTab({ result, data, go, open, expand, mapApps, statuses, re
   const top = landPrice.status === "ok" ? refLandPoint(landPrice.hits, y?.name).top : undefined;
   // 筆の出どころ（地番で探した・地図で選んだ・住所の地点）
   const parcelSub = parcel
-    ? `${parcels.status === "ok" && parcels.kind === "chiban" ? "地番で探した筆" : parcels.status === "ok" && parcels.kind === "picked" ? "地図で選んだ地点の筆" : offLot ? "住所の地点の筆（道路などの可能性）" : "住所の地点の筆（参考）"}${result.parcelOthers ? `・同じ地番がほかに${result.parcelOthers}件` : ""}`
+    ? `${parcels.status === "ok" && parcels.kind === "chiban" ? "地番で探した筆" : offLot ? `${parcels.status === "ok" && parcels.kind === "picked" ? "選んだ地点" : "住所の地点"}の筆（道路などの可能性）` : parcels.status === "ok" && parcels.kind === "picked" ? "地図で選んだ地点の筆" : "住所の地点の筆（参考）"}${result.parcelOthers ? `・同じ地番がほかに${result.parcelOthers}件` : ""}`
     : undefined;
 
   return (
@@ -286,7 +286,7 @@ function NeighborsCard({ data, open, has3d, neighbors, setNeighbors, pick, motio
   const [focus, setFocus] = useState<string | null>(null);
   const info = data.parcels;
   // 住所の地点の筆が道路・水路や、隣地のとても多い筆（物件の土地ではなさそう）のときは出さない
-  if (info.status !== "ok" || !isLotChiban(info.parcel.chibanRaw) || addressOffLot(info) !== undefined) return null;
+  if (info.status !== "ok" || !isLotChiban(info.parcel.chibanRaw) || pointOffLot(info) !== undefined) return null;
   const plan = pick.plan;
   const sides = plan?.status === "ok" ? plan.sides : undefined;
   // 方角が分かれば北から時計回り（同じ方角は接する長さの長い順）
