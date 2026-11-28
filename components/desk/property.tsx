@@ -3,8 +3,8 @@
 // PC の「調査デスク」で、調べた物件の画面：データを読み（スマホと同じ components/app/use-property.ts）、右のカルテ（地番・面積・坪・
 // 辺の数・隣地・調査の進み具合・要注意／要確認／次にやること・項目ごとの中身・書類／比較／結果をコピー）を出し、真ん中に重ねて開く
 // 画面（要注意点と次にやること・書類・取引事例）と、3D（Google の実写か代わりの街の模型）を出す。物件ごとに作り直す（key）
-import { ChevronRight, Copy, Share2, Star } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { ChevronRight, Copy, Info, Share2, Star, TriangleAlert } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { parcelAreaM2, TSUBO_M2 } from "@/lib/app/area";
 import type { CompareItem } from "@/lib/app/compare";
@@ -49,7 +49,7 @@ import type { Frame } from "./google-3d";
 import { DealsBlock, SectionBody, sectionSummary, SECTIONS, type MapLayer, type SectionCtx, type SectionKey } from "./sections";
 import { Stage3D, type Engine, type StageControls } from "./stage-3d";
 import { TriageOverlay } from "./triage";
-import { BodyPortal, copyText, Overlay, Ring, type Toast } from "./ui";
+import { BodyPortal, copyText, Overlay, Ring, RingMini, type Toast } from "./ui";
 
 export type PropOverlay = "triage" | "docs" | "deals";
 /** 3D の層のボタン（Google の 3D：筆・地番と駅・学校。代わりの 3D：見せ方） */
@@ -334,118 +334,238 @@ export function DeskProperty(props: Props) {
     return () => onGsiPane(false);
   }, [gsiPane, onGsiPane]);
 
+  // カルテは上から下まで 1 つのスクロール（見出し・場所の注意・進み具合も一緒に流れる）。進み具合の行が上へ流れたら、
+  // 上に細い帯（項目への近道・場所の注意の数・進み具合）だけを残す。帯は進み具合の行の下の端に重ねて置いてあり（app/desk.css の
+  // .desk-pin）、出ても中身は動かない。キーボードの順番は「見出し → 進み具合 → 帯 → 項目」
+  const notes = placeNotes({ query, result, data, onPick: props.onPick, onPickPoint: props.onPickPoint, onFix: props.onFix, onLiteral: props.onLiteral });
+  const notesWarn = notes.some((n) => n.warn);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const statusRef = useRef<HTMLButtonElement>(null);
+  const pinRef = useRef<HTMLDivElement>(null);
+  const noteBtnRef = useRef<HTMLButtonElement>(null);
+  const [pinned, setPinned] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  useEffect(() => {
+    const root = scrollRef.current;
+    const status = statusRef.current;
+    if (!root || !status || typeof IntersectionObserver === "undefined") return;
+    // 進み具合の行が、帯の高さぶんを残して上へ出きったら帯を出す（下へ外れているときは出さない）
+    const io = new IntersectionObserver(
+      ([e]) => {
+        const on = !e.isIntersecting && e.boundingClientRect.bottom <= (e.rootBounds?.top ?? root.getBoundingClientRect().top + PIN_H) + 1;
+        setPinned(on);
+        if (!on) setNotesOpen(false);
+      },
+      { root, rootMargin: `-${PIN_H}px 0px 0px 0px` },
+    );
+    io.observe(status);
+    return () => io.disconnect();
+  }, []);
+  // 帯から開いた「場所の注意」は、外を押す・Esc・少しスクロールする、で閉じる
+  useEffect(() => {
+    if (!notesOpen) return;
+    const root = scrollRef.current;
+    const start = root?.scrollTop ?? 0;
+    const onScroll = () => {
+      if (root && Math.abs(root.scrollTop - start) > 32) setNotesOpen(false);
+    };
+    const onDown = (e: PointerEvent) => {
+      if (!pinRef.current?.contains(e.target as Node)) setNotesOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setNotesOpen(false);
+      noteBtnRef.current?.focus();
+    };
+    root?.addEventListener("scroll", onScroll, { passive: true });
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      root?.removeEventListener("scroll", onScroll);
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [notesOpen]);
+  const statusLabel = `調査の進み具合 ${doneN}/${data.triage.actions.length}。要注意${warns}件・要確認${checks}件・次にやること${left}件。押すと要注意点と次にやることを開く`;
+
   const karte = (
     <aside className="desk-karte glass is-new" aria-label="物件のカルテ">
-      <div className="head">
-        <div className="town">
-          <span title={result.matchedAddress}>
-            {m.name} {town}
-          </span>
-          {shownParcel && <span className="chip">{shownParcel.sanko ? "市の地番参考図" : shownParcel.estimated ? "公図から推定した位置" : "登記所備付地図データを加工"}</span>}
+      <div className="desk-scroll" ref={scrollRef}>
+        <div className="head">
+          <div className="town">
+            <span title={result.matchedAddress}>
+              {m.name} {town}
+            </span>
+            {shownParcel && <span className="chip">{shownParcel.sanko ? "市の地番参考図" : shownParcel.estimated ? "公図から推定した位置" : "登記所備付地図データを加工"}</span>}
+          </div>
+          {props.place && (
+            // 地図で選んだ場所を覚えた・覚えた場所で出した（この端末の中だけ）。見出しは選んだ地点の住所のまま（正確な住所のように見せない）
+            <p className="picked-note">
+              <span>
+                {props.place.kind === "saved"
+                  ? `「${props.place.q}」の場所として、この端末に覚えました。次からすぐこの場所を出します。`
+                  : `「${props.place.q}」は、前に地図で選んだ場所（${placeDate(props.place.at)}）で出しています。`}
+              </span>
+              <button type="button" className="link" onClick={() => props.onForgetPlace(props.place!)}>
+                {props.place.kind === "saved" ? "取り消す" : "住所で探し直す"}
+              </button>
+            </p>
+          )}
+          <div className="big-num">
+            {lotNumber ? (
+              <>
+                <span className="label">地番</span>
+                <h2 className="num" title={`${kuikiLabel(lotParcel!.kuiki)} ${chibanLabel(lotParcel!.chibanRaw)}`}>
+                  {lotNumber}
+                </h2>
+              </>
+            ) : (
+              <h2 className="addr">{`${where}${placeSuffix(result, query)}`}</h2>
+            )}
+            <span className="acts">
+              <button type="button" className="btn ghost icon" onClick={copyAddress} aria-label="住所と地番をコピー" title="住所と地番をコピー（地図の住所検索に貼る）">
+                <Copy size={17} />
+              </button>
+              <button type="button" className="btn ghost icon" aria-pressed={props.favorite} onClick={() => props.onFavorite(itemOf(query, result))} aria-label={props.favorite ? "お気に入りから外す" : "お気に入りに保存"} title={props.favorite ? "お気に入りから外す" : "お気に入りに保存"}>
+                <Star size={17} fill={props.favorite ? "currentColor" : "none"} />
+              </button>
+              <button type="button" className="btn ghost icon" onClick={copyResult} aria-label="結果をコピー" title="結果をコピー（メール・チャットに貼る）">
+                <Share2 size={17} />
+              </button>
+            </span>
+          </div>
+          <div className="facts">
+            {areaText && (
+              <span>
+                <b>{areaText}</b>㎡
+              </span>
+            )}
+            {tsuboText && (
+              <span>
+                <b>{tsuboText}</b>坪
+              </span>
+            )}
+            {corners && (
+              <span title="地図データの筆の形から数えた目安（はっきり曲がる角の数）">
+                辺の数 <b>{corners}</b>
+              </span>
+            )}
+            {neighbors !== undefined && (
+              <span>
+                隣地 <b>{neighbors}</b>筆
+              </span>
+            )}
+            {refLot && <span className="chip gold">住所の地点の筆 {refLot}（参考）</span>}
+            {data.parcels.status === "loading" && <span>筆を確認しています…</span>}
+          </div>
+          <PlaceNoteList notes={notes} />
         </div>
-        {props.place && (
-          // 地図で選んだ場所を覚えた・覚えた場所で出した（この端末の中だけ）。見出しは選んだ地点の住所のまま（正確な住所のように見せない）
-          <p className="picked-note">
-            <span>
-              {props.place.kind === "saved"
-                ? `「${props.place.q}」の場所として、この端末に覚えました。次からすぐこの場所を出します。`
-                : `「${props.place.q}」は、前に地図で選んだ場所（${placeDate(props.place.at)}）で出しています。`}
+        <button ref={statusRef} type="button" className="desk-status" onClick={() => setOverlay("triage")} aria-label={statusLabel}>
+          <Ring done={doneN} total={data.triage.actions.length} />
+          <span className="block min-w-0">
+            <span className="block text-[13px]">
+              調査の進み具合{" "}
+              <b className="num">
+                {doneN} / {data.triage.actions.length}
+              </b>
+              {data.triage.pending.length > 0 && <span className="hint ml-2">確認中：{data.triage.pending.slice(0, 2).join("・")}</span>}
             </span>
-            <button type="button" className="link" onClick={() => props.onForgetPlace(props.place!)}>
-              {props.place.kind === "saved" ? "取り消す" : "住所で探し直す"}
-            </button>
-          </p>
-        )}
-        <div className="big-num">
-          {lotNumber ? (
-            <>
-              <span className="label">地番</span>
-              <h2 className="num" title={`${kuikiLabel(lotParcel!.kuiki)} ${chibanLabel(lotParcel!.chibanRaw)}`}>
-                {lotNumber}
-              </h2>
-            </>
-          ) : (
-            <h2 className="addr">{`${where}${placeSuffix(result, query)}`}</h2>
-          )}
-          <span className="acts">
-            <button type="button" className="btn ghost icon" onClick={copyAddress} aria-label="住所と地番をコピー" title="住所と地番をコピー（地図の住所検索に貼る）">
-              <Copy size={17} />
-            </button>
-            <button type="button" className="btn ghost icon" aria-pressed={props.favorite} onClick={() => props.onFavorite(itemOf(query, result))} aria-label={props.favorite ? "お気に入りから外す" : "お気に入りに保存"} title={props.favorite ? "お気に入りから外す" : "お気に入りに保存"}>
-              <Star size={17} fill={props.favorite ? "currentColor" : "none"} />
-            </button>
-            <button type="button" className="btn ghost icon" onClick={copyResult} aria-label="結果をコピー" title="結果をコピー（メール・チャットに貼る）">
-              <Share2 size={17} />
-            </button>
+            <span className="chips">
+              <span className={`chip ${warns ? "warn" : "ok"}`}>要注意 {warns}</span>
+              <span className={`chip ${checks ? "gold" : "ok"}`}>要確認 {checks}</span>
+              <span className="chip info">次にやること {left}</span>
+            </span>
           </span>
-        </div>
-        <div className="facts">
-          {areaText && (
-            <span>
-              <b>{areaText}</b>㎡
-            </span>
-          )}
-          {tsuboText && (
-            <span>
-              <b>{tsuboText}</b>坪
-            </span>
-          )}
-          {corners && (
-            <span title="地図データの筆の形から数えた目安（はっきり曲がる角の数）">
-              辺の数 <b>{corners}</b>
-            </span>
-          )}
-          {neighbors !== undefined && (
-            <span>
-              隣地 <b>{neighbors}</b>筆
-            </span>
-          )}
-          {refLot && <span className="chip gold">住所の地点の筆 {refLot}（参考）</span>}
-          {data.parcels.status === "loading" && <span>筆を確認しています…</span>}
-        </div>
-        <PlaceNotes query={query} result={result} data={data} onPick={props.onPick} onPickPoint={props.onPickPoint} onFix={props.onFix} onLiteral={props.onLiteral} />
-      </div>
-      <button type="button" className="desk-status" onClick={() => setOverlay("triage")} aria-label={`調査の進み具合 ${doneN}/${data.triage.actions.length}。要注意${warns}件・要確認${checks}件・次にやること${left}件。押すと要注意点と次にやることを開く`}>
-        <Ring done={doneN} total={data.triage.actions.length} />
-        <span className="block min-w-0">
-          <span className="block text-[13px]">
-            調査の進み具合{" "}
-            <b className="num">
-              {doneN} / {data.triage.actions.length}
-            </b>
-            {data.triage.pending.length > 0 && <span className="hint ml-2">確認中：{data.triage.pending.slice(0, 2).join("・")}</span>}
-          </span>
-          <span className="chips">
-            <span className={`chip ${warns ? "warn" : "ok"}`}>要注意 {warns}</span>
-            <span className={`chip ${checks ? "gold" : "ok"}`}>要確認 {checks}</span>
-            <span className="chip info">次にやること {left}</span>
-          </span>
-        </span>
-      </button>
-      <div className="desk-sections" role="list">
-        {SECTIONS.map((s) => {
-          const open = section === s.key;
-          return (
-            <div key={s.key} id={`desk-sec-${s.key}`} className="desk-sec" data-open={open} role="listitem">
-              <h3>
-                <button type="button" aria-expanded={open} aria-controls={`desk-secbody-${s.key}`} onClick={() => setSection(open ? null : s.key)}>
-                  <span className="ico" aria-hidden>
-                    {s.ico}
-                  </span>
-                  <span className="name">{s.name}</span>
-                  <span className="sum">{sectionSummary(s.key, { result, data, statuses })}</span>
-                  <ChevronRight size={16} className="arrow" aria-hidden />
-                </button>
-              </h3>
-              {open && (
-                <div id={`desk-secbody-${s.key}`} className="inner">
-                  <SectionBody k={s.key} ctx={ctx} />
-                </div>
-              )}
+        </button>
+        <div className="desk-pin" ref={pinRef} data-on={pinned ? "1" : undefined}>
+          <div className="bar" inert={!pinned}>
+            <nav className="tabs" aria-label="カルテの項目へ移る">
+              {SECTIONS.map((s) => {
+                const cur = section === s.key;
+                return (
+                  <button
+                    key={s.key}
+                    type="button"
+                    className="tab"
+                    aria-current={cur ? "true" : undefined}
+                    aria-label={cur ? `${s.name}（開いている項目）の先頭へ` : `${s.name}を開く`}
+                    title={s.name}
+                    onClick={() => {
+                      setNotesOpen(false);
+                      ctx.go(s.key);
+                    }}
+                  >
+                    <span className="ico" aria-hidden>
+                      {s.ico}
+                    </span>
+                    {cur && <span className="name">{s.name}</span>}
+                  </button>
+                );
+              })}
+            </nav>
+            {notes.length > 0 && (
+              <button
+                ref={noteBtnRef}
+                type="button"
+                className={`chip ${notesWarn ? "warn" : "info"} note-chip`}
+                aria-expanded={notesOpen}
+                aria-controls="desk-pin-notes"
+                aria-label={`物件の場所についての${notesWarn ? "注意" : "補足"} ${notes.length}件。押すとここで読める`}
+                title={`物件の場所についての${notesWarn ? "注意" : "補足"}（押すとここで読める）`}
+                onClick={() => setNotesOpen((v) => !v)}
+              >
+                {notesWarn ? <TriangleAlert size={13} aria-hidden /> : <Info size={13} aria-hidden />}
+                <span className="word">{notesWarn ? "注意" : "補足"}</span>
+                <span className="num">{notes.length}</span>
+              </button>
+            )}
+            <button type="button" className="prog" onClick={() => setOverlay("triage")} aria-label={statusLabel} title="調査の進み具合（押すと要注意点と次にやることを開く）">
+              <RingMini done={doneN} total={data.triage.actions.length} />
+              <span className="num">
+                {doneN}/{data.triage.actions.length}
+              </span>
+            </button>
+          </div>
+          {pinned && notesOpen && (
+            <div
+              id="desk-pin-notes"
+              className="pin-notes"
+              role="region"
+              aria-label="物件の場所についての注意"
+              onClick={(e) => {
+                // 中のボタン（場所を直す・別の候補で探す など）を押したら閉じる
+                if ((e.target as HTMLElement).closest("button")) setNotesOpen(false);
+              }}
+            >
+              <PlaceNoteList notes={notes} />
             </div>
-          );
-        })}
-        <p className="desk-small px-1">表示される情報は参考です。建てられるか・接道を満たすかなどの判断はしません。重要事項説明などの最終確認は、必ず役所の窓口で行ってください。</p>
+          )}
+        </div>
+        <div className="desk-sections" role="list">
+          {SECTIONS.map((s) => {
+            const open = section === s.key;
+            return (
+              <div key={s.key} id={`desk-sec-${s.key}`} className="desk-sec" data-open={open} role="listitem">
+                <h3>
+                  <button type="button" aria-expanded={open} aria-controls={`desk-secbody-${s.key}`} onClick={() => setSection(open ? null : s.key)}>
+                    <span className="ico" aria-hidden>
+                      {s.ico}
+                    </span>
+                    <span className="name">{s.name}</span>
+                    <span className="sum">{sectionSummary(s.key, { result, data, statuses })}</span>
+                    <ChevronRight size={16} className="arrow" aria-hidden />
+                  </button>
+                </h3>
+                {open && (
+                  <div id={`desk-secbody-${s.key}`} className="inner">
+                    <SectionBody k={s.key} ctx={ctx} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <p className="desk-small px-1">表示される情報は参考です。建てられるか・接道を満たすかなどの判断はしません。重要事項説明などの最終確認は、必ず役所の窓口で行ってください。</p>
+        </div>
       </div>
       <div className="foot">
         <button type="button" className="btn primary" onClick={() => ctx.openDocs(docKind)}>
@@ -559,10 +679,15 @@ export function DeskProperty(props: Props) {
   );
 }
 
-/** 物件の場所の確かさで注意がいるとき（スマホの物件の画面の PlaceNote と同じ場合分け） */
-function PlaceNotes({ query, result, data, onPick, onPickPoint, onFix, onLiteral }: { query: string; result: Ok; data: ReturnType<typeof useProperty>; onPick: (a: string) => void; onPickPoint?: (lat: number, lng: number) => void; onFix: () => void; onLiteral?: (fix: AddressFix) => void }) {
+/** カルテをスクロールしたときに上に残す細い帯の高さ（app/desk.css の --pin-h と同じ） */
+const PIN_H = 46;
+
+type PlaceNote = { warn?: boolean; body: ReactNode };
+
+/** 物件の場所の確かさで注意がいるとき（スマホの物件の画面の PlaceNote と同じ場合分け）。見出しの下と、スクロール中の細い帯から開く所の 2 か所に出す */
+function placeNotes({ query, result, data, onPick, onPickPoint, onFix, onLiteral }: { query: string; result: Ok; data: ReturnType<typeof useProperty>; onPick: (a: string) => void; onPickPoint?: (lat: number, lng: number) => void; onFix: () => void; onLiteral?: (fix: AddressFix) => void }): PlaceNote[] {
   const { approximate, picked, parcel, parcelMiss } = result;
-  const notes: { warn?: boolean; body: ReactNode }[] = [];
+  const notes: PlaceNote[] = [];
   const mini = (label: string, run: () => void) => (
     <button key={label} type="button" className="mini" onClick={run}>
       {label}
@@ -644,6 +769,10 @@ function PlaceNotes({ query, result, data, onPick, onPickPoint, onFix, onLiteral
       ),
     });
   if (sp?.overlaps?.length) notes.push({ warn: true, body: "要確認：地図データで筆が重なる所です。「筆・隣地」で候補の地番と確かめ方を見てください。" });
+  return notes;
+}
+
+function PlaceNoteList({ notes }: { notes: PlaceNote[] }) {
   if (!notes.length) return null;
   return (
     <div className="mt-2 flex flex-col gap-1.5">

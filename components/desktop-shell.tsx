@@ -404,7 +404,7 @@ export function DesktopShell({
                       setWide(false);
                       setRecenter((n) => n + 1);
                       controlsRef.current?.recenter();
-                      document.querySelector(".desk-sections")?.scrollTo({ top: 0, behavior: motionOn ? "smooth" : "auto" });
+                      document.querySelector(".desk-scroll")?.scrollTo({ top: 0, behavior: motionOn ? "smooth" : "auto" });
                     },
                   },
                 ]

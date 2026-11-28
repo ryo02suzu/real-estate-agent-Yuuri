@@ -1364,10 +1364,209 @@
 
 /* ---- 右のカルテ */
 .desk-karte {
+  --pin-h: 46px;
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+}
+/*
+ * カルテの中身は、上から下まで 1 つのスクロール（見出し・場所の注意・進み具合・項目の一覧）。下の 3 つのボタンだけ動かない。
+ * 前は見出し・場所の注意・進み具合が上に固定で、項目の一覧だけがスクロールしたので、画面の低い端末（iPad の横向きなど）では
+ * 見える詳細が少なかった。スクロールしていない間の見た目は前と同じ
+ */
+.desk-scroll {
+  flex: 1;
+  min-height: 0;
+  /* 横も auto（前の項目の一覧と同じ。幅からはみ出す中身があっても、切らずに横へ動かせる） */
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+/*
+ * 項目へ移るとき（scrollIntoView）や、Tab キーで中のボタン・リンクへ移るときは、上の細い帯の下に来るようにする。
+ * 枠のほうに scroll-padding を付けると、帯の中のボタンへ移ったときにも枠が動いてしまうので、行き先のほうに余白を持たせる
+ */
+.desk-sec,
+.desk-sections :is(a[href], button, input, select, textarea, summary, [tabindex]) {
+  scroll-margin-top: calc(var(--pin-h) + 8px);
+}
+/*
+ * スクロール中に上に残す細い帯（項目への近道・場所の注意の数・進み具合）。進み具合の行が上へ流れたら出す（components/desk/property.tsx）。
+ * 帯の入れ物は、進み具合の行の下の端に同じ高さぶん重ねて置く（上の余白をマイナスにするので、下の中身の位置は変わらない）。
+ * 進み具合の行が帯の高さを残して上へ出ると、入れ物がスクロールの枠の上の端に貼り付き、そこで帯を見せる。
+ * 見せていない間は押せないようにして、下にある進み具合の行をそのまま押せるようにする
+ */
+.desk-pin {
+  position: sticky;
+  top: 0;
+  height: var(--pin-h);
+  margin-top: calc(-1 * var(--pin-h));
+  z-index: 6;
+  pointer-events: none;
+}
+.desk-pin .bar {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 8px;
+  background: var(--panel-solid);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 10px 18px -14px rgba(40, 30, 10, 0.55);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px);
+  pointer-events: none;
+}
+.desk-pin[data-on="1"] .bar {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  pointer-events: auto;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .desk:not([data-motion="off"]) .desk-pin .bar {
+    transition:
+      opacity 0.16s ease,
+      transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+      visibility 0s linear 0.16s;
+  }
+  .desk:not([data-motion="off"]) .desk-pin[data-on="1"] .bar {
+    transition:
+      opacity 0.16s ease,
+      transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+      visibility 0s;
+  }
+}
+.desk-pin .tabs {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.desk-pin .tab {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 28px;
+  max-width: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+/* 指で押しやすいように、押せる範囲は帯の高さいっぱいまで広げる（見た目は変えない） */
+.desk-pin .tab::after,
+.desk-pin .prog::after,
+.desk .desk-pin .note-chip::after {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
+.desk-pin .tab .ico {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--gold-soft);
+  color: var(--gold-3);
+  font-size: 12.5px;
+  font-weight: 700;
+  transition: background 0.15s;
+}
+.desk-pin .tab:hover .ico {
+  background: color-mix(in srgb, var(--gold) 30%, transparent);
+}
+.desk-pin .tab .name {
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* いま開いている項目は、名前も出す */
+.desk-pin .tab[aria-current="true"] {
+  flex: none;
+  max-width: none;
+  padding: 0 10px 0 4px;
+  margin: 0 3px;
+  background: var(--gold-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 60%, transparent);
+}
+.desk-pin .tab[aria-current="true"]:first-child {
+  margin-left: 0;
+}
+.desk-pin .tab[aria-current="true"] .ico {
+  background: transparent;
+}
+.desk .desk-pin .note-chip {
+  position: relative;
+  flex: none;
+  height: 26px;
+  padding: 0 9px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.desk .desk-pin .note-chip[aria-expanded="true"] {
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 28%, transparent);
+}
+.desk-pin .prog {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.desk-pin .prog:hover {
+  background: var(--gold-soft);
+}
+/* カルテが細いとき（横幅 1199px 以下）は、注意の札は印と数だけ */
+@media (max-width: 1199px) {
+  .desk-pin .note-chip .word {
+    display: none;
+  }
+}
+/* 帯の「注意」を押すと、その場で場所の注意を読める（スクロールの位置はそのまま） */
+.desk-pin .pin-notes {
+  pointer-events: auto;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 10px;
+  right: 10px;
+  max-height: min(46vh, 340px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 2px 10px 10px;
+  background: var(--panel-solid);
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .desk:not([data-motion="off"]) .desk-pin .pin-notes {
+    animation: desk-pin-notes-in 0.16s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+}
+@keyframes desk-pin-notes-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 @media (prefers-reduced-motion: no-preference) {
   .desk:not([data-motion="off"]) .desk-karte.is-new {
@@ -1536,6 +1735,16 @@
   font-size: 13px;
   fill: var(--ink);
 }
+.desk-ring.mini {
+  width: 22px;
+  height: 22px;
+}
+.desk-ring.mini circle {
+  stroke-width: 3;
+}
+.desk-ring.mini .bg {
+  stroke: var(--line-strong);
+}
 .desk-status .chips {
   display: flex;
   gap: 6px;
@@ -1543,14 +1752,10 @@
   margin-top: 4px;
 }
 .desk-sections {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
   padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  scroll-padding-top: 10px;
 }
 .desk-sec {
   flex: none;

@@ -76,6 +76,19 @@ export function Ring({ done, total }: { done: number; total: number }) {
   );
 }
 
+/** 進み具合の小さな輪（文字なし）。カルテをスクロールしたときに上に残す細い帯で使う */
+export function RingMini({ done, total }: { done: number; total: number }) {
+  const r = 8;
+  const c = 2 * Math.PI * r;
+  const f = total ? Math.min(1, done / total) : 0;
+  return (
+    <svg className="desk-ring mini" viewBox="0 0 22 22" aria-hidden>
+      <circle className="bg" cx="11" cy="11" r={r} />
+      <circle className="fg" cx="11" cy="11" r={r} strokeDasharray={c.toFixed(1)} strokeDashoffset={(c * (1 - f)).toFixed(1)} />
+    </svg>
+  );
+}
+
 export type Toast = { text: string; action?: { label: string; run: () => void } };
 
 /** ひとこと（コピーした・比較に加えた・代わりの 3D にした など）。数秒で消える。読み上げにも伝える */
